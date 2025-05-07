@@ -1,3 +1,4 @@
+use infer::enclosing_class_symbol;
 use itertools::Either;
 
 use std::slice::Iter;
@@ -4678,6 +4679,7 @@ impl<'db> Type<'db> {
     pub fn in_type_expression(
         &self,
         db: &'db dyn Db,
+        scope_id: ScopeId,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
             // Special cases for `float` and `complex`
@@ -4762,7 +4764,40 @@ impl<'db> Type<'db> {
                 // TODO: Use an opt-in rule for a bare `Callable`
                 KnownInstanceType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
 
-                KnownInstanceType::TypingSelf => Ok(todo_type!("Support for `typing.Self`")),
+                KnownInstanceType::TypingSelf => {
+                    let index = semantic_index(db, scope_id.file(db));
+                    let Some(class_ty) = enclosing_class_symbol(db, index, scope_id) else {
+                        return Err(InvalidTypeExpressionError {
+                            fallback_type: Type::unknown(),
+                            invalid_expressions: smallvec::smallvec![
+                                InvalidTypeExpression::InvalidType(*self)
+                            ],
+                        });
+                    };
+                    let Some(TypeDefinition::Class(class_def)) = class_ty.definition(db) else {
+                        debug_assert!(
+                            false,
+                            "enclosing_class_symbol must return a type with class definition"
+                        );
+                        return Ok(Type::unknown());
+                    };
+                    let Some(instance) = class_ty.to_instance(db) else {
+                        debug_assert!(
+                            false,
+                            "enclosing_class_symbol must return type that can be instantiated"
+                        );
+                        return Ok(Type::unknown());
+                    };
+                    Ok(Type::TypeVar(TypeVarInstance::new(
+                        db,
+                        ast::name::Name::new("Self"),
+                        class_def,
+                        Some(TypeVarBoundOrConstraints::UpperBound(instance)),
+                        TypeVarVariance::Invariant,
+                        None,
+                        TypeVarKind::Legacy,
+                    )))
+                }
                 KnownInstanceType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
                 KnownInstanceType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
 
@@ -4829,7 +4864,7 @@ impl<'db> Type<'db> {
                 let mut builder = UnionBuilder::new(db);
                 let mut invalid_expressions = smallvec::SmallVec::default();
                 for element in union.elements(db) {
-                    match element.in_type_expression(db) {
+                    match element.in_type_expression(db, scope_id) {
                         Ok(type_expr) => builder = builder.add(type_expr),
                         Err(InvalidTypeExpressionError {
                             fallback_type,

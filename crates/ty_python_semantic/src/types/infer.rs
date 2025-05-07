@@ -316,6 +316,31 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     unpacker.finish()
 }
 
+/// Returns the type of the nearest enclosing class for the given scope.
+///
+/// This function walks up the ancestor scopes starting from the given scope,
+/// and finds the closest class definition.
+///
+/// Returns `None` if no enclosing class is found.a
+pub(crate) fn enclosing_class_symbol<'db>(
+    db: &'db dyn Db,
+    semantic: &SemanticIndex<'db>,
+    scope: ScopeId,
+) -> Option<Type<'db>> {
+    semantic
+        .ancestor_scopes(scope.file_scope_id(db))
+        .find_map(|(_, ancestor_scope)| {
+            if let NodeWithScopeKind::Class(class) = ancestor_scope.node() {
+                let definition = semantic.expect_single_definition(class.node());
+                let result = infer_definition_types(db, definition);
+
+                Some(result.declaration_type(definition).inner_type())
+            } else {
+                None
+            }
+        })
+}
+
 /// A region within which we can infer types.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum InferenceRegion<'db> {
@@ -4582,27 +4607,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         Some(infer_definition_types(self.db(), definition).binding_type(definition))
     }
 
-    /// Returns the type of the nearest enclosing class for the given scope.
-    ///
-    /// This function walks up the ancestor scopes starting from the given scope,
-    /// and finds the closest class definition.
-    ///
-    /// Returns `None` if no enclosing class is found.a
-    fn enclosing_class_symbol(&self, scope: ScopeId) -> Option<Type<'db>> {
-        self.index
-            .ancestor_scopes(scope.file_scope_id(self.db()))
-            .find_map(|(_, ancestor_scope)| {
-                if let NodeWithScopeKind::Class(class) = ancestor_scope.node() {
-                    let definition = self.index.expect_single_definition(class.node());
-                    let result = infer_definition_types(self.db(), definition);
-
-                    Some(result.declaration_type(definition).inner_type())
-                } else {
-                    None
-                }
-            })
-    }
-
     fn infer_call_expression(
         &mut self,
         call_expression_node: &ast::Expr,
@@ -4911,9 +4915,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             [] => {
                                                 let scope = self.scope();
 
-                                                let Some(enclosing_class) =
-                                                    self.enclosing_class_symbol(scope)
-                                                else {
+                                                let Some(enclosing_class) = enclosing_class_symbol(
+                                                    self.db(),
+                                                    self.index,
+                                                    scope,
+                                                ) else {
                                                     overload.set_return_type(Type::unknown());
                                                     BoundSuperError::UnavailableImplicitArguments
                                                         .report_diagnostic(
@@ -7311,7 +7317,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::FINAL)
                         }
                         _ => name_expr_ty
-                            .in_type_expression(self.db())
+                            .in_type_expression(self.db(), self.scope())
                             .unwrap_or_else(|error| {
                                 error.into_fallback_type(
                                     &self.context,
@@ -7491,7 +7497,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => self
                     .infer_name_expression(name)
-                    .in_type_expression(self.db())
+                    .in_type_expression(self.db(), self.scope())
                     .unwrap_or_else(|error| {
                         error.into_fallback_type(
                             &self.context,
@@ -7508,7 +7514,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
                 ast::ExprContext::Load => self
                     .infer_attribute_expression(attribute_expression)
-                    .in_type_expression(self.db())
+                    .in_type_expression(self.db(), self.scope())
                     .unwrap_or_else(|error| {
                         error.into_fallback_type(
                             &self.context,
@@ -8010,7 +8016,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             generic_context,
                         );
                         specialized_class
-                            .in_type_expression(self.db())
+                            .in_type_expression(self.db(), self.scope())
                             .unwrap_or(Type::unknown())
                     }
                     None => {

@@ -87,9 +87,11 @@ pub enum KnownInstanceType<'db> {
     /// (which can also be found as `typing_extensions.Callable` or as `collections.abc.Callable`)
     Callable,
 
+    /// The symbol `typing.Self`
+    TypingSelf,
+
     // Various special forms, special aliases and type qualifiers that we don't yet understand
     // (all currently inferred as TODO in most contexts):
-    TypingSelf,
     Final,
     ClassVar,
     Concatenate,
