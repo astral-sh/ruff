@@ -288,19 +288,34 @@ reveal_type(Z.__mro__)  # revealed: tuple[<class 'Z'>, Unknown, <class 'object'>
 
 ## `__bases__` lists with duplicate bases
 
+<!-- snapshot-diagnostics -->
+
 ```py
-class Foo(str, str): ...  # error: 16 [duplicate-base] "Duplicate base class `str`"
+from typing_extensions import reveal_type
+
+class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
 
 reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
 
 class Spam: ...
 class Eggs: ...
+class Bar: ...
+class Baz: ...
+
+# fmt: off
+
+# error: [duplicate-base] "Duplicate base class `Spam`"
+# error: [duplicate-base] "Duplicate base class `Eggs`"
 class Ham(
     Spam,
     Eggs,
-    Spam,  # error: [duplicate-base] "Duplicate base class `Spam`"
-    Eggs,  # error: [duplicate-base] "Duplicate base class `Eggs`"
+    Bar,
+    Baz,
+    Spam,
+    Eggs,
 ): ...
+
+# fmt: on
 
 reveal_type(Ham.__mro__)  # revealed: tuple[<class 'Ham'>, Unknown, <class 'object'>]
 
@@ -308,6 +323,70 @@ class Mushrooms: ...
 class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
 
 reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
+
+# fmt: off
+
+# error: [duplicate-base] "Duplicate base class `Eggs`"
+class VeryEggyOmelette(
+    Eggs,
+    Ham,
+    Spam,
+    Eggs,
+    Mushrooms,
+    Bar,
+    Eggs,
+    Baz,
+    Eggs,
+): ...
+
+# fmt: off
+```
+
+A `type: ignore` comment can suppress `duplicate-bases` errors if it is on the first or last line of
+the class "header":
+
+```py
+# fmt: off
+
+class A: ...
+
+class B(  # type: ignore[duplicate-base]
+    A,
+    A,
+): ...
+
+class C(
+    A,
+    A
+):  # type: ignore[duplicate-base]
+    x: int
+
+# fmt: on
+```
+
+But it will not suppress the error if it occurs in the class body, or on the duplicate base itself.
+The justification for this is that it is the class definition as a whole that will raise an
+exception at runtime, not a sub-expression in the class's bases list.
+
+```py
+# fmt: off
+
+# error: [duplicate-base]
+class D(
+    A,
+    # error: [unused-ignore-comment]
+    A,  # type: ignore[duplicate-base]
+): ...
+
+# error: [duplicate-base]
+class E(
+    A,
+    A
+):
+    # error: [unused-ignore-comment]
+    x: int  # type: ignore[duplicate-base]
+
+# fmt: on
 ```
 
 ## `__bases__` lists with duplicate `Unknown` bases

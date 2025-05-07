@@ -1,4 +1,4 @@
-//! A stateful LSP implementation that calls into the Ruff API.
+//! A stateful LSP implementation that calls into the ty API.
 
 use crate::server::client::{Notifier, Requester};
 use crate::session::{DocumentSnapshot, Session};

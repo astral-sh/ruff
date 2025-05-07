@@ -1,5 +1,6 @@
 use ruff_db::files::File;
 
+use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
@@ -285,11 +286,23 @@ pub(crate) fn global_symbol<'db>(
 }
 
 /// Infers the public type of an imported symbol.
+///
+/// If `requires_explicit_reexport` is [`None`], it will be inferred from the file's source type.
+/// For stub files, explicit re-export will be required, while for non-stub files, it will not.
 pub(crate) fn imported_symbol<'db>(
     db: &'db dyn Db,
     file: File,
     name: &str,
+    requires_explicit_reexport: Option<RequiresExplicitReExport>,
 ) -> SymbolAndQualifiers<'db> {
+    let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
+        if file.is_stub(db.upcast()) {
+            RequiresExplicitReExport::Yes
+        } else {
+            RequiresExplicitReExport::No
+        }
+    });
+
     // If it's not found in the global scope, check if it's present as an instance on
     // `types.ModuleType` or `builtins.object`.
     //
@@ -305,13 +318,16 @@ pub(crate) fn imported_symbol<'db>(
     // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
     // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
     // module we're dealing with.
-    external_symbol_impl(db, file, name).or_fall_back_to(db, || {
-        if name == "__getattr__" {
-            Symbol::Unbound.into()
-        } else {
-            KnownClass::ModuleType.to_instance(db).member(db, name)
-        }
-    })
+    symbol_impl(db, global_scope(db, file), name, requires_explicit_reexport).or_fall_back_to(
+        db,
+        || {
+            if name == "__getattr__" {
+                Symbol::Unbound.into()
+            } else {
+                KnownClass::ModuleType.to_instance(db).member(db, name)
+            }
+        },
+    )
 }
 
 /// Lookup the type of `symbol` in the builtins namespace.
@@ -324,7 +340,13 @@ pub(crate) fn imported_symbol<'db>(
 pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> SymbolAndQualifiers<'db> {
     resolve_module(db, &KnownModule::Builtins.name())
         .map(|module| {
-            external_symbol_impl(db, module.file(), symbol).or_fall_back_to(db, || {
+            symbol_impl(
+                db,
+                global_scope(db, module.file()),
+                symbol,
+                RequiresExplicitReExport::Yes,
+            )
+            .or_fall_back_to(db, || {
                 // We're looking up in the builtins namespace and not the module, so we should
                 // do the normal lookup in `types.ModuleType` and not the special one as in
                 // `imported_symbol`.
@@ -343,7 +365,7 @@ pub(crate) fn known_module_symbol<'db>(
     symbol: &str,
 ) -> SymbolAndQualifiers<'db> {
     resolve_module(db, &known_module.name())
-        .map(|module| imported_symbol(db, module.file(), symbol))
+        .map(|module| imported_symbol(db, module.file(), symbol, None))
         .unwrap_or_default()
 }
 
@@ -702,7 +724,7 @@ fn symbol_from_bindings_impl<'db>(
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
     let is_non_exported = |binding: Definition<'db>| {
-        requires_explicit_reexport.is_yes() && !binding.is_reexported(db)
+        requires_explicit_reexport.is_yes() && !is_reexported(db, binding)
     };
 
     let unbound_visibility_constraint = match bindings_with_constraints.peek() {
@@ -833,7 +855,7 @@ fn symbol_from_declarations_impl<'db>(
     let mut declarations = declarations.peekable();
 
     let is_non_exported = |declaration: Definition<'db>| {
-        requires_explicit_reexport.is_yes() && !declaration.is_reexported(db)
+        requires_explicit_reexport.is_yes() && !is_reexported(db, declaration)
     };
 
     let undeclared_visibility = match declarations.peek() {
@@ -909,6 +931,27 @@ fn symbol_from_declarations_impl<'db>(
     } else {
         Ok(Symbol::Unbound.into())
     }
+}
+
+// Returns `true` if the `definition` is re-exported.
+//
+// This will first check if the definition is using the "redundant alias" pattern like `import foo
+// as foo` or `from foo import bar as bar`. If it's not, it will check whether the symbol is being
+// exported via `__all__`.
+fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
+    // This information is computed by the semantic index builder.
+    if definition.is_reexported(db) {
+        return true;
+    }
+    // At this point, the definition should either be an `import` or `from ... import` statement.
+    // This is because the default value of `is_reexported` is `true` for any other kind of
+    // definition.
+    let Some(all_names) = dunder_all_names(db, definition.file(db)) else {
+        return false;
+    };
+    let table = symbol_table(db, definition.scope(db));
+    let symbol_name = table.symbol(definition.symbol(db)).name();
+    all_names.contains(symbol_name)
 }
 
 mod implicit_globals {
@@ -1015,26 +1058,8 @@ mod implicit_globals {
     }
 }
 
-/// Implementation of looking up a module-global symbol as seen from outside the file (e.g. via
-/// imports).
-///
-/// This will take into account whether the definition of the symbol is being explicitly
-/// re-exported from a stub file or not.
-fn external_symbol_impl<'db>(db: &'db dyn Db, file: File, name: &str) -> SymbolAndQualifiers<'db> {
-    symbol_impl(
-        db,
-        global_scope(db, file),
-        name,
-        if file.is_stub(db.upcast()) {
-            RequiresExplicitReExport::Yes
-        } else {
-            RequiresExplicitReExport::No
-        },
-    )
-}
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-enum RequiresExplicitReExport {
+pub(crate) enum RequiresExplicitReExport {
     Yes,
     No,
 }

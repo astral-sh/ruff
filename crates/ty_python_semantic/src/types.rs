@@ -997,12 +997,24 @@ impl<'db> Type<'db> {
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance)) if instance.class().is_object(db) => true,
 
-            // A fully static typevar is always a subtype of itself, and is never a subtype of any
-            // other typevar, since there is no guarantee that they will be specialized to the same
-            // type. (This is true even if both typevars are bounded by the same final class, since
-            // you can specialize the typevars to `Never` in addition to that final class.)
-            (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar)) => {
-                self_typevar == other_typevar
+            // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
+            // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
+            //    TypeVars without an explicit upper bound are treated as having an implicit upper bound of `object`.
+            // 2. `T` is a constrained TypeVar and all of `T`'s constraints are subtypes of `S`.
+            //
+            // However, there is one exception to this general rule: for any given typevar `T`,
+            // `T` will always be a subtype of any union containing `T`.
+            // A similar rule applies in reverse to intersection types.
+            (Type::TypeVar(_), Type::Union(union)) if union.elements(db).contains(&self) => true,
+            (Type::Intersection(intersection), Type::TypeVar(_))
+                if intersection.positive(db).contains(&target) =>
+            {
+                true
+            }
+            (Type::Intersection(intersection), Type::TypeVar(_))
+                if intersection.negative(db).contains(&target) =>
+            {
+                false
             }
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
@@ -1021,16 +1033,6 @@ impl<'db> Type<'db> {
                 }
             }
 
-            (Type::Union(union), _) => union
-                .elements(db)
-                .iter()
-                .all(|&elem_ty| elem_ty.is_subtype_of(db, target)),
-
-            (_, Type::Union(union)) => union
-                .elements(db)
-                .iter()
-                .any(|&elem_ty| self.is_subtype_of(db, elem_ty)),
-
             // If the typevar is constrained, there must be multiple constraints, and the typevar
             // might be specialized to any one of them. However, the constraints do not have to be
             // disjoint, which means an lhs type might be a subtype of all of the constraints.
@@ -1043,6 +1045,16 @@ impl<'db> Type<'db> {
             {
                 true
             }
+
+            (Type::Union(union), _) => union
+                .elements(db)
+                .iter()
+                .all(|&elem_ty| elem_ty.is_subtype_of(db, target)),
+
+            (_, Type::Union(union)) => union
+                .elements(db)
+                .iter()
+                .any(|&elem_ty| self.is_subtype_of(db, elem_ty)),
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
@@ -1309,12 +1321,24 @@ impl<'db> Type<'db> {
             // TODO this special case might be removable once the below cases are comprehensive
             (_, Type::NominalInstance(instance)) if instance.class().is_object(db) => true,
 
-            // A typevar is always assignable to itself, and is never assignable to any other
-            // typevar, since there is no guarantee that they will be specialized to the same
-            // type. (This is true even if both typevars are bounded by the same final class, since
-            // you can specialize the typevars to `Never` in addition to that final class.)
-            (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar)) => {
-                self_typevar == other_typevar
+            // In general, a TypeVar `T` is not assignable to a type `S` unless one of the two conditions is satisfied:
+            // 1. `T` is a bound TypeVar and `T`'s upper bound is assignable to `S`.
+            //    TypeVars without an explicit upper bound are treated as having an implicit upper bound of `object`.
+            // 2. `T` is a constrained TypeVar and all of `T`'s constraints are assignable to `S`.
+            //
+            // However, there is one exception to this general rule: for any given typevar `T`,
+            // `T` will always be assignable to any union containing `T`.
+            // A similar rule applies in reverse to intersection types.
+            (Type::TypeVar(_), Type::Union(union)) if union.elements(db).contains(&self) => true,
+            (Type::Intersection(intersection), Type::TypeVar(_))
+                if intersection.positive(db).contains(&target) =>
+            {
+                true
+            }
+            (Type::Intersection(intersection), Type::TypeVar(_))
+                if intersection.negative(db).contains(&target) =>
+            {
+                false
             }
 
             // A typevar is assignable to its upper bound, and to something similar to the union of
@@ -1333,18 +1357,6 @@ impl<'db> Type<'db> {
                 }
             }
 
-            // A union is assignable to a type T iff every element of the union is assignable to T.
-            (Type::Union(union), ty) => union
-                .elements(db)
-                .iter()
-                .all(|&elem_ty| elem_ty.is_assignable_to(db, ty)),
-
-            // A type T is assignable to a union iff T is assignable to any element of the union.
-            (ty, Type::Union(union)) => union
-                .elements(db)
-                .iter()
-                .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
-
             // If the typevar is constrained, there must be multiple constraints, and the typevar
             // might be specialized to any one of them. However, the constraints do not have to be
             // disjoint, which means an lhs type might be assignable to all of the constraints.
@@ -1357,6 +1369,18 @@ impl<'db> Type<'db> {
             {
                 true
             }
+
+            // A union is assignable to a type T iff every element of the union is assignable to T.
+            (Type::Union(union), ty) => union
+                .elements(db)
+                .iter()
+                .all(|&elem_ty| elem_ty.is_assignable_to(db, ty)),
+
+            // A type T is assignable to a union iff T is assignable to any element of the union.
+            (ty, Type::Union(union)) => union
+                .elements(db)
+                .iter()
+                .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is assignable to (A & B) because the left is assignable to both A and B,
@@ -1576,8 +1600,6 @@ impl<'db> Type<'db> {
                 }
             }
 
-            (Type::TypeVar(first), Type::TypeVar(second)) => first == second,
-
             (Type::NominalInstance(first), Type::NominalInstance(second)) => {
                 first.is_gradual_equivalent_to(db, second)
             }
@@ -1623,6 +1645,13 @@ impl<'db> Type<'db> {
                 if self_typevar == other_typevar =>
             {
                 false
+            }
+
+            (tvar @ Type::TypeVar(_), Type::Intersection(intersection))
+            | (Type::Intersection(intersection), tvar @ Type::TypeVar(_))
+                if intersection.negative(db).contains(&tvar) =>
+            {
+                true
             }
 
             // An unbounded typevar is never disjoint from any other type, since it might be
@@ -6974,6 +7003,8 @@ pub enum KnownFunction {
     IsSingleValued,
     /// `ty_extensions.generic_context`
     GenericContext,
+    /// `ty_extensions.dunder_all_names`
+    DunderAllNames,
 }
 
 impl KnownFunction {
@@ -7030,6 +7061,7 @@ impl KnownFunction {
             | Self::IsSingleton
             | Self::IsSubtypeOf
             | Self::GenericContext
+            | Self::DunderAllNames
             | Self::StaticAssert => module.is_ty_extensions(),
         }
     }
@@ -7337,7 +7369,7 @@ impl<'db> ModuleLiteralType<'db> {
             }
         }
 
-        imported_symbol(db, self.module(db).file(), name).symbol
+        imported_symbol(db, self.module(db).file(), name, None).symbol
     }
 }
 
@@ -8426,6 +8458,7 @@ pub(crate) mod tests {
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf
                 | KnownFunction::GenericContext
+                | KnownFunction::DunderAllNames
                 | KnownFunction::StaticAssert
                 | KnownFunction::IsFullyStatic
                 | KnownFunction::IsDisjointFrom

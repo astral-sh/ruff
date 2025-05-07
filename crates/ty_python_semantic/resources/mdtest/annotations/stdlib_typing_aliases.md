@@ -102,8 +102,8 @@ reveal_type(SetSubclass.__mro__)
 
 class FrozenSetSubclass(typing.FrozenSet): ...
 
-# TODO: should have `Generic`, should not have `Unknown`
-# revealed: tuple[<class 'FrozenSetSubclass'>, <class 'frozenset'>, Unknown, <class 'object'>]
+# TODO: generic protocols
+# revealed: tuple[<class 'FrozenSetSubclass'>, <class 'frozenset'>, <class 'AbstractSet'>, <class 'Collection'>, <class 'Iterable'>, <class 'Container'>, @Todo(`Protocol[]` subscript), typing.Generic, <class 'object'>]
 reveal_type(FrozenSetSubclass.__mro__)
 
 ####################

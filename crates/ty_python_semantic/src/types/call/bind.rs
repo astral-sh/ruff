@@ -10,6 +10,7 @@ use super::{
     InferContext, Signature, Signatures, Type,
 };
 use crate::db::Db;
+use crate::dunder_all::dunder_all_names;
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
@@ -580,6 +581,30 @@ impl<'db> Bindings<'db> {
                                         None => Type::none(db),
                                     },
 
+                                    _ => Type::none(db),
+                                });
+                            }
+                        }
+
+                        Some(KnownFunction::DunderAllNames) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                overload.set_return_type(match ty {
+                                    Type::ModuleLiteral(module_literal) => {
+                                        match dunder_all_names(db, module_literal.module(db).file())
+                                        {
+                                            Some(names) => {
+                                                let mut names = names.iter().collect::<Vec<_>>();
+                                                names.sort();
+                                                TupleType::from_elements(
+                                                    db,
+                                                    names.iter().map(|name| {
+                                                        Type::string_literal(db, name.as_str())
+                                                    }),
+                                                )
+                                            }
+                                            None => Type::none(db),
+                                        }
+                                    }
                                     _ => Type::none(db),
                                 });
                             }

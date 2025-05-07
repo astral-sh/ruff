@@ -1,4 +1,5 @@
 use super::context::InferContext;
+use super::mro::DuplicateBaseError;
 use super::{ClassLiteral, KnownClass};
 use crate::db::Db;
 use crate::declare_lint;
@@ -1594,4 +1595,52 @@ pub(crate) fn report_attempted_protocol_instantiation(
             .message(format_args!("`{class_name}` declared as a protocol here")),
     );
     diagnostic.sub(class_def_diagnostic);
+}
+
+pub(crate) fn report_duplicate_bases(
+    context: &InferContext,
+    class: ClassLiteral,
+    duplicate_base_error: &DuplicateBaseError,
+    bases_list: &[ast::Expr],
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&DUPLICATE_BASE, class.header_range(db)) else {
+        return;
+    };
+
+    let DuplicateBaseError {
+        duplicate_base,
+        first_index,
+        later_indices,
+    } = duplicate_base_error;
+
+    let duplicate_name = duplicate_base.name(db);
+
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Duplicate base class `{duplicate_name}`",));
+
+    let mut sub_diagnostic = SubDiagnostic::new(
+        Severity::Info,
+        format_args!(
+            "The definition of class `{}` will raise `TypeError` at runtime",
+            class.name(db)
+        ),
+    );
+    sub_diagnostic.annotate(
+        Annotation::secondary(
+            Span::from(context.file()).with_range(bases_list[*first_index].range()),
+        )
+        .message(format_args!(
+            "Class `{duplicate_name}` first included in bases list here"
+        )),
+    );
+    for index in later_indices {
+        sub_diagnostic.annotate(
+            Annotation::primary(Span::from(context.file()).with_range(bases_list[*index].range()))
+                .message(format_args!("Class `{duplicate_name}` later repeated here")),
+        );
+    }
+
+    diagnostic.sub(sub_diagnostic);
 }
