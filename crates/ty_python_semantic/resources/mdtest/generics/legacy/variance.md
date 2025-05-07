@@ -8,9 +8,13 @@ currently mentioned in the typing spec, but is a fourth case that we must consid
 For all of the examples below, we will consider a typevar `T`, a generic class using that typevar
 `C[T]`, and two types `A` and `B`.
 
+(Note that dynamic types like `Any` never participate in subtyping, so `C[Any]` is neither a subtype
+nor supertype of any other specialization of `C`, regardless of `T`'s variance.)
+
 ## Covariance
 
-With a covariant typevar, subtyping is in "alignment": if `A <: B`, then `C[A] <: C[B]`.
+With a covariant typevar, subtyping and assignability are in "alignment": if `A <: B`, then `C[A] <:
+C[B]`.
 
 Types that "produce" data on demand are covariant in their typevar. If you expect a sequence of
 `int`s, someone can safely provide a sequence of `bool`s, since each `bool` element that you would
@@ -66,7 +70,8 @@ static_assert(not is_gradual_equivalent_to(C[Any], C[B]))
 
 ## Contravariance
 
-With a contravariant typevar, subtyping is in "opposition": if `A <: B`, then `C[B] <: C[A]`.
+With a contravariant typevar, subtyping and assignability are in "opposition": if `A <: B`, then
+`C[B] <: C[A]`.
 
 Types that "consume" data are contravariant in their typevar. If you expect a consumer that receives
 `bool`s, someone can safely provide a consumer that expects to receive `int`s, since each `bool`
@@ -121,7 +126,8 @@ static_assert(not is_gradual_equivalent_to(C[Any], C[B]))
 
 ## Invariance
 
-With an invariant typevar, _no_ specializations of the generic class are subtypes of each other.
+With an invariant typevar, _no_ specializations of the generic class are subtypes of or assignable
+to each other.
 
 This often occurs for types that are both producers _and_ consumers, like a mutable `list`.
 Iterating over the elements in a list would work with a covariant typevar, just like with the
@@ -191,7 +197,8 @@ static_assert(not is_gradual_equivalent_to(C[Any], C[B]))
 
 ## Bivariance
 
-With a bivariant typevar, _all_ specializations of the generic class are subtypes of (and in fact,
+With a bivariant typevar, _all_ specializations of the generic class are assignable to (and in fact,
+gradually equivalent to) each other, and all fully static specializations are subtypes of (and
 equivalent to) each other.
 
 It is not possible to construct a legacy typevar that is explicitly bivariant.
