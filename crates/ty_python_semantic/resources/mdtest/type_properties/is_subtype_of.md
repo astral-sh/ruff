@@ -344,7 +344,9 @@ TODO: Infer a specialized type for the slice literal
 from ty_extensions import TypeOf, is_subtype_of, static_assert
 
 static_assert(not is_subtype_of(TypeOf[1:2:3], slice))
-static_assert(not is_subtype_of(TypeOf[1:2:3], slice[int]))
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_subtype_of(TypeOf[1:2:3], slice[int]))
 ```
 
 ### Special forms
