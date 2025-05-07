@@ -237,9 +237,8 @@ impl Diagnostic {
         self.primary_annotation().map(|ann| ann.tags.as_slice())
     }
 
-    pub fn expect_ruff_span(&self) -> Span {
-        self.primary_span()
-            .expect("Expected a primary span for a ruff diagnostic")
+    pub fn expect_span(&self) -> Span {
+        self.primary_span().expect("Expected a primary span")
     }
 }
 
@@ -641,13 +640,6 @@ impl UnifiedFile {
             UnifiedFile::Ruff(file) => Input::from(file),
         }
     }
-
-    pub fn expect_ruff(&self) -> &SourceFile {
-        match self {
-            UnifiedFile::Ruff(source_file) => source_file,
-            UnifiedFile::Ty(_) => panic!("Expected a ruff file, found a ty file"),
-        }
-    }
 }
 
 impl From<&SourceFile> for Input {
@@ -707,7 +699,7 @@ pub struct Span {
 }
 
 impl Span {
-    /// Returns the `File` attached to this `Span`.
+    /// Returns the `UnifiedFile` attached to this `Span`.
     pub fn file(&self) -> &UnifiedFile {
         &self.file
     }
@@ -731,10 +723,23 @@ impl Span {
         Span { range, ..self }
     }
 
+    /// Returns the [`File`] attached to this [`Span`].
+    ///
+    /// Panics if the file is a [`UnifiedFile::Ruff`] instead of a [`UnifiedFile::Ty`].
     pub fn expect_ty_file(&self) -> File {
         match self.file {
             UnifiedFile::Ty(file) => file,
-            UnifiedFile::Ruff(_) => panic!("Expected a `File`, found `RuffFile`"),
+            UnifiedFile::Ruff(_) => panic!("Expected a ty `File`, found a ruff `SourceFile`"),
+        }
+    }
+
+    /// Returns the [`SourceFile`] attached to this [`Span`].
+    ///
+    /// Panics if the file is a [`UnifiedFile::Ty`] instead of a [`UnifiedFile::Ruff`].
+    pub fn expect_ruff_file(&self) -> &SourceFile {
+        match &self.file {
+            UnifiedFile::Ty(_) => panic!("Expected a ruff `SourceFile`, found a ty `File`"),
+            UnifiedFile::Ruff(file) => file,
         }
     }
 }

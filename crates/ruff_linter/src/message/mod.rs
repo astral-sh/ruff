@@ -245,13 +245,9 @@ impl Message {
     pub fn filename(&self) -> Cow<'_, str> {
         match self {
             Message::Diagnostic(m) => Cow::Borrowed(m.file.name()),
-            Message::SyntaxError(diag) => Cow::Owned(
-                diag.expect_ruff_span()
-                    .file()
-                    .expect_ruff()
-                    .name()
-                    .to_string(),
-            ),
+            Message::SyntaxError(diag) => {
+                Cow::Owned(diag.expect_span().expect_ruff_file().name().to_string())
+            }
         }
     }
 
@@ -260,9 +256,8 @@ impl Message {
         match self {
             Message::Diagnostic(m) => m.file.to_source_code().line_column(m.range.start()),
             Message::SyntaxError(diag) => diag
-                .expect_ruff_span()
-                .file()
-                .expect_ruff()
+                .expect_span()
+                .expect_ruff_file()
                 .to_source_code()
                 .line_column(self.start()),
         }
@@ -273,9 +268,8 @@ impl Message {
         match self {
             Message::Diagnostic(m) => m.file.to_source_code().line_column(m.range.end()),
             Message::SyntaxError(diag) => diag
-                .expect_ruff_span()
-                .file()
-                .expect_ruff()
+                .expect_span()
+                .expect_ruff_file()
                 .to_source_code()
                 .line_column(self.end()),
         }
@@ -285,7 +279,7 @@ impl Message {
     pub fn source_file(&self) -> SourceFile {
         match self {
             Message::Diagnostic(m) => m.file.clone(),
-            Message::SyntaxError(m) => m.expect_ruff_span().file().expect_ruff().clone(),
+            Message::SyntaxError(m) => m.expect_span().expect_ruff_file().clone(),
         }
     }
 }
@@ -307,7 +301,7 @@ impl Ranged for Message {
         match self {
             Message::Diagnostic(m) => m.range,
             Message::SyntaxError(m) => m
-                .expect_ruff_span()
+                .expect_span()
                 .range()
                 .expect("Expected range for ruff span"),
         }
