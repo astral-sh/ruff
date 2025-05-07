@@ -2310,7 +2310,7 @@ where
 
                 walk_expr(self, expr);
             }
-            ast::Expr::Yield(_) => {
+            ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
                 let scope = self.current_scope();
                 if self.scopes[scope].kind() == ScopeKind::Function {
                     self.generator_functions.insert(scope);
