@@ -18,8 +18,8 @@ nor supertype of any other specialization of `C`, regardless of `T`'s variance.)
 
 ## Covariance
 
-With a covariant typevar, subtyping and assignability are in "alignment": if `A <: B`, then `C[A] <:
-C[B]`.
+With a covariant typevar, subtyping and assignability are in "alignment": if `A <: B`, then
+`C[A] <: C[B]`.
 
 Types that "produce" data on demand are covariant in their typevar. If you expect a sequence of
 `int`s, someone can safely provide a sequence of `bool`s, since each `bool` element that you would
