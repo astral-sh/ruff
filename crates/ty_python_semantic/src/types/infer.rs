@@ -72,9 +72,9 @@ use crate::types::diagnostic::{
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
     report_invalid_return_type, report_possibly_unbound_attribute, TypeCheckDiagnostics,
     CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS,
-    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE,
-    INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
-    INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
+    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, INCONSISTENT_MRO,
+    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
+    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
     INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
     POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
     UNSUPPORTED_OPERATOR,
@@ -99,9 +99,10 @@ use crate::{Db, FxOrderSet};
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
     report_attempted_protocol_instantiation, report_bad_argument_to_get_protocol_members,
-    report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_type_checking_constant,
-    report_non_subscriptable, report_possibly_unresolved_reference,
+    report_duplicate_bases, report_index_out_of_bounds, report_invalid_exception_caught,
+    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_invalid_type_checking_constant, report_non_subscriptable,
+    report_possibly_unresolved_reference,
     report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
     report_unresolved_reference, INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL,
     REDUNDANT_CAST, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
@@ -855,17 +856,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     match mro_error.reason() {
                         MroErrorKind::DuplicateBases(duplicates) => {
                             let base_nodes = class_node.bases();
-                            for (index, duplicate) in duplicates {
-                                let Some(builder) = self
-                                    .context
-                                    .report_lint(&DUPLICATE_BASE, &base_nodes[*index])
-                                else {
-                                    continue;
-                                };
-                                builder.into_diagnostic(format_args!(
-                                    "Duplicate base class `{}`",
-                                    duplicate.name(self.db())
-                                ));
+                            for duplicate in duplicates {
+                                report_duplicate_bases(&self.context, class, duplicate, base_nodes);
                             }
                         }
                         MroErrorKind::InvalidBases(bases) => {

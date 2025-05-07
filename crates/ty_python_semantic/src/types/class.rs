@@ -1799,26 +1799,32 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Returns the [`Span`] of the class's "header": the class name
+    /// Returns a [`Span`] with the range of the class's header.
+    ///
+    /// See [`Self::header_range`] for more details.
+    pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
+        Span::from(self.file(db)).with_range(self.header_range(db))
+    }
+
+    /// Returns the range of the class's "header": the class name
     /// and any arguments passed to the `class` statement. E.g.
     ///
     /// ```ignore
     /// class Foo(Bar, metaclass=Baz): ...
     ///       ^^^^^^^^^^^^^^^^^^^^^^^
     /// ```
-    pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
+    pub(super) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let class_scope = self.body_scope(db);
         let class_node = class_scope.node(db).expect_class();
         let class_name = &class_node.name;
-        let header_range = TextRange::new(
+        TextRange::new(
             class_name.start(),
             class_node
                 .arguments
                 .as_deref()
                 .map(Ranged::end)
                 .unwrap_or_else(|| class_name.end()),
-        );
-        Span::from(class_scope.file(db)).with_range(header_range)
+        )
     }
 }
 
