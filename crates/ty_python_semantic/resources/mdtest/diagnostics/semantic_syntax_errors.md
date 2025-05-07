@@ -297,20 +297,31 @@ Certain expressions like `yield` or inlined walrus assignments are not valid in 
 python-version = "3.12"
 ```
 
-```python
-# error: [invalid-syntax] "yield expression not allowed in type parameter bounds"
+```py
+# error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
+# error: [invalid-syntax] "yield expression cannot be used within a TypeVar bound"
+# error: [invalid-syntax] "`yield` statement outside of a function"
 type X[T: (yield 1)] = int
 
-# error: [invalid-syntax] "yield expression not allowed in type alias"
+# error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
+# error: [invalid-syntax] "yield expression cannot be used within a type alias"
+# error: [invalid-syntax] "`yield` statement outside of a function"
 type Y = (yield 1)
 
-# error: [invalid-syntax] "named expression not allowed in return annotation"
+# error: [invalid-type-form] "Named expressions are not allowed in type expressions"
+# error: [invalid-syntax] "named expression cannot be used within a generic definition"
 def f[T](x: int) -> (y := 3):
     return x
+
+# error: [invalid-syntax] "`yield from` statement outside of a function"
+# error: [invalid-syntax] "yield expression cannot be used within a generic definition"
+class C[T]((yield from [object])):
+    pass
 ```
 
-```python
-# error: [invalid-syntax] "yield from expression not allowed in base class list"
+```py
+# error: [invalid-syntax] "yield expression cannot be used within a generic definitio"
+# error: [invalid-syntax] "`yield from` statement outside of a function"
 class C[T]((yield from [object])):
     pass
 ```
@@ -319,7 +330,7 @@ class C[T]((yield from [object])):
 
 This error includes `await`, `async for`, `async with`, and `async` comprehensions.
 
-```python
+```py
 async def elements(n):
     yield n
 
@@ -332,7 +343,6 @@ def _():
     # error: [invalid-syntax] "`async with` outside of an asynchronous function"
     async with elements(1) as x:
         ...
-    # error: [invalid-syntax] "cannot use an asynchronous comprehension outside of an asynchronous function on Python 3.9 (syntax was added in 3.11)"
     # error: [invalid-syntax] "asynchronous comprehension outside of an asynchronous function"
     [x async for x in elements(1)]
 ```
