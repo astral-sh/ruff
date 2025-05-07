@@ -2174,8 +2174,9 @@ watermelon
         fn span(&self, path: &str, line_offset_start: &str, line_offset_end: &str) -> Span {
             let span = self.path(path);
 
-            let text = span.file().source_text(&self.db);
-            let line_index = span.file().line_index(&self.db);
+            let file = span.expect_ty_file();
+            let text = source_text(&self.db, file);
+            let line_index = line_index(&self.db, file);
             let source = SourceCode::new(text.as_str(), &line_index);
 
             let (line_start, offset_start) = parse_line_offset(line_offset_start);

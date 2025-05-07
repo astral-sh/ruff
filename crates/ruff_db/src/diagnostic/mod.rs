@@ -670,23 +670,6 @@ impl From<&SourceFile> for SourceText {
     }
 }
 
-#[cfg(test)]
-impl UnifiedFile {
-    fn source_text(&self, db: &dyn Db) -> SourceText {
-        match self {
-            UnifiedFile::Ty(file) => crate::source::source_text(db, *file),
-            UnifiedFile::Ruff(file) => SourceText::from(file),
-        }
-    }
-
-    fn line_index(&self, db: &dyn Db) -> ruff_source_file::LineIndex {
-        match self {
-            UnifiedFile::Ty(file) => crate::source::line_index(db, *file),
-            UnifiedFile::Ruff(file) => file.index().clone(),
-        }
-    }
-}
-
 /// A span represents the source of a diagnostic.
 ///
 /// It consists of a `File` and an optional range into that file. When the
