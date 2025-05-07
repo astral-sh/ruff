@@ -86,12 +86,12 @@ different uses of the same typevar.
 ```py
 def f[T](x: T, y: T) -> None:
     # TODO: revealed: T@f
-    reveal_type(x)  # revealed: ~T
+    reveal_type(x)  # revealed: T
 
 class C[T]:
     def m(self, x: T) -> None:
         # TODO: revealed: T@c
-        reveal_type(x)  # revealed: ~T
+        reveal_type(x)  # revealed: T
 ```
 
 ## Fully static typevars
@@ -377,19 +377,19 @@ class Unrelated: ...
 
 def unbounded_unconstrained[T](t: T) -> None:
     def _(x: T | Super) -> None:
-        reveal_type(x)  # revealed: ~T | Super
+        reveal_type(x)  # revealed: T | Super
 
     def _(x: T | Base) -> None:
-        reveal_type(x)  # revealed: ~T | Base
+        reveal_type(x)  # revealed: T | Base
 
     def _(x: T | Sub) -> None:
-        reveal_type(x)  # revealed: ~T | Sub
+        reveal_type(x)  # revealed: T | Sub
 
     def _(x: T | Unrelated) -> None:
-        reveal_type(x)  # revealed: ~T | Unrelated
+        reveal_type(x)  # revealed: T | Unrelated
 
     def _(x: T | Any) -> None:
-        reveal_type(x)  # revealed: ~T | Any
+        reveal_type(x)  # revealed: T | Any
 ```
 
 The union of a bounded typevar with its bound is that bound. (The typevar is guaranteed to be
@@ -405,13 +405,13 @@ def bounded[T: Base](t: T) -> None:
         reveal_type(x)  # revealed: Base
 
     def _(x: T | Sub) -> None:
-        reveal_type(x)  # revealed: ~T | Sub
+        reveal_type(x)  # revealed: T | Sub
 
     def _(x: T | Unrelated) -> None:
-        reveal_type(x)  # revealed: ~T | Unrelated
+        reveal_type(x)  # revealed: T | Unrelated
 
     def _(x: T | Any) -> None:
-        reveal_type(x)  # revealed: ~T | Any
+        reveal_type(x)  # revealed: T | Any
 ```
 
 The union of a constrained typevar with a type depends on how that type relates to the constraints.
@@ -428,13 +428,13 @@ def constrained[T: (Base, Sub)](t: T) -> None:
         reveal_type(x)  # revealed: Base
 
     def _(x: T | Sub) -> None:
-        reveal_type(x)  # revealed: ~T
+        reveal_type(x)  # revealed: T
 
     def _(x: T | Unrelated) -> None:
-        reveal_type(x)  # revealed: ~T | Unrelated
+        reveal_type(x)  # revealed: T | Unrelated
 
     def _(x: T | Any) -> None:
-        reveal_type(x)  # revealed: ~T | Any
+        reveal_type(x)  # revealed: T | Any
 ```
 
 ## Intersections involving typevars
@@ -453,19 +453,19 @@ class Unrelated: ...
 
 def unbounded_unconstrained[T](t: T) -> None:
     def _(x: Intersection[T, Super]) -> None:
-        reveal_type(x)  # revealed: ~T & Super
+        reveal_type(x)  # revealed: T & Super
 
     def _(x: Intersection[T, Base]) -> None:
-        reveal_type(x)  # revealed: ~T & Base
+        reveal_type(x)  # revealed: T & Base
 
     def _(x: Intersection[T, Sub]) -> None:
-        reveal_type(x)  # revealed: ~T & Sub
+        reveal_type(x)  # revealed: T & Sub
 
     def _(x: Intersection[T, Unrelated]) -> None:
-        reveal_type(x)  # revealed: ~T & Unrelated
+        reveal_type(x)  # revealed: T & Unrelated
 
     def _(x: Intersection[T, Any]) -> None:
-        reveal_type(x)  # revealed: ~T & Any
+        reveal_type(x)  # revealed: T & Any
 ```
 
 The intersection of a bounded typevar with its bound or a supertype of its bound is the typevar
@@ -477,19 +477,19 @@ from its bound is `Never`.
 ```py
 def bounded[T: Base](t: T) -> None:
     def _(x: Intersection[T, Super]) -> None:
-        reveal_type(x)  # revealed: ~T
+        reveal_type(x)  # revealed: T
 
     def _(x: Intersection[T, Base]) -> None:
-        reveal_type(x)  # revealed: ~T
+        reveal_type(x)  # revealed: T
 
     def _(x: Intersection[T, Sub]) -> None:
-        reveal_type(x)  # revealed: ~T & Sub
+        reveal_type(x)  # revealed: T & Sub
 
     def _(x: Intersection[T, None]) -> None:
         reveal_type(x)  # revealed: Never
 
     def _(x: Intersection[T, Any]) -> None:
-        reveal_type(x)  # revealed: ~T & Any
+        reveal_type(x)  # revealed: T & Any
 ```
 
 Constrained typevars can be modeled using a hypothetical `OneOf` connector, where the typevar must
@@ -511,7 +511,7 @@ can simplify the intersection as a whole to that constraint.
 def constrained[T: (Base, Sub, Unrelated)](t: T) -> None:
     def _(x: Intersection[T, Base]) -> None:
         # With OneOf this would be OneOf[Base, Sub]
-        reveal_type(x)  # revealed: ~T & Base
+        reveal_type(x)  # revealed: T & Base
 
     def _(x: Intersection[T, Unrelated]) -> None:
         reveal_type(x)  # revealed: Unrelated
@@ -523,7 +523,7 @@ def constrained[T: (Base, Sub, Unrelated)](t: T) -> None:
         reveal_type(x)  # revealed: Never
 
     def _(x: Intersection[T, Any]) -> None:
-        reveal_type(x)  # revealed: ~T & Any
+        reveal_type(x)  # revealed: T & Any
 ```
 
 We can simplify the intersection similarly when removing a type from a constrained typevar, since
@@ -538,19 +538,19 @@ def remove_constraint[T: (int, str, bool)](t: T) -> None:
 
     def _(x: Intersection[T, Not[str]]) -> None:
         # With OneOf this would be OneOf[int, bool]
-        reveal_type(x)  # revealed: ~T & ~str
+        reveal_type(x)  # revealed: T & ~str
 
     def _(x: Intersection[T, Not[bool]]) -> None:
-        reveal_type(x)  # revealed: ~T & ~bool
+        reveal_type(x)  # revealed: T & ~bool
 
     def _(x: Intersection[T, Not[int], Not[str]]) -> None:
         reveal_type(x)  # revealed: Never
 
     def _(x: Intersection[T, Not[None]]) -> None:
-        reveal_type(x)  # revealed: ~T
+        reveal_type(x)  # revealed: T
 
     def _(x: Intersection[T, Not[Any]]) -> None:
-        reveal_type(x)  # revealed: ~T & Any
+        reveal_type(x)  # revealed: T & Any
 ```
 
 The intersection of a typevar with any other type is assignable to (and if fully static, a subtype

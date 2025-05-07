@@ -261,9 +261,7 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
-            Type::TypeVar(typevar) => {
-                write!(f, "{}{}", typevar.variance(self.db), typevar.name(self.db))
-            }
+            Type::TypeVar(typevar) => f.write_str(typevar.name(self.db)),
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
             Type::BoundSuper(bound_super) => {
@@ -326,7 +324,6 @@ impl Display for DisplayGenericContext<'_> {
             if idx > 0 {
                 f.write_str(", ")?;
             }
-            write!(f, "{}", var.variance(self.db))?;
             f.write_str(var.name(self.db))?;
             match var.bound_or_constraints(self.db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {

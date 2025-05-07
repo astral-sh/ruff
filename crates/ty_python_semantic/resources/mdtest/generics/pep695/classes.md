@@ -16,8 +16,8 @@ from ty_extensions import generic_context
 class SingleTypevar[T]: ...
 class MultipleTypevars[T, S]: ...
 
-reveal_type(generic_context(SingleTypevar))  # revealed: tuple[~T]
-reveal_type(generic_context(MultipleTypevars))  # revealed: tuple[~T, ~S]
+reveal_type(generic_context(SingleTypevar))  # revealed: tuple[T]
+reveal_type(generic_context(MultipleTypevars))  # revealed: tuple[T, S]
 ```
 
 You cannot use the same typevar more than once.
@@ -43,8 +43,8 @@ class InheritedGeneric[U, V](MultipleTypevars[U, V]): ...
 class InheritedGenericPartiallySpecialized[U](MultipleTypevars[U, int]): ...
 class InheritedGenericFullySpecialized(MultipleTypevars[str, int]): ...
 
-reveal_type(generic_context(InheritedGeneric))  # revealed: tuple[~U, ~V]
-reveal_type(generic_context(InheritedGenericPartiallySpecialized))  # revealed: tuple[~U]
+reveal_type(generic_context(InheritedGeneric))  # revealed: tuple[U, V]
+reveal_type(generic_context(InheritedGenericPartiallySpecialized))  # revealed: tuple[U]
 reveal_type(generic_context(InheritedGenericFullySpecialized))  # revealed: None
 ```
 

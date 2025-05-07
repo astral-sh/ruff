@@ -5659,17 +5659,6 @@ pub enum TypeVarVariance {
     Bivariant,
 }
 
-impl std::fmt::Display for TypeVarVariance {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Invariant => f.write_str("~"),
-            Self::Covariant => f.write_str("+"),
-            Self::Contravariant => f.write_str("-"),
-            Self::Bivariant => Ok(()),
-        }
-    }
-}
-
 #[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update)]
 pub enum TypeVarBoundOrConstraints<'db> {
     UpperBound(Type<'db>),

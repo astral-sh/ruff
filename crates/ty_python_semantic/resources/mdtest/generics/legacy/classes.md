@@ -15,8 +15,8 @@ S = TypeVar("S")
 class SingleTypevar(Generic[T]): ...
 class MultipleTypevars(Generic[T, S]): ...
 
-reveal_type(generic_context(SingleTypevar))  # revealed: tuple[~T]
-reveal_type(generic_context(MultipleTypevars))  # revealed: tuple[~T, ~S]
+reveal_type(generic_context(SingleTypevar))  # revealed: tuple[T]
+reveal_type(generic_context(MultipleTypevars))  # revealed: tuple[T, S]
 ```
 
 You cannot use the same typevar more than once.
@@ -41,8 +41,8 @@ class InheritedGeneric(MultipleTypevars[T, S]): ...
 class InheritedGenericPartiallySpecialized(MultipleTypevars[T, int]): ...
 class InheritedGenericFullySpecialized(MultipleTypevars[str, int]): ...
 
-reveal_type(generic_context(InheritedGeneric))  # revealed: tuple[~T, ~S]
-reveal_type(generic_context(InheritedGenericPartiallySpecialized))  # revealed: tuple[~T]
+reveal_type(generic_context(InheritedGeneric))  # revealed: tuple[T, S]
+reveal_type(generic_context(InheritedGenericPartiallySpecialized))  # revealed: tuple[T]
 reveal_type(generic_context(InheritedGenericFullySpecialized))  # revealed: None
 ```
 
@@ -70,9 +70,9 @@ class ExplicitInheritedGenericPartiallySpecializedExtraTypevar(MultipleTypevars[
 # error: [invalid-generic-class] "`Generic` base class must include all type variables used in other base classes"
 class ExplicitInheritedGenericPartiallySpecializedMissingTypevar(MultipleTypevars[T, int], Generic[S]): ...
 
-reveal_type(generic_context(ExplicitInheritedGeneric))  # revealed: tuple[~T, ~S]
-reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))  # revealed: tuple[~T]
-reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))  # revealed: tuple[~T, ~S]
+reveal_type(generic_context(ExplicitInheritedGeneric))  # revealed: tuple[T, S]
+reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))  # revealed: tuple[T]
+reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))  # revealed: tuple[T, S]
 ```
 
 ## Specializing generic classes explicitly
