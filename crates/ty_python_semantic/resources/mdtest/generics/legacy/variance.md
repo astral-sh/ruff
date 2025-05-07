@@ -9,7 +9,8 @@ For all of the examples below, we will consider a typevar `T`, a generic class u
 `C[T]`, and two types `A` and `B`.
 
 (Note that dynamic types like `Any` never participate in subtyping, so `C[Any]` is neither a subtype
-nor supertype of any other specialization of `C`, regardless of `T`'s variance.)
+nor supertype of any other specialization of `C`, regardless of `T`'s variance. It is, however,
+assignable to any specialization of `C`, regardless of variance, via materialization.)
 
 ## Covariance
 
@@ -126,7 +127,7 @@ static_assert(not is_gradual_equivalent_to(C[Any], C[B]))
 
 ## Invariance
 
-With an invariant typevar, _no_ specializations of the generic class are subtypes of or assignable
+With an invariant typevar, only equivalent specializations of the generic class are subtypes of or assignable
 to each other.
 
 This often occurs for types that are both producers _and_ consumers, like a mutable `list`.
