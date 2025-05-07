@@ -3246,7 +3246,6 @@ dependencies = [
  "hashbrown 0.15.3",
  "hashlink",
  "indexmap",
- "loom",
  "parking_lot",
  "portable-atomic",
  "rayon",
