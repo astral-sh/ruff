@@ -16,7 +16,8 @@ use crate::{
 };
 
 use super::{
-    Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, Severity, SubDiagnostic,
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticSource, DisplayDiagnosticConfig, Severity,
+    SubDiagnostic,
 };
 
 /// A type that implements `std::fmt::Display` for diagnostic rendering.
@@ -89,7 +90,7 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                     path = fmt_styled(span.file().path(&self.resolver), stylesheet.emphasis)
                 )?;
                 if let Some(range) = span.range() {
-                    let input = span.file().input(&self.resolver);
+                    let input = span.file().diagnostic_source(&self.resolver);
                     let start = input.as_source_code().line_column(range.start());
 
                     write!(
@@ -191,7 +192,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             .iter()
             .filter_map(|ann| {
                 let path = ann.span.file.path(resolver);
-                let input = ann.span.file.input(resolver);
+                let input = ann.span.file.diagnostic_source(resolver);
                 ResolvedAnnotation::new(path, &input, ann)
             })
             .collect();
@@ -225,7 +226,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             .iter()
             .filter_map(|ann| {
                 let path = ann.span.file.path(resolver);
-                let input = ann.span.file.input(resolver);
+                let input = ann.span.file.diagnostic_source(resolver);
                 ResolvedAnnotation::new(path, &input, ann)
             })
             .collect();
@@ -259,10 +260,18 @@ impl<'a> ResolvedDiagnostic<'a> {
                     continue;
                 };
 
-                let prev_context_ends =
-                    context_after(&prev.input.as_source_code(), context, prev.line_end).get();
-                let this_context_begins =
-                    context_before(&ann.input.as_source_code(), context, ann.line_start).get();
+                let prev_context_ends = context_after(
+                    &prev.diagnostic_source.as_source_code(),
+                    context,
+                    prev.line_end,
+                )
+                .get();
+                let this_context_begins = context_before(
+                    &ann.diagnostic_source.as_source_code(),
+                    context,
+                    ann.line_start,
+                )
+                .get();
                 // The boundary case here is when `prev_context_ends`
                 // is exactly one less than `this_context_begins`. In
                 // that case, the context windows are adajcent and we
@@ -304,7 +313,7 @@ impl<'a> ResolvedDiagnostic<'a> {
 #[derive(Debug)]
 struct ResolvedAnnotation<'a> {
     path: &'a str,
-    input: Input,
+    diagnostic_source: DiagnosticSource,
     range: TextRange,
     line_start: OneIndexed,
     line_end: OneIndexed,
@@ -318,8 +327,12 @@ impl<'a> ResolvedAnnotation<'a> {
     /// `path` is the path of the file that this annotation points to.
     ///
     /// `input` is the contents of the file that this annotation points to.
-    fn new(path: &'a str, input: &Input, ann: &'a Annotation) -> Option<ResolvedAnnotation<'a>> {
-        let source = input.as_source_code();
+    fn new(
+        path: &'a str,
+        diagnostic_source: &DiagnosticSource,
+        ann: &'a Annotation,
+    ) -> Option<ResolvedAnnotation<'a>> {
+        let source = diagnostic_source.as_source_code();
         let (range, line_start, line_end) = match (ann.span.range(), ann.message.is_some()) {
             // An annotation with no range AND no message is probably(?)
             // meaningless, but we should try to render it anyway.
@@ -345,7 +358,7 @@ impl<'a> ResolvedAnnotation<'a> {
         };
         Some(ResolvedAnnotation {
             path,
-            input: input.clone(),
+            diagnostic_source: diagnostic_source.clone(),
             range,
             line_start,
             line_end,
@@ -510,8 +523,8 @@ impl<'r> RenderableSnippet<'r> {
             !anns.is_empty(),
             "creating a renderable snippet requires a non-zero number of annotations",
         );
-        let input = &anns[0].input;
-        let source = input.as_source_code();
+        let diagnostic_source = &anns[0].diagnostic_source;
+        let source = diagnostic_source.as_source_code();
         let has_primary = anns.iter().any(|ann| ann.is_primary);
 
         let line_start = context_before(
@@ -527,7 +540,7 @@ impl<'r> RenderableSnippet<'r> {
 
         let snippet_start = source.line_start(line_start);
         let snippet_end = source.line_end(line_end);
-        let snippet = input
+        let snippet = diagnostic_source
             .as_source_code()
             .slice(TextRange::new(snippet_start, snippet_end));
 
@@ -670,13 +683,6 @@ impl std::fmt::Debug for FileResolver<'_> {
 pub(crate) struct Input {
     pub(crate) text: SourceText,
     pub(crate) line_index: LineIndex,
-}
-
-impl Input {
-    /// Returns this input as a `SourceCode` for convenient querying.
-    fn as_source_code(&self) -> SourceCode<'_, '_> {
-        SourceCode::new(self.text.as_str(), &self.line_index)
-    }
 }
 
 /// Returns the line number accounting for the given `len`

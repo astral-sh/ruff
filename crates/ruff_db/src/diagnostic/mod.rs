@@ -1,8 +1,7 @@
 use std::{fmt::Formatter, sync::Arc};
 
-use countme::Count;
 use render::Input;
-use ruff_source_file::SourceFile;
+use ruff_source_file::{SourceCode, SourceFile};
 use thiserror::Error;
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
@@ -10,7 +9,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 pub use self::render::DisplayDiagnostic;
 use crate::files::File;
-use crate::source::{SourceText, SourceTextInner, SourceTextKind};
 use crate::Db;
 
 use self::render::FileResolver;
@@ -649,38 +647,35 @@ impl UnifiedFile {
         }
     }
 
-    fn input(&self, resolver: &FileResolver) -> Input {
+    fn diagnostic_source(&self, resolver: &FileResolver) -> DiagnosticSource {
         match self {
-            UnifiedFile::Ty(file) => resolver.input(*file),
-            UnifiedFile::Ruff(file) => Input::from(file),
+            UnifiedFile::Ty(file) => DiagnosticSource::Ty(resolver.input(*file)),
+            UnifiedFile::Ruff(file) => DiagnosticSource::Ruff(file.clone()),
         }
     }
 }
 
-impl From<&SourceFile> for Input {
-    fn from(value: &SourceFile) -> Self {
-        Input {
-            text: SourceText::from(value),
-            line_index: value.index().clone(),
-        }
-    }
+/// A unified wrapper for types that can be converted to a [`SourceCode`].
+///
+/// As with [`UnifiedFile`], ruff and ty use slightly different representations for source code.
+/// [`DiagnosticSource`] wraps both of these and provides the single
+/// [`DiagnosticSource::as_source_code`] method to produce a [`SourceCode`] with the appropriate
+/// lifetimes.
+///
+/// See [`UnifiedFile::source`] for a way to obtain a [`DiagnosticSource`] from a file and
+/// [`FileResolver`].
+#[derive(Clone, Debug)]
+enum DiagnosticSource {
+    Ty(Input),
+    Ruff(SourceFile),
 }
 
-impl From<&SourceFile> for SourceText {
-    fn from(value: &SourceFile) -> Self {
-        SourceText {
-            inner: Arc::new(SourceTextInner {
-                // NOTE: We can avoid re-parsing `value.source_text()` into a
-                // `SourceTextKind::Notebook` here because Ruff will identify notebooks by their
-                // file extension and handle them later when emitting `Message`s (see references to
-                // `EmitterContext::notebook_indexes`).
-                //
-                // TODO(brent) This will need to be updated when we switch to using `Diagnostic`'s
-                // output format.
-                kind: SourceTextKind::Text(value.source_text().to_string()),
-                read_error: None,
-                count: Count::new(),
-            }),
+impl DiagnosticSource {
+    /// Returns this input as a `SourceCode` for convenient querying.
+    fn as_source_code(&self) -> SourceCode {
+        match self {
+            DiagnosticSource::Ty(input) => SourceCode::new(input.text.as_str(), &input.line_index),
+            DiagnosticSource::Ruff(source) => SourceCode::new(source.source_text(), source.index()),
         }
     }
 }

@@ -67,7 +67,7 @@ fn is_notebook(path: &FilePath) -> bool {
 /// Cheap cloneable in `O(1)`.
 #[derive(Clone, Eq, PartialEq)]
 pub struct SourceText {
-    pub(crate) inner: Arc<SourceTextInner>,
+    inner: Arc<SourceTextInner>,
 }
 
 impl SourceText {
