@@ -642,13 +642,6 @@ impl UnifiedFile {
         }
     }
 
-    pub fn expect_ty(&self) -> File {
-        match self {
-            UnifiedFile::Ty(file) => *file,
-            UnifiedFile::Ruff(_) => panic!("Expected a `File`, found `RuffFile`"),
-        }
-    }
-
     pub fn expect_ruff(&self) -> &SourceFile {
         match self {
             UnifiedFile::Ruff(source_file) => source_file,
@@ -736,6 +729,13 @@ impl Span {
     /// Returns a new `Span` with the given optional `range` attached to it.
     pub fn with_optional_range(self, range: Option<TextRange>) -> Span {
         Span { range, ..self }
+    }
+
+    pub fn expect_ty_file(&self) -> File {
+        match self.file {
+            UnifiedFile::Ty(file) => file,
+            UnifiedFile::Ruff(_) => panic!("Expected a `File`, found `RuffFile`"),
+        }
     }
 }
 
