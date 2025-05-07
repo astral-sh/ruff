@@ -21,10 +21,10 @@ pub(crate) enum MinMax {
 /// readability.
 ///
 /// ## Fix safety
-/// This fix is always unsafe and may change the program's behavior in cases where
-/// `min()` or `max()` calls are nested. The underlying dunder methods (`__lt__`
-/// for `min` and `__gt__` for `max`) are not associative, particularly when dealing
-/// with special floating-point values like `NaN` (Not a Number).
+/// This fix is always unsafe and may change the program's behavior when expanding
+/// `min()` or `max()` calls. The underlying dunder methods (`__lt__` for `min` and
+/// `__gt__` for `max`) are not associative, particularly when dealing with special
+/// floating-point values like `NaN` (Not a Number).
 /// ```python
 /// print(min(2.0, min(float("nan"), 1.0))) # before fix: 2.0
 /// print(min(2.0, float("nan"), 1.0))      # after fix: 1.0
