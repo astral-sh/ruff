@@ -9,7 +9,6 @@ discord.py  # some kind of hang, only when multi-threaded?
 freqtrade  # cycle panics (try_metaclass_)
 hydpy  # cycle panics (try_metaclass_)
 ibis  # cycle panics (try_metaclass_)
-manticore  # stack overflow, see https://github.com/astral-sh/ruff/issues/17863
 pandas  # slow
 pandas-stubs  # cycle panics (try_metaclass_)
 pandera  # cycle panics (try_metaclass_)
