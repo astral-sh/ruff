@@ -127,8 +127,8 @@ static_assert(not is_gradual_equivalent_to(C[Any], C[B]))
 
 ## Invariance
 
-With an invariant typevar, only equivalent specializations of the generic class are subtypes of or assignable
-to each other.
+With an invariant typevar, only equivalent specializations of the generic class are subtypes of or
+assignable to each other.
 
 This often occurs for types that are both producers _and_ consumers, like a mutable `list`.
 Iterating over the elements in a list would work with a covariant typevar, just like with the
