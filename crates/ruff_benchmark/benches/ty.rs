@@ -214,7 +214,6 @@ fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic], expected: &[KeyDi
             )
         })
         .collect();
-
     assert_eq!(&normalized, expected);
 }
 
