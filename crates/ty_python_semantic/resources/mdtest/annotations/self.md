@@ -16,7 +16,7 @@ from typing import Self
 
 class Shape:
     def set_scale(self: Self, scale: float) -> Self:
-        reveal_type(self)  # revealed: Shape
+        reveal_type(self)  # revealed: Self
         return self
 
     def nested_type(self) -> list[Self]:
@@ -24,7 +24,7 @@ class Shape:
 
     def nested_func(self: Self) -> Self:
         def inner() -> Self:
-            reveal_type(self)  # revealed: Shape
+            reveal_type(self)  # revealed: Self
             return self
         return inner()
 
@@ -38,13 +38,13 @@ reveal_type(Shape().nested_func())  # revealed: Shape
 
 class Circle(Shape):
     def set_scale(self: Self, scale: float) -> Self:
-        reveal_type(self)  # revealed: Circle
+        reveal_type(self)  # revealed: Self
         return self
 
 class Outer:
     class Inner:
         def foo(self: Self) -> Self:
-            reveal_type(self)  # revealed: Inner
+            reveal_type(self)  # revealed: Self
             return self
 ```
 
@@ -134,7 +134,7 @@ from typing import Self
 
 class Shape:
     def union(self: Self, other: Self | None):
-        reveal_type(other)  # revealed: Shape | None
+        reveal_type(other)  # revealed: Self | None
         return self
 ```
 

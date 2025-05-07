@@ -4773,7 +4773,6 @@ impl<'db> Type<'db> {
                             ],
                         });
                     };
-                    let class = class_ty.expect_class_type(db);
                     let Some(class_def) = class_ty.definition(db) else {
                         debug_assert!(false, "enclosing_class_symbol must return a class type");
                         return Ok(Type::unknown());
@@ -4782,13 +4781,15 @@ impl<'db> Type<'db> {
                         debug_assert!(false, "class type must have a definition");
                         return Ok(Type::unknown());
                     };
+                    let Some(instance) = class_ty.to_instance(db) else {
+                        debug_assert!(false, "class type is convertible to instance");
+                        return Ok(Type::unknown());
+                    };
                     Ok(Type::TypeVar(TypeVarInstance::new(
                         db,
-                        class.name(db),
+                        ast::name::Name::new("Self"),
                         d,
-                        Some(TypeVarBoundOrConstraints::UpperBound(Type::instance(
-                            db, class,
-                        ))),
+                        Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         None,
                         TypeVarKind::Legacy,
                     )))
