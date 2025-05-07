@@ -50,6 +50,7 @@ jinja
 koda-validate
 kopf
 kornia
+manticore
 materialize
 meson
 mitmproxy
