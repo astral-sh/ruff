@@ -1579,16 +1579,18 @@ class RecursiveNonFullyStatic(Protocol):
 static_assert(is_fully_static(RecursiveFullyStatic))
 static_assert(not is_fully_static(RecursiveNonFullyStatic))
 
-# static_assert(is_assignable_to(RecursiveFullyStatic, RecursiveNonFullyStatic))
-# static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveFullyStatic))
-
 static_assert(not is_subtype_of(RecursiveFullyStatic, RecursiveNonFullyStatic))
 static_assert(not is_subtype_of(RecursiveNonFullyStatic, RecursiveFullyStatic))
+
+# TODO: currently leads to a stack overflow
+# static_assert(is_assignable_to(RecursiveFullyStatic, RecursiveNonFullyStatic))
+# static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveFullyStatic))
 
 class AlsoRecursiveFullyStatic(Protocol):
     parent: AlsoRecursiveFullyStatic | None
     x: int
 
+# TODO: currently leads to a stack overflow
 # static_assert(is_equivalent_to(AlsoRecursiveFullyStatic, RecursiveFullyStatic))
 ```
 
