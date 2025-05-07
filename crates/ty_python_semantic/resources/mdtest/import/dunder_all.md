@@ -415,27 +415,14 @@ __all__ = ("C", *subexporter.__all__)
 class C: ...
 ```
 
-`exporter2.py`:
-
-```py
-# Implicitly concantenated strings are not recognized
-__all__ = ("F" "oo", "Bar")
-
-class Foo: ...
-class Bar: ...
-```
-
 `importer.py`:
 
 ```py
 import exporter1
-import exporter2
 from ty_extensions import dunder_all_names
 
 # revealed: None
 reveal_type(dunder_all_names(exporter1))
-# revealed: None
-reveal_type(dunder_all_names(exporter2))
 ```
 
 ## Statically known branches

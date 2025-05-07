@@ -63,8 +63,7 @@ struct DunderAllNamesCollector<'db> {
 
     /// A flag indicating whether there are any invalid elements in `__all__`.
     ///
-    /// An invalid element is any element that is not a string literal including an implicitly
-    /// concatenated string literal.
+    /// An invalid element is any element that is not a string literal.
     contains_invalid_element: bool,
 
     /// A set of names found in `__all__` for the current module.
@@ -163,17 +162,13 @@ impl<'db> DunderAllNamesCollector<'db> {
             .ok()
     }
 
-    /// Create and return a [`Name`] from the given expression, [`None`] if it is an valid
+    /// Create and return a [`Name`] from the given expression, [`None`] if it is an invalid
     /// expression for a `__all__` element.
     fn create_name(&mut self, expr: &ast::Expr) -> Option<Name> {
         let Some(ast::ExprStringLiteral { value, .. }) = expr.as_string_literal_expr() else {
             self.contains_invalid_element = true;
             return None;
         };
-        if value.is_implicit_concatenated() {
-            self.contains_invalid_element = true;
-            return None;
-        }
         Some(Name::new(value.to_str()))
     }
 
@@ -193,10 +188,9 @@ impl<'db> DunderAllNamesCollector<'db> {
     /// invalid elements.
     fn into_names(self) -> Option<FxHashSet<Name>> {
         if self.origin.is_none() {
-            tracing::trace!("`__all__` is not defined in `{}`", self.file.path(self.db));
             None
         } else if self.contains_invalid_element {
-            tracing::trace!(
+            tracing::debug!(
                 "`__all__` in `{}` contains invalid elements",
                 self.file.path(self.db)
             );
