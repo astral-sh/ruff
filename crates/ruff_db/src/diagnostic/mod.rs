@@ -1,6 +1,6 @@
 use std::{fmt::Formatter, sync::Arc};
 
-use render::Input;
+use render::{FileResolver, Input};
 use ruff_source_file::{SourceCode, SourceFile};
 use thiserror::Error;
 
@@ -9,9 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 pub use self::render::DisplayDiagnostic;
 use crate::files::File;
-use crate::Db;
 
-use self::render::FileResolver;
 mod render;
 mod stylesheet;
 
@@ -115,12 +113,11 @@ impl Diagnostic {
     ///
     /// Note that this `Display` impl includes a trailing line terminator, so
     /// callers should prefer using this with `write!` instead of `writeln!`.
-    pub fn display<'a>(
+    pub fn display<'a, R>(
         &'a self,
-        db: &'a dyn Db,
+        resolver: R,
         config: &'a DisplayDiagnosticConfig,
-    ) -> DisplayDiagnostic<'a> {
-        let resolver = FileResolver::new(db);
+    ) -> DisplayDiagnostic<'a, R> {
         DisplayDiagnostic::new(resolver, config, self)
     }
 
@@ -633,21 +630,14 @@ pub enum UnifiedFile {
 }
 
 impl UnifiedFile {
-    pub fn file_path<'a>(&'a self, db: &'a dyn Db) -> &'a str {
-        match self {
-            UnifiedFile::Ty(file) => file.path(db).as_str(),
-            UnifiedFile::Ruff(file) => file.name(),
-        }
-    }
-
-    fn path<'a>(&'a self, resolver: &FileResolver<'a>) -> &'a str {
+    pub fn path<'a>(&'a self, resolver: &'a impl FileResolver) -> &'a str {
         match self {
             UnifiedFile::Ty(file) => resolver.path(*file),
             UnifiedFile::Ruff(file) => file.name(),
         }
     }
 
-    fn diagnostic_source(&self, resolver: &FileResolver) -> DiagnosticSource {
+    fn diagnostic_source(&self, resolver: &impl FileResolver) -> DiagnosticSource {
         match self {
             UnifiedFile::Ty(file) => DiagnosticSource::Ty(resolver.input(*file)),
             UnifiedFile::Ruff(file) => DiagnosticSource::Ruff(file.clone()),

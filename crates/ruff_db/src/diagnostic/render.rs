@@ -32,19 +32,19 @@ use super::{
 ///   of a Salsa `Db`.
 /// * The lifetime of the diagnostic being rendered.
 #[derive(Debug)]
-pub struct DisplayDiagnostic<'a> {
+pub struct DisplayDiagnostic<'a, R> {
     config: &'a DisplayDiagnosticConfig,
-    resolver: FileResolver<'a>,
+    resolver: R,
     annotate_renderer: AnnotateRenderer,
     diag: &'a Diagnostic,
 }
 
-impl<'a> DisplayDiagnostic<'a> {
+impl<'a, R> DisplayDiagnostic<'a, R> {
     pub(crate) fn new(
-        resolver: FileResolver<'a>,
+        resolver: R,
         config: &'a DisplayDiagnosticConfig,
         diag: &'a Diagnostic,
-    ) -> DisplayDiagnostic<'a> {
+    ) -> DisplayDiagnostic<'a, R> {
         let annotate_renderer = if config.color {
             AnnotateRenderer::styled()
         } else {
@@ -60,7 +60,10 @@ impl<'a> DisplayDiagnostic<'a> {
     }
 }
 
-impl std::fmt::Display for DisplayDiagnostic<'_> {
+impl<R> std::fmt::Display for DisplayDiagnostic<'_, R>
+where
+    R: FileResolver,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let stylesheet = if self.config.color {
             DiagnosticStylesheet::styled()
@@ -145,7 +148,7 @@ struct Resolved<'a> {
 
 impl<'a> Resolved<'a> {
     /// Creates a new resolved set of diagnostics.
-    fn new(resolver: &'a FileResolver<'a>, diag: &'a Diagnostic) -> Resolved<'a> {
+    fn new(resolver: &'a impl FileResolver, diag: &'a Diagnostic) -> Resolved<'a> {
         let mut diagnostics = vec![];
         diagnostics.push(ResolvedDiagnostic::from_diagnostic(resolver, diag));
         for sub in &diag.inner.subs {
@@ -183,7 +186,7 @@ struct ResolvedDiagnostic<'a> {
 impl<'a> ResolvedDiagnostic<'a> {
     /// Resolve a single diagnostic.
     fn from_diagnostic(
-        resolver: &FileResolver<'a>,
+        resolver: &'a impl FileResolver,
         diag: &'a Diagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
@@ -217,7 +220,7 @@ impl<'a> ResolvedDiagnostic<'a> {
 
     /// Resolve a single sub-diagnostic.
     fn from_sub_diagnostic(
-        resolver: &FileResolver<'a>,
+        resolver: &'a impl FileResolver,
         diag: &'a SubDiagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
@@ -626,7 +629,7 @@ impl<'r> RenderableAnnotation<'r> {
     }
 }
 
-/// A type that facilitates the retrieval of source code from a `Span`.
+/// A trait that facilitates the retrieval of source code from a `Span`.
 ///
 /// At present, this is tightly coupled with a Salsa database. In the future,
 /// it is intended for this resolver to become an abstraction providing a
@@ -641,36 +644,24 @@ impl<'r> RenderableAnnotation<'r> {
 /// callers will need to pass in a different "resolver" for turning `Span`s
 /// into actual file paths/contents. The infrastructure for this isn't fully in
 /// place, but this type serves to demarcate the intended abstraction boundary.
-pub(crate) struct FileResolver<'a> {
-    db: &'a dyn Db,
-}
-
-impl<'a> FileResolver<'a> {
-    /// Creates a new resolver from a Salsa database.
-    pub(crate) fn new(db: &'a dyn Db) -> FileResolver<'a> {
-        FileResolver { db }
-    }
-
+pub trait FileResolver {
     /// Returns the path associated with the file given.
-    pub(crate) fn path(&self, file: File) -> &'a str {
-        relativize_path(
-            self.db.system().current_directory(),
-            file.path(self.db).as_str(),
-        )
-    }
+    fn path(&self, file: File) -> &str;
 
     /// Returns the input contents associated with the file given.
-    pub(crate) fn input(&self, file: File) -> Input {
-        Input {
-            text: source_text(self.db, file),
-            line_index: line_index(self.db, file),
-        }
-    }
+    fn input(&self, file: File) -> Input;
 }
 
-impl std::fmt::Debug for FileResolver<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "<salsa based file resolver>")
+impl FileResolver for &dyn Db {
+    fn path(&self, file: File) -> &str {
+        relativize_path(self.system().current_directory(), file.path(*self).as_str())
+    }
+
+    fn input(&self, file: File) -> Input {
+        Input {
+            text: source_text(*self, file),
+            line_index: line_index(*self, file),
+        }
     }
 }
 
@@ -680,7 +671,7 @@ impl std::fmt::Debug for FileResolver<'_> {
 /// This contains the actual content of that input as well as a
 /// line index for efficiently querying its contents.
 #[derive(Clone, Debug)]
-pub(crate) struct Input {
+pub struct Input {
     pub(crate) text: SourceText,
     pub(crate) line_index: LineIndex,
 }
@@ -736,6 +727,7 @@ mod tests {
     use crate::files::system_path_to_file;
     use crate::system::{DbWithWritableSystem, SystemPath};
     use crate::tests::TestDb;
+    use crate::Upcast;
 
     use super::*;
 
@@ -2244,7 +2236,7 @@ watermelon
         ///
         /// (This will set the "printed" flag on `Diagnostic`.)
         fn render(&self, diag: &Diagnostic) -> String {
-            diag.display(&self.db, &self.config).to_string()
+            diag.display(self.db.upcast(), &self.config).to_string()
         }
     }
 

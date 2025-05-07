@@ -14,6 +14,7 @@ use rayon::ThreadPoolBuilder;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_db::Upcast;
 use salsa::plumbing::ZalsaDatabase;
 use ty_project::metadata::options::Options;
 use ty_project::watch::ProjectWatcher;
@@ -294,7 +295,11 @@ impl MainLoop {
                             let diagnostics_count = result.len();
 
                             for diagnostic in result {
-                                write!(stdout, "{}", diagnostic.display(db, &display_config))?;
+                                write!(
+                                    stdout,
+                                    "{}",
+                                    diagnostic.display(db.upcast(), &display_config)
+                                )?;
 
                                 max_severity = max_severity.max(diagnostic.severity());
                             }

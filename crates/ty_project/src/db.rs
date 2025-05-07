@@ -114,6 +114,16 @@ impl Upcast<dyn IdeDb> for ProjectDatabase {
     }
 }
 
+impl Upcast<dyn Db> for ProjectDatabase {
+    fn upcast(&self) -> &(dyn Db + 'static) {
+        self
+    }
+
+    fn upcast_mut(&mut self) -> &mut (dyn Db + 'static) {
+        self
+    }
+}
+
 #[salsa::db]
 impl IdeDb for ProjectDatabase {}
 

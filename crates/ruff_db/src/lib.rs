@@ -67,7 +67,7 @@ mod tests {
     use crate::system::TestSystem;
     use crate::system::{DbWithTestSystem, System};
     use crate::vendored::VendoredFileSystem;
-    use crate::Db;
+    use crate::{Db, Upcast};
 
     /// Database that can be used for testing.
     ///
@@ -134,6 +134,15 @@ mod tests {
 
         fn python_version(&self) -> ruff_python_ast::PythonVersion {
             ruff_python_ast::PythonVersion::latest()
+        }
+    }
+
+    impl Upcast<dyn Db> for TestDb {
+        fn upcast(&self) -> &(dyn Db + 'static) {
+            self
+        }
+        fn upcast_mut(&mut self) -> &mut (dyn Db + 'static) {
+            self
         }
     }
 

@@ -136,6 +136,7 @@ mod tests {
         Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
         Severity, Span,
     };
+    use ruff_db::Upcast;
     use ruff_text_size::{Ranged, TextRange};
 
     #[test]
@@ -773,7 +774,7 @@ mod tests {
                 .message("Cursor offset"),
             );
 
-            write!(buf, "{}", diagnostic.display(&self.db, &config)).unwrap();
+            write!(buf, "{}", diagnostic.display(self.db.upcast(), &config)).unwrap();
 
             buf
         }
