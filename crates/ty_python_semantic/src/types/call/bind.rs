@@ -622,7 +622,7 @@ impl<'db> Bindings<'db> {
                                         db,
                                         protocol_class
                                             .interface(db)
-                                            .members()
+                                            .members(db)
                                             .map(|member| Type::string_literal(db, member.name()))
                                             .collect::<Box<[Type<'db>]>>(),
                                     )));
