@@ -169,8 +169,8 @@ impl<'db> GenericContext<'db> {
         // class C[T, U = T]: ...
         // ```
         //
-        // If there is a mapping for `T`, we want to map `U` that type, not to `T`. To handle this,
-        // we repeatedly apply the specialization to itself, until we reach a fixed point.
+        // If there is a mapping for `T`, we want to map `U` to that type, not to `T`. To handle
+        // this, we repeatedly apply the specialization to itself, until we reach a fixed point.
         //
         // This loop will always terminate, since it's not possible to create cyclic typevar
         // references:
