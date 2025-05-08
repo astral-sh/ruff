@@ -18,7 +18,7 @@ use rustc_hash::FxHashSet;
 use salsa::Durability;
 use salsa::Setter;
 use std::backtrace::BacktraceStatus;
-use std::panic::{AssertUnwindSafe, UnwindSafe};
+use std::panic::{AssertUnwindSafe, RefUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::error;
@@ -106,6 +106,24 @@ pub struct Project {
     settings_diagnostics: Vec<OptionDiagnostic>,
 }
 
+/// A progress reporter.
+pub trait Reporter: Default + Send + Sync + RefUnwindSafe + 'static {
+    /// Initialize the reporter with the number of files.
+    fn set_files(&self, files: usize);
+
+    /// Report the completion of a given file.
+    fn report_file(&self, file: &File);
+}
+
+/// A no-op implementation of [`Reporter`].
+#[derive(Default)]
+pub struct DummyReporter;
+
+impl Reporter for DummyReporter {
+    fn set_files(&self, _files: usize) {}
+    fn report_file(&self, _file: &File) {}
+}
+
 #[salsa::tracked]
 impl Project {
     pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Self {
@@ -168,7 +186,7 @@ impl Project {
     }
 
     /// Checks all open files in the project and its dependencies.
-    pub(crate) fn check(self, db: &ProjectDatabase) -> Vec<Diagnostic> {
+    pub(crate) fn check(self, db: &ProjectDatabase, reporter: &impl Reporter) -> Vec<Diagnostic> {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
 
@@ -182,6 +200,7 @@ impl Project {
         );
 
         let files = ProjectFiles::new(db, self);
+        reporter.set_files(files.len());
 
         diagnostics.extend(
             files
@@ -190,36 +209,31 @@ impl Project {
                 .map(IOErrorDiagnostic::to_diagnostic),
         );
 
-        let file_diagnostics = Arc::new(std::sync::Mutex::new(vec![]));
+        let file_diagnostics = std::sync::Mutex::new(vec![]);
 
         {
-            let file_diagnostics = Arc::clone(&file_diagnostics);
             let db = db.clone();
-            let project_span = project_span.clone();
+            let file_diagnostics = &file_diagnostics;
+            let project_span = &project_span;
 
             rayon::scope(move |scope| {
                 for file in &files {
-                    let result = Arc::clone(&file_diagnostics);
                     let db = db.clone();
-                    let project_span = project_span.clone();
-
                     scope.spawn(move |_| {
                         let check_file_span =
-                            tracing::debug_span!(parent: &project_span, "check_file", ?file);
+                            tracing::debug_span!(parent: project_span, "check_file", ?file);
                         let _entered = check_file_span.entered();
 
-                        let file_diagnostics = check_file_impl(&db, file);
-                        result.lock().unwrap().extend(file_diagnostics);
+                        let result = check_file_impl(&db, file);
+                        file_diagnostics.lock().unwrap().extend(result);
+
+                        reporter.report_file(&file);
                     });
                 }
             });
         }
 
-        let mut file_diagnostics = Arc::into_inner(file_diagnostics)
-            .unwrap()
-            .into_inner()
-            .unwrap();
-
+        let mut file_diagnostics = file_diagnostics.into_inner().unwrap();
         file_diagnostics.sort_by(|left, right| {
             left.rendering_sort_key(db)
                 .cmp(&right.rendering_sort_key(db))
@@ -491,6 +505,13 @@ impl<'a> ProjectFiles<'a> {
         match self {
             ProjectFiles::OpenFiles(_) => &[],
             ProjectFiles::Indexed(indexed) => indexed.diagnostics(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            ProjectFiles::OpenFiles(open_files) => open_files.len(),
+            ProjectFiles::Indexed(indexed) => indexed.len(),
         }
     }
 }

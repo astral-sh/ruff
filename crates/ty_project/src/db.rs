@@ -2,7 +2,7 @@ use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
 use crate::DEFAULT_LINT_REGISTRY;
-use crate::{Project, ProjectMetadata};
+use crate::{Project, ProjectMetadata, Reporter};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
@@ -68,8 +68,8 @@ impl ProjectDatabase {
     }
 
     /// Checks all open files in the project and its dependencies.
-    pub fn check(&self) -> Result<Vec<Diagnostic>, Cancelled> {
-        self.with_db(|db| db.project().check(db))
+    pub fn check(&self, reporter: &impl Reporter) -> Result<Vec<Diagnostic>, Cancelled> {
+        self.with_db(|db| db.project().check(db, reporter))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
