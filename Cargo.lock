@@ -2583,6 +2583,7 @@ dependencies = [
  "ruff_linter",
  "ruff_macros",
  "ruff_notebook",
+ "ruff_options_metadata",
  "ruff_python_ast",
  "ruff_python_formatter",
  "ruff_python_parser",
@@ -2709,6 +2710,7 @@ dependencies = [
  "ruff_formatter",
  "ruff_linter",
  "ruff_notebook",
+ "ruff_options_metadata",
  "ruff_python_ast",
  "ruff_python_codegen",
  "ruff_python_formatter",
@@ -2873,6 +2875,14 @@ dependencies = [
  "test-case",
  "thiserror 2.0.12",
  "uuid",
+]
+
+[[package]]
+name = "ruff_options_metadata"
+version = "0.0.0"
+dependencies = [
+ "ruff_macros",
+ "serde",
 ]
 
 [[package]]
@@ -3161,6 +3171,7 @@ dependencies = [
  "ruff_graph",
  "ruff_linter",
  "ruff_macros",
+ "ruff_options_metadata",
  "ruff_python_ast",
  "ruff_python_formatter",
  "ruff_python_semantic",
@@ -4014,6 +4025,7 @@ dependencies = [
  "ruff_cache",
  "ruff_db",
  "ruff_macros",
+ "ruff_options_metadata",
  "ruff_python_ast",
  "ruff_python_formatter",
  "ruff_text_size",

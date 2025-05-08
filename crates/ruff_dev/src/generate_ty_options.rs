@@ -1,15 +1,30 @@
 //! Generate a Markdown-compatible listing of configuration options for `pyproject.toml`.
 //!
 //! Used for <https://docs.astral.sh/ruff/settings/>.
+use anyhow::bail;
 use itertools::Itertools;
-use std::fmt::Write;
+use pretty_assertions::StrComparison;
+use std::{fmt::Write, path::PathBuf};
 
 use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
 use ruff_python_trivia::textwrap;
-use ruff_workspace::options::Options;
+use ty_project::metadata::Options;
 
-pub(crate) fn generate() -> String {
+use crate::{
+    generate_all::{Mode, REGENERATE_ALL_COMMAND},
+    ROOT_DIR,
+};
+
+#[derive(clap::Args)]
+pub(crate) struct Args {
+    /// Write the generated table to stdout (rather than to `crates/ty/docs/configuration.md`).
+    #[arg(long, default_value_t, value_enum)]
+    pub(crate) mode: Mode,
+}
+
+pub(crate) fn main(args: Args) -> anyhow::Result<()> {
     let mut output = String::new();
+    let markdown_path = PathBuf::from(ROOT_DIR).join("crates/ty/docs/configuration.md");
 
     generate_set(
         &mut output,
@@ -17,7 +32,43 @@ pub(crate) fn generate() -> String {
         &mut Vec::new(),
     );
 
-    output
+    match args.mode {
+        Mode::DryRun => {
+            println!("{output}");
+        }
+        Mode::Check => {
+            let current = std::fs::read_to_string(&markdown_path)?;
+            if output == current {
+                println!(
+                    "Up-to-date: {markdown_path}",
+                    markdown_path = markdown_path.display()
+                );
+            } else {
+                let comparison = StrComparison::new(&current, &output);
+                bail!(
+                    "{markdown_path} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}",
+                    markdown_path = markdown_path.display()
+                );
+            }
+        }
+        Mode::Write => {
+            let current = std::fs::read_to_string(&markdown_path)?;
+            if current == output {
+                println!(
+                    "Up-to-date: {markdown_path}",
+                    markdown_path = markdown_path.display()
+                );
+            } else {
+                println!(
+                    "Updating: {markdown_path}",
+                    markdown_path = markdown_path.display()
+                );
+                std::fs::write(markdown_path, output.as_bytes())?;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
@@ -136,35 +187,45 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     let _ = writeln!(output, "**Type**: `{}`", field.value_type);
     output.push('\n');
     output.push_str("**Example usage**:\n\n");
-    output.push_str(&format_tab(
+    output.push_str(&format_example(
         "pyproject.toml",
-        &format_header(field.scope, parents, ConfigurationFile::PyprojectToml),
-        field.example,
-    ));
-    output.push_str(&format_tab(
-        "ruff.toml",
-        &format_header(field.scope, parents, ConfigurationFile::RuffToml),
+        &format_header(
+            field.scope,
+            field.example,
+            parents,
+            ConfigurationFile::PyprojectToml,
+        ),
         field.example,
     ));
     output.push('\n');
 }
 
-fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
-    format!(
-        "=== \"{}\"\n\n    ```toml\n    {}\n{}\n    ```\n",
-        tab_name,
-        header,
-        textwrap::indent(content, "    ")
-    )
+fn format_example(tab_name: &str, header: &str, content: &str) -> String {
+    if header.is_empty() {
+        format!(
+            "**{tab_name}**\n\n    ```toml\n{}\n    ```\n",
+            textwrap::indent(content, "    ")
+        )
+    } else {
+        format!(
+            "**{tab_name}**\n\n    ```toml\n    {header}\n{}\n    ```\n",
+            textwrap::indent(content, "    ")
+        )
+    }
 }
 
 /// Format the TOML header for the example usage for a given option.
 ///
 /// For example: `[tool.ruff.format]` or `[tool.ruff.lint.isort]`.
-fn format_header(scope: Option<&str>, parents: &[Set], configuration: ConfigurationFile) -> String {
+fn format_header(
+    scope: Option<&str>,
+    example: &str,
+    parents: &[Set],
+    configuration: ConfigurationFile,
+) -> String {
     let tool_parent = match configuration {
-        ConfigurationFile::PyprojectToml => Some("tool.ruff"),
-        ConfigurationFile::RuffToml => None,
+        ConfigurationFile::PyprojectToml => Some("tool.ty"),
+        ConfigurationFile::TyToml => None,
     };
 
     let header = tool_parent
@@ -173,17 +234,20 @@ fn format_header(scope: Option<&str>, parents: &[Set], configuration: Configurat
         .chain(scope)
         .join(".");
 
+    // Ex) `[[tool.ty.xx]]`
+    if example.starts_with(&format!("[[{header}")) {
+        return String::new();
+    }
+    // Ex) `[tool.ty.rules]`
+    if example.starts_with(&format!("[{header}")) {
+        return String::new();
+    }
+
     if header.is_empty() {
         String::new()
     } else {
         format!("[{header}]")
     }
-}
-
-#[derive(Debug, Copy, Clone)]
-enum ConfigurationFile {
-    PyprojectToml,
-    RuffToml,
 }
 
 #[derive(Default)]
@@ -200,4 +264,11 @@ impl Visit for CollectOptionsVisitor {
     fn record_field(&mut self, name: &str, field: OptionField) {
         self.fields.push((name.to_owned(), field));
     }
+}
+
+#[derive(Debug, Copy, Clone)]
+enum ConfigurationFile {
+    PyprojectToml,
+    #[expect(dead_code)]
+    TyToml,
 }

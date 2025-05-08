@@ -78,7 +78,7 @@
       "type": "object",
       "properties": {
         "extra-paths": {
-          "description": "List of user-provided paths that should take first priority in the module resolution. Examples in other type checkers are mypy's MYPYPATH environment variable, or pyright's stubPath configuration setting.",
+          "description": "List of user-provided paths that should take first priority in the module resolution. Examples in other type checkers are mypy's `MYPYPATH` environment variable, or pyright's `stubPath` configuration setting.",
           "type": [
             "array",
             "null"
@@ -106,7 +106,7 @@
           ]
         },
         "python-version": {
-          "description": "Specifies the version of Python that will be used to analyze the source code. The version should be specified as a string in the format `M.m` where `M` is the major version and `m` is the minor (e.g. \"3.0\" or \"3.6\"). If a version is provided, ty will generate errors if the source code makes use of language features that are not supported in that version. It will also tailor its use of type stub files, which conditionalizes type definitions based on the version.",
+          "description": "Specifies the version of Python that will be used to analyze the source code. The version should be specified as a string in the format `M.m` where `M` is the major version and `m` is the minor (e.g. `\"3.0\"` or `\"3.6\"`). If a version is provided, ty will generate errors if the source code makes use of language features that are not supported in that version. It will also tailor its use of type stub files, which conditionalizes type definitions based on the version.",
           "anyOf": [
             {
               "$ref": "#/definitions/PythonVersion"

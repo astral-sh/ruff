@@ -1,6 +1,3 @@
-use serde::{Serialize, Serializer};
-use std::collections::BTreeMap;
-
 use std::fmt::{Debug, Display, Formatter};
 
 /// Visits [`OptionsMetadata`].
@@ -42,8 +39,8 @@ where
 }
 
 /// Metadata of an option that can either be a [`OptionField`] or [`OptionSet`].
-#[derive(Clone, PartialEq, Eq, Debug, Serialize)]
-#[serde(untagged)]
+#[derive(Clone, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde", derive(::serde::Serialize), serde(untagged))]
 pub enum OptionEntry {
     /// A single option.
     Field(OptionField),
@@ -102,7 +99,7 @@ impl OptionSet {
     /// ### Test for the existence of a child option
     ///
     /// ```rust
-    /// # use ruff_workspace::options_base::{OptionField, OptionsMetadata, Visit};
+    /// # use ruff_options_metadata::{OptionField, OptionsMetadata, Visit};
     ///
     /// struct WithOptions;
     ///
@@ -125,7 +122,7 @@ impl OptionSet {
     /// ### Test for the existence of a nested option
     ///
     /// ```rust
-    /// # use ruff_workspace::options_base::{OptionField, OptionsMetadata, Visit};
+    /// # use ruff_options_metadata::{OptionField, OptionsMetadata, Visit};
     ///
     /// struct Root;
     ///
@@ -176,7 +173,7 @@ impl OptionSet {
     /// ### Find a child option
     ///
     /// ```rust
-    /// # use ruff_workspace::options_base::{OptionEntry, OptionField, OptionsMetadata, Visit};
+    /// # use ruff_options_metadata::{OptionEntry, OptionField, OptionsMetadata, Visit};
     ///
     /// struct WithOptions;
     ///
@@ -201,7 +198,7 @@ impl OptionSet {
     /// ### Find a nested option
     ///
     /// ```rust
-    /// # use ruff_workspace::options_base::{OptionEntry, OptionField, OptionsMetadata, Visit};
+    /// # use ruff_options_metadata::{OptionEntry, OptionField, OptionsMetadata, Visit};
     ///
     /// static HARD_TABS: OptionField = OptionField {
     ///     doc: "Use hard tabs for indentation and spaces for alignment.",
@@ -345,51 +342,14 @@ impl Display for OptionSet {
     }
 }
 
-struct SerializeVisitor<'a> {
-    entries: &'a mut BTreeMap<String, OptionField>,
-}
-
-impl Visit for SerializeVisitor<'_> {
-    fn record_set(&mut self, name: &str, set: OptionSet) {
-        // Collect the entries of the set.
-        let mut entries = BTreeMap::new();
-        let mut visitor = SerializeVisitor {
-            entries: &mut entries,
-        };
-        set.record(&mut visitor);
-
-        // Insert the set into the entries.
-        for (key, value) in entries {
-            self.entries.insert(format!("{name}.{key}"), value);
-        }
-    }
-
-    fn record_field(&mut self, name: &str, field: OptionField) {
-        self.entries.insert(name.to_string(), field);
-    }
-}
-
-impl Serialize for OptionSet {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut entries = BTreeMap::new();
-        let mut visitor = SerializeVisitor {
-            entries: &mut entries,
-        };
-        self.record(&mut visitor);
-        entries.serialize(serializer)
-    }
-}
-
 impl Debug for OptionSet {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
+#[derive(Debug, Eq, PartialEq, Clone)]
+#[cfg_attr(feature = "serde", derive(::serde::Serialize))]
 pub struct OptionField {
     pub doc: &'static str,
     /// Ex) `"false"`
@@ -402,7 +362,8 @@ pub struct OptionField {
     pub deprecated: Option<Deprecated>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(::serde::Serialize))]
 pub struct Deprecated {
     pub since: Option<&'static str>,
     pub message: Option<&'static str>,
@@ -430,5 +391,50 @@ impl Display for OptionField {
         }
 
         writeln!(f, "Example usage:\n```toml\n{}\n```", self.example)
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde {
+    use super::{OptionField, OptionSet, Visit};
+    use serde::{Serialize, Serializer};
+    use std::collections::BTreeMap;
+
+    impl Serialize for OptionSet {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut entries = BTreeMap::new();
+            let mut visitor = SerializeVisitor {
+                entries: &mut entries,
+            };
+            self.record(&mut visitor);
+            entries.serialize(serializer)
+        }
+    }
+
+    struct SerializeVisitor<'a> {
+        entries: &'a mut BTreeMap<String, OptionField>,
+    }
+
+    impl Visit for SerializeVisitor<'_> {
+        fn record_set(&mut self, name: &str, set: OptionSet) {
+            // Collect the entries of the set.
+            let mut entries = BTreeMap::new();
+            let mut visitor = SerializeVisitor {
+                entries: &mut entries,
+            };
+            set.record(&mut visitor);
+
+            // Insert the set into the entries.
+            for (key, value) in entries {
+                self.entries.insert(format!("{name}.{key}"), value);
+            }
+        }
+
+        fn record_field(&mut self, name: &str, field: OptionField) {
+            self.entries.insert(name.to_string(), field);
+        }
     }
 }

@@ -1,0 +1,20 @@
+[package]
+name = "ruff_options_metadata"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+ruff_macros = { workspace = true }
+
+[lints]
+workspace = true
