@@ -2669,8 +2669,11 @@ pub(crate) struct SliceLiteral {
 }
 
 impl<'db> Type<'db> {
-    /// If this type represents a valid specialization of `slice`, returns a [`SliceLiteral`]
-    /// describing the slice. Otherwise returns `None`.
+    /// If this type represents a valid slice literal, returns a [`SliceLiteral`] describing it.
+    /// Otherwise returns `None`.
+    ///
+    /// The type must be a specialization of the `slice` builtin type, where the specialized
+    /// typevars are statically known integers or `None`.
     pub(crate) fn slice_literal(self, db: &'db dyn Db) -> Option<SliceLiteral> {
         let ClassType::Generic(alias) = self.into_nominal_instance()?.class() else {
             return None;
