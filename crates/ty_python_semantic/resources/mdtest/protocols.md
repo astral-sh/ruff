@@ -1601,6 +1601,18 @@ static_assert(is_assignable_to(RecursiveOptionalParent, RecursiveOptionalParent)
 
 static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveOptionalParent))
 static_assert(not is_assignable_to(RecursiveOptionalParent, RecursiveNonFullyStatic))
+
+class Other(Protocol):
+    z: str
+
+def _(rec: RecursiveFullyStatic, other: Other):
+    reveal_type(rec.parent.parent.parent)  # revealed: RecursiveFullyStatic
+
+    rec.parent.parent.parent = rec
+    rec = rec.parent.parent.parent
+
+    rec.parent.parent.parent = other  # error: [invalid-assignment]
+    other = rec.parent.parent.parent  # error: [invalid-assignment]
 ```
 
 ### Regression test: narrowing with self-referential protocols

@@ -172,10 +172,6 @@ impl<'db> ProtocolInstanceType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        if self.0.interface(db).is_recursive_reference(db) {
-            return Type::ProtocolInstance(self);
-        }
-
         let object = KnownClass::Object.to_instance(db);
         if object.satisfies_protocol(db, self) {
             return object;
@@ -197,7 +193,7 @@ impl<'db> ProtocolInstanceType<'db> {
             Protocol::FromClass(class_type) if class_type.class_literal(db).0 == class => {
                 ProtocolInstanceType(Protocol::Synthesized(SynthesizedProtocolType::new(
                     db,
-                    ProtocolInterface::recursive_reference(db),
+                    ProtocolInterface::SelfReference,
                 )))
             }
             _ => self,
@@ -279,7 +275,7 @@ pub(super) enum Protocol<'db> {
 
 impl<'db> Protocol<'db> {
     /// Return the members of this protocol type
-    pub(crate) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
+    fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         match self {
             Self::FromClass(class) => class
                 .class_literal(db)
