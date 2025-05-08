@@ -3,7 +3,7 @@
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type};
 use crate::symbol::{Symbol, SymbolAndQualifiers};
-use crate::types::generics::Specialization;
+use crate::types::generics::{Specialize, TypeMapping};
 use crate::Db;
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -112,21 +112,19 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         SubclassOfType::from(db, self.class)
     }
-
-    pub(super) fn apply_specialization(
-        self,
-        db: &'db dyn Db,
-        specialization: Specialization<'db>,
-    ) -> Self {
-        Self {
-            class: self.class.apply_specialization(db, specialization),
-        }
-    }
 }
 
 impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     fn from(value: NominalInstanceType<'db>) -> Self {
         Self::NominalInstance(value)
+    }
+}
+
+impl<'db> Specialize<'db> for NominalInstanceType<'db> {
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+        Self {
+            class: self.class.apply_type_mapping(db, type_mapping),
+        }
     }
 }
 

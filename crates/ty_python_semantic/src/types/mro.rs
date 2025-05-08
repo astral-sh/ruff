@@ -4,7 +4,7 @@ use std::ops::Deref;
 use rustc_hash::FxHashMap;
 
 use crate::types::class_base::ClassBase;
-use crate::types::generics::Specialization;
+use crate::types::generics::{Specialization, Specialize};
 use crate::types::{ClassLiteral, ClassType, Type};
 use crate::Db;
 

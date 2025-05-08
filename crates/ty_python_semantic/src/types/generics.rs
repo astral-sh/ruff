@@ -204,38 +204,10 @@ pub struct Specialization<'db> {
 }
 
 impl<'db> Specialization<'db> {
-    /// Applies a specialization to this specialization. This is used, for instance, when a generic
-    /// class inherits from a generic alias:
-    ///
-    /// ```py
-    /// class A[T]: ...
-    /// class B[U](A[U]): ...
-    /// ```
-    ///
-    /// `B` is a generic class, whose MRO includes the generic alias `A[U]`, which specializes `A`
-    /// with the specialization `{T: U}`. If `B` is specialized to `B[int]`, with specialization
-    /// `{U: int}`, we can apply the second specialization to the first, resulting in `T: int`.
-    /// That lets us produce the generic alias `A[int]`, which is the corresponding entry in the
-    /// MRO of `B[int]`.
-    pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
-        let types: Box<[_]> = self
-            .types(db)
-            .into_iter()
-            .map(|ty| ty.apply_specialization(db, other))
-            .collect();
-        Specialization::new(db, self.generic_context(db), types)
-    }
-
-    /// Applies an optional specialization to this specialization.
-    pub(crate) fn apply_optional_specialization(
-        self,
-        db: &'db dyn Db,
-        other: Option<Specialization<'db>>,
-    ) -> Self {
-        if let Some(other) = other {
-            self.apply_specialization(db, other)
-        } else {
-            self
+    fn type_mapping(self, db: &'db dyn Db) -> TypeMapping<'db, 'db> {
+        TypeMapping {
+            variables: self.generic_context(db).variables(db),
+            types: self.types(db).as_ref(),
         }
     }
 
@@ -266,16 +238,6 @@ impl<'db> Specialization<'db> {
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         let types: Box<[_]> = self.types(db).iter().map(|ty| ty.normalized(db)).collect();
         Self::new(db, self.generic_context(db), types)
-    }
-
-    /// Returns the type that a typevar is specialized to, or None if the typevar isn't part of
-    /// this specialization.
-    pub(crate) fn get(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
-        let index = self
-            .generic_context(db)
-            .variables(db)
-            .get_index_of(&typevar)?;
-        Some(self.types(db)[index])
     }
 
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Specialization<'db>) -> bool {
@@ -424,6 +386,71 @@ impl<'db> Specialization<'db> {
         for ty in self.types(db) {
             ty.find_legacy_typevars(db, typevars);
         }
+    }
+}
+
+/// A mapping between type variables and types.
+///
+/// You will usually use [`Specialization`] instead of this type. This type is used when we need to
+/// substitute types for type variables before we have fully constructed a [`Specialization`].
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct TypeMapping<'a, 'db> {
+    variables: &'a FxOrderSet<TypeVarInstance<'db>>,
+    types: &'a [Type<'db>],
+}
+
+impl<'db> TypeMapping<'_, 'db> {
+    /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
+    /// mapping.
+    pub(crate) fn get(self, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
+        let index = self.variables.get_index_of(&typevar)?;
+        self.types.get(index).copied()
+    }
+}
+
+pub(crate) trait Specialize<'db>: Clone {
+    #[must_use]
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self;
+
+    #[must_use]
+    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        self.apply_type_mapping(db, specialization.type_mapping(db))
+    }
+
+    #[must_use]
+    fn apply_optional_specialization(
+        &self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Self {
+        match specialization {
+            Some(specialization) => self.apply_specialization(db, specialization),
+            None => self.clone(),
+        }
+    }
+}
+
+impl<'db> Specialize<'db> for Specialization<'db> {
+    /// Applies a type mapping to this specialization. This is used, for instance, when a generic
+    /// class inherits from a generic alias:
+    ///
+    /// ```py
+    /// class A[T]: ...
+    /// class B[U](A[U]): ...
+    /// ```
+    ///
+    /// `B` is a generic class, whose MRO includes the generic alias `A[U]`, which specializes `A`
+    /// with the specialization `{T: U}`. If `B` is specialized to `B[int]`, with specialization
+    /// `{U: int}`, we can apply the second specialization to the first, resulting in `T: int`.
+    /// That lets us produce the generic alias `A[int]`, which is the corresponding entry in the
+    /// MRO of `B[int]`.
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+        let types: Box<[_]> = self
+            .types(db)
+            .into_iter()
+            .map(|ty| ty.apply_type_mapping(db, type_mapping))
+            .collect();
+        Specialization::new(db, self.generic_context(db), types)
     }
 }
 

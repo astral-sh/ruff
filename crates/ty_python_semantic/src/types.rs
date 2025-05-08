@@ -45,7 +45,7 @@ use crate::types::call::{Bindings, CallArgumentTypes, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
-use crate::types::generics::{GenericContext, Specialization};
+use crate::types::generics::{GenericContext, Specialization, Specialize, TypeMapping};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
@@ -342,16 +342,6 @@ pub struct PropertyInstanceType<'db> {
 }
 
 impl<'db> PropertyInstanceType<'db> {
-    fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        let getter = self
-            .getter(db)
-            .map(|ty| ty.apply_specialization(db, specialization));
-        let setter = self
-            .setter(db)
-            .map(|ty| ty.apply_specialization(db, specialization));
-        Self::new(db, getter, setter)
-    }
-
     fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
@@ -363,6 +353,18 @@ impl<'db> PropertyInstanceType<'db> {
         if let Some(ty) = self.setter(db) {
             ty.find_legacy_typevars(db, typevars);
         }
+    }
+}
+
+impl<'db> Specialize<'db> for PropertyInstanceType<'db> {
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+        let getter = self
+            .getter(db)
+            .map(|ty| ty.apply_type_mapping(db, type_mapping));
+        let setter = self
+            .setter(db)
+            .map(|ty| ty.apply_type_mapping(db, type_mapping));
+        Self::new(db, getter, setter)
     }
 }
 
@@ -5018,100 +5020,85 @@ impl<'db> Type<'db> {
         }
     }
 
-    #[must_use]
-    pub fn apply_optional_specialization(
-        self,
-        db: &'db dyn Db,
-        specialization: Option<Specialization<'db>>,
-    ) -> Type<'db> {
-        if let Some(specialization) = specialization {
-            self.apply_specialization(db, specialization)
-        } else {
-            self
-        }
-    }
-
     /// Applies a specialization to this type, replacing any typevars with the types that they are
     /// specialized to.
     ///
     /// Note that this does not specialize generic classes, functions, or type aliases! That is a
     /// different operation that is performed explicitly (via a subscript operation), or implicitly
     /// via a call to the generic object.
-    #[must_use]
-    #[salsa::tracked]
-    pub fn apply_specialization(
+    fn apply_type_mapping_inner<'a>(
         self,
         db: &'db dyn Db,
-        specialization: Specialization<'db>,
+        type_mapping: TypeMapping<'a, 'db>,
     ) -> Type<'db> {
         match self {
-            Type::TypeVar(typevar) => specialization.get(db, typevar).unwrap_or(self),
+            Type::TypeVar(typevar) => type_mapping.get(typevar).unwrap_or(self),
 
             Type::FunctionLiteral(function) => {
-                Type::FunctionLiteral(function.apply_specialization(db, specialization))
+                Type::FunctionLiteral(function.apply_type_mapping(db, type_mapping))
             }
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
-                method.function(db).apply_specialization(db, specialization),
-                method.self_instance(db).apply_specialization(db, specialization),
+                method.function(db).apply_type_mapping(db, type_mapping),
+                method.self_instance(db).apply_type_mapping(db, type_mapping),
             )),
 
             Type::NominalInstance(instance) => Type::NominalInstance(
-                instance.apply_specialization(db, specialization),
+                instance.apply_type_mapping(db, type_mapping),
             ),
 
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(
-                    function.apply_specialization(db, specialization),
+                    function.apply_type_mapping(db, type_mapping),
                 ))
             }
 
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)) => {
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(
-                    function.apply_specialization(db, specialization),
+                    function.apply_type_mapping(db, type_mapping),
                 ))
             }
 
             Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)) => {
                 Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(
-                    property.apply_specialization(db, specialization),
+                    property.apply_type_mapping(db, type_mapping),
                 ))
             }
 
             Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)) => {
                 Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(
-                    property.apply_specialization(db, specialization),
+                    property.apply_type_mapping(db, type_mapping),
                 ))
             }
 
             Type::Callable(callable) => {
-                Type::Callable(callable.apply_specialization(db, specialization))
+                Type::Callable(callable.apply_type_mapping(db, type_mapping))
             }
 
             Type::GenericAlias(generic) => {
                 let specialization = generic
                     .specialization(db)
-                    .apply_specialization(db, specialization);
+                    .apply_type_mapping(db, type_mapping);
                 Type::GenericAlias(GenericAlias::new(db, generic.origin(db), specialization))
             }
 
             Type::PropertyInstance(property) => {
-                Type::PropertyInstance(property.apply_specialization(db, specialization))
+                Type::PropertyInstance(property.apply_type_mapping(db, type_mapping))
             }
 
             Type::Union(union) => union.map(db, |element| {
-                element.apply_specialization(db, specialization)
+                element.apply_type_mapping(db, type_mapping)
             }),
             Type::Intersection(intersection) => {
                 let mut builder = IntersectionBuilder::new(db);
                 for positive in intersection.positive(db) {
                     builder =
-                        builder.add_positive(positive.apply_specialization(db, specialization));
+                        builder.add_positive(positive.apply_type_mapping(db, type_mapping));
                 }
                 for negative in intersection.negative(db) {
                     builder =
-                        builder.add_negative(negative.apply_specialization(db, specialization));
+                        builder.add_negative(negative.apply_type_mapping(db, type_mapping));
                 }
                 builder.build()
             }
@@ -5119,7 +5106,7 @@ impl<'db> Type<'db> {
                 db,
                 tuple
                     .iter(db)
-                    .map(|ty| ty.apply_specialization(db, specialization)),
+                    .map(|ty| ty.apply_type_mapping(db, type_mapping)),
             ),
 
             Type::Dynamic(_)
@@ -5450,6 +5437,12 @@ impl<'db> Type<'db> {
 impl<'db> From<&Type<'db>> for Type<'db> {
     fn from(value: &Type<'db>) -> Self {
         *value
+    }
+}
+
+impl<'db> Specialize<'db> for Type<'db> {
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+        self.apply_type_mapping_inner(db, type_mapping)
     }
 }
 
@@ -6827,23 +6820,6 @@ impl<'db> FunctionType<'db> {
         )
     }
 
-    fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        let specialization = match self.specialization(db) {
-            Some(existing) => existing.apply_specialization(db, specialization),
-            None => specialization,
-        };
-        Self::new(
-            db,
-            self.name(db).clone(),
-            self.known(db),
-            self.body_scope(db),
-            self.decorators(db),
-            self.dataclass_transformer_params(db),
-            self.inherited_generic_context(db),
-            Some(specialization),
-        )
-    }
-
     fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
@@ -6944,6 +6920,41 @@ impl<'db> FunctionType<'db> {
         // functions yet. Refer to https://github.com/salsa-rs/salsa/pull/772. Remove the inner
         // function once it's supported.
         to_overloaded_impl(db, self).as_ref()
+    }
+}
+
+impl<'db> Specialize<'db> for FunctionType<'db> {
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+        let specialization = self
+            .specialization(db)
+            .map(|existing| existing.apply_type_mapping(db, type_mapping));
+        Self::new(
+            db,
+            self.name(db).clone(),
+            self.known(db),
+            self.body_scope(db),
+            self.decorators(db),
+            self.dataclass_transformer_params(db),
+            self.inherited_generic_context(db),
+            specialization,
+        )
+    }
+
+    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        let specialization = match self.specialization(db) {
+            Some(existing) => existing.apply_specialization(db, specialization),
+            None => specialization,
+        };
+        Self::new(
+            db,
+            self.name(db).clone(),
+            self.known(db),
+            self.body_scope(db),
+            self.decorators(db),
+            self.dataclass_transformer_params(db),
+            self.inherited_generic_context(db),
+            Some(specialization),
+        )
     }
 }
 
@@ -7192,18 +7203,6 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    /// Apply a specialization to this callable type.
-    ///
-    /// See [`Type::apply_specialization`] for more details.
-    fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        CallableType::from_overloads(
-            db,
-            self.signatures(db)
-                .iter()
-                .map(|signature| signature.apply_specialization(db, specialization)),
-        )
-    }
-
     fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
@@ -7326,6 +7325,17 @@ impl<'db> CallableType<'db> {
                 false
             }
         }
+    }
+}
+
+impl<'db> Specialize<'db> for CallableType<'db> {
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+        CallableType::from_overloads(
+            db,
+            self.signatures(db)
+                .iter()
+                .map(|signature| signature.apply_type_mapping(db, type_mapping)),
+        )
     }
 }
 
