@@ -57,6 +57,7 @@ impl<'db> Bindings<'db> {
     /// verify that each argument type is assignable to the corresponding parameter type.
     pub(crate) fn match_parameters(
         signatures: Signatures<'db>,
+        inferred_return_ty: impl Fn() -> Type<'db> + Copy,
         arguments: &CallArguments<'_>,
     ) -> Self {
         let mut argument_forms = vec![None; arguments.len()];
@@ -69,6 +70,7 @@ impl<'db> Bindings<'db> {
                     arguments,
                     &mut argument_forms,
                     &mut conflicting_forms,
+                    inferred_return_ty,
                 )
             })
             .collect();
@@ -352,7 +354,11 @@ impl<'db> Bindings<'db> {
                             [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
                                     if let Ok(return_ty) = getter
-                                        .try_call(db, &CallArgumentTypes::positional([*instance]))
+                                        .try_call(
+                                            db,
+                                            &CallArgumentTypes::positional([*instance]),
+                                            None,
+                                        )
                                         .map(|binding| binding.return_type(db))
                                     {
                                         overload.set_return_type(return_ty);
@@ -381,7 +387,11 @@ impl<'db> Bindings<'db> {
                             [Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
                                     if let Ok(return_ty) = getter
-                                        .try_call(db, &CallArgumentTypes::positional([*instance]))
+                                        .try_call(
+                                            db,
+                                            &CallArgumentTypes::positional([*instance]),
+                                            None,
+                                        )
                                         .map(|binding| binding.return_type(db))
                                     {
                                         overload.set_return_type(return_ty);
@@ -410,6 +420,7 @@ impl<'db> Bindings<'db> {
                                 if let Err(_call_error) = setter.try_call(
                                     db,
                                     &CallArgumentTypes::positional([*instance, *value]),
+                                    None,
                                 ) {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the setter failed",
@@ -429,6 +440,7 @@ impl<'db> Bindings<'db> {
                                 if let Err(_call_error) = setter.try_call(
                                     db,
                                     &CallArgumentTypes::positional([*instance, *value]),
+                                    None,
                                 ) {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the setter failed",
@@ -938,6 +950,7 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
+        inferred_return_ty: impl Fn() -> Type<'db> + Copy,
     ) -> Self {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
@@ -957,6 +970,7 @@ impl<'db> CallableBinding<'db> {
                     arguments.as_ref(),
                     argument_forms,
                     conflicting_forms,
+                    inferred_return_ty,
                 )
             })
             .collect();
@@ -1125,6 +1139,7 @@ impl<'db> Binding<'db> {
         arguments: &CallArguments<'_>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
+        inferred_return_ty: impl Fn() -> Type<'db>,
     ) -> Self {
         let parameters = signature.parameters();
         // The parameter that each argument is matched with.
@@ -1241,7 +1256,7 @@ impl<'db> Binding<'db> {
         }
 
         Self {
-            return_ty: signature.return_ty.unwrap_or(Type::unknown()),
+            return_ty: signature.return_ty.unwrap_or_else(inferred_return_ty),
             specialization: None,
             inherited_specialization: None,
             argument_parameters: argument_parameters.into_boxed_slice(),

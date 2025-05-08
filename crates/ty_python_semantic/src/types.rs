@@ -2665,7 +2665,11 @@ impl<'db> Type<'db> {
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
             let return_ty = descr_get
-                .try_call(db, &CallArgumentTypes::positional([self, instance, owner]))
+                .try_call(
+                    db,
+                    &CallArgumentTypes::positional([self, instance, owner]),
+                    None,
+                )
                 .map(|bindings| {
                     if descr_get_boundness == Boundness::Bound {
                         bindings.return_type(db)
@@ -3084,6 +3088,7 @@ impl<'db> Type<'db> {
                         CallArgumentTypes::positional([Type::StringLiteral(
                             StringLiteralType::new(db, Box::from(name.as_str())),
                         )]),
+                        None,
                     )
                     .map(|outcome| Symbol::bound(outcome.return_type(db)))
                     // TODO: Handle call errors here.
@@ -3202,7 +3207,7 @@ impl<'db> Type<'db> {
             // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
             // and a subclass could add a `__bool__` method.
 
-            match self.try_call_dunder(db, "__bool__", CallArgumentTypes::none()) {
+            match self.try_call_dunder(db, "__bool__", CallArgumentTypes::none(), None) {
                 Ok(outcome) => {
                     let return_type = outcome.return_type(db);
                     if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
@@ -3394,7 +3399,7 @@ impl<'db> Type<'db> {
             return usize_len.try_into().ok().map(Type::IntLiteral);
         }
 
-        let return_ty = match self.try_call_dunder(db, "__len__", CallArgumentTypes::none()) {
+        let return_ty = match self.try_call_dunder(db, "__len__", CallArgumentTypes::none(), None) {
             Ok(bindings) => bindings.return_type(db),
             Err(CallDunderError::PossiblyUnbound(bindings)) => bindings.return_type(db),
 
@@ -4218,6 +4223,32 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns the inferred return type of `self` if it is a function literal.
+    fn inferred_return_type(
+        self,
+        db: &'db dyn Db,
+        call_scope: Option<ScopeId>,
+    ) -> Option<Type<'db>> {
+        match self {
+            Type::FunctionLiteral(function_type)
+                if !function_type.file(db).is_stub(db)
+                    && call_scope
+                        .is_some_and(|call_scope| call_scope != function_type.body_scope(db)) =>
+            {
+                Some(function_type.inferred_return_type(db))
+            }
+            Type::BoundMethod(method_type)
+                if !method_type.function(db).file(db).is_stub(db)
+                    && call_scope.is_some_and(|call_scope| {
+                        call_scope != method_type.function(db).body_scope(db)
+                    }) =>
+            {
+                Some(method_type.inferred_return_type(db))
+            }
+            _ => None,
+        }
+    }
+
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if
     /// the arguments are not compatible with the formal parameters.
     ///
@@ -4228,9 +4259,15 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         argument_types: &CallArgumentTypes<'_, 'db>,
+        call_scope: Option<ScopeId>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
         let signatures = self.signatures(db);
-        Bindings::match_parameters(signatures, argument_types).check_types(db, argument_types)
+        let inferred_return_ty = || {
+            self.inferred_return_type(db, call_scope)
+                .unwrap_or(Type::unknown())
+        };
+        Bindings::match_parameters(signatures, inferred_return_ty, argument_types)
+            .check_types(db, argument_types)
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -4242,12 +4279,14 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         name: &str,
         mut argument_types: CallArgumentTypes<'_, 'db>,
+        call_scope: Option<ScopeId>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         self.try_call_dunder_with_policy(
             db,
             name,
             &mut argument_types,
             MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            call_scope,
         )
     }
 
@@ -4261,6 +4300,7 @@ impl<'db> Type<'db> {
         name: &str,
         argument_types: &mut CallArgumentTypes<'_, 'db>,
         policy: MemberLookupPolicy,
+        call_scope: Option<ScopeId>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match self
             .member_lookup_with_policy(db, name.into(), policy)
@@ -4268,8 +4308,14 @@ impl<'db> Type<'db> {
         {
             Symbol::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db);
-                let bindings = Bindings::match_parameters(signatures, argument_types)
-                    .check_types(db, argument_types)?;
+                let inferred_return_ty = || {
+                    dunder_callable
+                        .inferred_return_type(db, call_scope)
+                        .unwrap_or(Type::unknown())
+                };
+                let bindings =
+                    Bindings::match_parameters(signatures, inferred_return_ty, argument_types)
+                        .check_types(db, argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }
@@ -4306,18 +4352,19 @@ impl<'db> Type<'db> {
                 db,
                 "__getitem__",
                 CallArgumentTypes::positional([KnownClass::Int.to_instance(db)]),
+                None,
             )
             .map(|dunder_getitem_outcome| dunder_getitem_outcome.return_type(db))
         };
 
         let try_call_dunder_next_on_iterator = |iterator: Type<'db>| {
             iterator
-                .try_call_dunder(db, "__next__", CallArgumentTypes::none())
+                .try_call_dunder(db, "__next__", CallArgumentTypes::none(), None)
                 .map(|dunder_next_outcome| dunder_next_outcome.return_type(db))
         };
 
         let dunder_iter_result = self
-            .try_call_dunder(db, "__iter__", CallArgumentTypes::none())
+            .try_call_dunder(db, "__iter__", CallArgumentTypes::none(), None)
             .map(|dunder_iter_outcome| dunder_iter_outcome.return_type(db));
 
         match dunder_iter_result {
@@ -4401,11 +4448,12 @@ impl<'db> Type<'db> {
     ///     pass
     /// ```
     fn try_enter(self, db: &'db dyn Db) -> Result<Type<'db>, ContextManagerError<'db>> {
-        let enter = self.try_call_dunder(db, "__enter__", CallArgumentTypes::none());
+        let enter = self.try_call_dunder(db, "__enter__", CallArgumentTypes::none(), None);
         let exit = self.try_call_dunder(
             db,
             "__exit__",
             CallArgumentTypes::positional([Type::none(db), Type::none(db), Type::none(db)]),
+            None,
         );
 
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
@@ -4441,6 +4489,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         argument_types: CallArgumentTypes<'_, 'db>,
+        call_scope: Option<ScopeId>,
     ) -> Result<Type<'db>, ConstructorCallError<'db>> {
         debug_assert!(matches!(
             self,
@@ -4503,8 +4552,11 @@ impl<'db> Type<'db> {
         let new_call_outcome = new_method.and_then(|new_method| {
             match new_method.symbol.try_call_dunder_get(db, self_type) {
                 Symbol::Type(new_method, boundness) => {
-                    let result =
-                        new_method.try_call(db, argument_types.with_self(Some(self_type)).as_ref());
+                    let result = new_method.try_call(
+                        db,
+                        argument_types.with_self(Some(self_type)).as_ref(),
+                        call_scope,
+                    );
                     if boundness == Boundness::PossiblyUnbound {
                         Some(Err(DunderNewCallError::PossiblyUnbound(result.err())))
                     } else {
@@ -4532,7 +4584,7 @@ impl<'db> Type<'db> {
                 .symbol
                 .is_unbound()
         {
-            Some(init_ty.try_call_dunder(db, "__init__", argument_types))
+            Some(init_ty.try_call_dunder(db, "__init__", argument_types, call_scope))
         } else {
             None
         };
@@ -5897,7 +5949,7 @@ impl<'db> IterationError<'db> {
 
             Self::IterCallError(_, dunder_iter_bindings) => dunder_iter_bindings
                 .return_type(db)
-                .try_call_dunder(db, "__next__", CallArgumentTypes::none())
+                .try_call_dunder(db, "__next__", CallArgumentTypes::none(), None)
                 .map(|dunder_next_outcome| Some(dunder_next_outcome.return_type(db)))
                 .unwrap_or_else(|dunder_next_call_error| dunder_next_call_error.return_type(db)),
 
@@ -6787,6 +6839,14 @@ impl<'db> FunctionType<'db> {
         signature
     }
 
+    /// Infers this function scope's types and returns the inferred return type.
+    /// Do not call this method within a function scope itself, i.e. check that the function is not recursive.
+    fn inferred_return_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self.body_scope(db);
+        let inference = infer_scope_types(db, scope);
+        inference.inferred_return_type(db, None)
+    }
+
     pub(crate) fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
         self.known(db) == Some(known_function)
     }
@@ -7125,6 +7185,91 @@ impl<'db> BoundMethodType<'db> {
                 .iter()
                 .map(signatures::Signature::bind_self),
         ))
+    }
+
+    /// Infers this method scope's types and returns the inferred return type.
+    pub(crate) fn inferred_return_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self.function(db).body_scope(db);
+        let inference = infer_scope_types(db, scope);
+        inference.inferred_return_type(db, Some(self))
+    }
+
+    pub(crate) fn is_final(self, db: &'db dyn Db) -> bool {
+        if self
+            .function(db)
+            .has_known_decorator(db, FunctionDecorators::FINAL)
+        {
+            return true;
+        }
+        let definition_scope = self.function(db).definition(db).scope(db);
+        let index = semantic_index(db, definition_scope.file(db));
+        let class_definition =
+            index.expect_single_definition(definition_scope.node(db).expect_class());
+        let class_ty = binding_type(db, class_definition).expect_class_literal();
+        class_ty
+            .known_function_decorators(db)
+            .any(|deco| deco == KnownFunction::Final)
+    }
+
+    /// Returns the compatible return type for this method -- the intersection of the return types of the base class methods.
+    pub(crate) fn compatible_return_type(
+        self,
+        db: &'db dyn Db,
+        call_scope: Option<ScopeId>,
+    ) -> Option<Type<'db>> {
+        let definition_scope = self.function(db).definition(db).scope(db);
+        let index = semantic_index(db, definition_scope.file(db));
+        let class_definition =
+            index.expect_single_definition(definition_scope.node(db).expect_class());
+        let class = binding_type(db, class_definition).expect_class_type(db);
+        let (class_lit, _) = class.class_literal(db);
+        let name = self.function(db).name(db);
+
+        let mut found = false;
+        let mut intersection = IntersectionBuilder::new(db);
+        for base in class_lit.explicit_bases(db) {
+            if let Some(base_function_ty) = base
+                .member(db, name)
+                .into_lookup_result()
+                .ok()
+                .and_then(|ty| ty.inner_type().into_function_literal())
+            {
+                if let FunctionSignature::Single(base_signature) = base_function_ty.signature(db) {
+                    if let Some(return_ty) = base_signature.return_ty.or_else(|| {
+                        let base_method_ty =
+                            base_function_ty.into_bound_method_type(db, Type::instance(db, class));
+                        base_method_ty.inferred_return_type(db, call_scope)
+                    }) {
+                        if let Type::TypeVar(return_typevar) = return_ty {
+                            if let FunctionSignature::Single(signature) =
+                                self.function(db).signature(db)
+                            {
+                                if let Ok(specialization) =
+                                    base_signature.specialize_with(db, signature)
+                                {
+                                    if let Some(return_ty) = specialization.get(db, return_typevar)
+                                    {
+                                        found = true;
+                                        intersection = intersection.add_positive(return_ty);
+                                    }
+                                }
+                            }
+                        } else {
+                            found = true;
+                            intersection = intersection.add_positive(return_ty);
+                        }
+                    }
+                } else {
+                    // TODO: overloaded methods
+                }
+            }
+        }
+
+        if found {
+            Some(intersection.build())
+        } else {
+            None
+        }
     }
 }
 
