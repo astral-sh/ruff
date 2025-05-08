@@ -196,7 +196,8 @@ def f():
 x = 42
 
 def f():
-    print(x)  # error: [unresolved-reference] "Name `x` used when not defined"
+    # error: [unresolved-reference] "Name `x` used when not defined"
+    reveal_type(x)  # revealed: Unknown
     x = "56"
-    print(x)
+    reveal_type(x)  # revealed: Literal["56"]
 ```
