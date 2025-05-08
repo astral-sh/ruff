@@ -1310,14 +1310,14 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     // Use default (which should be latest supported)
     let case = TestCase::with_files([
         (
-            "project/ty.toml",
+            "ty.toml",
             r#"
             [environment]
             python-platform = "linux"
             "#,
         ),
         (
-            "project/main.py",
+            "main.py",
             r#"
             import os
 
