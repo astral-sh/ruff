@@ -184,6 +184,7 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    /// Replace references to `class` with a self-reference marker
     pub(super) fn replace_recursive_reference(
         self,
         db: &'db dyn Db,

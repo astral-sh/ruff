@@ -1615,6 +1615,52 @@ def _(rec: RecursiveFullyStatic, other: Other):
     other = rec.parent.parent.parent  # error: [invalid-assignment]
 ```
 
+### Nested occurrences of self-reference
+
+Make sure that we handle self-reference correctly, even if they appear as parts of type:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, Callable
+from ty_extensions import Intersection, Not, is_fully_static, is_assignable_to, is_equivalent_to, static_assert
+
+class C: ...
+
+class GenericC[T](Protocol):
+    pass
+
+class Recursive(Protocol):
+    direct: Recursive
+
+    union: None | Recursive
+
+    intersection1: Intersection[C, Recursive]
+    intersection2: Intersection[C, Not[Recursive]]
+
+    t: tuple[int, tuple[str, Recursive]]
+
+    callable1: Callable[[int], Recursive]
+    callable2: Callable[[Recursive], int]
+
+    subtype_of: type[Recursive]
+
+    generic: GenericC[Recursive]
+
+    def method(self, x: Recursive) -> Recursive: ...
+
+    nested: Recursive | Callable[[Recursive | Recursive, tuple[Recursive, Recursive]], Recursive | Recursive]
+
+static_assert(is_fully_static(Recursive))
+static_assert(is_equivalent_to(Recursive, Recursive))
+static_assert(is_assignable_to(Recursive, Recursive))
+```
+
 ### Regression test: narrowing with self-referential protocols
 
 This snippet caused us to panic on an early version of the implementation for protocols.

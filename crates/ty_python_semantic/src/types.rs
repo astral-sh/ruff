@@ -587,12 +587,11 @@ impl<'db> Type<'db> {
         matches!(self, Type::Dynamic(DynamicType::Todo(_)))
     }
 
+    /// Replace references to the class `class` with a self-reference marker. This is currently
+    /// used for recursive protocols, but could probably be extended to self-referential type-
+    /// aliases and similar.
     #[must_use]
-    pub fn replace_recursive_reference(
-        &self,
-        db: &'db dyn Db,
-        class: ClassLiteral<'db>,
-    ) -> Type<'db> {
+    pub fn replace_self_reference(&self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Type<'db> {
         match self {
             Self::ProtocolInstance(protocol) => {
                 Self::ProtocolInstance(protocol.replace_recursive_reference(db, class))
@@ -603,35 +602,36 @@ impl<'db> Type<'db> {
                 union
                     .elements(db)
                     .iter()
-                    .map(|ty| ty.replace_recursive_reference(db, class)),
+                    .map(|ty| ty.replace_self_reference(db, class)),
             ),
 
-            Self::Intersection(intersection) => {
-                let positive = intersection
-                    .positive(db)
-                    .iter()
-                    .map(|ty| ty.replace_recursive_reference(db, class));
-                let negative = intersection
-                    .negative(db)
-                    .iter()
-                    .map(|ty| ty.replace_recursive_reference(db, class));
-
-                IntersectionBuilder::new(db)
-                    .positive_elements(positive)
-                    .negative_elements(negative)
-                    .build()
-            }
+            Self::Intersection(intersection) => IntersectionBuilder::new(db)
+                .positive_elements(
+                    intersection
+                        .positive(db)
+                        .iter()
+                        .map(|ty| ty.replace_self_reference(db, class)),
+                )
+                .negative_elements(
+                    intersection
+                        .negative(db)
+                        .iter()
+                        .map(|ty| ty.replace_self_reference(db, class)),
+                )
+                .build(),
 
             Self::Tuple(tuple) => TupleType::from_elements(
                 db,
                 tuple
                     .elements(db)
                     .iter()
-                    .map(|ty| ty.replace_recursive_reference(db, class)),
+                    .map(|ty| ty.replace_self_reference(db, class)),
             ),
 
-            Self::GenericAlias(_) | Self::Callable(_) | Self::TypeVar(_) => {
-                // TODO
+            Self::Callable(callable) => Self::Callable(callable.replace_self_reference(db, class)),
+
+            Self::GenericAlias(_) | Self::TypeVar(_) => {
+                // TODO: replace self-references in generic aliases and typevars
                 *self
             }
 
@@ -641,16 +641,16 @@ impl<'db> Type<'db> {
             | Self::Never
             | Self::BooleanLiteral(_)
             | Self::BytesLiteral(_)
-            | Self::FunctionLiteral(_)
-            | Self::NominalInstance(_)
-            | Self::ModuleLiteral(_)
-            | Self::ClassLiteral(_)
-            | Self::KnownInstance(_)
-            | Self::PropertyInstance(_)
             | Self::StringLiteral(_)
             | Self::IntLiteral(_)
             | Self::LiteralString
             | Self::SliceLiteral(_)
+            | Self::FunctionLiteral(_)
+            | Self::ModuleLiteral(_)
+            | Self::ClassLiteral(_)
+            | Self::NominalInstance(_)
+            | Self::KnownInstance(_)
+            | Self::PropertyInstance(_)
             | Self::BoundMethod(_)
             | Self::WrapperDescriptor(_)
             | Self::MethodWrapper(_)
@@ -7345,6 +7345,17 @@ impl<'db> CallableType<'db> {
                 false
             }
         }
+    }
+
+    /// See [`Type::replace_self_reference`].
+    fn replace_self_reference(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
+        CallableType::from_overloads(
+            db,
+            self.signatures(db)
+                .iter()
+                .cloned()
+                .map(|signature| signature.replace_self_reference(db, class)),
+        )
     }
 }
 

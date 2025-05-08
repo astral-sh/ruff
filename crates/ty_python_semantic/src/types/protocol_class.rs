@@ -281,7 +281,7 @@ fn cached_protocol_interface<'db>(
                 })
                 .filter(|(name, _, _)| !excluded_from_proto_members(name))
                 .map(|(name, ty, qualifiers)| {
-                    let ty = ty.replace_recursive_reference(db, class);
+                    let ty = ty.replace_self_reference(db, class);
                     let member = ProtocolMemberData { ty, qualifiers };
                     (name.clone(), member)
                 }),
