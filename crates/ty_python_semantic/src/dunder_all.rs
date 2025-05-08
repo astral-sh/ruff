@@ -6,11 +6,10 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::{self as ast};
 
-use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId};
+use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{global_scope, semantic_index, SemanticIndex};
-use crate::symbol::{symbol_from_bindings, Boundness, Symbol};
-use crate::types::{infer_expression_types, Truthiness};
+use crate::types::{infer_expression_types, infer_scope_types, Truthiness, Type};
 use crate::{resolve_module, Db, ModuleName};
 
 #[allow(clippy::ref_option)]
@@ -111,18 +110,9 @@ impl<'db> DunderAllNamesCollector<'db> {
                 if attr != "__all__" {
                     return false;
                 }
-                let Some(name_node) = value.as_name_expr() else {
-                    return false;
-                };
-                let Symbol::Type(ty, Boundness::Bound) = symbol_from_bindings(
-                    self.db,
-                    self.index
-                        .use_def_map(self.scope.file_scope_id(self.db))
-                        .bindings_at_use(name_node.scoped_use_id(self.db, self.scope)),
-                ) else {
-                    return false;
-                };
-                let Some(module_literal) = ty.into_module_literal() else {
+                let value_id = value.scoped_expression_id(self.db, self.scope);
+                let value_ty = infer_scope_types(self.db, self.scope).expression_type(value_id);
+                let Type::ModuleLiteral(module_literal) = value_ty else {
                     return false;
                 };
                 let Some(module_dunder_all_names) =
