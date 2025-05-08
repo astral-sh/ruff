@@ -26,10 +26,10 @@ See [the rules documentation](https://github.com/astral-sh/ruff/blob/main/crates
 
 Valid severities are:
 
-- `ignore`: Disable the rule.
-- `warn`: Enable the rule and create a warning diagnostic.
-- `error`: Enable the rule and create an error diagnostic.
-   ty will exit with a non-zero code if any error diagnostics are emitted.
+* `ignore`: Disable the rule.
+* `warn`: Enable the rule and create a warning diagnostic.
+* `error`: Enable the rule and create an error diagnostic.
+  ty will exit with a non-zero code if any error diagnostics are emitted.
 
 **Default value**: `{...}`
 
