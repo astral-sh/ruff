@@ -178,7 +178,7 @@ x = None
 global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
 ```
 
-## Tricky cases
+## Local bindings override preceding `global` bindings
 
 ```py
 x = 42
@@ -189,6 +189,8 @@ def f():
     x = "56"
     reveal_type(x)  # revealed: Literal["56"]
 ```
+
+## Local assignment prevents falling back to the outer scope
 
 ```py
 x = 42
