@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Expr, ExprCall, Number, PythonVersion};
+use ruff_python_ast::{self as ast, Expr, ExprCall, Number, PythonVersion, UnaryOp};
 use ruff_source_file::find_newline;
 use ruff_text_size::Ranged;
 
@@ -127,7 +127,17 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
         return;
     }
 
-    let applicability = if matches!(arg, Expr::NumberLiteral(_)) {
+    let maybe_number = if let Some(maybe_number) = arg
+        .as_unary_op_expr()
+        .filter(|unary_expr| unary_expr.op == UnaryOp::UAdd)
+        .map(|unary_expr| &unary_expr.operand)
+    {
+        maybe_number
+    } else {
+        arg
+    };
+
+    let applicability = if matches!(maybe_number, Expr::NumberLiteral(_)) {
         Applicability::Safe
     } else {
         Applicability::DisplayOnly
@@ -155,7 +165,7 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
 fn try_create_replacement(checker: &Checker, arg: &Expr, base: Base) -> Option<String> {
     if !matches!(
         arg,
-        Expr::NumberLiteral(_) | Expr::Name(_) | Expr::Attribute(_)
+        Expr::NumberLiteral(_) | Expr::Name(_) | Expr::Attribute(_) | Expr::UnaryOp(_)
     ) {
         return None;
     }
