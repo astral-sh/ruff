@@ -153,43 +153,63 @@ impl<'db> Mro<'db> {
                         .collect(),
                 );
 
-                c3_merge(seqs).ok_or_else(|| {
-                    let duplicate_bases: Box<[DuplicateBaseError<'db>]> = {
-                        let mut base_to_indices: FxHashMap<ClassType<'db>, Vec<usize>> =
-                            FxHashMap::default();
+                if let Some(mro) = c3_merge(seqs) {
+                    return Ok(mro);
+                }
 
-                        for (index, base) in valid_bases
-                            .iter()
-                            .enumerate()
-                            .filter_map(|(index, base)| Some((index, base.into_class()?)))
-                        {
-                            base_to_indices.entry(base).or_default().push(index);
+                let mut duplicate_dynamic_bases = false;
+
+                let duplicate_bases: Vec<DuplicateBaseError<'db>> = {
+                    let mut base_to_indices: FxHashMap<ClassBase<'db>, Vec<usize>> =
+                        FxHashMap::default();
+
+                    for (index, base) in valid_bases.iter().enumerate() {
+                        base_to_indices.entry(*base).or_default().push(index);
+                    }
+
+                    let mut errors = vec![];
+
+                    for (base, indices) in base_to_indices {
+                        let Some((first_index, later_indices)) = indices.split_first() else {
+                            continue;
+                        };
+                        if later_indices.is_empty() {
+                            continue;
                         }
-
-                        base_to_indices
-                            .iter()
-                            .filter_map(|(base, indices)| {
-                                let (first_index, later_indices) = indices.split_first()?;
-                                if later_indices.is_empty() {
-                                    return None;
-                                }
-                                Some(DuplicateBaseError {
-                                    duplicate_base: base.class_literal(db).0,
+                        match base {
+                            ClassBase::Class(class) => {
+                                errors.push(DuplicateBaseError {
+                                    duplicate_base: class.class_literal(db).0,
                                     first_index: *first_index,
                                     later_indices: later_indices.iter().copied().collect(),
-                                })
-                            })
-                            .collect()
-                    };
-
-                    if duplicate_bases.is_empty() {
-                        MroErrorKind::UnresolvableMro {
-                            bases_list: valid_bases.into_boxed_slice(),
+                                });
+                            }
+                            // TODO these should also be reported as duplicate bases
+                            // rather than using the less specific `inconsistent-mro` error
+                            ClassBase::Generic(_) | ClassBase::Protocol => continue,
+                            ClassBase::Dynamic(_) => duplicate_dynamic_bases = true,
                         }
-                    } else {
-                        MroErrorKind::DuplicateBases(duplicate_bases)
                     }
-                })
+
+                    errors
+                };
+
+                if duplicate_bases.is_empty() {
+                    if duplicate_dynamic_bases {
+                        Ok(Mro::from_error(
+                            db,
+                            class.apply_optional_specialization(db, specialization),
+                        ))
+                    } else {
+                        Err(MroErrorKind::UnresolvableMro {
+                            bases_list: valid_bases.into_boxed_slice(),
+                        })
+                    }
+                } else {
+                    Err(MroErrorKind::DuplicateBases(
+                        duplicate_bases.into_boxed_slice(),
+                    ))
+                }
             }
         }
     }
