@@ -19,6 +19,16 @@ reveal_type(generic_context(SingleTypevar))  # revealed: tuple[T]
 reveal_type(generic_context(MultipleTypevars))  # revealed: tuple[T, S]
 ```
 
+Inheriting from `Generic` multiple times yields a `duplicate-base` diagnostic, just like any other
+class:
+
+```py
+class Bad(Generic[T], Generic[T]): ...  # error: [duplicate-base]
+
+# TODO: should emit an error (fails at runtime)
+class AlsoBad(Generic[T], Generic[S]): ...
+```
+
 You cannot use the same typevar more than once.
 
 ```py

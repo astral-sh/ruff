@@ -35,7 +35,7 @@ Just like for any other class base, it is an error for `Protocol` to appear mult
 class's bases:
 
 ```py
-class Foo(Protocol, Protocol): ...  # error: [inconsistent-mro]
+class Foo(Protocol, Protocol): ...  # error: [duplicate-base]
 
 reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
 ```
