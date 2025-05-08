@@ -200,3 +200,20 @@ S603.py:41:1: S603 `subprocess` call: check for execution of untrusted input
 41 | run(e)
    | ^^^ S603
    |
+
+S603.py:46:1: S603 `subprocess` call: check for execution of untrusted input
+   |
+44 | # https://github.com/astral-sh/ruff/issues/17798
+45 | # Tuple literals are trusted
+46 | check_output(("literal", "cmd", "using", "tuple"), text=True)
+   | ^^^^^^^^^^^^ S603
+47 | Popen(("literal", "cmd", "using", "tuple"))
+   |
+
+S603.py:47:1: S603 `subprocess` call: check for execution of untrusted input
+   |
+45 | # Tuple literals are trusted
+46 | check_output(("literal", "cmd", "using", "tuple"), text=True)
+47 | Popen(("literal", "cmd", "using", "tuple"))
+   | ^^^^^ S603
+   |

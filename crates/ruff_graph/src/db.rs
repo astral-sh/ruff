@@ -98,6 +98,4 @@ impl Db for ModuleDb {
 }
 
 #[salsa::db]
-impl salsa::Database for ModuleDb {
-    fn salsa_event(&self, _event: &dyn Fn() -> salsa::Event) {}
-}
+impl salsa::Database for ModuleDb {}

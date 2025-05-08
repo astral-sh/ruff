@@ -43,9 +43,9 @@ def _(flag: bool):
     C = A if flag else B
 
     if C != A:
-        reveal_type(C)  # revealed: Literal[B]
+        reveal_type(C)  # revealed: <class 'B'>
     else:
-        reveal_type(C)  # revealed: Literal[A]
+        reveal_type(C)  # revealed: <class 'A'>
 ```
 
 ## `x != y` where `y` has multiple single-valued options

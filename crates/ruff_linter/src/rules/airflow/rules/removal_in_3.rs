@@ -710,11 +710,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             // airflow.utils.dag_cycle_tester
             ["dag_cycle_tester", "test_cycle"] => Replacement::None,
 
-            // airflow.utils.dag_parsing_context
-            ["dag_parsing_context", "get_parsing_context"] => {
-                Replacement::Name("airflow.sdk.get_parsing_context")
-            }
-
             // airflow.utils.db
             ["db", "create_session"] => Replacement::None,
 

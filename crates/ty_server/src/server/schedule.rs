@@ -23,7 +23,7 @@ pub(crate) fn event_loop_thread(
 ) -> crate::Result<thread::JoinHandle<crate::Result<()>>> {
     // Override OS defaults to avoid stack overflows on platforms with low stack size defaults.
     const MAIN_THREAD_STACK_SIZE: usize = 2 * 1024 * 1024;
-    const MAIN_THREAD_NAME: &str = "ruff:main";
+    const MAIN_THREAD_NAME: &str = "ty:main";
     Ok(
         thread::Builder::new(thread::ThreadPriority::LatencySensitive)
             .name(MAIN_THREAD_NAME.into())
@@ -57,7 +57,6 @@ impl<'s> Scheduler<'s> {
     /// Immediately sends a request of kind `R` to the client, with associated parameters.
     /// The task provided by `response_handler` will be dispatched as soon as the response
     /// comes back from the client.
-    #[expect(dead_code)]
     pub(super) fn request<R>(
         &mut self,
         params: R::Params,

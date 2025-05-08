@@ -388,13 +388,13 @@ class A(metaclass=Meta): ...
 class B(metaclass=Meta): ...
 
 reveal_type(A + B)  # revealed: int
-# error: [unsupported-operator] "Operator `-` is unsupported between objects of type `Literal[A]` and `Literal[B]`"
+# error: [unsupported-operator] "Operator `-` is unsupported between objects of type `<class 'A'>` and `<class 'B'>`"
 reveal_type(A - B)  # revealed: Unknown
 
 reveal_type(A < B)  # revealed: bool
 reveal_type(A > B)  # revealed: bool
 
-# error: [unsupported-operator] "Operator `<=` is not supported for types `Literal[A]` and `Literal[B]`"
+# error: [unsupported-operator] "Operator `<=` is not supported for types `<class 'A'>` and `<class 'B'>`"
 reveal_type(A <= B)  # revealed: Unknown
 
 reveal_type(A[0])  # revealed: str

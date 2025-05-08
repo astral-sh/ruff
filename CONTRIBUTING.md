@@ -366,6 +366,15 @@ uvx --from ./python/ruff-ecosystem ruff-ecosystem format ruff "./target/debug/ru
 
 See the [ruff-ecosystem package](https://github.com/astral-sh/ruff/tree/main/python/ruff-ecosystem) for more details.
 
+## Upgrading Rust
+
+1. Change the `channel` in `./rust-toolchain.toml` to the new Rust version (`<latest>`)
+1. Change the `rust-version` in the `./Cargo.toml` to `<latest> - 2` (e.g. 1.84 if the latest is 1.86)
+1. Run `cargo clippy --fix --allow-dirty --allow-staged` to fix new clippy warnings
+1. Create and merge the PR
+1. Bump the Rust version in Ruff's conda forge recipe. See [this PR](https://github.com/conda-forge/ruff-feedstock/pull/266) for an example.
+1. Enjoy the new Rust version!
+
 ## Benchmarking and Profiling
 
 We have several ways of benchmarking and profiling Ruff:

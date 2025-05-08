@@ -16,7 +16,7 @@ Or used implicitly:
 
 ```py
 reveal_type(chr)  # revealed: def chr(i: SupportsIndex, /) -> str
-reveal_type(str)  # revealed: Literal[str]
+reveal_type(str)  # revealed: <class 'str'>
 ```
 
 ## Builtin symbol from custom typeshed

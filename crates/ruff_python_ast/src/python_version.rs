@@ -59,6 +59,10 @@ impl PythonVersion {
         Self::PY313
     }
 
+    pub const fn latest_ty() -> Self {
+        Self::PY313
+    }
+
     pub const fn as_tuple(self) -> (u8, u8) {
         (self.major, self.minor)
     }
@@ -72,6 +76,10 @@ impl PythonVersion {
     /// [PEP 701]: https://peps.python.org/pep-0701/
     pub fn supports_pep_701(self) -> bool {
         self >= Self::PY312
+    }
+
+    pub fn defers_annotations(self) -> bool {
+        self >= Self::PY314
     }
 }
 

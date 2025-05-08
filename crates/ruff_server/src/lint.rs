@@ -101,7 +101,8 @@ pub(crate) fn check(
         settings.linter.unresolved_target_version
     };
 
-    let parse_options = ParseOptions::from(source_type).with_target_version(target_version);
+    let parse_options =
+        ParseOptions::from(source_type).with_target_version(target_version.parser_version());
 
     // Parse once.
     let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), parse_options)

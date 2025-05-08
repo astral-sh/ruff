@@ -1,5 +1,4 @@
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
-use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
@@ -21,7 +20,7 @@ use std::sync::Arc;
 
 use super::UnionType;
 
-/// Return the type constraint that `test` (if true) would place on `definition`, if any.
+/// Return the type constraint that `test` (if true) would place on `symbol`, if any.
 ///
 /// For example, if we have this code:
 ///
@@ -35,12 +34,12 @@ use super::UnionType;
 /// The `test` expression `x is not None` places the constraint "not None" on the definition of
 /// `x`, so in that case we'd return `Some(Type::Intersection(negative=[Type::None]))`.
 ///
-/// But if we called this with the same `test` expression, but the `definition` of `y`, no
-/// constraint is applied to that definition, so we'd just return `None`.
+/// But if we called this with the same `test` expression, but the `symbol` of `y`, no
+/// constraint is applied to that symbol, so we'd just return `None`.
 pub(crate) fn infer_narrowing_constraint<'db>(
     db: &'db dyn Db,
     predicate: Predicate<'db>,
-    definition: Definition<'db>,
+    symbol: ScopedSymbolId,
 ) -> Option<Type<'db>> {
     let constraints = match predicate.node {
         PredicateNode::Expression(expression) => {
@@ -60,7 +59,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
     if let Some(constraints) = constraints {
-        constraints.get(&definition.symbol(db)).copied()
+        constraints.get(&symbol).copied()
     } else {
         None
     }

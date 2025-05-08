@@ -242,7 +242,7 @@
         },
         "call-possibly-unbound-method": {
           "title": "detects calls to possibly unbound methods",
-          "description": "## What it does\nChecks for calls to possibly unbound methods.\n\nTODO #14889",
+          "description": "## What it does\nChecks for calls to possibly unbound methods.\n\n## Why is this bad?\nCalling an unbound method will raise an `AttributeError` at runtime.",
           "default": "warn",
           "oneOf": [
             {
@@ -262,7 +262,7 @@
         },
         "conflicting-declarations": {
           "title": "detects conflicting declarations",
-          "description": "TODO #14889",
+          "description": "## What it does\nChecks whether a variable has been declared as two conflicting types.\n\n## Why is this bad\nA variable with two conflicting declarations likely indicates a mistake.\nMoreover, it could lead to incorrect or ill-defined type inference for\nother code that relies on these variables.",
           "default": "error",
           "oneOf": [
             {
@@ -302,7 +302,7 @@
         },
         "duplicate-base": {
           "title": "detects class definitions with duplicate bases",
-          "description": "TODO #14889",
+          "description": "## What it does\nChecks for class definitions with duplicate bases.\n\n## Why is this bad?\nClass definitions with duplicate bases raise a `TypeError` at runtime.",
           "default": "error",
           "oneOf": [
             {
@@ -352,7 +352,7 @@
         },
         "inconsistent-mro": {
           "title": "detects class definitions with an inconsistent MRO",
-          "description": "TODO #14889",
+          "description": "## What it does\nChecks for classes with an inconsistent method resolution order (MRO).\n\n## Why is this bad?\nClasses with an inconsistent MRO will raise a `TypeError` at runtime.",
           "default": "error",
           "oneOf": [
             {
@@ -362,7 +362,7 @@
         },
         "index-out-of-bounds": {
           "title": "detects index out of bounds errors",
-          "description": "## What it does\nTODO #14889",
+          "description": "## What it does\nChecks for attempts to use an out of bounds index to get an item from\na container.\n\n## Why is this bad?\nUsing an out of bounds index will raise an `IndexError` at runtime.",
           "default": "error",
           "oneOf": [
             {
@@ -551,7 +551,7 @@
           ]
         },
         "invalid-type-checking-constant": {
-          "title": "detects invalid TYPE_CHECKING constant assignments",
+          "title": "detects invalid `TYPE_CHECKING` constant assignments",
           "description": "## What it does\nChecks for a value other than `False` assigned to the `TYPE_CHECKING` variable, or an\nannotation not assignable from `bool`.\n\n## Why is this bad?\nThe name `TYPE_CHECKING` is reserved for a flag that can be used to provide conditional\ncode seen only by the type checker, and not at runtime. Normally this flag is imported from\n`typing` or `typing_extensions`, but it can also be defined locally. If defined locally, it\nmust be assigned the value `False` at runtime; the type checker will consider its value to\nbe `True`. If annotated, it must be annotated as a type that can accept `bool` values.",
           "default": "error",
           "oneOf": [
@@ -632,7 +632,7 @@
         },
         "possibly-unbound-attribute": {
           "title": "detects references to possibly unbound attributes",
-          "description": "## What it does\nChecks for possibly unbound attributes.\n\nTODO #14889",
+          "description": "## What it does\nChecks for possibly unbound attributes.\n\n## Why is this bad?\nAttempting to access an unbound attribute will raise an `AttributeError` at runtime.",
           "default": "warn",
           "oneOf": [
             {
@@ -642,7 +642,7 @@
         },
         "possibly-unbound-import": {
           "title": "detects possibly unbound imports",
-          "description": "TODO #14889",
+          "description": "## What it does\nChecks for imports of symbols that may be unbound.\n\n## Why is this bad?\nImporting an unbound module or name will raise a `ModuleNotFoundError`\nor `ImportError` at runtime.",
           "default": "warn",
           "oneOf": [
             {
@@ -653,7 +653,7 @@
         "possibly-unresolved-reference": {
           "title": "detects references to possibly undefined names",
           "description": "## What it does\nChecks for references to names that are possibly not defined.\n\n## Why is this bad?\nUsing an undefined variable will raise a `NameError` at runtime.\n\n## Example\n\n```python\nfor i in range(0):\n    x = i\n\nprint(x)  # NameError: name 'x' is not defined\n```",
-          "default": "warn",
+          "default": "ignore",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -762,7 +762,7 @@
         },
         "unresolved-attribute": {
           "title": "detects references to unresolved attributes",
-          "description": "## What it does\nChecks for unresolved attributes.\n\nTODO #14889",
+          "description": "## What it does\nChecks for unresolved attributes.\n\n## Why is this bad?\nAccessing an unbound attribute will raise an `AttributeError` at runtime. An unresolved attribute is not guaranteed to exist from the type alone, so this could also indicate that the object is not of the type that the user expects.",
           "default": "error",
           "oneOf": [
             {
@@ -772,7 +772,7 @@
         },
         "unresolved-import": {
           "title": "detects unresolved imports",
-          "description": "## What it does\nChecks for import statements for which the module cannot be resolved.\n\n## Why is this bad?\nImporting a module that cannot be resolved will raise an `ImportError` at runtime.",
+          "description": "## What it does\nChecks for import statements for which the module cannot be resolved.\n\n## Why is this bad?\nImporting a module that cannot be resolved will raise an `ImportError`\nat runtime.",
           "default": "error",
           "oneOf": [
             {
@@ -783,7 +783,7 @@
         "unresolved-reference": {
           "title": "detects references to names that are not defined",
           "description": "## What it does\nChecks for references to names that are not defined.\n\n## Why is this bad?\nUsing an undefined variable will raise a `NameError` at runtime.\n\n## Example\n\n```python\nprint(x)  # NameError: name 'x' is not defined\n```",
-          "default": "warn",
+          "default": "error",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -802,7 +802,7 @@
         },
         "unsupported-operator": {
           "title": "detects binary, unary, or comparison expressions where the operands don't support the operator",
-          "description": "## What it does\nChecks for binary expressions, comparisons, and unary expressions where the operands don't support the operator.\n\nTODO #14889",
+          "description": "## What it does\nChecks for binary expressions, comparisons, and unary expressions where\nthe operands don't support the operator.\n\n## Why is this bad?\nAttempting to use an unsupported operator will raise a `TypeError` at\nruntime.",
           "default": "error",
           "oneOf": [
             {

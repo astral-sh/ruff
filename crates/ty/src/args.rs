@@ -8,7 +8,7 @@ use ty_python_semantic::lint;
 
 #[derive(Debug, Parser)]
 #[command(author, name = "ty", about = "An extremely fast Python type checker.")]
-#[command(version)]
+#[command(long_version = crate::version::version())]
 pub(crate) struct Args {
     #[command(subcommand)]
     pub(crate) command: Command,
@@ -24,6 +24,10 @@ pub(crate) enum Command {
 
     /// Display ty's version
     Version,
+
+    /// Generate shell completion
+    #[clap(hide = true)]
+    GenerateShellCompletion { shell: clap_complete_command::Shell },
 }
 
 #[derive(Debug, Parser)]

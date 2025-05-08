@@ -61,7 +61,7 @@ impl Options {
             .environment
             .as_ref()
             .and_then(|env| env.python_version.as_deref().copied())
-            .unwrap_or_default();
+            .unwrap_or(PythonVersion::latest_ty());
         let python_platform = self
             .environment
             .as_ref()

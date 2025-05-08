@@ -30,7 +30,7 @@ def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.
 
 class Foo:
     def method(self, x: Self):
-        reveal_type(x)  # revealed: @Todo(Support for `typing.Self`)
+        reveal_type(x)  # revealed: Self
 ```
 
 ## Type expressions
@@ -73,7 +73,7 @@ class E(Concatenate): ...  # error: [invalid-base]
 class F(Callable): ...
 class G(Generic): ...  # error: [invalid-base] "Cannot inherit from plain `Generic`"
 
-reveal_type(F.__mro__)  # revealed: tuple[Literal[F], @Todo(Support for Callable as a base class), Literal[object]]
+reveal_type(F.__mro__)  # revealed: tuple[<class 'F'>, @Todo(Support for Callable as a base class), <class 'object'>]
 ```
 
 ## Subscriptability

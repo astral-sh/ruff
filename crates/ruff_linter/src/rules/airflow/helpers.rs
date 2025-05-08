@@ -1,5 +1,7 @@
-use crate::rules::numpy::helpers::ImportSearcher;
+use crate::rules::numpy::helpers::{AttributeSearcher, ImportSearcher};
+use ruff_python_ast::name::QualifiedNameBuilder;
 use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Expr, ExprName, StmtTry};
 use ruff_python_semantic::Exceptions;
 use ruff_python_semantic::SemanticModel;
@@ -47,6 +49,22 @@ pub(crate) fn is_guarded_by_try_except(
     semantic: &SemanticModel,
 ) -> bool {
     match expr {
+        Expr::Attribute(_) => {
+            if !semantic.in_exception_handler() {
+                return false;
+            }
+            let Some(try_node) = semantic
+                .current_statements()
+                .find_map(|stmt| stmt.as_try_stmt())
+            else {
+                return false;
+            };
+            let suspended_exceptions = Exceptions::from_try_stmt(try_node, semantic);
+            if !suspended_exceptions.contains(Exceptions::ATTRIBUTE_ERROR) {
+                return false;
+            }
+            try_block_contains_undeprecated_attribute(try_node, replacement, semantic)
+        }
         Expr::Name(ExprName { id, .. }) => {
             let Some(binding_id) = semantic.lookup_symbol(id.as_str()) else {
                 return false;
@@ -78,7 +96,31 @@ pub(crate) fn is_guarded_by_try_except(
 }
 
 /// Given an [`ast::StmtTry`] node, does the `try` branch of that node
-/// contain any [`ast::StmtImportFrom`] nodes that indicate the numpy
+/// contain any [`ast::ExprAttribute`] nodes that indicate the airflow
+/// member is being accessed from the non-deprecated location?
+fn try_block_contains_undeprecated_attribute(
+    try_node: &StmtTry,
+    replacement: &Replacement,
+    semantic: &SemanticModel,
+) -> bool {
+    let Replacement::AutoImport { module, name } = replacement else {
+        return false;
+    };
+    let undeprecated_qualified_name = {
+        let mut builder = QualifiedNameBuilder::default();
+        for part in module.split('.') {
+            builder.push(part);
+        }
+        builder.push(name);
+        builder.build()
+    };
+    let mut attribute_searcher = AttributeSearcher::new(undeprecated_qualified_name, semantic);
+    attribute_searcher.visit_body(&try_node.body);
+    attribute_searcher.found_attribute
+}
+
+/// Given an [`ast::StmtTry`] node, does the `try` branch of that node
+/// contain any [`ast::StmtImportFrom`] nodes that indicate the airflow
 /// member is being imported from the non-deprecated location?
 fn try_block_contains_undeprecated_import(try_node: &StmtTry, replacement: &Replacement) -> bool {
     let Replacement::AutoImport { module, name } = replacement else {

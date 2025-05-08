@@ -219,34 +219,10 @@ impl Project {
             .unwrap()
             .into_inner()
             .unwrap();
-        // We sort diagnostics in a way that keeps them in source order
-        // and grouped by file. After that, we fall back to severity
-        // (with fatal messages sorting before info messages) and then
-        // finally the diagnostic ID.
-        file_diagnostics.sort_by(|d1, d2| {
-            if let (Some(span1), Some(span2)) = (d1.primary_span(), d2.primary_span()) {
-                let order = span1
-                    .file()
-                    .path(db)
-                    .as_str()
-                    .cmp(span2.file().path(db).as_str());
-                if order.is_ne() {
-                    return order;
-                }
 
-                if let (Some(range1), Some(range2)) = (span1.range(), span2.range()) {
-                    let order = range1.start().cmp(&range2.start());
-                    if order.is_ne() {
-                        return order;
-                    }
-                }
-            }
-            // Reverse so that, e.g., Fatal sorts before Info.
-            let order = d1.severity().cmp(&d2.severity()).reverse();
-            if order.is_ne() {
-                return order;
-            }
-            d1.id().cmp(&d2.id())
+        file_diagnostics.sort_by(|left, right| {
+            left.rendering_sort_key(db)
+                .cmp(&right.rendering_sort_key(db))
         });
         diagnostics.extend(file_diagnostics);
         diagnostics

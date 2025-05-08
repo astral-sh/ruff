@@ -150,7 +150,7 @@ def _(x: Base):
 ```py
 def _(x: object):
     if (y := type(x)) is bool:
-        reveal_type(y)  # revealed: Literal[bool]
+        reveal_type(y)  # revealed: <class 'bool'>
     if (type(y := x)) is bool:
         reveal_type(y)  # revealed: bool
 ```

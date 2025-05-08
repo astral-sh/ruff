@@ -39,3 +39,9 @@ run(c := "true")
 # But non-instant are not.
 (e := "echo")
 run(e)
+
+
+# https://github.com/astral-sh/ruff/issues/17798
+# Tuple literals are trusted
+check_output(("literal", "cmd", "using", "tuple"), text=True)
+Popen(("literal", "cmd", "using", "tuple"))

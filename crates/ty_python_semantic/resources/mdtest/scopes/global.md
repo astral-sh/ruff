@@ -32,8 +32,14 @@ def f():
     y = ""
 
     global x
-    # TODO: error: [invalid-assignment] "Object of type `Literal[""]` is not assignable to `int`"
+    # error: [invalid-assignment] "Object of type `Literal[""]` is not assignable to `int`"
     x = ""
+
+    global z
+    # error: [invalid-assignment] "Object of type `Literal[""]` is not assignable to `int`"
+    z = ""
+
+z: int
 ```
 
 ## Nested intervening scope
@@ -48,8 +54,7 @@ def outer():
 
     def inner():
         global x
-        # TODO: revealed: int
-        reveal_type(x)  # revealed: str
+        reveal_type(x)  # revealed: int
 ```
 
 ## Narrowing
@@ -87,8 +92,7 @@ def f():
 ```py
 def f():
     global x
-    # TODO this should also not be an error
-    y = x  # error: [unresolved-reference] "Name `x` used when not defined"
+    y = x
     x = 1  # No error.
 
 x = 2
@@ -99,79 +103,111 @@ x = 2
 Using a name prior to its `global` declaration in the same scope is a syntax error.
 
 ```py
-x = 1
-
 def f():
-    print(x)  # TODO: error: [invalid-syntax] name `x` is used prior to global declaration
-    global x
+    print(x)
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     print(x)
 
 def f():
     global x
-    print(x)  # TODO: error: [invalid-syntax] name `x` is used prior to global declaration
-    global x
+    print(x)
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     print(x)
 
 def f():
-    print(x)  # TODO: error: [invalid-syntax] name `x` is used prior to global declaration
+    print(x)
+    global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
+    print(x)
+
+def f():
     global x, y
     print(x)
-
-def f():
-    global x, y
-    print(x)  # TODO: error: [invalid-syntax] name `x` is used prior to global declaration
-    global x, y
+    global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     print(x)
 
 def f():
-    x = 1  # TODO: error: [invalid-syntax] name `x` is used prior to global declaration
-    global x
+    x = 1
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     x = 1
 
 def f():
     global x
-    x = 1  # TODO: error: [invalid-syntax] name `x` is used prior to global declaration
-    global x
+    x = 1
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     x = 1
 
 def f():
-    del x  # TODO: error: [invalid-syntax] name `x` is used prior to global declaration
-    global x, y
+    del x
+    global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
 
 def f():
     global x, y
-    del x  # TODO: error: [invalid-syntax] name `x` is used prior to global declaration
-    global x, y
+    del x
+    global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
 
 def f():
-    del x  # TODO: error: [invalid-syntax] name `x` is used prior to global declaration
+    del x
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
+    del x
+
+def f():
     global x
     del x
-
-def f():
-    global x
-    del x  # TODO: error: [invalid-syntax] name `x` is used prior to global declaration
-    global x
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
 
 def f():
-    del x  # TODO: error: [invalid-syntax] name `x` is used prior to global declaration
-    global x, y
+    del x
+    global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
 
 def f():
     global x, y
-    del x  # TODO: error: [invalid-syntax] name `x` is used prior to global declaration
-    global x, y
+    del x
+    global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
 
 def f():
-    print(f"{x=}")  # TODO: error: [invalid-syntax] name `x` is used prior to global declaration
-    global x
+    print(f"{x=}")
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
 
 # still an error in module scope
-x = None  # TODO: error: [invalid-syntax] name `x` is used prior to global declaration
-global x
+x = None
+global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
+```
+
+## Local bindings override preceding `global` bindings
+
+```py
+x = 42
+
+def f():
+    global x
+    reveal_type(x)  # revealed: Unknown | Literal[42]
+    x = "56"
+    reveal_type(x)  # revealed: Literal["56"]
+```
+
+## Local assignment prevents falling back to the outer scope
+
+```py
+x = 42
+
+def f():
+    # error: [unresolved-reference] "Name `x` used when not defined"
+    reveal_type(x)  # revealed: Unknown
+    x = "56"
+    reveal_type(x)  # revealed: Literal["56"]
+```
+
+## Annotating a `global` binding is a syntax error
+
+```py
+x: int = 1
+
+def f():
+    global x
+    x: str = "foo"  # TODO: error: [invalid-syntax] "annotated name 'x' can't be global"
 ```

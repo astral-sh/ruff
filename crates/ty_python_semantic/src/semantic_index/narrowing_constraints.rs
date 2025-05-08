@@ -29,6 +29,7 @@
 //! [`Predicate`]: crate::semantic_index::predicate::Predicate
 
 use crate::list::{List, ListBuilder, ListSetReverseIterator, ListStorage};
+use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::predicate::ScopedPredicateId;
 
 /// A narrowing constraint associated with a live binding.
@@ -37,6 +38,12 @@ use crate::semantic_index::predicate::ScopedPredicateId;
 ///
 /// [`Predicate`]: crate::semantic_index::predicate::Predicate
 pub(crate) type ScopedNarrowingConstraint = List<ScopedNarrowingConstraintPredicate>;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ConstraintKey {
+    NarrowingConstraint(ScopedNarrowingConstraint),
+    UseId(ScopedUseId),
+}
 
 /// One of the [`Predicate`]s in a narrowing constraint, which constraints the type of the
 /// binding's symbol.

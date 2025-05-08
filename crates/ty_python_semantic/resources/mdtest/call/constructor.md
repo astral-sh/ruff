@@ -75,7 +75,8 @@ constructor from it.
 from typing_extensions import Self
 
 class Base:
-    def __new__(cls, x: int) -> Self: ...
+    def __new__(cls, x: int) -> Self:
+        return cls()
 
 class Foo(Base): ...
 

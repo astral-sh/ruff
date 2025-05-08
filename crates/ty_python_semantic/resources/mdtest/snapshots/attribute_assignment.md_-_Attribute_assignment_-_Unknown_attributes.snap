@@ -23,7 +23,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_as
 # Diagnostics
 
 ```
-error: lint:unresolved-attribute: Unresolved attribute `non_existent` on type `Literal[C]`.
+error: lint:unresolved-attribute: Unresolved attribute `non_existent` on type `<class 'C'>`.
  --> src/mdtest_snippet.py:3:1
   |
 1 | class C: ...
@@ -33,6 +33,7 @@ error: lint:unresolved-attribute: Unresolved attribute `non_existent` on type `L
 4 |
 5 | instance = C()
   |
+info: `lint:unresolved-attribute` is enabled by default
 
 ```
 
@@ -44,5 +45,6 @@ error: lint:unresolved-attribute: Unresolved attribute `non_existent` on type `C
 6 | instance.non_existent = 1  # error: [unresolved-attribute]
   | ^^^^^^^^^^^^^^^^^^^^^
   |
+info: `lint:unresolved-attribute` is enabled by default
 
 ```

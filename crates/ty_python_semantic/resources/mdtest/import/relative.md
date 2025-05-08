@@ -255,7 +255,7 @@ python-version = "3.13"
 ```py
 from foo import A
 
-reveal_type(A)  # revealed: Literal[A]
+reveal_type(A)  # revealed: <class 'A'>
 ```
 
 `/src/.venv/<path-to-site-packages>/foo/__init__.py`:

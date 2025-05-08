@@ -56,7 +56,7 @@ reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name:
 # These come from `builtins.object`, not `types.ModuleType`:
 reveal_type(typing.__eq__)  # revealed: bound method ModuleType.__eq__(value: object, /) -> bool
 
-reveal_type(typing.__class__)  # revealed: Literal[ModuleType]
+reveal_type(typing.__class__)  # revealed: <class 'ModuleType'>
 
 reveal_type(typing.__dict__)  # revealed: dict[str, Any]
 ```

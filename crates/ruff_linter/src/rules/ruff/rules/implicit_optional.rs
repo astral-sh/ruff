@@ -72,6 +72,11 @@ use super::super::typing::type_hint_explicitly_allows_none;
 /// ## Options
 /// - `target-version`
 ///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because it can change the behavior of code that relies on
+/// type hints, and it assumes the default value is always appropriate—which might not be the case.
+///
 /// [PEP 484]: https://peps.python.org/pep-0484/#union-types
 #[derive(ViolationMetadata)]
 pub(crate) struct ImplicitOptional {

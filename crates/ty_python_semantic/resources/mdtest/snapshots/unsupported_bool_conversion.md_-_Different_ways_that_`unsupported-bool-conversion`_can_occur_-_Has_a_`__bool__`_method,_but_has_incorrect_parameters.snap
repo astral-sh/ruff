@@ -42,5 +42,6 @@ info: `__bool__` methods must only have a `self` parameter
   |         Method defined here
 3 |         return False
   |
+info: `lint:unsupported-bool-conversion` is enabled by default
 
 ```

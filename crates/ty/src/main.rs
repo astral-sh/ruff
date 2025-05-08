@@ -7,10 +7,12 @@ use std::sync::Mutex;
 use crate::args::{Args, CheckCommand, Command, TerminalColor};
 use crate::logging::setup_tracing;
 use anyhow::{anyhow, Context};
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
+use rayon::ThreadPoolBuilder;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
+use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
 use ty_project::metadata::options::Options;
@@ -25,6 +27,8 @@ mod python_version;
 mod version;
 
 pub fn main() -> ExitStatus {
+    setup_rayon();
+
     run().unwrap_or_else(|error| {
         use std::io::Write;
 
@@ -64,6 +68,10 @@ fn run() -> anyhow::Result<ExitStatus> {
         Command::Server => run_server().map(|()| ExitStatus::Success),
         Command::Check(check_args) => run_check(check_args),
         Command::Version => version().map(|()| ExitStatus::Success),
+        Command::GenerateShellCompletion { shell } => {
+            shell.generate(&mut Args::command(), &mut stdout());
+            Ok(ExitStatus::Success)
+        }
     }
 }
 
@@ -302,6 +310,10 @@ impl MainLoop {
                                 if diagnostics_count > 1 { "s" } else { "" }
                             )?;
 
+                            if max_severity.is_fatal() {
+                                tracing::warn!("A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details.");
+                            }
+
                             if self.watcher.is_none() {
                                 return Ok(match max_severity {
                                     Severity::Info => ExitStatus::Success,
@@ -391,4 +403,18 @@ fn set_colored_override(color: Option<TerminalColor>) {
             colored::control::set_override(false);
         }
     }
+}
+
+/// Initializes the global rayon thread pool to never use more than `TY_MAX_PARALLELISM` threads.
+fn setup_rayon() {
+    ThreadPoolBuilder::default()
+        .num_threads(max_parallelism().get())
+        // Use a reasonably large stack size to avoid running into stack overflows too easily. The
+        // size was chosen in such a way as to still be able to handle large expressions involving
+        // binary operators (x + x + … + x) both during the AST walk in semantic index building as
+        // well as during type checking. Using this stack size, we can handle handle expressions
+        // that are several times larger than the corresponding limits in existing type checkers.
+        .stack_size(16 * 1024 * 1024)
+        .build_global()
+        .unwrap();
 }

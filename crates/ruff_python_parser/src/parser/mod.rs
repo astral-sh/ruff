@@ -539,17 +539,19 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses a comma separated list of elements where each element is parsed
-    /// sing the given `parse_element` function.
+    /// using the given `parse_element` function.
     ///
     /// The difference between this function and `parse_comma_separated_list_into_vec`
     /// is that this function does not return the parsed elements. Instead, it is the
     /// caller's responsibility to handle the parsed elements. This is the reason
     /// that the `parse_element` parameter is bound to [`FnMut`] instead of [`Fn`].
+    ///
+    /// Returns `true` if there is a trailing comma present.
     fn parse_comma_separated_list(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
         mut parse_element: impl FnMut(&mut Parser<'src>),
-    ) {
+    ) -> bool {
         let mut progress = ParserProgress::default();
 
         let saved_context = self.recovery_context;
@@ -659,6 +661,8 @@ impl<'src> Parser<'src> {
         }
 
         self.recovery_context = saved_context;
+
+        trailing_comma_range.is_some()
     }
 
     #[cold]

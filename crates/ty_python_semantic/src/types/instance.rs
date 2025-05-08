@@ -3,6 +3,7 @@
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type};
 use crate::symbol::{Symbol, SymbolAndQualifiers};
+use crate::types::generics::Specialization;
 use crate::Db;
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -37,7 +38,7 @@ impl<'db> Type<'db> {
         protocol
             .0
             .interface(db)
-            .members()
+            .members(db)
             .all(|member| !self.member(db, member.name()).symbol.is_unbound())
     }
 }
@@ -111,6 +112,16 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         SubclassOfType::from(db, self.class)
     }
+
+    pub(super) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        Self {
+            class: self.class.apply_specialization(db, specialization),
+        }
+    }
 }
 
 impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
@@ -166,7 +177,7 @@ impl<'db> ProtocolInstanceType<'db> {
         }
         match self.0 {
             Protocol::FromClass(_) => Type::ProtocolInstance(Self(Protocol::Synthesized(
-                SynthesizedProtocolType::new(db, self.0.interface(db).clone()),
+                SynthesizedProtocolType::new(db, self.0.interface(db)),
             ))),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
         }
@@ -194,7 +205,7 @@ impl<'db> ProtocolInstanceType<'db> {
         other
             .0
             .interface(db)
-            .is_sub_interface_of(self.0.interface(db))
+            .is_sub_interface_of(db, self.0.interface(db))
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
@@ -226,8 +237,8 @@ impl<'db> ProtocolInstanceType<'db> {
         match self.inner() {
             Protocol::FromClass(class) => class.instance_member(db, name),
             Protocol::Synthesized(synthesized) => synthesized
-                .interface(db)
-                .member_by_name(name)
+                .interface()
+                .member_by_name(db, name)
                 .map(|member| SymbolAndQualifiers {
                     symbol: Symbol::bound(member.ty()),
                     qualifiers: member.qualifiers(),
@@ -247,7 +258,7 @@ pub(super) enum Protocol<'db> {
 
 impl<'db> Protocol<'db> {
     /// Return the members of this protocol type
-    fn interface(self, db: &'db dyn Db) -> &'db ProtocolInterface<'db> {
+    fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         match self {
             Self::FromClass(class) => class
                 .class_literal(db)
@@ -255,7 +266,7 @@ impl<'db> Protocol<'db> {
                 .into_protocol_class(db)
                 .expect("Protocol class literal should be a protocol class")
                 .interface(db),
-            Self::Synthesized(synthesized) => synthesized.interface(db),
+            Self::Synthesized(synthesized) => synthesized.interface(),
         }
     }
 }
@@ -274,24 +285,15 @@ mod synthesized_protocol {
     /// The constructor method of this type maintains the invariant that a synthesized protocol type
     /// is always constructed from a *normalized* protocol interface.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord)]
-    pub(in crate::types) struct SynthesizedProtocolType<'db>(SynthesizedProtocolTypeInner<'db>);
+    pub(in crate::types) struct SynthesizedProtocolType<'db>(ProtocolInterface<'db>);
 
     impl<'db> SynthesizedProtocolType<'db> {
         pub(super) fn new(db: &'db dyn Db, interface: ProtocolInterface<'db>) -> Self {
-            Self(SynthesizedProtocolTypeInner::new(
-                db,
-                interface.normalized(db),
-            ))
+            Self(interface.normalized(db))
         }
 
-        pub(in crate::types) fn interface(self, db: &'db dyn Db) -> &'db ProtocolInterface<'db> {
-            self.0.interface(db)
+        pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {
+            self.0
         }
-    }
-
-    #[salsa::interned(debug)]
-    struct SynthesizedProtocolTypeInner<'db> {
-        #[return_ref]
-        interface: ProtocolInterface<'db>,
     }
 }

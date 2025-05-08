@@ -39,5 +39,6 @@ error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for u
 15 | 10 and get() and True
    |        ^^^^^
    |
+info: `lint:unsupported-bool-conversion` is enabled by default
 
 ```

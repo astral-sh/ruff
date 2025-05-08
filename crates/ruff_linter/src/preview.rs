@@ -22,6 +22,11 @@ pub(crate) const fn is_py314_support_enabled(settings: &LinterSettings) -> bool 
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/16565
+pub(crate) const fn is_full_path_match_source_strategy_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // Rule-specific behavior
 
 // https://github.com/astral-sh/ruff/pull/17136

@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+<filename>:3:21: SyntaxError: mapping pattern checks duplicate key `'key'`
+  |
+2 | match x:
+3 |     case {'key': 1, 'key': 2}:
+  |                     ^^^^^
+4 |         pass
+  |

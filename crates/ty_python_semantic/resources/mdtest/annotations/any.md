@@ -59,7 +59,7 @@ from typing import Any
 
 class SubclassOfAny(Any): ...
 
-reveal_type(SubclassOfAny.__mro__)  # revealed: tuple[Literal[SubclassOfAny], Any, Literal[object]]
+reveal_type(SubclassOfAny.__mro__)  # revealed: tuple[<class 'SubclassOfAny'>, Any, <class 'object'>]
 
 x: SubclassOfAny = 1  # error: [invalid-assignment]
 y: int = SubclassOfAny()

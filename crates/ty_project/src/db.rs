@@ -37,7 +37,19 @@ impl ProjectDatabase {
     {
         let mut db = Self {
             project: None,
-            storage: salsa::Storage::default(),
+            storage: salsa::Storage::new(if tracing::enabled!(tracing::Level::TRACE) {
+                Some(Box::new({
+                    move |event: Event| {
+                        if matches!(event.kind, salsa::EventKind::WillCheckCancellation) {
+                            return;
+                        }
+
+                        tracing::trace!("Salsa event: {event:?}");
+                    }
+                }))
+            } else {
+                None
+            }),
             files: Files::default(),
             system: Arc::new(system),
         };
@@ -156,20 +168,7 @@ impl SourceDb for ProjectDatabase {
 }
 
 #[salsa::db]
-impl salsa::Database for ProjectDatabase {
-    fn salsa_event(&self, event: &dyn Fn() -> Event) {
-        if !tracing::enabled!(tracing::Level::TRACE) {
-            return;
-        }
-
-        let event = event();
-        if matches!(event.kind, salsa::EventKind::WillCheckCancellation) {
-            return;
-        }
-
-        tracing::trace!("Salsa event: {event:?}");
-    }
-}
+impl salsa::Database for ProjectDatabase {}
 
 #[salsa::db]
 impl Db for ProjectDatabase {
@@ -206,9 +205,7 @@ mod format {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::sync::Arc;
-
-    use salsa::Event;
+    use std::sync::{Arc, Mutex};
 
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
@@ -221,11 +218,13 @@ pub(crate) mod tests {
     use crate::DEFAULT_LINT_REGISTRY;
     use crate::{Project, ProjectMetadata};
 
+    type Events = Arc<Mutex<Vec<salsa::Event>>>;
+
     #[salsa::db]
     #[derive(Clone)]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
-        events: Arc<std::sync::Mutex<Vec<Event>>>,
+        events: Events,
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
@@ -234,12 +233,19 @@ pub(crate) mod tests {
 
     impl TestDb {
         pub(crate) fn new(project: ProjectMetadata) -> Self {
+            let events = Events::default();
             let mut db = Self {
-                storage: salsa::Storage::default(),
+                storage: salsa::Storage::new(Some(Box::new({
+                    let events = events.clone();
+                    move |event| {
+                        let mut events = events.lock().unwrap();
+                        events.push(event);
+                    }
+                }))),
                 system: TestSystem::default(),
                 vendored: ty_vendored::file_system().clone(),
                 files: Files::default(),
-                events: Arc::default(),
+                events,
                 project: None,
             };
 
@@ -251,13 +257,9 @@ pub(crate) mod tests {
 
     impl TestDb {
         /// Takes the salsa events.
-        ///
-        /// ## Panics
-        /// If there are any pending salsa snapshots.
         pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
-            let inner = Arc::get_mut(&mut self.events).expect("no pending salsa snapshots");
+            let mut events = self.events.lock().unwrap();
 
-            let events = inner.get_mut().unwrap();
             std::mem::take(&mut *events)
         }
     }
@@ -332,10 +334,5 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl salsa::Database for TestDb {
-        fn salsa_event(&self, event: &dyn Fn() -> Event) {
-            let mut events = self.events.lock().unwrap();
-            events.push(event());
-        }
-    }
+    impl salsa::Database for TestDb {}
 }

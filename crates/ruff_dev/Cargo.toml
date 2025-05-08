@@ -44,6 +44,7 @@ toml = { workspace = true, features = ["parse"] }
 tracing = { workspace = true }
 tracing-indicatif = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+url = { workspace = true }
 
 [dev-dependencies]
 indoc = { workspace = true }

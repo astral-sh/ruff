@@ -227,7 +227,7 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersion::latest(),
+                python_version: PythonVersion::latest_ty(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],

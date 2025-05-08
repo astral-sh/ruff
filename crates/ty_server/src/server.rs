@@ -7,7 +7,8 @@ use std::panic::PanicInfo;
 
 use lsp_server::Message;
 use lsp_types::{
-    ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
+    ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities,
+    DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, HoverProviderCapability,
     InlayHintOptions, InlayHintServerCapabilities, MessageType, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
     TypeDefinitionProviderCapability, Url,
@@ -15,7 +16,7 @@ use lsp_types::{
 
 use self::connection::{Connection, ConnectionInitializer};
 use self::schedule::event_loop_thread;
-use crate::session::{AllSettings, ClientSettings, Session};
+use crate::session::{AllSettings, ClientSettings, Experimental, Session};
 use crate::PositionEncoding;
 
 mod api;
@@ -24,6 +25,7 @@ mod connection;
 mod schedule;
 
 use crate::message::try_show_message;
+use crate::server::schedule::Task;
 pub(crate) use connection::ClientSender;
 
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
@@ -41,19 +43,6 @@ impl Server {
 
         let (id, init_params) = connection.initialize_start()?;
 
-        let client_capabilities = init_params.capabilities;
-        let position_encoding = Self::find_best_position_encoding(&client_capabilities);
-        let server_capabilities = Self::server_capabilities(position_encoding);
-
-        let connection = connection.initialize_finish(
-            id,
-            &server_capabilities,
-            crate::SERVER_NAME,
-            crate::version(),
-        )?;
-
-        crate::message::init_messenger(connection.make_sender());
-
         let AllSettings {
             global_settings,
             mut workspace_settings,
@@ -63,6 +52,19 @@ impl Server {
                 .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
         );
 
+        let client_capabilities = init_params.capabilities;
+        let position_encoding = Self::find_best_position_encoding(&client_capabilities);
+        let server_capabilities =
+            Self::server_capabilities(position_encoding, global_settings.experimental.as_ref());
+
+        let connection = connection.initialize_finish(
+            id,
+            &server_capabilities,
+            crate::SERVER_NAME,
+            crate::version(),
+        )?;
+
+        crate::message::init_messenger(connection.make_sender());
         crate::logging::init_logging(
             global_settings.tracing.log_level.unwrap_or_default(),
             global_settings.tracing.log_file.as_deref(),
@@ -148,7 +150,7 @@ impl Server {
             writeln!(stderr, "{panic_info}\n{backtrace}").ok();
 
             try_show_message(
-                "The Ruff language server exited with a panic. See the logs for more details."
+                "The ty language server exited with a panic. See the logs for more details."
                     .to_string(),
                 MessageType::ERROR,
             )
@@ -170,12 +172,79 @@ impl Server {
 
     fn event_loop(
         connection: &Connection,
-        _client_capabilities: &ClientCapabilities,
+        client_capabilities: &ClientCapabilities,
         mut session: Session,
         worker_threads: NonZeroUsize,
     ) -> crate::Result<()> {
         let mut scheduler =
             schedule::Scheduler::new(&mut session, worker_threads, connection.make_sender());
+
+        let fs_watcher = client_capabilities
+            .workspace
+            .as_ref()
+            .and_then(|workspace| workspace.did_change_watched_files?.dynamic_registration)
+            .unwrap_or_default();
+
+        if fs_watcher {
+            let registration = lsp_types::Registration {
+                id: "workspace/didChangeWatchedFiles".to_owned(),
+                method: "workspace/didChangeWatchedFiles".to_owned(),
+                register_options: Some(
+                    serde_json::to_value(DidChangeWatchedFilesRegistrationOptions {
+                        watchers: vec![
+                            FileSystemWatcher {
+                                glob_pattern: lsp_types::GlobPattern::String("**/ty.toml".into()),
+                                kind: None,
+                            },
+                            FileSystemWatcher {
+                                glob_pattern: lsp_types::GlobPattern::String(
+                                    "**/.gitignore".into(),
+                                ),
+                                kind: None,
+                            },
+                            FileSystemWatcher {
+                                glob_pattern: lsp_types::GlobPattern::String("**/.ignore".into()),
+                                kind: None,
+                            },
+                            FileSystemWatcher {
+                                glob_pattern: lsp_types::GlobPattern::String(
+                                    "**/pyproject.toml".into(),
+                                ),
+                                kind: None,
+                            },
+                            FileSystemWatcher {
+                                glob_pattern: lsp_types::GlobPattern::String("**/*.py".into()),
+                                kind: None,
+                            },
+                            FileSystemWatcher {
+                                glob_pattern: lsp_types::GlobPattern::String("**/*.pyi".into()),
+                                kind: None,
+                            },
+                            FileSystemWatcher {
+                                glob_pattern: lsp_types::GlobPattern::String("**/*.ipynb".into()),
+                                kind: None,
+                            },
+                        ],
+                    })
+                    .unwrap(),
+                ),
+            };
+            let response_handler = |()| {
+                tracing::info!("File watcher successfully registered");
+                Task::nothing()
+            };
+
+            if let Err(err) = scheduler.request::<lsp_types::request::RegisterCapability>(
+                lsp_types::RegistrationParams {
+                    registrations: vec![registration],
+                },
+                response_handler,
+            ) {
+                tracing::error!("An error occurred when trying to register the configuration file watcher: {err}");
+            }
+        } else {
+            tracing::warn!("The client does not support file system watching.");
+        }
 
         for msg in connection.incoming() {
             if connection.handle_shutdown(&msg)? {
@@ -206,7 +275,10 @@ impl Server {
             .unwrap_or_default()
     }
 
-    fn server_capabilities(position_encoding: PositionEncoding) -> ServerCapabilities {
+    fn server_capabilities(
+        position_encoding: PositionEncoding,
+        experimental: Option<&Experimental>,
+    ) -> ServerCapabilities {
         ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
             diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
@@ -226,9 +298,11 @@ impl Server {
             inlay_hint_provider: Some(lsp_types::OneOf::Right(
                 InlayHintServerCapabilities::Options(InlayHintOptions::default()),
             )),
-            completion_provider: Some(lsp_types::CompletionOptions {
-                ..Default::default()
-            }),
+            completion_provider: experimental
+                .is_some_and(Experimental::is_completions_enabled)
+                .then_some(lsp_types::CompletionOptions {
+                    ..Default::default()
+                }),
             ..Default::default()
         }
     }

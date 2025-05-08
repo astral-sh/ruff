@@ -139,7 +139,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/UP041.py"),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY310,
+                unresolved_target_version: PythonVersion::PY310.into(),
                 ..settings::LinterSettings::for_rule(Rule::TimeoutErrorAlias)
             },
         )?;
@@ -152,7 +152,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/UP040.py"),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY311,
+                unresolved_target_version: PythonVersion::PY311.into(),
                 ..settings::LinterSettings::for_rule(Rule::NonPEP695TypeAlias)
             },
         )?;
@@ -168,7 +168,7 @@ mod tests {
                 pyupgrade: pyupgrade::settings::Settings {
                     keep_runtime_typing: true,
                 },
-                unresolved_target_version: PythonVersion::PY37,
+                unresolved_target_version: PythonVersion::PY37.into(),
                 ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
@@ -184,7 +184,7 @@ mod tests {
                 pyupgrade: pyupgrade::settings::Settings {
                     keep_runtime_typing: true,
                 },
-                unresolved_target_version: PythonVersion::PY310,
+                unresolved_target_version: PythonVersion::PY310.into(),
                 ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
@@ -197,7 +197,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY37,
+                unresolved_target_version: PythonVersion::PY37.into(),
                 ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
@@ -210,7 +210,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY310,
+                unresolved_target_version: PythonVersion::PY310.into(),
                 ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
@@ -223,7 +223,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY37,
+                unresolved_target_version: PythonVersion::PY37.into(),
                 ..settings::LinterSettings::for_rules([
                     Rule::NonPEP604AnnotationUnion,
                     Rule::NonPEP604AnnotationOptional,
@@ -239,7 +239,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY310,
+                unresolved_target_version: PythonVersion::PY310.into(),
                 ..settings::LinterSettings::for_rules([
                     Rule::NonPEP604AnnotationUnion,
                     Rule::NonPEP604AnnotationOptional,
@@ -255,7 +255,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/UP017.py"),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY311,
+                unresolved_target_version: PythonVersion::PY311.into(),
                 ..settings::LinterSettings::for_rule(Rule::DatetimeTimezoneUTC)
             },
         )?;
@@ -268,7 +268,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/UP044.py"),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY311,
+                unresolved_target_version: PythonVersion::PY311.into(),
                 ..settings::LinterSettings::for_rule(Rule::NonPEP646Unpack)
             },
         )?;

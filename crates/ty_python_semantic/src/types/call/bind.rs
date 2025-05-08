@@ -10,6 +10,7 @@ use super::{
     InferContext, Signature, Signatures, Type,
 };
 use crate::db::Db;
+use crate::dunder_all::dunder_all_names;
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
@@ -20,8 +21,8 @@ use crate::types::generics::{Specialization, SpecializationBuilder, Specializati
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     todo_type, BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators,
-    KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType,
-    TupleType, UnionType, WrapperDescriptorKind,
+    FunctionType, KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind,
+    PropertyInstanceType, TupleType, UnionType, WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -587,6 +588,30 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownFunction::DunderAllNames) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                overload.set_return_type(match ty {
+                                    Type::ModuleLiteral(module_literal) => {
+                                        match dunder_all_names(db, module_literal.module(db).file())
+                                        {
+                                            Some(names) => {
+                                                let mut names = names.iter().collect::<Vec<_>>();
+                                                names.sort();
+                                                TupleType::from_elements(
+                                                    db,
+                                                    names.iter().map(|name| {
+                                                        Type::string_literal(db, name.as_str())
+                                                    }),
+                                                )
+                                            }
+                                            None => Type::none(db),
+                                        }
+                                    }
+                                    _ => Type::none(db),
+                                });
+                            }
+                        }
+
                         Some(KnownFunction::Len) => {
                             if let [Some(first_arg)] = overload.parameter_types() {
                                 if let Some(len_ty) = first_arg.len(db) {
@@ -624,7 +649,7 @@ impl<'db> Bindings<'db> {
                                         db,
                                         protocol_class
                                             .interface(db)
-                                            .members()
+                                            .members(db)
                                             .map(|member| Type::string_literal(db, member.name()))
                                             .collect::<Box<[Type<'db>]>>(),
                                     )));
@@ -772,29 +797,50 @@ impl<'db> Bindings<'db> {
                         }
 
                         _ => {
-                            if let Some(params) = function_type.dataclass_transformer_params(db) {
-                                // This is a call to a custom function that was decorated with `@dataclass_transformer`.
-                                // If this function was called with a keyword argument like `order=False`, we extract
-                                // the argument type and overwrite the corresponding flag in `dataclass_params` after
-                                // constructing them from the `dataclass_transformer`-parameter defaults.
+                            let mut handle_dataclass_transformer_params =
+                                |function_type: &FunctionType| {
+                                    if let Some(params) =
+                                        function_type.dataclass_transformer_params(db)
+                                    {
+                                        // This is a call to a custom function that was decorated with `@dataclass_transformer`.
+                                        // If this function was called with a keyword argument like `order=False`, we extract
+                                        // the argument type and overwrite the corresponding flag in `dataclass_params` after
+                                        // constructing them from the `dataclass_transformer`-parameter defaults.
 
-                                let mut dataclass_params = DataclassParams::from(params);
+                                        let mut dataclass_params = DataclassParams::from(params);
 
-                                if let Some(Some(Type::BooleanLiteral(order))) = callable_signature
+                                        if let Some(Some(Type::BooleanLiteral(order))) =
+                                            callable_signature.iter().nth(overload_index).and_then(
+                                                |signature| {
+                                                    let (idx, _) = signature
+                                                        .parameters()
+                                                        .keyword_by_name("order")?;
+                                                    overload.parameter_types().get(idx)
+                                                },
+                                            )
+                                        {
+                                            dataclass_params.set(DataclassParams::ORDER, *order);
+                                        }
+
+                                        overload.set_return_type(Type::DataclassDecorator(
+                                            dataclass_params,
+                                        ));
+                                    }
+                                };
+
+                            // Ideally, either the implementation, or exactly one of the overloads
+                            // of the function can have the dataclass_transform decorator applied.
+                            // However, we do not yet enforce this, and in the case of multiple
+                            // applications of the decorator, we will only consider the last one
+                            // for the return value, since the prior ones will be over-written.
+                            if let Some(overloaded) = function_type.to_overloaded(db) {
+                                overloaded
+                                    .overloads
                                     .iter()
-                                    .nth(overload_index)
-                                    .and_then(|signature| {
-                                        let (idx, _) =
-                                            signature.parameters().keyword_by_name("order")?;
-                                        overload.parameter_types().get(idx)
-                                    })
-                                {
-                                    dataclass_params.set(DataclassParams::ORDER, *order);
-                                }
-
-                                overload
-                                    .set_return_type(Type::DataclassDecorator(dataclass_params));
+                                    .for_each(&mut handle_dataclass_transformer_params);
                             }
+
+                            handle_dataclass_transformer_params(&function_type);
                         }
                     },
 
@@ -1321,8 +1367,25 @@ impl<'db> Binding<'db> {
         self.inherited_specialization
     }
 
+    /// Returns the bound types for each parameter, in parameter source order, or `None` if no
+    /// argument was matched to that parameter.
     pub(crate) fn parameter_types(&self) -> &[Option<Type<'db>>] {
         &self.parameter_tys
+    }
+
+    /// Returns the bound types for each parameter, in parameter source order, with default values
+    /// applied for arguments that weren't matched to a parameter. Returns `None` if there are any
+    /// non-default arguments that weren't matched to a parameter.
+    pub(crate) fn parameter_types_with_defaults(
+        &self,
+        signature: &Signature<'db>,
+    ) -> Option<Box<[Type<'db>]>> {
+        signature
+            .parameters()
+            .iter()
+            .zip(&self.parameter_tys)
+            .map(|(parameter, parameter_ty)| parameter_ty.or(parameter.default_type()))
+            .collect()
     }
 
     pub(crate) fn arguments_for_parameter<'a>(

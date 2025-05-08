@@ -6,6 +6,7 @@ use ruff_text_size::TextSize;
 
 use crate::Db;
 
+#[derive(Debug, Clone)]
 pub struct Completion {
     pub label: String,
 }

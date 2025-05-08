@@ -6,7 +6,8 @@ pub(crate) struct ResolvedClientCapabilities {
     pub(crate) code_action_deferred_edit_resolution: bool,
     pub(crate) apply_edit: bool,
     pub(crate) document_changes: bool,
-    pub(crate) workspace_refresh: bool,
+    pub(crate) diagnostics_refresh: bool,
+    pub(crate) inlay_refresh: bool,
     pub(crate) pull_diagnostics: bool,
     /// Whether `textDocument.typeDefinition.linkSupport` is `true`
     pub(crate) type_definition_link_support: bool,
@@ -47,18 +48,17 @@ impl ResolvedClientCapabilities {
             .and_then(|document| document.type_definition?.link_support)
             .unwrap_or_default();
 
-        let workspace_refresh = true;
-
-        // TODO(jane): Once the bug involving workspace.diagnostic(s) deserialization has been fixed,
-        // uncomment this.
-        /*
-        let workspace_refresh = client_capabilities
+        let diagnostics_refresh = client_capabilities
             .workspace
             .as_ref()
-            .and_then(|workspace| workspace.diagnostic.as_ref())
-            .and_then(|diagnostic| diagnostic.refresh_support)
+            .and_then(|workspace| workspace.diagnostics.as_ref()?.refresh_support)
             .unwrap_or_default();
-        */
+
+        let inlay_refresh = client_capabilities
+            .workspace
+            .as_ref()
+            .and_then(|workspace| workspace.inlay_hint.as_ref()?.refresh_support)
+            .unwrap_or_default();
 
         let pull_diagnostics = client_capabilities
             .text_document
@@ -86,7 +86,8 @@ impl ResolvedClientCapabilities {
                 && code_action_edit_resolution,
             apply_edit,
             document_changes,
-            workspace_refresh,
+            diagnostics_refresh,
+            inlay_refresh,
             pull_diagnostics,
             type_definition_link_support: declaration_link_support,
             hover_prefer_markdown,

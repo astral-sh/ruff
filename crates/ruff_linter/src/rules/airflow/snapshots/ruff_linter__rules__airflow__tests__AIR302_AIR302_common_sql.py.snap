@@ -216,7 +216,7 @@ AIR302_common_sql.py:99:1: AIR302 `airflow.operators.sql.BaseSQLOperator` is mov
  99 | BaseSQLOperator()
     | ^^^^^^^^^^^^^^^ AIR302
 100 | BranchSQLOperator()
-101 | SQLTablecheckOperator()
+101 | SQLTableCheckOperator()
     |
     = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.BaseSQLOperator` instead.
 
@@ -225,26 +225,26 @@ AIR302_common_sql.py:100:1: AIR302 `airflow.operators.sql.BranchSQLOperator` is 
  99 | BaseSQLOperator()
 100 | BranchSQLOperator()
     | ^^^^^^^^^^^^^^^^^ AIR302
-101 | SQLTablecheckOperator()
+101 | SQLTableCheckOperator()
 102 | SQLColumnCheckOperator()
     |
     = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.BranchSQLOperator` instead.
 
-AIR302_common_sql.py:101:1: AIR302 `airflow.operators.sql.SQLTablecheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:101:1: AIR302 `airflow.operators.sql.SQLTableCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
  99 | BaseSQLOperator()
 100 | BranchSQLOperator()
-101 | SQLTablecheckOperator()
+101 | SQLTableCheckOperator()
     | ^^^^^^^^^^^^^^^^^^^^^ AIR302
 102 | SQLColumnCheckOperator()
 103 | _convert_to_float_if_possible()
     |
-    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLTablecheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLTableCheckOperator` instead.
 
 AIR302_common_sql.py:102:1: AIR302 `airflow.operators.sql.SQLColumnCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
 100 | BranchSQLOperator()
-101 | SQLTablecheckOperator()
+101 | SQLTableCheckOperator()
 102 | SQLColumnCheckOperator()
     | ^^^^^^^^^^^^^^^^^^^^^^ AIR302
 103 | _convert_to_float_if_possible()
@@ -254,7 +254,7 @@ AIR302_common_sql.py:102:1: AIR302 `airflow.operators.sql.SQLColumnCheckOperator
 
 AIR302_common_sql.py:103:1: AIR302 `airflow.operators.sql._convert_to_float_if_possible` is moved into `common-sql` provider in Airflow 3.0;
     |
-101 | SQLTablecheckOperator()
+101 | SQLTableCheckOperator()
 102 | SQLColumnCheckOperator()
 103 | _convert_to_float_if_possible()
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302

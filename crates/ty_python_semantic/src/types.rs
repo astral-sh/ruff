@@ -1,3 +1,4 @@
+use infer::enclosing_class_symbol;
 use itertools::Either;
 
 use std::slice::Iter;
@@ -932,6 +933,7 @@ impl<'db> Type<'db> {
                         typevar.name(db).clone(),
                         typevar.definition(db),
                         Some(TypeVarBoundOrConstraints::UpperBound(bound.normalized(db))),
+                        typevar.variance(db),
                         typevar.default_ty(db),
                         typevar.kind(db),
                     ))
@@ -942,6 +944,7 @@ impl<'db> Type<'db> {
                         typevar.name(db).clone(),
                         typevar.definition(db),
                         Some(TypeVarBoundOrConstraints::Constraints(union.normalized(db))),
+                        typevar.variance(db),
                         typevar.default_ty(db),
                         typevar.kind(db),
                     ))
@@ -995,12 +998,24 @@ impl<'db> Type<'db> {
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance)) if instance.class().is_object(db) => true,
 
-            // A fully static typevar is always a subtype of itself, and is never a subtype of any
-            // other typevar, since there is no guarantee that they will be specialized to the same
-            // type. (This is true even if both typevars are bounded by the same final class, since
-            // you can specialize the typevars to `Never` in addition to that final class.)
-            (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar)) => {
-                self_typevar == other_typevar
+            // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
+            // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
+            //    TypeVars without an explicit upper bound are treated as having an implicit upper bound of `object`.
+            // 2. `T` is a constrained TypeVar and all of `T`'s constraints are subtypes of `S`.
+            //
+            // However, there is one exception to this general rule: for any given typevar `T`,
+            // `T` will always be a subtype of any union containing `T`.
+            // A similar rule applies in reverse to intersection types.
+            (Type::TypeVar(_), Type::Union(union)) if union.elements(db).contains(&self) => true,
+            (Type::Intersection(intersection), Type::TypeVar(_))
+                if intersection.positive(db).contains(&target) =>
+            {
+                true
+            }
+            (Type::Intersection(intersection), Type::TypeVar(_))
+                if intersection.negative(db).contains(&target) =>
+            {
+                false
             }
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
@@ -1019,16 +1034,6 @@ impl<'db> Type<'db> {
                 }
             }
 
-            (Type::Union(union), _) => union
-                .elements(db)
-                .iter()
-                .all(|&elem_ty| elem_ty.is_subtype_of(db, target)),
-
-            (_, Type::Union(union)) => union
-                .elements(db)
-                .iter()
-                .any(|&elem_ty| self.is_subtype_of(db, elem_ty)),
-
             // If the typevar is constrained, there must be multiple constraints, and the typevar
             // might be specialized to any one of them. However, the constraints do not have to be
             // disjoint, which means an lhs type might be a subtype of all of the constraints.
@@ -1041,6 +1046,16 @@ impl<'db> Type<'db> {
             {
                 true
             }
+
+            (Type::Union(union), _) => union
+                .elements(db)
+                .iter()
+                .all(|&elem_ty| elem_ty.is_subtype_of(db, target)),
+
+            (_, Type::Union(union)) => union
+                .elements(db)
+                .iter()
+                .any(|&elem_ty| self.is_subtype_of(db, elem_ty)),
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
@@ -1307,12 +1322,24 @@ impl<'db> Type<'db> {
             // TODO this special case might be removable once the below cases are comprehensive
             (_, Type::NominalInstance(instance)) if instance.class().is_object(db) => true,
 
-            // A typevar is always assignable to itself, and is never assignable to any other
-            // typevar, since there is no guarantee that they will be specialized to the same
-            // type. (This is true even if both typevars are bounded by the same final class, since
-            // you can specialize the typevars to `Never` in addition to that final class.)
-            (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar)) => {
-                self_typevar == other_typevar
+            // In general, a TypeVar `T` is not assignable to a type `S` unless one of the two conditions is satisfied:
+            // 1. `T` is a bound TypeVar and `T`'s upper bound is assignable to `S`.
+            //    TypeVars without an explicit upper bound are treated as having an implicit upper bound of `object`.
+            // 2. `T` is a constrained TypeVar and all of `T`'s constraints are assignable to `S`.
+            //
+            // However, there is one exception to this general rule: for any given typevar `T`,
+            // `T` will always be assignable to any union containing `T`.
+            // A similar rule applies in reverse to intersection types.
+            (Type::TypeVar(_), Type::Union(union)) if union.elements(db).contains(&self) => true,
+            (Type::Intersection(intersection), Type::TypeVar(_))
+                if intersection.positive(db).contains(&target) =>
+            {
+                true
+            }
+            (Type::Intersection(intersection), Type::TypeVar(_))
+                if intersection.negative(db).contains(&target) =>
+            {
+                false
             }
 
             // A typevar is assignable to its upper bound, and to something similar to the union of
@@ -1331,18 +1358,6 @@ impl<'db> Type<'db> {
                 }
             }
 
-            // A union is assignable to a type T iff every element of the union is assignable to T.
-            (Type::Union(union), ty) => union
-                .elements(db)
-                .iter()
-                .all(|&elem_ty| elem_ty.is_assignable_to(db, ty)),
-
-            // A type T is assignable to a union iff T is assignable to any element of the union.
-            (ty, Type::Union(union)) => union
-                .elements(db)
-                .iter()
-                .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
-
             // If the typevar is constrained, there must be multiple constraints, and the typevar
             // might be specialized to any one of them. However, the constraints do not have to be
             // disjoint, which means an lhs type might be assignable to all of the constraints.
@@ -1355,6 +1370,18 @@ impl<'db> Type<'db> {
             {
                 true
             }
+
+            // A union is assignable to a type T iff every element of the union is assignable to T.
+            (Type::Union(union), ty) => union
+                .elements(db)
+                .iter()
+                .all(|&elem_ty| elem_ty.is_assignable_to(db, ty)),
+
+            // A type T is assignable to a union iff T is assignable to any element of the union.
+            (ty, Type::Union(union)) => union
+                .elements(db)
+                .iter()
+                .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is assignable to (A & B) because the left is assignable to both A and B,
@@ -1489,6 +1516,10 @@ impl<'db> Type<'db> {
                 false
             }
 
+            (Type::SliceLiteral(_), _) => KnownClass::Slice
+                .to_instance(db)
+                .is_assignable_to(db, target),
+
             (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
                 self_function_literal
                     .into_callable_type(db)
@@ -1570,8 +1601,6 @@ impl<'db> Type<'db> {
                 }
             }
 
-            (Type::TypeVar(first), Type::TypeVar(second)) => first == second,
-
             (Type::NominalInstance(first), Type::NominalInstance(second)) => {
                 first.is_gradual_equivalent_to(db, second)
             }
@@ -1617,6 +1646,13 @@ impl<'db> Type<'db> {
                 if self_typevar == other_typevar =>
             {
                 false
+            }
+
+            (tvar @ Type::TypeVar(_), Type::Intersection(intersection))
+            | (Type::Intersection(intersection), tvar @ Type::TypeVar(_))
+                if intersection.negative(db).contains(&tvar) =>
+            {
+                true
             }
 
             // An unbounded typevar is never disjoint from any other type, since it might be
@@ -3890,6 +3926,9 @@ impl<'db> Type<'db> {
                     );
                     Signatures::single(signature)
                 }
+                Some(KnownClass::Enum) => {
+                    Signatures::single(CallableSignature::todo("functional `Enum` syntax"))
+                }
 
                 Some(KnownClass::Super) => {
                     // ```py
@@ -4656,6 +4695,7 @@ impl<'db> Type<'db> {
     pub fn in_type_expression(
         &self,
         db: &'db dyn Db,
+        scope_id: ScopeId,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
             // Special cases for `float` and `complex`
@@ -4740,7 +4780,40 @@ impl<'db> Type<'db> {
                 // TODO: Use an opt-in rule for a bare `Callable`
                 KnownInstanceType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
 
-                KnownInstanceType::TypingSelf => Ok(todo_type!("Support for `typing.Self`")),
+                KnownInstanceType::TypingSelf => {
+                    let index = semantic_index(db, scope_id.file(db));
+                    let Some(class_ty) = enclosing_class_symbol(db, index, scope_id) else {
+                        return Err(InvalidTypeExpressionError {
+                            fallback_type: Type::unknown(),
+                            invalid_expressions: smallvec::smallvec![
+                                InvalidTypeExpression::InvalidType(*self)
+                            ],
+                        });
+                    };
+                    let Some(TypeDefinition::Class(class_def)) = class_ty.definition(db) else {
+                        debug_assert!(
+                            false,
+                            "enclosing_class_symbol must return a type with class definition"
+                        );
+                        return Ok(Type::unknown());
+                    };
+                    let Some(instance) = class_ty.to_instance(db) else {
+                        debug_assert!(
+                            false,
+                            "enclosing_class_symbol must return type that can be instantiated"
+                        );
+                        return Ok(Type::unknown());
+                    };
+                    Ok(Type::TypeVar(TypeVarInstance::new(
+                        db,
+                        ast::name::Name::new("Self"),
+                        class_def,
+                        Some(TypeVarBoundOrConstraints::UpperBound(instance)),
+                        TypeVarVariance::Invariant,
+                        None,
+                        TypeVarKind::Legacy,
+                    )))
+                }
                 KnownInstanceType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
                 KnownInstanceType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
 
@@ -4807,7 +4880,7 @@ impl<'db> Type<'db> {
                 let mut builder = UnionBuilder::new(db);
                 let mut invalid_expressions = smallvec::SmallVec::default();
                 for element in union.elements(db) {
-                    match element.in_type_expression(db) {
+                    match element.in_type_expression(db, scope_id) {
                         Ok(type_expr) => builder = builder.add(type_expr),
                         Err(InvalidTypeExpressionError {
                             fallback_type,
@@ -4848,6 +4921,9 @@ impl<'db> Type<'db> {
                 )),
                 Some(KnownClass::UnionType) => Ok(todo_type!(
                     "Support for `types.UnionType` instances in type expressions"
+                )),
+                Some(KnownClass::NamedTuple) => Ok(todo_type!(
+                    "Support for functional `typing.NamedTuple` syntax"
                 )),
                 _ => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
@@ -4958,6 +5034,19 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[must_use]
+    pub fn apply_optional_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Type<'db> {
+        if let Some(specialization) = specialization {
+            self.apply_specialization(db, specialization)
+        } else {
+            self
+        }
+    }
+
     /// Applies a specialization to this type, replacing any typevars with the types that they are
     /// specialized to.
     ///
@@ -4978,19 +5067,15 @@ impl<'db> Type<'db> {
                 Type::FunctionLiteral(function.apply_specialization(db, specialization))
             }
 
-            // Note that we don't need to apply the specialization to `self_instance`, since it
-            // must either be a non-generic class literal (which cannot have any typevars to
-            // specialize) or a generic alias (which has already been fully specialized). For a
-            // generic alias, the specialization being applied here must be for some _other_
-            // generic context nested within the generic alias's class literal, which the generic
-            // alias's context cannot refer to. (The _method_ does need to be specialized, since it
-            // might be a nested generic method, whose generic context is what is now being
-            // specialized.)
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
                 method.function(db).apply_specialization(db, specialization),
-                method.self_instance(db),
+                method.self_instance(db).apply_specialization(db, specialization),
             )),
+
+            Type::NominalInstance(instance) => Type::NominalInstance(
+                instance.apply_specialization(db, specialization),
+            ),
 
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(
@@ -5076,9 +5161,6 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::SliceLiteral(_)
             | Type::BoundSuper(_)
-            // `NominalInstance` contains a ClassType, which has already been specialized if needed,
-            // like above with BoundMethod's self_instance.
-            | Type::NominalInstance(_)
             // Same for `ProtocolInstance`
             | Type::ProtocolInstance(_)
             | Type::KnownInstance(_) => self,
@@ -5622,6 +5704,9 @@ pub struct TypeVarInstance<'db> {
     /// The upper bound or constraint on the type of this TypeVar
     bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
 
+    /// The variance of the TypeVar
+    variance: TypeVarVariance,
+
     /// The default type for this TypeVar
     default_ty: Option<Type<'db>>,
 
@@ -5650,7 +5735,15 @@ impl<'db> TypeVarInstance<'db> {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
+pub enum TypeVarVariance {
+    Invariant,
+    Covariant,
+    Contravariant,
+    Bivariant,
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
 pub enum TypeVarBoundOrConstraints<'db> {
     UpperBound(Type<'db>),
     Constraints(UnionType<'db>),
@@ -6511,6 +6604,11 @@ impl<'db> FunctionSignature<'db> {
     pub(crate) fn iter(&self) -> Iter<Signature<'db>> {
         self.as_slice().iter()
     }
+
+    /// Returns the "bottom" signature (subtype of all fully-static signatures.)
+    pub(crate) fn bottom(db: &'db dyn Db) -> Self {
+        Self::Single(Signature::bottom(db))
+    }
 }
 
 impl<'db> IntoIterator for &'db FunctionSignature<'db> {
@@ -6655,7 +6753,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(return_ref)]
+    #[salsa::tracked(return_ref, cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
         if let Some(overloaded) = self.to_overloaded(db) {
             FunctionSignature::Overloaded(
@@ -6872,6 +6970,22 @@ impl<'db> FunctionType<'db> {
     }
 }
 
+fn signature_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &FunctionSignature<'db>,
+    _count: u32,
+    _function: FunctionType<'db>,
+) -> salsa::CycleRecoveryAction<FunctionSignature<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn signature_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _function: FunctionType<'db>,
+) -> FunctionSignature<'db> {
+    FunctionSignature::bottom(db)
+}
+
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
 /// have special behavior.
 #[derive(
@@ -6947,6 +7061,8 @@ pub enum KnownFunction {
     IsSingleValued,
     /// `ty_extensions.generic_context`
     GenericContext,
+    /// `ty_extensions.dunder_all_names`
+    DunderAllNames,
 }
 
 impl KnownFunction {
@@ -7003,6 +7119,7 @@ impl KnownFunction {
             | Self::IsSingleton
             | Self::IsSubtypeOf
             | Self::GenericContext
+            | Self::DunderAllNames
             | Self::StaticAssert => module.is_ty_extensions(),
         }
     }
@@ -7083,10 +7200,7 @@ impl<'db> CallableType<'db> {
     /// `(*args: object, **kwargs: object) -> Never`.
     #[cfg(test)]
     pub(crate) fn bottom(db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::single(
-            db,
-            Signature::new(Parameters::object(db), Some(Type::Never)),
-        ))
+        Type::Callable(CallableType::single(db, Signature::bottom(db)))
     }
 
     /// Return a "normalized" version of this `Callable` type.
@@ -7313,7 +7427,7 @@ impl<'db> ModuleLiteralType<'db> {
             }
         }
 
-        imported_symbol(db, self.module(db).file(), name).symbol
+        imported_symbol(db, self.module(db).file(), name, None).symbol
     }
 }
 
@@ -7985,7 +8099,9 @@ pub enum SuperOwnerKind<'db> {
 impl<'db> SuperOwnerKind<'db> {
     fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
-            SuperOwnerKind::Dynamic(dynamic) => Either::Left(ClassBase::Dynamic(dynamic).mro(db)),
+            SuperOwnerKind::Dynamic(dynamic) => {
+                Either::Left(ClassBase::Dynamic(dynamic).mro(db, None))
+            }
             SuperOwnerKind::Class(class) => Either::Right(class.iter_mro(db)),
             SuperOwnerKind::Instance(instance) => Either::Right(instance.class().iter_mro(db)),
         }
@@ -8112,7 +8228,7 @@ impl<'db> BoundSuperType<'db> {
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> impl Iterator<Item = ClassBase<'db>> {
         let Some(pivot_class) = self.pivot_class(db).into_class() else {
-            return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db));
+            return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db, None));
         };
 
         let mut pivot_found = false;
@@ -8400,6 +8516,7 @@ pub(crate) mod tests {
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf
                 | KnownFunction::GenericContext
+                | KnownFunction::DunderAllNames
                 | KnownFunction::StaticAssert
                 | KnownFunction::IsFullyStatic
                 | KnownFunction::IsDisjointFrom

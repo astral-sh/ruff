@@ -3,7 +3,7 @@
 ## Unresolved import statement
 
 ```py
-import bar  # error: "Cannot resolve import `bar`"
+import bar  # error: "Cannot resolve imported module `bar`"
 
 reveal_type(bar)  # revealed: Unknown
 ```
@@ -11,7 +11,7 @@ reveal_type(bar)  # revealed: Unknown
 ## Unresolved import from statement
 
 ```py
-from bar import baz  # error: "Cannot resolve import `bar`"
+from bar import baz  # error: "Cannot resolve imported module `bar`"
 
 reveal_type(baz)  # revealed: Unknown
 ```
@@ -34,7 +34,7 @@ reveal_type(thing)  # revealed: Unknown
 `a.py`:
 
 ```py
-import foo as foo  # error: "Cannot resolve import `foo`"
+import foo as foo  # error: "Cannot resolve imported module `foo`"
 
 reveal_type(foo)  # revealed: Unknown
 ```
@@ -69,12 +69,12 @@ x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]"
 ```py
 class A: ...
 
-reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Literal[object]]
+reveal_type(A.__mro__)  # revealed: tuple[<class 'A'>, <class 'object'>]
 import b
 
 class C(b.B): ...
 
-reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[B], Literal[A], Literal[object]]
+reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'B'>, <class 'A'>, <class 'object'>]
 ```
 
 `b.py`:
@@ -84,5 +84,5 @@ from a import A
 
 class B(A): ...
 
-reveal_type(B.__mro__)  # revealed: tuple[Literal[B], Literal[A], Literal[object]]
+reveal_type(B.__mro__)  # revealed: tuple[<class 'B'>, <class 'A'>, <class 'object'>]
 ```
