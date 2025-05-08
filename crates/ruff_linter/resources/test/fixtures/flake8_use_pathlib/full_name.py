@@ -87,3 +87,20 @@ def bar(x: int):
 os.rename("src", "dst", src_dir_fd=3, dst_dir_fd=4)
 os.rename("src", "dst", src_dir_fd=3)
 os.rename("src", "dst", dst_dir_fd=4)
+
+# if `dir_fd` is set, suppress the diagnostic
+os.readlink(p, dir_fd=1)
+os.stat(p, dir_fd=2)
+os.unlink(p, dir_fd=3)
+os.remove(p, dir_fd=4)
+os.rmdir(p, dir_fd=5)
+os.mkdir(p, dir_fd=6)
+os.chmod(p, dir_fd=7)
+# `chmod` can also receive a file descriptor in the first argument
+os.chmod(8)
+os.chmod(x)
+
+# if `src_dir_fd` or `dst_dir_fd` are set, suppress the diagnostic
+os.replace("src", "dst", src_dir_fd=1, dst_dir_fd=2)
+os.replace("src", "dst", src_dir_fd=1)
+os.replace("src", "dst", dst_dir_fd=2)

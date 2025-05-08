@@ -26,15 +26,49 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
         // PTH100
         ["os", "path", "abspath"] => OsPathAbspath.into(),
         // PTH101
-        ["os", "chmod"] => OsChmod.into(),
+        ["os", "chmod"] => {
+            // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
+            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.chmod)
+            // ```text
+            //           0     1          2               3
+            // os.chmod(path, mode, *, dir_fd=None, follow_symlinks=True)
+            // ```
+            if call
+                .arguments
+                .find_positional(0)
+                .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
+                || call
+                    .arguments
+                    .find_argument_value("dir_fd", 2)
+                    .is_some_and(|expr| !expr.is_none_literal_expr())
+            {
+                return;
+            }
+            OsChmod.into()
+        }
         // PTH102
         ["os", "makedirs"] => OsMakedirs.into(),
         // PTH103
-        ["os", "mkdir"] => OsMkdir.into(),
+        ["os", "mkdir"] => {
+            // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
+            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.mkdir)
+            // ```text
+            //           0     1                2
+            // os.mkdir(path, mode=0o777, *, dir_fd=None)
+            // ```
+            if call
+                .arguments
+                .find_argument_value("dir_fd", 2)
+                .is_some_and(|expr| !expr.is_none_literal_expr())
+            {
+                return;
+            }
+            OsMkdir.into()
+        }
         // PTH104
         ["os", "rename"] => {
             // `src_dir_fd` and `dst_dir_fd` are not supported by pathlib, so check if they are
-            // are set to non-default values.
+            // set to non-default values.
             // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.rename)
             // ```text
             //           0    1       2                3
@@ -54,13 +88,78 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             OsRename.into()
         }
         // PTH105
-        ["os", "replace"] => OsReplace.into(),
+        ["os", "replace"] => {
+            // `src_dir_fd` and `dst_dir_fd` are not supported by pathlib, so check if they are
+            // set to non-default values.
+            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.replace)
+            // ```text
+            //              0    1       2                3
+            // os.replace(src, dst, *, src_dir_fd=None, dst_dir_fd=None)
+            // ```
+            if call
+                .arguments
+                .find_argument_value("src_dir_fd", 2)
+                .is_some_and(|expr| !expr.is_none_literal_expr())
+                || call
+                    .arguments
+                    .find_argument_value("dst_dir_fd", 3)
+                    .is_some_and(|expr| !expr.is_none_literal_expr())
+            {
+                return;
+            }
+            OsReplace.into()
+        }
         // PTH106
-        ["os", "rmdir"] => OsRmdir.into(),
+        ["os", "rmdir"] => {
+            // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
+            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.rmdir)
+            // ```text
+            //            0         1
+            // os.rmdir(path, *, dir_fd=None)
+            // ```
+            if call
+                .arguments
+                .find_argument_value("dir_fd", 1)
+                .is_some_and(|expr| !expr.is_none_literal_expr())
+            {
+                return;
+            }
+            OsRmdir.into()
+        }
         // PTH107
-        ["os", "remove"] => OsRemove.into(),
+        ["os", "remove"] => {
+            // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
+            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.remove)
+            // ```text
+            //            0         1
+            // os.remove(path, *, dir_fd=None)
+            // ```
+            if call
+                .arguments
+                .find_argument_value("dir_fd", 1)
+                .is_some_and(|expr| !expr.is_none_literal_expr())
+            {
+                return;
+            }
+            OsRemove.into()
+        }
         // PTH108
-        ["os", "unlink"] => OsUnlink.into(),
+        ["os", "unlink"] => {
+            // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
+            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.unlink)
+            // ```text
+            //            0         1
+            // os.unlink(path, *, dir_fd=None)
+            // ```
+            if call
+                .arguments
+                .find_argument_value("dir_fd", 1)
+                .is_some_and(|expr| !expr.is_none_literal_expr())
+            {
+                return;
+            }
+            OsUnlink.into()
+        }
         // PTH109
         ["os", "getcwd"] => OsGetcwd.into(),
         ["os", "getcwdb"] => OsGetcwd.into(),
@@ -76,10 +175,20 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
         ["os", "path", "islink"] => OsPathIslink.into(),
         // PTH116
         ["os", "stat"] => {
+            // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
+            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.stat)
+            // ```text
+            //           0         1           2
+            // os.stat(path, *, dir_fd=None, follow_symlinks=True)
+            // ```
             if call
                 .arguments
                 .find_positional(0)
                 .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
+                || call
+                    .arguments
+                    .find_argument_value("dir_fd", 1)
+                    .is_some_and(|expr| !expr.is_none_literal_expr())
             {
                 return;
             }
@@ -164,17 +273,65 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
         // PTH124
         ["py", "path", "local"] => PyPath.into(),
         // PTH207
-        ["glob", "glob"] => Glob {
-            function: "glob".to_string(),
+        ["glob", "glob"] => {
+            // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
+            // Signature as of Python 3.13 (https://docs.python.org/3/library/glob.html#glob.glob)
+            // ```text
+            //               0           1              2            3                 4
+            // glob.glob(pathname, *, root_dir=None, dir_fd=None, recursive=False, include_hidden=False)
+            // ```
+            if call
+                .arguments
+                .find_argument_value("dir_fd", 2)
+                .is_some_and(|expr| !expr.is_none_literal_expr())
+            {
+                return;
+            }
+
+            Glob {
+                function: "glob".to_string(),
+            }
+            .into()
         }
-        .into(),
-        ["glob", "iglob"] => Glob {
-            function: "iglob".to_string(),
+
+        ["glob", "iglob"] => {
+            // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
+            // Signature as of Python 3.13 (https://docs.python.org/3/library/glob.html#glob.iglob)
+            // ```text
+            //                0           1              2            3                 4
+            // glob.iglob(pathname, *, root_dir=None, dir_fd=None, recursive=False, include_hidden=False)
+            // ```
+            if call
+                .arguments
+                .find_argument_value("dir_fd", 2)
+                .is_some_and(|expr| !expr.is_none_literal_expr())
+            {
+                return;
+            }
+
+            Glob {
+                function: "iglob".to_string(),
+            }
+            .into()
         }
-        .into(),
         // PTH115
         // Python 3.9+
-        ["os", "readlink"] if checker.target_version() >= PythonVersion::PY39 => OsReadlink.into(),
+        ["os", "readlink"] if checker.target_version() >= PythonVersion::PY39 => {
+            // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
+            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.readlink)
+            // ```text
+            //               0         1
+            // os.readlink(path, *, dir_fd=None)
+            // ```
+            if call
+                .arguments
+                .find_argument_value("dir_fd", 1)
+                .is_some_and(|expr| !expr.is_none_literal_expr())
+            {
+                return;
+            }
+            OsReadlink.into()
+        }
         // PTH208
         ["os", "listdir"] => {
             if call
