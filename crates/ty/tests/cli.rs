@@ -373,8 +373,8 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
             "#,
     )?;
 
-    // Assert that there's no possibly unresolved reference diagnostic
-    // but one division-by-zero with a severity of error by default.
+    // Assert that there's an `unresolved-reference` diagnostic (error)
+    // and a `division-by-zero` diagnostic (error).
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
@@ -452,8 +452,8 @@ fn cli_rule_severity() -> anyhow::Result<()> {
         "#,
     )?;
 
-    // Assert that there's no unresolved reference diagnostic by default
-    // but a division-by-zero (error) and a unresolved-import (error) diagnostic
+    // Assert that there's an `unresolved-reference` diagnostic (error),
+    // a `division-by-zero` (error) and a unresolved-import (error) diagnostic by default.
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
@@ -555,8 +555,8 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
         "#,
     )?;
 
-    // Assert that there's a possibly unresolved reference diagnostic
-    // and that division-by-zero has a severity of error by default.
+    // Assert that there's a `unresolved-reference` diagnostic (error)
+    // and a `division-by-zero` (error) by default.
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
