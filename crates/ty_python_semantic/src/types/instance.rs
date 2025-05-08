@@ -4,6 +4,7 @@ use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type};
 use crate::symbol::{Symbol, SymbolAndQualifiers};
 use crate::types::generics::TypeMapping;
+use crate::types::ClassLiteral;
 use crate::Db;
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -187,8 +188,20 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    pub(super) fn contains_recursive_reference(self, db: &'db dyn Db) -> bool {
-        self.0.interface(db).contains_recursive_reference(db)
+    pub(super) fn replace_recursive_reference(
+        self,
+        db: &'db dyn Db,
+        class: ClassLiteral<'db>,
+    ) -> Self {
+        match self.0 {
+            Protocol::FromClass(class_type) if class_type.class_literal(db).0 == class => {
+                ProtocolInstanceType(Protocol::Synthesized(SynthesizedProtocolType::new(
+                    db,
+                    ProtocolInterface::recursive_reference(db),
+                )))
+            }
+            _ => self,
+        }
     }
 
     /// Return `true` if any of the members of this protocol type contain any `Todo` types.

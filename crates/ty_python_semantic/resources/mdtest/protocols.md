@@ -1600,8 +1600,6 @@ static_assert(is_fully_static(RecursiveOptionalParent))
 static_assert(is_assignable_to(RecursiveOptionalParent, RecursiveOptionalParent))
 
 static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveOptionalParent))
-# TODO: this should not be an error
-# error: [static-assert-error]
 static_assert(not is_assignable_to(RecursiveOptionalParent, RecursiveNonFullyStatic))
 ```
 

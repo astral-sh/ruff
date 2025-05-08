@@ -587,60 +587,53 @@ impl<'db> Type<'db> {
         matches!(self, Type::Dynamic(DynamicType::Todo(_)))
     }
 
-    pub fn contains_recursive_reference(&self, db: &'db dyn Db) -> bool {
+    #[must_use]
+    pub fn replace_recursive_reference(
+        &self,
+        db: &'db dyn Db,
+        class: ClassLiteral<'db>,
+    ) -> Type<'db> {
         match self {
-            Self::ProtocolInstance(protocol) => protocol.contains_recursive_reference(db),
-
-            Self::Union(union) => union
-                .elements(db)
-                .iter()
-                .any(|ty| ty.contains_recursive_reference(db)),
-
-            Self::Intersection(intersection) => {
-                intersection
-                    .positive(db)
-                    .iter()
-                    .any(|ty| ty.contains_recursive_reference(db))
-                    || intersection
-                        .negative(db)
-                        .iter()
-                        .any(|ty| ty.contains_recursive_reference(db))
+            Self::ProtocolInstance(protocol) => {
+                Self::ProtocolInstance(protocol.replace_recursive_reference(db, class))
             }
 
-            Self::Tuple(tuple) => tuple
-                .elements(db)
-                .iter()
-                .any(|ty| ty.contains_recursive_reference(db)),
-
-            Self::GenericAlias(generic) => generic
-                .specialization(db)
-                .types(db)
-                .iter()
-                .any(|ty| ty.contains_recursive_reference(db)),
-
-            Self::Callable(callable) => {
-                let signatures = callable.signatures(db);
-                signatures.iter().any(|signature| {
-                    signature.parameters().iter().any(|param| {
-                        param
-                            .annotated_type()
-                            .is_some_and(|ty| ty.contains_recursive_reference(db))
-                    }) || signature
-                        .return_ty
-                        .is_some_and(|ty| ty.contains_recursive_reference(db))
-                })
-            }
-
-            Self::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
-                None => false,
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    bound.contains_recursive_reference(db)
-                }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+            Self::Union(union) => UnionType::from_elements(
+                db,
+                union
                     .elements(db)
                     .iter()
-                    .any(|constraint| constraint.contains_recursive_reference(db)),
-            },
+                    .map(|ty| ty.replace_recursive_reference(db, class)),
+            ),
+
+            Self::Intersection(intersection) => {
+                let positive = intersection
+                    .positive(db)
+                    .iter()
+                    .map(|ty| ty.replace_recursive_reference(db, class));
+                let negative = intersection
+                    .negative(db)
+                    .iter()
+                    .map(|ty| ty.replace_recursive_reference(db, class));
+
+                IntersectionBuilder::new(db)
+                    .positive_elements(positive)
+                    .negative_elements(negative)
+                    .build()
+            }
+
+            Self::Tuple(tuple) => TupleType::from_elements(
+                db,
+                tuple
+                    .elements(db)
+                    .iter()
+                    .map(|ty| ty.replace_recursive_reference(db, class)),
+            ),
+
+            Self::GenericAlias(_) | Self::Callable(_) | Self::TypeVar(_) => {
+                // TODO
+                *self
+            }
 
             Self::Dynamic(_)
             | Self::AlwaysFalsy
@@ -664,7 +657,7 @@ impl<'db> Type<'db> {
             | Self::DataclassDecorator(_)
             | Self::DataclassTransformer(_)
             | Self::SubclassOf(_)
-            | Self::BoundSuper(_) => false,
+            | Self::BoundSuper(_) => *self,
         }
     }
 

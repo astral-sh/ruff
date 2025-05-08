@@ -67,7 +67,7 @@ pub(super) struct ProtocolInterface<'db> {
 }
 
 impl<'db> ProtocolInterface<'db> {
-    fn recursive_reference(db: &'db dyn Db) -> Self {
+    pub(super) fn recursive_reference(db: &'db dyn Db) -> Self {
         ProtocolInterface::new(db, BTreeMap::default(), true)
     }
 
@@ -97,7 +97,11 @@ impl<'db> ProtocolInterface<'db> {
 
     /// Return `true` if all members of this protocol are fully static.
     pub(super) fn is_fully_static(self, db: &'db dyn Db) -> bool {
-        cached_is_fully_static(db, self)
+        if self.is_recursive_reference(db) {
+            return true;
+        }
+
+        self.members(db).all(|member| member.ty.is_fully_static(db))
     }
 
     /// Return `true` if if all members on `self` are also members of `other`.
@@ -107,13 +111,6 @@ impl<'db> ProtocolInterface<'db> {
         self._members(db)
             .keys()
             .all(|member_name| other._members(db).contains_key(member_name))
-    }
-
-    pub(super) fn contains_recursive_reference(self, db: &'db dyn Db) -> bool {
-        self.is_recursive_reference(db)
-            || self
-                .members(db)
-                .any(|member| member.ty.contains_recursive_reference(db))
     }
 
     /// Return `true` if any of the members of this protocol type contain any `Todo` types.
@@ -126,7 +123,14 @@ impl<'db> ProtocolInterface<'db> {
             return self;
         }
 
-        cached_normalized(db, self)
+        ProtocolInterface::new(
+            db,
+            self._members(db)
+                .iter()
+                .map(|(name, data)| (name.clone(), data.normalized(db)))
+                .collect::<BTreeMap<_, _>>(),
+            false,
+        )
     }
 }
 
@@ -257,6 +261,7 @@ fn cached_protocol_interface<'db>(
                 })
                 .filter(|(name, _, _)| !excluded_from_proto_members(name))
                 .map(|(name, ty, qualifiers)| {
+                    let ty = ty.replace_recursive_reference(db, class);
                     let member = ProtocolMemberData { ty, qualifiers };
                     (name.clone(), member)
                 }),
@@ -280,80 +285,5 @@ fn proto_interface_cycle_initial<'db>(
     db: &'db dyn Db,
     _class: ClassLiteral<'db>,
 ) -> ProtocolInterface<'db> {
-    ProtocolInterface::recursive_reference(db)
-}
-
-#[salsa::tracked(cycle_fn=is_fully_static_cycle_recover, cycle_initial=is_fully_static_cycle_initial)]
-fn cached_is_fully_static<'db>(db: &'db dyn Db, interface: ProtocolInterface<'db>) -> bool {
-    interface
-        .members(db)
-        .all(|member| member.ty.is_fully_static(db))
-}
-
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn is_fully_static_cycle_recover(
-    _db: &dyn Db,
-    _value: &bool,
-    _count: u32,
-    _interface: ProtocolInterface<'_>,
-) -> salsa::CycleRecoveryAction<bool> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn is_fully_static_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _interface: ProtocolInterface<'db>,
-) -> bool {
-    // Assume that the protocol is fully static until we find members that indicate otherwise.
-    true
-}
-
-#[salsa::tracked(cycle_fn=cached_normalized_cycle_recover, cycle_initial=cached_normalized_cycle_initial)]
-fn cached_normalized<'db>(
-    db: &'db dyn Db,
-    interface: ProtocolInterface<'db>,
-) -> ProtocolInterface<'db> {
-    let result = ProtocolInterface::new(
-        db,
-        interface
-            ._members(db)
-            .iter()
-            .map(|(name, data)| (name.clone(), data.normalized(db)))
-            .collect::<BTreeMap<_, _>>(),
-        false,
-    );
-
-    if result
-        ._members(db)
-        .iter()
-        .any(|(_, data)| data.ty.contains_recursive_reference(db))
-    {
-        // When the normalized result contains a recursive reference, we know that we have
-        // returned from a self-cycle. In this case, we do not return the answer, but rather
-        // just a recursive reference, knowing that this will be embedded in an enclosing
-        // protocol as a member.
-        ProtocolInterface::recursive_reference(db)
-    } else {
-        result
-    }
-}
-
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn cached_normalized_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value_output: &ProtocolInterface<'db>,
-    count: u32,
-    _interface_input: ProtocolInterface<'db>,
-) -> salsa::CycleRecoveryAction<ProtocolInterface<'db>> {
-    if count > 1 {
-        unreachable!("Expected 'normalized' cycles to be resolved after one iteration");
-    }
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn cached_normalized_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _interface: ProtocolInterface<'db>,
-) -> ProtocolInterface<'db> {
-    ProtocolInterface::new(db, BTreeMap::default(), true)
+    ProtocolInterface::new(db, BTreeMap::default(), false)
 }
