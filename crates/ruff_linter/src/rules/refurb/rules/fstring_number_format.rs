@@ -130,7 +130,7 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
     let applicability = if matches!(arg, Expr::NumberLiteral(_)) {
         Applicability::Safe
     } else {
-        Applicability::Unsafe
+        Applicability::DisplayOnly
     };
 
     let replacement = try_create_replacement(checker, arg, base);
