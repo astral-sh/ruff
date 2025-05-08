@@ -1,12 +1,13 @@
 [package]
 name = "ty"
 version = "0.0.0"
-edition.workspace = true
-rust-version.workspace = true
-homepage.workspace = true
-documentation.workspace = true
+# required for correct pypi metadata
+homepage = "https://github.com/astral-sh/ty/"
+documentation = "https://github.com/astral-sh/ty/"
 # Releases occur in this other repository!
 repository = "https://github.com/astral-sh/ty/"
+edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 
