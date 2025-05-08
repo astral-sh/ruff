@@ -34,7 +34,7 @@ pub struct Definition<'db> {
     /// WARNING: Only access this field when doing type inference for the same
     /// file as where `Definition` is defined to avoid cross-file query dependencies.
     #[no_eq]
-    #[return_ref]
+    #[returns(ref)]
     #[tracked]
     pub(crate) kind: DefinitionKind<'db>,
 

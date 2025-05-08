@@ -471,7 +471,7 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
 #[salsa::interned(debug)]
 pub struct ClassLiteral<'db> {
     /// Name of the class at definition
-    #[return_ref]
+    #[returns(ref)]
     pub(crate) name: ast::name::Name,
 
     pub(crate) body_scope: ScopeId<'db>,
@@ -634,21 +634,8 @@ impl<'db> ClassLiteral<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
-    pub(super) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
-        self.explicit_bases_query(db)
-    }
-
-    /// Iterate over this class's explicit bases, filtering out any bases that are not class
-    /// objects, and applying default specialization to any unspecialized generic class literals.
-    fn fully_static_explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = ClassType<'db>> {
-        self.explicit_bases(db)
-            .iter()
-            .copied()
-            .filter_map(|ty| ty.to_class_type(db))
-    }
-
-    #[salsa::tracked(return_ref, cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial)]
-    fn explicit_bases_query(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+    #[salsa::tracked(returns(deref), cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial)]
+    pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::explicit_bases_query: {}", self.name(db));
 
         let class_stmt = self.node(db);
@@ -660,6 +647,15 @@ impl<'db> ClassLiteral<'db> {
             .iter()
             .map(|base_node| definition_expression_type(db, class_definition, base_node))
             .collect()
+    }
+
+    /// Iterate over this class's explicit bases, filtering out any bases that are not class
+    /// objects, and applying default specialization to any unspecialized generic class literals.
+    fn fully_static_explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = ClassType<'db>> {
+        self.explicit_bases(db)
+            .iter()
+            .copied()
+            .filter_map(|ty| ty.to_class_type(db))
     }
 
     /// Determine if this class is a protocol.
@@ -700,7 +696,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Return the types of the decorators on this class
-    #[salsa::tracked(return_ref)]
+    #[salsa::tracked(returns(deref))]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::decorators: {}", self.name(db));
 
@@ -746,7 +742,7 @@ impl<'db> ClassLiteral<'db> {
     /// attribute on a class at runtime.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    #[salsa::tracked(return_ref, cycle_fn=try_mro_cycle_recover, cycle_initial=try_mro_cycle_initial)]
+    #[salsa::tracked(returns(as_ref), cycle_fn=try_mro_cycle_recover, cycle_initial=try_mro_cycle_initial)]
     pub(super) fn try_mro(
         self,
         db: &'db dyn Db,
@@ -842,11 +838,7 @@ impl<'db> ClassLiteral<'db> {
             return Ok((SubclassOfType::subclass_of_unknown(), None));
         }
 
-        if self
-            .try_mro(db, None)
-            .as_ref()
-            .is_err_and(MroError::is_cycle)
-        {
+        if self.try_mro(db, None).is_err_and(MroError::is_cycle) {
             return Ok((SubclassOfType::subclass_of_unknown(), None));
         }
 
@@ -2728,7 +2720,7 @@ impl<'db> Type<'db> {
         if !alias.origin(db).is_known(db, KnownClass::Slice) {
             return None;
         }
-        let [start, stop, step] = alias.specialization(db).types(db).as_ref() else {
+        let [start, stop, step] = alias.specialization(db).types(db) else {
             return None;
         };
 

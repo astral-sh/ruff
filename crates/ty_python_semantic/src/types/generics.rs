@@ -15,7 +15,7 @@ use crate::{Db, FxOrderSet};
 /// containing context.
 #[salsa::interned(debug)]
 pub struct GenericContext<'db> {
-    #[return_ref]
+    #[returns(ref)]
     pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
 }
 
@@ -216,7 +216,7 @@ impl<'db> GenericContext<'db> {
 #[salsa::interned(debug)]
 pub struct Specialization<'db> {
     pub(crate) generic_context: GenericContext<'db>,
-    #[return_ref]
+    #[returns(deref)]
     pub(crate) types: Box<[Type<'db>]>,
 }
 
@@ -249,7 +249,7 @@ impl<'db> Specialization<'db> {
     ) -> Self {
         let types: Box<[_]> = self
             .types(db)
-            .into_iter()
+            .iter()
             .map(|ty| ty.apply_type_mapping(db, type_mapping))
             .collect();
         Specialization::new(db, self.generic_context(db), types)
@@ -282,7 +282,7 @@ impl<'db> Specialization<'db> {
         // explicitly tells us which typevars are mapped.
         let types: Box<[_]> = self
             .types(db)
-            .into_iter()
+            .iter()
             .zip(other.types(db))
             .map(|(self_type, other_type)| match (self_type, other_type) {
                 (unknown, known) | (known, unknown) if unknown.is_unknown() => *known,

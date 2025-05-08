@@ -16,7 +16,6 @@ use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
-use std::sync::Arc;
 
 use super::UnionType;
 
@@ -65,8 +64,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
     }
 }
 
-#[allow(clippy::ref_option)]
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(returns(as_ref))]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -74,9 +72,8 @@ fn all_narrowing_constraints_for_pattern<'db>(
     NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), true).finish()
 }
 
-#[allow(clippy::ref_option)]
 #[salsa::tracked(
-    return_ref,
+    returns(as_ref),
     cycle_fn=constraints_for_expression_cycle_recover,
     cycle_initial=constraints_for_expression_cycle_initial,
 )]
@@ -87,9 +84,8 @@ fn all_narrowing_constraints_for_expression<'db>(
     NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), true).finish()
 }
 
-#[allow(clippy::ref_option)]
 #[salsa::tracked(
-    return_ref,
+    returns(as_ref),
     cycle_fn=negative_constraints_for_expression_cycle_recover,
     cycle_initial=negative_constraints_for_expression_cycle_initial,
 )]
@@ -100,8 +96,7 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
     NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), false).finish()
 }
 
-#[allow(clippy::ref_option)]
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(returns(as_ref))]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -109,7 +104,7 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
     NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), false).finish()
 }
 
-#[allow(clippy::ref_option)]
+#[expect(clippy::ref_option)]
 fn constraints_for_expression_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Option<NarrowingConstraints<'db>>,
@@ -286,7 +281,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let expression_node = expression.node_ref(self.db).node();
+        let expression_node = expression.node_ref(self.db);
         self.evaluate_expression_node_predicate(expression_node, expression, is_positive)
     }
 
@@ -344,7 +339,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             })
     }
 
-    fn symbols(&self) -> Arc<SymbolTable> {
+    fn symbols(&self) -> &'db SymbolTable {
         symbol_table(self.db, self.scope())
     }
 

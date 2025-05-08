@@ -150,20 +150,20 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
         (Type::BoundSuper(left), Type::BoundSuper(right)) => {
             (match (left.pivot_class(db), right.pivot_class(db)) {
-                (ClassBase::Class(left), ClassBase::Class(right)) => left.cmp(right),
+                (ClassBase::Class(left), ClassBase::Class(right)) => left.cmp(&right),
                 (ClassBase::Class(_), _) => Ordering::Less,
                 (_, ClassBase::Class(_)) => Ordering::Greater,
                 (ClassBase::Protocol, _) => Ordering::Less,
                 (_, ClassBase::Protocol) => Ordering::Greater,
-                (ClassBase::Generic(left), ClassBase::Generic(right)) => left.cmp(right),
+                (ClassBase::Generic(left), ClassBase::Generic(right)) => left.cmp(&right),
                 (ClassBase::Generic(_), _) => Ordering::Less,
                 (_, ClassBase::Generic(_)) => Ordering::Greater,
                 (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
-                    dynamic_elements_ordering(*left, *right)
+                    dynamic_elements_ordering(left, right)
                 }
             })
             .then_with(|| match (left.owner(db), right.owner(db)) {
-                (SuperOwnerKind::Class(left), SuperOwnerKind::Class(right)) => left.cmp(right),
+                (SuperOwnerKind::Class(left), SuperOwnerKind::Class(right)) => left.cmp(&right),
                 (SuperOwnerKind::Class(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Class(_)) => Ordering::Greater,
                 (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => {
@@ -172,7 +172,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
                 (SuperOwnerKind::Dynamic(left), SuperOwnerKind::Dynamic(right)) => {
-                    dynamic_elements_ordering(*left, *right)
+                    dynamic_elements_ordering(left, right)
                 }
             })
         }

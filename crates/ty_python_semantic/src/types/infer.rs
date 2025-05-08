@@ -117,7 +117,7 @@ use super::{BoundSuperError, BoundSuperType, ClassBase};
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
-#[salsa::tracked(return_ref, cycle_fn=scope_cycle_recover, cycle_initial=scope_cycle_initial)]
+#[salsa::tracked(returns(ref), cycle_fn=scope_cycle_recover, cycle_initial=scope_cycle_initial)]
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), ?file).entered();
@@ -144,7 +144,7 @@ fn scope_cycle_initial<'db>(_db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInfere
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a symbol name use or public type of a symbol.
-#[salsa::tracked(return_ref, cycle_fn=definition_cycle_recover, cycle_initial=definition_cycle_initial)]
+#[salsa::tracked(returns(ref), cycle_fn=definition_cycle_recover, cycle_initial=definition_cycle_initial)]
 pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -182,7 +182,7 @@ fn definition_cycle_initial<'db>(
 ///
 /// Deferred expressions are type expressions (annotations, base classes, aliases...) in a stub
 /// file, or in a file with `from __future__ import annotations`, or stringified annotations.
-#[salsa::tracked(return_ref, cycle_fn=deferred_cycle_recover, cycle_initial=deferred_cycle_initial)]
+#[salsa::tracked(returns(ref), cycle_fn=deferred_cycle_recover, cycle_initial=deferred_cycle_initial)]
 pub(crate) fn infer_deferred_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -218,7 +218,7 @@ fn deferred_cycle_initial<'db>(db: &'db dyn Db, definition: Definition<'db>) -> 
 /// Use rarely; only for cases where we'd otherwise risk double-inferring an expression: RHS of an
 /// assignment, which might be unpacking/multi-target and thus part of multiple definitions, or a
 /// type narrowing guard expression (e.g. if statement test node).
-#[salsa::tracked(return_ref, cycle_fn=expression_cycle_recover, cycle_initial=expression_cycle_initial)]
+#[salsa::tracked(returns(ref), cycle_fn=expression_cycle_recover, cycle_initial=expression_cycle_initial)]
 pub(crate) fn infer_expression_types<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
@@ -305,7 +305,7 @@ fn single_expression_cycle_initial<'db>(
 /// involved in an unpacking operation. It returns a result-like object that can be used to get the
 /// type of the variables involved in this unpacking along with any violations that are detected
 /// during this unpacking.
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(returns(ref))]
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
     let _span =
@@ -876,7 +876,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // (3) Check that the class's MRO is resolvable
-            match class.try_mro(self.db(), None).as_ref() {
+            match class.try_mro(self.db(), None) {
                 Err(mro_error) => {
                     match mro_error.reason() {
                         MroErrorKind::DuplicateBases(duplicates) => {
@@ -3265,7 +3265,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 let mut assigned_tys = match assigned_ty {
                     Some(Type::Tuple(tuple)) => {
-                        Either::Left(tuple.elements(self.db()).into_iter().copied())
+                        Either::Left(tuple.elements(self.db()).iter().copied())
                     }
                     Some(_) | None => Either::Right(std::iter::empty()),
                 };
@@ -4864,7 +4864,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                 if !truthiness.is_always_true() {
                                                     if let Some(message) = message
                                                         .and_then(Type::into_string_literal)
-                                                        .map(|s| &**s.value(self.db()))
+                                                        .map(|s| s.value(self.db()))
                                                     {
                                                         builder.into_diagnostic(format_args!(
                                                             "Static assertion error: {message}"
@@ -5122,7 +5122,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                                         let name_param = name_param
                                             .into_string_literal()
-                                            .map(|name| name.value(self.db()).as_ref());
+                                            .map(|name| name.value(self.db()));
                                         if name_param
                                             .is_none_or(|name_param| name_param != target.id)
                                         {
@@ -5856,13 +5856,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
-                let bytes = [&**lhs.value(self.db()), &**rhs.value(self.db())].concat();
+                let bytes = [lhs.value(self.db()), rhs.value(self.db())].concat();
                 Some(Type::bytes_literal(self.db(), &bytes))
             }
 
             (Type::StringLiteral(lhs), Type::StringLiteral(rhs), ast::Operator::Add) => {
                 let lhs_value = lhs.value(self.db()).to_string();
-                let rhs_value = rhs.value(self.db()).as_ref();
+                let rhs_value = rhs.value(self.db());
                 let ty = if lhs_value.len() + rhs_value.len() <= Self::MAX_STRING_LITERAL_SIZE {
                     Type::string_literal(self.db(), &(lhs_value + rhs_value))
                 } else {
@@ -6463,8 +6463,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ast::CmpOp::LtE => Ok(Type::BooleanLiteral(s1 <= s2)),
                     ast::CmpOp::Gt => Ok(Type::BooleanLiteral(s1 > s2)),
                     ast::CmpOp::GtE => Ok(Type::BooleanLiteral(s1 >= s2)),
-                    ast::CmpOp::In => Ok(Type::BooleanLiteral(s2.contains(s1.as_ref()))),
-                    ast::CmpOp::NotIn => Ok(Type::BooleanLiteral(!s2.contains(s1.as_ref()))),
+                    ast::CmpOp::In => Ok(Type::BooleanLiteral(s2.contains(s1))),
+                    ast::CmpOp::NotIn => Ok(Type::BooleanLiteral(!s2.contains(s1))),
                     ast::CmpOp::Is => {
                         if s1 == s2 {
                             Ok(KnownClass::Bool.to_instance(self.db()))
@@ -6508,8 +6508,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             ),
 
             (Type::BytesLiteral(salsa_b1), Type::BytesLiteral(salsa_b2)) => {
-                let b1 = &**salsa_b1.value(self.db());
-                let b2 = &**salsa_b2.value(self.db());
+                let b1 = salsa_b1.value(self.db());
+                let b2 = salsa_b2.value(self.db());
                 match op {
                     ast::CmpOp::Eq => Ok(Type::BooleanLiteral(b1 == b2)),
                     ast::CmpOp::NotEq => Ok(Type::BooleanLiteral(b1 != b2)),

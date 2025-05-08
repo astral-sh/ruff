@@ -41,7 +41,7 @@ pub(crate) struct Expression<'db> {
     /// The expression node.
     #[no_eq]
     #[tracked]
-    #[return_ref]
+    #[returns(deref)]
     pub(crate) node_ref: AstNodeRef<ast::Expr>,
 
     /// An assignment statement, if this expression is immediately used as the rhs of that

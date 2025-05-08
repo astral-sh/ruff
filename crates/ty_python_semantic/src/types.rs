@@ -81,7 +81,7 @@ mod definition;
 #[cfg(test)]
 mod property_tests;
 
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(returns(ref))]
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     let _span = tracing::trace_span!("check_types", ?file).entered();
 
@@ -3376,14 +3376,10 @@ impl<'db> Type<'db> {
     /// [`CallErrorKind::NotCallable`].
     fn signatures(self, db: &'db dyn Db) -> Signatures<'db> {
         match self {
-            Type::Callable(callable) => {
-                Signatures::single(match callable.signatures(db).as_ref() {
-                    [signature] => CallableSignature::single(self, signature.clone()),
-                    signatures => {
-                        CallableSignature::from_overloads(self, signatures.iter().cloned())
-                    }
-                })
-            }
+            Type::Callable(callable) => Signatures::single(match callable.signatures(db) {
+                [signature] => CallableSignature::single(self, signature.clone()),
+                signatures => CallableSignature::from_overloads(self, signatures.iter().cloned()),
+            }),
 
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
@@ -5639,7 +5635,7 @@ pub enum TypeVarKind {
 #[salsa::interned(debug)]
 pub struct TypeVarInstance<'db> {
     /// The name of this TypeVar (e.g. `T`)
-    #[return_ref]
+    #[returns(ref)]
     name: ast::name::Name,
 
     /// The type var's definition
@@ -6587,7 +6583,7 @@ impl<'db> OverloadedFunction<'db> {
 #[salsa::interned(debug)]
 pub struct FunctionType<'db> {
     /// Name of the function at definition.
-    #[return_ref]
+    #[returns(ref)]
     pub name: ast::name::Name,
 
     /// Is this a function that we special-case somehow? If so, which one?
@@ -6697,7 +6693,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(return_ref, cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial)]
+    #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
         if let Some(overloaded) = self.to_overloaded(db) {
             FunctionSignature::Overloaded(
@@ -6846,68 +6842,56 @@ impl<'db> FunctionType<'db> {
     /// 2. second `foo` definition, it would contain both overloads and still no implementation
     /// 3. third `foo` definition, it would contain both overloads and the implementation which is
     ///    itself
-    fn to_overloaded(self, db: &'db dyn Db) -> Option<&'db OverloadedFunction<'db>> {
-        #[allow(clippy::ref_option)]
-        #[salsa::tracked(return_ref)]
-        fn to_overloaded_impl<'db>(
-            db: &'db dyn Db,
-            function: FunctionType<'db>,
-        ) -> Option<OverloadedFunction<'db>> {
-            let mut current = function;
-            let mut overloads = vec![];
+    #[salsa::tracked(returns(as_ref))]
+    fn to_overloaded(self, db: &'db dyn Db) -> Option<OverloadedFunction<'db>> {
+        let mut current = self;
+        let mut overloads = vec![];
 
-            loop {
-                // The semantic model records a use for each function on the name node. This is used
-                // here to get the previous function definition with the same name.
-                let scope = current.definition(db).scope(db);
-                let use_def =
-                    semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
-                let use_id = current
-                    .body_scope(db)
-                    .node(db)
-                    .expect_function()
-                    .name
-                    .scoped_use_id(db, scope);
+        loop {
+            // The semantic model records a use for each function on the name node. This is used
+            // here to get the previous function definition with the same name.
+            let scope = current.definition(db).scope(db);
+            let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
+            let use_id = current
+                .body_scope(db)
+                .node(db)
+                .expect_function()
+                .name
+                .scoped_use_id(db, scope);
 
-                let Symbol::Type(Type::FunctionLiteral(previous), Boundness::Bound) =
-                    symbol_from_bindings(db, use_def.bindings_at_use(use_id))
-                else {
-                    break;
-                };
-
-                if previous.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
-                    overloads.push(previous);
-                } else {
-                    break;
-                }
-
-                current = previous;
-            }
-
-            // Overloads are inserted in reverse order, from bottom to top.
-            overloads.reverse();
-
-            let implementation = if function.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
-                overloads.push(function);
-                None
-            } else {
-                Some(function)
+            let Symbol::Type(Type::FunctionLiteral(previous), Boundness::Bound) =
+                symbol_from_bindings(db, use_def.bindings_at_use(use_id))
+            else {
+                break;
             };
 
-            if overloads.is_empty() {
-                None
+            if previous.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+                overloads.push(previous);
             } else {
-                Some(OverloadedFunction {
-                    overloads,
-                    implementation,
-                })
+                break;
             }
+
+            current = previous;
         }
 
-        // HACK: This is required because salsa doesn't support returning `Option<&T>` from tracked
-        // functions yet. Refer to https://github.com/salsa-rs/salsa/pull/772. Remove the inner
-        // function once it's supported.
-        to_overloaded_impl(db, self).as_ref()
+        // Overloads are inserted in reverse order, from bottom to top.
+        overloads.reverse();
+
+        let implementation = if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+            overloads.push(self);
+            None
+        } else {
+            Some(self)
+        };
+
+        if overloads.is_empty() {
+            None
+        } else {
+            Some(OverloadedFunction {
+                overloads,
+                implementation,
+            })
+        }
     }
 }
 
@@ -7100,7 +7084,7 @@ impl<'db> BoundMethodType<'db> {
 /// `CallableType`.
 #[salsa::interned(debug)]
 pub struct CallableType<'db> {
-    #[return_ref]
+    #[returns(deref)]
     signatures: Box<[Signature<'db>]>,
 }
 
@@ -7210,7 +7194,7 @@ impl<'db> CallableType<'db> {
     where
         F: Fn(&Signature<'db>, &Signature<'db>) -> bool,
     {
-        match (&**self.signatures(db), &**other.signatures(db)) {
+        match (self.signatures(db), other.signatures(db)) {
             ([self_signature], [other_signature]) => {
                 // Base case: both callable types contain a single signature.
                 check_signature(self_signature, other_signature)
@@ -7252,7 +7236,7 @@ impl<'db> CallableType<'db> {
     ///
     /// See [`Type::is_equivalent_to`] for more details.
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        match (&**self.signatures(db), &**other.signatures(db)) {
+        match (self.signatures(db), other.signatures(db)) {
             ([self_signature], [other_signature]) => {
                 // Common case: both callable types contain a single signature, use the custom
                 // equivalence check instead of delegating it to the subtype check.
@@ -7278,7 +7262,7 @@ impl<'db> CallableType<'db> {
     ///
     /// See [`Type::is_gradual_equivalent_to`] for more details.
     fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        match (&**self.signatures(db), &**other.signatures(db)) {
+        match (self.signatures(db), other.signatures(db)) {
             ([self_signature], [other_signature]) => {
                 self_signature.is_gradual_equivalent_to(db, other_signature)
             }
@@ -7371,7 +7355,7 @@ impl<'db> ModuleLiteralType<'db> {
 
 #[salsa::interned(debug)]
 pub struct TypeAliasType<'db> {
-    #[return_ref]
+    #[returns(ref)]
     pub name: ast::name::Name,
 
     rhs_scope: ScopeId<'db>,
@@ -7405,15 +7389,11 @@ pub(super) struct MetaclassCandidate<'db> {
 #[salsa::interned(debug)]
 pub struct UnionType<'db> {
     /// The union type includes values in any of these types.
-    #[return_ref]
-    elements_boxed: Box<[Type<'db>]>,
+    #[returns(deref)]
+    pub elements: Box<[Type<'db>]>,
 }
 
 impl<'db> UnionType<'db> {
-    fn elements(self, db: &'db dyn Db) -> &'db [Type<'db>] {
-        self.elements_boxed(db)
-    }
-
     /// Create a union from a list of elements
     /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
     pub fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
@@ -7630,7 +7610,7 @@ impl<'db> UnionType<'db> {
 #[salsa::interned(debug)]
 pub struct IntersectionType<'db> {
     /// The intersection type includes only values in all of these types.
-    #[return_ref]
+    #[returns(ref)]
     positive: FxOrderSet<Type<'db>>,
 
     /// The intersection type does not include any value in any of these types.
@@ -7638,7 +7618,7 @@ pub struct IntersectionType<'db> {
     /// Negation types aren't expressible in annotations, and are most likely to arise from type
     /// narrowing along with intersections (e.g. `if not isinstance(...)`), so we represent them
     /// directly in intersections rather than as a separate type.
-    #[return_ref]
+    #[returns(ref)]
     negative: FxOrderSet<Type<'db>>,
 }
 
@@ -7868,7 +7848,7 @@ impl<'db> IntersectionType<'db> {
 
 #[salsa::interned(debug)]
 pub struct StringLiteralType<'db> {
-    #[return_ref]
+    #[returns(deref)]
     value: Box<str>,
 }
 
@@ -7889,7 +7869,7 @@ impl<'db> StringLiteralType<'db> {
 
 #[salsa::interned(debug)]
 pub struct BytesLiteralType<'db> {
-    #[return_ref]
+    #[returns(deref)]
     value: Box<[u8]>,
 }
 
@@ -7901,7 +7881,7 @@ impl<'db> BytesLiteralType<'db> {
 
 #[salsa::interned(debug)]
 pub struct TupleType<'db> {
-    #[return_ref]
+    #[returns(deref)]
     elements: Box<[Type<'db>]>,
 }
 
@@ -8082,7 +8062,6 @@ impl<'db> SuperOwnerKind<'db> {
 /// Represent a bound super object like `super(PivotClass, owner)`
 #[salsa::interned(debug)]
 pub struct BoundSuperType<'db> {
-    #[return_ref]
     pub pivot_class: ClassBase<'db>,
     #[return_ref]
     pub owner: SuperOwnerKind<'db>,
@@ -8223,7 +8202,7 @@ impl<'db> BoundSuperType<'db> {
                     .find_name_in_mro_with_policy(db, name, policy)
                     .expect("Calling `find_name_in_mro` on dynamic type should return `Some`")
             }
-            SuperOwnerKind::Class(class) => *class,
+            SuperOwnerKind::Class(class) => class,
             SuperOwnerKind::Instance(instance) => instance.class(),
         };
 

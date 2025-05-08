@@ -86,7 +86,7 @@ declare_lint! {
     }
 }
 
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(returns(ref))]
 pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     let parsed = parsed_module(db.upcast(), file);
     let source = source_text(db.upcast(), file);

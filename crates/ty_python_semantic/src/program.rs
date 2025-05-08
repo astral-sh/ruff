@@ -13,10 +13,10 @@ use salsa::Setter;
 pub struct Program {
     pub python_version: PythonVersion,
 
-    #[return_ref]
+    #[returns(ref)]
     pub python_platform: PythonPlatform,
 
-    #[return_ref]
+    #[returns(ref)]
     pub(crate) search_paths: SearchPaths,
 }
 

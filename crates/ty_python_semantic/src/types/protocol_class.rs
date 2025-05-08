@@ -59,7 +59,7 @@ impl<'db> Deref for ProtocolClassLiteral<'db> {
 /// The interface of a protocol: the members of that protocol, and the types of those members.
 #[salsa::interned(debug)]
 pub(super) struct ProtocolInterface<'db> {
-    #[return_ref]
+    #[returns(ref)]
     _members: BTreeMap<Name, ProtocolMemberData<'db>>,
 }
 

@@ -60,21 +60,21 @@ pub struct Project {
     ///
     /// Setting the open files to a non-`None` value changes `check` to only check the
     /// open files rather than all files in the project.
-    #[return_ref]
+    #[returns(as_deref)]
     #[default]
     open_fileset: Option<Arc<FxHashSet<File>>>,
 
     /// The first-party files of this project.
     #[default]
-    #[return_ref]
+    #[returns(ref)]
     file_set: IndexedFiles,
 
     /// The metadata describing the project, including the unresolved options.
-    #[return_ref]
+    #[returns(ref)]
     pub metadata: ProjectMetadata,
 
     /// The resolved project settings.
-    #[return_ref]
+    #[returns(ref)]
     pub settings: Settings,
 
     /// The paths that should be included when checking this project.
@@ -98,11 +98,11 @@ pub struct Project {
     /// in an IDE when the user only wants to check the open tabs. This could be modeled
     /// with `included_paths` too but it would require an explicit walk dir step that's simply unnecessary.
     #[default]
-    #[return_ref]
+    #[returns(deref)]
     included_paths_list: Vec<SystemPathBuf>,
 
     /// Diagnostics that were generated when resolving the project settings.
-    #[return_ref]
+    #[returns(deref)]
     settings_diagnostics: Vec<OptionDiagnostic>,
 }
 
@@ -131,7 +131,7 @@ impl Project {
     /// This is a salsa query to prevent re-computing queries if other, unrelated
     /// settings change. For example, we don't want that changing the terminal settings
     /// invalidates any type checking queries.
-    #[salsa::tracked]
+    #[salsa::tracked(returns(deref))]
     pub fn rules(self, db: &dyn Db) -> Arc<RuleSelection> {
         self.settings(db).to_rules()
     }
@@ -157,7 +157,7 @@ impl Project {
                 self.set_settings(db).to(settings);
             }
 
-            if self.settings_diagnostics(db) != &settings_diagnostics {
+            if self.settings_diagnostics(db) != settings_diagnostics {
                 self.set_settings_diagnostics(db).to(settings_diagnostics);
             }
 
@@ -284,7 +284,7 @@ impl Project {
     /// This can be useful to check arbitrary files, but it isn't something we recommend.
     /// We should try to support this use case but it's okay if there are some limitations around it.
     fn included_paths_or_root(self, db: &dyn Db) -> &[SystemPathBuf] {
-        match &**self.included_paths_list(db) {
+        match self.included_paths_list(db) {
             [] => std::slice::from_ref(&self.metadata(db).root),
             paths => paths,
         }
@@ -292,7 +292,7 @@ impl Project {
 
     /// Returns the open files in the project or `None` if the entire project should be checked.
     pub fn open_files(self, db: &dyn Db) -> Option<&FxHashSet<File>> {
-        self.open_fileset(db).as_deref()
+        self.open_fileset(db)
     }
 
     /// Sets the open files in the project.

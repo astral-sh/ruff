@@ -223,8 +223,7 @@ impl Display for DisplayRepresentation<'_> {
             Type::StringLiteral(string) => string.display(self.db).fmt(f),
             Type::LiteralString => f.write_str("LiteralString"),
             Type::BytesLiteral(bytes) => {
-                let escape =
-                    AsciiEscape::with_preferred_quote(bytes.value(self.db).as_ref(), Quote::Double);
+                let escape = AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
 
                 escape.bytes_repr(TripleQuotes::No).write(f)
             }
