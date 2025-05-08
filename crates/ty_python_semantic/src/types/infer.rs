@@ -4259,7 +4259,54 @@ impl<'db> TypeInferenceBuilder<'db> {
         collector.string_type(self.db())
     }
 
-    fn infer_tstring_expression(&mut self, _tstring: &ast::ExprTString) -> Type<'db> {
+    fn infer_tstring_expression(&mut self, tstring: &ast::ExprTString) -> Type<'db> {
+        let ast::ExprTString { value, .. } = tstring;
+        for part in value {
+            match part {
+                ast::TStringPart::Literal(_) => {}
+                ast::TStringPart::FString(fstring) => {
+                    for element in &fstring.elements {
+                        match element {
+                            ast::FStringElement::Expression(expression) => {
+                                let ast::FStringExpressionElement {
+                                    expression,
+                                    format_spec,
+                                    ..
+                                } = expression;
+                                self.infer_expression(expression);
+
+                                if let Some(ref format_spec) = format_spec {
+                                    for element in format_spec.elements.expressions() {
+                                        self.infer_expression(&element.expression);
+                                    }
+                                }
+                            }
+                            ast::FStringElement::Literal(_) => {}
+                        }
+                    }
+                }
+                ast::TStringPart::TString(tstring) => {
+                    for element in &tstring.elements {
+                        match element {
+                            ast::TStringElement::Interpolation(tstring_interpolation_element) => {
+                                let ast::TStringInterpolationElement {
+                                    interpolation,
+                                    format_spec,
+                                    ..
+                                } = tstring_interpolation_element;
+                                self.infer_expression(interpolation);
+                                if let Some(ref format_spec) = format_spec {
+                                    for element in format_spec.elements.interpolations() {
+                                        self.infer_expression(&element.interpolation);
+                                    }
+                                }
+                            }
+                            ast::TStringElement::Literal(_) => {}
+                        }
+                    }
+                }
+            }
+        }
         todo_type!("Template")
     }
 
