@@ -369,12 +369,12 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
             for a in range(0, int(y)):
                 x = a
 
-            print(x)  # possibly-unresolved-reference
+            prin(x)  # unresolved-reference
             "#,
     )?;
 
-    // Assert that there's a possibly unresolved reference diagnostic
-    // and that division-by-zero has a severity of error by default.
+    // Assert that there's an `unresolved-reference` diagnostic (error)
+    // and a `division-by-zero` diagnostic (error).
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
@@ -389,15 +389,15 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
       |
     info: `lint:division-by-zero` is enabled by default
 
-    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> test.py:7:7
+    warning: lint:unresolved-reference: Name `prin` used when not defined
+     --> test.py:7:1
       |
     5 |     x = a
     6 |
-    7 | print(x)  # possibly-unresolved-reference
-      |       ^
+    7 | prin(x)  # unresolved-reference
+      | ^^^^
       |
-    info: `lint:possibly-unresolved-reference` is enabled by default
+    info: `lint:unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
@@ -409,7 +409,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
         r#"
         [tool.ty.rules]
         division-by-zero = "warn" # demote to warn
-        possibly-unresolved-reference = "ignore"
+        unresolved-reference = "ignore"
     "#,
     )?;
 
@@ -448,12 +448,12 @@ fn cli_rule_severity() -> anyhow::Result<()> {
         for a in range(0, int(y)):
             x = a
 
-        print(x)  # possibly-unresolved-reference
+        prin(x)  # unresolved-reference
         "#,
     )?;
 
-    // Assert that there's a possibly unresolved reference diagnostic
-    // and that division-by-zero has a severity of error by default.
+    // Assert that there's an `unresolved-reference` diagnostic (error),
+    // a `division-by-zero` (error) and a unresolved-import (error) diagnostic by default.
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
@@ -480,15 +480,15 @@ fn cli_rule_severity() -> anyhow::Result<()> {
       |
     info: `lint:division-by-zero` is enabled by default
 
-    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> test.py:9:7
+    warning: lint:unresolved-reference: Name `prin` used when not defined
+     --> test.py:9:1
       |
     7 |     x = a
     8 |
-    9 | print(x)  # possibly-unresolved-reference
-      |       ^
+    9 | prin(x)  # unresolved-reference
+      | ^^^^
       |
-    info: `lint:possibly-unresolved-reference` is enabled by default
+    info: `lint:unresolved-reference` is enabled by default
 
     Found 3 diagnostics
 
@@ -499,7 +499,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
         case
             .command()
             .arg("--ignore")
-            .arg("possibly-unresolved-reference")
+            .arg("unresolved-reference")
             .arg("--warn")
             .arg("division-by-zero")
             .arg("--warn")
@@ -551,12 +551,12 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
         for a in range(0, int(y)):
             x = a
 
-        print(x)  # possibly-unresolved-reference
+        prin(x)  # unresolved-reference
         "#,
     )?;
 
-    // Assert that there's a possibly unresolved reference diagnostic
-    // and that division-by-zero has a severity of error by default.
+    // Assert that there's a `unresolved-reference` diagnostic (error)
+    // and a `division-by-zero` (error) by default.
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
@@ -571,15 +571,15 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
       |
     info: `lint:division-by-zero` is enabled by default
 
-    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> test.py:7:7
+    warning: lint:unresolved-reference: Name `prin` used when not defined
+     --> test.py:7:1
       |
     5 |     x = a
     6 |
-    7 | print(x)  # possibly-unresolved-reference
-      |       ^
+    7 | prin(x)  # unresolved-reference
+      | ^^^^
       |
-    info: `lint:possibly-unresolved-reference` is enabled by default
+    info: `lint:unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
@@ -590,12 +590,12 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
         case
             .command()
             .arg("--error")
-            .arg("possibly-unresolved-reference")
+            .arg("unresolved-reference")
             .arg("--warn")
             .arg("division-by-zero")
             // Override the error severity with warning
             .arg("--ignore")
-            .arg("possibly-unresolved-reference"),
+            .arg("unresolved-reference"),
         @r"
     success: true
     exit_code: 0
@@ -951,7 +951,7 @@ fn user_configuration() -> anyhow::Result<()> {
             for a in range(0, int(y)):
                 x = a
 
-            print(x)
+            prin(x)
             "#,
         ),
     ])?;
@@ -979,15 +979,15 @@ fn user_configuration() -> anyhow::Result<()> {
       |
     info: `lint:division-by-zero` was selected in the configuration file
 
-    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> main.py:7:7
+    warning: lint:unresolved-reference: Name `prin` used when not defined
+     --> main.py:7:1
       |
     5 |     x = a
     6 |
-    7 | print(x)
-      |       ^
+    7 | prin(x)
+      | ^^^^
       |
-    info: `lint:possibly-unresolved-reference` is enabled by default
+    info: `lint:unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
@@ -995,7 +995,7 @@ fn user_configuration() -> anyhow::Result<()> {
     "
     );
 
-    // The user-level configuration promotes `possibly-unresolved-reference` to an error.
+    // The user-level configuration sets the severity for `unresolved-reference` to error.
     // Changing the level for `division-by-zero` has no effect, because the project-level configuration
     // has higher precedence.
     case.write_file(
@@ -1003,7 +1003,7 @@ fn user_configuration() -> anyhow::Result<()> {
         r#"
         [rules]
         division-by-zero = "error"
-        possibly-unresolved-reference = "error"
+        unresolved-reference = "error"
         "#,
     )?;
 
@@ -1023,15 +1023,15 @@ fn user_configuration() -> anyhow::Result<()> {
       |
     info: `lint:division-by-zero` was selected in the configuration file
 
-    error: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> main.py:7:7
+    error: lint:unresolved-reference: Name `prin` used when not defined
+     --> main.py:7:1
       |
     5 |     x = a
     6 |
-    7 | print(x)
-      |       ^
+    7 | prin(x)
+      | ^^^^
       |
-    info: `lint:possibly-unresolved-reference` was selected in the configuration file
+    info: `lint:unresolved-reference` was selected in the configuration file
 
     Found 2 diagnostics
 
