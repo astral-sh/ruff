@@ -28,6 +28,17 @@ use crate::fix::edits::add_argument;
 /// Python 3.10 and later, or `locale.getpreferredencoding()` on earlier versions,
 /// to make the encoding explicit.
 ///
+/// ## Fis safety
+/// This fix is always unsafe and may change the program's behavior. The default
+/// encoding is platform-dependent. Making it explicit does not guarantee compatibility
+/// with the actual file encoding and may cause errors.
+/// ```python
+/// with open("test.txt") as f:
+///     print(f.read()) # before fix: 你好，世界！ (works on UTF-8 systems)
+/// with open("test.txt", encoding=locale.getpreferredencoding(False)) as f:
+///     print(f.read()) # after fix, on Windows: UnicodeDecodeError
+/// ```
+///
 /// ## Example
 /// ```python
 /// open("file.txt")
