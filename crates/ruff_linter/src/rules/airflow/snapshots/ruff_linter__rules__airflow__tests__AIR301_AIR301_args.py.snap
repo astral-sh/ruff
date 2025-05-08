@@ -258,10 +258,11 @@ AIR301_args.py:90:16: AIR301 `filename_template` is removed in Airflow 3.0
 92 | FabAuthManager(None)
    |
 
-AIR301_args.py:92:15: AIR301 `appbuilder` is removed in Airflow 3.0; The constructor takes no parameter now
+AIR301_args.py:92:15: AIR301 `appbuilder` is removed in Airflow 3.0
    |
 90 | GCSTaskHandler(filename_template="/tmp/test")
 91 |
 92 | FabAuthManager(None)
    |               ^^^^^^ AIR301
    |
+   = help: The constructor takes no parameter now
