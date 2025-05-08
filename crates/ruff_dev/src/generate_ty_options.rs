@@ -26,7 +26,8 @@ pub(crate) struct Args {
 
 pub(crate) fn main(args: &Args) -> anyhow::Result<()> {
     let mut output = String::new();
-    let markdown_path = PathBuf::from(ROOT_DIR).join("crates/ty/docs/configuration.md");
+    let file_name = "crates/ty/docs/configuration.md";
+    let markdown_path = PathBuf::from(ROOT_DIR).join(file_name);
 
     generate_set(
         &mut output,
@@ -41,30 +42,18 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<()> {
         Mode::Check => {
             let current = std::fs::read_to_string(&markdown_path)?;
             if output == current {
-                println!(
-                    "Up-to-date: {markdown_path}",
-                    markdown_path = markdown_path.display()
-                );
+                println!("Up-to-date: {file_name}",);
             } else {
                 let comparison = StrComparison::new(&current, &output);
-                bail!(
-                    "{markdown_path} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}",
-                    markdown_path = markdown_path.display()
-                );
+                bail!("{file_name} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}",);
             }
         }
         Mode::Write => {
             let current = std::fs::read_to_string(&markdown_path)?;
             if current == output {
-                println!(
-                    "Up-to-date: {markdown_path}",
-                    markdown_path = markdown_path.display()
-                );
+                println!("Up-to-date: {file_name}",);
             } else {
-                println!(
-                    "Updating: {markdown_path}",
-                    markdown_path = markdown_path.display()
-                );
+                println!("Updating: {file_name}",);
                 std::fs::write(markdown_path, output.as_bytes())?;
             }
         }
@@ -150,10 +139,6 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     let header_level = if parents.is_empty() { "####" } else { "#####" };
 
     let _ = writeln!(output, "{header_level} [`{name}`]");
-
-    // the anchor used to just be the name, but now it's the group name
-    // for backwards compatibility, we need to keep the old anchor
-    let _ = writeln!(output, "<span id=\"{name}\"></span>");
 
     output.push('\n');
 
@@ -278,11 +263,6 @@ mod tests {
 
     #[test]
     fn ty_configuration_markdown_up_to_date() -> Result<()> {
-        let mode = if env::var("TY_UPDATE_SCHEMA").as_deref() == Ok("1") {
-            Mode::Write
-        } else {
-            Mode::Check
-        };
-        main(&Args { mode })
+        main(&Args { mode: Mode::Check })?;
     }
 }

@@ -1,6 +1,5 @@
 ### Top-level
 ##### [`respect-ignore-files`]
-<span id="respect-ignore-files"></span>
 
 Whether to automatically exclude files that are ignored by `.ignore`,
 `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
@@ -22,7 +21,6 @@ Enabled by default.
 ---
 
 ##### [`rules`]
-<span id="rules"></span>
 
 Configures the enabled lints and their severity.
 
@@ -45,7 +43,6 @@ Configures the enabled lints and their severity.
 #### `environment`
 
 ##### [`extra-paths`]
-<span id="extra-paths"></span>
 
 List of user-provided paths that should take first priority in the module resolution.
 Examples in other type checkers are mypy's `MYPYPATH` environment variable,
@@ -67,7 +64,6 @@ or pyright's `stubPath` configuration setting.
 ---
 
 ##### [`python`]
-<span id="python"></span>
 
 Path to the Python installation from which ty resolves type information and third-party dependencies.
 
@@ -92,7 +88,6 @@ This option is commonly used to specify the path to a virtual environment.
 ---
 
 ##### [`python-platform`]
-<span id="python-platform"></span>
 
 Specifies the target platform that will be used to analyze the source code.
 If specified, ty will tailor its use of type stub files,
@@ -122,7 +117,6 @@ If no platform is specified, ty will use the current platform:
 ---
 
 ##### [`python-version`]
-<span id="python-version"></span>
 
 Specifies the version of Python that will be used to analyze the source code.
 The version should be specified as a string in the format `M.m` where `M` is the major version
@@ -147,7 +141,6 @@ It will also tailor its use of type stub files, which conditionalizes type defin
 ---
 
 ##### [`typeshed`]
-<span id="typeshed"></span>
 
 Optional path to a "typeshed" directory on disk for us to use for standard-library types.
 If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
@@ -171,7 +164,6 @@ bundled as a zip file in the binary
 #### `src`
 
 ##### [`root`]
-<span id="root"></span>
 
 The root of the project, used for finding first-party modules.
 
@@ -193,7 +185,6 @@ The root of the project, used for finding first-party modules.
 #### `terminal`
 
 ##### [`error-on-warning`]
-<span id="error-on-warning"></span>
 
 Use exit code 1 if there are any warning-level diagnostics.
 
@@ -216,7 +207,6 @@ Defaults to `false`.
 ---
 
 ##### [`output-format`]
-<span id="output-format"></span>
 
 The format to use for printing diagnostic messages.
 
