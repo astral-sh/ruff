@@ -77,9 +77,7 @@ impl<'db> ClassBase<'db> {
             ClassBase::Dynamic(DynamicType::Any) => "Any",
             ClassBase::Dynamic(DynamicType::Unknown) => "Unknown",
             ClassBase::Dynamic(DynamicType::Todo(_)) => "@Todo",
-            ClassBase::Protocol(_) | ClassBase::Dynamic(DynamicType::SubscriptedProtocol) => {
-                "Protocol"
-            }
+            ClassBase::Protocol(_) => "Protocol",
             ClassBase::Generic(_) => "Generic",
         }
     }
@@ -262,9 +260,6 @@ impl<'db> ClassBase<'db> {
         match self {
             ClassBase::Protocol(context) => {
                 ClassBaseMroIterator::length_3(db, self, ClassBase::Generic(context))
-            }
-            ClassBase::Dynamic(DynamicType::SubscriptedProtocol) => {
-                ClassBaseMroIterator::length_3(db, self, ClassBase::Generic(None))
             }
             ClassBase::Dynamic(_) | ClassBase::Generic(_) => {
                 ClassBaseMroIterator::length_2(db, self)

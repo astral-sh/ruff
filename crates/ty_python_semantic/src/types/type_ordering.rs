@@ -386,8 +386,5 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 
         #[cfg(not(debug_assertions))]
         (DynamicType::Todo(TodoType), DynamicType::Todo(TodoType)) => Ordering::Equal,
-
-        (DynamicType::SubscriptedProtocol, _) => Ordering::Less,
-        (_, DynamicType::SubscriptedProtocol) => Ordering::Greater,
     }
 }
