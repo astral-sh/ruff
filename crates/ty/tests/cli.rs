@@ -619,6 +619,159 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn cli_rule_severity_union_type() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r#"
+def f1() -> int: return 0
+def f2(name: str) -> int: return 0
+
+def _(flag: bool):
+    if flag:
+        f = f1
+    else:
+        f = f2
+    x = f(3)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: lint:invalid-union-call: Union type `(def f1() -> int) | (def f2(name: str) -> int)` is not callable because of one or more incompatible variants
+      --> test.py:10:9
+       |
+     8 |     else:
+     9 |         f = f2
+    10 |     x = f(3)
+       |         ^^^^
+       |
+    info: Cannot call union variant `def f1() -> int` because there are too many positional arguments to function `f1`: expected 0, got 1
+      --> test.py:10:11
+       |
+     8 |     else:
+     9 |         f = f2
+    10 |     x = f(3)
+       |           ^
+       |
+    info: Cannot call union variant `def f2(name: str) -> int` because the argument to this function is incorrect
+      --> test.py:10:11
+       |
+     8 |     else:
+     9 |         f = f2
+    10 |     x = f(3)
+       |           ^ Expected `str`, found `Literal[3]`
+       |
+    info: `lint:invalid-union-call` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--ignore")
+            .arg("invalid-union-call"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--ignore")
+            .arg("invalid-argument-type"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: lint:invalid-union-call: Union type `(def f1() -> int) | (def f2(name: str) -> int)` is not callable because of one or more incompatible variants
+      --> test.py:10:9
+       |
+     8 |     else:
+     9 |         f = f2
+    10 |     x = f(3)
+       |         ^^^^
+       |
+    info: Cannot call union variant `def f1() -> int` because there are too many positional arguments to function `f1`: expected 0, got 1
+      --> test.py:10:11
+       |
+     8 |     else:
+     9 |         f = f2
+    10 |     x = f(3)
+       |           ^
+       |
+    info: `lint:invalid-union-call` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
+    );
+
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--ignore")
+            .arg("too-many-positional-arguments"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: lint:invalid-union-call: Union type `(def f1() -> int) | (def f2(name: str) -> int)` is not callable because of one or more incompatible variants
+      --> test.py:10:9
+       |
+     8 |     else:
+     9 |         f = f2
+    10 |     x = f(3)
+       |         ^^^^
+       |
+    info: Cannot call union variant `def f2(name: str) -> int` because the argument to this function is incorrect
+      --> test.py:10:11
+       |
+     8 |     else:
+     9 |         f = f2
+    10 |     x = f(3)
+       |           ^ Expected `str`, found `Literal[3]`
+       |
+    info: `lint:invalid-union-call` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
+    );
+
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--ignore")
+            .arg("too-many-positional-arguments")
+            .arg("--ignore")
+            .arg("invalid-argument-type"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
 /// ty warns about unknown rules specified in a configuration file
 #[test]
 fn configuration_unknown_rules() -> anyhow::Result<()> {

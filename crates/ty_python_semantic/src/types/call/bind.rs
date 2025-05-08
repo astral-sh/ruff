@@ -24,8 +24,9 @@ use crate::types::{
     FunctionType, KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind,
     PropertyInstanceType, TupleType, UnionType, WrapperDescriptorKind,
 };
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
+use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
+use ruff_text_size::{Ranged, TextRange};
 
 /// Binding information for a possible union of callables. At a call site, the arguments must be
 /// compatible with _all_ of the types in the union for the call to be valid.
@@ -211,17 +212,30 @@ impl<'db> Bindings<'db> {
         let Some(builder) = context.report_lint(&INVALID_UNION_CALL, node) else {
             return;
         };
+        let mut subs = vec![];
+        for binding in self {
+            let mut union_diag = UnionDiagnostic {
+                subs: vec![],
+                binding,
+                error_count,
+            };
+            binding.report_diagnostics(context, node, &mut Some(&mut union_diag));
+            for sub in union_diag.subs {
+                if context.report_lint(sub.lint, sub.range).is_none() {
+                    continue;
+                }
+                subs.push(sub);
+            }
+        }
+        if subs.is_empty() {
+            return;
+        }
         let mut diag = builder.into_diagnostic(format_args!(
             "Union type `{}` is not callable because of one or more incompatible variants",
             self.callable_type().display(context.db())
         ));
-        for binding in self {
-            let union_diag = UnionDiagnostic {
-                diag: &mut diag,
-                binding,
-                error_count,
-            };
-            binding.report_diagnostics(context, node, &mut Some(union_diag));
+        for sub in subs {
+            diag.sub(sub.sub);
         }
     }
 
@@ -1068,19 +1082,20 @@ impl<'db> CallableBinding<'db> {
         &self,
         context: &InferContext<'db>,
         node: ast::AnyNodeRef,
-        diag: &mut Option<UnionDiagnostic<'_, '_, '_>>,
+        diag: &mut Option<&mut UnionDiagnostic<'_, '_>>,
     ) {
         if !self.is_callable() {
             if let Some(union_diag) = diag {
-                let mut sub = union_diag.sub(
+                let sub = union_diag.sub(
                     context.db(),
+                    &CALL_NON_CALLABLE,
+                    node,
                     format_args!(
                         "object of type `{}` is not callable",
                         self.callable_type.display(context.db()),
                     ),
                 );
                 sub.annotate(Annotation::primary(context.span(node)));
-                union_diag.diag.sub(sub);
                 return;
             } else if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
                 builder.into_diagnostic(format_args!(
@@ -1093,15 +1108,16 @@ impl<'db> CallableBinding<'db> {
 
         if self.dunder_call_is_possibly_unbound {
             if let Some(union_diag) = diag {
-                let mut sub = union_diag.sub(
+                let sub = union_diag.sub(
                     context.db(),
+                    &CALL_NON_CALLABLE,
+                    node,
                     format_args!(
                         "object of type `{}` is not callable (possibly unbound `__call__` method)",
                         self.callable_type.display(context.db()),
                     ),
                 );
                 sub.annotate(Annotation::primary(context.span(node)));
-                union_diag.diag.sub(sub);
             } else if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
                 builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable (possibly unbound `__call__` method)",
@@ -1114,8 +1130,10 @@ impl<'db> CallableBinding<'db> {
         let callable_description = CallableDescription::new(context.db(), self.callable_type);
         if self.overloads.len() > 1 {
             if let Some(union_diag) = diag {
-                let mut sub = union_diag.sub(
+                let sub = union_diag.sub(
                     context.db(),
+                    &NO_MATCHING_OVERLOAD,
+                    node,
                     format_args!(
                         "no overload{} matches arguments",
                         if let Some(CallableDescription { kind, name }) = callable_description {
@@ -1126,7 +1144,6 @@ impl<'db> CallableBinding<'db> {
                     ),
                 );
                 sub.annotate(Annotation::primary(context.span(node)));
-                union_diag.diag.sub(sub);
             } else if let Some(builder) = context.report_lint(&NO_MATCHING_OVERLOAD, node) {
                 builder.into_diagnostic(format_args!(
                     "No overload{} matches arguments",
@@ -1462,7 +1479,7 @@ impl<'db> Binding<'db> {
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
         callable_description: Option<&CallableDescription>,
-        diag: &mut Option<UnionDiagnostic<'_, '_, '_>>,
+        diag: &mut Option<&mut UnionDiagnostic<'_, '_>>,
     ) {
         for error in &self.errors {
             error.report_diagnostic(context, node, callable_ty, callable_description, diag);
@@ -1623,7 +1640,7 @@ impl<'db> BindingError<'db> {
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
         callable_description: Option<&CallableDescription>,
-        diag: &mut Option<UnionDiagnostic<'_, '_, '_>>,
+        diag: &mut Option<&mut UnionDiagnostic<'_, '_>>,
     ) {
         match self {
             Self::InvalidArgumentType {
@@ -1637,14 +1654,17 @@ impl<'db> BindingError<'db> {
                     let provided_ty_display = provided_ty.display(context.db());
                     let expected_ty_display = expected_ty.display(context.db());
 
-                    let mut sub =
-                        union_diag.sub(context.db(), "the argument to this function is incorrect");
+                    let sub = union_diag.sub(
+                        context.db(),
+                        &INVALID_ARGUMENT_TYPE,
+                        range,
+                        "the argument to this function is incorrect",
+                    );
                     sub.annotate(
                         Annotation::primary(context.span(range)).message(format_args!(
                             "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
                         )),
                     );
-                    union_diag.diag.sub(sub);
 
                     if union_diag.verbose() {
                         if let Some((name_span, parameter_span)) =
@@ -1657,7 +1677,11 @@ impl<'db> BindingError<'db> {
                                 Annotation::secondary(parameter_span)
                                     .message("Parameter declared here"),
                             );
-                            union_diag.diag.sub(sub);
+                            union_diag.subs.push(UnionSubDiagnostic {
+                                lint: &INVALID_ARGUMENT_TYPE,
+                                sub,
+                                range: range.range(),
+                            });
                         }
                     }
                     return;
@@ -1693,8 +1717,10 @@ impl<'db> BindingError<'db> {
             } => {
                 let node = Self::get_node(node, *first_excess_argument_index);
                 if let Some(union_diag) = diag {
-                    let mut sub = union_diag.sub(
+                    let sub = union_diag.sub(
                         context.db(),
+                        &TOO_MANY_POSITIONAL_ARGUMENTS,
+                        node,
                         format_args!(
                             "there are too many positional arguments{}: expected \
                              {expected_positional_count}, got {provided_positional_count}",
@@ -1706,7 +1732,6 @@ impl<'db> BindingError<'db> {
                         ),
                     );
                     sub.annotate(Annotation::primary(context.span(node)));
-                    union_diag.diag.sub(sub);
                     return;
                 }
                 if let Some(builder) = context.report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, node) {
@@ -1726,8 +1751,10 @@ impl<'db> BindingError<'db> {
                 let s = if parameters.0.len() == 1 { "" } else { "s" };
 
                 if let Some(union_diag) = diag {
-                    let mut sub = union_diag.sub(
+                    let sub = union_diag.sub(
                         context.db(),
+                        &MISSING_ARGUMENT,
+                        node,
                         format_args!(
                             "no argument{s} provided for \
                              required parameter{s} {parameters}{}",
@@ -1739,7 +1766,6 @@ impl<'db> BindingError<'db> {
                         ),
                     );
                     sub.annotate(Annotation::primary(context.span(node)));
-                    union_diag.diag.sub(sub);
                     return;
                 }
 
@@ -1762,8 +1788,10 @@ impl<'db> BindingError<'db> {
                 let node = Self::get_node(node, *argument_index);
 
                 if let Some(union_diag) = diag {
-                    let mut sub = union_diag.sub(
+                    let sub = union_diag.sub(
                         context.db(),
+                        &UNKNOWN_ARGUMENT,
+                        node,
                         format_args!(
                             "the argument `{argument_name}` does not match any known parameter{}",
                             if let Some(CallableDescription { kind, name }) = callable_description {
@@ -1774,7 +1802,6 @@ impl<'db> BindingError<'db> {
                         ),
                     );
                     sub.annotate(Annotation::primary(context.span(node)));
-                    union_diag.diag.sub(sub);
                     return;
                 }
 
@@ -1797,8 +1824,10 @@ impl<'db> BindingError<'db> {
                 let node = Self::get_node(node, *argument_index);
 
                 if let Some(union_diag) = diag {
-                    let mut sub = union_diag.sub(
+                    let sub = union_diag.sub(
                         context.db(),
+                        &PARAMETER_ALREADY_ASSIGNED,
+                        node,
                         format_args!(
                             "there were multiple values provided for parameter {parameter}{}",
                             if let Some(CallableDescription { kind, name }) = callable_description {
@@ -1809,7 +1838,6 @@ impl<'db> BindingError<'db> {
                         ),
                     );
                     sub.annotate(Annotation::primary(context.span(node)));
-                    union_diag.diag.sub(sub);
                     return;
                 }
 
@@ -1836,8 +1864,12 @@ impl<'db> BindingError<'db> {
                     let argument_type = error.argument_type();
                     let argument_ty_display = argument_type.display(context.db());
 
-                    let mut sub =
-                        union_diag.sub(context.db(), "the argument to this function is incorrect");
+                    let sub = union_diag.sub(
+                        context.db(),
+                        &INVALID_ARGUMENT_TYPE,
+                        node,
+                        "the argument to this function is incorrect",
+                    );
                     sub.annotate(
                         Annotation::primary(context.span(range)).message(format_args!(
                             "Argument type `{argument_ty_display}` \
@@ -1849,7 +1881,6 @@ impl<'db> BindingError<'db> {
                             typevar.name(context.db()),
                         )),
                     );
-                    union_diag.diag.sub(sub);
                     return;
                 }
 
@@ -1881,8 +1912,10 @@ impl<'db> BindingError<'db> {
                 let node = Self::get_node(node, None);
 
                 if let Some(union_diag) = diag {
-                    let mut sub = union_diag.sub(
+                    let sub = union_diag.sub(
                         context.db(),
+                        &CALL_NON_CALLABLE,
+                        node,
                         format_args!(
                             "call{} failed: {reason}",
                             if let Some(CallableDescription { kind, name }) = callable_description {
@@ -1893,7 +1926,6 @@ impl<'db> BindingError<'db> {
                         ),
                     );
                     sub.annotate(Annotation::primary(context.span(node)));
-                    union_diag.diag.sub(sub);
                     return;
                 }
 
@@ -1942,9 +1974,11 @@ impl<'db> BindingError<'db> {
 ///
 /// For invalid function calls that aren't on union types, this helper type is
 /// not used.
-struct UnionDiagnostic<'d, 'b, 'db> {
-    /// The diagnostic created for the invalid union function call.
-    diag: &'d mut Diagnostic,
+struct UnionDiagnostic<'b, 'db> {
+    /// The sub-diagnostics to add for this errant union
+    /// variant.
+    subs: Vec<UnionSubDiagnostic>,
+    /// The sub-diagnostics to attach to a parent diagnostic.
     /// The specific binding for this errant call.
     binding: &'b CallableBinding<'db>,
     /// The number of variants in the corresponding union
@@ -1953,20 +1987,32 @@ struct UnionDiagnostic<'d, 'b, 'db> {
     error_count: usize,
 }
 
-impl UnionDiagnostic<'_, '_, '_> {
+impl UnionDiagnostic<'_, '_> {
     /// Creates a sub-diagnostic with the given message.
     ///
     /// The message given is preceded with "because."
     ///
     /// Callers must attach the sub-diagnostic returned to `self.diag`.
-    fn sub(&self, db: &'_ dyn Db, because: impl std::fmt::Display) -> SubDiagnostic {
-        SubDiagnostic::new(
+    fn sub(
+        &mut self,
+        db: &'_ dyn Db,
+        lint: &'static crate::lint::LintMetadata,
+        ranged: impl Ranged,
+        because: impl std::fmt::Display,
+    ) -> &mut SubDiagnostic {
+        let sub = SubDiagnostic::new(
             Severity::Info,
             format_args!(
                 "Cannot call union variant `{callable_ty}` because {because}",
                 callable_ty = self.binding.callable_type.display(db),
             ),
-        )
+        );
+        self.subs.push(UnionSubDiagnostic {
+            lint,
+            sub,
+            range: ranged.range(),
+        });
+        &mut self.subs.last_mut().unwrap().sub
     }
 
     /// Whether callers should attach more verbose context to this
@@ -1981,4 +2027,10 @@ impl UnionDiagnostic<'_, '_, '_> {
     fn verbose(&self) -> bool {
         self.error_count <= 1
     }
+}
+
+struct UnionSubDiagnostic {
+    lint: &'static crate::lint::LintMetadata,
+    sub: SubDiagnostic,
+    range: TextRange,
 }
