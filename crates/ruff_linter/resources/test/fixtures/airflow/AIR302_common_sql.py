@@ -91,14 +91,14 @@ from airflow.operators.sql import (
     BaseSQLOperator,
     BranchSQLOperator,
     SQLColumnCheckOperator,
-    SQLTablecheckOperator,
+    SQLTableCheckOperator,
     _convert_to_float_if_possible,
     parse_boolean,
 )
 
 BaseSQLOperator()
 BranchSQLOperator()
-SQLTablecheckOperator()
+SQLTableCheckOperator()
 SQLColumnCheckOperator()
 _convert_to_float_if_possible()
 parse_boolean()
