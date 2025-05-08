@@ -54,18 +54,12 @@ impl Violation for Airflow3SuggestedUpdate {
         match replacement {
             Replacement::None
             | Replacement::Name(_)
+            | Replacement::Message(_)
             | Replacement::AutoImport { module: _, name: _ }
             | Replacement::SourceModuleMoved { module: _, name: _ } => {
                 format!(
                     "`{deprecated}` is removed in Airflow 3.0; \
                     It still works in Airflow 3.0 but is expected to be removed in a future version."
-                )
-            }
-            Replacement::Message(message) => {
-                format!(
-                    "`{deprecated}` is removed in Airflow 3.0; \
-                     It still works in Airflow 3.0 but is expected to be removed in a future version.; \
-                    {message}"
                 )
             }
         }
@@ -74,14 +68,15 @@ impl Violation for Airflow3SuggestedUpdate {
     fn fix_title(&self) -> Option<String> {
         let Airflow3SuggestedUpdate { replacement, .. } = self;
         match replacement {
+            Replacement::None => None,
             Replacement::Name(name) => Some(format!("Use `{name}` instead")),
+            Replacement::Message(message) => Some((*message).to_string()),
             Replacement::AutoImport { module, name } => {
                 Some(format!("Use `{module}.{name}` instead"))
             }
             Replacement::SourceModuleMoved { module, name } => {
                 Some(format!("Use `{module}.{name}` instead"))
             }
-            _ => None,
         }
     }
 }

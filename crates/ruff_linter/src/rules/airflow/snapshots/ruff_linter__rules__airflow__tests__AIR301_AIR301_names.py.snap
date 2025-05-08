@@ -143,12 +143,13 @@ AIR301_names.py:63:72: AIR301 `airflow.configuration.set` is removed in Airflow 
    |
    = help: Use `airflow.configuration.conf.set` instead
 
-AIR301_names.py:67:1: AIR301 `airflow.contrib.aws_athena_hook.AWSAthenaHook` is removed in Airflow 3.0; The whole `airflow.contrib` module has been removed.
+AIR301_names.py:67:1: AIR301 `airflow.contrib.aws_athena_hook.AWSAthenaHook` is removed in Airflow 3.0
    |
 66 | # airflow.contrib.*
 67 | AWSAthenaHook()
    | ^^^^^^^^^^^^^ AIR301
    |
+   = help: The whole `airflow.contrib` module has been removed.
 
 AIR301_names.py:71:1: AIR301 `airflow.datasets.DatasetAliasEvent` is removed in Airflow 3.0
    |
@@ -165,44 +166,13 @@ AIR301_names.py:75:1: AIR301 `airflow.hooks.base_hook.BaseHook` is removed in Ai
    |
    = help: Use `airflow.hooks.base.BaseHook` instead
 
-AIR301_names.py:79:1: AIR301 `airflow.operators.subdag.SubDagOperator` is removed in Airflow 3.0; The whole `airflow.subdag` module has been removed.
+AIR301_names.py:79:1: AIR301 `airflow.operators.subdag.SubDagOperator` is removed in Airflow 3.0
    |
 78 | # airflow.operators.subdag.*
 79 | SubDagOperator()
    | ^^^^^^^^^^^^^^ AIR301
-80 |
-81 | # airflow.providers.mysql
    |
-
-AIR301_names.py:82:7: AIR301 `airflow.providers.mysql.datasets.mysql.sanitize_uri` is removed in Airflow 3.0
-   |
-81 | # airflow.providers.mysql
-82 | mysql.sanitize_uri
-   |       ^^^^^^^^^^^^ AIR301
-83 |
-84 | # airflow.providers.postgres
-   |
-   = help: Use `airflow.providers.mysql.assets.mysql.sanitize_uri` instead
-
-AIR301_names.py:85:10: AIR301 `airflow.providers.postgres.datasets.postgres.sanitize_uri` is removed in Airflow 3.0
-   |
-84 | # airflow.providers.postgres
-85 | postgres.sanitize_uri
-   |          ^^^^^^^^^^^^ AIR301
-86 |
-87 | # airflow.providers.trino
-   |
-   = help: Use `airflow.providers.postgres.assets.postgres.sanitize_uri` instead
-
-AIR301_names.py:88:7: AIR301 `airflow.providers.trino.datasets.trino.sanitize_uri` is removed in Airflow 3.0
-   |
-87 | # airflow.providers.trino
-88 | trino.sanitize_uri
-   |       ^^^^^^^^^^^^ AIR301
-89 |
-90 | # airflow.secrets
-   |
-   = help: Use `airflow.providers.trino.assets.trino.sanitize_uri` instead
+   = help: The whole `airflow.subdag` module has been removed.
 
 AIR301_names.py:96:1: AIR301 `airflow.sensors.base_sensor_operator.BaseSensorOperator` is removed in Airflow 3.0
    |
@@ -315,7 +285,7 @@ AIR301_names.py:122:1: AIR301 `airflow.utils.db.create_session` is removed in Ai
 124 | # airflow.utils.decorators
     |
 
-AIR301_names.py:125:1: AIR301 `airflow.utils.decorators.apply_defaults` is removed in Airflow 3.0; `apply_defaults` is now unconditionally done and can be safely removed.
+AIR301_names.py:125:1: AIR301 `airflow.utils.decorators.apply_defaults` is removed in Airflow 3.0
     |
 124 | # airflow.utils.decorators
 125 | apply_defaults
@@ -323,6 +293,7 @@ AIR301_names.py:125:1: AIR301 `airflow.utils.decorators.apply_defaults` is remov
 126 |
 127 | # airflow.utils.file
     |
+    = help: `apply_defaults` is now unconditionally done and can be safely removed.
 
 AIR301_names.py:128:1: AIR301 `airflow.utils.file.TemporaryDirectory` is removed in Airflow 3.0
     |
@@ -344,7 +315,7 @@ AIR301_names.py:129:1: AIR301 `airflow.utils.file.mkdirs` is removed in Airflow 
     |
     = help: Use `pathlib.Path({path}).mkdir` instead
 
-AIR301_names.py:132:1: AIR301 `airflow.utils.helpers.chain` is removed in Airflow 3.0
+AIR301_names.py:132:1: AIR301 [*] `airflow.utils.helpers.chain` is removed in Airflow 3.0
     |
 131 | #  airflow.utils.helpers
 132 | helper_chain
@@ -353,7 +324,25 @@ AIR301_names.py:132:1: AIR301 `airflow.utils.helpers.chain` is removed in Airflo
     |
     = help: Use `airflow.sdk.chain` instead
 
-AIR301_names.py:133:1: AIR301 `airflow.utils.helpers.cross_downstream` is removed in Airflow 3.0
+ℹ Safe fix
+51  51  | from airflow.utils.trigger_rule import TriggerRule
+52  52  | from airflow.www.auth import has_access
+53  53  | from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
+    54  |+from airflow.sdk import chain
+54  55  | 
+55  56  | # airflow root
+56  57  | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+--------------------------------------------------------------------------------
+129 130 | mkdirs
+130 131 | 
+131 132 | #  airflow.utils.helpers
+132     |-helper_chain
+    133 |+chain
+133 134 | helper_cross_downstream
+134 135 | 
+135 136 | #  airflow.utils.log
+
+AIR301_names.py:133:1: AIR301 [*] `airflow.utils.helpers.cross_downstream` is removed in Airflow 3.0
     |
 131 | #  airflow.utils.helpers
 132 | helper_chain
@@ -363,6 +352,24 @@ AIR301_names.py:133:1: AIR301 `airflow.utils.helpers.cross_downstream` is remove
 135 | #  airflow.utils.log
     |
     = help: Use `airflow.sdk.cross_downstream` instead
+
+ℹ Safe fix
+51  51  | from airflow.utils.trigger_rule import TriggerRule
+52  52  | from airflow.www.auth import has_access
+53  53  | from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
+    54  |+from airflow.sdk import cross_downstream
+54  55  | 
+55  56  | # airflow root
+56  57  | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+--------------------------------------------------------------------------------
+130 131 | 
+131 132 | #  airflow.utils.helpers
+132 133 | helper_chain
+133     |-helper_cross_downstream
+    134 |+cross_downstream
+134 135 | 
+135 136 | #  airflow.utils.log
+136 137 | secrets_masker
 
 AIR301_names.py:136:1: AIR301 `airflow.utils.log.secrets_masker` is removed in Airflow 3.0
     |
@@ -444,5 +451,38 @@ AIR301_names.py:157:1: AIR301 `airflow.operators.python.get_current_context` is 
 156 |
 157 | get_current_context()
     | ^^^^^^^^^^^^^^^^^^^ AIR301
+158 |
+159 | # airflow.providers.mysql
     |
     = help: Use `airflow.sdk.get_current_context` instead
+
+AIR301_names.py:162:1: AIR301 `airflow.providers.mysql.datasets.mysql.sanitize_uri` is removed in Airflow 3.0
+    |
+160 | from airflow.providers.mysql.datasets.mysql import sanitize_uri
+161 |
+162 | sanitize_uri
+    | ^^^^^^^^^^^^ AIR301
+163 |
+164 | # airflow.providers.postgres
+    |
+    = help: Use `airflow.providers.mysql.assets.mysql.sanitize_uri` instead
+
+AIR301_names.py:166:1: AIR301 `airflow.providers.postgres.datasets.postgres.sanitize_uri` is removed in Airflow 3.0
+    |
+164 | # airflow.providers.postgres
+165 | from airflow.providers.postgres.datasets.postgres import sanitize_uri
+166 | sanitize_uri
+    | ^^^^^^^^^^^^ AIR301
+167 |
+168 | # airflow.providers.trino
+    |
+    = help: Use `airflow.providers.postgres.assets.postgres.sanitize_uri` instead
+
+AIR301_names.py:170:1: AIR301 `airflow.providers.trino.datasets.trino.sanitize_uri` is removed in Airflow 3.0
+    |
+168 | # airflow.providers.trino
+169 | from airflow.providers.trino.datasets.trino import sanitize_uri
+170 | sanitize_uri
+    | ^^^^^^^^^^^^ AIR301
+    |
+    = help: Use `airflow.providers.trino.assets.trino.sanitize_uri` instead
