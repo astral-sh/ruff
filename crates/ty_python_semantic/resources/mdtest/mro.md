@@ -393,7 +393,8 @@ class E(
 
 We do not emit errors on classes where multiple bases are inferred as `Unknown`, `Todo` or `Any`.
 Usually having duplicate bases in a bases list like this would cause us to emit a diagnostic;
-however, for gradual types this would break the [gradual guarantee](https://typing.python.org/en/latest/spec/concepts.html#the-gradual-guarantee):
+however, for gradual types this would break the
+[gradual guarantee](https://typing.python.org/en/latest/spec/concepts.html#the-gradual-guarantee):
 the dynamic base can usually be materialised to a type that would lead to a resolvable MRO.
 
 ```py
