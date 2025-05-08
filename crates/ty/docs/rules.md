@@ -1230,6 +1230,30 @@ at runtime.
 * [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1013)
 </details>
 
+## `unresolved-reference`
+
+**Default level**: error
+
+<details>
+<summary>detects references to names that are not defined</summary>
+
+### What it does
+Checks for references to names that are not defined.
+
+### Why is this bad?
+Using an undefined variable will raise a `NameError` at runtime.
+
+### Example
+
+```python
+print(x)  # NameError: name 'x' is not defined
+```
+
+### Links
+* [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unresolved-reference)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1027)
+</details>
+
 ## `unsupported-bool-conversion`
 
 **Default level**: error
@@ -1469,30 +1493,6 @@ a = 20 / 0  # ty: ignore[division-by-zero]
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unknown-rule)
 * [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L40)
-</details>
-
-## `unresolved-reference`
-
-**Default level**: warn
-
-<details>
-<summary>detects references to names that are not defined</summary>
-
-### What it does
-Checks for references to names that are not defined.
-
-### Why is this bad?
-Using an undefined variable will raise a `NameError` at runtime.
-
-### Example
-
-```python
-print(x)  # NameError: name 'x' is not defined
-```
-
-### Links
-* [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unresolved-reference)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1027)
 </details>
 
 ## `unused-ignore-comment`

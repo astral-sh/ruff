@@ -1039,7 +1039,7 @@ declare_lint! {
     pub(crate) static UNRESOLVED_REFERENCE = {
         summary: "detects references to names that are not defined",
         status: LintStatus::preview("1.0.0"),
-        default_level: Level::Warn,
+        default_level: Level::Error,
     }
 }
 
