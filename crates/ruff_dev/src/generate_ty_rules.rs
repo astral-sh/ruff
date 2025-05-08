@@ -101,7 +101,8 @@ fn generate_markdown() -> String {
             summary = replace_inline_code(lint.summary()),
             encoded_name = url::form_urlencoded::byte_serialize(lint.name().as_str().as_bytes())
                 .collect::<String>(),
-            file = url::form_urlencoded::byte_serialize(lint.file().as_bytes()).collect::<String>(),
+            file = url::form_urlencoded::byte_serialize(lint.file().replace('\\', "/").as_bytes())
+                .collect::<String>(),
             line = lint.line(),
         );
     }
