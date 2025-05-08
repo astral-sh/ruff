@@ -5032,7 +5032,7 @@ impl<'db> Type<'db> {
         type_mapping: TypeMapping<'a, 'db>,
     ) -> Type<'db> {
         match self {
-            Type::TypeVar(typevar) => type_mapping.get(typevar).unwrap_or(self),
+            Type::TypeVar(typevar) => type_mapping.get(db, typevar).unwrap_or(self),
 
             Type::FunctionLiteral(function) => {
                 Type::FunctionLiteral(function.apply_type_mapping(db, type_mapping))
@@ -6925,19 +6925,7 @@ impl<'db> FunctionType<'db> {
 
 impl<'db> Specialize<'db> for FunctionType<'db> {
     fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
-        let specialization = self
-            .specialization(db)
-            .map(|existing| existing.apply_type_mapping(db, type_mapping));
-        Self::new(
-            db,
-            self.name(db).clone(),
-            self.known(db),
-            self.body_scope(db),
-            self.decorators(db),
-            self.dataclass_transformer_params(db),
-            self.inherited_generic_context(db),
-            specialization,
-        )
+        self.apply_specialization(db, type_mapping.into_specialization(db))
     }
 
     fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {

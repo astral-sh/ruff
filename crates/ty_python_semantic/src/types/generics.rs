@@ -204,11 +204,8 @@ pub struct Specialization<'db> {
 }
 
 impl<'db> Specialization<'db> {
-    fn type_mapping(self, db: &'db dyn Db) -> TypeMapping<'db, 'db> {
-        TypeMapping {
-            variables: self.generic_context(db).variables(db),
-            types: self.types(db).as_ref(),
-        }
+    fn type_mapping(self) -> TypeMapping<'db, 'db> {
+        TypeMapping::Specialization(self)
     }
 
     /// Combines two specializations of the same generic context. If either specialization maps a
@@ -394,17 +391,49 @@ impl<'db> Specialization<'db> {
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct TypeMapping<'a, 'db> {
-    variables: &'a FxOrderSet<TypeVarInstance<'db>>,
-    types: &'a [Type<'db>],
+pub(crate) enum TypeMapping<'a, 'db> {
+    Specialization(Specialization<'db>),
+    Partial {
+        generic_context: GenericContext<'db>,
+        types: &'a [Type<'db>],
+    },
 }
 
 impl<'db> TypeMapping<'_, 'db> {
+    fn generic_context(self, db: &'db dyn Db) -> GenericContext<'db> {
+        match self {
+            Self::Specialization(specialization) => specialization.generic_context(db),
+            Self::Partial {
+                generic_context, ..
+            } => generic_context,
+        }
+    }
+
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
-    pub(crate) fn get(self, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
-        let index = self.variables.get_index_of(&typevar)?;
-        self.types.get(index).copied()
+    pub(crate) fn get(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
+        let index = self
+            .generic_context(db)
+            .variables(db)
+            .get_index_of(&typevar)?;
+        match self {
+            Self::Specialization(specialization) => specialization.types(db).get(index).copied(),
+            Self::Partial { types, .. } => types.get(index).copied(),
+        }
+    }
+
+    pub(crate) fn into_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+        match self {
+            Self::Specialization(specialization) => specialization,
+            Self::Partial {
+                generic_context,
+                types,
+            } => {
+                let mut types = types.to_vec();
+                types.resize(generic_context.variables(db).len(), Type::unknown());
+                Specialization::new(db, generic_context, types.into_boxed_slice())
+            }
+        }
     }
 }
 
@@ -414,7 +443,7 @@ pub(crate) trait Specialize<'db>: Clone {
 
     #[must_use]
     fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        self.apply_type_mapping(db, specialization.type_mapping(db))
+        self.apply_type_mapping(db, specialization.type_mapping())
     }
 
     #[must_use]
