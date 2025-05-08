@@ -177,16 +177,13 @@ impl<'db> Mro<'db> {
                             continue;
                         }
                         match base {
-                            ClassBase::Class(class) => {
+                            ClassBase::Class(_) | ClassBase::Generic(_) | ClassBase::Protocol => {
                                 errors.push(DuplicateBaseError {
-                                    duplicate_base: class.class_literal(db).0,
+                                    duplicate_base: base,
                                     first_index: *first_index,
                                     later_indices: later_indices.iter().copied().collect(),
                                 });
                             }
-                            // TODO these should also be reported as duplicate bases
-                            // rather than using the less specific `inconsistent-mro` error
-                            ClassBase::Generic(_) | ClassBase::Protocol => continue,
                             ClassBase::Dynamic(_) => duplicate_dynamic_bases = true,
                         }
                     }
@@ -385,7 +382,7 @@ impl<'db> MroErrorKind<'db> {
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(super) struct DuplicateBaseError<'db> {
     /// The base that is duplicated in the class's bases list.
-    pub(super) duplicate_base: ClassLiteral<'db>,
+    pub(super) duplicate_base: ClassBase<'db>,
     /// The index of the first occurrence of the base in the class's bases list.
     pub(super) first_index: usize,
     /// The indices of the base's later occurrences in the class's bases list.
