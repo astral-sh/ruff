@@ -2734,7 +2734,7 @@ mod tests {
 
         Program::get(&db)
             .set_python_version(&mut db)
-            .to(PythonVersion::latest());
+            .to(PythonVersion::latest_ty());
 
         for class in KnownClass::iter() {
             assert_ne!(
