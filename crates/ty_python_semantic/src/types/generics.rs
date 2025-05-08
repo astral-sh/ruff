@@ -184,7 +184,7 @@ impl<'db> GenericContext<'db> {
         // If there is a mapping for `T`, we want to map `U` to that type, not to `T`. To handle
         // this, we repeatedly apply the specialization to itself, until we reach a fixed point.
         let mut expanded = vec![Type::unknown(); types.len()];
-        for (idx, (ty, typevar)) in types.into_iter().zip(variables).enumerate() {
+        for (idx, (ty, typevar)) in types.iter().zip(variables).enumerate() {
             if let Some(ty) = ty {
                 expanded[idx] = *ty;
                 continue;
