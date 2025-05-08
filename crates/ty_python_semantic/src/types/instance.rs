@@ -185,11 +185,7 @@ impl<'db> ProtocolInstanceType<'db> {
     }
 
     /// Replace references to `class` with a self-reference marker
-    pub(super) fn replace_recursive_reference(
-        self,
-        db: &'db dyn Db,
-        class: ClassLiteral<'db>,
-    ) -> Self {
+    pub(super) fn replace_self_reference(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
         match self.0 {
             Protocol::FromClass(class_type) if class_type.class_literal(db).0 == class => {
                 ProtocolInstanceType(Protocol::Synthesized(SynthesizedProtocolType::new(

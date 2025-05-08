@@ -594,7 +594,7 @@ impl<'db> Type<'db> {
     pub fn replace_self_reference(&self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Type<'db> {
         match self {
             Self::ProtocolInstance(protocol) => {
-                Self::ProtocolInstance(protocol.replace_recursive_reference(db, class))
+                Self::ProtocolInstance(protocol.replace_self_reference(db, class))
             }
 
             Self::Union(union) => UnionType::from_elements(
