@@ -184,7 +184,7 @@ fn try_create_replacement(checker: &Checker, arg: &Expr, base: Base) -> Option<S
         return None;
     }
 
-    let mut quote = checker.stylist().quote();
+    let quote = checker.stylist().quote();
     let shorthand = base.shorthand();
 
     // If the `arg` contains double quotes we need to create the f-string with single quotes
@@ -193,7 +193,7 @@ fn try_create_replacement(checker: &Checker, arg: &Expr, base: Base) -> Option<S
         && quote.is_double()
         && inner_source.contains('"')
     {
-        quote = quote.opposite();
+        return None;
     }
 
     // If the `arg` contains a brace add an space before it to avoid a `SyntaxError`
