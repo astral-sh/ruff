@@ -23,6 +23,7 @@ types_requiring_create_prefix = {
     "BytesLiteralValue",
     "StringLiteralValue",
     "FStringValue",
+    "TStringValue",
     "Arguments",
     "CmpOp",
     "Comprehension",
