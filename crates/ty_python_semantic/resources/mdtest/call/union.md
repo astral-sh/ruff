@@ -39,7 +39,10 @@ def _(flag: bool):
     else:
         def f() -> int:
             return 1
-    x = f()  # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
+    x = (
+        # error: [invalid-union-call] "Union type `Literal[1] | (def f() -> int)` is not callable because of one or more incompatible variants"
+        f()
+    )
     reveal_type(x)  # revealed: Unknown | int
 ```
 
@@ -57,7 +60,7 @@ def _(flag: bool, flag2: bool):
         def f() -> int:
             return 1
     # TODO we should mention all non-callable elements of the union
-    # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
+    # error: [invalid-union-call] "Union type `Literal[1, "foo"] | (def f() -> int)` is not callable because of one or more incompatible variants"
     # revealed: Unknown | int
     reveal_type(f())
 ```
@@ -94,7 +97,7 @@ def _(flag: bool):
     else:
         f = f2
 
-    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `str`, found `Literal[3]`"
+    # error: [invalid-union-call] "Union type `(def f1(a: int) -> int) | (def f2(a: str) -> str)` is not callable because of one or more incompatible variants"
     x = f(3)
     reveal_type(x)  # revealed: int | str
 ```
@@ -109,7 +112,7 @@ def _(flag: bool):
     else:
         f = "This is a string literal"
 
-    # error: [call-non-callable] "Object of type `Literal["This is a string literal"]` is not callable"
+    # error: [invalid-union-call] "Union type `(def f1(a: int) -> Unknown) | Literal["This is a string literal"]` is not callable because of one or more incompatible variants"
     x = f(3)
     reveal_type(x)  # revealed: Unknown
 ```
@@ -126,7 +129,7 @@ def _(flag: bool):
         f = f2
 
     # TODO: we should show all errors from the union, not arbitrarily pick one union element
-    # error: [too-many-positional-arguments] "Too many positional arguments to function `f1`: expected 0, got 1"
+    # error: [invalid-union-call] "Union type `(def f1() -> Unknown) | (def f2() -> Unknown)` is not callable because of one or more incompatible variants"
     x = f(3)
     reveal_type(x)  # revealed: Unknown
 ```
@@ -144,7 +147,7 @@ def _(flag: bool):
         f = C()
 
     # TODO: we should either show all union errors here, or prioritize the not-callable error
-    # error: [too-many-positional-arguments] "Too many positional arguments to function `f1`: expected 0, got 1"
+    # error: [invalid-union-call] "Union type `(def f1() -> Unknown) | C` is not callable because of one or more incompatible variants"
     x = f(3)
     reveal_type(x)  # revealed: Unknown
 ```

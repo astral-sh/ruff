@@ -99,11 +99,11 @@ def _(flag: bool) -> None:
             def __new__(cls, x: int, y: int = 1): ...
 
     reveal_type(Foo(1))  # revealed: Foo
-    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["1"]`"
+    # error: [invalid-union-call] "Union type `(def __new__(cls, x: int) -> Unknown) | (def __new__(cls, x: int, y: int = Literal[1]) -> Unknown)` is not callable because of one or more incompatible variants"
     reveal_type(Foo("1"))  # revealed: Foo
-    # error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
+    # error: [invalid-union-call] "Union type `(def __new__(cls, x: int) -> Unknown) | (def __new__(cls, x: int, y: int = Literal[1]) -> Unknown)` is not callable because of one or more incompatible variants"
     reveal_type(Foo())  # revealed: Foo
-    # error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 1, got 2"
+    # error: [invalid-union-call] "Union type `(def __new__(cls, x: int) -> Unknown) | (def __new__(cls, x: int, y: int = Literal[1]) -> Unknown)` is not callable because of one or more incompatible variants"
     reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
@@ -141,7 +141,7 @@ class Foo:
     __new__ = Callable()
 
 reveal_type(Foo(1))  # revealed: Foo
-# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
+# error: [invalid-union-call] "Union type `Unknown | Callable` is not callable because of one or more incompatible variants"
 reveal_type(Foo())  # revealed: Foo
 ```
 
@@ -176,11 +176,11 @@ def _(flag: bool) -> None:
     class Foo:
         __new__ = Callable()
 
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly unbound `__call__` method)"
+    # error: [invalid-union-call] "Union type `Unknown | Callable` is not callable because of one or more incompatible variants"
     reveal_type(Foo(1))  # revealed: Foo
-    # TODO should be - error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
+    # TODO should be - error: [invalid-union-call] "Union type `Unknown | Callable` is not callable because of one or more incompatible variants"
     # but we currently infer the signature of `__call__` as unknown, so it accepts any arguments
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly unbound `__call__` method)"
+    # error: [invalid-union-call] "Union type `Unknown | Callable` is not callable because of one or more incompatible variants"
     reveal_type(Foo())  # revealed: Foo
 ```
 
@@ -230,11 +230,11 @@ def _(flag: bool) -> None:
             def __init__(self, x: int, y: int = 1): ...
 
     reveal_type(Foo(1))  # revealed: Foo
-    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["1"]`"
+    # error: [invalid-union-call] "Union type `(bound method Foo.__init__(x: int) -> Unknown) | (bound method Foo.__init__(x: int, y: int = Literal[1]) -> Unknown)` is not callable because of one or more incompatible variants"
     reveal_type(Foo("1"))  # revealed: Foo
-    # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
+    # error: [invalid-union-call] "Union type `(bound method Foo.__init__(x: int) -> Unknown) | (bound method Foo.__init__(x: int, y: int = Literal[1]) -> Unknown)` is not callable because of one or more incompatible variants"
     reveal_type(Foo())  # revealed: Foo
-    # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+    # error: [invalid-union-call] "Union type `(bound method Foo.__init__(x: int) -> Unknown) | (bound method Foo.__init__(x: int, y: int = Literal[1]) -> Unknown)` is not callable because of one or more incompatible variants"
     reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
@@ -274,7 +274,7 @@ class Foo:
     __init__ = Callable()
 
 reveal_type(Foo(1))  # revealed: Foo
-# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
+# error: [invalid-union-call] "Union type `Unknown | Callable` is not callable because of one or more incompatible variants"
 reveal_type(Foo())  # revealed: Foo
 ```
 
@@ -290,11 +290,11 @@ def _(flag: bool) -> None:
     class Foo:
         __init__ = Callable()
 
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly unbound `__call__` method)"
+    # error: [invalid-union-call] "Union type `Unknown | Callable` is not callable because of one or more incompatible variants"
     reveal_type(Foo(1))  # revealed: Foo
     # TODO should be - error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
     # but we currently infer the signature of `__call__` as unknown, so it accepts any arguments
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly unbound `__call__` method)"
+    # error: [invalid-union-call] "Union type `Unknown | Callable` is not callable because of one or more incompatible variants"
     reveal_type(Foo())  # revealed: Foo
 ```
 

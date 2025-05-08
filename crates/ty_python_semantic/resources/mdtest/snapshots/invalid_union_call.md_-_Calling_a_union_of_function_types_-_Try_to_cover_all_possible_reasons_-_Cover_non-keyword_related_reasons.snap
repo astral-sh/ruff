@@ -1,0 +1,127 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_union_call.md - Calling a union of function types - Try to cover all possible reasons - Cover non-keyword related reasons
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_union_call.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from inspect import getattr_static
+ 2 | 
+ 3 | def f1() -> int:
+ 4 |     return 0
+ 5 | 
+ 6 | def f2(name: str) -> int:
+ 7 |     return 0
+ 8 | 
+ 9 | def f3(a: int, b: int) -> int:
+10 |     return 0
+11 | 
+12 | def f4[T: str](x: T) -> int:
+13 |     return 0
+14 | 
+15 | class OverloadExample:
+16 |     def f(self, x: str) -> int:
+17 |         return 0
+18 | 
+19 | f5 = getattr_static(OverloadExample, "f").__get__
+20 | 
+21 | def _(n: int):
+22 |     class PossiblyNotCallable:
+23 |         if n == 0:
+24 |             def __call__(self) -> int:
+25 |                 return 0
+26 | 
+27 |     if n == 0:
+28 |         f = f1
+29 |     elif n == 1:
+30 |         f = f2
+31 |     elif n == 2:
+32 |         f = f3
+33 |     elif n == 3:
+34 |         f = f4
+35 |     elif n == 4:
+36 |         f = 5
+37 |     elif n == 5:
+38 |         f = f5
+39 |     else:
+40 |         f = PossiblyNotCallable()
+41 |     x = f(3)  # error: [invalid-union-call]
+```
+
+# Diagnostics
+
+```
+error: lint:invalid-union-call: Union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable` is not callable because of one or more incompatible variants
+  --> src/mdtest_snippet.py:41:9
+   |
+39 |     else:
+40 |         f = PossiblyNotCallable()
+41 |     x = f(3)  # error: [invalid-union-call]
+   |         ^^^^
+   |
+info: Cannot call union variant `def f1() -> int` because there are too many positional arguments to function `f1`: expected 0, got 1
+  --> src/mdtest_snippet.py:41:11
+   |
+39 |     else:
+40 |         f = PossiblyNotCallable()
+41 |     x = f(3)  # error: [invalid-union-call]
+   |           ^
+   |
+info: Cannot call union variant `def f2(name: str) -> int` because the argument to this function is incorrect
+  --> src/mdtest_snippet.py:41:11
+   |
+39 |     else:
+40 |         f = PossiblyNotCallable()
+41 |     x = f(3)  # error: [invalid-union-call]
+   |           ^ Expected `str`, found `Literal[3]`
+   |
+info: Cannot call union variant `def f3(a: int, b: int) -> int` because no argument provided for required parameter `b` of function `f3`
+  --> src/mdtest_snippet.py:41:9
+   |
+39 |     else:
+40 |         f = PossiblyNotCallable()
+41 |     x = f(3)  # error: [invalid-union-call]
+   |         ^^^^
+   |
+info: Cannot call union variant `def f4(x: T) -> int` because the argument to this function is incorrect
+  --> src/mdtest_snippet.py:41:11
+   |
+39 |     else:
+40 |         f = PossiblyNotCallable()
+41 |     x = f(3)  # error: [invalid-union-call]
+   |           ^ Argument type `Literal[3]` does not satisfy upper bound of type variable `T`
+   |
+info: Cannot call union variant `Literal[5]` because object of type `Literal[5]` is not callable
+  --> src/mdtest_snippet.py:41:9
+   |
+39 |     else:
+40 |         f = PossiblyNotCallable()
+41 |     x = f(3)  # error: [invalid-union-call]
+   |         ^^^^
+   |
+info: Cannot call union variant `<method-wrapper `__get__` of `f`>` because no overload of method wrapper `__get__` of function `f` matches arguments
+  --> src/mdtest_snippet.py:41:9
+   |
+39 |     else:
+40 |         f = PossiblyNotCallable()
+41 |     x = f(3)  # error: [invalid-union-call]
+   |         ^^^^
+   |
+info: Cannot call union variant `PossiblyNotCallable` because object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)
+  --> src/mdtest_snippet.py:41:9
+   |
+39 |     else:
+40 |         f = PossiblyNotCallable()
+41 |     x = f(3)  # error: [invalid-union-call]
+   |         ^^^^
+   |
+info: `lint:invalid-union-call` is enabled by default
+
+```

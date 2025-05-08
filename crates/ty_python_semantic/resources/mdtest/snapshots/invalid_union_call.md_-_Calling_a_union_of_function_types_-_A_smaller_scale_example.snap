@@ -1,0 +1,58 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_union_call.md - Calling a union of function types - A smaller scale example
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_union_call.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def f1() -> int:
+ 2 |     return 0
+ 3 | 
+ 4 | def f2(name: str) -> int:
+ 5 |     return 0
+ 6 | 
+ 7 | def _(flag: bool):
+ 8 |     if flag:
+ 9 |         f = f1
+10 |     else:
+11 |         f = f2
+12 |     x = f(3)  # error: [invalid-union-call]
+```
+
+# Diagnostics
+
+```
+error: lint:invalid-union-call: Union type `(def f1() -> int) | (def f2(name: str) -> int)` is not callable because of one or more incompatible variants
+  --> src/mdtest_snippet.py:12:9
+   |
+10 |     else:
+11 |         f = f2
+12 |     x = f(3)  # error: [invalid-union-call]
+   |         ^^^^
+   |
+info: Cannot call union variant `def f1() -> int` because there are too many positional arguments to function `f1`: expected 0, got 1
+  --> src/mdtest_snippet.py:12:11
+   |
+10 |     else:
+11 |         f = f2
+12 |     x = f(3)  # error: [invalid-union-call]
+   |           ^
+   |
+info: Cannot call union variant `def f2(name: str) -> int` because the argument to this function is incorrect
+  --> src/mdtest_snippet.py:12:11
+   |
+10 |     else:
+11 |         f = f2
+12 |     x = f(3)  # error: [invalid-union-call]
+   |           ^ Expected `str`, found `Literal[3]`
+   |
+info: `lint:invalid-union-call` is enabled by default
+
+```

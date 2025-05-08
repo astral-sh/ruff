@@ -34,6 +34,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_RETURN_TYPE);
     registry.register_lint(&INVALID_ASSIGNMENT);
     registry.register_lint(&INVALID_BASE);
+    registry.register_lint(&INVALID_UNION_CALL);
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
@@ -356,6 +357,33 @@ declare_lint! {
     /// TODO #14889
     pub(crate) static INVALID_BASE = {
         summary: "detects class definitions with an invalid base",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks if a function call on a value with a union type is correct for
+    /// all possible variants of that union.
+    ///
+    /// ## Why is this bad?
+    /// Failing to call a function correctly will raise a `TypeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def f1() -> int: return 0
+    /// def f2(name: str) -> int: return 0
+    ///
+    /// def _(flag: bool):
+    ///     if flag:
+    ///         f = f1
+    ///     else:
+    ///         f = f2
+    ///     x = f(3)
+    /// ```
+    pub(crate) static INVALID_UNION_CALL = {
+        summary: "detects function calls that are inconsistent with one or more union type variants",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
