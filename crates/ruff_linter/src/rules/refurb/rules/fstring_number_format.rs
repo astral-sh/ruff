@@ -188,7 +188,7 @@ fn try_create_replacement(checker: &Checker, arg: &Expr, base: Base) -> Option<S
 
     // If the `arg` contains a brace add an space before it to avoid a `SyntaxError`
     // in the f-string.
-    if inner_source.contains('{') {
+    if inner_source.starts_with('{') {
         Some(format!("f{quote}{{ {inner_source}:{shorthand}}}{quote}"))
     } else {
         Some(format!("f{quote}{{{inner_source}:{shorthand}}}{quote}"))
