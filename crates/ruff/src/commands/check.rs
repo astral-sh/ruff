@@ -20,7 +20,7 @@ use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::{fs, warn_user_once, IOError};
 use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 use ruff_workspace::resolver::{
     match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile,
 };
@@ -133,7 +133,7 @@ pub(crate) fn check(
                         vec![Message::from_diagnostic(
                             Diagnostic::new(IOError { message }, TextRange::default()),
                             dummy,
-                            TextSize::default(),
+                            None,
                         )],
                         FxHashMap::default(),
                     )
