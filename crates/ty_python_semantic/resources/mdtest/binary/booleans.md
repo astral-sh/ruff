@@ -51,6 +51,12 @@ reveal_type(a & a)  # revealed: Literal[True]
 reveal_type(a & b)  # revealed: Literal[False]
 reveal_type(b & a)  # revealed: Literal[False]
 reveal_type(b & b)  # revealed: Literal[False]
+
+# bitwise XOR
+reveal_type(a ^ a)  # revealed: Literal[False]
+reveal_type(a ^ b)  # revealed: Literal[True]
+reveal_type(b ^ a)  # revealed: Literal[True]
+reveal_type(b ^ b)  # revealed: Literal[False]
 ```
 
 ## Arithmetic with a variable
