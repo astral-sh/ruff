@@ -7938,7 +7938,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_tstring_expression(tstring);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("F-strings are not allowed in type expressions"),
+                    format_args!("T-strings are not allowed in type expressions"),
                 )
             }
 
