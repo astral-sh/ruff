@@ -202,6 +202,18 @@ impl<'db> ClassBase<'db> {
         }
     }
 
+    pub(crate) fn apply_optional_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Self {
+        if let Some(specialization) = specialization {
+            self.apply_type_mapping(db, specialization.type_mapping())
+        } else {
+            self
+        }
+    }
+
     /// Iterate over the MRO of this base
     pub(super) fn mro(
         self,

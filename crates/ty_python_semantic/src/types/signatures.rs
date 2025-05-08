@@ -17,7 +17,7 @@ use smallvec::{smallvec, SmallVec};
 
 use super::{definition_expression_type, DynamicType, Type};
 use crate::semantic_index::definition::Definition;
-use crate::types::generics::{GenericContext, Specialize, TypeMapping};
+use crate::types::generics::{GenericContext, Specialization, Specialize, TypeMapping};
 use crate::types::{todo_type, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -307,6 +307,14 @@ impl<'db> Signature<'db> {
                 .collect(),
             return_ty: self.return_ty.map(|return_ty| return_ty.normalized(db)),
         }
+    }
+
+    pub(crate) fn apply_specialization(
+        &self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        self.apply_type_mapping(db, specialization.type_mapping())
     }
 
     pub(crate) fn find_legacy_typevars(

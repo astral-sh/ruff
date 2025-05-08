@@ -221,8 +221,38 @@ pub struct Specialization<'db> {
 }
 
 impl<'db> Specialization<'db> {
-    fn type_mapping(self) -> TypeMapping<'db, 'db> {
+    pub(crate) fn type_mapping(self) -> TypeMapping<'db, 'db> {
         TypeMapping::Specialization(self)
+    }
+
+    /// Applies a specialization to this specialization. This is used, for instance, when a generic
+    /// class inherits from a generic alias:
+    ///
+    /// ```py
+    /// class A[T]: ...
+    /// class B[U](A[U]): ...
+    /// ```
+    ///
+    /// `B` is a generic class, whose MRO includes the generic alias `A[U]`, which specializes `A`
+    /// with the specialization `{T: U}`. If `B` is specialized to `B[int]`, with specialization
+    /// `{U: int}`, we can apply the second specialization to the first, resulting in `T: int`.
+    /// That lets us produce the generic alias `A[int]`, which is the corresponding entry in the
+    /// MRO of `B[int]`.
+    pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
+        self.apply_type_mapping(db, other.type_mapping())
+    }
+
+    /// Applies an optional specialization to this specialization.
+    pub(crate) fn apply_optional_specialization(
+        self,
+        db: &'db dyn Db,
+        other: Option<Specialization<'db>>,
+    ) -> Self {
+        if let Some(other) = other {
+            self.apply_specialization(db, other)
+        } else {
+            self
+        }
     }
 
     /// Combines two specializations of the same generic context. If either specialization maps a
@@ -457,23 +487,6 @@ impl<'db> TypeMapping<'_, 'db> {
 pub(crate) trait Specialize<'db>: Clone {
     #[must_use]
     fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self;
-
-    #[must_use]
-    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        self.apply_type_mapping(db, specialization.type_mapping())
-    }
-
-    #[must_use]
-    fn apply_optional_specialization(
-        &self,
-        db: &'db dyn Db,
-        specialization: Option<Specialization<'db>>,
-    ) -> Self {
-        match specialization {
-            Some(specialization) => self.apply_specialization(db, specialization),
-            None => self.clone(),
-        }
-    }
 }
 
 impl<'db> Specialize<'db> for Specialization<'db> {

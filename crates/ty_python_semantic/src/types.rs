@@ -5020,12 +5020,35 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[must_use]
+    pub fn apply_optional_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Type<'db> {
+        if let Some(specialization) = specialization {
+            self.apply_specialization(db, specialization)
+        } else {
+            self
+        }
+    }
+
     /// Applies a specialization to this type, replacing any typevars with the types that they are
     /// specialized to.
     ///
     /// Note that this does not specialize generic classes, functions, or type aliases! That is a
     /// different operation that is performed explicitly (via a subscript operation), or implicitly
     /// via a call to the generic object.
+    #[must_use]
+    #[salsa::tracked]
+    fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Type<'db> {
+        self.apply_type_mapping_inner(db, specialization.type_mapping())
+    }
+
     fn apply_type_mapping_inner<'a>(
         self,
         db: &'db dyn Db,
@@ -6820,6 +6843,23 @@ impl<'db> FunctionType<'db> {
         )
     }
 
+    fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        let specialization = match self.specialization(db) {
+            Some(existing) => existing.apply_specialization(db, specialization),
+            None => specialization,
+        };
+        Self::new(
+            db,
+            self.name(db).clone(),
+            self.known(db),
+            self.body_scope(db),
+            self.decorators(db),
+            self.dataclass_transformer_params(db),
+            self.inherited_generic_context(db),
+            Some(specialization),
+        )
+    }
+
     fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
@@ -6926,23 +6966,6 @@ impl<'db> FunctionType<'db> {
 impl<'db> Specialize<'db> for FunctionType<'db> {
     fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
         self.apply_specialization(db, type_mapping.into_specialization(db))
-    }
-
-    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        let specialization = match self.specialization(db) {
-            Some(existing) => existing.apply_specialization(db, specialization),
-            None => specialization,
-        };
-        Self::new(
-            db,
-            self.name(db).clone(),
-            self.known(db),
-            self.body_scope(db),
-            self.decorators(db),
-            self.dataclass_transformer_params(db),
-            self.inherited_generic_context(db),
-            Some(specialization),
-        )
     }
 }
 
