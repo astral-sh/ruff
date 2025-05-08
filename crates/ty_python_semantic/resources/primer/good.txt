@@ -9,6 +9,7 @@ aioredis
 aiortc
 alectryon
 alerta
+antidote
 anyio
 apprise
 arviz
@@ -30,6 +31,7 @@ cwltool
 dacite
 dd-trace-py
 dedupe
+discord.py
 django-stubs
 downforeveryone
 dragonchain
@@ -75,6 +77,7 @@ pip
 poetry
 porcupine
 ppb-vector
+prefect
 psycopg
 pwndbg
 pybind11
