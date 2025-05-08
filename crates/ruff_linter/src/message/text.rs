@@ -73,12 +73,12 @@ impl Emitter for TextEmitter {
             write!(
                 writer,
                 "{path}{sep}",
-                path = relativize_path(message.filename()).bold(),
+                path = relativize_path(&*message.filename()).bold(),
                 sep = ":".cyan(),
             )?;
 
             let start_location = message.compute_start_location();
-            let notebook_index = context.notebook_index(message.filename());
+            let notebook_index = context.notebook_index(&message.filename());
 
             // Check if we're working on a jupyter notebook and translate positions with cell accordingly
             let diagnostic_location = if let Some(notebook_index) = notebook_index {
@@ -191,7 +191,8 @@ impl Display for MessageCodeFrame<'_> {
             Vec::new()
         };
 
-        let source_code = self.message.source_file().to_source_code();
+        let source_file = self.message.source_file();
+        let source_code = source_file.to_source_code();
 
         let content_start_index = source_code.line_index(self.message.start());
         let mut start_index = content_start_index.saturating_sub(2);

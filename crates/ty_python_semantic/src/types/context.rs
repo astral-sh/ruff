@@ -521,7 +521,7 @@ impl Drop for DiagnosticGuard<'_, '_> {
         };
 
         let expected_file = self.ctx.file();
-        let got_file = ann.get_span().file();
+        let got_file = ann.get_span().expect_ty_file();
         assert_eq!(
             expected_file,
             got_file,

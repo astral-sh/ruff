@@ -197,7 +197,7 @@ fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic], expected: &[KeyDi
                 diagnostic.id(),
                 diagnostic
                     .primary_span()
-                    .map(|span| span.file())
+                    .map(|span| span.expect_ty_file())
                     .map(|file| file.path(db).as_str()),
                 diagnostic
                     .primary_span()

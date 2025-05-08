@@ -439,7 +439,7 @@ impl LintCacheData {
             .map(|msg| {
                 // Make sure that all message use the same source file.
                 assert_eq!(
-                    &msg.file,
+                    msg.file,
                     messages.first().unwrap().source_file(),
                     "message uses a different source file"
                 );

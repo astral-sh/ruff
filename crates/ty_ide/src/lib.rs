@@ -204,6 +204,7 @@ mod tests {
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_db::Upcast;
     use ruff_python_ast::PythonVersion;
     use ruff_text_size::TextSize;
     use ty_python_semantic::{
@@ -285,7 +286,7 @@ mod tests {
                 .format(DiagnosticFormat::Full);
             for diagnostic in diagnostics {
                 let diag = diagnostic.into_diagnostic();
-                write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
+                write!(buf, "{}", diag.display(&self.db.upcast(), &config)).unwrap();
             }
 
             buf

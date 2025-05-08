@@ -17,7 +17,7 @@ impl Emitter for AzureEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {
-            let location = if context.is_notebook(message.filename()) {
+            let location = if context.is_notebook(&message.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 LineColumn::default()
