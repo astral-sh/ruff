@@ -53,7 +53,7 @@ impl Violation for Airflow3SuggestedUpdate {
         } = self;
         match replacement {
             Replacement::None
-            | Replacement::Name(_)
+            | Replacement::AttrName(_)
             | Replacement::Message(_)
             | Replacement::AutoImport { module: _, name: _ }
             | Replacement::SourceModuleMoved { module: _, name: _ } => {
@@ -69,7 +69,7 @@ impl Violation for Airflow3SuggestedUpdate {
         let Airflow3SuggestedUpdate { replacement, .. } = self;
         match replacement {
             Replacement::None => None,
-            Replacement::Name(name) => Some(format!("Use `{name}` instead")),
+            Replacement::AttrName(name) => Some(format!("Use `{name}` instead")),
             Replacement::Message(message) => Some((*message).to_string()),
             Replacement::AutoImport { module, name } => {
                 Some(format!("Use `{module}.{name}` instead"))
@@ -121,7 +121,7 @@ fn diagnostic_for_argument(
         Airflow3SuggestedUpdate {
             deprecated: deprecated.to_string(),
             replacement: match replacement {
-                Some(name) => Replacement::Name(name),
+                Some(name) => Replacement::AttrName(name),
                 None => Replacement::None,
             },
         },
