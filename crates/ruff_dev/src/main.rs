@@ -15,6 +15,7 @@ mod generate_docs;
 mod generate_json_schema;
 mod generate_options;
 mod generate_rules_table;
+mod generate_ty_rules;
 mod generate_ty_schema;
 mod print_ast;
 mod print_cst;
@@ -44,6 +45,7 @@ enum Command {
     GenerateTySchema(generate_ty_schema::Args),
     /// Generate a Markdown-compatible table of supported lint rules.
     GenerateRulesTable,
+    GenerateTyRules(generate_ty_rules::Args),
     /// Generate a Markdown-compatible listing of configuration options.
     GenerateOptions,
     /// Generate CLI help.
@@ -88,6 +90,7 @@ fn main() -> Result<ExitCode> {
         Command::GenerateJSONSchema(args) => generate_json_schema::main(&args)?,
         Command::GenerateTySchema(args) => generate_ty_schema::main(&args)?,
         Command::GenerateRulesTable => println!("{}", generate_rules_table::generate()),
+        Command::GenerateTyRules(args) => generate_ty_rules::main(&args)?,
         Command::GenerateOptions => println!("{}", generate_options::generate()),
         Command::GenerateCliHelp(args) => generate_cli_help::main(&args)?,
         Command::GenerateDocs(args) => generate_docs::main(&args)?,

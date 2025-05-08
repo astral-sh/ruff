@@ -2726,6 +2726,7 @@ dependencies = [
  "tracing-indicatif",
  "tracing-subscriber",
  "ty_project",
+ "url",
 ]
 
 [[package]]
