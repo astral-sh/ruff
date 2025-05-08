@@ -5039,7 +5039,7 @@ impl<'db> Type<'db> {
     /// via a call to the generic object.
     #[must_use]
     #[salsa::tracked]
-    fn apply_specialization(
+    pub fn apply_specialization(
         self,
         db: &'db dyn Db,
         specialization: Specialization<'db>,

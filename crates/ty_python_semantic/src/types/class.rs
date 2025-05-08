@@ -146,9 +146,7 @@ impl<'db> GenericAlias<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.origin(db).definition(db)
     }
-}
 
-impl<'db> GenericAlias<'db> {
     fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
         Self::new(
             db,
@@ -233,7 +231,7 @@ impl<'db> ClassType<'db> {
         self.is_known(db, KnownClass::Object)
     }
 
-    pub(crate) fn apply_type_mapping<'a>(
+    pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: TypeMapping<'a, 'db>,

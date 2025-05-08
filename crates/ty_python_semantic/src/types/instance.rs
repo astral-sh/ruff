@@ -113,7 +113,7 @@ impl<'db> NominalInstanceType<'db> {
         SubclassOfType::from(db, self.class)
     }
 
-    pub(crate) fn apply_type_mapping<'a>(
+    pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: TypeMapping<'a, 'db>,
