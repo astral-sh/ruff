@@ -94,14 +94,16 @@ impl<'db> DunderAllNamesCollector<'db> {
     }
 
     /// Extends the current set of names with the names from the given expression which can be
-    /// either a list of names or a module's `__all__` variable.
+    /// either a list/tuple/set of string-literal names or a module's `__all__` variable.
     ///
-    /// Returns `true` if the expression is a valid list or module `__all__`, `false` otherwise.
-    fn extend_from_list_or_module(&mut self, expr: &ast::Expr) -> bool {
+    /// Returns `true` if the expression is a valid list/tuple/set or module `__all__`, `false` otherwise.
+    fn extend(&mut self, expr: &ast::Expr) -> bool {
         match expr {
             // `__all__ += [...]`
             // `__all__.extend([...])`
-            ast::Expr::List(ast::ExprList { elts, .. }) => self.add_names(elts),
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+            | ast::Expr::Set(ast::ExprSet { elts, .. }) => self.add_names(elts),
 
             // `__all__ += module.__all__`
             // `__all__.extend(module.__all__)`
@@ -155,7 +157,7 @@ impl<'db> DunderAllNamesCollector<'db> {
             // `__all__.extend([...])`
             // `__all__.extend(module.__all__)`
             "extend" => {
-                if !self.extend_from_list_or_module(argument) {
+                if !self.extend(argument) {
                     return false;
                 }
             }
@@ -330,7 +332,7 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 if !is_dunder_all(target) {
                     return;
                 }
-                if !self.extend_from_list_or_module(value) {
+                if !self.extend(value) {
                     self.invalid = true;
                 }
             }
