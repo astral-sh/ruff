@@ -29,7 +29,11 @@ impl Db {
 
         Self {
             system: MdtestSystem::in_memory(),
-            storage: salsa::Storage::default(),
+            storage: salsa::Storage::new(Some(Box::new({
+                move |event| {
+                    tracing::trace!("event: {:?}", event);
+                }
+            }))),
             vendored: ty_vendored::file_system().clone(),
             files: Files::default(),
             rule_selection: Arc::new(rule_selection),
@@ -95,12 +99,7 @@ impl SemanticDb for Db {
 }
 
 #[salsa::db]
-impl salsa::Database for Db {
-    fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
-        let event = event();
-        tracing::trace!("event: {:?}", event);
-    }
-}
+impl salsa::Database for Db {}
 
 impl DbWithWritableSystem for Db {
     type System = MdtestSystem;
