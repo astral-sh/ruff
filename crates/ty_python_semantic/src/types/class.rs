@@ -8,7 +8,7 @@ use super::{
 };
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::DeclarationWithConstraint;
-use crate::types::generics::{GenericContext, Specialization, Specialize, TypeMapping};
+use crate::types::generics::{GenericContext, Specialization, TypeMapping};
 use crate::types::signatures::{Parameter, Parameters};
 use crate::types::{
     CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, Signature,
@@ -148,19 +148,19 @@ impl<'db> GenericAlias<'db> {
     }
 }
 
-impl<'db> From<GenericAlias<'db>> for Type<'db> {
-    fn from(alias: GenericAlias<'db>) -> Type<'db> {
-        Type::GenericAlias(alias)
-    }
-}
-
-impl<'db> Specialize<'db> for GenericAlias<'db> {
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+impl<'db> GenericAlias<'db> {
+    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
         Self::new(
             db,
             self.origin(db),
             self.specialization(db).apply_type_mapping(db, type_mapping),
         )
+    }
+}
+
+impl<'db> From<GenericAlias<'db>> for Type<'db> {
+    fn from(alias: GenericAlias<'db>) -> Type<'db> {
+        Type::GenericAlias(alias)
     }
 }
 
@@ -231,6 +231,17 @@ impl<'db> ClassType<'db> {
     /// Return `true` if this class represents the builtin class `object`
     pub(crate) fn is_object(self, db: &'db dyn Db) -> bool {
         self.is_known(db, KnownClass::Object)
+    }
+
+    pub(crate) fn apply_type_mapping<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: TypeMapping<'a, 'db>,
+    ) -> Self {
+        match self {
+            Self::NonGeneric(_) => self,
+            Self::Generic(generic) => Self::Generic(generic.apply_type_mapping(db, type_mapping)),
+        }
     }
 
     /// Iterate over the [method resolution order] ("MRO") of the class.
@@ -430,15 +441,6 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
         match class {
             ClassType::NonGeneric(non_generic) => non_generic.into(),
             ClassType::Generic(generic) => generic.into(),
-        }
-    }
-}
-
-impl<'db> Specialize<'db> for ClassType<'db> {
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
-        match self {
-            Self::NonGeneric(_) => *self,
-            Self::Generic(generic) => Self::Generic(generic.apply_type_mapping(db, type_mapping)),
         }
     }
 }

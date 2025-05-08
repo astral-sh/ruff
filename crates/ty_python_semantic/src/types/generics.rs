@@ -242,6 +242,19 @@ impl<'db> Specialization<'db> {
         self.apply_type_mapping(db, other.type_mapping())
     }
 
+    pub(crate) fn apply_type_mapping<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: TypeMapping<'a, 'db>,
+    ) -> Self {
+        let types: Box<[_]> = self
+            .types(db)
+            .into_iter()
+            .map(|ty| ty.apply_type_mapping(db, type_mapping))
+            .collect();
+        Specialization::new(db, self.generic_context(db), types)
+    }
+
     /// Applies an optional specialization to this specialization.
     pub(crate) fn apply_optional_specialization(
         self,
@@ -481,35 +494,6 @@ impl<'db> TypeMapping<'_, 'db> {
                 Specialization::new(db, generic_context, types.into_boxed_slice())
             }
         }
-    }
-}
-
-pub(crate) trait Specialize<'db>: Clone {
-    #[must_use]
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self;
-}
-
-impl<'db> Specialize<'db> for Specialization<'db> {
-    /// Applies a type mapping to this specialization. This is used, for instance, when a generic
-    /// class inherits from a generic alias:
-    ///
-    /// ```py
-    /// class A[T]: ...
-    /// class B[U](A[U]): ...
-    /// ```
-    ///
-    /// `B` is a generic class, whose MRO includes the generic alias `A[U]`, which specializes `A`
-    /// with the specialization `{T: U}`. If `B` is specialized to `B[int]`, with specialization
-    /// `{U: int}`, we can apply the second specialization to the first, resulting in `T: int`.
-    /// That lets us produce the generic alias `A[int]`, which is the corresponding entry in the
-    /// MRO of `B[int]`.
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
-        let types: Box<[_]> = self
-            .types(db)
-            .into_iter()
-            .map(|ty| ty.apply_type_mapping(db, type_mapping))
-            .collect();
-        Specialization::new(db, self.generic_context(db), types)
     }
 }
 

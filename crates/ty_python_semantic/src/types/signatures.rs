@@ -17,7 +17,7 @@ use smallvec::{smallvec, SmallVec};
 
 use super::{definition_expression_type, DynamicType, Type};
 use crate::semantic_index::definition::Definition;
-use crate::types::generics::{GenericContext, Specialization, Specialize, TypeMapping};
+use crate::types::generics::{GenericContext, Specialization, TypeMapping};
 use crate::types::{todo_type, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -315,6 +315,21 @@ impl<'db> Signature<'db> {
         specialization: Specialization<'db>,
     ) -> Self {
         self.apply_type_mapping(db, specialization.type_mapping())
+    }
+
+    pub(crate) fn apply_type_mapping<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: TypeMapping<'a, 'db>,
+    ) -> Self {
+        Self {
+            generic_context: self.generic_context,
+            inherited_generic_context: self.inherited_generic_context,
+            parameters: self.parameters.apply_type_mapping(db, type_mapping),
+            return_ty: self
+                .return_ty
+                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+        }
     }
 
     pub(crate) fn find_legacy_typevars(
@@ -863,19 +878,6 @@ impl<'db> Signature<'db> {
     }
 }
 
-impl<'db> Specialize<'db> for Signature<'db> {
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
-        Self {
-            generic_context: self.generic_context,
-            inherited_generic_context: self.inherited_generic_context,
-            parameters: self.parameters.apply_type_mapping(db, type_mapping),
-            return_ty: self
-                .return_ty
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) struct Parameters<'db> {
     // TODO: use SmallVec here once invariance bug is fixed
@@ -1059,6 +1061,17 @@ impl<'db> Parameters<'db> {
         )
     }
 
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+        Self {
+            value: self
+                .value
+                .iter()
+                .map(|param| param.apply_type_mapping(db, type_mapping))
+                .collect(),
+            is_gradual: self.is_gradual,
+        }
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.value.len()
     }
@@ -1113,19 +1126,6 @@ impl<'db> Parameters<'db> {
         self.iter()
             .enumerate()
             .rfind(|(_, parameter)| parameter.is_keyword_variadic())
-    }
-}
-
-impl<'db> Specialize<'db> for Parameters<'db> {
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
-        Self {
-            value: self
-                .value
-                .iter()
-                .map(|param| param.apply_type_mapping(db, type_mapping))
-                .collect(),
-            is_gradual: self.is_gradual,
-        }
     }
 }
 
@@ -1231,6 +1231,16 @@ impl<'db> Parameter<'db> {
     pub(crate) fn type_form(mut self) -> Self {
         self.form = ParameterForm::Type;
         self
+    }
+
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+        Self {
+            annotated_type: self
+                .annotated_type
+                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+            kind: self.kind.apply_type_mapping(db, type_mapping),
+            form: self.form,
+        }
     }
 
     /// Strip information from the parameter so that two equivalent parameters compare equal.
@@ -1380,18 +1390,6 @@ impl<'db> Parameter<'db> {
     }
 }
 
-impl<'db> Specialize<'db> for Parameter<'db> {
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
-        Self {
-            annotated_type: self
-                .annotated_type
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
-            kind: self.kind.apply_type_mapping(db, type_mapping),
-            form: self.form,
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) enum ParameterKind<'db> {
     /// Positional-only parameter, e.g. `def f(x, /): ...`
@@ -1431,7 +1429,7 @@ pub(crate) enum ParameterKind<'db> {
     },
 }
 
-impl<'db> Specialize<'db> for ParameterKind<'db> {
+impl<'db> ParameterKind<'db> {
     fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
         match self {
             Self::PositionalOnly { default_type, name } => Self::PositionalOnly {

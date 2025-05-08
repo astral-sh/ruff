@@ -45,7 +45,7 @@ use crate::types::call::{Bindings, CallArgumentTypes, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
-use crate::types::generics::{GenericContext, Specialization, Specialize, TypeMapping};
+use crate::types::generics::{GenericContext, Specialization, TypeMapping};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
@@ -342,6 +342,16 @@ pub struct PropertyInstanceType<'db> {
 }
 
 impl<'db> PropertyInstanceType<'db> {
+    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+        let getter = self
+            .getter(db)
+            .map(|ty| ty.apply_type_mapping(db, type_mapping));
+        let setter = self
+            .setter(db)
+            .map(|ty| ty.apply_type_mapping(db, type_mapping));
+        Self::new(db, getter, setter)
+    }
+
     fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
@@ -353,18 +363,6 @@ impl<'db> PropertyInstanceType<'db> {
         if let Some(ty) = self.setter(db) {
             ty.find_legacy_typevars(db, typevars);
         }
-    }
-}
-
-impl<'db> Specialize<'db> for PropertyInstanceType<'db> {
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
-        let getter = self
-            .getter(db)
-            .map(|ty| ty.apply_type_mapping(db, type_mapping));
-        let setter = self
-            .setter(db)
-            .map(|ty| ty.apply_type_mapping(db, type_mapping));
-        Self::new(db, getter, setter)
     }
 }
 
@@ -5046,10 +5044,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         specialization: Specialization<'db>,
     ) -> Type<'db> {
-        self.apply_type_mapping_inner(db, specialization.type_mapping())
+        self.apply_type_mapping(db, specialization.type_mapping())
     }
 
-    fn apply_type_mapping_inner<'a>(
+    fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: TypeMapping<'a, 'db>,
@@ -5460,12 +5458,6 @@ impl<'db> Type<'db> {
 impl<'db> From<&Type<'db>> for Type<'db> {
     fn from(value: &Type<'db>) -> Self {
         *value
-    }
-}
-
-impl<'db> Specialize<'db> for Type<'db> {
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
-        self.apply_type_mapping_inner(db, type_mapping)
     }
 }
 
@@ -6860,6 +6852,10 @@ impl<'db> FunctionType<'db> {
         )
     }
 
+    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+        self.apply_specialization(db, type_mapping.into_specialization(db))
+    }
+
     fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
@@ -6960,12 +6956,6 @@ impl<'db> FunctionType<'db> {
         // functions yet. Refer to https://github.com/salsa-rs/salsa/pull/772. Remove the inner
         // function once it's supported.
         to_overloaded_impl(db, self).as_ref()
-    }
-}
-
-impl<'db> Specialize<'db> for FunctionType<'db> {
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
-        self.apply_specialization(db, type_mapping.into_specialization(db))
     }
 }
 
@@ -7214,6 +7204,15 @@ impl<'db> CallableType<'db> {
         )
     }
 
+    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+        CallableType::from_overloads(
+            db,
+            self.signatures(db)
+                .iter()
+                .map(|signature| signature.apply_type_mapping(db, type_mapping)),
+        )
+    }
+
     fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
@@ -7336,17 +7335,6 @@ impl<'db> CallableType<'db> {
                 false
             }
         }
-    }
-}
-
-impl<'db> Specialize<'db> for CallableType<'db> {
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
-        CallableType::from_overloads(
-            db,
-            self.signatures(db)
-                .iter()
-                .map(|signature| signature.apply_type_mapping(db, type_mapping)),
-        )
     }
 }
 
