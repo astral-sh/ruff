@@ -6,11 +6,10 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::{self as ast};
 
-use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId};
+use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{global_scope, semantic_index, SemanticIndex};
-use crate::symbol::{symbol_from_bindings, Boundness, Symbol};
-use crate::types::{infer_expression_types, Truthiness};
+use crate::types::{infer_expression_types, Truthiness, Type};
 use crate::{resolve_module, Db, ModuleName};
 
 #[allow(clippy::ref_option)]
@@ -111,18 +110,8 @@ impl<'db> DunderAllNamesCollector<'db> {
                 if attr != "__all__" {
                     return false;
                 }
-                let Some(name_node) = value.as_name_expr() else {
-                    return false;
-                };
-                let Symbol::Type(ty, Boundness::Bound) = symbol_from_bindings(
-                    self.db,
-                    self.index
-                        .use_def_map(self.scope.file_scope_id(self.db))
-                        .bindings_at_use(name_node.scoped_use_id(self.db, self.scope)),
-                ) else {
-                    return false;
-                };
-                let Some(module_literal) = ty.into_module_literal() else {
+                let Type::ModuleLiteral(module_literal) = self.standalone_expression_type(value)
+                else {
                     return false;
                 };
                 let Some(module_dunder_all_names) =
@@ -198,14 +187,21 @@ impl<'db> DunderAllNamesCollector<'db> {
         dunder_all_names(self.db, module.file())
     }
 
+    /// Infer the type of a standalone expression.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if `expr` was not marked as a standalone expression during semantic indexing.
+    fn standalone_expression_type(&self, expr: &ast::Expr) -> Type<'db> {
+        infer_expression_types(self.db, self.index.expression(expr))
+            .expression_type(expr.scoped_expression_id(self.db, self.scope))
+    }
+
     /// Evaluate the given expression and return its truthiness.
     ///
     /// Returns [`None`] if the expression type doesn't implement `__bool__` correctly.
     fn evaluate_test_expr(&self, expr: &ast::Expr) -> Option<Truthiness> {
-        infer_expression_types(self.db, self.index.expression(expr))
-            .expression_type(expr.scoped_expression_id(self.db, self.scope))
-            .try_bool(self.db)
-            .ok()
+        self.standalone_expression_type(expr).try_bool(self.db).ok()
     }
 
     /// Add valid names to the set.

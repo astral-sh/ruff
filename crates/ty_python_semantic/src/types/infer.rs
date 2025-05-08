@@ -5505,7 +5505,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = attribute;
 
-        let value_type = self.infer_expression(value);
+        let value_type = if self.index.is_standalone_expression(&**value) {
+            self.infer_standalone_expression(value)
+        } else {
+            self.infer_expression(value)
+        };
+
         let db = self.db();
 
         value_type
