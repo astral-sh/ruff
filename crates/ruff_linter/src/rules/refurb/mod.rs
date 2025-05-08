@@ -89,4 +89,15 @@ mod tests {
         assert_messages!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn fstring_number_format_python_311() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("refurb/FURB116.py"),
+            &settings::LinterSettings::for_rule(Rule::FStringNumberFormat)
+                .with_target_version(PythonVersion::PY311),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
 }
