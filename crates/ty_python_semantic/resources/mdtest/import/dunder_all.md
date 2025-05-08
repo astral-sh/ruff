@@ -268,15 +268,25 @@ __all__ = ["foo"]
 foo = 42
 ```
 
+`exporter/sub2.py`:
+
+```py
+__all__ = ["bar"]
+
+bar = 56
+```
+
 `module.py`:
 
 ```py
 import exporter.sub
+import exporter.sub2
 
 __all__ = []
 
 if True:
     __all__.extend(exporter.sub.__all__)
+    __all__ += exporter.sub2.__all__
 ```
 
 `main.py`:
@@ -285,7 +295,7 @@ if True:
 import module
 from ty_extensions import dunder_all_names
 
-reveal_type(dunder_all_names(module))  # revealed: tuple[Literal["foo"]]
+reveal_type(dunder_all_names(module))  # revealed: tuple[Literal["bar"], Literal["foo"]]
 ```
 
 ### Extending with a list or submodule `__all__`

@@ -9,7 +9,7 @@ use ruff_python_ast::{self as ast};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{global_scope, semantic_index, SemanticIndex};
-use crate::types::{infer_expression_types, infer_scope_types, Truthiness, Type};
+use crate::types::{infer_expression_types, Truthiness, Type};
 use crate::{resolve_module, Db, ModuleName};
 
 #[allow(clippy::ref_option)]
@@ -110,9 +110,8 @@ impl<'db> DunderAllNamesCollector<'db> {
                 if attr != "__all__" {
                     return false;
                 }
-                let value_id = value.scoped_expression_id(self.db, self.scope);
-                let value_ty = infer_scope_types(self.db, self.scope).expression_type(value_id);
-                let Type::ModuleLiteral(module_literal) = value_ty else {
+                let Type::ModuleLiteral(module_literal) = self.standalone_expression_type(value)
+                else {
                     return false;
                 };
                 let Some(module_dunder_all_names) =
@@ -188,14 +187,21 @@ impl<'db> DunderAllNamesCollector<'db> {
         dunder_all_names(self.db, module.file())
     }
 
+    /// Infer the type of a standalone expression.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if `expr` was not marked as a standalone expression during semantic indexing.
+    fn standalone_expression_type(&self, expr: &ast::Expr) -> Type<'db> {
+        infer_expression_types(self.db, self.index.expression(expr))
+            .expression_type(expr.scoped_expression_id(self.db, self.scope))
+    }
+
     /// Evaluate the given expression and return its truthiness.
     ///
     /// Returns [`None`] if the expression type doesn't implement `__bool__` correctly.
     fn evaluate_test_expr(&self, expr: &ast::Expr) -> Option<Truthiness> {
-        infer_expression_types(self.db, self.index.expression(expr))
-            .expression_type(expr.scoped_expression_id(self.db, self.scope))
-            .try_bool(self.db)
-            .ok()
+        self.standalone_expression_type(expr).try_bool(self.db).ok()
     }
 
     /// Add valid names to the set.

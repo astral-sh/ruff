@@ -1479,23 +1479,37 @@ where
                 aug_assign @ ast::StmtAugAssign {
                     range: _,
                     target,
-                    op: _,
+                    op,
                     value,
                 },
             ) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
                 self.visit_expr(value);
 
-                // See https://docs.python.org/3/library/ast.html#ast.AugAssign
-                if matches!(
-                    **target,
-                    ast::Expr::Attribute(_) | ast::Expr::Subscript(_) | ast::Expr::Name(_)
-                ) {
-                    self.push_assignment(aug_assign.into());
-                    self.visit_expr(target);
-                    self.pop_assignment();
-                } else {
-                    self.visit_expr(target);
+                match &**target {
+                    ast::Expr::Name(ast::ExprName { id, .. })
+                        if id == "__all__" && op.is_add() && self.in_module_scope() =>
+                    {
+                        if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) =
+                            &**value
+                        {
+                            if attr == "__all__" {
+                                self.add_standalone_expression(value);
+                            }
+                        }
+
+                        self.push_assignment(aug_assign.into());
+                        self.visit_expr(target);
+                        self.pop_assignment();
+                    }
+                    ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+                        self.push_assignment(aug_assign.into());
+                        self.visit_expr(target);
+                        self.pop_assignment();
+                    }
+                    _ => {
+                        self.visit_expr(target);
+                    }
                 }
             }
             ast::Stmt::If(node) => {
@@ -1933,6 +1947,12 @@ where
                     }
                 }
                 walk_stmt(self, stmt);
+            }
+            ast::Stmt::Expr(ast::StmtExpr { value, range: _ }) if self.in_module_scope() => {
+                if let Some(expr) = dunder_all_extend_argument(value) {
+                    self.add_standalone_expression(expr);
+                }
+                self.visit_expr(value);
             }
             _ => {
                 walk_stmt(self, stmt);
@@ -2622,4 +2642,44 @@ impl<'a> Unpackable<'a> {
             },
         }
     }
+}
+
+/// Returns the single argument to `__all__.extend()`, if it is a call to `__all__.extend()`
+/// where it looks like the argument might be a `submodule.__all__` expression.
+/// Else, returns `None`.
+fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
+    let ast::ExprCall {
+        func,
+        arguments:
+            ast::Arguments {
+                args,
+                keywords,
+                range: _,
+            },
+        ..
+    } = value.as_call_expr()?;
+
+    let ast::ExprAttribute { value, attr, .. } = func.as_attribute_expr()?;
+
+    let ast::ExprName { id, .. } = value.as_name_expr()?;
+
+    if id != "__all__" {
+        return None;
+    }
+
+    if attr != "extend" {
+        return None;
+    }
+
+    if !keywords.is_empty() {
+        return None;
+    }
+
+    let [single_argument] = &**args else {
+        return None;
+    };
+
+    let ast::ExprAttribute { value, attr, .. } = single_argument.as_attribute_expr()?;
+
+    (attr == "__all__").then_some(value)
 }
