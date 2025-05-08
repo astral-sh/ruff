@@ -1964,7 +1964,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
             inferred_ty = match decorator_ty
-                .try_call(self.db(), &CallArgumentTypes::positional([inferred_ty]))
+                .try_call(
+                    self.db(),
+                    &CallArgumentTypes::positional([inferred_ty]),
+                    Some(self.scope()),
+                )
                 .map(|bindings| bindings.return_type(self.db()))
             {
                 Ok(return_ty) => return_ty,
@@ -3001,6 +3005,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                         object_ty,
                                         value_ty,
                                     ]),
+                                    Some(self.scope()),
                                 )
                                 .is_ok();
 
@@ -3084,6 +3089,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 ]),
                                 MemberLookupPolicy::NO_INSTANCE_FALLBACK
                                     | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                                Some(self.scope()),
                             );
 
                             match result {
@@ -3142,6 +3148,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                         object_ty,
                                         value_ty,
                                     ]),
+                                    Some(self.scope()),
                                 )
                                 .is_ok();
 
@@ -3544,15 +3551,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             ));
         };
 
-        // Fall back to non-augmented binary operator inference.
-        let mut binary_return_ty = || {
-            self.infer_binary_expression_type(assignment.into(), false, target_type, value_type, op)
-                .unwrap_or_else(|| {
-                    report_unsupported_augmented_op(&mut self.context);
-                    Type::unknown()
-                })
-        };
-
         match target_type {
             Type::Union(union) => union.map(db, |&elem_type| {
                 self.infer_augmented_op(assignment, elem_type, value_type)
@@ -3562,7 +3560,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                     db,
                     op.in_place_dunder(),
                     CallArgumentTypes::positional([value_type]),
+                    Some(self.scope()),
                 );
+
+                // Fall back to non-augmented binary operator inference.
+                let mut binary_return_ty = || {
+                    self.infer_binary_expression_type(
+                        assignment.into(),
+                        false,
+                        target_type,
+                        value_type,
+                        op,
+                    )
+                    .unwrap_or_else(|| {
+                        report_unsupported_augmented_op(&mut self.context);
+                        Type::unknown()
+                    })
+                };
 
                 match call {
                     Ok(outcome) => outcome.return_type(db),
@@ -4774,7 +4788,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_argument_types(arguments, call_arguments, &argument_forms);
 
                 return callable_type
-                    .try_call_constructor(self.db(), call_argument_types)
+                    .try_call_constructor(self.db(), call_argument_types, Some(self.scope()))
                     .unwrap_or_else(|err| {
                         err.report_diagnostic(&self.context, callable_type, call_expression.into());
                         err.return_type()
@@ -4785,7 +4799,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let signatures = callable_type.signatures(self.db());
         let inferred_return_ty = || {
             callable_type
-                .inferred_return_type(self.db())
+                .inferred_return_type(self.db(), Some(self.scope()))
                 .unwrap_or(Type::unknown())
         };
         let bindings = Bindings::match_parameters(signatures, inferred_return_ty, &call_arguments);
@@ -5724,6 +5738,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.db(),
                     unary_dunder_method,
                     CallArgumentTypes::none(),
+                    Some(self.scope()),
                 ) {
                     Ok(outcome) => outcome.return_type(self.db()),
                     Err(e) => {
@@ -6071,6 +6086,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 self.db(),
                                 reflected_dunder,
                                 CallArgumentTypes::positional([left_ty]),
+                                Some(self.scope()),
                             )
                             .map(|outcome| outcome.return_type(self.db()))
                             .or_else(|_| {
@@ -6079,6 +6095,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                         self.db(),
                                         op.dunder(),
                                         CallArgumentTypes::positional([right_ty]),
+                                        Some(self.scope()),
                                     )
                                     .map(|outcome| outcome.return_type(self.db()))
                             })
@@ -6091,6 +6108,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         self.db(),
                         op.dunder(),
                         CallArgumentTypes::positional([right_ty]),
+                        Some(self.scope()),
                     )
                     .map(|outcome| outcome.return_type(self.db()))
                     .ok();
@@ -6104,6 +6122,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 self.db(),
                                 op.reflected_dunder(),
                                 CallArgumentTypes::positional([left_ty]),
+                                Some(self.scope()),
                             )
                             .map(|outcome| outcome.return_type(self.db()))
                             .ok()
@@ -6743,9 +6762,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         // The following resource has details about the rich comparison algorithm:
         // https://snarky.ca/unravelling-rich-comparison-operators/
         let call_dunder = |op: RichCompareOperator, left: Type<'db>, right: Type<'db>| {
-            left.try_call_dunder(db, op.dunder(), CallArgumentTypes::positional([right]))
-                .map(|outcome| outcome.return_type(db))
-                .ok()
+            left.try_call_dunder(
+                db,
+                op.dunder(),
+                CallArgumentTypes::positional([right]),
+                Some(self.scope()),
+            )
+            .map(|outcome| outcome.return_type(db))
+            .ok()
         };
 
         // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
@@ -6789,7 +6813,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             Symbol::Type(contains_dunder, Boundness::Bound) => {
                 // If `__contains__` is available, it is used directly for the membership test.
                 contains_dunder
-                    .try_call(db, &CallArgumentTypes::positional([right, left]))
+                    .try_call(
+                        db,
+                        &CallArgumentTypes::positional([right, left]),
+                        Some(self.scope()),
+                    )
                     .map(|bindings| bindings.return_type(db))
                     .ok()
             }
@@ -6969,7 +6997,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         ));
         let inferred_return_ty = || {
             value_ty
-                .inferred_return_type(self.db())
+                .inferred_return_type(self.db(), Some(self.scope()))
                 .unwrap_or(Type::unknown())
         };
         let bindings =
@@ -7177,6 +7205,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.db(),
                     "__getitem__",
                     CallArgumentTypes::positional([slice_ty]),
+                    Some(self.scope()),
                 ) {
                     Ok(outcome) => return outcome.return_type(self.db()),
                     Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
@@ -7243,6 +7272,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             match ty.try_call(
                                 self.db(),
                                 &CallArgumentTypes::positional([value_ty, slice_ty]),
+                                Some(self.scope()),
                             ) {
                                 Ok(bindings) => return bindings.return_type(self.db()),
                                 Err(CallError(_, bindings)) => {
