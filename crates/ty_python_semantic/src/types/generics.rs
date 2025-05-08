@@ -172,15 +172,8 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         types: &[Option<Type<'db>>],
     ) -> Specialization<'db> {
-        let types: Box<[_]> = self
-            .variables(db)
-            .iter()
-            .zip(types)
-            .map(|(typevar, ty)| {
-                ty.or_else(|| typevar.default_ty(db))
-                    .unwrap_or(Type::unknown())
-            })
-            .collect();
+        let variables = self.variables(db);
+        assert!(variables.len() == types.len());
 
         // Typevars can have other typevars as their default values, e.g.
         //
@@ -190,24 +183,29 @@ impl<'db> GenericContext<'db> {
         //
         // If there is a mapping for `T`, we want to map `U` to that type, not to `T`. To handle
         // this, we repeatedly apply the specialization to itself, until we reach a fixed point.
-        //
-        // This loop will always terminate, since it's not possible to create cyclic typevar
-        // references:
-        //
-        // ```py
-        // # error: [unresolved-reference] for use of `U`
-        // class C[T = U, U = T]: ...
-        // ```
-        assert!(self.variables(db).len() == types.len());
-        let original = Specialization::new(db, self, types);
-        let mut result = original;
-        loop {
-            let next = result.apply_specialization(db, original);
-            if result == next {
-                return result;
+        let mut expanded = vec![Type::unknown(); types.len()];
+        for (idx, (ty, typevar)) in types.into_iter().zip(variables).enumerate() {
+            if let Some(ty) = ty {
+                expanded[idx] = *ty;
+                continue;
             }
-            result = next;
+
+            let Some(default) = typevar.default_ty(db) else {
+                continue;
+            };
+
+            // Typevars are only allowed to refer to _earlier_ typevars in their defaults. (This is
+            // statically enforced for PEP-695 contexts, and is explicitly called out as a
+            // requirement for legacy contexts.)
+            let type_mapping = TypeMapping::Partial {
+                generic_context: self,
+                types: &expanded[0..idx],
+            };
+            let default = default.apply_type_mapping(db, type_mapping);
+            expanded[idx] = default;
         }
+
+        Specialization::new(db, self, expanded.into_boxed_slice())
     }
 }
 
