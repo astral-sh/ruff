@@ -65,7 +65,7 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<()> {
 fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
     match &set {
         Set::Toplevel(_) => {
-            output.push_str("### Top-level\n");
+            output.push_str("# Configuration\n");
         }
         Set::Named { name, .. } => {
             let title = parents
@@ -73,7 +73,7 @@ fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
                 .filter_map(|set| set.name())
                 .chain(std::iter::once(name.as_str()))
                 .join(".");
-            writeln!(output, "#### `{title}`\n",).unwrap();
+            writeln!(output, "## `{title}`\n",).unwrap();
         }
     }
 
@@ -136,7 +136,7 @@ impl Set {
 }
 
 fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[Set]) {
-    let header_level = if parents.is_empty() { "####" } else { "#####" };
+    let header_level = if parents.is_empty() { "###" } else { "####" };
 
     let _ = writeln!(output, "{header_level} [`{name}`]");
 

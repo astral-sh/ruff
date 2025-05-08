@@ -29,7 +29,16 @@ pub struct Options {
     #[option_group]
     pub src: Option<SrcOptions>,
 
-    /// Configures the enabled lints and their severity.
+    /// Configures the enabled rules and their severity.
+    ///
+    /// See [the rules documentation](https://github.com/astral-sh/ruff/blob/main/crates/ty/docs/rules.md) for a list of all available rules.
+    ///
+    /// Valid severities are:
+    ///
+    /// - `ignore`: Disable the rule.
+    /// - `warn`: Enable the rule and create a warning diagnostic.
+    /// - `error`: Enable the rule and create an error diagnostic.
+    ///    ty will exit with a non-zero code if any error diagnostics are emitted.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"{...}"#,
