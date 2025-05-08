@@ -130,12 +130,7 @@ impl<'db> GenericContext<'db> {
     }
 
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        let types = self
-            .variables(db)
-            .iter()
-            .map(|typevar| typevar.default_ty(db).unwrap_or(Type::unknown()))
-            .collect();
-        self.specialize(db, types)
+        self.specialize_partial(db, &vec![None; self.variables(db).len()])
     }
 
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
@@ -157,12 +152,36 @@ impl<'db> GenericContext<'db> {
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
-    /// match the number of typevars in the generic context.
+    /// match the number of typevars in the generic context. You must provide a specific type for
+    /// each typevar; no defaults are used. (Use [`specialize_partial`](Self::specialize_partial)
+    /// if you might not have types for every typevar.)
     pub(crate) fn specialize(
         self,
         db: &'db dyn Db,
         types: Box<[Type<'db>]>,
     ) -> Specialization<'db> {
+        assert!(self.variables(db).len() == types.len());
+        Specialization::new(db, self, types)
+    }
+
+    /// Creates a specialization of this generic context. Panics if the length of `types` does not
+    /// match the number of typevars in the generic context. If any provided type is `None`, we
+    /// will use the corresponding typevar's default type.
+    pub(crate) fn specialize_partial(
+        self,
+        db: &'db dyn Db,
+        types: &[Option<Type<'db>>],
+    ) -> Specialization<'db> {
+        let types: Box<[_]> = self
+            .variables(db)
+            .iter()
+            .zip(types)
+            .map(|(typevar, ty)| {
+                ty.or_else(|| typevar.default_ty(db))
+                    .unwrap_or(Type::unknown())
+            })
+            .collect();
+
         // Typevars can have other typevars as their default values, e.g.
         //
         // ```py
