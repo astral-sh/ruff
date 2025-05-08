@@ -9,14 +9,12 @@ Enabled by default.
 
 **Type**: `bool`
 
-**Example usage**:
+**Example usage** (`pyproject.toml`):
 
-**pyproject.toml**
-
-    ```toml
-    [tool.ty]
-    respect-ignore-files = false
-    ```
+```toml
+[tool.ty]
+respect-ignore-files = false
+```
 
 ---
 
@@ -37,15 +35,13 @@ Valid severities are:
 
 **Type**: `dict[str, ignore | warn | error]`
 
-**Example usage**:
+**Example usage** (`pyproject.toml`):
 
-**pyproject.toml**
-
-    ```toml
-    [tool.ty.rules]
-    possibly-unresolved-reference = "warn"
-    division-by-zero = "ignore"
-    ```
+```toml
+[tool.ty.rules]
+possibly-unresolved-reference = "warn"
+division-by-zero = "ignore"
+```
 
 ---
 
@@ -61,14 +57,12 @@ or pyright's `stubPath` configuration setting.
 
 **Type**: `list[str]`
 
-**Example usage**:
+**Example usage** (`pyproject.toml`):
 
-**pyproject.toml**
-
-    ```toml
-    [tool.ty.environment]
-    extra-paths = ["~/shared/my-search-path"]
-    ```
+```toml
+[tool.ty.environment]
+extra-paths = ["~/shared/my-search-path"]
+```
 
 ---
 
@@ -85,14 +79,12 @@ This option is commonly used to specify the path to a virtual environment.
 
 **Type**: `str`
 
-**Example usage**:
+**Example usage** (`pyproject.toml`):
 
-**pyproject.toml**
-
-    ```toml
-    [tool.ty.environment]
-    python = "./.venv"
-    ```
+```toml
+[tool.ty.environment]
+python = "./.venv"
+```
 
 ---
 
@@ -113,15 +105,13 @@ If no platform is specified, ty will use the current platform:
 
 **Type**: `"win32" | "darwin" | "android" | "ios" | "linux" | str`
 
-**Example usage**:
+**Example usage** (`pyproject.toml`):
 
-**pyproject.toml**
-
-    ```toml
-    [tool.ty.environment]
-    # Tailor type stubs and conditionalized type definitions to windows.
-    python-platform = "win32"
-    ```
+```toml
+[tool.ty.environment]
+# Tailor type stubs and conditionalized type definitions to windows.
+python-platform = "win32"
+```
 
 ---
 
@@ -138,14 +128,12 @@ It will also tailor its use of type stub files, which conditionalizes type defin
 
 **Type**: `"3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | <major>.<minor>`
 
-**Example usage**:
+**Example usage** (`pyproject.toml`):
 
-**pyproject.toml**
-
-    ```toml
-    [tool.ty.environment]
-    python-version = "3.12"
-    ```
+```toml
+[tool.ty.environment]
+python-version = "3.12"
+```
 
 ---
 
@@ -159,14 +147,12 @@ bundled as a zip file in the binary
 
 **Type**: `str`
 
-**Example usage**:
+**Example usage** (`pyproject.toml`):
 
-**pyproject.toml**
-
-    ```toml
-    [tool.ty.environment]
-    typeshed = "/path/to/custom/typeshed"
-    ```
+```toml
+[tool.ty.environment]
+typeshed = "/path/to/custom/typeshed"
+```
 
 ---
 
@@ -180,14 +166,12 @@ The root of the project, used for finding first-party modules.
 
 **Type**: `list[str]`
 
-**Example usage**:
+**Example usage** (`pyproject.toml`):
 
-**pyproject.toml**
-
-    ```toml
-    [tool.ty.src]
-    root = ["./app"]
-    ```
+```toml
+[tool.ty.src]
+root = ["./app"]
+```
 
 ---
 
@@ -203,15 +187,13 @@ Defaults to `false`.
 
 **Type**: `bool`
 
-**Example usage**:
+**Example usage** (`pyproject.toml`):
 
-**pyproject.toml**
-
-    ```toml
-    [tool.ty.terminal]
-    # Error if ty emits any warning-level diagnostics.
-    error-on-warning = true
-    ```
+```toml
+[tool.ty.terminal]
+# Error if ty emits any warning-level diagnostics.
+error-on-warning = true
+```
 
 ---
 
@@ -225,14 +207,12 @@ Defaults to `full`.
 
 **Type**: `full | concise`
 
-**Example usage**:
+**Example usage** (`pyproject.toml`):
 
-**pyproject.toml**
-
-    ```toml
-    [tool.ty.terminal]
-    output-format = "concise"
-    ```
+```toml
+[tool.ty.terminal]
+output-format = "concise"
+```
 
 ---
 

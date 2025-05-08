@@ -9,7 +9,6 @@ use pretty_assertions::StrComparison;
 use std::{fmt::Write, path::PathBuf};
 
 use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
-use ruff_python_trivia::textwrap;
 use ty_project::metadata::Options;
 
 use crate::{
@@ -165,9 +164,8 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     output.push('\n');
     let _ = writeln!(output, "**Type**: `{}`", field.value_type);
     output.push('\n');
-    output.push_str("**Example usage**:\n\n");
+    output.push_str("**Example usage** (`pyproject.toml`):\n\n");
     output.push_str(&format_example(
-        "pyproject.toml",
         &format_header(
             field.scope,
             field.example,
@@ -179,17 +177,11 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     output.push('\n');
 }
 
-fn format_example(tab_name: &str, header: &str, content: &str) -> String {
+fn format_example(header: &str, content: &str) -> String {
     if header.is_empty() {
-        format!(
-            "**{tab_name}**\n\n    ```toml\n{}\n    ```\n",
-            textwrap::indent(content, "    ")
-        )
+        format!("```toml\n{content}\n```\n",)
     } else {
-        format!(
-            "**{tab_name}**\n\n    ```toml\n    {header}\n{}\n    ```\n",
-            textwrap::indent(content, "    ")
-        )
+        format!("```toml\n{header}\n{content}\n```\n",)
     }
 }
 
