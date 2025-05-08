@@ -6882,12 +6882,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         slice_ty: Type<'db>,
     ) -> Type<'db> {
         match (value_ty, slice_ty) {
-            (
-                Type::NominalInstance(instance),
-                Type::IntLiteral(_) | Type::BooleanLiteral(_) | Type::SliceLiteral(_),
-            ) if instance
-                .class()
-                .is_known(self.db(), KnownClass::VersionInfo) =>
+            (Type::NominalInstance(instance), _)
+                if instance
+                    .class()
+                    .is_known(self.db(), KnownClass::VersionInfo) =>
             {
                 self.infer_subscript_expression_types(
                     value_node,
