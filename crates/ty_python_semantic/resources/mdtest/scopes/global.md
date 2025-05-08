@@ -201,3 +201,13 @@ def f():
     x = "56"
     reveal_type(x)  # revealed: Literal["56"]
 ```
+
+## Annotating a `global` binding is a syntax error
+
+```py
+x: int = 1
+
+def f():
+    global x
+    x: str = "foo"  # TODO: error: [invalid-syntax] "annotated name 'x' can't be global"
+```
