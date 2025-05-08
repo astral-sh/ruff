@@ -7908,7 +7908,7 @@ impl<'db> IntersectionType<'db> {
 #[salsa::interned(debug)]
 pub struct StringLiteralType<'db> {
     #[return_ref]
-    value: Box<str>,
+    pub(crate) value: Box<str>,
 }
 
 impl<'db> StringLiteralType<'db> {
@@ -7953,7 +7953,7 @@ impl SliceLiteralType<'_> {
 #[salsa::interned(debug)]
 pub struct TupleType<'db> {
     #[return_ref]
-    elements: Box<[Type<'db>]>,
+    pub(crate) elements: Box<[Type<'db>]>,
 }
 
 impl<'db> TupleType<'db> {
