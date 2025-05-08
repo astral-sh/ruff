@@ -1,6 +1,7 @@
 use anyhow::Context;
 use insta::internals::SettingsBindDropGuard;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
+use ruff_python_ast::PythonVersion;
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -1256,6 +1257,80 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
       |
 
     Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "ty.toml",
+            &*format!(
+                r#"
+                [environment]
+                python-version = "{}"
+                python-platform = "linux"
+                "#,
+                PythonVersion::default()
+            ),
+        ),
+        (
+            "main.py",
+            r#"
+            import os
+
+            os.grantpt(1) # only available on unix, Python 3.13 or newer
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: lint:unresolved-attribute: Type `<module 'os'>` has no attribute `grantpt`
+     --> main.py:4:1
+      |
+    2 | import os
+    3 |
+    4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
+      | ^^^^^^^^^^
+      |
+    info: `lint:unresolved-attribute` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // Use default (which should be latest supported)
+    let case = TestCase::with_files([
+        (
+            "ty.toml",
+            r#"
+            [environment]
+            python-platform = "linux"
+            "#,
+        ),
+        (
+            "main.py",
+            r#"
+            import os
+
+            os.grantpt(1) # only available on unix, Python 3.13 or newer
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     ");

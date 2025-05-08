@@ -136,7 +136,7 @@ mod tests {
         }
 
         fn python_version(&self) -> ruff_python_ast::PythonVersion {
-            ruff_python_ast::PythonVersion::latest()
+            ruff_python_ast::PythonVersion::latest_ty()
         }
     }
 

@@ -103,7 +103,7 @@ impl Project {
         let major =
             u8::try_from(major).map_err(|_| ResolveRequiresPythonError::TooLargeMajor(major))?;
         let minor =
-            u8::try_from(minor).map_err(|_| ResolveRequiresPythonError::TooLargeMajor(minor))?;
+            u8::try_from(minor).map_err(|_| ResolveRequiresPythonError::TooLargeMinor(minor))?;
 
         Ok(Some(
             requires_python
