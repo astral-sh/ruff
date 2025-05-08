@@ -12,7 +12,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
 use ruff_python_ast::{self as ast, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
-    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
+    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
 use ruff_text_size::TextRange;
 
@@ -106,6 +106,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
+    globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedSymbolId>>,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
@@ -144,6 +145,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
+            globals_by_scope: FxHashMap::default(),
 
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
@@ -1085,6 +1087,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.scopes_by_node.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
         self.eager_snapshots.shrink_to_fit();
+        self.globals_by_scope.shrink_to_fit();
 
         SemanticIndex {
             symbol_tables,
@@ -1093,6 +1096,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope,
+            globals_by_scope: self.globals_by_scope,
             ast_ids,
             scopes_by_expression: self.scopes_by_expression,
             scopes_by_node: self.scopes_by_node,
@@ -1898,7 +1902,38 @@ where
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
             }
-
+            ast::Stmt::Global(ast::StmtGlobal { range: _, names }) => {
+                for name in names {
+                    let symbol_id = self.add_symbol(name.id.clone());
+                    let symbol_table = self.current_symbol_table();
+                    let symbol = symbol_table.symbol(symbol_id);
+                    if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
+                                name: name.to_string(),
+                                start: name.range.start(),
+                            },
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
+                    let scope_id = self.current_scope();
+                    self.globals_by_scope
+                        .entry(scope_id)
+                        .or_default()
+                        .insert(symbol_id);
+                }
+                walk_stmt(self, stmt);
+            }
+            ast::Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
+                for target in targets {
+                    if let ast::Expr::Name(ast::ExprName { id, .. }) = target {
+                        let symbol_id = self.add_symbol(id.clone());
+                        self.current_symbol_table().mark_symbol_used(symbol_id);
+                    }
+                }
+                walk_stmt(self, stmt);
+            }
             _ => {
                 walk_stmt(self, stmt);
             }
@@ -2387,7 +2422,8 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
         self.source_text().as_str()
     }
 
-    // TODO(brent) handle looking up `global` bindings
+    // We handle the one syntax error that relies on this method (`LoadBeforeGlobalDeclaration`)
+    // directly in `visit_stmt`, so this just returns a placeholder value.
     fn global(&self, _name: &str) -> Option<TextRange> {
         None
     }

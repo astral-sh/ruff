@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use js_sys::Error;
-use ruff_linter::message::{DiagnosticMessage, Message, SyntaxErrorMessage};
+use ruff_linter::message::{DiagnosticMessage, Message};
 use ruff_linter::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -230,15 +230,13 @@ impl Workspace {
                             .collect(),
                     }),
                 },
-                Message::SyntaxError(SyntaxErrorMessage { message, range, .. }) => {
-                    ExpandedMessage {
-                        code: None,
-                        message,
-                        start_location: source_code.line_column(range.start()).into(),
-                        end_location: source_code.line_column(range.end()).into(),
-                        fix: None,
-                    }
-                }
+                Message::SyntaxError(_) => ExpandedMessage {
+                    code: None,
+                    message: message.body().to_string(),
+                    start_location: source_code.line_column(message.range().start()).into(),
+                    end_location: source_code.line_column(message.range().end()).into(),
+                    fix: None,
+                },
             })
             .collect();
 

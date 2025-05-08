@@ -195,7 +195,7 @@ impl SourceFile {
         }
     }
 
-    fn index(&self) -> &LineIndex {
+    pub fn index(&self) -> &LineIndex {
         self.inner
             .line_index
             .get_or_init(|| LineIndex::from_source_text(self.source_text()))

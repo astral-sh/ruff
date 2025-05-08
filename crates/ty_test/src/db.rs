@@ -1,4 +1,5 @@
 use camino::{Utf8Component, Utf8PathBuf};
+use ruff_db::diagnostic::Severity;
 use ruff_db::files::{File, Files};
 use ruff_db::system::{
     CaseSensitivity, DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath,
@@ -25,7 +26,7 @@ pub(crate) struct Db {
 
 impl Db {
     pub(crate) fn setup() -> Self {
-        let rule_selection = RuleSelection::from_registry(default_lint_registry());
+        let rule_selection = RuleSelection::all(default_lint_registry(), Severity::Info);
 
         Self {
             system: MdtestSystem::in_memory(),

@@ -130,12 +130,7 @@ impl<'db> GenericContext<'db> {
     }
 
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        let types = self
-            .variables(db)
-            .iter()
-            .map(|typevar| typevar.default_ty(db).unwrap_or(Type::unknown()))
-            .collect();
-        self.specialize(db, types)
+        self.specialize_partial(db, &vec![None; self.variables(db).len()])
     }
 
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
@@ -157,12 +152,29 @@ impl<'db> GenericContext<'db> {
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
-    /// match the number of typevars in the generic context.
+    /// match the number of typevars in the generic context. You must provide a specific type for
+    /// each typevar; no defaults are used. (Use [`specialize_partial`](Self::specialize_partial)
+    /// if you might not have types for every typevar.)
     pub(crate) fn specialize(
         self,
         db: &'db dyn Db,
         types: Box<[Type<'db>]>,
     ) -> Specialization<'db> {
+        assert!(self.variables(db).len() == types.len());
+        Specialization::new(db, self, types)
+    }
+
+    /// Creates a specialization of this generic context. Panics if the length of `types` does not
+    /// match the number of typevars in the generic context. If any provided type is `None`, we
+    /// will use the corresponding typevar's default type.
+    pub(crate) fn specialize_partial(
+        self,
+        db: &'db dyn Db,
+        types: &[Option<Type<'db>>],
+    ) -> Specialization<'db> {
+        let variables = self.variables(db);
+        assert!(variables.len() == types.len());
+
         // Typevars can have other typevars as their default values, e.g.
         //
         // ```py
@@ -171,24 +183,29 @@ impl<'db> GenericContext<'db> {
         //
         // If there is a mapping for `T`, we want to map `U` to that type, not to `T`. To handle
         // this, we repeatedly apply the specialization to itself, until we reach a fixed point.
-        //
-        // This loop will always terminate, since it's not possible to create cyclic typevar
-        // references:
-        //
-        // ```py
-        // # error: [unresolved-reference] for use of `U`
-        // class C[T = U, U = T]: ...
-        // ```
-        assert!(self.variables(db).len() == types.len());
-        let original = Specialization::new(db, self, types);
-        let mut result = original;
-        loop {
-            let next = result.apply_specialization(db, original);
-            if result == next {
-                return result;
+        let mut expanded = vec![Type::unknown(); types.len()];
+        for (idx, (ty, typevar)) in types.iter().zip(variables).enumerate() {
+            if let Some(ty) = ty {
+                expanded[idx] = *ty;
+                continue;
             }
-            result = next;
+
+            let Some(default) = typevar.default_ty(db) else {
+                continue;
+            };
+
+            // Typevars are only allowed to refer to _earlier_ typevars in their defaults. (This is
+            // statically enforced for PEP-695 contexts, and is explicitly called out as a
+            // requirement for legacy contexts.)
+            let type_mapping = TypeMapping::Partial {
+                generic_context: self,
+                types: &expanded[0..idx],
+            };
+            let default = default.apply_type_mapping(db, type_mapping);
+            expanded[idx] = default;
         }
+
+        Specialization::new(db, self, expanded.into_boxed_slice())
     }
 }
 
@@ -204,6 +221,10 @@ pub struct Specialization<'db> {
 }
 
 impl<'db> Specialization<'db> {
+    pub(crate) fn type_mapping(self) -> TypeMapping<'db, 'db> {
+        TypeMapping::Specialization(self)
+    }
+
     /// Applies a specialization to this specialization. This is used, for instance, when a generic
     /// class inherits from a generic alias:
     ///
@@ -218,10 +239,18 @@ impl<'db> Specialization<'db> {
     /// That lets us produce the generic alias `A[int]`, which is the corresponding entry in the
     /// MRO of `B[int]`.
     pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
+        self.apply_type_mapping(db, other.type_mapping())
+    }
+
+    pub(crate) fn apply_type_mapping<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: TypeMapping<'a, 'db>,
+    ) -> Self {
         let types: Box<[_]> = self
             .types(db)
             .into_iter()
-            .map(|ty| ty.apply_specialization(db, other))
+            .map(|ty| ty.apply_type_mapping(db, type_mapping))
             .collect();
         Specialization::new(db, self.generic_context(db), types)
     }
@@ -266,16 +295,6 @@ impl<'db> Specialization<'db> {
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         let types: Box<[_]> = self.types(db).iter().map(|ty| ty.normalized(db)).collect();
         Self::new(db, self.generic_context(db), types)
-    }
-
-    /// Returns the type that a typevar is specialized to, or None if the typevar isn't part of
-    /// this specialization.
-    pub(crate) fn get(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
-        let index = self
-            .generic_context(db)
-            .variables(db)
-            .get_index_of(&typevar)?;
-        Some(self.types(db)[index])
     }
 
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Specialization<'db>) -> bool {
@@ -423,6 +442,57 @@ impl<'db> Specialization<'db> {
     ) {
         for ty in self.types(db) {
             ty.find_legacy_typevars(db, typevars);
+        }
+    }
+}
+
+/// A mapping between type variables and types.
+///
+/// You will usually use [`Specialization`] instead of this type. This type is used when we need to
+/// substitute types for type variables before we have fully constructed a [`Specialization`].
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum TypeMapping<'a, 'db> {
+    Specialization(Specialization<'db>),
+    Partial {
+        generic_context: GenericContext<'db>,
+        types: &'a [Type<'db>],
+    },
+}
+
+impl<'db> TypeMapping<'_, 'db> {
+    fn generic_context(self, db: &'db dyn Db) -> GenericContext<'db> {
+        match self {
+            Self::Specialization(specialization) => specialization.generic_context(db),
+            Self::Partial {
+                generic_context, ..
+            } => generic_context,
+        }
+    }
+
+    /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
+    /// mapping.
+    pub(crate) fn get(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
+        let index = self
+            .generic_context(db)
+            .variables(db)
+            .get_index_of(&typevar)?;
+        match self {
+            Self::Specialization(specialization) => specialization.types(db).get(index).copied(),
+            Self::Partial { types, .. } => types.get(index).copied(),
+        }
+    }
+
+    pub(crate) fn into_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+        match self {
+            Self::Specialization(specialization) => specialization,
+            Self::Partial {
+                generic_context,
+                types,
+            } => {
+                let mut types = types.to_vec();
+                types.resize(generic_context.variables(db).len(), Type::unknown());
+                Specialization::new(db, generic_context, types.into_boxed_slice())
+            }
         }
     }
 }

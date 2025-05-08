@@ -475,12 +475,26 @@ impl RuleSelection {
     /// Creates a new rule selection from all known lints in the registry that are enabled
     /// according to their default severity.
     pub fn from_registry(registry: &LintRegistry) -> Self {
+        Self::from_registry_with_default(registry, None)
+    }
+
+    /// Creates a new rule selection from all known lints in the registry, including lints that are default by default.
+    /// Lints that are disabled by default use the `default_severity`.
+    pub fn all(registry: &LintRegistry, default_severity: Severity) -> Self {
+        Self::from_registry_with_default(registry, Some(default_severity))
+    }
+
+    fn from_registry_with_default(
+        registry: &LintRegistry,
+        default_severity: Option<Severity>,
+    ) -> Self {
         let lints = registry
             .lints()
             .iter()
             .filter_map(|lint| {
                 Severity::try_from(lint.default_level())
                     .ok()
+                    .or(default_severity)
                     .map(|severity| (*lint, (severity, LintSource::Default)))
             })
             .collect();

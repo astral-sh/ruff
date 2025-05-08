@@ -8,7 +8,7 @@ use super::{
 };
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::DeclarationWithConstraint;
-use crate::types::generics::{GenericContext, Specialization};
+use crate::types::generics::{GenericContext, Specialization, TypeMapping};
 use crate::types::signatures::{Parameter, Parameters};
 use crate::types::{
     CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, Signature,
@@ -147,16 +147,11 @@ impl<'db> GenericAlias<'db> {
         self.origin(db).definition(db)
     }
 
-    pub(super) fn apply_specialization(
-        self,
-        db: &'db dyn Db,
-        specialization: Specialization<'db>,
-    ) -> Self {
+    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
         Self::new(
             db,
             self.origin(db),
-            self.specialization(db)
-                .apply_specialization(db, specialization),
+            self.specialization(db).apply_type_mapping(db, type_mapping),
         )
     }
 }
@@ -236,16 +231,14 @@ impl<'db> ClassType<'db> {
         self.is_known(db, KnownClass::Object)
     }
 
-    pub(super) fn apply_specialization(
+    pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
-        specialization: Specialization<'db>,
+        type_mapping: TypeMapping<'a, 'db>,
     ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
-            Self::Generic(generic) => {
-                Self::Generic(generic.apply_specialization(db, specialization))
-            }
+            Self::Generic(generic) => Self::Generic(generic.apply_type_mapping(db, type_mapping)),
         }
     }
 
@@ -2772,7 +2765,7 @@ mod tests {
 
         Program::get(&db)
             .set_python_version(&mut db)
-            .to(PythonVersion::latest());
+            .to(PythonVersion::latest_ty());
 
         for class in KnownClass::iter() {
             assert_ne!(
