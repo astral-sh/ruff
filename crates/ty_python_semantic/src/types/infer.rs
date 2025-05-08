@@ -65,7 +65,7 @@ use crate::symbol::{
     typing_extensions_symbol, Boundness, LookupError,
 };
 use crate::types::call::{Argument, Bindings, CallArgumentTypes, CallArguments, CallError};
-use crate::types::class::MetaclassErrorKind;
+use crate::types::class::{MetaclassErrorKind, SliceLiteral};
 use crate::types::diagnostic::{
     report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
@@ -87,10 +87,10 @@ use crate::types::{
     ClassType, DataclassParams, DynamicType, FunctionDecorators, FunctionType, GenericAlias,
     IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
     MemberLookupPolicy, MetaclassCandidate, Parameter, ParameterForm, Parameters, Signature,
-    Signatures, SliceLiteralType, StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers,
-    Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    UnionBuilder, UnionType,
+    Signatures, StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness,
+    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder,
+    UnionType,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -2878,7 +2878,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
             | Type::LiteralString
-            | Type::SliceLiteral(..)
             | Type::Tuple(..)
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
@@ -5603,7 +5602,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::StringLiteral(_)
                 | Type::LiteralString
                 | Type::BytesLiteral(_)
-                | Type::SliceLiteral(_)
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_),
@@ -5902,7 +5900,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::StringLiteral(_)
                 | Type::LiteralString
                 | Type::BytesLiteral(_)
-                | Type::SliceLiteral(_)
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_),
@@ -5928,7 +5925,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::StringLiteral(_)
                 | Type::LiteralString
                 | Type::BytesLiteral(_)
-                | Type::SliceLiteral(_)
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_),
@@ -6881,8 +6877,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
     ) -> Type<'db> {
-        match (value_ty, slice_ty) {
-            (Type::NominalInstance(instance), _)
+        match (value_ty, slice_ty, slice_ty.slice_literal(self.db())) {
+            (Type::NominalInstance(instance), _, _)
                 if instance
                     .class()
                     .is_known(self.db(), KnownClass::VersionInfo) =>
@@ -6895,7 +6891,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
-            (Type::Tuple(tuple_ty), Type::IntLiteral(int)) if i32::try_from(int).is_ok() => {
+            (Type::Tuple(tuple_ty), Type::IntLiteral(int), _) if i32::try_from(int).is_ok() => {
                 let elements = tuple_ty.elements(self.db());
                 elements
                     .iter()
@@ -6914,9 +6910,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     })
             }
             // Ex) Given `("a", 1, Null)[0:2]`, return `("a", 1)`
-            (Type::Tuple(tuple_ty), Type::SliceLiteral(slice_ty)) => {
+            (Type::Tuple(tuple_ty), _, Some(SliceLiteral { start, stop, step })) => {
                 let elements = tuple_ty.elements(self.db());
-                let (start, stop, step) = slice_ty.as_tuple(self.db());
 
                 if let Ok(new_elements) = elements.py_slice(start, stop, step) {
                     TupleType::from_elements(self.db(), new_elements)
@@ -6926,7 +6921,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
             // Ex) Given `"value"[1]`, return `"a"`
-            (Type::StringLiteral(literal_ty), Type::IntLiteral(int))
+            (Type::StringLiteral(literal_ty), Type::IntLiteral(int), _)
                 if i32::try_from(int).is_ok() =>
             {
                 let literal_value = literal_ty.value(self.db());
@@ -6947,9 +6942,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     })
             }
             // Ex) Given `"value"[1:3]`, return `"al"`
-            (Type::StringLiteral(literal_ty), Type::SliceLiteral(slice_ty)) => {
+            (Type::StringLiteral(literal_ty), _, Some(SliceLiteral { start, stop, step })) => {
                 let literal_value = literal_ty.value(self.db());
-                let (start, stop, step) = slice_ty.as_tuple(self.db());
 
                 let chars: Vec<_> = literal_value.chars().collect();
                 let result = if let Ok(new_chars) = chars.py_slice(start, stop, step) {
@@ -6962,7 +6956,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 result
             }
             // Ex) Given `b"value"[1]`, return `b"a"`
-            (Type::BytesLiteral(literal_ty), Type::IntLiteral(int))
+            (Type::BytesLiteral(literal_ty), Type::IntLiteral(int), _)
                 if i32::try_from(int).is_ok() =>
             {
                 let literal_value = literal_ty.value(self.db());
@@ -6983,9 +6977,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     })
             }
             // Ex) Given `b"value"[1:3]`, return `b"al"`
-            (Type::BytesLiteral(literal_ty), Type::SliceLiteral(slice_ty)) => {
+            (Type::BytesLiteral(literal_ty), _, Some(SliceLiteral { start, stop, step })) => {
                 let literal_value = literal_ty.value(self.db());
-                let (start, stop, step) = slice_ty.as_tuple(self.db());
 
                 if let Ok(new_bytes) = literal_value.py_slice(start, stop, step) {
                     let new_bytes: Vec<u8> = new_bytes.copied().collect();
@@ -6999,29 +6992,30 @@ impl<'db> TypeInferenceBuilder<'db> {
             (
                 Type::Tuple(_) | Type::StringLiteral(_) | Type::BytesLiteral(_),
                 Type::BooleanLiteral(bool),
+                _,
             ) => self.infer_subscript_expression_types(
                 value_node,
                 value_ty,
                 Type::IntLiteral(i64::from(bool)),
             ),
-            (Type::KnownInstance(KnownInstanceType::Protocol), _) => {
+            (Type::KnownInstance(KnownInstanceType::Protocol), _, _) => {
                 Type::Dynamic(DynamicType::SubscriptedProtocol)
             }
-            (Type::KnownInstance(KnownInstanceType::Generic(None)), Type::Tuple(typevars)) => {
+            (Type::KnownInstance(KnownInstanceType::Generic(None)), Type::Tuple(typevars), _) => {
                 self.infer_subscript_legacy_generic_class(value_node, typevars.elements(self.db()))
             }
-            (Type::KnownInstance(KnownInstanceType::Generic(None)), typevar) => self
+            (Type::KnownInstance(KnownInstanceType::Generic(None)), typevar, _) => self
                 .infer_subscript_legacy_generic_class(value_node, std::slice::from_ref(&typevar)),
-            (Type::KnownInstance(KnownInstanceType::Generic(Some(_))), _) => {
+            (Type::KnownInstance(KnownInstanceType::Generic(Some(_))), _, _) => {
                 // TODO: emit a diagnostic
                 todo_type!("doubly-specialized typing.Generic")
             }
-            (Type::KnownInstance(known_instance), _)
+            (Type::KnownInstance(known_instance), _, _)
                 if known_instance.class().is_special_form() =>
             {
                 todo_type!("Inference of subscript on special form")
             }
-            (value_ty, slice_ty) => {
+            (value_ty, slice_ty, _) => {
                 // If the class defines `__getitem__`, return its return type.
                 //
                 // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
@@ -7200,8 +7194,8 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {
-        enum SliceArg {
-            Arg(Option<i32>),
+        enum SliceArg<'db> {
+            Arg(Type<'db>),
             Unsupported,
         }
 
@@ -7217,17 +7211,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty_step = self.infer_optional_expression(step.as_deref());
 
         let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
-            Some(Type::IntLiteral(n)) => match i32::try_from(n) {
-                Ok(n) => SliceArg::Arg(Some(n)),
-                Err(_) => SliceArg::Unsupported,
-            },
-            Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
-            Some(Type::NominalInstance(instance))
+            Some(ty @ (Type::IntLiteral(_) | Type::BooleanLiteral(_))) => SliceArg::Arg(ty),
+            Some(ty @ Type::NominalInstance(instance))
                 if instance.class().is_known(self.db(), KnownClass::NoneType) =>
             {
-                SliceArg::Arg(None)
+                SliceArg::Arg(ty)
             }
-            None => SliceArg::Arg(None),
+            None => SliceArg::Arg(Type::none(self.db())),
             _ => SliceArg::Unsupported,
         };
 
@@ -7237,7 +7227,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             type_to_slice_argument(ty_step),
         ) {
             (SliceArg::Arg(lower), SliceArg::Arg(upper), SliceArg::Arg(step)) => {
-                Type::SliceLiteral(SliceLiteralType::new(self.db(), lower, upper, step))
+                KnownClass::Slice.to_specialized_instance(self.db(), [lower, upper, step])
             }
             _ => KnownClass::Slice.to_instance(self.db()),
         }

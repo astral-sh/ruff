@@ -112,7 +112,6 @@ impl<'db> ClassBase<'db> {
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::Tuple(_)
-            | Type::SliceLiteral(_)
             | Type::ModuleLiteral(_)
             | Type::SubclassOf(_)
             | Type::TypeVar(_)

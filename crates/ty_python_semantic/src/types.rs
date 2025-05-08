@@ -520,8 +520,6 @@ pub enum Type<'db> {
     LiteralString,
     /// A bytes literal
     BytesLiteral(BytesLiteralType<'db>),
-    /// A slice literal, e.g. `1:5`, `10:0:-1` or `:`
-    SliceLiteral(SliceLiteralType<'db>),
     /// A heterogeneous tuple type, with elements of the given types in source order.
     // TODO: Support variable length homogeneous tuple type like `tuple[int, ...]`.
     Tuple(TupleType<'db>),
@@ -607,7 +605,6 @@ impl<'db> Type<'db> {
             | Self::StringLiteral(_)
             | Self::IntLiteral(_)
             | Self::LiteralString
-            | Self::SliceLiteral(_)
             | Self::Dynamic(DynamicType::Unknown | DynamicType::Any)
             | Self::BoundMethod(_)
             | Self::WrapperDescriptor(_)
@@ -905,7 +902,6 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::BooleanLiteral(_)
-            | Type::SliceLiteral(_)
             | Type::BytesLiteral(_)
             | Type::StringLiteral(_)
             | Type::Dynamic(_)
@@ -1102,15 +1098,13 @@ impl<'db> Type<'db> {
                 | Type::BytesLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::FunctionLiteral(_)
-                | Type::ModuleLiteral(_)
-                | Type::SliceLiteral(_),
+                | Type::ModuleLiteral(_),
                 Type::StringLiteral(_)
                 | Type::IntLiteral(_)
                 | Type::BytesLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::FunctionLiteral(_)
-                | Type::ModuleLiteral(_)
-                | Type::SliceLiteral(_),
+                | Type::ModuleLiteral(_),
             ) => false,
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
@@ -1132,9 +1126,6 @@ impl<'db> Type<'db> {
             (Type::ModuleLiteral(_), _) => KnownClass::ModuleType
                 .to_instance(db)
                 .is_subtype_of(db, target),
-            (Type::SliceLiteral(_), _) => {
-                KnownClass::Slice.to_instance(db).is_subtype_of(db, target)
-            }
 
             (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
                 self_function_literal
@@ -1516,10 +1507,6 @@ impl<'db> Type<'db> {
                 false
             }
 
-            (Type::SliceLiteral(_), _) => KnownClass::Slice
-                .to_instance(db)
-                .is_assignable_to(db, target),
-
             (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
                 self_function_literal
                     .into_callable_type(db)
@@ -1711,7 +1698,6 @@ impl<'db> Type<'db> {
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
-                | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::MethodWrapper(..)
@@ -1724,7 +1710,6 @@ impl<'db> Type<'db> {
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
-                | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::MethodWrapper(..)
@@ -1751,7 +1736,6 @@ impl<'db> Type<'db> {
                 | Type::DataclassDecorator(..)
                 | Type::DataclassTransformer(..)
                 | Type::IntLiteral(..)
-                | Type::SliceLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::LiteralString,
             )
@@ -1768,7 +1752,6 @@ impl<'db> Type<'db> {
                 | Type::DataclassDecorator(..)
                 | Type::DataclassTransformer(..)
                 | Type::IntLiteral(..)
-                | Type::SliceLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::LiteralString,
                 Type::Tuple(..),
@@ -1799,7 +1782,6 @@ impl<'db> Type<'db> {
                 | Type::StringLiteral(..)
                 | Type::LiteralString
                 | Type::BytesLiteral(..)
-                | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::MethodWrapper(..)
@@ -1812,7 +1794,6 @@ impl<'db> Type<'db> {
                 | Type::StringLiteral(..)
                 | Type::LiteralString
                 | Type::BytesLiteral(..)
-                | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::MethodWrapper(..)
@@ -1848,7 +1829,6 @@ impl<'db> Type<'db> {
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
                 | Type::BooleanLiteral(..)
-                | Type::SliceLiteral(..)
                 | Type::ClassLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
@@ -1862,7 +1842,6 @@ impl<'db> Type<'db> {
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
                 | Type::BooleanLiteral(..)
-                | Type::SliceLiteral(..)
                 | Type::ClassLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
@@ -1953,13 +1932,6 @@ impl<'db> Type<'db> {
                 !KnownClass::Bytes.is_subclass_of(db, instance.class())
             }
 
-            (Type::SliceLiteral(..), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::SliceLiteral(..)) => {
-                // A `Type::SliceLiteral` must be an instance of exactly `slice`
-                // (it cannot be an instance of a `slice` subclass)
-                !KnownClass::Slice.is_subclass_of(db, instance.class())
-            }
-
             // A class-literal type `X` is always disjoint from an instance type `Y`,
             // unless the type expressing "all instances of `Z`" is a subtype of of `Y`,
             // where `Z` is `X`'s metaclass.
@@ -2005,14 +1977,8 @@ impl<'db> Type<'db> {
                 false
             }
 
-            (
-                Type::Callable(_),
-                Type::StringLiteral(_) | Type::BytesLiteral(_) | Type::SliceLiteral(_),
-            )
-            | (
-                Type::StringLiteral(_) | Type::BytesLiteral(_) | Type::SliceLiteral(_),
-                Type::Callable(_),
-            ) => {
+            (Type::Callable(_), Type::StringLiteral(_) | Type::BytesLiteral(_))
+            | (Type::StringLiteral(_) | Type::BytesLiteral(_), Type::Callable(_)) => {
                 // A callable type is disjoint from other literal types. For example,
                 // `Type::StringLiteral` must be an instance of exactly `str`, not a subclass
                 // of `str`, and `str` is not callable. The same applies to other literal types.
@@ -2092,7 +2058,6 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::BytesLiteral(_)
-            | Type::SliceLiteral(_)
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -2157,7 +2122,6 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
-            | Type::SliceLiteral(..)
             | Type::LiteralString => {
                 // Note: The literal types included in this pattern are not true singletons.
                 // There can be multiple Python objects (at different memory locations) that
@@ -2284,7 +2248,6 @@ impl<'db> Type<'db> {
             | Type::BooleanLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
-            | Type::SliceLiteral(..)
             | Type::KnownInstance(..) => true,
 
             Type::ProtocolInstance(..) => {
@@ -2481,7 +2444,6 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::BytesLiteral(_)
-            | Type::SliceLiteral(_)
             | Type::Tuple(_)
             | Type::TypeVar(_)
             | Type::NominalInstance(_)
@@ -2591,7 +2553,6 @@ impl<'db> Type<'db> {
                 KnownClass::Str.to_instance(db).instance_member(db, name)
             }
             Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db).instance_member(db, name),
-            Type::SliceLiteral(_) => KnownClass::Slice.to_instance(db).instance_member(db, name),
             Type::Tuple(_) => KnownClass::Tuple.to_instance(db).instance_member(db, name),
 
             Type::AlwaysTruthy | Type::AlwaysFalsy => Type::object(db).instance_member(db, name),
@@ -3046,7 +3007,6 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
             | Type::LiteralString
-            | Type::SliceLiteral(..)
             | Type::Tuple(..)
             | Type::TypeVar(..)
             | Type::KnownInstance(..)
@@ -3303,7 +3263,6 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
-            | Type::SliceLiteral(_)
             | Type::AlwaysTruthy => Truthiness::AlwaysTrue,
 
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
@@ -4210,7 +4169,6 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::LiteralString
-            | Type::SliceLiteral(_)
             | Type::Tuple(_)
             | Type::BoundSuper(_)
             | Type::TypeVar(_)
@@ -4660,7 +4618,6 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)
-            | Type::SliceLiteral(_)
             | Type::Tuple(_)
             | Type::TypeVar(_)
             | Type::LiteralString
@@ -4713,7 +4670,6 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
-            | Type::SliceLiteral(_)
             | Type::IntLiteral(_)
             | Type::LiteralString
             | Type::ModuleLiteral(_)
@@ -4972,7 +4928,6 @@ impl<'db> Type<'db> {
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class_literal(db),
             Type::BytesLiteral(_) => KnownClass::Bytes.to_class_literal(db),
-            Type::SliceLiteral(_) => KnownClass::Slice.to_class_literal(db),
             Type::IntLiteral(_) => KnownClass::Int.to_class_literal(db),
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
             Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
@@ -5143,7 +5098,6 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
-            | Type::SliceLiteral(_)
             | Type::BoundSuper(_)
             // Same for `ProtocolInstance`
             | Type::ProtocolInstance(_)
@@ -5234,7 +5188,6 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
-            | Type::SliceLiteral(_)
             | Type::BoundSuper(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
@@ -5326,7 +5279,6 @@ impl<'db> Type<'db> {
             | Self::LiteralString
             | Self::IntLiteral(_)
             | Self::BytesLiteral(_)
-            | Self::SliceLiteral(_)
             | Self::MethodWrapper(_)
             | Self::WrapperDescriptor(_)
             | Self::DataclassDecorator(_)
@@ -7938,18 +7890,6 @@ impl<'db> BytesLiteralType<'db> {
     }
 }
 
-#[salsa::interned(debug)]
-pub struct SliceLiteralType<'db> {
-    start: Option<i32>,
-    stop: Option<i32>,
-    step: Option<i32>,
-}
-
-impl SliceLiteralType<'_> {
-    fn as_tuple(self, db: &dyn Db) -> (Option<i32>, Option<i32>, Option<i32>) {
-        (self.start(db), self.stop(db), self.step(db))
-    }
-}
 #[salsa::interned(debug)]
 pub struct TupleType<'db> {
     #[return_ref]
