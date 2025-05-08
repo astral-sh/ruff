@@ -183,7 +183,7 @@ wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false }
 
 [workspace.metadata.cargo-shear]
-ignored = ["getrandom"]
+ignored = ["getrandom", "ruff_options_metadata"]
 
 
 [workspace.lints.rust]

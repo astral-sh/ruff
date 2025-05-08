@@ -1,7 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Options",
-  "description": "The options for the project.",
   "type": "object",
   "properties": {
     "environment": {
@@ -16,6 +15,7 @@
       ]
     },
     "respect-ignore-files": {
+      "description": "Whether to automatically exclude files that are ignored by `.ignore`, `.gitignore`, `.git/info/exclude`, and global `gitignore` files. Enabled by default.",
       "type": [
         "boolean",
         "null"

@@ -14,7 +14,6 @@ use ty_python_semantic::{ProgramSettings, PythonPath, PythonPlatform, SearchPath
 
 use super::settings::{Settings, TerminalSettings};
 
-/// The options for the project.
 #[derive(
     Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize, OptionsMetadata,
 )]

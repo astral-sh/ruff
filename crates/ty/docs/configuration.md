@@ -1,7 +1,28 @@
 ### Top-level
-The options for the project.
+##### [`respect-ignore-files`]
+<span id="respect-ignore-files"></span>
 
-##### [`rules`](#rules) {: #rules }
+Whether to automatically exclude files that are ignored by `.ignore`,
+`.gitignore`, `.git/info/exclude`, and global `gitignore` files.
+Enabled by default.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+**pyproject.toml**
+
+    ```toml
+    [tool.ty]
+    respect-ignore-files = false
+    ```
+
+---
+
+##### [`rules`]
+<span id="rules"></span>
 
 Configures the enabled lints and their severity.
 
@@ -23,7 +44,7 @@ Configures the enabled lints and their severity.
 
 #### `environment`
 
-##### [`extra-paths`](#environment_extra-paths) {: #environment_extra-paths }
+##### [`extra-paths`]
 <span id="extra-paths"></span>
 
 List of user-provided paths that should take first priority in the module resolution.
@@ -45,7 +66,7 @@ or pyright's `stubPath` configuration setting.
 
 ---
 
-##### [`python`](#environment_python) {: #environment_python }
+##### [`python`]
 <span id="python"></span>
 
 Path to the Python installation from which ty resolves type information and third-party dependencies.
@@ -70,7 +91,7 @@ This option is commonly used to specify the path to a virtual environment.
 
 ---
 
-##### [`python-platform`](#environment_python-platform) {: #environment_python-platform }
+##### [`python-platform`]
 <span id="python-platform"></span>
 
 Specifies the target platform that will be used to analyze the source code.
@@ -100,7 +121,7 @@ If no platform is specified, ty will use the current platform:
 
 ---
 
-##### [`python-version`](#environment_python-version) {: #environment_python-version }
+##### [`python-version`]
 <span id="python-version"></span>
 
 Specifies the version of Python that will be used to analyze the source code.
@@ -125,7 +146,7 @@ It will also tailor its use of type stub files, which conditionalizes type defin
 
 ---
 
-##### [`typeshed`](#environment_typeshed) {: #environment_typeshed }
+##### [`typeshed`]
 <span id="typeshed"></span>
 
 Optional path to a "typeshed" directory on disk for us to use for standard-library types.
@@ -149,7 +170,7 @@ bundled as a zip file in the binary
 
 #### `src`
 
-##### [`root`](#src_root) {: #src_root }
+##### [`root`]
 <span id="root"></span>
 
 The root of the project, used for finding first-party modules.
@@ -171,7 +192,7 @@ The root of the project, used for finding first-party modules.
 
 #### `terminal`
 
-##### [`error-on-warning`](#terminal_error-on-warning) {: #terminal_error-on-warning }
+##### [`error-on-warning`]
 <span id="error-on-warning"></span>
 
 Use exit code 1 if there are any warning-level diagnostics.
@@ -194,7 +215,7 @@ Defaults to `false`.
 
 ---
 
-##### [`output-format`](#terminal_output-format) {: #terminal_output-format }
+##### [`output-format`]
 <span id="output-format"></span>
 
 The format to use for printing diagnostic messages.

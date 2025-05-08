@@ -1,6 +1,8 @@
 //! Generate a Markdown-compatible listing of configuration options for `pyproject.toml`.
 //!
 //! Used for <https://docs.astral.sh/ruff/settings/>.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
+
 use anyhow::bail;
 use itertools::Itertools;
 use pretty_assertions::StrComparison;
@@ -146,20 +148,12 @@ impl Set {
 
 fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[Set]) {
     let header_level = if parents.is_empty() { "####" } else { "#####" };
-    let parents_anchor = parents.iter().filter_map(|parent| parent.name()).join("_");
 
-    if parents_anchor.is_empty() {
-        let _ = writeln!(output, "{header_level} [`{name}`](#{name}) {{: #{name} }}");
-    } else {
-        let _ =
-            writeln!(output,
-            "{header_level} [`{name}`](#{parents_anchor}_{name}) {{: #{parents_anchor}_{name} }}"
-        );
+    let _ = writeln!(output, "{header_level} [`{name}`]");
 
-        // the anchor used to just be the name, but now it's the group name
-        // for backwards compatibility, we need to keep the old anchor
-        let _ = writeln!(output, "<span id=\"{name}\"></span>");
-    }
+    // the anchor used to just be the name, but now it's the group name
+    // for backwards compatibility, we need to keep the old anchor
+    let _ = writeln!(output, "<span id=\"{name}\"></span>");
 
     output.push('\n');
 

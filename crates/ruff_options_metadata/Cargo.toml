@@ -14,7 +14,6 @@ license = { workspace = true }
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
-ruff_macros = { workspace = true }
 
 [lints]
 workspace = true

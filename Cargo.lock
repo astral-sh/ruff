@@ -2881,7 +2881,6 @@ dependencies = [
 name = "ruff_options_metadata"
 version = "0.0.0"
 dependencies = [
- "ruff_macros",
  "serde",
 ]
 
