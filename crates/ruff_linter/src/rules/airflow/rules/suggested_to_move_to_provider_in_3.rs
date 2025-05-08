@@ -127,32 +127,30 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
                 version: "0.0.1",
             }
         }
-        ["airflow", "hooks", "subprocess", rest @ ("SubprocessHook" | "SubprocessResult" | "working_directory")] => {
-            ProviderReplacement::SourceModuleMovedToProvider {
-                name: (*rest).to_string(),
-                module: "airflow.providers.standard.hooks.subprocess",
-                provider: "standard",
-                version: "0.0.3",
-            }
-        }
+        ["airflow", "hooks", "subprocess", "SubprocessHook"] => ProviderReplacement::AutoImport {
+            module: "airflow.providers.standard.hooks.subprocess",
+            name: "SubprocessHook",
+            provider: "standard",
+            version: "0.0.3",
+        },
         ["airflow", "operators", "bash", "BashOperator"] => ProviderReplacement::AutoImport {
             module: "airflow.providers.standard.operators.bash",
             name: "BashOperator",
             provider: "standard",
             version: "0.0.1",
         },
-        ["airflow", "operators", "datetime", rest @ ("BranchDateTimeOperator" | "target_times_as_dates")] => {
-            ProviderReplacement::SourceModuleMovedToProvider {
-                name: (*rest).to_string(),
+        ["airflow", "operators", "datetime", "BranchDateTimeOperator"] => {
+            ProviderReplacement::AutoImport {
                 module: "airflow.providers.standard.operators.datetime",
+                name: "BranchDateTimeOperator",
                 provider: "standard",
                 version: "0.0.1",
             }
         }
-        ["airflow", "operators", "trigger_dagrun", rest @ ("TriggerDagRunLink" | "TriggerDagRunOperator")] => {
-            ProviderReplacement::SourceModuleMovedToProvider {
-                name: (*rest).to_string(),
+        ["airflow", "operators", "trigger_dagrun", "TriggerDagRunOperator"] => {
+            ProviderReplacement::AutoImport {
                 module: "airflow.providers.standard.operators.trigger_dagrun",
+                name: "TriggerDagRunOperator",
                 provider: "standard",
                 version: "0.0.2",
             }
@@ -218,7 +216,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
                 version: "0.0.1",
             }
         }
-        ["airflow", "sensors", "time_delta", rest @ ("TimeDeltaSensor" | "TimeDeltaSensorAsync" | "WaitSensor")] => {
+        ["airflow", "sensors", "time_delta", rest @ ("TimeDeltaSensor" | "TimeDeltaSensorAsync")] => {
             ProviderReplacement::SourceModuleMovedToProvider {
                 name: (*rest).to_string(),
                 module: "airflow.providers.standard.sensors.time_delta",
