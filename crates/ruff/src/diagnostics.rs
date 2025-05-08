@@ -25,7 +25,7 @@ use ruff_linter::{IOError, fs};
 use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 use ruff_workspace::Settings;
 
 use crate::cache::{Cache, FileCacheKey, LintCacheData};
@@ -71,7 +71,7 @@ impl Diagnostics {
                                 TextRange::default(),
                             ),
                             source_file,
-                            TextSize::default(),
+                            None,
                         )],
                         FxHashMap::default(),
                     )

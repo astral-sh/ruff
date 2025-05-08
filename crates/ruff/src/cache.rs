@@ -13,20 +13,20 @@ use itertools::Itertools;
 use log::{debug, error};
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelBridge};
-use ruff_linter::{codes::Rule, registry::AsRule};
+use ruff_linter::codes::Rule;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::Fix;
-use ruff_linter::message::{DiagnosticMessage, Message};
+use ruff_linter::message::Message;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use ruff_workspace::Settings;
 use ruff_workspace::resolver::Resolver;
 
@@ -348,16 +348,16 @@ impl FileCache {
                 lint.messages
                     .iter()
                     .map(|msg| {
-                        Message::Diagnostic(DiagnosticMessage {
-                            name: msg.rule.into(),
-                            body: msg.body.clone(),
-                            suggestion: msg.suggestion.clone(),
-                            range: msg.range,
-                            fix: msg.fix.clone(),
-                            file: file.clone(),
-                            noqa_offset: msg.noqa_offset,
-                            parent: msg.parent,
-                        })
+                        Message::diagnostic(
+                            msg.rule.into(),
+                            msg.body.clone(),
+                            msg.suggestion.clone(),
+                            msg.range,
+                            msg.fix.clone(),
+                            msg.parent,
+                            file.clone(),
+                            msg.noqa_offset,
+                        )
                     })
                     .collect()
             };
@@ -438,22 +438,22 @@ impl LintCacheData {
 
         let messages = messages
             .iter()
-            .filter_map(|message| message.as_diagnostic_message())
-            .map(|msg| {
+            .filter_map(|msg| msg.rule().map(|rule| (rule, msg)))
+            .map(|(rule, msg)| {
                 // Make sure that all message use the same source file.
                 assert_eq!(
-                    msg.file,
+                    msg.source_file(),
                     messages.first().unwrap().source_file(),
                     "message uses a different source file"
                 );
                 CacheMessage {
-                    rule: msg.rule(),
-                    body: msg.body.clone(),
-                    suggestion: msg.suggestion.clone(),
-                    range: msg.range,
+                    rule,
+                    body: msg.body().to_string(),
+                    suggestion: msg.suggestion().map(ToString::to_string),
+                    range: msg.range(),
                     parent: msg.parent,
-                    fix: msg.fix.clone(),
-                    noqa_offset: msg.noqa_offset,
+                    fix: msg.fix().cloned(),
+                    noqa_offset: msg.noqa_offset(),
                 }
             })
             .collect();
@@ -479,7 +479,7 @@ pub(super) struct CacheMessage {
     range: TextRange,
     parent: Option<TextSize>,
     fix: Option<Fix>,
-    noqa_offset: TextSize,
+    noqa_offset: Option<TextSize>,
 }
 
 pub(crate) trait PackageCaches {

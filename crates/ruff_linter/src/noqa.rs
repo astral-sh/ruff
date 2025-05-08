@@ -18,7 +18,7 @@ use crate::Locator;
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
 use crate::message::Message;
-use crate::registry::{AsRule, Rule, RuleSet};
+use crate::registry::{Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 
 /// Generates an array of edits that matches the length of `messages`.
@@ -846,7 +846,7 @@ fn find_noqa_comments<'a>(
 
     // Mark any non-ignored diagnostics.
     for message in messages {
-        let Message::Diagnostic(diagnostic) = message else {
+        let Some(rule) = message.rule() else {
             comments_by_line.push(None);
             continue;
         };
@@ -859,7 +859,7 @@ fn find_noqa_comments<'a>(
             }
             FileExemption::Codes(codes) => {
                 // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
-                if codes.contains(&&diagnostic.rule().noqa_code()) {
+                if codes.contains(&&rule.noqa_code()) {
                     comments_by_line.push(None);
                     continue;
                 }
@@ -867,7 +867,7 @@ fn find_noqa_comments<'a>(
         }
 
         // Is the violation ignored by a `noqa` directive on the parent line?
-        if let Some(parent) = diagnostic.parent {
+        if let Some(parent) = message.parent {
             if let Some(directive_line) =
                 directives.find_line_with_directive(noqa_line_for.resolve(parent))
             {
@@ -877,7 +877,7 @@ fn find_noqa_comments<'a>(
                         continue;
                     }
                     Directive::Codes(codes) => {
-                        if codes.includes(diagnostic.rule()) {
+                        if codes.includes(rule) {
                             comments_by_line.push(None);
                             continue;
                         }
@@ -886,9 +886,7 @@ fn find_noqa_comments<'a>(
             }
         }
 
-        let noqa_offset = noqa_line_for.resolve(diagnostic.range.start());
-
-        let rule = diagnostic.rule();
+        let noqa_offset = noqa_line_for.resolve(message.range().start());
 
         // Or ignored by the directive itself?
         if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {
@@ -1260,7 +1258,7 @@ mod tests {
     ) -> Message {
         let noqa_offset = diagnostic.start();
         let file = SourceFileBuilder::new(path.as_ref().to_string_lossy(), source).finish();
-        Message::from_diagnostic(diagnostic, file, noqa_offset)
+        Message::from_diagnostic(diagnostic, file, Some(noqa_offset))
     }
 
     #[test]
