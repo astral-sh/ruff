@@ -113,7 +113,7 @@ use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
 use super::subclass_of::SubclassOfInner;
-use super::{BoundSuperError, BoundSuperType, ClassBase};
+use super::{BoundMethodType, BoundSuperError, BoundSuperType, ClassBase};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -477,7 +477,13 @@ impl<'db> TypeInference<'db> {
 
     /// Returns the inferred return type of this function body (union of all possible return types),
     /// or `None` if the region is not a function body.
-    pub(crate) fn inferred_return_type(&self, db: &'db dyn Db) -> Type<'db> {
+    /// In the case of methods, the return type of the superclass method is further unioned.
+    /// If there is no superclass method and this method is not `final`, it will be unioned with `Unknown`.
+    pub(crate) fn inferred_return_type(
+        &self,
+        db: &'db dyn Db,
+        method_ty: Option<BoundMethodType<'db>>,
+    ) -> Type<'db> {
         let mut union = UnionBuilder::new(db);
         for ty in &self.return_types {
             union = union.add(*ty);
@@ -485,6 +491,13 @@ impl<'db> TypeInference<'db> {
         let use_def = use_def_map(db, self.scope);
         if use_def.can_implicit_return(db) {
             union = union.add(Type::none(db));
+        }
+        if let Some(method_ty) = method_ty {
+            if let Some(return_ty) = method_ty.compatible_return_type(db, Some(self.scope)) {
+                union = union.add(return_ty);
+            } else if !method_ty.is_final(db) {
+                union = union.add(Type::unknown());
+            }
         }
         union.build()
     }
