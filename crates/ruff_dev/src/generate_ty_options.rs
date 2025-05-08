@@ -247,7 +247,6 @@ enum ConfigurationFile {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use std::env;
 
     use crate::generate_all::Mode;
 
@@ -256,5 +255,6 @@ mod tests {
     #[test]
     fn ty_configuration_markdown_up_to_date() -> Result<()> {
         main(&Args { mode: Mode::Check })?;
+        Ok(())
     }
 }
