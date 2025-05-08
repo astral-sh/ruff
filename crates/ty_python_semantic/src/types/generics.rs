@@ -163,8 +163,32 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         types: Box<[Type<'db>]>,
     ) -> Specialization<'db> {
+        // Typevars can have other typevars as their default values, e.g.
+        //
+        // ```py
+        // class C[T, U = T]: ...
+        // ```
+        //
+        // If there is a mapping for `T`, we want to map `U` that type, not to `T`. To handle this,
+        // we repeatedly apply the specialization to itself, until we reach a fixed point.
+        //
+        // This loop will always terminate, since it's not possible to create cyclic typevar
+        // references:
+        //
+        // ```py
+        // # error: [unresolved-reference] for use of `U`
+        // class C[T = U, U = T]: ...
+        // ```
         assert!(self.variables(db).len() == types.len());
-        Specialization::new(db, self, types)
+        let original = Specialization::new(db, self, types);
+        let mut result = original;
+        loop {
+            let next = result.apply_specialization(db, original);
+            if result == next {
+                return result;
+            }
+            result = next;
+        }
     }
 }
 

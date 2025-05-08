@@ -40,6 +40,25 @@ def g[S]():
     reveal_type(S.__default__)  # revealed: NoDefault
 ```
 
+### Using other typevars as a default
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+class Valid[T, U = T, V = T | U]: ...
+
+reveal_type(Valid())  # revealed: Valid[Unknown, Unknown, Unknown]
+reveal_type(Valid[int]())  # revealed: Valid[int, int, int]
+reveal_type(Valid[int, str]())  # revealed: Valid[int, str, int | str]
+reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
+
+# error: [unresolved-reference]
+class Invalid[S = T]: ...
+```
+
 ### Type variables with an upper bound
 
 ```py
