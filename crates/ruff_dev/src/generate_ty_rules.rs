@@ -97,12 +97,32 @@ fn generate_markdown() -> String {
 </details>
 "#,
             level = lint.default_level(),
-            summary = lint.summary(),
+            // GitHub doesn't support markdown in `summary` headers
+            summary = replace_inline_code(lint.summary()),
             encoded_name = url::form_urlencoded::byte_serialize(lint.name().as_str().as_bytes())
                 .collect::<String>(),
             file = url::form_urlencoded::byte_serialize(lint.file().as_bytes()).collect::<String>(),
             line = lint.line(),
         );
+    }
+
+    output
+}
+
+/// Replaces inline code blocks (`code`) with `<code>code</code>`
+fn replace_inline_code(input: &str) -> String {
+    let mut output = String::new();
+    let mut parts = input.split('`');
+
+    while let Some(before) = parts.next() {
+        if let Some(between) = parts.next() {
+            output.push_str(before);
+            output.push_str("<code>");
+            output.push_str(between);
+            output.push_str("</code>");
+        } else {
+            output.push_str(before);
+        }
     }
 
     output

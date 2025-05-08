@@ -646,7 +646,7 @@ declare_lint! {
     /// must be assigned the value `False` at runtime; the type checker will consider its value to
     /// be `True`. If annotated, it must be annotated as a type that can accept `bool` values.
     pub(crate) static INVALID_TYPE_CHECKING_CONSTANT = {
-        summary: "detects invalid TYPE_CHECKING constant assignments",
+        summary: "detects invalid `TYPE_CHECKING` constant assignments",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }

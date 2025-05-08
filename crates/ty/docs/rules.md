@@ -240,7 +240,7 @@ def test(): -> "Literal[5]":
 **Default level**: error
 
 <details>
-<summary>detects class definitions whose MRO has conflicting `__slots__`</summary>
+<summary>detects class definitions whose MRO has conflicting <code>__slots__</code></summary>
 
 ### What it does
 Checks for classes whose bases define incompatible `__slots__`.
@@ -446,7 +446,7 @@ TODO #14889
 **Default level**: error
 
 <details>
-<summary>detects exception handlers that catch classes that do not inherit from `BaseException`</summary>
+<summary>detects exception handlers that catch classes that do not inherit from <code>BaseException</code></summary>
 
 ### What it does
 Checks for exception handlers that catch non-exception classes.
@@ -551,7 +551,7 @@ def f(t: TypeVar("U")): ...
 **Default level**: error
 
 <details>
-<summary>detects invalid `metaclass=` arguments</summary>
+<summary>detects invalid <code>metaclass=</code> arguments</summary>
 
 ### What it does
 Checks for arguments to `metaclass=` that are invalid.
@@ -583,7 +583,7 @@ class B(metaclass=f): ...
 **Default level**: error
 
 <details>
-<summary>detects invalid `@overload` usages</summary>
+<summary>detects invalid <code>@overload</code> usages</summary>
 
 ### What it does
 Checks for various invalid `@overload` usages.
@@ -682,7 +682,7 @@ TypeError: Protocols can only inherit from other protocols, got <class 'int'>
 **Default level**: error
 
 <details>
-<summary>detects `raise` statements that raise invalid exceptions or use invalid causes</summary>
+<summary>detects <code>raise</code> statements that raise invalid exceptions or use invalid causes</summary>
 
 Checks for `raise` statements that raise non-exceptions or use invalid
 causes for their raised exceptions.
@@ -754,7 +754,7 @@ def func() -> int:
 **Default level**: error
 
 <details>
-<summary>detects invalid arguments for `super()`</summary>
+<summary>detects invalid arguments for <code>super()</code></summary>
 
 ### What it does
 Detects `super()` calls where:
@@ -812,7 +812,7 @@ TODO #14889
 **Default level**: error
 
 <details>
-<summary>detects invalid TYPE_CHECKING constant assignments</summary>
+<summary>detects invalid <code>TYPE_CHECKING</code> constant assignments</summary>
 
 ### What it does
 Checks for a value other than `False` assigned to the `TYPE_CHECKING` variable, or an
@@ -1128,7 +1128,7 @@ def _(x: int):
 **Default level**: error
 
 <details>
-<summary>detects invalid `super()` calls where implicit arguments are unavailable.</summary>
+<summary>detects invalid <code>super()</code> calls where implicit arguments are unavailable.</summary>
 
 ### What it does
 Detects invalid `super()` calls where implicit arguments like the enclosing class or first method argument are unavailable.
@@ -1235,7 +1235,7 @@ at runtime.
 **Default level**: error
 
 <details>
-<summary>detects boolean conversion where the object incorrectly implements `__bool__`</summary>
+<summary>detects boolean conversion where the object incorrectly implements <code>__bool__</code></summary>
 
 ### What it does
 Checks for bool conversions where the object doesn't correctly implement `__bool__`.
@@ -1426,7 +1426,7 @@ print(x)  # NameError: name 'x' is not defined
 **Default level**: warn
 
 <details>
-<summary>detects redundant `cast` calls</summary>
+<summary>detects redundant <code>cast</code> calls</summary>
 
 ### What it does
 Detects redundant `cast` calls where the value already has the target type.
@@ -1452,7 +1452,7 @@ cast(int, f())  # Redundant
 **Default level**: warn
 
 <details>
-<summary>detects usages of `reveal_type` without importing it</summary>
+<summary>detects usages of <code>reveal_type</code> without importing it</summary>
 
 ### What it does
 Checks for calls to `reveal_type` without importing it.
@@ -1473,7 +1473,7 @@ TODO #14889
 **Default level**: warn
 
 <details>
-<summary>detects `ty: ignore` comments that reference unknown rules</summary>
+<summary>detects <code>ty: ignore</code> comments that reference unknown rules</summary>
 
 ### What it does
 Checks for `ty: ignore[code]` where `code` isn't a known lint rule.
@@ -1527,7 +1527,7 @@ print(x)  # NameError: name 'x' is not defined
 **Default level**: warn
 
 <details>
-<summary>detects unused `type: ignore` comments</summary>
+<summary>detects unused <code>type: ignore</code> comments</summary>
 
 ### What it does
 Checks for `type: ignore` or `ty: ignore` directives that are no longer applicable.
