@@ -65,6 +65,19 @@ impl<'db> ClassBase<'db> {
         Display { base: self, db }
     }
 
+    pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
+        match self {
+            ClassBase::Class(class) => class.name(db),
+            ClassBase::Dynamic(DynamicType::Any) => "Any",
+            ClassBase::Dynamic(DynamicType::Unknown) => "Unknown",
+            ClassBase::Dynamic(DynamicType::Todo(_)) => "@Todo",
+            ClassBase::Protocol | ClassBase::Dynamic(DynamicType::SubscriptedProtocol) => {
+                "Protocol"
+            }
+            ClassBase::Generic(_) => "Generic",
+        }
+    }
+
     /// Return a `ClassBase` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
         KnownClass::Object

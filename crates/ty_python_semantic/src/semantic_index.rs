@@ -387,6 +387,14 @@ impl<'db> SemanticIndex<'db> {
             .copied()
     }
 
+    pub(crate) fn is_standalone_expression(
+        &self,
+        expression_key: impl Into<ExpressionNodeKey>,
+    ) -> bool {
+        self.expressions_by_node
+            .contains_key(&expression_key.into())
+    }
+
     /// Returns the id of the scope that `node` creates.
     /// This is different from [`definition::Definition::scope`] which
     /// returns the scope in which that definition is defined in.
