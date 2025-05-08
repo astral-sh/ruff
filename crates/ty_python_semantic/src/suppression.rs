@@ -33,7 +33,7 @@ declare_lint! {
     pub(crate) static UNUSED_IGNORE_COMMENT = {
         summary: "detects unused `type: ignore` comments",
         status: LintStatus::preview("1.0.0"),
-        default_level: Level::Warn,
+        default_level: Level::Ignore,
     }
 }
 

@@ -1495,36 +1495,6 @@ a = 20 / 0  # ty: ignore[division-by-zero]
 * [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L40)
 </details>
 
-## `unused-ignore-comment`
-
-**Default level**: warn
-
-<details>
-<summary>detects unused <code>type: ignore</code> comments</summary>
-
-### What it does
-Checks for `type: ignore` or `ty: ignore` directives that are no longer applicable.
-
-### Why is this bad?
-A `type: ignore` directive that no longer matches any diagnostic violations is likely
-included by mistake, and should be removed to avoid confusion.
-
-### Examples
-```py
-a = 20 / 2  # ty: ignore[division-by-zero]
-```
-
-Use instead:
-
-```py
-a = 20 / 2
-```
-
-### Links
-* [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unused-ignore-comment)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L15)
-</details>
-
 ## `possibly-unresolved-reference`
 
 **Default level**: ignore
@@ -1550,5 +1520,35 @@ print(x)  # NameError: name 'x' is not defined
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-unresolved-reference)
 * [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L836)
+</details>
+
+## `unused-ignore-comment`
+
+**Default level**: ignore
+
+<details>
+<summary>detects unused <code>type: ignore</code> comments</summary>
+
+### What it does
+Checks for `type: ignore` or `ty: ignore` directives that are no longer applicable.
+
+### Why is this bad?
+A `type: ignore` directive that no longer matches any diagnostic violations is likely
+included by mistake, and should be removed to avoid confusion.
+
+### Examples
+```py
+a = 20 / 2  # ty: ignore[division-by-zero]
+```
+
+Use instead:
+
+```py
+a = 20 / 2
+```
+
+### Links
+* [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unused-ignore-comment)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L15)
 </details>
 

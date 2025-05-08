@@ -4,3 +4,4 @@
 # Enable off-by-default rules.
 [rules]
 possibly-unresolved-reference = "warn"
+unused-ignore-comment = "warn"

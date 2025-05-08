@@ -59,13 +59,7 @@ type KeyDiagnosticFields = (
     Severity,
 );
 
-static EXPECTED_TOMLLIB_DIAGNOSTICS: &[KeyDiagnosticFields] = &[(
-    DiagnosticId::lint("unused-ignore-comment"),
-    Some("/src/tomllib/_parser.py"),
-    Some(22299..22333),
-    "Unused blanket `type: ignore` directive",
-    Severity::Warning,
-)];
+static EXPECTED_TOMLLIB_DIAGNOSTICS: &[KeyDiagnosticFields] = &[];
 
 fn tomllib_path(file: &TestFile) -> SystemPathBuf {
     SystemPathBuf::from("src").join(file.name())
