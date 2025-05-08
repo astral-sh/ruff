@@ -9,7 +9,7 @@ use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
 use salsa::plumbing::ZalsaDatabase;
-use salsa::Cancelled;
+use salsa::{Cancelled, Event};
 use ty_ide::Db as IdeDb;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{Db as SemanticDb, Program};
@@ -37,19 +37,19 @@ impl ProjectDatabase {
     {
         let mut db = Self {
             project: None,
-            storage: salsa::Storage::new(Some(Box::new({
-                move |event| {
-                    if !tracing::enabled!(tracing::Level::TRACE) {
-                        return;
-                    }
+            storage: salsa::Storage::new(if tracing::enabled!(tracing::Level::TRACE) {
+                Some(Box::new({
+                    move |event: Event| {
+                        if matches!(event.kind, salsa::EventKind::WillCheckCancellation) {
+                            return;
+                        }
 
-                    if matches!(event.kind, salsa::EventKind::WillCheckCancellation) {
-                        return;
+                        tracing::trace!("Salsa event: {event:?}");
                     }
-
-                    tracing::trace!("Salsa event: {event:?}");
-                }
-            }))),
+                }))
+            } else {
+                None
+            }),
             files: Files::default(),
             system: Arc::new(system),
         };
