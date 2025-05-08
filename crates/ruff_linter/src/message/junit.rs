@@ -32,7 +32,7 @@ impl Emitter for JunitEmitter {
             report.add_test_suite(test_suite);
         } else {
             for (filename, messages) in group_messages_by_filename(messages) {
-                let mut test_suite = TestSuite::new(filename);
+                let mut test_suite = TestSuite::new(&filename);
                 test_suite
                     .extra
                     .insert(XmlString::new("package"), XmlString::new("org.ruff"));
@@ -44,7 +44,7 @@ impl Emitter for JunitEmitter {
                     } = message;
                     let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
                     status.set_message(message.body());
-                    let location = if context.is_notebook(message.filename()) {
+                    let location = if context.is_notebook(&message.filename()) {
                         // We can't give a reasonable location for the structured formats,
                         // so we show one that's clearly a fallback
                         LineColumn::default()
@@ -66,7 +66,7 @@ impl Emitter for JunitEmitter {
                         },
                         status,
                     );
-                    let file_path = Path::new(filename);
+                    let file_path = Path::new(&*filename);
                     let file_stem = file_path.file_stem().unwrap().to_str().unwrap();
                     let classname = file_path.parent().unwrap().join(file_stem);
                     case.set_classname(classname.to_str().unwrap());

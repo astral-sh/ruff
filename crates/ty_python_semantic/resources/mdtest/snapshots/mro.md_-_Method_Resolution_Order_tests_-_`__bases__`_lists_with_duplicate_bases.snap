@@ -345,7 +345,7 @@ info: `lint:duplicate-base` is enabled by default
 ```
 
 ```
-warning: lint:unused-ignore-comment
+info: lint:unused-ignore-comment
   --> src/mdtest_snippet.py:72:9
    |
 70 |     A,
@@ -388,7 +388,7 @@ info: `lint:duplicate-base` is enabled by default
 ```
 
 ```
-warning: lint:unused-ignore-comment
+info: lint:unused-ignore-comment
   --> src/mdtest_snippet.py:81:13
    |
 79 | ):

@@ -50,6 +50,10 @@ jobs:
         run: |
           cd ruff
 
+          echo "Enabling mypy primer specific configuration overloads (see .github/mypy-primer-ty.toml)"
+          mkdir -p ~/.config/ty
+          cp .github/mypy-primer-ty.toml ~/.config/ty/ty.toml
+
           PRIMER_SELECTOR="$(paste -s -d'|' crates/ty_python_semantic/resources/primer/good.txt)"
 
           echo "new commit"

@@ -56,7 +56,7 @@ use crate::semantic_index::definition::{
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::narrowing_constraints::ConstraintKey;
 use crate::semantic_index::symbol::{
-    FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
+    FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind, ScopedSymbolId,
 };
 use crate::semantic_index::{semantic_index, EagerSnapshotResult, SemanticIndex};
 use crate::symbol::{
@@ -1387,9 +1387,29 @@ impl<'db> TypeInferenceBuilder<'db> {
             .kind(self.db())
             .category(self.context.in_stub())
             .is_binding());
-        let use_def = self.index.use_def_map(binding.file_scope(self.db()));
-        let declarations = use_def.declarations_at_binding(binding);
+
+        let file_scope_id = binding.file_scope(self.db());
+        let symbol_table = self.index.symbol_table(file_scope_id);
+        let use_def = self.index.use_def_map(file_scope_id);
         let mut bound_ty = ty;
+        let symbol_id = binding.symbol(self.db());
+
+        let global_use_def_map = self.index.use_def_map(FileScopeId::global());
+        let declarations = if self.skip_non_global_scopes(file_scope_id, symbol_id) {
+            let symbol_name = symbol_table.symbol(symbol_id).name();
+            match self
+                .index
+                .symbol_table(FileScopeId::global())
+                .symbol_id_by_name(symbol_name)
+            {
+                Some(id) => global_use_def_map.public_declarations(id),
+                // This case is a syntax error (load before global declaration) but ignore that here
+                None => use_def.declarations_at_binding(binding),
+            }
+        } else {
+            use_def.declarations_at_binding(binding)
+        };
+
         let declared_ty = symbol_from_declarations(self.db(), declarations)
             .map(|SymbolAndQualifiers { symbol, .. }| {
                 symbol.ignore_possibly_unbound().unwrap_or(Type::unknown())
@@ -1413,6 +1433,19 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         self.types.bindings.insert(binding, bound_ty);
+    }
+
+    /// Returns `true` if `symbol_id` should be looked up in the global scope, skipping intervening
+    /// local scopes.
+    fn skip_non_global_scopes(
+        &self,
+        file_scope_id: FileScopeId,
+        symbol_id: ScopedSymbolId,
+    ) -> bool {
+        !file_scope_id.is_global()
+            && self
+                .index
+                .symbol_is_global_in_scope(symbol_id, file_scope_id)
     }
 
     fn add_declaration(
@@ -5256,6 +5289,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             };
 
+            let current_file = self.file();
+
+            let skip_non_global_scopes = symbol_table
+                .symbol_id_by_name(symbol_name)
+                .is_some_and(|symbol_id| self.skip_non_global_scopes(file_scope_id, symbol_id));
+
+            if skip_non_global_scopes {
+                return symbol(
+                    db,
+                    FileScopeId::global().to_scope_id(db, current_file),
+                    symbol_name,
+                );
+            }
+
             // If it's a function-like scope and there is one or more binding in this scope (but
             // none of those bindings are visible from where we are in the control flow), we cannot
             // fallback to any bindings in enclosing scopes. As such, we can immediately short-circuit
@@ -5272,8 +5319,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             if let Some(use_id) = use_id {
                 constraint_keys.push((file_scope_id, ConstraintKey::UseId(use_id)));
             }
-
-            let current_file = self.file();
 
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)

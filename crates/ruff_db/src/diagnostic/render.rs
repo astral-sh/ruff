@@ -16,7 +16,8 @@ use crate::{
 };
 
 use super::{
-    Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, Severity, SubDiagnostic,
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticSource, DisplayDiagnosticConfig, Severity,
+    SubDiagnostic,
 };
 
 /// A type that implements `std::fmt::Display` for diagnostic rendering.
@@ -30,17 +31,16 @@ use super::{
 ///   values. When using Salsa, this most commonly corresponds to the lifetime
 ///   of a Salsa `Db`.
 /// * The lifetime of the diagnostic being rendered.
-#[derive(Debug)]
 pub struct DisplayDiagnostic<'a> {
     config: &'a DisplayDiagnosticConfig,
-    resolver: FileResolver<'a>,
+    resolver: &'a dyn FileResolver,
     annotate_renderer: AnnotateRenderer,
     diag: &'a Diagnostic,
 }
 
 impl<'a> DisplayDiagnostic<'a> {
     pub(crate) fn new(
-        resolver: FileResolver<'a>,
+        resolver: &'a dyn FileResolver,
         config: &'a DisplayDiagnosticConfig,
         diag: &'a Diagnostic,
     ) -> DisplayDiagnostic<'a> {
@@ -86,11 +86,13 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 write!(
                     f,
                     " {path}",
-                    path = fmt_styled(self.resolver.path(span.file()), stylesheet.emphasis)
+                    path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
                 )?;
                 if let Some(range) = span.range() {
-                    let input = self.resolver.input(span.file());
-                    let start = input.as_source_code().line_column(range.start());
+                    let diagnostic_source = span.file().diagnostic_source(self.resolver);
+                    let start = diagnostic_source
+                        .as_source_code()
+                        .line_column(range.start());
 
                     write!(
                         f,
@@ -115,7 +117,7 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
             .emphasis(stylesheet.emphasis)
             .none(stylesheet.none);
 
-        let resolved = Resolved::new(&self.resolver, self.diag);
+        let resolved = Resolved::new(self.resolver, self.diag);
         let renderable = resolved.to_renderable(self.config.context);
         for diag in renderable.diagnostics.iter() {
             writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
@@ -144,7 +146,7 @@ struct Resolved<'a> {
 
 impl<'a> Resolved<'a> {
     /// Creates a new resolved set of diagnostics.
-    fn new(resolver: &FileResolver<'a>, diag: &'a Diagnostic) -> Resolved<'a> {
+    fn new(resolver: &'a dyn FileResolver, diag: &'a Diagnostic) -> Resolved<'a> {
         let mut diagnostics = vec![];
         diagnostics.push(ResolvedDiagnostic::from_diagnostic(resolver, diag));
         for sub in &diag.inner.subs {
@@ -182,7 +184,7 @@ struct ResolvedDiagnostic<'a> {
 impl<'a> ResolvedDiagnostic<'a> {
     /// Resolve a single diagnostic.
     fn from_diagnostic(
-        resolver: &FileResolver<'a>,
+        resolver: &'a dyn FileResolver,
         diag: &'a Diagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
@@ -190,9 +192,9 @@ impl<'a> ResolvedDiagnostic<'a> {
             .annotations
             .iter()
             .filter_map(|ann| {
-                let path = resolver.path(ann.span.file);
-                let input = resolver.input(ann.span.file);
-                ResolvedAnnotation::new(path, &input, ann)
+                let path = ann.span.file.path(resolver);
+                let diagnostic_source = ann.span.file.diagnostic_source(resolver);
+                ResolvedAnnotation::new(path, &diagnostic_source, ann)
             })
             .collect();
         let message = if diag.inner.message.as_str().is_empty() {
@@ -216,7 +218,7 @@ impl<'a> ResolvedDiagnostic<'a> {
 
     /// Resolve a single sub-diagnostic.
     fn from_sub_diagnostic(
-        resolver: &FileResolver<'a>,
+        resolver: &'a dyn FileResolver,
         diag: &'a SubDiagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
@@ -224,9 +226,9 @@ impl<'a> ResolvedDiagnostic<'a> {
             .annotations
             .iter()
             .filter_map(|ann| {
-                let path = resolver.path(ann.span.file);
-                let input = resolver.input(ann.span.file);
-                ResolvedAnnotation::new(path, &input, ann)
+                let path = ann.span.file.path(resolver);
+                let diagnostic_source = ann.span.file.diagnostic_source(resolver);
+                ResolvedAnnotation::new(path, &diagnostic_source, ann)
             })
             .collect();
         ResolvedDiagnostic {
@@ -259,10 +261,18 @@ impl<'a> ResolvedDiagnostic<'a> {
                     continue;
                 };
 
-                let prev_context_ends =
-                    context_after(&prev.input.as_source_code(), context, prev.line_end).get();
-                let this_context_begins =
-                    context_before(&ann.input.as_source_code(), context, ann.line_start).get();
+                let prev_context_ends = context_after(
+                    &prev.diagnostic_source.as_source_code(),
+                    context,
+                    prev.line_end,
+                )
+                .get();
+                let this_context_begins = context_before(
+                    &ann.diagnostic_source.as_source_code(),
+                    context,
+                    ann.line_start,
+                )
+                .get();
                 // The boundary case here is when `prev_context_ends`
                 // is exactly one less than `this_context_begins`. In
                 // that case, the context windows are adajcent and we
@@ -304,7 +314,7 @@ impl<'a> ResolvedDiagnostic<'a> {
 #[derive(Debug)]
 struct ResolvedAnnotation<'a> {
     path: &'a str,
-    input: Input,
+    diagnostic_source: DiagnosticSource,
     range: TextRange,
     line_start: OneIndexed,
     line_end: OneIndexed,
@@ -318,8 +328,12 @@ impl<'a> ResolvedAnnotation<'a> {
     /// `path` is the path of the file that this annotation points to.
     ///
     /// `input` is the contents of the file that this annotation points to.
-    fn new(path: &'a str, input: &Input, ann: &'a Annotation) -> Option<ResolvedAnnotation<'a>> {
-        let source = input.as_source_code();
+    fn new(
+        path: &'a str,
+        diagnostic_source: &DiagnosticSource,
+        ann: &'a Annotation,
+    ) -> Option<ResolvedAnnotation<'a>> {
+        let source = diagnostic_source.as_source_code();
         let (range, line_start, line_end) = match (ann.span.range(), ann.message.is_some()) {
             // An annotation with no range AND no message is probably(?)
             // meaningless, but we should try to render it anyway.
@@ -345,7 +359,7 @@ impl<'a> ResolvedAnnotation<'a> {
         };
         Some(ResolvedAnnotation {
             path,
-            input: input.clone(),
+            diagnostic_source: diagnostic_source.clone(),
             range,
             line_start,
             line_end,
@@ -510,8 +524,8 @@ impl<'r> RenderableSnippet<'r> {
             !anns.is_empty(),
             "creating a renderable snippet requires a non-zero number of annotations",
         );
-        let input = &anns[0].input;
-        let source = input.as_source_code();
+        let diagnostic_source = &anns[0].diagnostic_source;
+        let source = diagnostic_source.as_source_code();
         let has_primary = anns.iter().any(|ann| ann.is_primary);
 
         let line_start = context_before(
@@ -527,7 +541,7 @@ impl<'r> RenderableSnippet<'r> {
 
         let snippet_start = source.line_start(line_start);
         let snippet_end = source.line_end(line_end);
-        let snippet = input
+        let snippet = diagnostic_source
             .as_source_code()
             .slice(TextRange::new(snippet_start, snippet_end));
 
@@ -613,7 +627,7 @@ impl<'r> RenderableAnnotation<'r> {
     }
 }
 
-/// A type that facilitates the retrieval of source code from a `Span`.
+/// A trait that facilitates the retrieval of source code from a `Span`.
 ///
 /// At present, this is tightly coupled with a Salsa database. In the future,
 /// it is intended for this resolver to become an abstraction providing a
@@ -628,36 +642,24 @@ impl<'r> RenderableAnnotation<'r> {
 /// callers will need to pass in a different "resolver" for turning `Span`s
 /// into actual file paths/contents. The infrastructure for this isn't fully in
 /// place, but this type serves to demarcate the intended abstraction boundary.
-pub(crate) struct FileResolver<'a> {
-    db: &'a dyn Db,
-}
-
-impl<'a> FileResolver<'a> {
-    /// Creates a new resolver from a Salsa database.
-    pub(crate) fn new(db: &'a dyn Db) -> FileResolver<'a> {
-        FileResolver { db }
-    }
-
+pub trait FileResolver {
     /// Returns the path associated with the file given.
-    fn path(&self, file: File) -> &'a str {
-        relativize_path(
-            self.db.system().current_directory(),
-            file.path(self.db).as_str(),
-        )
-    }
+    fn path(&self, file: File) -> &str;
 
     /// Returns the input contents associated with the file given.
-    fn input(&self, file: File) -> Input {
-        Input {
-            text: source_text(self.db, file),
-            line_index: line_index(self.db, file),
-        }
-    }
+    fn input(&self, file: File) -> Input;
 }
 
-impl std::fmt::Debug for FileResolver<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "<salsa based file resolver>")
+impl FileResolver for &dyn Db {
+    fn path(&self, file: File) -> &str {
+        relativize_path(self.system().current_directory(), file.path(*self).as_str())
+    }
+
+    fn input(&self, file: File) -> Input {
+        Input {
+            text: source_text(*self, file),
+            line_index: line_index(*self, file),
+        }
     }
 }
 
@@ -667,16 +669,9 @@ impl std::fmt::Debug for FileResolver<'_> {
 /// This contains the actual content of that input as well as a
 /// line index for efficiently querying its contents.
 #[derive(Clone, Debug)]
-struct Input {
-    text: SourceText,
-    line_index: LineIndex,
-}
-
-impl Input {
-    /// Returns this input as a `SourceCode` for convenient querying.
-    fn as_source_code(&self) -> SourceCode<'_, '_> {
-        SourceCode::new(self.text.as_str(), &self.line_index)
-    }
+pub struct Input {
+    pub(crate) text: SourceText,
+    pub(crate) line_index: LineIndex,
 }
 
 /// Returns the line number accounting for the given `len`
@@ -730,6 +725,7 @@ mod tests {
     use crate::files::system_path_to_file;
     use crate::system::{DbWithWritableSystem, SystemPath};
     use crate::tests::TestDb;
+    use crate::Upcast;
 
     use super::*;
 
@@ -2174,8 +2170,9 @@ watermelon
         fn span(&self, path: &str, line_offset_start: &str, line_offset_end: &str) -> Span {
             let span = self.path(path);
 
-            let text = source_text(&self.db, span.file());
-            let line_index = line_index(&self.db, span.file());
+            let file = span.expect_ty_file();
+            let text = source_text(&self.db, file);
+            let line_index = line_index(&self.db, file);
             let source = SourceCode::new(text.as_str(), &line_index);
 
             let (line_start, offset_start) = parse_line_offset(line_offset_start);
@@ -2237,7 +2234,7 @@ watermelon
         ///
         /// (This will set the "printed" flag on `Diagnostic`.)
         fn render(&self, diag: &Diagnostic) -> String {
-            diag.display(&self.db, &self.config).to_string()
+            diag.display(&self.db.upcast(), &self.config).to_string()
         }
     }
 

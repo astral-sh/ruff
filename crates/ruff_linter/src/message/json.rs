@@ -49,8 +49,9 @@ impl Serialize for ExpandedMessages<'_> {
 }
 
 pub(crate) fn message_to_json_value(message: &Message, context: &EmitterContext) -> Value {
-    let source_code = message.source_file().to_source_code();
-    let notebook_index = context.notebook_index(message.filename());
+    let source_file = message.source_file();
+    let source_code = source_file.to_source_code();
+    let notebook_index = context.notebook_index(&message.filename());
 
     let fix = message.fix().map(|fix| {
         json!({

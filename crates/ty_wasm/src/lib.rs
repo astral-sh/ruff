@@ -373,7 +373,7 @@ impl Diagnostic {
         self.inner.primary_span().and_then(|span| {
             Some(Range::from_file_range(
                 &workspace.db,
-                FileRange::new(span.file(), span.range()?),
+                FileRange::new(span.expect_ty_file(), span.range()?),
                 workspace.position_encoding,
             ))
         })
@@ -383,7 +383,7 @@ impl Diagnostic {
     pub fn display(&self, workspace: &Workspace) -> JsString {
         let config = DisplayDiagnosticConfig::default().color(false);
         self.inner
-            .display(workspace.db.upcast(), &config)
+            .display(&workspace.db.upcast(), &config)
             .to_string()
             .into()
     }

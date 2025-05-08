@@ -1,8 +1,10 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::ops::Deref;
 
+use ruff_db::diagnostic::{self as db, Annotation, DiagnosticId, Severity, Span};
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::FxHashMap;
 
@@ -45,7 +47,7 @@ mod text;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Message {
     Diagnostic(DiagnosticMessage),
-    SyntaxError(SyntaxErrorMessage),
+    SyntaxError(db::Diagnostic),
 }
 
 /// A diagnostic message corresponding to a rule violation.
@@ -57,14 +59,6 @@ pub struct DiagnosticMessage {
     pub parent: Option<TextSize>,
     pub file: SourceFile,
     pub noqa_offset: TextSize,
-}
-
-/// A syntax error message raised by the parser.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SyntaxErrorMessage {
-    pub message: String,
-    pub range: TextRange,
-    pub file: SourceFile,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -83,6 +77,17 @@ impl MessageKind {
 }
 
 impl Message {
+    pub fn syntax_error(
+        message: impl std::fmt::Display,
+        range: TextRange,
+        file: SourceFile,
+    ) -> Message {
+        let mut diag = db::Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
+        let span = Span::from(file).with_range(range);
+        diag.annotate(Annotation::primary(span).message(message));
+        Self::SyntaxError(diag)
+    }
+
     /// Create a [`Message`] from the given [`Diagnostic`] corresponding to a rule violation.
     pub fn from_diagnostic(
         diagnostic: Diagnostic,
@@ -114,14 +119,14 @@ impl Message {
             .next()
             .map_or(TextSize::new(0), TextLen::text_len);
 
-        Message::SyntaxError(SyntaxErrorMessage {
-            message: format!(
+        Message::syntax_error(
+            format_args!(
                 "SyntaxError: {}",
                 DisplayParseErrorType::new(&parse_error.error)
             ),
-            range: TextRange::at(parse_error.location.start(), len),
+            TextRange::at(parse_error.location.start(), len),
             file,
-        })
+        )
     }
 
     /// Create a [`Message`] from the given [`UnsupportedSyntaxError`].
@@ -129,11 +134,11 @@ impl Message {
         unsupported_syntax_error: &UnsupportedSyntaxError,
         file: SourceFile,
     ) -> Message {
-        Message::SyntaxError(SyntaxErrorMessage {
-            message: format!("SyntaxError: {unsupported_syntax_error}"),
-            range: unsupported_syntax_error.range,
+        Message::syntax_error(
+            format_args!("SyntaxError: {unsupported_syntax_error}"),
+            unsupported_syntax_error.range,
             file,
-        })
+        )
     }
 
     /// Create a [`Message`] from the given [`SemanticSyntaxError`].
@@ -141,11 +146,11 @@ impl Message {
         semantic_syntax_error: &SemanticSyntaxError,
         file: SourceFile,
     ) -> Message {
-        Message::SyntaxError(SyntaxErrorMessage {
-            message: format!("SyntaxError: {semantic_syntax_error}"),
-            range: semantic_syntax_error.range,
+        Message::syntax_error(
+            format_args!("SyntaxError: {semantic_syntax_error}"),
+            semantic_syntax_error.range,
             file,
-        })
+        )
     }
 
     pub const fn as_diagnostic_message(&self) -> Option<&DiagnosticMessage> {
@@ -168,8 +173,11 @@ impl Message {
     }
 
     /// Returns `true` if `self` is a syntax error message.
-    pub const fn is_syntax_error(&self) -> bool {
-        matches!(self, Message::SyntaxError(_))
+    pub fn is_syntax_error(&self) -> bool {
+        match self {
+            Message::Diagnostic(_) => false,
+            Message::SyntaxError(diag) => diag.id().is_invalid_syntax(),
+        }
     }
 
     /// Returns a message kind.
@@ -192,7 +200,11 @@ impl Message {
     pub fn body(&self) -> &str {
         match self {
             Message::Diagnostic(m) => &m.kind.body,
-            Message::SyntaxError(m) => &m.message,
+            Message::SyntaxError(m) => m
+                .primary_annotation()
+                .expect("Expected a primary annotation for a ruff diagnostic")
+                .get_message()
+                .expect("Expected a message for a ruff diagnostic"),
         }
     }
 
@@ -234,27 +246,47 @@ impl Message {
     }
 
     /// Returns the filename for the message.
-    pub fn filename(&self) -> &str {
-        self.source_file().name()
+    pub fn filename(&self) -> Cow<'_, str> {
+        match self {
+            Message::Diagnostic(m) => Cow::Borrowed(m.file.name()),
+            Message::SyntaxError(diag) => Cow::Owned(
+                diag.expect_primary_span()
+                    .expect_ruff_file()
+                    .name()
+                    .to_string(),
+            ),
+        }
     }
 
     /// Computes the start source location for the message.
     pub fn compute_start_location(&self) -> LineColumn {
-        self.source_file()
-            .to_source_code()
-            .line_column(self.start())
+        match self {
+            Message::Diagnostic(m) => m.file.to_source_code().line_column(m.range.start()),
+            Message::SyntaxError(diag) => diag
+                .expect_primary_span()
+                .expect_ruff_file()
+                .to_source_code()
+                .line_column(self.start()),
+        }
     }
 
     /// Computes the end source location for the message.
     pub fn compute_end_location(&self) -> LineColumn {
-        self.source_file().to_source_code().line_column(self.end())
+        match self {
+            Message::Diagnostic(m) => m.file.to_source_code().line_column(m.range.end()),
+            Message::SyntaxError(diag) => diag
+                .expect_primary_span()
+                .expect_ruff_file()
+                .to_source_code()
+                .line_column(self.end()),
+        }
     }
 
     /// Returns the [`SourceFile`] which the message belongs to.
-    pub fn source_file(&self) -> &SourceFile {
+    pub fn source_file(&self) -> SourceFile {
         match self {
-            Message::Diagnostic(m) => &m.file,
-            Message::SyntaxError(m) => &m.file,
+            Message::Diagnostic(m) => m.file.clone(),
+            Message::SyntaxError(m) => m.expect_primary_span().expect_ruff_file().clone(),
         }
     }
 }
@@ -275,7 +307,10 @@ impl Ranged for Message {
     fn range(&self) -> TextRange {
         match self {
             Message::Diagnostic(m) => m.range,
-            Message::SyntaxError(m) => m.range,
+            Message::SyntaxError(m) => m
+                .expect_primary_span()
+                .range()
+                .expect("Expected range for ruff span"),
         }
     }
 }
@@ -293,11 +328,11 @@ impl Deref for MessageWithLocation<'_> {
     }
 }
 
-fn group_messages_by_filename(messages: &[Message]) -> BTreeMap<&str, Vec<MessageWithLocation>> {
+fn group_messages_by_filename(messages: &[Message]) -> BTreeMap<String, Vec<MessageWithLocation>> {
     let mut grouped_messages = BTreeMap::default();
     for message in messages {
         grouped_messages
-            .entry(message.filename())
+            .entry(message.filename().to_string())
             .or_insert_with(Vec::new)
             .push(MessageWithLocation {
                 message,

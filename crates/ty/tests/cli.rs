@@ -1,6 +1,7 @@
 use anyhow::Context;
 use insta::internals::SettingsBindDropGuard;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
+use ruff_python_ast::PythonVersion;
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -368,12 +369,12 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
             for a in range(0, int(y)):
                 x = a
 
-            print(x)  # possibly-unresolved-reference
+            prin(x)  # unresolved-reference
             "#,
     )?;
 
-    // Assert that there's a possibly unresolved reference diagnostic
-    // and that division-by-zero has a severity of error by default.
+    // Assert that there's an `unresolved-reference` diagnostic (error)
+    // and a `division-by-zero` diagnostic (error).
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
@@ -388,15 +389,15 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
       |
     info: `lint:division-by-zero` is enabled by default
 
-    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> test.py:7:7
+    error: lint:unresolved-reference: Name `prin` used when not defined
+     --> test.py:7:1
       |
     5 |     x = a
     6 |
-    7 | print(x)  # possibly-unresolved-reference
-      |       ^
+    7 | prin(x)  # unresolved-reference
+      | ^^^^
       |
-    info: `lint:possibly-unresolved-reference` is enabled by default
+    info: `lint:unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
@@ -408,7 +409,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
         r#"
         [tool.ty.rules]
         division-by-zero = "warn" # demote to warn
-        possibly-unresolved-reference = "ignore"
+        unresolved-reference = "ignore"
     "#,
     )?;
 
@@ -447,12 +448,12 @@ fn cli_rule_severity() -> anyhow::Result<()> {
         for a in range(0, int(y)):
             x = a
 
-        print(x)  # possibly-unresolved-reference
+        prin(x)  # unresolved-reference
         "#,
     )?;
 
-    // Assert that there's a possibly unresolved reference diagnostic
-    // and that division-by-zero has a severity of error by default.
+    // Assert that there's an `unresolved-reference` diagnostic (error),
+    // a `division-by-zero` (error) and a unresolved-import (error) diagnostic by default.
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
@@ -479,15 +480,15 @@ fn cli_rule_severity() -> anyhow::Result<()> {
       |
     info: `lint:division-by-zero` is enabled by default
 
-    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> test.py:9:7
+    error: lint:unresolved-reference: Name `prin` used when not defined
+     --> test.py:9:1
       |
     7 |     x = a
     8 |
-    9 | print(x)  # possibly-unresolved-reference
-      |       ^
+    9 | prin(x)  # unresolved-reference
+      | ^^^^
       |
-    info: `lint:possibly-unresolved-reference` is enabled by default
+    info: `lint:unresolved-reference` is enabled by default
 
     Found 3 diagnostics
 
@@ -498,7 +499,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
         case
             .command()
             .arg("--ignore")
-            .arg("possibly-unresolved-reference")
+            .arg("unresolved-reference")
             .arg("--warn")
             .arg("division-by-zero")
             .arg("--warn")
@@ -550,12 +551,12 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
         for a in range(0, int(y)):
             x = a
 
-        print(x)  # possibly-unresolved-reference
+        prin(x)  # unresolved-reference
         "#,
     )?;
 
-    // Assert that there's a possibly unresolved reference diagnostic
-    // and that division-by-zero has a severity of error by default.
+    // Assert that there's a `unresolved-reference` diagnostic (error)
+    // and a `division-by-zero` (error) by default.
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
@@ -570,15 +571,15 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
       |
     info: `lint:division-by-zero` is enabled by default
 
-    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> test.py:7:7
+    error: lint:unresolved-reference: Name `prin` used when not defined
+     --> test.py:7:1
       |
     5 |     x = a
     6 |
-    7 | print(x)  # possibly-unresolved-reference
-      |       ^
+    7 | prin(x)  # unresolved-reference
+      | ^^^^
       |
-    info: `lint:possibly-unresolved-reference` is enabled by default
+    info: `lint:unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
@@ -588,13 +589,13 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     assert_cmd_snapshot!(
         case
             .command()
-            .arg("--error")
-            .arg("possibly-unresolved-reference")
+            .arg("--warn")
+            .arg("unresolved-reference")
             .arg("--warn")
             .arg("division-by-zero")
             // Override the error severity with warning
             .arg("--ignore")
-            .arg("possibly-unresolved-reference"),
+            .arg("unresolved-reference"),
         @r"
     success: true
     exit_code: 0
@@ -675,7 +676,7 @@ fn cli_unknown_rules() -> anyhow::Result<()> {
 fn exit_code_only_warnings() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -685,7 +686,7 @@ fn exit_code_only_warnings() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: `lint:unresolved-reference` is enabled by default
+    info: `lint:unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -759,7 +760,7 @@ fn exit_code_only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
 fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
-    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r"
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning").arg("--warn").arg("unresolved-reference"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -769,7 +770,7 @@ fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: `lint:unresolved-reference` is enabled by default
+    info: `lint:unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -792,7 +793,7 @@ fn exit_code_no_errors_but_error_on_warning_is_enabled_in_configuration() -> any
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -802,7 +803,7 @@ fn exit_code_no_errors_but_error_on_warning_is_enabled_in_configuration() -> any
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: `lint:unresolved-reference` is enabled by default
+    info: `lint:unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -822,7 +823,7 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -833,7 +834,7 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
       |       ^
     3 | print(4[1])  # [non-subscriptable]
       |
-    info: `lint:unresolved-reference` is enabled by default
+    info: `lint:unresolved-reference` was selected on the command line
 
     error: lint:non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
@@ -862,7 +863,7 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
         "###,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--error-on-warning"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -873,7 +874,7 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
       |       ^
     3 | print(4[1])  # [non-subscriptable]
       |
-    info: `lint:unresolved-reference` is enabled by default
+    info: `lint:unresolved-reference` was selected on the command line
 
     error: lint:non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
@@ -902,7 +903,7 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--exit-zero"), @r"
+    assert_cmd_snapshot!(case.command().arg("--exit-zero").arg("--warn").arg("unresolved-reference"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -913,7 +914,7 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
       |       ^
     3 | print(4[1])  # [non-subscriptable]
       |
-    info: `lint:unresolved-reference` is enabled by default
+    info: `lint:unresolved-reference` was selected on the command line
 
     error: lint:non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
@@ -950,7 +951,7 @@ fn user_configuration() -> anyhow::Result<()> {
             for a in range(0, int(y)):
                 x = a
 
-            print(x)
+            prin(x)
             "#,
         ),
     ])?;
@@ -961,50 +962,6 @@ fn user_configuration() -> anyhow::Result<()> {
     } else {
         "XDG_CONFIG_HOME"
     };
-
-    assert_cmd_snapshot!(
-        case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
-        @r"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    warning: lint:division-by-zero: Cannot divide object of type `Literal[4]` by zero
-     --> main.py:2:5
-      |
-    2 | y = 4 / 0
-      |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
-      |
-    info: `lint:division-by-zero` was selected in the configuration file
-
-    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> main.py:7:7
-      |
-    5 |     x = a
-    6 |
-    7 | print(x)
-      |       ^
-      |
-    info: `lint:possibly-unresolved-reference` is enabled by default
-
-    Found 2 diagnostics
-
-    ----- stderr -----
-    "
-    );
-
-    // The user-level configuration promotes `possibly-unresolved-reference` to an error.
-    // Changing the level for `division-by-zero` has no effect, because the project-level configuration
-    // has higher precedence.
-    case.write_file(
-        config_directory.join("ty/ty.toml"),
-        r#"
-        [rules]
-        division-by-zero = "error"
-        possibly-unresolved-reference = "error"
-        "#,
-    )?;
 
     assert_cmd_snapshot!(
         case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
@@ -1022,15 +979,59 @@ fn user_configuration() -> anyhow::Result<()> {
       |
     info: `lint:division-by-zero` was selected in the configuration file
 
-    error: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> main.py:7:7
+    error: lint:unresolved-reference: Name `prin` used when not defined
+     --> main.py:7:1
       |
     5 |     x = a
     6 |
-    7 | print(x)
-      |       ^
+    7 | prin(x)
+      | ^^^^
       |
-    info: `lint:possibly-unresolved-reference` was selected in the configuration file
+    info: `lint:unresolved-reference` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    // The user-level configuration sets the severity for `unresolved-reference` to warn.
+    // Changing the level for `division-by-zero` has no effect, because the project-level configuration
+    // has higher precedence.
+    case.write_file(
+        config_directory.join("ty/ty.toml"),
+        r#"
+        [rules]
+        division-by-zero = "error"
+        unresolved-reference = "warn"
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning: lint:division-by-zero: Cannot divide object of type `Literal[4]` by zero
+     --> main.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ^^^^^
+    3 |
+    4 | for a in range(0, int(y)):
+      |
+    info: `lint:division-by-zero` was selected in the configuration file
+
+    warning: lint:unresolved-reference: Name `prin` used when not defined
+     --> main.py:7:1
+      |
+    5 |     x = a
+    6 |
+    7 | prin(x)
+      | ^^^^
+      |
+    info: `lint:unresolved-reference` was selected in the configuration file
 
     Found 2 diagnostics
 
@@ -1180,7 +1181,7 @@ fn concise_diagnostics() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @r"
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise").arg("--warn").arg("unresolved-reference"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1256,6 +1257,80 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
       |
 
     Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "ty.toml",
+            &*format!(
+                r#"
+                [environment]
+                python-version = "{}"
+                python-platform = "linux"
+                "#,
+                PythonVersion::default()
+            ),
+        ),
+        (
+            "main.py",
+            r#"
+            import os
+
+            os.grantpt(1) # only available on unix, Python 3.13 or newer
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: lint:unresolved-attribute: Type `<module 'os'>` has no attribute `grantpt`
+     --> main.py:4:1
+      |
+    2 | import os
+    3 |
+    4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
+      | ^^^^^^^^^^
+      |
+    info: `lint:unresolved-attribute` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // Use default (which should be latest supported)
+    let case = TestCase::with_files([
+        (
+            "ty.toml",
+            r#"
+            [environment]
+            python-platform = "linux"
+            "#,
+        ),
+        (
+            "main.py",
+            r#"
+            import os
+
+            os.grantpt(1) # only available on unix, Python 3.13 or newer
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     ");

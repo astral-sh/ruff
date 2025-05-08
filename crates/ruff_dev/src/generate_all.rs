@@ -2,7 +2,9 @@
 
 use anyhow::Result;
 
-use crate::{generate_cli_help, generate_docs, generate_json_schema, generate_ty_schema};
+use crate::{
+    generate_cli_help, generate_docs, generate_json_schema, generate_ty_rules, generate_ty_schema,
+};
 
 pub(crate) const REGENERATE_ALL_COMMAND: &str = "cargo dev generate-all";
 
@@ -38,5 +40,6 @@ pub(crate) fn main(args: &Args) -> Result<()> {
     generate_docs::main(&generate_docs::Args {
         dry_run: args.mode.is_dry_run(),
     })?;
+    generate_ty_rules::main(&generate_ty_rules::Args { mode: args.mode })?;
     Ok(())
 }

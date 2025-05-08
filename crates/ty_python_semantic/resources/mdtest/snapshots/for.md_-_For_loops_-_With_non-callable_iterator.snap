@@ -59,7 +59,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
+info: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
   --> src/mdtest_snippet.py:16:17
    |
 14 |     # revealed: Unknown
