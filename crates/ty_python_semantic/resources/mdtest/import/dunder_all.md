@@ -269,6 +269,8 @@ import subexporter
 
 __all__ = []
 __all__.extend(["C", "D"])
+__all__.extend(("E", "F"))
+__all__.extend({"G", "H"})
 __all__.extend(subexporter.__all__)
 
 class C: ...
@@ -281,7 +283,7 @@ class D: ...
 import exporter
 from ty_extensions import dunder_all_names
 
-# revealed: tuple[Literal["A"], Literal["B"], Literal["C"], Literal["D"]]
+# revealed: tuple[Literal["A"], Literal["B"], Literal["C"], Literal["D"], Literal["E"], Literal["F"], Literal["G"], Literal["H"]]
 reveal_type(dunder_all_names(exporter))
 ```
 
