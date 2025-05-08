@@ -391,26 +391,32 @@ class E(
 
 ## `__bases__` lists with duplicate `Unknown` bases
 
+We do not emit errors on classes where multiple bases are inferred as `Unknown`, `Todo` or `Any`.
+Usually having duplicate bases in a bases list like this would cause us to emit a diagnostic;
+however, for gradual types this would break the [gradual guarantee](https://typing.python.org/en/latest/spec/concepts.html#the-gradual-guarantee):
+the dynamic base can usually be materialised to a type that would lead to a resolvable MRO.
+
 ```py
-# error: [unresolved-import]
-from does_not_exist import unknown_object_1, unknown_object_2
+from unresolvable_module import UnknownBase1, UnknownBase2  # error: [unresolved-import]
 
-reveal_type(unknown_object_1)  # revealed: Unknown
-reveal_type(unknown_object_2)  # revealed: Unknown
+reveal_type(UnknownBase1)  # revealed: Unknown
+reveal_type(UnknownBase2)  # revealed: Unknown
 
-# We *should* emit an error here to warn the user that we have no idea
-# what the MRO of this class should really be.
-# However, we don't complain about "duplicate base classes" here,
-# even though two classes are both inferred as being `Unknown`.
-#
-# (TODO: should we revisit this? Does it violate the gradual guarantee?
-# Should we just silently infer `[Foo, Unknown, object]` as the MRO here
-# without emitting any error at all? Not sure...)
-#
-# error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Foo` with bases list `[Unknown, Unknown]`"
-class Foo(unknown_object_1, unknown_object_2): ...
+# no error here -- we respect the gradual guarantee:
+class Foo(UnknownBase1, UnknownBase2): ...
 
 reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+```
+
+However, if there are duplicate class elements, we do emit an error, even if there are also multiple
+dynamic members. The following class definition will definitely fail, no matter what the dynamic
+bases materialize to:
+
+```py
+# error: [duplicate-base] "Duplicate base class `Foo`"
+class Bar(UnknownBase1, Foo, UnknownBase2, Foo): ...
+
+reveal_type(Bar.__mro__)  # revealed: tuple[<class 'Bar'>, Unknown, <class 'object'>]
 ```
 
 ## Unrelated objects inferred as `Any`/`Unknown` do not have special `__mro__` attributes
