@@ -1672,6 +1672,21 @@ class Recursive(Protocol):
 static_assert(is_fully_static(Recursive))
 static_assert(is_equivalent_to(Recursive, Recursive))
 static_assert(is_assignable_to(Recursive, Recursive))
+
+def _(r: Recursive):
+    reveal_type(r.direct)  # revealed: Recursive
+    reveal_type(r.union)  # revealed: None | Recursive
+    reveal_type(r.intersection1)  # revealed: C & Recursive
+    reveal_type(r.intersection2)  # revealed: C & ~Recursive
+    reveal_type(r.t)  # revealed: tuple[int, tuple[str, Recursive]]
+    reveal_type(r.callable1)  # revealed: (int, /) -> Recursive
+    reveal_type(r.callable2)  # revealed: (Recursive, /) -> int
+    reveal_type(r.subtype_of)  # revealed: type[Recursive]
+    reveal_type(r.generic)  # revealed: GenericC[Recursive]
+    reveal_type(r.method(r))  # revealed: Recursive
+    reveal_type(r.nested)  # revealed: Recursive | ((Recursive, tuple[Recursive, Recursive], /) -> Recursive)
+
+    reveal_type(r.method(r).callable1(1).direct.t[1][1])  # revealed: Recursive
 ```
 
 ### Regression test: narrowing with self-referential protocols
