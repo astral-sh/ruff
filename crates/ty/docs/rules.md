@@ -1394,33 +1394,6 @@ or `ImportError` at runtime.
 * [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L822)
 </details>
 
-## `possibly-unresolved-reference`
-
-**Default level**: warn
-
-<details>
-<summary>detects references to possibly undefined names</summary>
-
-### What it does
-Checks for references to names that are possibly not defined.
-
-### Why is this bad?
-Using an undefined variable will raise a `NameError` at runtime.
-
-### Example
-
-```python
-for i in range(0):
-    x = i
-
-print(x)  # NameError: name 'x' is not defined
-```
-
-### Links
-* [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-unresolved-reference)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L836)
-</details>
-
 ## `redundant-cast`
 
 **Default level**: warn
@@ -1550,5 +1523,32 @@ a = 20 / 2
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unused-ignore-comment)
 * [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L15)
+</details>
+
+## `possibly-unresolved-reference`
+
+**Default level**: ignore
+
+<details>
+<summary>detects references to possibly undefined names</summary>
+
+### What it does
+Checks for references to names that are possibly not defined.
+
+### Why is this bad?
+Using an undefined variable will raise a `NameError` at runtime.
+
+### Example
+
+```python
+for i in range(0):
+    x = i
+
+print(x)  # NameError: name 'x' is not defined
+```
+
+### Links
+* [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-unresolved-reference)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L836)
 </details>
 
