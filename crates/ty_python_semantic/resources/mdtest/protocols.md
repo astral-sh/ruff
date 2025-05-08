@@ -1613,11 +1613,24 @@ def _(rec: RecursiveFullyStatic, other: Other):
 
     rec.parent.parent.parent = other  # error: [invalid-assignment]
     other = rec.parent.parent.parent  # error: [invalid-assignment]
+
+class Foo(Protocol):
+    @property
+    def x(self) -> "Foo": ...
+
+class Bar(Protocol):
+    @property
+    def x(self) -> "Bar": ...
+
+# TODO: this should pass
+# error: [static-assert-error]
+static_assert(is_equivalent_to(Foo, Bar))
 ```
 
 ### Nested occurrences of self-reference
 
-Make sure that we handle self-reference correctly, even if they appear as parts of type:
+Make sure that we handle self-reference correctly, even if the self-reference appears deeply nested
+within the type of a protocol member:
 
 ```toml
 [environment]
