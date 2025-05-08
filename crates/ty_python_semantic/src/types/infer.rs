@@ -5773,6 +5773,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }),
 
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::BitOr) => {
+                Some(Type::IntLiteral(n | m))
+            }
+
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::BitAnd) => {
+                Some(Type::IntLiteral(n & m))
+            }
+
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::BitXor) => {
+                Some(Type::IntLiteral(n ^ m))
+            }
+
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
                 let bytes = [&**lhs.value(self.db()), &**rhs.value(self.db())].concat();
                 Some(Type::bytes_literal(self.db(), &bytes))
@@ -5826,6 +5838,14 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             (Type::BooleanLiteral(b1), Type::BooleanLiteral(b2), ast::Operator::BitOr) => {
                 Some(Type::BooleanLiteral(b1 | b2))
+            }
+
+            (Type::BooleanLiteral(b1), Type::BooleanLiteral(b2), ast::Operator::BitAnd) => {
+                Some(Type::BooleanLiteral(b1 & b2))
+            }
+
+            (Type::BooleanLiteral(b1), Type::BooleanLiteral(b2), ast::Operator::BitXor) => {
+                Some(Type::BooleanLiteral(b1 ^ b2))
             }
 
             (Type::BooleanLiteral(bool_value), right, op) => self.infer_binary_expression_type(
