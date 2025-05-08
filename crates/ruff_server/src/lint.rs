@@ -32,6 +32,7 @@ use ruff_text_size::{Ranged, TextRange};
 /// This is serialized on the diagnostic `data` field.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct AssociatedDiagnosticData {
+    /// The message describing what the fix does, if it exists, or the diagnostic name otherwise.
     pub(crate) title: String,
     /// Edits to fix the diagnostic. If this is empty, a fix
     /// does not exist.
