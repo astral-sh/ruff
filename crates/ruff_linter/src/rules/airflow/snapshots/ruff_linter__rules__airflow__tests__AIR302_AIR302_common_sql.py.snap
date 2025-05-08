@@ -289,7 +289,7 @@ AIR302_common_sql.py:114:1: AIR302 `airflow.sensors.sql_sensor.SqlSensor` is mov
     |
     = help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `airflow.providers.common.sql.sensors.sql.SqlSensor` instead.
 
-AIR302_common_sql.py:124:1: AIR302 `airflow.operators.jdbc_operator.JdbcOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:124:1: AIR302 [*] `airflow.operators.jdbc_operator.JdbcOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
 122 | from airflow.operators.sqlite_operator import SqliteOperator
 123 |
@@ -300,7 +300,19 @@ AIR302_common_sql.py:124:1: AIR302 `airflow.operators.jdbc_operator.JdbcOperator
     |
     = help: Install `apache-airflow-providers-common-sql>=1.3.0` and use `airflow.providers.common.sql.operators.sql.SQLExecuteQueryOperator` instead.
 
-AIR302_common_sql.py:125:1: AIR302 `airflow.operators.mssql_operator.MsSqlOperator` is moved into `common-sql` provider in Airflow 3.0;
+ℹ Safe fix
+120 120 | from airflow.operators.oracle_operator import OracleOperator
+121 121 | from airflow.operators.postgres_operator import PostgresOperator
+122 122 | from airflow.operators.sqlite_operator import SqliteOperator
+    123 |+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+123 124 | 
+124     |-JdbcOperator()
+    125 |+SQLExecuteQueryOperator()
+125 126 | MsSqlOperator()
+126 127 | MySqlOperator()
+127 128 | OracleOperator()
+
+AIR302_common_sql.py:125:1: AIR302 [*] `airflow.operators.mssql_operator.MsSqlOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
 124 | JdbcOperator()
 125 | MsSqlOperator()
@@ -310,7 +322,20 @@ AIR302_common_sql.py:125:1: AIR302 `airflow.operators.mssql_operator.MsSqlOperat
     |
     = help: Install `apache-airflow-providers-common-sql>=1.3.0` and use `airflow.providers.common.sql.operators.sql.SQLExecuteQueryOperator` instead.
 
-AIR302_common_sql.py:126:1: AIR302 `airflow.operators.mysql_operator.MySqlOperator` is moved into `common-sql` provider in Airflow 3.0;
+ℹ Safe fix
+120 120 | from airflow.operators.oracle_operator import OracleOperator
+121 121 | from airflow.operators.postgres_operator import PostgresOperator
+122 122 | from airflow.operators.sqlite_operator import SqliteOperator
+    123 |+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+123 124 | 
+124 125 | JdbcOperator()
+125     |-MsSqlOperator()
+    126 |+SQLExecuteQueryOperator()
+126 127 | MySqlOperator()
+127 128 | OracleOperator()
+128 129 | PostgresOperator()
+
+AIR302_common_sql.py:126:1: AIR302 [*] `airflow.operators.mysql_operator.MySqlOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
 124 | JdbcOperator()
 125 | MsSqlOperator()
@@ -321,7 +346,21 @@ AIR302_common_sql.py:126:1: AIR302 `airflow.operators.mysql_operator.MySqlOperat
     |
     = help: Install `apache-airflow-providers-common-sql>=1.3.0` and use `airflow.providers.common.sql.operators.sql.SQLExecuteQueryOperator` instead.
 
-AIR302_common_sql.py:127:1: AIR302 `airflow.operators.oracle_operator.OracleOperator` is moved into `common-sql` provider in Airflow 3.0;
+ℹ Safe fix
+120 120 | from airflow.operators.oracle_operator import OracleOperator
+121 121 | from airflow.operators.postgres_operator import PostgresOperator
+122 122 | from airflow.operators.sqlite_operator import SqliteOperator
+    123 |+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+123 124 | 
+124 125 | JdbcOperator()
+125 126 | MsSqlOperator()
+126     |-MySqlOperator()
+    127 |+SQLExecuteQueryOperator()
+127 128 | OracleOperator()
+128 129 | PostgresOperator()
+129 130 | SqliteOperator()
+
+AIR302_common_sql.py:127:1: AIR302 [*] `airflow.operators.oracle_operator.OracleOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
 125 | MsSqlOperator()
 126 | MySqlOperator()
@@ -332,7 +371,21 @@ AIR302_common_sql.py:127:1: AIR302 `airflow.operators.oracle_operator.OracleOper
     |
     = help: Install `apache-airflow-providers-common-sql>=1.3.0` and use `airflow.providers.common.sql.operators.sql.SQLExecuteQueryOperator` instead.
 
-AIR302_common_sql.py:128:1: AIR302 `airflow.operators.postgres_operator.PostgresOperator` is moved into `common-sql` provider in Airflow 3.0;
+ℹ Safe fix
+120 120 | from airflow.operators.oracle_operator import OracleOperator
+121 121 | from airflow.operators.postgres_operator import PostgresOperator
+122 122 | from airflow.operators.sqlite_operator import SqliteOperator
+    123 |+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+123 124 | 
+124 125 | JdbcOperator()
+125 126 | MsSqlOperator()
+126 127 | MySqlOperator()
+127     |-OracleOperator()
+    128 |+SQLExecuteQueryOperator()
+128 129 | PostgresOperator()
+129 130 | SqliteOperator()
+
+AIR302_common_sql.py:128:1: AIR302 [*] `airflow.operators.postgres_operator.PostgresOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
 126 | MySqlOperator()
 127 | OracleOperator()
@@ -342,7 +395,21 @@ AIR302_common_sql.py:128:1: AIR302 `airflow.operators.postgres_operator.Postgres
     |
     = help: Install `apache-airflow-providers-common-sql>=1.3.0` and use `airflow.providers.common.sql.operators.sql.SQLExecuteQueryOperator` instead.
 
-AIR302_common_sql.py:129:1: AIR302 `airflow.operators.sqlite_operator.SqliteOperator` is moved into `common-sql` provider in Airflow 3.0;
+ℹ Safe fix
+120 120 | from airflow.operators.oracle_operator import OracleOperator
+121 121 | from airflow.operators.postgres_operator import PostgresOperator
+122 122 | from airflow.operators.sqlite_operator import SqliteOperator
+    123 |+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+123 124 | 
+124 125 | JdbcOperator()
+125 126 | MsSqlOperator()
+126 127 | MySqlOperator()
+127 128 | OracleOperator()
+128     |-PostgresOperator()
+    129 |+SQLExecuteQueryOperator()
+129 130 | SqliteOperator()
+
+AIR302_common_sql.py:129:1: AIR302 [*] `airflow.operators.sqlite_operator.SqliteOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
 127 | OracleOperator()
 128 | PostgresOperator()
@@ -350,3 +417,17 @@ AIR302_common_sql.py:129:1: AIR302 `airflow.operators.sqlite_operator.SqliteOper
     | ^^^^^^^^^^^^^^ AIR302
     |
     = help: Install `apache-airflow-providers-common-sql>=1.3.0` and use `airflow.providers.common.sql.operators.sql.SQLExecuteQueryOperator` instead.
+
+ℹ Safe fix
+120 120 | from airflow.operators.oracle_operator import OracleOperator
+121 121 | from airflow.operators.postgres_operator import PostgresOperator
+122 122 | from airflow.operators.sqlite_operator import SqliteOperator
+    123 |+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+123 124 | 
+124 125 | JdbcOperator()
+125 126 | MsSqlOperator()
+126 127 | MySqlOperator()
+127 128 | OracleOperator()
+128 129 | PostgresOperator()
+129     |-SqliteOperator()
+    130 |+SQLExecuteQueryOperator()
