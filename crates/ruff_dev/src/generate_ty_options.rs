@@ -24,7 +24,7 @@ pub(crate) struct Args {
     pub(crate) mode: Mode,
 }
 
-pub(crate) fn main(args: Args) -> anyhow::Result<()> {
+pub(crate) fn main(args: &Args) -> anyhow::Result<()> {
     let mut output = String::new();
     let markdown_path = PathBuf::from(ROOT_DIR).join("crates/ty/docs/configuration.md");
 
@@ -265,4 +265,24 @@ enum ConfigurationFile {
     PyprojectToml,
     #[expect(dead_code)]
     TyToml,
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use std::env;
+
+    use crate::generate_all::Mode;
+
+    use super::{main, Args};
+
+    #[test]
+    fn ty_configuration_markdown_up_to_date() -> Result<()> {
+        let mode = if env::var("TY_UPDATE_SCHEMA").as_deref() == Ok("1") {
+            Mode::Write
+        } else {
+            Mode::Check
+        };
+        main(&Args { mode })
+    }
 }

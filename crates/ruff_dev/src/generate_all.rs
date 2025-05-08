@@ -41,7 +41,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
     generate_docs::main(&generate_docs::Args {
         dry_run: args.mode.is_dry_run(),
     })?;
-    generate_ty_options::main(generate_ty_options::Args { mode: args.mode })?;
+    generate_ty_options::main(&generate_ty_options::Args { mode: args.mode })?;
     generate_ty_rules::main(&generate_ty_rules::Args { mode: args.mode })?;
     Ok(())
 }

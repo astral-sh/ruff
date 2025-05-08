@@ -94,7 +94,7 @@ fn main() -> Result<ExitCode> {
         Command::GenerateRulesTable => println!("{}", generate_rules_table::generate()),
         Command::GenerateTyRules(args) => generate_ty_rules::main(&args)?,
         Command::GenerateOptions => println!("{}", generate_options::generate()),
-        Command::GenerateTyOptions(args) => generate_ty_options::main(args)?,
+        Command::GenerateTyOptions(args) => generate_ty_options::main(&args)?,
         Command::GenerateCliHelp(args) => generate_cli_help::main(&args)?,
         Command::GenerateDocs(args) => generate_docs::main(&args)?,
         Command::PrintAST(args) => print_ast::main(&args)?,
