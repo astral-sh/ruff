@@ -251,6 +251,43 @@ from ty_extensions import dunder_all_names
 reveal_type(dunder_all_names(exporter))
 ```
 
+### Augmenting list with a list or submodule `__all__` (2)
+
+The same again, but the submodule is an attribute expression rather than a name expression:
+
+`exporter/__init__.py`:
+
+```py
+```
+
+`exporter/sub.py`:
+
+```py
+__all__ = ["foo"]
+
+foo = 42
+```
+
+`module.py`:
+
+```py
+import exporter.sub
+
+__all__ = []
+
+if True:
+    __all__.extend(exporter.sub.__all__)
+```
+
+`main.py`:
+
+```py
+import module
+from ty_extensions import dunder_all_names
+
+reveal_type(dunder_all_names(module))  # revealed: tuple[Literal["foo"]]
+```
+
 ### Extending with a list or submodule `__all__`
 
 `subexporter.py`:
