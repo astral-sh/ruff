@@ -176,6 +176,9 @@ pub(crate) struct SemanticIndex<'db> {
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
 
+    /// Map from the file-local [`FileScopeId`] to the set of explicit-global symbols it contains.
+    globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedSymbolId>>,
+
     /// Use-def map for each scope in this file.
     use_def_maps: IndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
 
@@ -253,6 +256,16 @@ impl<'db> SemanticIndex<'db> {
 
     pub(crate) fn scope_ids(&self) -> impl Iterator<Item = ScopeId> {
         self.scope_ids_by_scope.iter().copied()
+    }
+
+    pub(crate) fn symbol_is_global_in_scope(
+        &self,
+        symbol: ScopedSymbolId,
+        scope: FileScopeId,
+    ) -> bool {
+        self.globals_by_scope
+            .get(&scope)
+            .is_some_and(|globals| globals.contains(&symbol))
     }
 
     /// Returns the id of the parent scope.
