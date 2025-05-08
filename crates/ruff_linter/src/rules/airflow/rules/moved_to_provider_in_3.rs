@@ -288,7 +288,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             }
         }
         ["airflow", "operators", "sql", rest] => match *rest {
-            "BaseSQLOperator" | "BranchSQLOperator" | "SQLTablecheckOperator" => {
+            "BaseSQLOperator" | "BranchSQLOperator" | "SQLTableCheckOperator" => {
                 ProviderReplacement::SourceModuleMovedToProvider {
                     name: (*rest).to_string(),
                     module: "airflow.providers.common.sql.operators.sql",
