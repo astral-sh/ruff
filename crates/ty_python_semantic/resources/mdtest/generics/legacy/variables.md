@@ -86,6 +86,26 @@ S = TypeVar("S")
 reveal_type(S.__default__)  # revealed: NoDefault
 ```
 
+### Using other typevars as a default
+
+```py
+from typing import Generic, TypeVar, Union
+
+T = TypeVar("T")
+U = TypeVar("U", default=T)
+V = TypeVar("V", default=Union[T, U])
+
+class Valid(Generic[T, U, V]): ...
+
+reveal_type(Valid())  # revealed: Valid[Unknown, Unknown, Unknown]
+reveal_type(Valid[int]())  # revealed: Valid[int, int, int]
+reveal_type(Valid[int, str]())  # revealed: Valid[int, str, int | str]
+reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
+
+# TODO: error, default value for U isn't available in the generic context
+class Invalid(Generic[U]): ...
+```
+
 ### Type variables with an upper bound
 
 ```py
