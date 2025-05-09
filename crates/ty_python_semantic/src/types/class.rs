@@ -982,18 +982,22 @@ impl<'db> ClassLiteral<'db> {
         let class_def_node = scope.node(db).expect_class(&parsed);
         class_def_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
-            GenericContext::from_type_params(db, index, type_params)
+            let definition = index.expect_single_definition(class_def_node);
+            GenericContext::from_type_params(db, index, type_params, definition)
         })
     }
 
     pub(crate) fn legacy_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        self.explicit_bases(db).iter().find_map(|base| match base {
-            Type::KnownInstance(
-                KnownInstanceType::SubscriptedGeneric(generic_context)
-                | KnownInstanceType::SubscriptedProtocol(generic_context),
-            ) => Some(*generic_context),
-            _ => None,
-        })
+        self.explicit_bases(db)
+            .iter()
+            .find_map(|base| match base {
+                Type::KnownInstance(
+                    KnownInstanceType::SubscriptedGeneric(generic_context)
+                    | KnownInstanceType::SubscriptedProtocol(generic_context),
+                ) => Some(*generic_context),
+                _ => None,
+            })
+            .map(|generic_context| generic_context.with_definition(db, self.definition(db)))
     }
 
     pub(crate) fn inherited_legacy_generic_context(
@@ -1006,6 +1010,7 @@ impl<'db> ClassLiteral<'db> {
                 .iter()
                 .copied()
                 .filter(|ty| matches!(ty, Type::GenericAlias(_))),
+            self.definition(db),
         )
     }
 
