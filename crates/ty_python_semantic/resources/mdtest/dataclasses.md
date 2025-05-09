@@ -369,8 +369,8 @@ To do
 
 ### `frozen`
 
-If true (the default is False), assigning to fields will generate a diagnostic. If __setattr__() or
-__delattr__() is defined in the class, we should emit a diagnostic.
+If true (the default is False), assigning to fields will generate a diagnostic. If `__setattr__()` or
+`__delattr__()` is defined in the class, we should emit a diagnostic.
 
 ```py
 from dataclasses import dataclass
