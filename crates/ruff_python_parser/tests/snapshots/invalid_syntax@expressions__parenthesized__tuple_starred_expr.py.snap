@@ -1117,7 +1117,7 @@ Module(
 ## Errors
 
   |
-2 | # Test the first and any other element as the there are two separate calls.
+2 | # Test the first and any other element as there are two separate calls.
 3 |
 4 | (*x in y, z, *x in y)
   |   ^^^^^^ Syntax Error: Comparison expression cannot be used here
@@ -1127,7 +1127,7 @@ Module(
 
 
   |
-2 | # Test the first and any other element as the there are two separate calls.
+2 | # Test the first and any other element as there are two separate calls.
 3 |
 4 | (*x in y, z, *x in y)
   |               ^^^^^^ Syntax Error: Comparison expression cannot be used here

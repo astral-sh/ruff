@@ -8277,7 +8277,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let callable_type = Type::Callable(callable_type);
 
                 // `Signature` / `Parameters` are not a `Type` variant, so we're storing
-                // the outer callable type on the these expressions instead.
+                // the outer callable type on these expressions instead.
                 self.store_expression_type(arguments_slice, callable_type);
                 if let Some(first_argument) = first_argument {
                     self.store_expression_type(first_argument, callable_type);

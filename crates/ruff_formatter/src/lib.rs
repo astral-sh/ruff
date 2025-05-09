@@ -92,7 +92,7 @@ impl std::fmt::Display for IndentStyle {
     }
 }
 
-/// The visual width of a indentation.
+/// The visual width of an indentation.
 ///
 /// Determines the visual width of a tab character (`\t`) and the number of
 /// spaces per indent when using [`IndentStyle::Space`].
@@ -207,7 +207,7 @@ pub trait FormatOptions {
     /// What's the max width of a line. Defaults to 80.
     fn line_width(&self) -> LineWidth;
 
-    /// Derives the print options from the these format options
+    /// Derives the print options from these format options
     fn as_print_options(&self) -> PrinterOptions;
 }
 

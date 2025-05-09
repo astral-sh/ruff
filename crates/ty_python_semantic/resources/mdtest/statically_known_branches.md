@@ -163,7 +163,7 @@ other
 
 ## Based on type inference
 
-For the the rest of this test suite, we will mostly use `True` and `False` literals to indicate
+For the rest of this test suite, we will mostly use `True` and `False` literals to indicate
 statically known conditions, but here, we show that the results are truly based on type inference,
 not some special handling of specific conditions in semantic index building. We use two modules to
 demonstrate this, since semantic index building is inherently single-module:
