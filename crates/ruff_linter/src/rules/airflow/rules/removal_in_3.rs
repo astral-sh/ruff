@@ -243,8 +243,8 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                         ));
                     }
                     ["airflow", .., "operators", "datetime", "BranchDateTimeOperator"]
-                    | ["airflow", .., "operators", "weekday", "DayOfWeekSensor" | "BranchDayOfWeekOperator"] =>
-                    {
+                    | ["airflow", .., "operators", "weekday", "BranchDayOfWeekOperator"]
+                    | ["airflow", .., "sensors", "weekday", "DayOfWeekSensor"] => {
                         checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
                             "use_task_execution_day",
@@ -481,7 +481,7 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
         },
 
         ["airflow", "auth", "managers", "base_auth_manager", "BaseAuthManager"]
-        | ["airflow", "providers", "amazon", "auth_manager", "aws_auth_manager", "AwsAuthManager"]
+        | ["airflow", "providers", "amazon", "aws", "auth_manager", "aws_auth_manager", "AwsAuthManager"]
         | ["airflow", "providers", "fab", "auth_manager", "fab_auth_manager", "FabAuthManager"] => {
             if attr.as_str() == "is_authorized_dataset" {
                 Replacement::AttrName("is_authorized_asset")
@@ -585,6 +585,12 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.auth.managers
+        ["airflow", "auth", "managers", "base_auth_manager", "BaseAuthManager"] => {
+            Replacement::AutoImport {
+                module: "airflow.api_fastapi.auth.managers.base_auth_manager",
+                name: "BaseAuthManager",
+            }
+        }
         ["airflow", "auth", "managers", "models", "resource_details", "DatasetDetails"] => {
             Replacement::AutoImport {
                 module: "airflow.api_fastapi.auth.managers.models.resource_details",
@@ -637,7 +643,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.listeners.spec
-        // TODO: this is removed
         ["airflow", "listeners", "spec", "dataset", rest] => match *rest {
             "on_dataset_created" => Replacement::AutoImport {
                 module: "airflow.listeners.spec.asset",
