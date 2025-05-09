@@ -504,8 +504,8 @@ declare_lint! {
     /// is not [assignable to] its post-hoc declared type.
     ///
     /// ## Why is this bad?
-    /// Such declarations break the rules of the type system and weaken a type checker's
-    /// ability to accurately reason about your code.
+    /// Such declarations break the rules of the type system and
+    /// weaken a type checker's ability to accurately reason about your code.
     ///
     /// ## Examples
     /// ```python
@@ -1332,18 +1332,24 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Makes sure that instance attribute accesses are valid.
+    /// Checks for assignments to class variables from instances
+    /// and assignments to instance variables from its class.
     ///
     /// ## Why is this bad?
-    /// Incorrect attribute accesses raise `AttributeError` at runtime.
+    /// Incorrect assignments break the rules of the type system and
+    /// weaken a type checker's ability to accurately reason about your code.
     ///
     /// ## Examples
     /// ```python
     /// class C:
-    ///   var: ClassVar[int] = 1
+    ///     class_var: ClassVar[int] = 1
+    ///     instance_var: int
     ///
-    /// C.var = 3  # okay
-    /// C().var = 3  # error: Cannot assign to class variable
+    /// C.class_var = 3  # okay
+    /// C().class_var = 3  # error: Cannot assign to class variable
+    ///
+    /// C().instance_var = 3  # okay
+    /// C.instance_var = 3  # error: Cannot assign to instance variable
     /// ```
     pub(crate) static INVALID_ATTRIBUTE_ACCESS = {
         summary: "Invalid attribute access",
