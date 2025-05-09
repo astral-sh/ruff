@@ -248,12 +248,15 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.models.baseoperator
-        ["airflow", "models", "baseoperator", rest @ ("chain" | "chain_linear" | "cross_downstream")] => {
-            Replacement::SourceModuleMoved {
-                module: "airflow.sdk",
-                name: (*rest).to_string(),
-            }
-        }
+        [
+            "airflow",
+            "models",
+            "baseoperator",
+            rest @ ("chain" | "chain_linear" | "cross_downstream"),
+        ] => Replacement::SourceModuleMoved {
+            module: "airflow.sdk",
+            name: (*rest).to_string(),
+        },
         ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => Replacement::AutoImport {
             module: "airflow.sdk.definitions.baseoperatorlink",
             name: "BaseOperatorLink",

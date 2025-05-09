@@ -310,7 +310,7 @@ AIR301_class_attribute.py:50:11: AIR301 [*] `airflow.lineage.hook.DatasetLineage
 11 11 | from airflow.datasets.manager import DatasetManager
 12    |-from airflow.lineage.hook import DatasetLineageInfo, HookLineageCollector
    12 |+from airflow.lineage.hook import DatasetLineageInfo, HookLineageCollector, AssetLineageInfo
-13 13 | from airflow.providers.amazon.auth_manager.aws_auth_manager import AwsAuthManager
+13 13 | from airflow.providers.amazon.aws.auth_manager.aws_auth_manager import AwsAuthManager
 14 14 | from airflow.providers.apache.beam.hooks import BeamHook, NotAir302HookError
 15 15 | from airflow.providers.google.cloud.secrets.secret_manager import (
 --------------------------------------------------------------------------------

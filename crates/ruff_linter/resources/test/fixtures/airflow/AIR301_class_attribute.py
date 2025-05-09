@@ -10,7 +10,7 @@ from airflow.datasets import (
 )
 from airflow.datasets.manager import DatasetManager
 from airflow.lineage.hook import DatasetLineageInfo, HookLineageCollector
-from airflow.providers.amazon.auth_manager.aws_auth_manager import AwsAuthManager
+from airflow.providers.amazon.aws.auth_manager.aws_auth_manager import AwsAuthManager
 from airflow.providers.apache.beam.hooks import BeamHook, NotAir302HookError
 from airflow.providers.google.cloud.secrets.secret_manager import (
     CloudSecretManagerBackend,
