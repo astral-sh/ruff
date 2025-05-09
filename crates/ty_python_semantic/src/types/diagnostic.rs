@@ -985,6 +985,7 @@ declare_lint! {
     /// f(1, x=2)  # Error raised here
     /// ```
     pub(crate) static PARAMETER_ALREADY_ASSIGNED = {
+        summary: "detects multiple arguments for the same parameter",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
