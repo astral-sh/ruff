@@ -71,11 +71,7 @@ fn is_empty(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         Expr::List(ast::ExprList { elts, .. }) => elts.is_empty(),
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.is_empty(),
-        Expr::Set(ast::ExprSet { elts, .. }) => match elts.as_slice() {
-            [] => true,
-            [element] => is_empty(element, semantic),
-            _ => false,
-        },
+        Expr::Set(ast::ExprSet { elts, .. }) => elts.is_empty(),
         Expr::Dict(ast::ExprDict { items, .. }) => items.is_empty(),
         Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),

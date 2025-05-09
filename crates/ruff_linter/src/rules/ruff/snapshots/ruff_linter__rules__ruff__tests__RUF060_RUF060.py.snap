@@ -207,6 +207,7 @@ RUF060.py:22:1: RUF060 Unnecessary membership test on empty collection
 22 | 1 in set(set())
    | ^^^^^^^^^^^^^^^ RUF060
 23 | 2 in frozenset([])
+24 | '' in set("")
    |
 
 RUF060.py:23:1: RUF060 Unnecessary membership test on empty collection
@@ -215,6 +216,15 @@ RUF060.py:23:1: RUF060 Unnecessary membership test on empty collection
 22 | 1 in set(set())
 23 | 2 in frozenset([])
    | ^^^^^^^^^^^^^^^^^^ RUF060
-24 |
-25 | # OK
+24 | '' in set("")
+   |
+
+RUF060.py:24:1: RUF060 Unnecessary membership test on empty collection
+   |
+22 | 1 in set(set())
+23 | 2 in frozenset([])
+24 | '' in set("")
+   | ^^^^^^^^^^^^^ RUF060
+25 |
+26 | # OK
    |
