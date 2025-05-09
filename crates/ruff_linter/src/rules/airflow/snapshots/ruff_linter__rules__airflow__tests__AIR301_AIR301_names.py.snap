@@ -492,5 +492,16 @@ AIR301_names.py:165:1: AIR301 `airflow.notifications.basenotifier.BaseNotifier` 
 164 | from airflow.notifications.basenotifier import BaseNotifier
 165 | BaseNotifier()
     | ^^^^^^^^^^^^ AIR301
+166 |
+167 | # airflow.auth.manager
     |
     = help: Use `airflow.sdk.bases.notifier.BaseNotifier` instead
+
+AIR301_names.py:169:1: AIR301 `airflow.auth.managers.base_auth_manager.BaseAuthManager` is removed in Airflow 3.0
+    |
+167 | # airflow.auth.manager
+168 | from airflow.auth.managers.base_auth_manager import BaseAuthManager
+169 | BaseAuthManager()
+    | ^^^^^^^^^^^^^^^ AIR301
+    |
+    = help: Use `airflow.api_fastapi.auth.managers.base_auth_manager.BaseAuthManager` instead
