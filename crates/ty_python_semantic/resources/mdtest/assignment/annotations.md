@@ -61,7 +61,7 @@ reveal_type(d)  # revealed: tuple[tuple[str, str], tuple[int, int]]
 reveal_type(e)  # revealed: @Todo(full tuple[...] support)
 reveal_type(f)  # revealed: @Todo(full tuple[...] support)
 reveal_type(g)  # revealed: @Todo(full tuple[...] support)
-reveal_type(h)  # revealed: tuple[@Todo(specialized non-generic class), @Todo(specialized non-generic class)]
+reveal_type(h)  # revealed: tuple[list[int], list[int]]
 
 reveal_type(i)  # revealed: tuple[str | int, str | int]
 reveal_type(j)  # revealed: tuple[str | int]
@@ -76,7 +76,7 @@ a: tuple[()] = (1, 2)
 # error: [invalid-assignment] "Object of type `tuple[Literal["foo"]]` is not assignable to `tuple[int]`"
 b: tuple[int] = ("foo",)
 
-# error: [invalid-assignment] "Object of type `tuple[list, Literal["foo"]]` is not assignable to `tuple[str | int, str]`"
+# error: [invalid-assignment] "Object of type `tuple[list[Unknown], Literal["foo"]]` is not assignable to `tuple[str | int, str]`"
 c: tuple[str | int, str] = ([], "foo")
 ```
 

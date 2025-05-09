@@ -60,7 +60,7 @@ pub enum KnownInstanceType<'db> {
     /// The symbol `typing.OrderedDict` (which can also be found as `typing_extensions.OrderedDict`)
     OrderedDict,
     /// The symbol `typing.Protocol` (which can also be found as `typing_extensions.Protocol`)
-    Protocol,
+    Protocol(Option<GenericContext<'db>>),
     /// The symbol `typing.Generic` (which can also be found as `typing_extensions.Generic`)
     Generic(Option<GenericContext<'db>>),
     /// The symbol `typing.Type` (which can also be found as `typing_extensions.Type`)
@@ -146,7 +146,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Deque
             | Self::ChainMap
             | Self::OrderedDict
-            | Self::Protocol
+            | Self::Protocol(_)
             | Self::Generic(_)
             | Self::ReadOnly
             | Self::TypeAliasType(_)
@@ -203,7 +203,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deque => KnownClass::StdlibAlias,
             Self::ChainMap => KnownClass::StdlibAlias,
             Self::OrderedDict => KnownClass::StdlibAlias,
-            Self::Protocol => KnownClass::SpecialForm, // actually `_ProtocolMeta` at runtime but this is what typeshed says
+            Self::Protocol(_) => KnownClass::SpecialForm, // actually `_ProtocolMeta` at runtime but this is what typeshed says
             Self::Generic(_) => KnownClass::SpecialForm, // actually `type` at runtime but this is what typeshed says
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
@@ -249,7 +249,7 @@ impl<'db> KnownInstanceType<'db> {
             "ChainMap" => Self::ChainMap,
             "OrderedDict" => Self::OrderedDict,
             "Generic" => Self::Generic(None),
-            "Protocol" => Self::Protocol,
+            "Protocol" => Self::Protocol(None),
             "Optional" => Self::Optional,
             "Union" => Self::Union,
             "NoReturn" => Self::NoReturn,
@@ -311,7 +311,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Generic(_)
             | Self::Callable => module.is_typing(),
             Self::Annotated
-            | Self::Protocol
+            | Self::Protocol(_)
             | Self::Literal
             | Self::LiteralString
             | Self::Never
@@ -384,11 +384,17 @@ impl Display for KnownInstanceRepr<'_> {
             KnownInstanceType::Deque => f.write_str("typing.Deque"),
             KnownInstanceType::ChainMap => f.write_str("typing.ChainMap"),
             KnownInstanceType::OrderedDict => f.write_str("typing.OrderedDict"),
-            KnownInstanceType::Protocol => f.write_str("typing.Protocol"),
+            KnownInstanceType::Protocol(generic_context) => {
+                f.write_str("typing.Protocol")?;
+                if let Some(generic_context) = generic_context {
+                    generic_context.display(self.db).fmt(f)?;
+                }
+                Ok(())
+            }
             KnownInstanceType::Generic(generic_context) => {
                 f.write_str("typing.Generic")?;
                 if let Some(generic_context) = generic_context {
-                    write!(f, "{}", generic_context.display(self.db))?;
+                    generic_context.display(self.db).fmt(f)?;
                 }
                 Ok(())
             }

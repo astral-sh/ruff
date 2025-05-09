@@ -48,8 +48,8 @@ alice2 = Person2(1, "Alice")
 # TODO: should be an error
 Person2(1)
 
-reveal_type(alice2.id)  # revealed: @Todo(GenericAlias instance)
-reveal_type(alice2.name)  # revealed: @Todo(GenericAlias instance)
+reveal_type(alice2.id)  # revealed: @Todo(functional `NamedTuple` syntax)
+reveal_type(alice2.name)  # revealed: @Todo(functional `NamedTuple` syntax)
 ```
 
 ### Multiple Inheritance

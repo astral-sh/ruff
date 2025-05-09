@@ -107,6 +107,7 @@ use super::diagnostic::{
     report_unresolved_reference, INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL,
     REDUNDANT_CAST, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
 };
+use super::generics::{GenericContextOrigin, LegacyGenericBase};
 use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
@@ -1020,14 +1021,16 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // (5) Check that a generic class does not have invalid or conflicting generic
             // contexts.
-            if class.pep695_generic_context(self.db()).is_some()
-                && class.legacy_generic_context(self.db()).is_some()
-            {
-                if let Some(builder) = self.context.report_lint(&INVALID_GENERIC_CLASS, class_node)
-                {
-                    builder.into_diagnostic(
-                        "Cannot both inherit from `Generic` and use PEP 695 type variables",
-                    );
+            if class.pep695_generic_context(self.db()).is_some() {
+                if let Some(legacy_context) = class.legacy_generic_context(self.db()) {
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_GENERIC_CLASS, class_node)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot both inherit from {} and use PEP 695 type variables",
+                            legacy_context.origin(self.db())
+                        ));
+                    }
                 }
             }
 
@@ -4734,6 +4737,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         | KnownClass::Property
                         | KnownClass::Super
                         | KnownClass::TypeVar
+                        | KnownClass::NamedTuple
                 )
             )
             // temporary special-casing for all subclasses of `enum.Enum`
@@ -5795,8 +5799,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
             (todo @ Type::Dynamic(DynamicType::Todo(_)), _, _)
             | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
-            (todo @ Type::Dynamic(DynamicType::SubscriptedProtocol), _, _)
-            | (_, todo @ Type::Dynamic(DynamicType::SubscriptedProtocol), _) => Some(todo),
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
@@ -6884,6 +6886,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         // special cases, too.
         let value_ty = self.infer_expression(value);
         if let Type::ClassLiteral(class) = value_ty {
+            if class.is_known(self.db(), KnownClass::Tuple) {
+                self.infer_expression(slice);
+                // TODO heterogeneous and homogeneous tuples in value expressions
+                return Type::from(
+                    class.todo_specialization(self.db(), "Generic tuple specializations"),
+                );
+            }
             if let Some(generic_context) = class.generic_context(self.db()) {
                 return self.infer_explicit_class_specialization(
                     subscript,
@@ -7072,14 +7081,44 @@ impl<'db> TypeInferenceBuilder<'db> {
                 value_ty,
                 Type::IntLiteral(i64::from(bool)),
             ),
-            (Type::KnownInstance(KnownInstanceType::Protocol), _, _) => {
-                Type::Dynamic(DynamicType::SubscriptedProtocol)
+            (Type::KnownInstance(KnownInstanceType::Protocol(None)), Type::Tuple(typevars), _) => {
+                self.legacy_generic_class_context(
+                    value_node,
+                    typevars.elements(self.db()),
+                    LegacyGenericBase::Protocol,
+                )
+                .map(|context| Type::KnownInstance(KnownInstanceType::Protocol(Some(context))))
+                .unwrap_or_else(Type::unknown)
+            }
+            (Type::KnownInstance(KnownInstanceType::Protocol(None)), typevar, _) => self
+                .legacy_generic_class_context(
+                    value_node,
+                    std::slice::from_ref(&typevar),
+                    LegacyGenericBase::Protocol,
+                )
+                .map(|context| Type::KnownInstance(KnownInstanceType::Protocol(Some(context))))
+                .unwrap_or_else(Type::unknown),
+            (Type::KnownInstance(KnownInstanceType::Protocol(Some(_))), _, _) => {
+                // TODO: emit a diagnostic
+                todo_type!("doubly-specialized typing.Protocol")
             }
             (Type::KnownInstance(KnownInstanceType::Generic(None)), Type::Tuple(typevars), _) => {
-                self.infer_subscript_legacy_generic_class(value_node, typevars.elements(self.db()))
+                self.legacy_generic_class_context(
+                    value_node,
+                    typevars.elements(self.db()),
+                    LegacyGenericBase::Generic,
+                )
+                .map(|context| Type::KnownInstance(KnownInstanceType::Generic(Some(context))))
+                .unwrap_or_else(Type::unknown)
             }
             (Type::KnownInstance(KnownInstanceType::Generic(None)), typevar, _) => self
-                .infer_subscript_legacy_generic_class(value_node, std::slice::from_ref(&typevar)),
+                .legacy_generic_class_context(
+                    value_node,
+                    std::slice::from_ref(&typevar),
+                    LegacyGenericBase::Generic,
+                )
+                .map(|context| Type::KnownInstance(KnownInstanceType::Generic(Some(context))))
+                .unwrap_or_else(Type::unknown),
             (Type::KnownInstance(KnownInstanceType::Generic(Some(_))), _, _) => {
                 // TODO: emit a diagnostic
                 todo_type!("doubly-specialized typing.Generic")
@@ -7238,11 +7277,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn infer_subscript_legacy_generic_class(
+    fn legacy_generic_class_context(
         &mut self,
         value_node: &ast::Expr,
         typevars: &[Type<'db>],
-    ) -> Type<'db> {
+        origin: LegacyGenericBase,
+    ) -> Option<GenericContext<'db>> {
         let typevars: Option<FxOrderSet<_>> = typevars
             .iter()
             .map(|typevar| match typevar {
@@ -7252,7 +7292,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
                     {
                         builder.into_diagnostic(format_args!(
-                            "`{}` is not a valid argument to `typing.Generic`",
+                            "`{}` is not a valid argument to {origin}",
                             typevar.display(self.db()),
                         ));
                     }
@@ -7260,11 +7300,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             })
             .collect();
-        let Some(typevars) = typevars else {
-            return Type::unknown();
-        };
-        let generic_context = GenericContext::new(self.db(), typevars);
-        Type::KnownInstance(KnownInstanceType::Generic(Some(generic_context)))
+        typevars.map(|typevars| {
+            GenericContext::new(self.db(), typevars, GenericContextOrigin::from(origin))
+        })
     }
 
     fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {
@@ -8420,9 +8458,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`Unpack[]` special form")
             }
-            KnownInstanceType::Protocol => {
+            KnownInstanceType::Protocol(_) => {
                 self.infer_type_expression(arguments_slice);
-                Type::Dynamic(DynamicType::SubscriptedProtocol)
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                    builder.into_diagnostic(format_args!(
+                        "`typing.Protocol` is not allowed in type expressions",
+                    ));
+                }
+                Type::unknown()
             }
             KnownInstanceType::Generic(_) => {
                 self.infer_type_expression(arguments_slice);

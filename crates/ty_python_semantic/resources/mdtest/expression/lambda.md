@@ -79,8 +79,7 @@ lambda x=1: reveal_type(x)  # revealed: Unknown | Literal[1]
 Using a variadic parameter:
 
 ```py
-# TODO: should be `tuple[Unknown, ...]` (needs generics)
-lambda *args: reveal_type(args)  # revealed: tuple
+lambda *args: reveal_type(args)  # revealed: tuple[Unknown, ...]
 ```
 
 Using a keyword-variadic parameter:

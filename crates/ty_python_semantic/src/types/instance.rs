@@ -260,6 +260,21 @@ impl<'db> ProtocolInstanceType<'db> {
                 .unwrap_or_else(|| KnownClass::Object.to_instance(db).instance_member(db, name)),
         }
     }
+
+    pub(super) fn apply_specialization<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: TypeMapping<'a, 'db>,
+    ) -> Self {
+        match self.0 {
+            Protocol::FromClass(class) => Self(Protocol::FromClass(
+                class.apply_type_mapping(db, type_mapping),
+            )),
+            Protocol::Synthesized(synthesized) => Self(Protocol::Synthesized(
+                synthesized.apply_type_mapping(db, type_mapping),
+            )),
+        }
+    }
 }
 
 /// An enumeration of the two kinds of protocol types: those that originate from a class
@@ -287,6 +302,7 @@ impl<'db> Protocol<'db> {
 
 mod synthesized_protocol {
     use crate::db::Db;
+    use crate::types::generics::TypeMapping;
     use crate::types::protocol_class::ProtocolInterface;
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
@@ -304,6 +320,14 @@ mod synthesized_protocol {
     impl<'db> SynthesizedProtocolType<'db> {
         pub(super) fn new(db: &'db dyn Db, interface: ProtocolInterface<'db>) -> Self {
             Self(interface.normalized(db))
+        }
+
+        pub(super) fn apply_type_mapping<'a>(
+            self,
+            db: &'db dyn Db,
+            type_mapping: TypeMapping<'a, 'db>,
+        ) -> Self {
+            Self(self.0.specialized_and_normalized(db, type_mapping))
         }
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {

@@ -13,8 +13,7 @@ reveal_type(__loader__)  # revealed: LoaderProtocol | None
 reveal_type(__package__)  # revealed: str | None
 reveal_type(__doc__)  # revealed: str | None
 reveal_type(__spec__)  # revealed: ModuleSpec | None
-
-reveal_type(__path__)  # revealed: @Todo(specialized non-generic class)
+reveal_type(__path__)  # revealed: MutableSequence[str]
 
 class X:
     reveal_type(__name__)  # revealed: str

@@ -3,5 +3,5 @@
 ## Basic set
 
 ```py
-reveal_type({1, 2})  # revealed: set
+reveal_type({1, 2})  # revealed: set[Unknown]
 ```

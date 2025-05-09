@@ -58,6 +58,7 @@ class Bar1(Protocol[T], Generic[T]):
 class Bar2[T](Protocol):
     x: T
 
+# error: [invalid-generic-class] "Cannot both inherit from subscripted `typing.Protocol` and use PEP 695 type variables"
 class Bar3[T](Protocol[T]):
     x: T
 ```
@@ -70,8 +71,8 @@ simultaneously:
 class DuplicateBases(Protocol, Protocol[T]):
     x: T
 
-# TODO: should not have `Protocol` multiple times
-# revealed: tuple[<class 'DuplicateBases'>, typing.Protocol, @Todo(`Protocol[]` subscript), typing.Generic, <class 'object'>]
+# TODO: should not have `Protocol` or `Generic` multiple times
+# revealed: tuple[<class 'DuplicateBases[Unknown]'>, typing.Protocol, typing.Generic, typing.Protocol[T], typing.Generic[T], <class 'object'>]
 reveal_type(DuplicateBases.__mro__)
 ```
 

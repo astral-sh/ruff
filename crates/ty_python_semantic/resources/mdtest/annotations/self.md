@@ -33,7 +33,9 @@ class Shape:
         reveal_type(self)  # revealed: Unknown
         return self
 
-reveal_type(Shape().nested_type())  # revealed: @Todo(specialized non-generic class)
+# TODO: should be `list[Shape]`
+reveal_type(Shape().nested_type())  # revealed: list[Self]
+
 reveal_type(Shape().nested_func())  # revealed: Shape
 
 class Circle(Shape):

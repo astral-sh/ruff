@@ -662,7 +662,7 @@ impl<'db> Type<'db> {
 
     pub fn contains_todo(&self, db: &'db dyn Db) -> bool {
         match self {
-            Self::Dynamic(DynamicType::Todo(_) | DynamicType::SubscriptedProtocol) => true,
+            Self::Dynamic(DynamicType::Todo(_)) => true,
 
             Self::AlwaysFalsy
             | Self::AlwaysTruthy
@@ -703,9 +703,7 @@ impl<'db> Type<'db> {
             }
 
             Self::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
-                SubclassOfInner::Dynamic(
-                    DynamicType::Todo(_) | DynamicType::SubscriptedProtocol,
-                ) => true,
+                SubclassOfInner::Dynamic(DynamicType::Todo(_)) => true,
                 SubclassOfInner::Dynamic(DynamicType::Unknown | DynamicType::Any) => false,
                 SubclassOfInner::Class(_) => false,
             },
@@ -722,12 +720,10 @@ impl<'db> Type<'db> {
             Self::BoundSuper(bound_super) => {
                 matches!(
                     bound_super.pivot_class(db),
-                    ClassBase::Dynamic(DynamicType::Todo(_) | DynamicType::SubscriptedProtocol)
+                    ClassBase::Dynamic(DynamicType::Todo(_))
                 ) || matches!(
                     bound_super.owner(db),
-                    SuperOwnerKind::Dynamic(
-                        DynamicType::Todo(_) | DynamicType::SubscriptedProtocol
-                    )
+                    SuperOwnerKind::Dynamic(DynamicType::Todo(_))
                 )
             }
 
@@ -3939,6 +3935,9 @@ impl<'db> Type<'db> {
                     );
                     Signatures::single(signature)
                 }
+                Some(KnownClass::NamedTuple) => {
+                    Signatures::single(CallableSignature::todo("functional `NamedTuple` syntax"))
+                }
                 Some(KnownClass::Object) => {
                     // ```py
                     // class object:
@@ -4326,6 +4325,12 @@ impl<'db> Type<'db> {
     fn try_iterate(self, db: &'db dyn Db) -> Result<Type<'db>, IterationError<'db>> {
         if let Type::Tuple(tuple_type) = self {
             return Ok(UnionType::from_elements(db, tuple_type.elements(db)));
+        }
+
+        if let Type::GenericAlias(alias) = self {
+            if alias.origin(db).is_known(db, KnownClass::Tuple) {
+                return Ok(todo_type!("*tuple[] annotations"));
+            }
         }
 
         let try_call_dunder_getitem = || {
@@ -4826,7 +4831,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
                 KnownInstanceType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
 
-                KnownInstanceType::Protocol => Err(InvalidTypeExpressionError {
+                KnownInstanceType::Protocol(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
                     fallback_type: Type::unknown(),
                 }),
@@ -4930,9 +4935,6 @@ impl<'db> Type<'db> {
                 )),
                 Some(KnownClass::UnionType) => Ok(todo_type!(
                     "Support for `types.UnionType` instances in type expressions"
-                )),
-                Some(KnownClass::NamedTuple) => Ok(todo_type!(
-                    "Support for functional `typing.NamedTuple` syntax"
                 )),
                 _ => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
@@ -5093,6 +5095,10 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping(db, type_mapping),
             ),
 
+            Type::ProtocolInstance(instance) => {
+                Type::ProtocolInstance(instance.apply_specialization(db, type_mapping))
+            }
+
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(
                     function.apply_type_mapping(db, type_mapping),
@@ -5176,8 +5182,6 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
             | Type::BoundSuper(_)
-            // Same for `ProtocolInstance`
-            | Type::ProtocolInstance(_)
             | Type::KnownInstance(_) => self,
         }
     }
@@ -5498,9 +5502,6 @@ pub enum DynamicType {
     ///
     /// This variant should be created with the `todo_type!` macro.
     Todo(TodoType),
-    /// Temporary type until we support generic protocols.
-    /// We use a separate variant (instead of `Todo(…)`) in order to be able to match on them explicitly.
-    SubscriptedProtocol,
 }
 
 impl std::fmt::Display for DynamicType {
@@ -5511,11 +5512,6 @@ impl std::fmt::Display for DynamicType {
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type
             DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
-            DynamicType::SubscriptedProtocol => f.write_str(if cfg!(debug_assertions) {
-                "@Todo(`Protocol[]` subscript)"
-            } else {
-                "@Todo"
-            }),
         }
     }
 }

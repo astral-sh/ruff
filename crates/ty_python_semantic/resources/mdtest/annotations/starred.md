@@ -14,7 +14,7 @@ Ts = TypeVarTuple("Ts")
 
 def append_int(*args: *Ts) -> tuple[*Ts, int]:
     # TODO: tuple[*Ts]
-    reveal_type(args)  # revealed: tuple
+    reveal_type(args)  # revealed: tuple[Unknown, ...]
 
     return (*args, 1)
 

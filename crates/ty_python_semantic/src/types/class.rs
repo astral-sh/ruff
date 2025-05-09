@@ -312,7 +312,7 @@ impl<'db> ClassType<'db> {
                 ClassBase::Dynamic(_) => false,
 
                 // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic(_) => false,
+                ClassBase::Protocol(_) | ClassBase::Generic(_) => false,
 
                 ClassBase::Class(base) => match (base, other) {
                     (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
@@ -350,7 +350,7 @@ impl<'db> ClassType<'db> {
                 ClassBase::Dynamic(_) => false,
 
                 // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic(_) => false,
+                ClassBase::Protocol(_) | ClassBase::Generic(_) => false,
 
                 ClassBase::Class(base) => match (base, other) {
                     (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
@@ -536,7 +536,10 @@ impl<'db> ClassLiteral<'db> {
 
     pub(crate) fn legacy_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.explicit_bases(db).iter().find_map(|base| match base {
-            Type::KnownInstance(KnownInstanceType::Generic(generic_context)) => *generic_context,
+            Type::KnownInstance(
+                KnownInstanceType::Generic(generic_context)
+                | KnownInstanceType::Protocol(generic_context),
+            ) => *generic_context,
             _ => None,
         })
     }
@@ -603,6 +606,17 @@ impl<'db> ClassLiteral<'db> {
             None => ClassType::NonGeneric(self),
             Some(generic_context) => {
                 let specialization = generic_context.default_specialization(db);
+                ClassType::Generic(GenericAlias::new(db, self, specialization))
+            }
+        }
+    }
+
+    /// Returns a specialization of this class with a `@Todo`-type
+    pub(crate) fn todo_specialization(self, db: &'db dyn Db, todo: &'static str) -> ClassType<'db> {
+        match self.generic_context(db) {
+            None => ClassType::NonGeneric(self),
+            Some(generic_context) => {
+                let specialization = generic_context.todo_specialization(db, todo);
                 ClassType::Generic(GenericAlias::new(db, self, specialization))
             }
         }
@@ -678,13 +692,11 @@ impl<'db> ClassLiteral<'db> {
                 // - OR be the last-but-one base (with the final base being `Generic[]` or `object`)
                 // - OR be the last-but-two base (with the penultimate base being `Generic[]`
                 //                                and the final base being `object`)
-                self.explicit_bases(db).iter().rev().take(3).any(|base| {
-                    matches!(
-                        base,
-                        Type::KnownInstance(KnownInstanceType::Protocol)
-                            | Type::Dynamic(DynamicType::SubscriptedProtocol)
-                    )
-                })
+                self.explicit_bases(db)
+                    .iter()
+                    .rev()
+                    .take(3)
+                    .any(|base| matches!(base, Type::KnownInstance(KnownInstanceType::Protocol(_))))
             })
     }
 
@@ -1011,12 +1023,8 @@ impl<'db> ClassLiteral<'db> {
 
         for superclass in mro_iter {
             match superclass {
-                ClassBase::Dynamic(DynamicType::SubscriptedProtocol)
-                | ClassBase::Generic(_)
-                | ClassBase::Protocol => {
-                    // TODO: We currently skip `Protocol` when looking up class members, in order to
-                    // avoid creating many dynamic types in our test suite that would otherwise
-                    // result from looking up attributes on builtin types like `str`, `list`, `tuple`
+                ClassBase::Generic(_) | ClassBase::Protocol(_) => {
+                    // Skip over these very special class bases that aren't really classes.
                 }
                 ClassBase::Dynamic(_) => {
                     // Note: calling `Type::from(superclass).member()` would be incorrect here.
@@ -1354,12 +1362,8 @@ impl<'db> ClassLiteral<'db> {
 
         for superclass in self.iter_mro(db, specialization) {
             match superclass {
-                ClassBase::Dynamic(DynamicType::SubscriptedProtocol)
-                | ClassBase::Generic(_)
-                | ClassBase::Protocol => {
-                    // TODO: We currently skip these when looking up instance members, in order to
-                    // avoid creating many dynamic types in our test suite that would otherwise
-                    // result from looking up attributes on builtin types like `str`, `list`, `tuple`
+                ClassBase::Generic(_) | ClassBase::Protocol(_) => {
+                    // Skip over these very special class bases that aren't really classes.
                 }
                 ClassBase::Dynamic(_) => {
                     return SymbolAndQualifiers::todo(

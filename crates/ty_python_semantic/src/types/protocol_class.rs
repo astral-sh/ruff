@@ -8,7 +8,7 @@ use crate::{
     db::Db,
     semantic_index::{symbol_table, use_def_map},
     symbol::{symbol_from_bindings, symbol_from_declarations},
-    types::{ClassBase, ClassLiteral, KnownFunction, Type, TypeQualifiers},
+    types::{ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers},
 };
 
 impl<'db> ClassLiteral<'db> {
@@ -146,6 +146,29 @@ impl<'db> ProtocolInterface<'db> {
             Self::SelfReference => Self::SelfReference,
         }
     }
+
+    pub(super) fn specialized_and_normalized<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: TypeMapping<'a, 'db>,
+    ) -> Self {
+        match self {
+            Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
+                db,
+                members
+                    .inner(db)
+                    .iter()
+                    .map(|(name, data)| {
+                        (
+                            name.clone(),
+                            data.apply_type_mapping(db, type_mapping).normalized(db),
+                        )
+                    })
+                    .collect::<BTreeMap<_, _>>(),
+            )),
+            Self::SelfReference => Self::SelfReference,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]
@@ -158,6 +181,13 @@ impl<'db> ProtocolMemberData<'db> {
     fn normalized(&self, db: &'db dyn Db) -> Self {
         Self {
             ty: self.ty.normalized(db),
+            qualifiers: self.qualifiers,
+        }
+    }
+
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+        Self {
+            ty: self.ty.apply_type_mapping(db, type_mapping),
             qualifiers: self.qualifiers,
         }
     }
