@@ -114,7 +114,23 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks whether an argument is used as both a value and a type form in a call
+    /// Checks whether an argument is used as both a value and a type form in a call.
+    ///
+    /// ## Why is this bad?
+    /// Such calls have confusing semantics and often indicate a logic error.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import reveal_type
+    /// from ty_extensions import is_fully_static
+    ///
+    /// if flag:
+    ///     f = repr  # Expects a value
+    /// else:
+    ///     f = is_fully_static  # Expects a type form
+    ///
+    /// f(int)  # error
+    /// ```
     pub(crate) static CONFLICTING_ARGUMENT_FORMS = {
         summary: "detects when an argument is used as both a value and a type form in a call",
         status: LintStatus::preview("1.0.0"),
@@ -130,6 +146,16 @@ declare_lint! {
     /// A variable with two conflicting declarations likely indicates a mistake.
     /// Moreover, it could lead to incorrect or ill-defined type inference for
     /// other code that relies on these variables.
+    ///
+    /// ## Examples
+    /// ```python
+    /// if b:
+    ///     a: int
+    /// else:
+    ///     a: str
+    ///
+    /// a = 1
+    /// ```
     pub(crate) static CONFLICTING_DECLARATIONS = {
         summary: "detects conflicting declarations",
         status: LintStatus::preview("1.0.0"),
@@ -138,7 +164,24 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for class definitions where the metaclass of the class
+    /// being created would not be a subclass of the metaclasses of
+    /// all the class's bases.
+    ///
+    /// ## Why is it bad?
+    /// Such a class definition raises a `TypeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class M1(type): ...
+    /// class M2(type): ...
+    /// class A(metaclass=M1): ...
+    /// class B(metaclass=M2): ...
+    ///
+    /// # TypeError: metaclass conflict
+    /// class C(A, B): ...
+    /// ```
     pub(crate) static CONFLICTING_METACLASS = {
         summary: "detects conflicting metaclasses",
         status: LintStatus::preview("1.0.0"),
@@ -148,10 +191,23 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for class definitions with a cyclic inheritance chain.
+    /// Checks for class definitions in stub files that inherit
+    /// (directly or indirectly) from themselves.
     ///
     /// ## Why is it bad?
-    /// TODO #14889
+    /// Although forward references are natively supported in stub files,
+    /// inheritance cycles are still disallowed, as it is impossible to
+    /// resolve a consistent [method resolution order] for a class that
+    /// inherits from itself.
+    ///
+    /// ## Examples
+    /// ```python
+    /// # foo.pyi
+    /// class A(B): ...
+    /// class B(A): ...
+    /// ```
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     pub(crate) static CYCLIC_CLASS_DEFINITION = {
         summary: "detects cyclic class definitions",
         status: LintStatus::preview("1.0.0"),
@@ -182,7 +238,15 @@ declare_lint! {
     /// Checks for class definitions with duplicate bases.
     ///
     /// ## Why is this bad?
-    /// Class definitions with duplicate bases raise a `TypeError` at runtime.
+    /// Class definitions with duplicate bases raise `TypeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class A: ...
+    ///
+    /// # TypeError: duplicate base class
+    /// class B(A, A): ...
+    /// ```
     pub(crate) static DUPLICATE_BASE = {
         summary: "detects class definitions with duplicate bases",
         status: LintStatus::preview("1.0.0"),
@@ -278,10 +342,21 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for classes with an inconsistent method resolution order (MRO).
+    /// Checks for classes with an inconsistent [method resolution order] (MRO).
     ///
     /// ## Why is this bad?
     /// Classes with an inconsistent MRO will raise a `TypeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class A: ...
+    /// class B(A): ...
+    ///
+    /// # TypeError: Cannot create a consistent method resolution order
+    /// class C(A, B): ...
+    /// ```
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     pub(crate) static INCONSISTENT_MRO = {
         summary: "detects class definitions with an inconsistent MRO",
         status: LintStatus::preview("1.0.0"),
@@ -296,6 +371,12 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// Using an out of bounds index will raise an `IndexError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// t = (0, 1, 2)
+    /// t[3]  # IndexError: tuple index out of range
+    /// ```
     pub(crate) static INDEX_OUT_OF_BOUNDS = {
         summary: "detects index out of bounds errors",
         status: LintStatus::preview("1.0.0"),
@@ -344,7 +425,20 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for assignments where the type of the value
+    /// is not [assignable to] the type of the assignee.
+    ///
+    /// ## Why is this bad?
+    /// Such assignments break the rules of the type system and
+    /// weaken a type checker's ability to accurately reason about your code.
+    ///
+    /// ## Examples
+    /// ```python
+    /// a: int = ''
+    /// ```
+    ///
+    /// [assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
     pub(crate) static INVALID_ASSIGNMENT = {
         summary: "detects invalid assignments",
         status: LintStatus::preview("1.0.0"),
@@ -355,14 +449,26 @@ declare_lint! {
 declare_lint! {
     /// TODO #14889
     pub(crate) static INVALID_BASE = {
-        summary: "detects class definitions with an invalid base",
+        summary: "detects invalid bases in class definitions",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for expressions used in `with` statements
+    /// that do not implement the context manager protocol.
+    ///
+    /// ## Why is this bad?
+    /// Such a statement will raise `TypeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// # TypeError: 'int' object does not support the context manager protocol
+    /// with 1:
+    ///     print(2)
+    /// ```
     pub(crate) static INVALID_CONTEXT_MANAGER = {
         summary: "detects expressions used in with statements that don't implement the context manager protocol",
         status: LintStatus::preview("1.0.0"),
@@ -371,7 +477,21 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for declarations where the inferred type of an existing symbol
+    /// is not [assignable to] its post-hoc declared type.
+    ///
+    /// ## Why is this bad?
+    /// Such declarations break the rules of the type system and
+    /// weaken a type checker's ability to accurately reason about your code.
+    ///
+    /// ## Examples
+    /// ```python
+    /// a = 1
+    /// a: str
+    /// ```
+    ///
+    /// [assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
     pub(crate) static INVALID_DECLARATION = {
         summary: "detects invalid declarations",
         status: LintStatus::preview("1.0.0"),
@@ -541,10 +661,17 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for default values that can't be assigned to the parameter's annotated type.
+    /// Checks for default values that can't be
+    /// assigned to the parameter's annotated type.
     ///
     /// ## Why is this bad?
-    /// TODO #14889
+    /// This breaks the rules of the type system and
+    /// weakens a type checker's ability to accurately reason about your code.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def f(a: int = ''): ...
+    /// ```
     pub(crate) static INVALID_PARAMETER_DEFAULT = {
         summary: "detects default values that can't be assigned to the parameter's annotated type",
         status: LintStatus::preview("1.0.0"),
@@ -645,6 +772,12 @@ declare_lint! {
     /// `typing` or `typing_extensions`, but it can also be defined locally. If defined locally, it
     /// must be assigned the value `False` at runtime; the type checker will consider its value to
     /// be `True`. If annotated, it must be annotated as a type that can accept `bool` values.
+    ///
+    /// ## Examples
+    /// ```python
+    /// TYPE_CHECKING: str
+    /// TYPE_CHECKING = ''
+    /// ```
     pub(crate) static INVALID_TYPE_CHECKING_CONSTANT = {
         summary: "detects invalid `TYPE_CHECKING` constant assignments",
         status: LintStatus::preview("1.0.0"),
@@ -654,10 +787,20 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for invalid type expressions.
+    /// Checks for expressions that are used as type expressions
+    /// but cannot validly be interpreted as such.
     ///
     /// ## Why is this bad?
-    /// TODO #14889
+    /// Such expressions cannot be understood by ty.
+    /// In some cases, they might raise errors at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import Annotated
+    ///
+    /// a: type[1]  # `1` is not a type
+    /// b: Annotated[int]  # `Annotated` expects at least two arguments
+    /// ```
     pub(crate) static INVALID_TYPE_FORM = {
         summary: "detects invalid type forms",
         status: LintStatus::preview("1.0.0"),
@@ -666,7 +809,27 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for constrained [type variables] with only one constraint.
+    ///
+    /// ## Why is this bad?
+    /// A constrained type variable must have at least two constraints.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeVar
+    ///
+    /// T = TypeVar('T', str)  # invalid constrained TypeVar
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// T = TypeVar('T', str, int)  # valid constrained TypeVar
+    /// # or
+    /// T = TypeVar('T', bound=str)  # valid bound TypeVar
+    /// ```
+    ///
+    /// [type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar
     pub(crate) static INVALID_TYPE_VARIABLE_CONSTRAINTS = {
         summary: "detects invalid type variable constraints",
         status: LintStatus::preview("1.0.0"),
@@ -812,6 +975,15 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// Attempting to access an unbound attribute will raise an `AttributeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class A:
+    ///     if b:
+    ///         c = 0
+    ///
+    /// A.c  # AttributeError: type object 'A' has no attribute 'c'
+    /// ```
     pub(crate) static POSSIBLY_UNBOUND_ATTRIBUTE = {
         summary: "detects references to possibly unbound attributes",
         status: LintStatus::preview("1.0.0"),
@@ -826,6 +998,18 @@ declare_lint! {
     /// ## Why is this bad?
     /// Importing an unbound module or name will raise a `ModuleNotFoundError`
     /// or `ImportError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// # module.py
+    /// import datetime
+    ///
+    /// if datetime.date.today().weekday() != 6:
+    ///     a = 1
+    ///
+    /// # main.py
+    /// from module import a  # ImportError: cannot import name 'a' from 'module'
+    /// ```
     pub(crate) static POSSIBLY_UNBOUND_IMPORT = {
         summary: "detects possibly unbound imports",
         status: LintStatus::preview("1.0.0"),
@@ -968,7 +1152,9 @@ declare_lint! {
     /// Using `reveal_type` without importing it will raise a `NameError` at runtime.
     ///
     /// ## Examples
-    /// TODO #14889
+    /// ```python
+    /// reveal_type(1)  # NameError: name 'reveal_type' is not defined
+    /// ```
     pub(crate) static UNDEFINED_REVEAL = {
         summary: "detects usages of `reveal_type` without importing it",
         status: LintStatus::preview("1.0.0"),
@@ -1002,7 +1188,16 @@ declare_lint! {
     /// Checks for unresolved attributes.
     ///
     /// ## Why is this bad?
-    /// Accessing an unbound attribute will raise an `AttributeError` at runtime. An unresolved attribute is not guaranteed to exist from the type alone, so this could also indicate that the object is not of the type that the user expects.
+    /// Accessing an unbound attribute will raise an `AttributeError` at runtime.
+    /// An unresolved attribute is not guaranteed to exist from the type alone,
+    /// so this could also indicate that the object is not of the type that the user expects.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class A: ...
+    ///
+    /// A().foo  # AttributeError: 'A' object has no attribute 'foo'
+    /// ```
     pub(crate) static UNRESOLVED_ATTRIBUTE = {
         summary: "detects references to unresolved attributes",
         status: LintStatus::preview("1.0.0"),
@@ -1015,8 +1210,13 @@ declare_lint! {
     /// Checks for import statements for which the module cannot be resolved.
     ///
     /// ## Why is this bad?
-    /// Importing a module that cannot be resolved will raise an `ImportError`
+    /// Importing a module that cannot be resolved will raise a `ModuleNotFoundError`
     /// at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// import foo  # ModuleNotFoundError: No module named 'foo'
+    /// ```
     pub(crate) static UNRESOLVED_IMPORT = {
         summary: "detects unresolved imports",
         status: LintStatus::preview("1.0.0"),
@@ -1051,6 +1251,13 @@ declare_lint! {
     /// ## Why is this bad?
     /// Attempting to use an unsupported operator will raise a `TypeError` at
     /// runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class A: ...
+    ///
+    /// A() + A()  # TypeError: unsupported operand type(s) for +: 'A' and 'A'
+    /// ```
     pub(crate) static UNSUPPORTED_OPERATOR = {
         summary: "detects binary, unary, or comparison expressions where the operands don't support the operator",
         status: LintStatus::preview("1.0.0"),
@@ -1081,6 +1288,11 @@ declare_lint! {
     /// ## What it does
     /// Makes sure that the argument of `static_assert` is statically known to be true.
     ///
+    /// ## Why is this bad?
+    /// A `static_assert` call represents an explicit request from the user
+    /// for the type checker to emit an error if the argument cannot be verified
+    /// to evaluate to `True` in a boolean context.
+    ///
     /// ## Examples
     /// ```python
     /// from ty_extensions import static_assert
@@ -1098,15 +1310,24 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Makes sure that instance attribute accesses are valid.
+    /// Checks for assignments to class variables from instances
+    /// and assignments to instance variables from its class.
+    ///
+    /// ## Why is this bad?
+    /// Incorrect assignments break the rules of the type system and
+    /// weaken a type checker's ability to accurately reason about your code.
     ///
     /// ## Examples
     /// ```python
     /// class C:
-    ///   var: ClassVar[int] = 1
+    ///     class_var: ClassVar[int] = 1
+    ///     instance_var: int
     ///
-    /// C.var = 3  # okay
-    /// C().var = 3  # error: Cannot assign to class variable
+    /// C.class_var = 3  # okay
+    /// C().class_var = 3  # error: Cannot assign to class variable
+    ///
+    /// C().instance_var = 3  # okay
+    /// C.instance_var = 3  # error: Cannot assign to instance variable
     /// ```
     pub(crate) static INVALID_ATTRIBUTE_ACCESS = {
         summary: "Invalid attribute access",
