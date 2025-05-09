@@ -34,10 +34,6 @@ pub(crate) enum MinMax {
 /// diff = maximum - minimum
 /// ```
 ///
-/// ## References
-/// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
-/// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
-///
 /// ## Fix safety
 /// This fix is always unsafe and may change the program's behavior for types without full
 /// equivalence relations, such as float comparisons involving `NaN`.
@@ -48,6 +44,10 @@ pub(crate) enum MinMax {
 /// print(max(1.0, max(float("nan"), 2.0))) # before fix: 1.0
 /// print(max(1.0, float("nan"), 2.0))      # after fix: 2.0
 /// ```
+///
+/// ## References
+/// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
+/// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[derive(ViolationMetadata)]
 pub(crate) struct NestedMinMax {
     func: MinMax,
