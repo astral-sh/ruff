@@ -874,19 +874,24 @@ mod tests {
     }
 
     #[test]
-    fn reject_venv_with_no_pyvenv_cfg_file() {
+    fn env_with_no_pyvenv_cfg_file() {
         let system = TestSystem::default();
         system
             .memory_file_system()
             .create_directory_all("/.venv")
             .unwrap();
-        assert!(matches!(
-            PythonEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system),
-            Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(
-                SysPrefixPathOrigin::VirtualEnvVar,
-                _
-            ))
-        ));
+        let env =
+            PythonEnvironment::new("/.venv", SysPrefixPathOrigin::PythonCliFlag, &system).unwrap();
+        let PythonEnvironment::System(env) = env else {
+            panic!("Expected a system environment; got {env:?}");
+        };
+        assert!(
+            env.root_path
+                == SysPrefixPath {
+                    inner: system.canonicalize_path(SystemPath::new("/.venv")).unwrap(),
+                    origin: SysPrefixPathOrigin::PythonCliFlag,
+                }
+        );
     }
 
     #[test]
