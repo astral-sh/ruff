@@ -161,6 +161,10 @@ impl Indexed<'_> {
     pub(super) fn diagnostics(&self) -> &[IOErrorDiagnostic] {
         &self.inner.diagnostics
     }
+
+    pub(super) fn len(&self) -> usize {
+        self.inner.files.len()
+    }
 }
 
 impl Deref for Indexed<'_> {

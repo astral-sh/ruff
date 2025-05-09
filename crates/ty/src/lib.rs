@@ -25,7 +25,7 @@ use ruff_db::Upcast;
 use salsa::plumbing::ZalsaDatabase;
 use ty_project::metadata::options::Options;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{watch, Db};
+use ty_project::{watch, Db, DummyReporter, Reporter};
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
 
@@ -200,22 +200,28 @@ impl MainLoop {
 
         self.watcher = Some(ProjectWatcher::new(watcher, db));
 
-        self.run(db)?;
+        // Do not show progress bars with `--watch`, indicatif does not seem to
+        // handle cancelling independent progress bars very well.
+        self.run_with_progress::<DummyReporter>(db)?;
 
         Ok(ExitStatus::Success)
     }
 
-    fn run(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
+    fn run(self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
+        self.run_with_progress::<IndicatifReporter>(db)
+    }
+
+    fn run_with_progress<R: Reporter>(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
 
-        let result = self.main_loop(db);
+        let result = self.main_loop::<R>(db);
 
         tracing::debug!("Exiting main loop");
 
         result
     }
 
-    fn main_loop(&mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
+    fn main_loop<R: Reporter>(&mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
         // Schedule the first check.
         tracing::debug!("Starting main loop");
 
@@ -226,11 +232,12 @@ impl MainLoop {
                 MainLoopMessage::CheckWorkspace => {
                     let db = db.clone();
                     let sender = self.sender.clone();
+                    let reporter = R::default();
 
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
-                        match db.check() {
+                        match db.check(&reporter) {
                             Ok(result) => {
                                 // Send the result back to the main loop for printing.
                                 sender
@@ -337,6 +344,34 @@ impl MainLoop {
         }
 
         Ok(ExitStatus::Success)
+    }
+}
+
+/// A progress reporter for `ty check`.
+struct IndicatifReporter(indicatif::ProgressBar);
+
+impl Default for IndicatifReporter {
+    fn default() -> IndicatifReporter {
+        let progress = indicatif::ProgressBar::new(0);
+        progress.set_style(
+            indicatif::ProgressStyle::with_template(
+                "{msg:8.dim} {bar:60.green/dim} {pos}/{len} files",
+            )
+            .unwrap()
+            .progress_chars("--"),
+        );
+        progress.set_message("Checking");
+        IndicatifReporter(progress)
+    }
+}
+
+impl ty_project::Reporter for IndicatifReporter {
+    fn set_files(&self, files: usize) {
+        self.0.set_length(files as u64);
+    }
+
+    fn report_file(&self, _file: &ruff_db::files::File) {
+        self.0.inc(1);
     }
 }
 

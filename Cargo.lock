@@ -3984,6 +3984,7 @@ dependencies = [
  "crossbeam",
  "ctrlc",
  "filetime",
+ "indicatif",
  "insta",
  "insta-cmd",
  "jiff",
