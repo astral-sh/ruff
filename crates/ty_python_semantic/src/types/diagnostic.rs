@@ -985,7 +985,6 @@ declare_lint! {
     /// f(1, x=2)  # Error raised here
     /// ```
     pub(crate) static PARAMETER_ALREADY_ASSIGNED = {
-    /// A.c  # AttributeError: type object 'A' has no attribute 'c'
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
