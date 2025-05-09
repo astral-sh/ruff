@@ -261,8 +261,9 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                         ..,
                         "operators",
                         "weekday",
-                        "DayOfWeekSensor" | "BranchDayOfWeekOperator",
-                    ] => {
+                        "BranchDayOfWeekOperator",
+                    ]
+                    | ["airflow", .., "sensors", "weekday", "DayOfWeekSensor"] => {
                         checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
                             "use_task_execution_day",
@@ -611,6 +612,16 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "airflow",
             "auth",
             "managers",
+            "base_auth_manager",
+            "BaseAuthManager",
+        ] => Replacement::AutoImport {
+            module: "airflow.api_fastapi.auth.managers.base_auth_manager",
+            name: "BaseAuthManager",
+        },
+        [
+            "airflow",
+            "auth",
+            "managers",
             "models",
             "resource_details",
             "DatasetDetails",
@@ -668,7 +679,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.listeners.spec
-        // TODO: this is removed
         ["airflow", "listeners", "spec", "dataset", rest] => match *rest {
             "on_dataset_created" => Replacement::AutoImport {
                 module: "airflow.listeners.spec.asset",

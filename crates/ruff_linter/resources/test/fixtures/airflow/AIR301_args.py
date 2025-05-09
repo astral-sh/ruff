@@ -12,7 +12,8 @@ from airflow.providers.fab.auth_manager.fab_auth_manager import FabAuthManager
 from airflow.providers.google.cloud.log.gcs_task_handler import GCSTaskHandler
 from airflow.providers.standard.operators import datetime, trigger_dagrun
 from airflow.providers.standard.sensors import weekday
-from airflow.sensors.weekday import BranchDayOfWeekOperator, DayOfWeekSensor
+from airflow.operators.weekday import BranchDayOfWeekOperator
+from airflow.sensors.weekday import DayOfWeekSensor
 from airflow.timetables.simple import NullTimetable
 
 DAG(dag_id="class_schedule", schedule="@hourly")
@@ -90,3 +91,4 @@ ElasticsearchTaskHandler(filename_template="/tmp/test")
 GCSTaskHandler(filename_template="/tmp/test")
 
 FabAuthManager(None)
+
