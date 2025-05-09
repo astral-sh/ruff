@@ -1,4 +1,4 @@
-//! Generate a Markdown-compatible reference for the uv command-line interface.
+//! Generate a Markdown-compatible reference for the ty command-line interface.
 use std::cmp::max;
 use std::path::PathBuf;
 
@@ -103,7 +103,7 @@ fn generate_command<'a>(output: &mut String, command: &'a Command, parents: &mut
         )
     };
 
-    // Display the top-level `uv` command at the same level as its children
+    // Display the top-level `ty` command at the same level as its children
     let level = max(2, parents.len() + 1);
     output.push_str(&format!("{} {name}\n\n", "#".repeat(level)));
 
@@ -128,6 +128,10 @@ fn generate_command<'a>(output: &mut String, command: &'a Command, parents: &mut
                 .trim_start_matches("Usage: "),
         ));
         output.push_str("\n\n");
+    }
+
+    if command.get_name() == "help" {
+        return;
     }
 
     // Display a list of child commands
