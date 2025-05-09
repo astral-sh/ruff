@@ -56,8 +56,8 @@ def _(flag: bool, flag2: bool):
     else:
         def f() -> int:
             return 1
-    # TODO we should mention all non-callable elements of the union
     # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
+    # error: [call-non-callable] "Object of type `Literal["foo"]` is not callable"
     # revealed: Unknown | int
     reveal_type(f())
 ```
@@ -125,8 +125,8 @@ def _(flag: bool):
     else:
         f = f2
 
-    # TODO: we should show all errors from the union, not arbitrarily pick one union element
     # error: [too-many-positional-arguments] "Too many positional arguments to function `f1`: expected 0, got 1"
+    # error: [too-many-positional-arguments] "Too many positional arguments to function `f2`: expected 0, got 1"
     x = f(3)
     reveal_type(x)  # revealed: Unknown
 ```
@@ -143,8 +143,8 @@ def _(flag: bool):
     else:
         f = C()
 
-    # TODO: we should either show all union errors here, or prioritize the not-callable error
     # error: [too-many-positional-arguments] "Too many positional arguments to function `f1`: expected 0, got 1"
+    # error: [call-non-callable] "Object of type `C` is not callable"
     x = f(3)
     reveal_type(x)  # revealed: Unknown
 ```

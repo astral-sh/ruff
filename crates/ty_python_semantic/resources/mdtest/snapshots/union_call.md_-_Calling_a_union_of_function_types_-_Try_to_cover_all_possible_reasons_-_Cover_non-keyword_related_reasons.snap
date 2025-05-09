@@ -53,18 +53,120 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.m
 39 |     else:
 40 |         f = PossiblyNotCallable()
 41 |     # error: [too-many-positional-arguments]
-42 |     x = f(3)
+42 |     # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `str`, found `Literal[3]`"
+43 |     # error: [missing-argument]
+44 |     # error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal[3]` does not satisfy upper bound of type variable `T`"
+45 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
 ```
 
 # Diagnostics
 
 ```
-error: lint:too-many-positional-arguments: Too many positional arguments to function `f1`: expected 0, got 1
-  --> src/mdtest_snippet.py:42:11
+error: lint:call-non-callable: Object of type `Literal[5]` is not callable
+  --> src/mdtest_snippet.py:48:9
    |
-40 |         f = PossiblyNotCallable()
-41 |     # error: [too-many-positional-arguments]
-42 |     x = f(3)
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
+   |         ^^^^
+   |
+info: `lint:call-non-callable` is enabled by default
+
+```
+
+```
+error: lint:call-non-callable: Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)
+  --> src/mdtest_snippet.py:48:9
+   |
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
+   |         ^^^^
+   |
+info: `lint:call-non-callable` is enabled by default
+
+```
+
+```
+error: lint:missing-argument: No argument provided for required parameter `b` of function `f3`
+  --> src/mdtest_snippet.py:48:9
+   |
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
+   |         ^^^^
+   |
+info: `lint:missing-argument` is enabled by default
+
+```
+
+```
+error: lint:no-matching-overload: No overload of method wrapper `__get__` of function `f` matches arguments
+  --> src/mdtest_snippet.py:48:9
+   |
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
+   |         ^^^^
+   |
+info: `lint:no-matching-overload` is enabled by default
+
+```
+
+```
+error: lint:invalid-argument-type: Argument to this function is incorrect
+  --> src/mdtest_snippet.py:48:11
+   |
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
+   |           ^ Expected `str`, found `Literal[3]`
+   |
+info: Function defined here
+ --> src/mdtest_snippet.py:6:5
+  |
+4 |     return 0
+5 |
+6 | def f2(name: str) -> int:
+  |     ^^ --------- Parameter declared here
+7 |     return 0
+  |
+info: `lint:invalid-argument-type` is enabled by default
+
+```
+
+```
+error: lint:invalid-argument-type: Argument to this function is incorrect
+  --> src/mdtest_snippet.py:48:11
+   |
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
+   |           ^ Argument type `Literal[3]` does not satisfy upper bound of type variable `T`
+   |
+info: Type variable defined here
+  --> src/mdtest_snippet.py:12:8
+   |
+10 |     return 0
+11 |
+12 | def f4[T: str](x: T) -> int:
+   |        ^^^^^^
+13 |     return 0
+   |
+info: `lint:invalid-argument-type` is enabled by default
+
+```
+
+```
+error: lint:too-many-positional-arguments: Too many positional arguments to function `f1`: expected 0, got 1
+  --> src/mdtest_snippet.py:48:11
+   |
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
    |           ^
    |
 info: `lint:too-many-positional-arguments` is enabled by default
