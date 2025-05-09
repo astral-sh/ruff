@@ -644,7 +644,6 @@ impl<'db> Type<'db> {
             | Self::StringLiteral(_)
             | Self::IntLiteral(_)
             | Self::LiteralString
-            | Self::SliceLiteral(_)
             | Self::FunctionLiteral(_)
             | Self::ModuleLiteral(_)
             | Self::ClassLiteral(_)
