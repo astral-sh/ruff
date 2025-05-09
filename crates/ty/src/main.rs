@@ -3,10 +3,20 @@ use std::io;
 use ty::{run, ExitStatus};
 
 pub fn main() -> ExitStatus {
-    run().unwrap_or_else(|error| {
-        use io::Write;
+    use io::Write;
 
-        // Use `writeln` instead of `eprintln` to avoid panicking when the stderr pipe is broken.
+    // Use `writeln` instead of `eprintln` to avoid panicking when the stderr pipe is broken.
+    let mut stderr = io::stderr().lock();
+
+    writeln!(
+        stderr,
+        "{warning}: ty is pre-release software and not ready for production use. \
+                    Expect to encounter bugs, missing features, and fatal errors.",
+        warning = "warning".yellow().bold()
+    )
+    .ok();
+
+    run().unwrap_or_else(|error| {
         let mut stderr = io::stderr().lock();
 
         // This communicates that this isn't a linter error but ty itself hard-errored for
