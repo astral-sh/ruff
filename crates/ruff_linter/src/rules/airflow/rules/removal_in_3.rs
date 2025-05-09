@@ -497,21 +497,25 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
             "collected_datasets" => Replacement::AttrName("collected_assets"),
             _ => return,
         },
-        ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
-            "initialize_providers_dataset_uri_resources" => {
+        ["airflow", "providers_manager", "ProvidersManager"] => {
+            if attr.as_str() == "initialize_providers_dataset_uri_resources" {
                 Replacement::AttrName("initialize_providers_asset_uri_resources")
+            } else {
+                return;
             }
-            _ => return,
-        },
+        }
         [
             "airflow",
             "secrets",
             "local_filesystem",
             "LocalFilesystemBackend",
-        ] => match attr.as_str() {
-            "get_connections" => Replacement::AttrName("get_connection"),
-            _ => return,
-        },
+        ] => {
+            if attr.as_str() == "get_connections" {
+                Replacement::AttrName("get_connection")
+            } else {
+                return;
+            }
+        }
         ["airflow", "datasets", ..] | ["airflow", "Dataset"] => match attr.as_str() {
             "iter_datasets" => Replacement::AttrName("iter_assets"),
             "iter_dataset_aliases" => Replacement::AttrName("iter_asset_aliases"),
@@ -524,17 +528,14 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
                     "get_connections" => Replacement::AttrName("get_connection"),
                     _ => return,
                 }
-            } else if is_airflow_hook(segments) {
-                match attr.as_str() {
-                    "get_connections" => Replacement::AttrName("get_connection"),
-                    _ => return,
-                }
             } else if is_airflow_auth_manager(segments) {
                 if attr.as_str() == "is_authorized_dataset" {
                     Replacement::AttrName("is_authorized_asset")
                 } else {
                     return;
                 }
+            } else if is_airflow_hook(segments) && attr.as_str() == "get_connections" {
+                Replacement::AttrName("get_connection")
             } else {
                 return;
             }
@@ -993,7 +994,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             name
         };
         diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            let (import_edit, _) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from(module, import_target),
                 expr.start(),
                 checker.semantic(),
