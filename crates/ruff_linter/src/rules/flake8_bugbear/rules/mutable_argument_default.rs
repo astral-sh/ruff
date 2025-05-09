@@ -68,6 +68,10 @@ use crate::Locator;
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
 ///
+/// ## Fix safety
+///
+/// This fix is marked as unsafe as it changes program behavior.
+///
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
 #[derive(ViolationMetadata)]
