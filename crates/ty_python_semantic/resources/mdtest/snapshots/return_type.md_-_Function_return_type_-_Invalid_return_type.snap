@@ -43,7 +43,7 @@ error[invalid-return-type]: Function can implicitly return `None`, which is not 
   |            ^^^
 3 |     1
   |
-info: `lint:invalid-return-type` is enabled by default
+info: `invalid-return-type` is enabled by default
 
 ```
 
@@ -61,7 +61,7 @@ error[invalid-return-type]: Return type does not match returned value
 8 |
 9 | def f() -> int:
   |
-info: `lint:invalid-return-type` is enabled by default
+info: `invalid-return-type` is enabled by default
 
 ```
 
@@ -79,7 +79,7 @@ error[invalid-return-type]: Return type does not match returned value
 12 |
 13 | from typing import TypeVar
    |
-info: `lint:invalid-return-type` is enabled by default
+info: `invalid-return-type` is enabled by default
 
 ```
 
@@ -91,6 +91,6 @@ error[invalid-return-type]: Function can implicitly return `None`, which is not 
 18 | def m(x: T) -> T: ...
    |                ^
    |
-info: `lint:invalid-return-type` is enabled by default
+info: `invalid-return-type` is enabled by default
 
 ```

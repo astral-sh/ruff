@@ -24,6 +24,6 @@ error[unresolved-import]: Cannot resolve imported module `zqzqzqzqzqzqzq`
 1 | import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve imported module `zqzqzqzqzqzqzq`"
   |        ^^^^^^^^^^^^^^
   |
-info: `lint:unresolved-import` is enabled by default
+info: `unresolved-import` is enabled by default
 
 ```

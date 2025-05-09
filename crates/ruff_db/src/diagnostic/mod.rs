@@ -2,7 +2,6 @@ use std::{fmt::Formatter, sync::Arc};
 
 use render::{FileResolver, Input};
 use ruff_source_file::{SourceCode, SourceFile};
-use thiserror::Error;
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange};
@@ -613,53 +612,18 @@ impl DiagnosticId {
         code.split_once(':').map(|(_, rest)| rest)
     }
 
-    /// Returns `true` if this `DiagnosticId` matches the given name.
+    /// Returns a concise description of this diagnostic ID.
     ///
-    /// ## Examples
-    /// ```
-    /// use ruff_db::diagnostic::DiagnosticId;
-    ///
-    /// assert!(DiagnosticId::Io.matches("io"));
-    /// assert!(DiagnosticId::lint("test").matches("lint:test"));
-    /// assert!(!DiagnosticId::lint("test").matches("test"));
-    /// ```
-    pub fn matches(&self, expected_name: &str) -> bool {
-        match self.as_str() {
-            Ok(id) => id == expected_name,
-            Err(DiagnosticAsStrError::Category { category, name }) => expected_name
-                .strip_prefix(category)
-                .and_then(|prefix| prefix.strip_prefix(":"))
-                .is_some_and(|rest| rest == name),
-        }
-    }
-
-    pub fn as_str(&self) -> Result<&str, DiagnosticAsStrError> {
-        Ok(match self {
+    /// Note that this doesn't include the lint's category. It
+    /// only includes the lint's name.
+    pub fn as_str(&self) -> &str {
+        match self {
             DiagnosticId::Panic => "panic",
             DiagnosticId::Io => "io",
             DiagnosticId::InvalidSyntax => "invalid-syntax",
-            DiagnosticId::Lint(name) => {
-                return Err(DiagnosticAsStrError::Category {
-                    category: "lint",
-                    name: name.as_str(),
-                })
-            }
+            DiagnosticId::Lint(name) => name.as_str(),
             DiagnosticId::RevealedType => "revealed-type",
             DiagnosticId::UnknownRule => "unknown-rule",
-        })
-    }
-
-    /// Returns a "concise" description of this diagnostic ID.
-    ///
-    /// Specifically, this avoids adding a `lint:` prefix (or other
-    /// possible category prefixes, although `lint` is the only one
-    /// as of 2025-05-09) to the diagnostic ID when this is a lint
-    /// identifier. This is useful in diagnostic rendering where we
-    /// want to elide this prefix.
-    fn as_concise_str(&self) -> &str {
-        match self.as_str() {
-            Ok(name) => name,
-            Err(DiagnosticAsStrError::Category { name, .. }) => name,
         }
     }
 
@@ -668,26 +632,9 @@ impl DiagnosticId {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Error)]
-pub enum DiagnosticAsStrError {
-    /// The id can't be converted to a string because it belongs to a sub-category.
-    #[error("id from a sub-category: {category}:{name}")]
-    Category {
-        /// The id's category.
-        category: &'static str,
-        /// The diagnostic id in this category.
-        name: &'static str,
-    },
-}
-
 impl std::fmt::Display for DiagnosticId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.as_str() {
-            Ok(name) => f.write_str(name),
-            Err(DiagnosticAsStrError::Category { category, name }) => {
-                write!(f, "{category}:{name}")
-            }
-        }
+        write!(f, "{}", self.as_str())
     }
 }
 

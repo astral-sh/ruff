@@ -22,7 +22,7 @@ fn check() {
 
     let diagnostic = &result[0];
 
-    assert_eq!(diagnostic.id(), "lint:unresolved-import");
+    assert_eq!(diagnostic.id(), "unresolved-import");
     assert_eq!(
         diagnostic.to_range(&workspace).unwrap().start,
         Position { line: 1, column: 8 }

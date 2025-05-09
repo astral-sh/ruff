@@ -26,6 +26,6 @@ error[unresolved-import]: Cannot resolve imported module `does_not_exist`
 2 | from does_not_exist import foo, bar, baz
   |      ^^^^^^^^^^^^^^
   |
-info: `lint:unresolved-import` is enabled by default
+info: `unresolved-import` is enabled by default
 
 ```
