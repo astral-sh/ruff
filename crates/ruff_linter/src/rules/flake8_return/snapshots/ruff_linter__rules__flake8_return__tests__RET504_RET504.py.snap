@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
-snapshot_kind: text
 ---
 RET504.py:6:12: RET504 [*] Unnecessary assignment to `a` before `return` statement
   |
@@ -248,6 +247,8 @@ RET504.py:423:16: RET504 [*] Unnecessary assignment to `services` before `return
 422 |         services = a["services"]
 423 |         return services
     |                ^^^^^^^^ RET504
+424 |
+425 | # See: https://github.com/astral-sh/ruff/issues/14052
     |
     = help: Remove unnecessary assignment
 
@@ -258,3 +259,6 @@ RET504.py:423:16: RET504 [*] Unnecessary assignment to `services` before `return
 422     |-        services = a["services"]
 423     |-        return services
     422 |+        return a["services"]
+424 423 | 
+425 424 | # See: https://github.com/astral-sh/ruff/issues/14052
+426 425 | def outer() -> list[object]:
