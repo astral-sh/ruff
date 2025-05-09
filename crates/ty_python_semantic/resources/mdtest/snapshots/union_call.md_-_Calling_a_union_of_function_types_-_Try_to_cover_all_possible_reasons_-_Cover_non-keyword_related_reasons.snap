@@ -1,0 +1,72 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: union_call.md - Calling a union of function types - Try to cover all possible reasons - Cover non-keyword related reasons
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from inspect import getattr_static
+ 2 | 
+ 3 | def f1() -> int:
+ 4 |     return 0
+ 5 | 
+ 6 | def f2(name: str) -> int:
+ 7 |     return 0
+ 8 | 
+ 9 | def f3(a: int, b: int) -> int:
+10 |     return 0
+11 | 
+12 | def f4[T: str](x: T) -> int:
+13 |     return 0
+14 | 
+15 | class OverloadExample:
+16 |     def f(self, x: str) -> int:
+17 |         return 0
+18 | 
+19 | f5 = getattr_static(OverloadExample, "f").__get__
+20 | 
+21 | def _(n: int):
+22 |     class PossiblyNotCallable:
+23 |         if n == 0:
+24 |             def __call__(self) -> int:
+25 |                 return 0
+26 | 
+27 |     if n == 0:
+28 |         f = f1
+29 |     elif n == 1:
+30 |         f = f2
+31 |     elif n == 2:
+32 |         f = f3
+33 |     elif n == 3:
+34 |         f = f4
+35 |     elif n == 4:
+36 |         f = 5
+37 |     elif n == 5:
+38 |         f = f5
+39 |     else:
+40 |         f = PossiblyNotCallable()
+41 |     # error: [too-many-positional-arguments]
+42 |     x = f(3)
+```
+
+# Diagnostics
+
+```
+error: lint:too-many-positional-arguments: Too many positional arguments to function `f1`: expected 0, got 1
+  --> src/mdtest_snippet.py:42:11
+   |
+40 |         f = PossiblyNotCallable()
+41 |     # error: [too-many-positional-arguments]
+42 |     x = f(3)
+   |           ^
+   |
+info: `lint:too-many-positional-arguments` is enabled by default
+
+```
