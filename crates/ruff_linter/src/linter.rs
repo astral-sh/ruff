@@ -1116,6 +1116,95 @@ mod tests {
         PythonVersion::PY310,
         "InvalidStarExpression"
     )]
+    #[test_case(
+        "irrefutable_case_pattern_wildcard",
+        "
+        match value:
+            case _:
+                pass
+            case 1:
+                pass
+        ",
+        PythonVersion::PY310,
+        "IrrefutableCasePattern"
+    )]
+    #[test_case(
+        "irrefutable_case_pattern_capture",
+        "
+        match value:
+            case irrefutable:
+                pass
+            case 1:
+                pass
+        ",
+        PythonVersion::PY310,
+        "IrrefutableCasePattern"
+    )]
+    #[test_case(
+        "single_starred_assignment",
+        "*a = [1, 2, 3, 4]",
+        PythonVersion::PY310,
+        "SingleStarredAssignment"
+    )]
+    #[test_case(
+        "write_to_debug",
+        "
+        __debug__ = False
+        ",
+        PythonVersion::PY310,
+        "WriteToDebug"
+    )]
+    #[test_case(
+        "write_to_debug_in_function_param",
+        "
+        def process(__debug__):
+            pass
+        ",
+        PythonVersion::PY310,
+        "WriteToDebug"
+    )]
+    #[test_case(
+        "write_to_debug_class_type_param",
+        "
+        class Generic[__debug__]:
+            pass
+        ",
+        PythonVersion::PY312,
+        "WriteToDebug"
+    )]
+    #[test_case(
+        "invalid_expression_yield_in_type_param",
+        "
+        type X[T: (yield 1)] = int
+        ",
+        PythonVersion::PY312,
+        "InvalidExpression"
+    )]
+    #[test_case(
+        "invalid_expression_yield_in_type_alias",
+        "
+        type Y = (yield 1)
+        ",
+        PythonVersion::PY312,
+        "InvalidExpression"
+    )]
+    #[test_case(
+        "invalid_expression_walrus_in_return_annotation",
+        "
+        def f[T](x: int) -> (y := 3): return x
+        ",
+        PythonVersion::PY312,
+        "InvalidExpression"
+    )]
+    #[test_case(
+        "invalid_expression_yield_from_in_base_class",
+        "
+        class C[T]((yield from [object])):
+            pass
+        ",
+        PythonVersion::PY312,
+        "InvalidExpression"
+    )]
     fn test_semantic_errors(
         name: &str,
         contents: &str,
