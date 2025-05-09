@@ -50,6 +50,23 @@ class Outer:
             return self
 ```
 
+## typing_extensions
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from typing_extensions import Self
+
+class C:
+    def method(self: Self) -> Self:
+        return self
+
+reveal_type(C().method())  # revealed: C
+```
+
 ## Class Methods
 
 ```toml
