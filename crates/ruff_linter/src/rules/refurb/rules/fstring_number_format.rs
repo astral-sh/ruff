@@ -189,10 +189,7 @@ fn try_create_replacement(checker: &Checker, arg: &Expr, base: Base) -> Option<S
 
     // If the `arg` contains double quotes we need to create the f-string with single quotes
     // to avoid a `SyntaxError` in Python 3.11 and earlier.
-    if checker.target_version() <= PythonVersion::PY311
-        && quote.is_double()
-        && inner_source.contains('"')
-    {
+    if checker.target_version() <= PythonVersion::PY311 && inner_source.contains(quote.as_str()) {
         return None;
     }
 
