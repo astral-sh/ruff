@@ -792,7 +792,7 @@ declare_lint! {
     /// The name `TYPE_CHECKING` is reserved for a flag that can be used to provide conditional
     /// code seen only by the type checker, and not at runtime. Normally this flag is imported from
     /// `typing` or `typing_extensions`, but it can also be defined locally. If defined locally, it
-    /// but cannot validly be interpreted as such.
+    /// must be assigned the value `False` at runtime; the type checker will consider its value to
     /// be `True`. If annotated, it must be annotated as a type that can accept `bool` values.
     ///
     /// ## Examples
