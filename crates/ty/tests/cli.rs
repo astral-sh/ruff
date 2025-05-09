@@ -197,12 +197,12 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     exit_code: 0
     ----- stdout -----
     info: revealed-type: Revealed type
-     --> test.py:5:1
+     --> test.py:5:13
       |
     3 | from typing_extensions import reveal_type
     4 |
     5 | reveal_type(sys.platform)
-      | ^^^^^^^^^^^^^^^^^^^^^^^^^ `Literal["linux"]`
+      |             ^^^^^^^^^^^^ `Literal["linux"]`
       |
 
     Found 1 diagnostic
@@ -215,12 +215,12 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     exit_code: 0
     ----- stdout -----
     info: revealed-type: Revealed type
-     --> test.py:5:1
+     --> test.py:5:13
       |
     3 | from typing_extensions import reveal_type
     4 |
     5 | reveal_type(sys.platform)
-      | ^^^^^^^^^^^^^^^^^^^^^^^^^ `LiteralString`
+      |             ^^^^^^^^^^^^ `LiteralString`
       |
 
     Found 1 diagnostic
@@ -711,11 +711,11 @@ fn exit_code_only_info() -> anyhow::Result<()> {
     exit_code: 0
     ----- stdout -----
     info: revealed-type: Revealed type
-     --> test.py:3:1
+     --> test.py:3:13
       |
     2 | from typing_extensions import reveal_type
     3 | reveal_type(1)
-      | ^^^^^^^^^^^^^^ `Literal[1]`
+      |             ^ `Literal[1]`
       |
 
     Found 1 diagnostic
@@ -741,11 +741,11 @@ fn exit_code_only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
     exit_code: 0
     ----- stdout -----
     info: revealed-type: Revealed type
-     --> test.py:3:1
+     --> test.py:3:13
       |
     2 | from typing_extensions import reveal_type
     3 | reveal_type(1)
-      | ^^^^^^^^^^^^^^ `Literal[1]`
+      |             ^ `Literal[1]`
       |
 
     Found 1 diagnostic
@@ -1219,7 +1219,7 @@ fn concise_revealed_type() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    info[revealed-type] test.py:5:1: Revealed type: `Literal["hello"]`
+    info[revealed-type] test.py:5:13: Revealed type: `Literal["hello"]`
     Found 1 diagnostic
 
     ----- stderr -----
@@ -1248,12 +1248,12 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
     exit_code: 0
     ----- stdout -----
     info: revealed-type: Revealed type
-     --> test.py:4:1
+     --> test.py:4:13
       |
     2 | from typing_extensions import reveal_type
     3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1...
     4 | reveal_type(total)
-      | ^^^^^^^^^^^^^^^^^^ `Literal[2000]`
+      |             ^^^^^ `Literal[2000]`
       |
 
     Found 1 diagnostic

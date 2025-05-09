@@ -67,12 +67,12 @@ info: `lint:not-iterable` is enabled by default
 
 ```
 info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:29:9
+  --> src/mdtest_snippet.py:29:21
    |
 27 |     # error: [not-iterable]
 28 |     for x in Iterable1():
 29 |         reveal_type(x)  # revealed: int | str
-   |         ^^^^^^^^^^^^^^ `int | str`
+   |                     ^ `int | str`
 30 |
 31 |     # error: [not-iterable]
    |
@@ -96,12 +96,12 @@ info: `lint:not-iterable` is enabled by default
 
 ```
 info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:34:9
+  --> src/mdtest_snippet.py:34:21
    |
 32 |     for y in Iterable2():
 33 |         # TODO: `int` would probably be better here:
 34 |         reveal_type(y)  # revealed: int | Unknown
-   |         ^^^^^^^^^^^^^^ `int | Unknown`
+   |                     ^ `int | Unknown`
    |
 
 ```

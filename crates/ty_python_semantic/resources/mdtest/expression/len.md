@@ -11,30 +11,28 @@ reveal_type(len(r"conca\t" "ena\tion"))  # revealed: Literal[14]
 reveal_type(len(b"ytes lite" rb"al"))  # revealed: Literal[11]
 reveal_type(len("𝒰𝕹🄸©🕲𝕕ℇ"))  # revealed: Literal[7]
 
-reveal_type(  # revealed: Literal[7]
-    len(
+# fmt: off
+
+reveal_type(len(  # revealed: Literal[7]
         """foo
 bar"""
-    )
-)
-reveal_type(  # revealed: Literal[9]
-    len(
+))
+
+reveal_type(len(  # revealed: Literal[9]
         r"""foo\r
 bar"""
-    )
-)
-reveal_type(  # revealed: Literal[7]
-    len(
+))
+
+reveal_type(len(  # revealed: Literal[7]
         b"""foo
 bar"""
-    )
-)
-reveal_type(  # revealed: Literal[9]
-    len(
+))
+reveal_type(len(  # revealed: Literal[9]
         rb"""foo\r
 bar"""
-    )
-)
+))
+
+# fmt: on
 ```
 
 ### Tuples
@@ -50,15 +48,17 @@ reveal_type(len(tuple()))  # revealed: int
 # TODO: Handle star unpacks; Should be: Literal[0]
 reveal_type(len((*[],)))  # revealed: Literal[1]
 
+# fmt: off
+
 # TODO: Handle star unpacks; Should be: Literal[1]
-reveal_type(  # revealed: Literal[2]
-    len(
-        (
-            *[],
-            1,
-        )
+reveal_type(len(  # revealed: Literal[2]
+    (
+        *[],
+        1,
     )
-)
+))
+
+# fmt: on
 
 # TODO: Handle star unpacks; Should be: Literal[2]
 reveal_type(len((*[], 1, 2)))  # revealed: Literal[3]

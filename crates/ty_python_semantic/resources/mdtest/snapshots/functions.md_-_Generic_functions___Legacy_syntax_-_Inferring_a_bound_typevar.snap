@@ -30,12 +30,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/function
 
 ```
 info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:9:1
+  --> src/mdtest_snippet.py:9:13
    |
  7 |     return x
  8 |
  9 | reveal_type(f(1))  # revealed: Literal[1]
-   | ^^^^^^^^^^^^^^^^^ `Literal[1]`
+   |             ^^^^ `Literal[1]`
 10 | reveal_type(f(True))  # revealed: Literal[True]
 11 | # error: [invalid-argument-type]
    |
@@ -44,11 +44,11 @@ info: revealed-type: Revealed type
 
 ```
 info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:10:1
+  --> src/mdtest_snippet.py:10:13
    |
  9 | reveal_type(f(1))  # revealed: Literal[1]
 10 | reveal_type(f(True))  # revealed: Literal[True]
-   | ^^^^^^^^^^^^^^^^^^^^ `Literal[True]`
+   |             ^^^^^^^ `Literal[True]`
 11 | # error: [invalid-argument-type]
 12 | reveal_type(f("string"))  # revealed: Unknown
    |
@@ -57,12 +57,12 @@ info: revealed-type: Revealed type
 
 ```
 info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:12:1
+  --> src/mdtest_snippet.py:12:13
    |
 10 | reveal_type(f(True))  # revealed: Literal[True]
 11 | # error: [invalid-argument-type]
 12 | reveal_type(f("string"))  # revealed: Unknown
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ `Unknown`
+   |             ^^^^^^^^^^^ `Unknown`
    |
 
 ```

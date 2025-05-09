@@ -4781,7 +4781,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             ) {
                                                 let mut diag =
                                                     builder.into_diagnostic("Revealed type");
-                                                let span = self.context.span(call_expression);
+                                                let span = self
+                                                    .context
+                                                    .span(&call_expression.arguments.args[0]);
                                                 diag.annotate(Annotation::primary(span).message(
                                                     format_args!(
                                                         "`{}`",
