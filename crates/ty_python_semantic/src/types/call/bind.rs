@@ -199,11 +199,8 @@ impl<'db> Bindings<'db> {
             }
         }
 
-        // TODO: We currently only report errors for the first union element. Ideally, we'd report
-        // an error saying that the union type can't be called, followed by subdiagnostics
-        // explaining why.
-        if let Some(first) = self.into_iter().find(|b| b.as_result().is_err()) {
-            first.report_diagnostics(context, node);
+        for binding in self {
+            binding.report_diagnostics(context, node);
         }
     }
 

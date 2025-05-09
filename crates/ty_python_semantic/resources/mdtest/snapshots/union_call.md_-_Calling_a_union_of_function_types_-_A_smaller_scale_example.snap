@@ -24,18 +24,41 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.m
 10 |     else:
 11 |         f = f2
 12 |     # error: [too-many-positional-arguments]
-13 |     x = f(3)
+13 |     # error: [invalid-argument-type]
+14 |     x = f(3)
 ```
 
 # Diagnostics
 
 ```
-error: lint:too-many-positional-arguments: Too many positional arguments to function `f1`: expected 0, got 1
-  --> src/mdtest_snippet.py:13:11
+error: lint:invalid-argument-type: Argument to this function is incorrect
+  --> src/mdtest_snippet.py:14:11
    |
-11 |         f = f2
 12 |     # error: [too-many-positional-arguments]
-13 |     x = f(3)
+13 |     # error: [invalid-argument-type]
+14 |     x = f(3)
+   |           ^ Expected `str`, found `Literal[3]`
+   |
+info: Function defined here
+ --> src/mdtest_snippet.py:4:5
+  |
+2 |     return 0
+3 |
+4 | def f2(name: str) -> int:
+  |     ^^ --------- Parameter declared here
+5 |     return 0
+  |
+info: `lint:invalid-argument-type` is enabled by default
+
+```
+
+```
+error: lint:too-many-positional-arguments: Too many positional arguments to function `f1`: expected 0, got 1
+  --> src/mdtest_snippet.py:14:11
+   |
+12 |     # error: [too-many-positional-arguments]
+13 |     # error: [invalid-argument-type]
+14 |     x = f(3)
    |           ^
    |
 info: `lint:too-many-positional-arguments` is enabled by default
