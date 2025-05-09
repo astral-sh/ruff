@@ -248,7 +248,7 @@ AIR311_names.py:42:1: AIR311 `airflow.io.storage.attach` is removed in Airflow 3
    |
    = help: Use `airflow.sdk.io.attach` instead
 
-AIR311_names.py:45:1: AIR311 `airflow.models.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:45:1: AIR311 [*] `airflow.models.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 44 | # airflow.models
 45 | DAGFromModel()
@@ -257,6 +257,24 @@ AIR311_names.py:45:1: AIR311 `airflow.models.DAG` is removed in Airflow 3.0; It 
 47 | # airflow.models.baseoperator
    |
    = help: Use `airflow.sdk.DAG` instead
+
+ℹ Safe fix
+18 18 | from airflow.models.dag import DAG as DAGFromDag
+19 19 | from airflow.timetables.datasets import DatasetOrTimeSchedule
+20 20 | from airflow.utils.dag_parsing_context import get_parsing_context
+   21 |+from airflow.sdk import DAG
+21 22 | 
+22 23 | # airflow
+23 24 | DatasetFromRoot()
+--------------------------------------------------------------------------------
+42 43 | attach()
+43 44 | 
+44 45 | # airflow.models
+45    |-DAGFromModel()
+   46 |+DAG()
+46 47 | 
+47 48 | # airflow.models.baseoperator
+48 49 | chain()
 
 AIR311_names.py:48:1: AIR311 `airflow.models.baseoperator.chain` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
@@ -289,7 +307,7 @@ AIR311_names.py:50:1: AIR311 `airflow.models.baseoperator.cross_downstream` is r
    |
    = help: Use `airflow.sdk.cross_downstream` instead
 
-AIR311_names.py:56:1: AIR311 `airflow.models.dag.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:56:1: AIR311 [*] `airflow.models.dag.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 55 | # airflow.models.dag
 56 | DAGFromDag()
@@ -298,6 +316,24 @@ AIR311_names.py:56:1: AIR311 `airflow.models.dag.DAG` is removed in Airflow 3.0;
 58 | DatasetOrTimeSchedule()
    |
    = help: Use `airflow.sdk.DAG` instead
+
+ℹ Safe fix
+18 18 | from airflow.models.dag import DAG as DAGFromDag
+19 19 | from airflow.timetables.datasets import DatasetOrTimeSchedule
+20 20 | from airflow.utils.dag_parsing_context import get_parsing_context
+   21 |+from airflow.sdk import DAG
+21 22 | 
+22 23 | # airflow
+23 24 | DatasetFromRoot()
+--------------------------------------------------------------------------------
+53 54 | BaseOperatorLink()
+54 55 | 
+55 56 | # airflow.models.dag
+56    |-DAGFromDag()
+   57 |+DAG()
+57 58 | # airflow.timetables.datasets
+58 59 | DatasetOrTimeSchedule()
+59 60 | 
 
 AIR311_names.py:58:1: AIR311 [*] `airflow.timetables.datasets.DatasetOrTimeSchedule` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
