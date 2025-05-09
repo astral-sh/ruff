@@ -128,12 +128,12 @@ info: `lint:duplicate-base` is enabled by default
 
 ```
 info: revealed-type: Revealed type
- --> src/mdtest_snippet.py:5:1
+ --> src/mdtest_snippet.py:5:13
   |
 3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
 4 |
 5 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
-  | ^^^^^^^^^^^^^^^^^^^^^^^^ `tuple[<class 'Foo'>, Unknown, <class 'object'>]`
+  |             ^^^^^^^^^^^ `tuple[<class 'Foo'>, Unknown, <class 'object'>]`
 6 |
 7 | class Spam: ...
   |
@@ -217,12 +217,12 @@ info: `lint:duplicate-base` is enabled by default
 
 ```
 info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:27:1
+  --> src/mdtest_snippet.py:27:13
    |
 25 | # fmt: on
 26 |
 27 | reveal_type(Ham.__mro__)  # revealed: tuple[<class 'Ham'>, Unknown, <class 'object'>]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ `tuple[<class 'Ham'>, Unknown, <class 'object'>]`
+   |             ^^^^^^^^^^^ `tuple[<class 'Ham'>, Unknown, <class 'object'>]`
 28 |
 29 | class Mushrooms: ...
    |
@@ -256,12 +256,12 @@ info: `lint:duplicate-base` is enabled by default
 
 ```
 info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:32:1
+  --> src/mdtest_snippet.py:32:13
    |
 30 | class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
 31 |
 32 | reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `tuple[<class 'Omelette'>, Unknown, <class 'object'>]`
+   |             ^^^^^^^^^^^^^^^^ `tuple[<class 'Omelette'>, Unknown, <class 'object'>]`
 33 |
 34 | # fmt: off
    |

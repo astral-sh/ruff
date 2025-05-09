@@ -47,12 +47,12 @@ info: `lint:not-iterable` is enabled by default
 
 ```
 info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:14:9
+  --> src/mdtest_snippet.py:14:21
    |
 12 |     # error: [not-iterable]
 13 |     for x in Test() if flag else 42:
 14 |         reveal_type(x)  # revealed: int
-   |         ^^^^^^^^^^^^^^ `int`
+   |                     ^ `int`
    |
 
 ```

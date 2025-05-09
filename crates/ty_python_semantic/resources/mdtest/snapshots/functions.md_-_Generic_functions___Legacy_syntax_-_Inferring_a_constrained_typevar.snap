@@ -31,12 +31,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/function
 
 ```
 info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:9:1
+  --> src/mdtest_snippet.py:9:13
    |
  7 |     return x
  8 |
  9 | reveal_type(f(1))  # revealed: int
-   | ^^^^^^^^^^^^^^^^^ `int`
+   |             ^^^^ `int`
 10 | reveal_type(f(True))  # revealed: int
 11 | reveal_type(f(None))  # revealed: None
    |
@@ -45,11 +45,11 @@ info: revealed-type: Revealed type
 
 ```
 info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:10:1
+  --> src/mdtest_snippet.py:10:13
    |
  9 | reveal_type(f(1))  # revealed: int
 10 | reveal_type(f(True))  # revealed: int
-   | ^^^^^^^^^^^^^^^^^^^^ `int`
+   |             ^^^^^^^ `int`
 11 | reveal_type(f(None))  # revealed: None
 12 | # error: [invalid-argument-type]
    |
@@ -58,12 +58,12 @@ info: revealed-type: Revealed type
 
 ```
 info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:11:1
+  --> src/mdtest_snippet.py:11:13
    |
  9 | reveal_type(f(1))  # revealed: int
 10 | reveal_type(f(True))  # revealed: int
 11 | reveal_type(f(None))  # revealed: None
-   | ^^^^^^^^^^^^^^^^^^^^ `None`
+   |             ^^^^^^^ `None`
 12 | # error: [invalid-argument-type]
 13 | reveal_type(f("string"))  # revealed: Unknown
    |
@@ -72,12 +72,12 @@ info: revealed-type: Revealed type
 
 ```
 info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:13:1
+  --> src/mdtest_snippet.py:13:13
    |
 11 | reveal_type(f(None))  # revealed: None
 12 | # error: [invalid-argument-type]
 13 | reveal_type(f("string"))  # revealed: Unknown
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ `Unknown`
+   |             ^^^^^^^^^^^ `Unknown`
    |
 
 ```
