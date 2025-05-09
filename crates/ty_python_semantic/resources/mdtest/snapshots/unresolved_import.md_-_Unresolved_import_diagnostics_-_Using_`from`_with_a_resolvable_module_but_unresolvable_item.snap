@@ -25,7 +25,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unresolved_i
 # Diagnostics
 
 ```
-error: unresolved-import: Module `a` has no member `does_not_exist`
+error[unresolved-import]: Module `a` has no member `does_not_exist`
  --> src/mdtest_snippet.py:1:28
   |
 1 | from a import does_exist1, does_not_exist, does_exist2  # error: [unresolved-import]

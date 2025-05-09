@@ -46,7 +46,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: not-iterable: Object of type `Iterable1` may not be iterable
+error[not-iterable]: Object of type `Iterable1` may not be iterable
   --> src/mdtest_snippet.py:22:14
    |
 21 |     # error: [not-iterable]
@@ -62,7 +62,7 @@ info: `lint:not-iterable` is enabled by default
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:24:21
    |
 22 |     for x in Iterable1():
@@ -76,7 +76,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: not-iterable: Object of type `Iterable2` may not be iterable
+error[not-iterable]: Object of type `Iterable2` may not be iterable
   --> src/mdtest_snippet.py:27:14
    |
 26 |     # error: [not-iterable]
@@ -92,7 +92,7 @@ info: `lint:not-iterable` is enabled by default
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:29:21
    |
 27 |     for y in Iterable2():

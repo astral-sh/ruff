@@ -57,7 +57,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 # Diagnostics
 
 ```
-error: invalid-argument-type: Class `HasX` cannot be used as the second argument to `isinstance`
+error[invalid-argument-type]: Class `HasX` cannot be used as the second argument to `isinstance`
  --> src/mdtest_snippet.py:7:8
   |
 6 | def f(arg: object, arg2: type):
@@ -82,7 +82,7 @@ info: `lint:invalid-argument-type` is enabled by default
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:8:21
    |
  6 | def f(arg: object, arg2: type):
@@ -96,7 +96,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:10:21
    |
  8 |         reveal_type(arg)  # revealed: HasX
@@ -110,7 +110,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: invalid-argument-type: Class `HasX` cannot be used as the second argument to `issubclass`
+error[invalid-argument-type]: Class `HasX` cannot be used as the second argument to `issubclass`
   --> src/mdtest_snippet.py:12:8
    |
 10 |         reveal_type(arg)  # revealed: ~HasX
@@ -136,7 +136,7 @@ info: `lint:invalid-argument-type` is enabled by default
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:13:21
    |
 12 |     if issubclass(arg2, HasX):  # error: [invalid-argument-type]
@@ -149,7 +149,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:15:21
    |
 13 |         reveal_type(arg2)  # revealed: type[HasX]
@@ -162,7 +162,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:24:21
    |
 22 | def f(arg: object):
@@ -176,7 +176,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:26:21
    |
 24 |         reveal_type(arg)  # revealed: RuntimeCheckableHasX
@@ -190,7 +190,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:33:21
    |
 31 | def f(arg1: type, arg2: type):
@@ -204,7 +204,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:35:21
    |
 33 |         reveal_type(arg1)  # revealed: type[RuntimeCheckableHasX]
@@ -218,7 +218,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:38:21
    |
 37 |     if issubclass(arg2, OnlyMethodMembers):  # no error!
@@ -231,7 +231,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:40:21
    |
 38 |         reveal_type(arg2)  # revealed: type[OnlyMethodMembers]

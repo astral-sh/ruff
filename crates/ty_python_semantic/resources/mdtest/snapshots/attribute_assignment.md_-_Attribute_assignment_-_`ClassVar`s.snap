@@ -27,7 +27,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_as
 # Diagnostics
 
 ```
-error: invalid-assignment: Object of type `Literal["wrong"]` is not assignable to attribute `attr` of type `int`
+error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to attribute `attr` of type `int`
  --> src/mdtest_snippet.py:7:1
   |
 6 | C.attr = 1  # fine
@@ -41,7 +41,7 @@ info: `lint:invalid-assignment` is enabled by default
 ```
 
 ```
-error: invalid-attribute-access: Cannot assign to ClassVar `attr` from an instance of type `C`
+error[invalid-attribute-access]: Cannot assign to ClassVar `attr` from an instance of type `C`
   --> src/mdtest_snippet.py:10:1
    |
  9 | instance = C()

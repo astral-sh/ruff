@@ -42,7 +42,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 # Diagnostics
 
 ```
-error: call-non-callable: Object of type `typing.Protocol` is not callable
+error[call-non-callable]: Object of type `typing.Protocol` is not callable
  --> src/mdtest_snippet.py:4:13
   |
 3 | # error: [call-non-callable]
@@ -56,7 +56,7 @@ info: `lint:call-non-callable` is enabled by default
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
  --> src/mdtest_snippet.py:4:13
   |
 3 | # error: [call-non-callable]
@@ -69,7 +69,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: call-non-callable: Cannot instantiate class `MyProtocol`
+error[call-non-callable]: Cannot instantiate class `MyProtocol`
   --> src/mdtest_snippet.py:10:13
    |
  9 | # error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
@@ -92,7 +92,7 @@ info: `lint:call-non-callable` is enabled by default
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:10:13
    |
  9 | # error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
@@ -105,7 +105,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: call-non-callable: Cannot instantiate class `GenericProtocol`
+error[call-non-callable]: Cannot instantiate class `GenericProtocol`
   --> src/mdtest_snippet.py:16:13
    |
 15 | # error: [call-non-callable] "Cannot instantiate class `GenericProtocol`"
@@ -127,7 +127,7 @@ info: `lint:call-non-callable` is enabled by default
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:16:13
    |
 15 | # error: [call-non-callable] "Cannot instantiate class `GenericProtocol`"
@@ -139,7 +139,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:19:13
    |
 17 | class SubclassOfMyProtocol(MyProtocol): ...
@@ -153,7 +153,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:23:13
    |
 21 | class SubclassOfGenericProtocol[T](GenericProtocol[T]): ...
@@ -167,7 +167,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:25:17
    |
 23 | reveal_type(SubclassOfGenericProtocol[int]())  # revealed: SubclassOfGenericProtocol[int]

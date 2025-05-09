@@ -24,7 +24,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: not-iterable: Object of type `NotIterable` is not iterable
+error[not-iterable]: Object of type `NotIterable` is not iterable
  --> src/mdtest_snippet.py:6:10
   |
 4 |     __iter__: None = None

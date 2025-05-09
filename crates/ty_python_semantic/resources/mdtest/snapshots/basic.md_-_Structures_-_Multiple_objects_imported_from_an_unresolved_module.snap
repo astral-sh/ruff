@@ -19,7 +19,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/import/basic.md
 # Diagnostics
 
 ```
-error: unresolved-import: Cannot resolve imported module `does_not_exist`
+error[unresolved-import]: Cannot resolve imported module `does_not_exist`
  --> src/mdtest_snippet.py:2:6
   |
 1 | # error: [unresolved-import]

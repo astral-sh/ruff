@@ -29,7 +29,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 # Diagnostics
 
 ```
-error: invalid-argument-type: Invalid argument to `get_protocol_members`
+error[invalid-argument-type]: Invalid argument to `get_protocol_members`
  --> src/mdtest_snippet.py:5:1
   |
 3 | class NotAProtocol: ...
@@ -57,7 +57,7 @@ info: `lint:invalid-argument-type` is enabled by default
 ```
 
 ```
-error: invalid-argument-type: Invalid argument to `get_protocol_members`
+error[invalid-argument-type]: Invalid argument to `get_protocol_members`
   --> src/mdtest_snippet.py:9:1
    |
  7 | class AlsoNotAProtocol(NotAProtocol, object): ...

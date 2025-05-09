@@ -27,7 +27,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/import/basic.md
 # Diagnostics
 
 ```
-error: unresolved-import: Cannot resolve imported module `a.foo`
+error[unresolved-import]: Cannot resolve imported module `a.foo`
  --> src/mdtest_snippet.py:2:8
   |
 1 | # Topmost component resolvable, submodule not resolvable:
@@ -41,7 +41,7 @@ info: `lint:unresolved-import` is enabled by default
 ```
 
 ```
-error: unresolved-import: Cannot resolve imported module `b.foo`
+error[unresolved-import]: Cannot resolve imported module `b.foo`
  --> src/mdtest_snippet.py:5:8
   |
 4 | # Topmost component unresolvable:

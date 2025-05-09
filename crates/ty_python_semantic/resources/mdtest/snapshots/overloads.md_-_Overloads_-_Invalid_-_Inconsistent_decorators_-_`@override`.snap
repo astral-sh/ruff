@@ -82,7 +82,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 # Diagnostics
 
 ```
-error: invalid-overload: `@override` decorator should be applied only to the overload implementation
+error[invalid-overload]: `@override` decorator should be applied only to the overload implementation
   --> src/mdtest_snippet.py:27:9
    |
 25 |     def method(self, x: str) -> str: ...
@@ -98,7 +98,7 @@ info: `lint:invalid-overload` is enabled by default
 ```
 
 ```
-error: invalid-overload: `@override` decorator should be applied only to the overload implementation
+error[invalid-overload]: `@override` decorator should be applied only to the overload implementation
   --> src/mdtest_snippet.py:37:9
    |
 35 |     def method(self, x: str) -> str: ...
@@ -114,7 +114,7 @@ info: `lint:invalid-overload` is enabled by default
 ```
 
 ```
-error: invalid-overload: `@override` decorator should be applied only to the first overload
+error[invalid-overload]: `@override` decorator should be applied only to the first overload
   --> src/mdtest_snippet.pyi:18:9
    |
 16 | class Sub2(Base):

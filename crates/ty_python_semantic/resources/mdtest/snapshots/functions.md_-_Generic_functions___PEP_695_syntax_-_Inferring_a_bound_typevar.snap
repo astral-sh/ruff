@@ -26,7 +26,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/function
 # Diagnostics
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
  --> src/mdtest_snippet.py:6:13
   |
 4 |     return x
@@ -40,7 +40,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
  --> src/mdtest_snippet.py:7:13
   |
 6 | reveal_type(f(1))  # revealed: Literal[1]
@@ -53,7 +53,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-info: revealed-type: Revealed type
+info[revealed-type]: Revealed type
  --> src/mdtest_snippet.py:9:13
   |
 7 | reveal_type(f(True))  # revealed: Literal[True]
@@ -65,7 +65,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: invalid-argument-type: Argument to this function is incorrect
+error[invalid-argument-type]: Argument to this function is incorrect
  --> src/mdtest_snippet.py:9:15
   |
 7 | reveal_type(f(True))  # revealed: Literal[True]

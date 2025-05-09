@@ -72,7 +72,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 # Diagnostics
 
 ```
-error: invalid-overload: Overloaded function `try_from1` does not use the `@classmethod` decorator consistently
+error[invalid-overload]: Overloaded function `try_from1` does not use the `@classmethod` decorator consistently
   --> src/mdtest_snippet.py:13:9
    |
 11 |     def try_from1(cls, x: int) -> CheckClassMethod: ...
@@ -91,7 +91,7 @@ info: `lint:invalid-overload` is enabled by default
 ```
 
 ```
-error: invalid-overload: Overloaded function `try_from2` does not use the `@classmethod` decorator consistently
+error[invalid-overload]: Overloaded function `try_from2` does not use the `@classmethod` decorator consistently
   --> src/mdtest_snippet.py:28:9
    |
 26 |     @classmethod
@@ -114,7 +114,7 @@ info: `lint:invalid-overload` is enabled by default
 ```
 
 ```
-error: invalid-overload: Overloaded function `try_from3` does not use the `@classmethod` decorator consistently
+error[invalid-overload]: Overloaded function `try_from3` does not use the `@classmethod` decorator consistently
   --> src/mdtest_snippet.py:40:9
    |
 38 |     def try_from3(cls, x: str) -> None: ...

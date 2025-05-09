@@ -26,7 +26,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/tuples.md
 # Diagnostics
 
 ```
-error: unsupported-bool-conversion: Boolean conversion is unsupported for type `NotBoolable`
+error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable`
  --> src/mdtest_snippet.py:9:1
   |
 8 | # error: [unsupported-bool-conversion]

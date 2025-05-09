@@ -20,7 +20,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: not-iterable: Object of type `Literal[123]` is not iterable
+error[not-iterable]: Object of type `Literal[123]` is not iterable
  --> src/mdtest_snippet.py:2:10
   |
 1 | nonsense = 123
