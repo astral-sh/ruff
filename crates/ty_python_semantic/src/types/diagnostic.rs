@@ -447,20 +447,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for class bases which are not themselves a class or
-    /// a [gradual form] (`typing.Any`, `ty_extensions.Unknown`).
-    ///
-    /// ## Why is this bad?
-    /// Such bases likely indicate a logic error.
-    ///
-    /// ## Examples
-    /// ```python
-    /// class A(1): ...
-    /// class B(A()): ...
-    /// ```
-    ///
-    /// [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form
+    /// TODO #14889
     pub(crate) static INVALID_BASE = {
         summary: "detects invalid bases in class definitions",
         status: LintStatus::preview("1.0.0"),
