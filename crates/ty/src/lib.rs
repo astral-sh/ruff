@@ -15,6 +15,7 @@ use crate::args::{CheckCommand, Command, TerminalColor};
 use crate::logging::setup_tracing;
 use anyhow::{anyhow, Context};
 use clap::{CommandFactory, Parser};
+use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
@@ -260,7 +261,7 @@ impl MainLoop {
                         let mut stdout = stdout().lock();
 
                         if result.is_empty() {
-                            writeln!(stdout, "All checks passed!")?;
+                            writeln!(stdout, "{}", "All checks passed!".green().bold())?;
 
                             if self.watcher.is_none() {
                                 return Ok(ExitStatus::Success);
