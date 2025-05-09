@@ -5,6 +5,17 @@ name, and not just by its numeric position within the tuple:
 
 ## `typing.NamedTuple`
 
+### Definition
+
+```py
+from typing import NamedTuple
+
+class Location(NamedTuple):
+    altitude: float = 0.0
+    latitude: float  # TODO: this should be an error. Fields without default values cannot come after fields with.
+    longitude: float
+```
+
 ### Basics
 
 ```py
@@ -37,6 +48,10 @@ Person(3, "Eve", 99, "extra")
 
 # error: [invalid-argument-type]
 Person(id="3", name="Eve")
+
+# TODO: over-writing NamedTuple fields should be an error
+alice.id = 42
+bob.age = None
 ```
 
 Alternative functional syntax:
@@ -87,6 +102,18 @@ reveal_type(alice.level)  # revealed: int
 # This is an error because `level` is not part of the signature:
 # error: [too-many-positional-arguments]
 alice = SuperUser(1, "Alice", 3)
+```
+
+```py
+# TODO: enforce that newly-added fields in subclass do not conflict with fields in base class
+from typing import NamedTuple
+
+class User(NamedTuple):
+    id: int
+    name: str
+
+class SuperUser(User):
+    id: int  # this should be an error
 ```
 
 ### Generic named tuples
