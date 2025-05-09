@@ -174,8 +174,9 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for class definitions whose metaclass
-    /// is not a non-strict subclass of the metaclasses of its bases.
+    /// Checks for class definitions where the metaclass of the class
+    /// being created would not be a subclass of the metaclasses of
+    /// all the class's bases.
     ///
     /// ## Why is it bad?
     /// Such a class definition raises a `TypeError` at runtime.
@@ -456,9 +457,8 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for class bases which are not themselves a class,
-    /// a [gradual form] (`typing.Any`, `ty_extensions.Unknown`)
-    /// or of a gradual type (`Any`, `Unknown`, `Todo`).
+    /// Checks for class bases which are not themselves a class or
+    /// a [gradual form] (`typing.Any`, `ty_extensions.Unknown`).
     ///
     /// ## Why is this bad?
     /// Such bases likely indicate a logic error.
@@ -471,7 +471,7 @@ declare_lint! {
     ///
     /// [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form
     pub(crate) static INVALID_BASE = {
-        summary: "detects class definitions with an invalid base",
+        summary: "detects invalid bases in class definitions",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
