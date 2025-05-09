@@ -28,17 +28,6 @@ use crate::fix::edits::add_argument;
 /// Python 3.10 and later, or `locale.getpreferredencoding()` on earlier versions,
 /// to make the encoding explicit.
 ///
-/// ## Fis safety
-/// This fix is always unsafe and may change the program's behavior. The default
-/// encoding is platform-dependent. Making it explicit does not guarantee compatibility
-/// with the actual file encoding and may cause errors.
-/// ```python
-/// with open("test.txt") as f:
-///     print(f.read()) # before fix: 你好，世界！ (works on UTF-8 systems)
-/// with open("test.txt", encoding=locale.getpreferredencoding(False)) as f:
-///     print(f.read()) # after fix, on Windows: UnicodeDecodeError
-/// ```
-///
 /// ## Example
 /// ```python
 /// open("file.txt")
@@ -53,6 +42,17 @@ use crate::fix::edits::add_argument;
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 ///
 /// [PEP 597]: https://peps.python.org/pep-0597/
+///
+/// ## Fix safety
+/// This fix is always unsafe and may change the program's behavior. It forces
+/// `encoding="utf-8"` as the default, regardless of the platform’s actual default
+/// encoding, which may cause `UnicodeDecodeError` on non-UTF-8 systems.
+/// ```python
+/// with open("test.txt") as f:
+///     print(f.read()) # before fix (on UTF-8 systems): 你好，世界！
+/// with open("test.txt", encoding="utf-8") as f:
+///     print(f.read()) # after fix (on Windows): UnicodeDecodeError
+/// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct UnspecifiedEncoding {
     function_name: String,
