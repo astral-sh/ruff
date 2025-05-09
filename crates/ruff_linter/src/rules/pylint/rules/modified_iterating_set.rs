@@ -24,12 +24,6 @@ use crate::checkers::ast::Checker;
 /// directly on the variable itself (e.g., `set.add()`), as opposed to
 /// modifications within other function calls (e.g., `some_function(set)`).
 ///
-/// ## Fix safety
-/// This fix is always marked as unsafe because it changes the iteration target
-/// from the original set to a copy of the set. While this prevents the `RuntimeError`
-/// that would occur when modifying a set during iteration, it may change the behavior
-/// of the code if the original set is modified elsewhere during the iteration.
-///
 /// ## Example
 /// ```python
 /// nums = {1, 2, 3}
@@ -46,6 +40,11 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
+///
+/// ## Fix safety
+/// This fix is always unsafe because it changes the program’s behavior. Replacing the
+/// original set with a copy during iteration allows code that would previously raise a
+/// `RuntimeError` to run without error.
 #[derive(ViolationMetadata)]
 pub(crate) struct ModifiedIteratingSet {
     name: Name,
