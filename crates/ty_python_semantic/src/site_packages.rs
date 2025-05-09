@@ -986,35 +986,63 @@ mod tests {
     }
 
     #[test]
-    fn cannot_find_lib_directory() {
+    fn cannot_read_lib_directory() {
         let system = TestSystem::default();
         system
             .memory_file_system()
             .create_directory_all("/env")
             .unwrap();
-        // Environment creation succeeds, but site-packages retrieval fails reading the `lib` directory
+        // Environment creation succeeds, but site-packages retrieval fails reading the `lib`
+        // directory
         let env =
             PythonEnvironment::new("/env", SysPrefixPathOrigin::PythonCliFlag, &system).unwrap();
-        assert!(matches!(
-            env.site_packages_directories(&system),
-            Err(SitePackagesDiscoveryError::CouldNotReadLibDirectory(..))
-        ));
+        let site_packages = env.site_packages_directories(&system);
+        if cfg!(unix) {
+            assert!(
+                matches!(
+                    site_packages,
+                    Err(SitePackagesDiscoveryError::CouldNotReadLibDirectory(..)),
+                ),
+                "Got {site_packages:?}",
+            );
+        } else {
+            // On Windows, we look for `Lib/site-packages` directly instead of listing the entries
+            // of `lib/...` — so we don't see the intermediate failure
+            assert!(
+                matches!(
+                    site_packages,
+                    Err(SitePackagesDiscoveryError::NoSitePackagesDirFound(..)),
+                ),
+                "Got {site_packages:?}",
+            );
+        }
     }
 
     #[test]
     fn cannot_find_site_packages_directory() {
         let system = TestSystem::default();
-        system
-            .memory_file_system()
-            .create_directory_all("/env/lib")
-            .unwrap();
+        if cfg!(unix) {
+            system
+                .memory_file_system()
+                .create_directory_all("/env/lib")
+                .unwrap();
+        } else {
+            system
+                .memory_file_system()
+                .create_directory_all("/env/Lib")
+                .unwrap();
+        }
         // Environment creation succeeds, but site-packages retrieval fails
         let env =
             PythonEnvironment::new("/env", SysPrefixPathOrigin::PythonCliFlag, &system).unwrap();
-        assert!(matches!(
-            env.site_packages_directories(&system),
-            Err(SitePackagesDiscoveryError::NoSitePackagesDirFound(..))
-        ));
+        let site_packages = env.site_packages_directories(&system);
+        assert!(
+            matches!(
+                site_packages,
+                Err(SitePackagesDiscoveryError::NoSitePackagesDirFound(..)),
+            ),
+            "Got {site_packages:?}",
+        );
     }
 
     #[test]
