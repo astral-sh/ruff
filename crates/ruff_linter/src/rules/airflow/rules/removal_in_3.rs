@@ -479,12 +479,17 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
             "collected_datasets" => Replacement::AttrName("collected_assets"),
             _ => return,
         },
-        ["airflow", "providers", "amazon", "auth_manager", "aws_auth_manager", "AwsAuthManager"] => {
-            match attr.as_str() {
-                "is_authorized_dataset" => Replacement::AttrName("is_authorized_asset"),
-                _ => return,
+
+        ["airflow", "auth", "managers", "base_auth_manager", "BaseAuthManager"]
+        | ["airflow", "providers", "amazon", "auth_manager", "aws_auth_manager", "AwsAuthManager"]
+        | ["airflow", "providers", "fab", "auth_manager", "fab_auth_manager", "FabAuthManager"] => {
+            if attr.as_str() == "is_authorized_dataset" {
+                Replacement::AttrName("is_authorized_asset")
+            } else {
+                return;
             }
         }
+
         ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
             "initialize_providers_dataset_uri_resources" => {
                 Replacement::AttrName("initialize_providers_asset_uri_resources")
@@ -569,12 +574,12 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.api_connexion.security
-        ["airflow", "api_connexion", "security", "requires_access"] => {
-            Replacement::Message("Use `airflow.api_connexion.security.requires_access_*` instead")
-        }
+        ["airflow", "api_connexion", "security", "requires_access"] => Replacement::Message(
+            "Use `airflow.api_fastapi.core_api.security.requires_access_*` instead",
+        ),
         ["airflow", "api_connexion", "security", "requires_access_dataset"] => {
             Replacement::AutoImport {
-                module: "airflow.api_connexion.security",
+                module: "airflow.api_fastapi.core_api.security",
                 name: "requires_access_asset",
             }
         }
@@ -586,18 +591,13 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 name: "AssetDetails",
             }
         }
-        ["airflow", "auth", "managers", "base_auth_manager", "is_authorized_dataset"] => {
-            Replacement::AutoImport {
-                module: "airflow.api_fastapi.auth.managers.base_auth_manager",
-                name: "is_authorized_asset",
-            }
-        }
 
         // airflow.configuration
+        // TODO: check whether we could improve it
         ["airflow", "configuration", rest @ ("as_dict" | "get" | "getboolean" | "getfloat" | "getint" | "has_option"
         | "remove_option" | "set")] => Replacement::SourceModuleMoved {
-            module: "airflow.configuration.conf",
-            name: (*rest).to_string(),
+            module: "airflow.configuration",
+            name: format!("conf.{rest}"),
         },
 
         // airflow.contrib.*
@@ -665,7 +665,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
         // airflow.notifications
         ["airflow", "notifications", "basenotifier", "BaseNotifier"] => Replacement::AutoImport {
-            module: "airflow.sdk",
+            module: "airflow.sdk.bases.notifier",
             name: "BaseNotifier",
         },
 
@@ -766,22 +766,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.www
-        // TODO: www has been removed
-        ["airflow", "www", "auth", "has_access"] => {
-            Replacement::Message("Use `airflow.www.auth.has_access_*` instead")
+        ["airflow", "www", "auth", "has_access" | "has_access_dataset"] => Replacement::None,
+        ["airflow", "www", "utils", "get_sensitive_variables_fields" | "should_hide_value_for_key"] => {
+            Replacement::None
         }
-        ["airflow", "www", "auth", "has_access_dataset"] => Replacement::AutoImport {
-            module: "airflow.www.auth",
-            name: "has_access_asset",
-        },
-        ["airflow", "www", "utils", "get_sensitive_variables_fields"] => Replacement::AutoImport {
-            module: "airflow.utils.log.secrets_masker",
-            name: "get_sensitive_variables_fields",
-        },
-        ["airflow", "www", "utils", "should_hide_value_for_key"] => Replacement::AutoImport {
-            module: "airflow.utils.log.secrets_masker",
-            name: "should_hide_value_for_key",
-        },
 
         // airflow.providers.amazon
         ["airflow", "providers", "amazon", "aws", "datasets", "s3", rest] => match *rest {
@@ -801,8 +789,8 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
         ["airflow", "providers", "amazon", "aws", "auth_manager", "avp", "entities", "AvpEntities", "DATASET"] => {
             Replacement::AutoImport {
-                module: "airflow.providers.amazon.aws.auth_manager.avp.entities.AvpEntities",
-                name: "ASSET",
+                module: "airflow.providers.amazon.aws.auth_manager.avp.entities",
+                name: "AvpEntities.ASSET",
             }
         }
 
@@ -823,14 +811,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             },
             _ => return,
         },
-
-        // airflow.providers.fab
-        ["airflow", "providers", "fab", "auth_manager", "fab_auth_manager", "is_authorized_dataset"] => {
-            Replacement::AutoImport {
-                module: "airflow.providers.fab.auth_manager.fab_auth_manager",
-                name: "is_authorized_asset",
-            }
-        }
 
         // airflow.providers.google
         // airflow.providers.google.datasets

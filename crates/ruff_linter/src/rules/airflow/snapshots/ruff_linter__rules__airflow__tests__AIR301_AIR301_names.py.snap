@@ -77,7 +77,7 @@ AIR301_names.py:56:1: AIR301 `airflow.api_connexion.security.requires_access` is
 56 | requires_access
    | ^^^^^^^^^^^^^^^ AIR301
    |
-   = help: Use `airflow.api_connexion.security.requires_access_*` instead
+   = help: Use `airflow.api_fastapi.core_api.security.requires_access_*` instead
 
 AIR301_names.py:60:1: AIR301 `airflow.configuration.get` is removed in Airflow 3.0
    |
@@ -423,7 +423,6 @@ AIR301_names.py:137:1: AIR301 `airflow.www.auth.has_access` is removed in Airflo
 138 |
 139 | # airflow.www.utils
     |
-    = help: Use `airflow.www.auth.has_access_*` instead
 
 AIR301_names.py:140:1: AIR301 `airflow.www.utils.get_sensitive_variables_fields` is removed in Airflow 3.0
     |
@@ -432,7 +431,6 @@ AIR301_names.py:140:1: AIR301 `airflow.www.utils.get_sensitive_variables_fields`
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
 141 | should_hide_value_for_key
     |
-    = help: Use `airflow.utils.log.secrets_masker.get_sensitive_variables_fields` instead
 
 AIR301_names.py:141:1: AIR301 `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0
     |
@@ -443,7 +441,6 @@ AIR301_names.py:141:1: AIR301 `airflow.www.utils.should_hide_value_for_key` is r
 142 |
 143 | # airflow.operators.python
     |
-    = help: Use `airflow.utils.log.secrets_masker.should_hide_value_for_key` instead
 
 AIR301_names.py:146:1: AIR301 `airflow.operators.python.get_current_context` is removed in Airflow 3.0
     |

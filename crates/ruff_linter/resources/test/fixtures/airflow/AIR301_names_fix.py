@@ -3,7 +3,7 @@ from __future__ import annotations
 from airflow.api_connexion.security import requires_access_dataset
 from airflow.auth.managers.models.resource_details import (
     DatasetDetails,
-    is_authorized_dataset,
+
 )
 from airflow.datasets.manager import (
     DatasetManager,
@@ -19,7 +19,7 @@ from airflow.www.auth import has_access_dataset
 requires_access_dataset()
 
 DatasetDetails()
-is_authorized_dataset()
+
 
 DatasetManager()
 dataset_manager()
