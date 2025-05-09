@@ -21,6 +21,7 @@ pub(crate) enum MinMax {
 /// readability.
 ///
 /// ## Example
+///
 /// ```python
 /// minimum = min(1, 2, min(3, 4, 5))
 /// maximum = max(1, 2, max(3, 4, 5))
@@ -28,6 +29,7 @@ pub(crate) enum MinMax {
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// minimum = min(1, 2, 3, 4, 5)
 /// maximum = max(1, 2, 3, 4, 5)
@@ -35,8 +37,10 @@ pub(crate) enum MinMax {
 /// ```
 ///
 /// ## Fix safety
+///
 /// This fix is always unsafe and may change the program's behavior for types without full
 /// equivalence relations, such as float comparisons involving `NaN`.
+///
 /// ```python
 /// print(min(2.0, min(float("nan"), 1.0))) # before fix: 2.0
 /// print(min(2.0, float("nan"), 1.0))      # after fix: 1.0
