@@ -108,12 +108,11 @@ declare_lint! {
     ///
     /// ## Examples
     /// ```python
-    /// def f(b: bool):
-    ///     class A:
-    ///         if b:  # False
-    ///             def __class_getitem__(self, v): ...
+    /// class A:
+    ///     if b:  # False
+    ///         def __class_getitem__(self, v): ...
     ///
-    ///     A[int]  # TypeError: type 'A' is not subscriptable
+    /// A[int]  # TypeError: type 'A' is not subscriptable
     /// ```
     pub(crate) static CALL_POSSIBLY_UNBOUND_METHOD = {
         summary: "detects calls to possibly unbound methods",
@@ -139,7 +138,7 @@ declare_lint! {
     /// else:
     ///     f = is_fully_static  # Expects a type form
     ///
-    /// reveal_type(f(int))  # str | Literal[True]
+    /// f(int)  # error
     /// ```
     pub(crate) static CONFLICTING_ARGUMENT_FORMS = {
         summary: "detects when an argument is used as both a value and a type form in a call",
@@ -175,10 +174,11 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for class definitions with multiple metaclasses.
+    /// Checks for class definitions whose metaclass
+    /// is not a non-strict subclass of the metaclasses of its bases.
     ///
     /// ## Why is it bad?
-    /// A class with more than one metaclass raises a `TypeError` at runtime.
+    /// Such a class definition raises a `TypeError` at runtime.
     ///
     /// ## Examples
     /// ```python
@@ -199,11 +199,14 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for class definitions with a cyclic inheritance chain.
+    /// Checks for class definitions in stub files that inherit
+    /// (directly or indirectly) from themselves.
     ///
     /// ## Why is it bad?
-    /// A cyclic inheritance chain is most likely to be an error,
-    /// as at runtime such chains must be resolvable.
+    /// Although forward references are natively supported in stub files,
+    /// inheritance cycles are still disallowed, as it is impossible to
+    /// resolve a consistent [method resolution order] for a class that
+    /// inherits from itself.
     ///
     /// ## Examples
     /// ```python
@@ -211,6 +214,8 @@ declare_lint! {
     /// class A(B): ...
     /// class B(A): ...
     /// ```
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     pub(crate) static CYCLIC_CLASS_DEFINITION = {
         summary: "detects cyclic class definitions",
         status: LintStatus::preview("1.0.0"),
@@ -241,7 +246,7 @@ declare_lint! {
     /// Checks for class definitions with duplicate bases.
     ///
     /// ## Why is this bad?
-    /// Class definitions with duplicate bases raise a `TypeError` at runtime.
+    /// Class definitions with duplicate bases raise `TypeError` at runtime.
     ///
     /// ## Examples
     /// ```python
@@ -345,7 +350,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for classes with an inconsistent method resolution order (MRO).
+    /// Checks for classes with an inconsistent [method resolution order] (MRO).
     ///
     /// ## Why is this bad?
     /// Classes with an inconsistent MRO will raise a `TypeError` at runtime.
@@ -358,6 +363,8 @@ declare_lint! {
     /// # TypeError: Cannot create a consistent method resolution order
     /// class C(A, B): ...
     /// ```
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     pub(crate) static INCONSISTENT_MRO = {
         summary: "detects class definitions with an inconsistent MRO",
         status: LintStatus::preview("1.0.0"),
@@ -428,15 +435,18 @@ declare_lint! {
 declare_lint! {
     /// ## What it does
     /// Checks for assignments where the type of the value
-    /// is not assignable to the type of the assignee.
+    /// is not [assignable to] the type of the assignee.
     ///
     /// ## Why is this bad?
-    /// Such assignments often indicate an error in logic.
+    /// Such assignments break the rules of the type system and
+    /// weaken a type checker's ability to accurately reason about your code.
     ///
     /// ## Examples
     /// ```python
     /// a: int = ''
     /// ```
+    ///
+    /// [assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
     pub(crate) static INVALID_ASSIGNMENT = {
         summary: "detects invalid assignments",
         status: LintStatus::preview("1.0.0"),
@@ -446,8 +456,9 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for class bases which are not a class or of a gradual type
-    /// (`Any`, `Unknown`, `Todo`).
+    /// Checks for class bases which are not themselves a class,
+    /// a [gradual form] (`typing.Any`, `ty_extensions.Unknown`)
+    /// or of a gradual type (`Any`, `Unknown`, `Todo`).
     ///
     /// ## Why is this bad?
     /// Such bases likely indicate a logic error.
@@ -457,6 +468,8 @@ declare_lint! {
     /// class A(1): ...
     /// class B(A()): ...
     /// ```
+    ///
+    /// [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form
     pub(crate) static INVALID_BASE = {
         summary: "detects class definitions with an invalid base",
         status: LintStatus::preview("1.0.0"),
@@ -488,16 +501,19 @@ declare_lint! {
 declare_lint! {
     /// ## What it does
     /// Checks for declarations where the inferred type of an existing symbol
-    /// is not assignable to its post-hoc declared type.
+    /// is not [assignable to] its post-hoc declared type.
     ///
     /// ## Why is this bad?
-    /// Such declarations often indicate a logic error.
+    /// Such declarations break the rules of the type system and weaken a type checker's
+    /// ability to accurately reason about your code.
     ///
     /// ## Examples
     /// ```python
     /// a = 1
     /// a: str
     /// ```
+    ///
+    /// [assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
     pub(crate) static INVALID_DECLARATION = {
         summary: "detects invalid declarations",
         status: LintStatus::preview("1.0.0"),
@@ -667,10 +683,12 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for default values that can't be assigned to the parameter's annotated type.
+    /// Checks for default values that can't be
+    /// assigned to the parameter's annotated type.
     ///
     /// ## Why is this bad?
-    /// Such values often indicate a logic error.
+    /// This breaks the rules of the type system and
+    /// weakens a type checker's ability to accurately reason about your code.
     ///
     /// ## Examples
     /// ```python
@@ -774,7 +792,7 @@ declare_lint! {
     /// The name `TYPE_CHECKING` is reserved for a flag that can be used to provide conditional
     /// code seen only by the type checker, and not at runtime. Normally this flag is imported from
     /// `typing` or `typing_extensions`, but it can also be defined locally. If defined locally, it
-    /// must be assigned the value `False` at runtime; the type checker will consider its value to
+    /// but cannot validly be interpreted as such.
     /// be `True`. If annotated, it must be annotated as a type that can accept `bool` values.
     ///
     /// ## Examples
@@ -792,7 +810,7 @@ declare_lint! {
 declare_lint! {
     /// ## What it does
     /// Checks for expressions that are used as type expressions
-    /// but cannot be interpreted as such.
+    /// but cannot validly be interpreted as such.
     ///
     /// ## Why is this bad?
     /// Such expressions cannot be understood by ty.
@@ -814,25 +832,26 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for type variables that has only one constraint.
+    /// Checks for constrained [type variables] with only one constraint.
     ///
     /// ## Why is this bad?
-    /// A type variable must either not constrained,
-    /// or have at least two constraints.
+    /// A constrained type variable must have at least two constraints.
     ///
     /// ## Examples
     /// ```python
     /// from typing import TypeVar
     ///
-    /// T = TypeVar('T', str)
+    /// T = TypeVar('T', str)  # invalid constrained TypeVar
     /// ```
     ///
     /// Use instead:
     /// ```python
-    /// T = TypeVar('T', str, int)
+    /// T = TypeVar('T', str, int)  # valid constrained TypeVar
     /// # or
-    /// T = TypeVar('T', bound=str)
+    /// T = TypeVar('T', bound=str)  # valid bound TypeVar
     /// ```
+    ///
+    /// [type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar
     pub(crate) static INVALID_TYPE_VARIABLE_CONSTRAINTS = {
         summary: "detects invalid type variable constraints",
         status: LintStatus::preview("1.0.0"),
@@ -966,7 +985,7 @@ declare_lint! {
     /// f(1, x=2)  # Error raised here
     /// ```
     pub(crate) static PARAMETER_ALREADY_ASSIGNED = {
-        summary: "detects multiple arguments for the same parameter",
+    /// A.c  # AttributeError: type object 'A' has no attribute 'c'
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -985,7 +1004,7 @@ declare_lint! {
     ///     if b:
     ///         c = 0
     ///
-    /// A().c  # AttributeError: 'A' object has no attribute 'c'
+    /// A.c  # AttributeError: type object 'A' has no attribute 'c'
     /// ```
     pub(crate) static POSSIBLY_UNBOUND_ATTRIBUTE = {
         summary: "detects references to possibly unbound attributes",
@@ -1005,7 +1024,9 @@ declare_lint! {
     /// ## Examples
     /// ```python
     /// # module.py
-    /// if b:
+    /// import datetime
+    ///
+    /// if datetime.date.today().weekday() != 6:
     ///     a = 1
     ///
     /// # main.py
@@ -1211,7 +1232,7 @@ declare_lint! {
     /// Checks for import statements for which the module cannot be resolved.
     ///
     /// ## Why is this bad?
-    /// Importing a module that cannot be resolved will raise an `ImportError`
+    /// Importing a module that cannot be resolved will raise a `ModuleNotFoundError`
     /// at runtime.
     ///
     /// ## Examples
@@ -1290,7 +1311,9 @@ declare_lint! {
     /// Makes sure that the argument of `static_assert` is statically known to be true.
     ///
     /// ## Why is this bad?
-    /// Failed assertions often indicate a logic error.
+    /// A `static_assert` call represents an explicit request from the user
+    /// for the type checker to emit an error if the argument cannot be verified
+    /// to evaluate to `True` in a boolean context.
     ///
     /// ## Examples
     /// ```python
