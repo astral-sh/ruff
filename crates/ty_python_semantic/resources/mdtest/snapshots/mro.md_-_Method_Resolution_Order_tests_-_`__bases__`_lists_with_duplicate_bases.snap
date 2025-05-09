@@ -100,7 +100,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 # Diagnostics
 
 ```
-error: lint:duplicate-base: Duplicate base class `str`
+error: duplicate-base: Duplicate base class `str`
  --> src/mdtest_snippet.py:3:7
   |
 1 | from typing_extensions import reveal_type
@@ -141,7 +141,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:duplicate-base: Duplicate base class `Spam`
+error: duplicate-base: Duplicate base class `Spam`
   --> src/mdtest_snippet.py:16:7
    |
 14 |   # error: [duplicate-base] "Duplicate base class `Spam`"
@@ -179,7 +179,7 @@ info: `lint:duplicate-base` is enabled by default
 ```
 
 ```
-error: lint:duplicate-base: Duplicate base class `Eggs`
+error: duplicate-base: Duplicate base class `Eggs`
   --> src/mdtest_snippet.py:16:7
    |
 14 |   # error: [duplicate-base] "Duplicate base class `Spam`"
@@ -230,7 +230,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:duplicate-base: Duplicate base class `Mushrooms`
+error: duplicate-base: Duplicate base class `Mushrooms`
   --> src/mdtest_snippet.py:30:7
    |
 29 | class Mushrooms: ...
@@ -269,7 +269,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:duplicate-base: Duplicate base class `Eggs`
+error: duplicate-base: Duplicate base class `Eggs`
   --> src/mdtest_snippet.py:37:7
    |
 36 |   # error: [duplicate-base] "Duplicate base class `Eggs`"
@@ -314,7 +314,7 @@ info: `lint:duplicate-base` is enabled by default
 ```
 
 ```
-error: lint:duplicate-base: Duplicate base class `A`
+error: duplicate-base: Duplicate base class `A`
   --> src/mdtest_snippet.py:69:7
    |
 68 |   # error: [duplicate-base]
@@ -345,7 +345,7 @@ info: `lint:duplicate-base` is enabled by default
 ```
 
 ```
-info: lint:unused-ignore-comment
+info: unused-ignore-comment
   --> src/mdtest_snippet.py:72:9
    |
 70 |     A,
@@ -358,7 +358,7 @@ info: lint:unused-ignore-comment
 ```
 
 ```
-error: lint:duplicate-base: Duplicate base class `A`
+error: duplicate-base: Duplicate base class `A`
   --> src/mdtest_snippet.py:76:7
    |
 75 |   # error: [duplicate-base]
@@ -388,7 +388,7 @@ info: `lint:duplicate-base` is enabled by default
 ```
 
 ```
-info: lint:unused-ignore-comment
+info: unused-ignore-comment
   --> src/mdtest_snippet.py:81:13
    |
 79 | ):

@@ -649,6 +649,20 @@ impl DiagnosticId {
         })
     }
 
+    /// Returns a "concise" description of this diagnostic ID.
+    ///
+    /// Specifically, this avoids adding a `lint:` prefix (or other
+    /// possible category prefixes, although `lint` is the only one
+    /// as of 2025-05-09) to the diagnostic ID when this is a lint
+    /// identifier. This is useful in diagnostic rendering where we
+    /// want to elide this prefix.
+    fn as_concise_str(&self) -> &str {
+        match self.as_str() {
+            Ok(name) => name,
+            Err(DiagnosticAsStrError::Category { name, .. }) => name,
+        }
+    }
+
     pub fn is_invalid_syntax(&self) -> bool {
         matches!(self, Self::InvalidSyntax)
     }

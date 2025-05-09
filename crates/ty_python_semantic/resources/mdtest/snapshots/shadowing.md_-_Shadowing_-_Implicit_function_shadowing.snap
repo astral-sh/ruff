@@ -20,7 +20,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/shadowing.md
 # Diagnostics
 
 ```
-error: lint:invalid-assignment: Implicit shadowing of function `f`
+error: invalid-assignment: Implicit shadowing of function `f`
  --> src/mdtest_snippet.py:3:1
   |
 1 | def f(): ...

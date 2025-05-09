@@ -18,7 +18,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unpacking.md
 # Diagnostics
 
 ```
-error: lint:invalid-assignment: Not enough values to unpack
+error: invalid-assignment: Not enough values to unpack
  --> src/mdtest_snippet.py:1:1
   |
 1 | a, b = (1,)  # error: [invalid-assignment]

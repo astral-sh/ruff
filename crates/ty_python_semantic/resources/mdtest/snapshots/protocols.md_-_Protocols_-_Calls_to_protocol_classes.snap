@@ -42,7 +42,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 # Diagnostics
 
 ```
-error: lint:call-non-callable: Object of type `typing.Protocol` is not callable
+error: call-non-callable: Object of type `typing.Protocol` is not callable
  --> src/mdtest_snippet.py:4:13
   |
 3 | # error: [call-non-callable]
@@ -69,7 +69,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:call-non-callable: Cannot instantiate class `MyProtocol`
+error: call-non-callable: Cannot instantiate class `MyProtocol`
   --> src/mdtest_snippet.py:10:13
    |
  9 | # error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
@@ -105,7 +105,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:call-non-callable: Cannot instantiate class `GenericProtocol`
+error: call-non-callable: Cannot instantiate class `GenericProtocol`
   --> src/mdtest_snippet.py:16:13
    |
 15 | # error: [call-non-callable] "Cannot instantiate class `GenericProtocol`"

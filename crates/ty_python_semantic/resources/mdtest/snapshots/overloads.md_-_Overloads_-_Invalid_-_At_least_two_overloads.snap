@@ -35,7 +35,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 # Diagnostics
 
 ```
-error: lint:invalid-overload: Overloaded function `func` requires at least two overloads
+error: invalid-overload: Overloaded function `func` requires at least two overloads
  --> src/mdtest_snippet.py:4:5
   |
 3 | @overload
@@ -52,7 +52,7 @@ info: `lint:invalid-overload` is enabled by default
 ```
 
 ```
-error: lint:invalid-overload: Overloaded function `func` requires at least two overloads
+error: invalid-overload: Overloaded function `func` requires at least two overloads
  --> src/mdtest_snippet.pyi:5:5
   |
 3 | @overload

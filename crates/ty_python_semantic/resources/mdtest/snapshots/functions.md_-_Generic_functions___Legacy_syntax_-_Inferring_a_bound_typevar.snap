@@ -68,7 +68,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:invalid-argument-type: Argument to this function is incorrect
+error: invalid-argument-type: Argument to this function is incorrect
   --> src/mdtest_snippet.py:12:15
    |
 10 | reveal_type(f(True))  # revealed: Literal[True]
