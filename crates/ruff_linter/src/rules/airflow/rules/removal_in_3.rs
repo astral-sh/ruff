@@ -490,17 +490,20 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
             }
         }
 
-        ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
-            "initialize_providers_dataset_uri_resources" => {
+        ["airflow", "providers_manager", "ProvidersManager"] => {
+            if attr.as_str() == "initialize_providers_dataset_uri_resources" {
                 Replacement::AttrName("initialize_providers_asset_uri_resources")
+            } else {
+                return;
             }
-            _ => return,
-        },
-        ["airflow", "secrets", "local_filesystem", "LocalFilesystemBackend"] => match attr.as_str()
-        {
-            "get_connections" => Replacement::AttrName("get_connection"),
-            _ => return,
-        },
+        }
+        ["airflow", "secrets", "local_filesystem", "LocalFilesystemBackend"] => {
+            if attr.as_str() == "get_connections" {
+                Replacement::AttrName("get_connection")
+            } else {
+                return;
+            }
+        }
         ["airflow", "datasets", ..] | ["airflow", "Dataset"] => match attr.as_str() {
             "iter_datasets" => Replacement::AttrName("iter_assets"),
             "iter_dataset_aliases" => Replacement::AttrName("iter_asset_aliases"),
@@ -513,11 +516,8 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
                     "get_connections" => Replacement::AttrName("get_connection"),
                     _ => return,
                 }
-            } else if is_airflow_hook(segments) {
-                match attr.as_str() {
-                    "get_connections" => Replacement::AttrName("get_connection"),
-                    _ => return,
-                }
+            } else if is_airflow_hook(segments) && attr.as_str() == "get_connections" {
+                Replacement::AttrName("get_connection")
             } else {
                 return;
             }
