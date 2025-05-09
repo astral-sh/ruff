@@ -35,12 +35,9 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             // ```
             if call
                 .arguments
-                .find_positional(0)
+                .find_argument_value("path", 0)
                 .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
-                || call
-                    .arguments
-                    .find_argument_value("dir_fd", 2)
-                    .is_some_and(|expr| !expr.is_none_literal_expr())
+                || is_argument_non_default(&call.arguments, "dir_fd", 2)
             {
                 return;
             }
@@ -56,11 +53,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //           0     1                2
             // os.mkdir(path, mode=0o777, *, dir_fd=None)
             // ```
-            if call
-                .arguments
-                .find_argument_value("dir_fd", 2)
-                .is_some_and(|expr| !expr.is_none_literal_expr())
-            {
+            if is_argument_non_default(&call.arguments, "dir_fd", 2) {
                 return;
             }
             OsMkdir.into()
@@ -74,14 +67,8 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //           0    1       2                3
             // os.rename(src, dst, *, src_dir_fd=None, dst_dir_fd=None)
             // ```
-            if call
-                .arguments
-                .find_argument_value("src_dir_fd", 2)
-                .is_some_and(|expr| !expr.is_none_literal_expr())
-                || call
-                    .arguments
-                    .find_argument_value("dst_dir_fd", 3)
-                    .is_some_and(|expr| !expr.is_none_literal_expr())
+            if is_argument_non_default(&call.arguments, "src_dir_fd", 2)
+                || is_argument_non_default(&call.arguments, "dst_dir_fd", 3)
             {
                 return;
             }
@@ -96,14 +83,8 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //              0    1       2                3
             // os.replace(src, dst, *, src_dir_fd=None, dst_dir_fd=None)
             // ```
-            if call
-                .arguments
-                .find_argument_value("src_dir_fd", 2)
-                .is_some_and(|expr| !expr.is_none_literal_expr())
-                || call
-                    .arguments
-                    .find_argument_value("dst_dir_fd", 3)
-                    .is_some_and(|expr| !expr.is_none_literal_expr())
+            if is_argument_non_default(&call.arguments, "src_dir_fd", 2)
+                || is_argument_non_default(&call.arguments, "dst_dir_fd", 3)
             {
                 return;
             }
@@ -117,11 +98,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //            0         1
             // os.rmdir(path, *, dir_fd=None)
             // ```
-            if call
-                .arguments
-                .find_argument_value("dir_fd", 1)
-                .is_some_and(|expr| !expr.is_none_literal_expr())
-            {
+            if is_argument_non_default(&call.arguments, "dir_fd", 1) {
                 return;
             }
             OsRmdir.into()
@@ -134,11 +111,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //            0         1
             // os.remove(path, *, dir_fd=None)
             // ```
-            if call
-                .arguments
-                .find_argument_value("dir_fd", 1)
-                .is_some_and(|expr| !expr.is_none_literal_expr())
-            {
+            if is_argument_non_default(&call.arguments, "dir_fd", 1) {
                 return;
             }
             OsRemove.into()
@@ -151,11 +124,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //            0         1
             // os.unlink(path, *, dir_fd=None)
             // ```
-            if call
-                .arguments
-                .find_argument_value("dir_fd", 1)
-                .is_some_and(|expr| !expr.is_none_literal_expr())
-            {
+            if is_argument_non_default(&call.arguments, "dir_fd", 1) {
                 return;
             }
             OsUnlink.into()
@@ -183,12 +152,9 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             // ```
             if call
                 .arguments
-                .find_positional(0)
+                .find_argument_value("path", 0)
                 .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
-                || call
-                    .arguments
-                    .find_argument_value("dir_fd", 1)
-                    .is_some_and(|expr| !expr.is_none_literal_expr())
+                || is_argument_non_default(&call.arguments, "dir_fd", 1)
             {
                 return;
             }
@@ -257,13 +223,10 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
                         Expr::BooleanLiteral(ExprBooleanLiteral { value: true, .. })
                     )
                 })
+                || is_argument_non_default(&call.arguments, "opener", 7)
                 || call
                     .arguments
-                    .find_argument_value("opener", 7)
-                    .is_some_and(|expr| !expr.is_none_literal_expr())
-                || call
-                    .arguments
-                    .find_positional(0)
+                    .find_argument_value("file", 0)
                     .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
             {
                 return;
@@ -280,11 +243,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //               0           1              2            3                 4
             // glob.glob(pathname, *, root_dir=None, dir_fd=None, recursive=False, include_hidden=False)
             // ```
-            if call
-                .arguments
-                .find_argument_value("dir_fd", 2)
-                .is_some_and(|expr| !expr.is_none_literal_expr())
-            {
+            if is_argument_non_default(&call.arguments, "dir_fd", 2) {
                 return;
             }
 
@@ -301,11 +260,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //                0           1              2            3                 4
             // glob.iglob(pathname, *, root_dir=None, dir_fd=None, recursive=False, include_hidden=False)
             // ```
-            if call
-                .arguments
-                .find_argument_value("dir_fd", 2)
-                .is_some_and(|expr| !expr.is_none_literal_expr())
-            {
+            if is_argument_non_default(&call.arguments, "dir_fd", 2) {
                 return;
             }
 
@@ -323,11 +278,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //               0         1
             // os.readlink(path, *, dir_fd=None)
             // ```
-            if call
-                .arguments
-                .find_argument_value("dir_fd", 1)
-                .is_some_and(|expr| !expr.is_none_literal_expr())
-            {
+            if is_argument_non_default(&call.arguments, "dir_fd", 1) {
                 return;
             }
             OsReadlink.into()
@@ -380,4 +331,11 @@ fn get_name_expr(expr: &Expr) -> Option<&ast::ExprName> {
         Expr::Call(ast::ExprCall { func, .. }) => get_name_expr(func),
         _ => None,
     }
+}
+
+/// Returns `true` if argument `name` is set to a non-default `None` value.
+fn is_argument_non_default(arguments: &ast::Arguments, name: &str, position: usize) -> bool {
+    arguments
+        .find_argument_value(name, position)
+        .is_some_and(|expr| !expr.is_none_literal_expr())
 }
