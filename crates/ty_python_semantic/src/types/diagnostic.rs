@@ -105,15 +105,6 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// Calling an unbound method will raise an `AttributeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// class A:
-    ///     if b:  # False
-    ///         def __class_getitem__(self, v): ...
-    ///
-    /// A[int]  # TypeError: type 'A' is not subscriptable
-    /// ```
     pub(crate) static CALL_POSSIBLY_UNBOUND_METHOD = {
         summary: "detects calls to possibly unbound methods",
         status: LintStatus::preview("1.0.0"),
