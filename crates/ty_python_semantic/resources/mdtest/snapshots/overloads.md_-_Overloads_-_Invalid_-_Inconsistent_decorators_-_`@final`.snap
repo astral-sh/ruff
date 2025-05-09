@@ -65,7 +65,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 # Diagnostics
 
 ```
-error: invalid-overload: `@final` decorator should be applied only to the overload implementation
+error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
   --> src/mdtest_snippet.py:18:9
    |
 16 |     def method2(self, x: str) -> str: ...
@@ -81,7 +81,7 @@ info: `lint:invalid-overload` is enabled by default
 ```
 
 ```
-error: invalid-overload: `@final` decorator should be applied only to the overload implementation
+error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
   --> src/mdtest_snippet.py:27:9
    |
 25 |     def method3(self, x: str) -> str: ...
@@ -97,7 +97,7 @@ info: `lint:invalid-overload` is enabled by default
 ```
 
 ```
-error: invalid-overload: `@final` decorator should be applied only to the first overload
+error[invalid-overload]: `@final` decorator should be applied only to the first overload
   --> src/mdtest_snippet.pyi:11:9
    |
 10 |     @overload

@@ -32,7 +32,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unresolved_i
 # Diagnostics
 
 ```
-error: unresolved-import: Cannot resolve imported module `....foo`
+error[unresolved-import]: Cannot resolve imported module `....foo`
  --> src/package/subpackage/subsubpackage/__init__.py:1:10
   |
 1 | from ....foo import add  # error: [unresolved-import]

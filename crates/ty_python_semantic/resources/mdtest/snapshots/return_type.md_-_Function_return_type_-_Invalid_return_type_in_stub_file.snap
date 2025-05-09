@@ -30,7 +30,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 # Diagnostics
 
 ```
-error: invalid-return-type: Return type does not match returned value
+error[invalid-return-type]: Return type does not match returned value
  --> src/mdtest_snippet.pyi:1:12
   |
 1 | def f() -> int:
@@ -46,7 +46,7 @@ info: `lint:invalid-return-type` is enabled by default
 ```
 
 ```
-error: invalid-return-type: Function can implicitly return `None`, which is not assignable to return type `int`
+error[invalid-return-type]: Function can implicitly return `None`, which is not assignable to return type `int`
  --> src/mdtest_snippet.pyi:6:14
   |
 5 | # error: [invalid-return-type]
@@ -60,7 +60,7 @@ info: `lint:invalid-return-type` is enabled by default
 ```
 
 ```
-error: invalid-return-type: Function can implicitly return `None`, which is not assignable to return type `int`
+error[invalid-return-type]: Function can implicitly return `None`, which is not assignable to return type `int`
   --> src/mdtest_snippet.pyi:11:14
    |
 10 | # error: [invalid-return-type]

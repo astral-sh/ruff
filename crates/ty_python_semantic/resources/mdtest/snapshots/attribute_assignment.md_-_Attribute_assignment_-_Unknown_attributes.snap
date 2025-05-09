@@ -23,7 +23,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_as
 # Diagnostics
 
 ```
-error: unresolved-attribute: Unresolved attribute `non_existent` on type `<class 'C'>`.
+error[unresolved-attribute]: Unresolved attribute `non_existent` on type `<class 'C'>`.
  --> src/mdtest_snippet.py:3:1
   |
 1 | class C: ...
@@ -38,7 +38,7 @@ info: `lint:unresolved-attribute` is enabled by default
 ```
 
 ```
-error: unresolved-attribute: Unresolved attribute `non_existent` on type `C`.
+error[unresolved-attribute]: Unresolved attribute `non_existent` on type `C`.
  --> src/mdtest_snippet.py:6:1
   |
 5 | instance = C()

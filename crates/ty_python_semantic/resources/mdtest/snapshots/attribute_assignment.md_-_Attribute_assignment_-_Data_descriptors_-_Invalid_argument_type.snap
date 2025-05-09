@@ -29,7 +29,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_as
 # Diagnostics
 
 ```
-error: invalid-assignment: Invalid assignment to data descriptor attribute `attr` on type `C` with custom `__set__` method
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C` with custom `__set__` method
   --> src/mdtest_snippet.py:12:1
    |
 11 | # TODO: ideally, we would mention why this is an invalid assignment (wrong argument type for `value` parameter)

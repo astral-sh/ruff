@@ -14,7 +14,7 @@ fn test_run_in_sub_directory() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: invalid-syntax: 
+    error[invalid-syntax]
      --> <temp_dir>/test.py:1:2
       |
     1 | ~
@@ -35,7 +35,7 @@ fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: invalid-syntax: 
+    error[invalid-syntax]
      --> .test.py:1:2
       |
     1 | ~
@@ -68,7 +68,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: invalid-syntax: 
+    error[invalid-syntax]
      --> test.py:1:2
       |
     1 | ~
@@ -86,7 +86,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: invalid-syntax: 
+    error[invalid-syntax]
      --> test.py:1:2
       |
     1 | ~
@@ -104,7 +104,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: invalid-syntax: 
+    error[invalid-syntax]
      --> test.py:1:2
       |
     1 | ~
@@ -144,7 +144,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: unresolved-attribute: Type `<module 'sys'>` has no attribute `last_exc`
+    error[unresolved-attribute]: Type `<module 'sys'>` has no attribute `last_exc`
      --> test.py:5:7
       |
     4 | # Access `sys.last_exc` that was only added in Python 3.12
@@ -278,7 +278,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: unresolved-import: Cannot resolve imported module `utils`
+    error[unresolved-import]: Cannot resolve imported module `utils`
      --> test.py:2:6
       |
     2 | from utils import add
@@ -379,7 +379,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
       |
     2 | y = 4 / 0
@@ -389,7 +389,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
       |
     info: `lint:division-by-zero` is enabled by default
 
-    error: unresolved-reference: Name `prin` used when not defined
+    error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:7:1
       |
     5 |     x = a
@@ -417,7 +417,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
       |
     2 | y = 4 / 0
@@ -458,7 +458,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: unresolved-import: Cannot resolve imported module `does_not_exit`
+    error[unresolved-import]: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
@@ -468,7 +468,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
       |
     info: `lint:unresolved-import` is enabled by default
 
-    error: division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:4:5
       |
     2 | import does_not_exit
@@ -480,7 +480,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
       |
     info: `lint:division-by-zero` is enabled by default
 
-    error: unresolved-reference: Name `prin` used when not defined
+    error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:9:1
       |
     7 |     x = a
@@ -508,7 +508,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: unresolved-import: Cannot resolve imported module `does_not_exit`
+    warning[unresolved-import]: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
@@ -518,7 +518,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
       |
     info: `lint:unresolved-import` was selected on the command line
 
-    warning: division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:4:5
       |
     2 | import does_not_exit
@@ -561,7 +561,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
       |
     2 | y = 4 / 0
@@ -571,7 +571,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
       |
     info: `lint:division-by-zero` is enabled by default
 
-    error: unresolved-reference: Name `prin` used when not defined
+    error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:7:1
       |
     5 |     x = a
@@ -600,7 +600,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
       |
     2 | y = 4 / 0
@@ -637,7 +637,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: unknown-rule: 
+    warning[unknown-rule]
      --> pyproject.toml:3:1
       |
     2 | [tool.ty.rules]
@@ -662,7 +662,7 @@ fn cli_unknown_rules() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: unknown-rule: Unknown lint rule `division-by-zer`
+    warning[unknown-rule]: Unknown lint rule `division-by-zer`
 
     Found 1 diagnostic
 
@@ -680,7 +680,7 @@ fn exit_code_only_warnings() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: unresolved-reference: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
@@ -764,7 +764,7 @@ fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning: unresolved-reference: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
@@ -797,7 +797,7 @@ fn exit_code_no_errors_but_error_on_warning_is_enabled_in_configuration() -> any
     success: false
     exit_code: 1
     ----- stdout -----
-    warning: unresolved-reference: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
@@ -827,7 +827,7 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning: unresolved-reference: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:2:7
       |
     2 | print(x)     # [unresolved-reference]
@@ -836,7 +836,7 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
       |
     info: `lint:unresolved-reference` was selected on the command line
 
-    error: non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    error[non-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
       |
     2 | print(x)     # [unresolved-reference]
@@ -867,7 +867,7 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
     success: false
     exit_code: 1
     ----- stdout -----
-    warning: unresolved-reference: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:2:7
       |
     2 | print(x)     # [unresolved-reference]
@@ -876,7 +876,7 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
       |
     info: `lint:unresolved-reference` was selected on the command line
 
-    error: non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    error[non-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
       |
     2 | print(x)     # [unresolved-reference]
@@ -907,7 +907,7 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: unresolved-reference: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:2:7
       |
     2 | print(x)     # [unresolved-reference]
@@ -916,7 +916,7 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
       |
     info: `lint:unresolved-reference` was selected on the command line
 
-    error: non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    error[non-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
       |
     2 | print(x)     # [unresolved-reference]
@@ -969,7 +969,7 @@ fn user_configuration() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning: division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> main.py:2:5
       |
     2 | y = 4 / 0
@@ -979,7 +979,7 @@ fn user_configuration() -> anyhow::Result<()> {
       |
     info: `lint:division-by-zero` was selected in the configuration file
 
-    error: unresolved-reference: Name `prin` used when not defined
+    error[unresolved-reference]: Name `prin` used when not defined
      --> main.py:7:1
       |
     5 |     x = a
@@ -1013,7 +1013,7 @@ fn user_configuration() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> main.py:2:5
       |
     2 | y = 4 / 0
@@ -1023,7 +1023,7 @@ fn user_configuration() -> anyhow::Result<()> {
       |
     info: `lint:division-by-zero` was selected in the configuration file
 
-    warning: unresolved-reference: Name `prin` used when not defined
+    warning[unresolved-reference]: Name `prin` used when not defined
      --> main.py:7:1
       |
     5 |     x = a
@@ -1073,7 +1073,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> project/main.py:2:5
       |
     2 | y = 4 / 0  # error: division-by-zero
@@ -1081,7 +1081,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |
     info: `lint:division-by-zero` is enabled by default
 
-    error: unresolved-import: Cannot resolve imported module `main2`
+    error[unresolved-import]: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
     2 | from main2 import z  # error: unresolved-import
@@ -1091,7 +1091,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |
     info: `lint:unresolved-import` is enabled by default
 
-    error: unresolved-import: Cannot resolve imported module `does_not_exist`
+    error[unresolved-import]: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
     2 | import does_not_exist  # error: unresolved-import
@@ -1113,7 +1113,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: unresolved-import: Cannot resolve imported module `main2`
+    error[unresolved-import]: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
     2 | from main2 import z  # error: unresolved-import
@@ -1123,7 +1123,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |
     info: `lint:unresolved-import` is enabled by default
 
-    error: unresolved-import: Cannot resolve imported module `does_not_exist`
+    error[unresolved-import]: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
     2 | import does_not_exist  # error: unresolved-import
@@ -1157,9 +1157,9 @@ fn check_non_existing_path() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: io: `<temp_dir>/project/main.py`: No such file or directory (os error 2)
+    error[io]: `<temp_dir>/project/main.py`: No such file or directory (os error 2)
 
-    error: io: `<temp_dir>/project/tests`: No such file or directory (os error 2)
+    error[io]: `<temp_dir>/project/tests`: No such file or directory (os error 2)
 
     Found 2 diagnostics
 
@@ -1292,7 +1292,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: unresolved-attribute: Type `<module 'os'>` has no attribute `grantpt`
+    error[unresolved-attribute]: Type `<module 'os'>` has no attribute `grantpt`
      --> main.py:4:1
       |
     2 | import os
@@ -1347,7 +1347,7 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning: unresolved-reference: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
@@ -1365,7 +1365,7 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: unresolved-reference: Name `x` used when not defined
+    error[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
@@ -1397,7 +1397,7 @@ fn cli_config_args_overrides_knot_toml() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: unresolved-reference: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
@@ -1420,7 +1420,7 @@ fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: unresolved-reference: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]

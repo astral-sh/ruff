@@ -156,7 +156,7 @@ mod tests {
         Literal[10]
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:4:9
           |
         2 |         a = 10
@@ -192,7 +192,7 @@ mod tests {
         int
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
           --> main.py:10:9
            |
          9 |         foo = Foo()
@@ -222,7 +222,7 @@ mod tests {
         def foo(a, b) -> Unknown
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:4:13
           |
         2 |             def foo(a, b): ...
@@ -251,7 +251,7 @@ mod tests {
         bool
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:3:17
           |
         2 |             def foo(a: int, b: int, c: int):
@@ -282,7 +282,7 @@ mod tests {
         Literal[123]
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:4:18
           |
         2 |             def test(a: int): ...
@@ -320,7 +320,7 @@ mod tests {
         (def foo(a, b) -> Unknown) | (def bar(a, b) -> Unknown)
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
           --> main.py:12:13
            |
         10 |                 a = bar
@@ -352,7 +352,7 @@ mod tests {
         <module 'lib'>
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:4:13
           |
         2 |             import lib
@@ -381,7 +381,7 @@ mod tests {
         T
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:2:46
           |
         2 |             type Alias[T: int = bool] = list[T]
@@ -407,7 +407,7 @@ mod tests {
         @Todo
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:2:53
           |
         2 |             type Alias[**P = [int, str]] = Callable[P, int]
@@ -433,7 +433,7 @@ mod tests {
         @Todo
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:2:43
           |
         2 |             type Alias[*Ts = ()] = tuple[*Ts]
@@ -459,7 +459,7 @@ mod tests {
         Literal[1]
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:2:13
           |
         2 |             value = 1
@@ -490,7 +490,7 @@ mod tests {
         Literal[1]
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:3:13
           |
         2 |             value = 1
@@ -520,7 +520,7 @@ mod tests {
         Literal[2]
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:5:13
           |
         3 |                 attr: int = 1
@@ -553,7 +553,7 @@ mod tests {
         Unknown | Literal[1]
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:5:13
           |
         3 |                 attr = 1
@@ -582,7 +582,7 @@ mod tests {
         int
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:3:13
           |
         2 |         class Foo:
@@ -610,7 +610,7 @@ mod tests {
         Literal[1]
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:3:13
           |
         2 |         class Foo:
@@ -639,7 +639,7 @@ mod tests {
         int
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:4:17
           |
         2 |         class Foo:
@@ -669,7 +669,7 @@ mod tests {
         str
         ```
         ---------------------------------------------
-        info: hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:4:27
           |
         2 |             def foo(a: str | None, b):
