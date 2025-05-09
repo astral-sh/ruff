@@ -146,7 +146,7 @@ class C:
     @property
     def attr(self) -> int:
         return 1
-    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `(Any, Any, /) -> None`, found `def attr(self) -> None`"
+    # error: [invalid-argument-type] "Argument to bound method `setter` is incorrect: Expected `(Any, Any, /) -> None`, found `def attr(self) -> None`"
     @attr.setter
     def attr(self) -> None:
         pass
@@ -156,7 +156,7 @@ class C:
 
 ```py
 class C:
-    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `((Any, /) -> Any) | None`, found `def attr(self, x: int) -> int`"
+    # error: [invalid-argument-type] "Argument to class `property` is incorrect: Expected `((Any, /) -> Any) | None`, found `def attr(self, x: int) -> int`"
     @property
     def attr(self, x: int) -> int:
         return 1

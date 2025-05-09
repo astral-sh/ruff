@@ -83,7 +83,7 @@ info[revealed-type]: Revealed type
 ```
 
 ```
-error[invalid-argument-type]: Argument to this function is incorrect
+error[invalid-argument-type]: Argument to function `f` is incorrect
   --> src/mdtest_snippet.py:13:15
    |
 11 | reveal_type(f(None))  # revealed: None

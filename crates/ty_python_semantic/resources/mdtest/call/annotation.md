@@ -9,8 +9,8 @@ def _(c: Callable[[], int]):
 def _(c: Callable[[int, str], int]):
     reveal_type(c(1, "a"))  # revealed: int
 
-    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["a"]`"
-    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `str`, found `Literal[1]`"
+    # error: [invalid-argument-type] "Argument is incorrect: Expected `int`, found `Literal["a"]`"
+    # error: [invalid-argument-type] "Argument is incorrect: Expected `str`, found `Literal[1]`"
     reveal_type(c("a", 1))  # revealed: int
 ```
 

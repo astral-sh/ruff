@@ -53,9 +53,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.m
 39 |     else:
 40 |         f = PossiblyNotCallable()
 41 |     # error: [too-many-positional-arguments]
-42 |     # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `str`, found `Literal[3]`"
+42 |     # error: [invalid-argument-type] "Argument to function `f2` is incorrect: Expected `str`, found `Literal[3]`"
 43 |     # error: [missing-argument]
-44 |     # error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal[3]` does not satisfy upper bound of type variable `T`"
+44 |     # error: [invalid-argument-type] "Argument to function `f4` is incorrect: Argument type `Literal[3]` does not satisfy upper bound of type variable `T`"
 45 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
 46 |     # error: [no-matching-overload]
 47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
@@ -65,7 +65,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.m
 # Diagnostics
 
 ```
-error: lint:call-non-callable: Object of type `Literal[5]` is not callable
+error[call-non-callable]: Object of type `Literal[5]` is not callable
   --> src/mdtest_snippet.py:48:9
    |
 46 |     # error: [no-matching-overload]
@@ -73,12 +73,14 @@ error: lint:call-non-callable: Object of type `Literal[5]` is not callable
 48 |     x = f(3)
    |         ^^^^
    |
-info: `lint:call-non-callable` is enabled by default
+info: Union variant `Literal[5]` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
+info: `call-non-callable` is enabled by default
 
 ```
 
 ```
-error: lint:call-non-callable: Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)
+error[call-non-callable]: Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)
   --> src/mdtest_snippet.py:48:9
    |
 46 |     # error: [no-matching-overload]
@@ -86,12 +88,14 @@ error: lint:call-non-callable: Object of type `PossiblyNotCallable` is not calla
 48 |     x = f(3)
    |         ^^^^
    |
-info: `lint:call-non-callable` is enabled by default
+info: Union variant `PossiblyNotCallable` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
+info: `call-non-callable` is enabled by default
 
 ```
 
 ```
-error: lint:missing-argument: No argument provided for required parameter `b` of function `f3`
+error[missing-argument]: No argument provided for required parameter `b` of function `f3`
   --> src/mdtest_snippet.py:48:9
    |
 46 |     # error: [no-matching-overload]
@@ -99,12 +103,14 @@ error: lint:missing-argument: No argument provided for required parameter `b` of
 48 |     x = f(3)
    |         ^^^^
    |
-info: `lint:missing-argument` is enabled by default
+info: Union variant `def f3(a: int, b: int) -> int` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
+info: `missing-argument` is enabled by default
 
 ```
 
 ```
-error: lint:no-matching-overload: No overload of method wrapper `__get__` of function `f` matches arguments
+error[no-matching-overload]: No overload of method wrapper `__get__` of function `f` matches arguments
   --> src/mdtest_snippet.py:48:9
    |
 46 |     # error: [no-matching-overload]
@@ -112,12 +118,14 @@ error: lint:no-matching-overload: No overload of method wrapper `__get__` of fun
 48 |     x = f(3)
    |         ^^^^
    |
-info: `lint:no-matching-overload` is enabled by default
+info: Union variant `<method-wrapper `__get__` of `f`>` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
+info: `no-matching-overload` is enabled by default
 
 ```
 
 ```
-error: lint:invalid-argument-type: Argument to this function is incorrect
+error[invalid-argument-type]: Argument to function `f2` is incorrect
   --> src/mdtest_snippet.py:48:11
    |
 46 |     # error: [no-matching-overload]
@@ -134,12 +142,14 @@ info: Function defined here
   |     ^^ --------- Parameter declared here
 7 |     return 0
   |
-info: `lint:invalid-argument-type` is enabled by default
+info: Union variant `def f2(name: str) -> int` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
+info: `invalid-argument-type` is enabled by default
 
 ```
 
 ```
-error: lint:invalid-argument-type: Argument to this function is incorrect
+error[invalid-argument-type]: Argument to function `f4` is incorrect
   --> src/mdtest_snippet.py:48:11
    |
 46 |     # error: [no-matching-overload]
@@ -156,12 +166,14 @@ info: Type variable defined here
    |        ^^^^^^
 13 |     return 0
    |
-info: `lint:invalid-argument-type` is enabled by default
+info: Union variant `def f4(x: T) -> int` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
+info: `invalid-argument-type` is enabled by default
 
 ```
 
 ```
-error: lint:too-many-positional-arguments: Too many positional arguments to function `f1`: expected 0, got 1
+error[too-many-positional-arguments]: Too many positional arguments to function `f1`: expected 0, got 1
   --> src/mdtest_snippet.py:48:11
    |
 46 |     # error: [no-matching-overload]
@@ -169,6 +181,8 @@ error: lint:too-many-positional-arguments: Too many positional arguments to func
 48 |     x = f(3)
    |           ^
    |
-info: `lint:too-many-positional-arguments` is enabled by default
+info: Union variant `def f1() -> int` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
+info: `too-many-positional-arguments` is enabled by default
 
 ```

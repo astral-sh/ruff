@@ -350,7 +350,7 @@ class D:
         # This function is wrongly annotated, it should be `type[D]` instead of `D`
         pass
 
-# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `D`, found `<class 'D'>`"
+# error: [invalid-argument-type] "Argument to bound method `f` is incorrect: Expected `D`, found `<class 'D'>`"
 D.f()
 ```
 

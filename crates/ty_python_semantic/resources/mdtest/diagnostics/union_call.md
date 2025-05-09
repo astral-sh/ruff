@@ -99,9 +99,9 @@ def _(n: int):
     else:
         f = PossiblyNotCallable()
     # error: [too-many-positional-arguments]
-    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `str`, found `Literal[3]`"
+    # error: [invalid-argument-type] "Argument to function `f2` is incorrect: Expected `str`, found `Literal[3]`"
     # error: [missing-argument]
-    # error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal[3]` does not satisfy upper bound of type variable `T`"
+    # error: [invalid-argument-type] "Argument to function `f4` is incorrect: Argument type `Literal[3]` does not satisfy upper bound of type variable `T`"
     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
     # error: [no-matching-overload]
     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"

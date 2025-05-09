@@ -94,7 +94,7 @@ def _(flag: bool):
     else:
         f = f2
 
-    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `str`, found `Literal[3]`"
+    # error: [invalid-argument-type] "Argument to function `f2` is incorrect: Expected `str`, found `Literal[3]`"
     x = f(3)
     reveal_type(x)  # revealed: int | str
 ```
