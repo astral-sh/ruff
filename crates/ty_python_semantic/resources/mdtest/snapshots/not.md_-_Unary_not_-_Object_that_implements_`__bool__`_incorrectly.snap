@@ -30,6 +30,6 @@ error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `
   | ^^^^^^^^^^^^^^^^^
   |
 info: `__bool__` on `NotBoolable` must be callable
-info: `lint:unsupported-bool-conversion` is enabled by default
+info: `unsupported-bool-conversion` is enabled by default
 
 ```

@@ -79,7 +79,7 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 f,
                 "{severity}[{id}]",
                 severity = fmt_styled(severity, severity_style),
-                id = fmt_styled(self.diag.id().as_concise_str(), stylesheet.emphasis)
+                id = fmt_styled(self.diag.id(), stylesheet.emphasis)
             )?;
 
             if let Some(span) = self.diag.primary_span() {
@@ -195,7 +195,7 @@ impl<'a> ResolvedDiagnostic<'a> {
                 ResolvedAnnotation::new(path, &diagnostic_source, ann)
             })
             .collect();
-        let id = Some(diag.inner.id.as_concise_str().to_string());
+        let id = Some(diag.inner.id.to_string());
         let message = diag.inner.message.as_str().to_string();
         ResolvedDiagnostic {
             severity: diag.inner.severity,

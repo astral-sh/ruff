@@ -36,7 +36,7 @@ error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable t
 8 |
 9 | C.attr = 1  # error: [invalid-attribute-access]
   |
-info: `lint:invalid-assignment` is enabled by default
+info: `invalid-assignment` is enabled by default
 
 ```
 
@@ -49,6 +49,6 @@ error[invalid-attribute-access]: Cannot assign to instance attribute `attr` from
 9 | C.attr = 1  # error: [invalid-attribute-access]
   | ^^^^^^
   |
-info: `lint:invalid-attribute-access` is enabled by default
+info: `invalid-attribute-access` is enabled by default
 
 ```

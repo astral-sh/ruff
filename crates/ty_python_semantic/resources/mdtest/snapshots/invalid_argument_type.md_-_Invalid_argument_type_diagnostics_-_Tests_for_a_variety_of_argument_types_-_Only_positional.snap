@@ -36,6 +36,6 @@ info: Function defined here
   |     ^^^         ------ Parameter declared here
 2 |     return x * y * z
   |
-info: `lint:invalid-argument-type` is enabled by default
+info: `invalid-argument-type` is enabled by default
 
 ```
