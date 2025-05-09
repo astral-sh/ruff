@@ -13,8 +13,8 @@ use strum::IntoEnumIterator;
 
 use ruff_diagnostics::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
+use ruff_options_metadata::{OptionEntry, OptionsMetadata};
 use ruff_workspace::options::Options;
-use ruff_workspace::options_base::{OptionEntry, OptionsMetadata};
 
 use crate::ROOT_DIR;
 

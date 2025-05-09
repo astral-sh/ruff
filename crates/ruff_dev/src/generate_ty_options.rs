@@ -1,15 +1,30 @@
 //! Generate a Markdown-compatible listing of configuration options for `pyproject.toml`.
-//!
-//! Used for <https://docs.astral.sh/ruff/settings/>.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
+
+use anyhow::bail;
 use itertools::Itertools;
-use std::fmt::Write;
+use pretty_assertions::StrComparison;
+use std::{fmt::Write, path::PathBuf};
 
 use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
-use ruff_python_trivia::textwrap;
-use ruff_workspace::options::Options;
+use ty_project::metadata::Options;
 
-pub(crate) fn generate() -> String {
+use crate::{
+    generate_all::{Mode, REGENERATE_ALL_COMMAND},
+    ROOT_DIR,
+};
+
+#[derive(clap::Args)]
+pub(crate) struct Args {
+    /// Write the generated table to stdout (rather than to `crates/ty/docs/configuration.md`).
+    #[arg(long, default_value_t, value_enum)]
+    pub(crate) mode: Mode,
+}
+
+pub(crate) fn main(args: &Args) -> anyhow::Result<()> {
     let mut output = String::new();
+    let file_name = "crates/ty/docs/configuration.md";
+    let markdown_path = PathBuf::from(ROOT_DIR).join(file_name);
 
     generate_set(
         &mut output,
@@ -17,13 +32,37 @@ pub(crate) fn generate() -> String {
         &mut Vec::new(),
     );
 
-    output
+    match args.mode {
+        Mode::DryRun => {
+            println!("{output}");
+        }
+        Mode::Check => {
+            let current = std::fs::read_to_string(&markdown_path)?;
+            if output == current {
+                println!("Up-to-date: {file_name}",);
+            } else {
+                let comparison = StrComparison::new(&current, &output);
+                bail!("{file_name} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}",);
+            }
+        }
+        Mode::Write => {
+            let current = std::fs::read_to_string(&markdown_path)?;
+            if current == output {
+                println!("Up-to-date: {file_name}",);
+            } else {
+                println!("Updating: {file_name}",);
+                std::fs::write(markdown_path, output.as_bytes())?;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
     match &set {
         Set::Toplevel(_) => {
-            output.push_str("### Top-level\n");
+            output.push_str("# Configuration\n");
         }
         Set::Named { name, .. } => {
             let title = parents
@@ -31,7 +70,7 @@ fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
                 .filter_map(|set| set.name())
                 .chain(std::iter::once(name.as_str()))
                 .join(".");
-            writeln!(output, "#### `{title}`\n",).unwrap();
+            writeln!(output, "## `{title}`\n",).unwrap();
         }
     }
 
@@ -94,21 +133,9 @@ impl Set {
 }
 
 fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[Set]) {
-    let header_level = if parents.is_empty() { "####" } else { "#####" };
-    let parents_anchor = parents.iter().filter_map(|parent| parent.name()).join("_");
+    let header_level = if parents.is_empty() { "###" } else { "####" };
 
-    if parents_anchor.is_empty() {
-        let _ = writeln!(output, "{header_level} [`{name}`](#{name}) {{: #{name} }}");
-    } else {
-        let _ =
-            writeln!(output,
-            "{header_level} [`{name}`](#{parents_anchor}_{name}) {{: #{parents_anchor}_{name} }}"
-        );
-
-        // the anchor used to just be the name, but now it's the group name
-        // for backwards compatibility, we need to keep the old anchor
-        let _ = writeln!(output, "<span id=\"{name}\"></span>");
-    }
+    let _ = writeln!(output, "{header_level} [`{name}`]");
 
     output.push('\n');
 
@@ -135,36 +162,39 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     output.push('\n');
     let _ = writeln!(output, "**Type**: `{}`", field.value_type);
     output.push('\n');
-    output.push_str("**Example usage**:\n\n");
-    output.push_str(&format_tab(
-        "pyproject.toml",
-        &format_header(field.scope, parents, ConfigurationFile::PyprojectToml),
-        field.example,
-    ));
-    output.push_str(&format_tab(
-        "ruff.toml",
-        &format_header(field.scope, parents, ConfigurationFile::RuffToml),
+    output.push_str("**Example usage** (`pyproject.toml`):\n\n");
+    output.push_str(&format_example(
+        &format_header(
+            field.scope,
+            field.example,
+            parents,
+            ConfigurationFile::PyprojectToml,
+        ),
         field.example,
     ));
     output.push('\n');
 }
 
-fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
-    format!(
-        "=== \"{}\"\n\n    ```toml\n    {}\n{}\n    ```\n",
-        tab_name,
-        header,
-        textwrap::indent(content, "    ")
-    )
+fn format_example(header: &str, content: &str) -> String {
+    if header.is_empty() {
+        format!("```toml\n{content}\n```\n",)
+    } else {
+        format!("```toml\n{header}\n{content}\n```\n",)
+    }
 }
 
 /// Format the TOML header for the example usage for a given option.
 ///
 /// For example: `[tool.ruff.format]` or `[tool.ruff.lint.isort]`.
-fn format_header(scope: Option<&str>, parents: &[Set], configuration: ConfigurationFile) -> String {
+fn format_header(
+    scope: Option<&str>,
+    example: &str,
+    parents: &[Set],
+    configuration: ConfigurationFile,
+) -> String {
     let tool_parent = match configuration {
-        ConfigurationFile::PyprojectToml => Some("tool.ruff"),
-        ConfigurationFile::RuffToml => None,
+        ConfigurationFile::PyprojectToml => Some("tool.ty"),
+        ConfigurationFile::TyToml => None,
     };
 
     let header = tool_parent
@@ -173,17 +203,20 @@ fn format_header(scope: Option<&str>, parents: &[Set], configuration: Configurat
         .chain(scope)
         .join(".");
 
+    // Ex) `[[tool.ty.xx]]`
+    if example.starts_with(&format!("[[{header}")) {
+        return String::new();
+    }
+    // Ex) `[tool.ty.rules]`
+    if example.starts_with(&format!("[{header}")) {
+        return String::new();
+    }
+
     if header.is_empty() {
         String::new()
     } else {
         format!("[{header}]")
     }
-}
-
-#[derive(Debug, Copy, Clone)]
-enum ConfigurationFile {
-    PyprojectToml,
-    RuffToml,
 }
 
 #[derive(Default)]
@@ -199,5 +232,27 @@ impl Visit for CollectOptionsVisitor {
 
     fn record_field(&mut self, name: &str, field: OptionField) {
         self.fields.push((name.to_owned(), field));
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+enum ConfigurationFile {
+    PyprojectToml,
+    #[expect(dead_code)]
+    TyToml,
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+
+    use crate::generate_all::Mode;
+
+    use super::{main, Args};
+
+    #[test]
+    fn ty_configuration_markdown_up_to_date() -> Result<()> {
+        main(&Args { mode: Mode::Check })?;
+        Ok(())
     }
 }

@@ -5,6 +5,7 @@ exclude: |
     .github/workflows/release.yml|
     crates/ty_vendored/vendor/.*|
     crates/ty_project/resources/.*|
+    crates/ty/docs/configuration.md|
     crates/ty/docs/rules.md|
     crates/ruff_benchmark/resources/.*|
     crates/ruff_linter/resources/.*|

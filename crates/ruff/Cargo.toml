@@ -20,6 +20,7 @@ ruff_graph = { workspace = true, features = ["serde", "clap"] }
 ruff_linter = { workspace = true, features = ["clap"] }
 ruff_macros = { workspace = true }
 ruff_notebook = { workspace = true }
+ruff_options_metadata = { workspace = true, features = ["serde"] }
 ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_python_parser = { workspace = true }

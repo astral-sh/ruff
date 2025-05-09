@@ -8,7 +8,7 @@ use ty_python_semantic::ProgramSettings;
 use crate::combine::Combine;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::value::ValueSource;
-use options::Options;
+pub use options::Options;
 use options::TyTomlError;
 
 mod configuration_file;

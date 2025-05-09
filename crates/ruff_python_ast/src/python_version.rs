@@ -60,6 +60,7 @@ impl PythonVersion {
     }
 
     pub const fn latest_ty() -> Self {
+        // Make sure to update the default value for  `EnvironmentOptions::python_version` when bumping this version.
         Self::PY313
     }
 
