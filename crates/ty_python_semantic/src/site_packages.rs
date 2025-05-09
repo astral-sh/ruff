@@ -19,6 +19,34 @@ use ruff_python_ast::PythonVersion;
 
 type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 
+pub(crate) enum PythonEnvironment {
+    Virtual(VirtualEnvironment),
+}
+
+impl PythonEnvironment {
+    pub(crate) fn new(
+        path: impl AsRef<SystemPath>,
+        origin: SysPrefixPathOrigin,
+        system: &dyn System,
+    ) -> SitePackagesDiscoveryResult<Self> {
+        // TODO(zanieb): Add support for non-virtual environments
+        let venv = VirtualEnvironment::new(path, origin, system)?;
+        Ok(Self::Virtual(venv))
+    }
+
+    /// Returns the `site-packages` directories for this Python environment.
+    ///
+    /// See the documentation for [`site_packages_directory_from_sys_prefix`] for more details.
+    pub(crate) fn site_packages_directories(
+        &self,
+        system: &dyn System,
+    ) -> SitePackagesDiscoveryResult<Vec<SystemPathBuf>> {
+        match self {
+            Self::Virtual(venv) => venv.site_packages_directories(system),
+        }
+    }
+}
+
 /// Abstraction for a Python virtual environment.
 ///
 /// Most of this information is derived from the virtual environment's `pyvenv.cfg` file.
@@ -162,7 +190,7 @@ impl VirtualEnvironment {
 
     /// Return a list of `site-packages` directories that are available from this virtual environment
     ///
-    /// See the documentation for `site_packages_dir_from_sys_prefix` for more details.
+    /// See the documentation for [`site_packages_directory_from_sys_prefix`] for more details.
     pub(crate) fn site_packages_directories(
         &self,
         system: &dyn System,
@@ -212,9 +240,9 @@ System site-packages will not be used for module resolution.",
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum SitePackagesDiscoveryError {
     #[error("Invalid {1}: `{0}` could not be canonicalized")]
-    VenvDirCanonicalizationError(SystemPathBuf, SysPrefixPathOrigin, #[source] io::Error),
+    EnvDirCanonicalizationError(SystemPathBuf, SysPrefixPathOrigin, #[source] io::Error),
     #[error("Invalid {1}: `{0}` does not point to a directory on disk")]
-    VenvDirIsNotADirectory(SystemPathBuf, SysPrefixPathOrigin),
+    EnvDirNotDirectory(SystemPathBuf, SysPrefixPathOrigin),
     #[error("{0} points to a broken venv with no pyvenv.cfg file")]
     NoPyvenvCfgFile(SysPrefixPathOrigin, #[source] io::Error),
     #[error("Failed to parse the pyvenv.cfg file at {0} because {1}")]
@@ -401,7 +429,7 @@ impl SysPrefixPath {
         let canonicalized = system
             .canonicalize_path(unvalidated_path)
             .map_err(|io_err| {
-                SitePackagesDiscoveryError::VenvDirCanonicalizationError(
+                SitePackagesDiscoveryError::EnvDirCanonicalizationError(
                     unvalidated_path.to_path_buf(),
                     origin,
                     io_err,
@@ -414,7 +442,7 @@ impl SysPrefixPath {
                 origin,
             })
             .ok_or_else(|| {
-                SitePackagesDiscoveryError::VenvDirIsNotADirectory(
+                SitePackagesDiscoveryError::EnvDirNotDirectory(
                     unvalidated_path.to_path_buf(),
                     origin,
                 )
@@ -783,7 +811,7 @@ mod tests {
         let system = TestSystem::default();
         assert!(matches!(
             VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system),
-            Err(SitePackagesDiscoveryError::VenvDirCanonicalizationError(..))
+            Err(SitePackagesDiscoveryError::EnvDirCanonicalizationError(..))
         ));
     }
 
@@ -796,7 +824,7 @@ mod tests {
             .unwrap();
         assert!(matches!(
             VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system),
-            Err(SitePackagesDiscoveryError::VenvDirIsNotADirectory(..))
+            Err(SitePackagesDiscoveryError::EnvDirNotDirectory(..))
         ));
     }
 
