@@ -14,7 +14,7 @@ fn test_run_in_sub_directory() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: invalid-syntax
+    error: invalid-syntax: 
      --> <temp_dir>/test.py:1:2
       |
     1 | ~
@@ -35,7 +35,7 @@ fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: invalid-syntax
+    error: invalid-syntax: 
      --> .test.py:1:2
       |
     1 | ~
@@ -68,7 +68,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: invalid-syntax
+    error: invalid-syntax: 
      --> test.py:1:2
       |
     1 | ~
@@ -86,7 +86,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: invalid-syntax
+    error: invalid-syntax: 
      --> test.py:1:2
       |
     1 | ~
@@ -104,7 +104,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: invalid-syntax
+    error: invalid-syntax: 
      --> test.py:1:2
       |
     1 | ~
@@ -637,7 +637,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: unknown-rule
+    warning: unknown-rule: 
      --> pyproject.toml:3:1
       |
     2 | [tool.ty.rules]
