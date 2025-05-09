@@ -84,7 +84,7 @@ class C[T]:
 c: C[int] = C[int]()
 c.m1(1)
 c.m2(1)
-# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["string"]`"
+# error: [invalid-argument-type] "Argument to bound method `m2` is incorrect: Expected `int`, found `Literal["string"]`"
 c.m2("string")
 ```
 

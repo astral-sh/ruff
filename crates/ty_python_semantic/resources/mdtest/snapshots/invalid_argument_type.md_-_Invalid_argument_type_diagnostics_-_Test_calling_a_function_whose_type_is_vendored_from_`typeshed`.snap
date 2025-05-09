@@ -20,7 +20,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_argu
 # Diagnostics
 
 ```
-error[invalid-argument-type]: Argument to this function is incorrect
+error[invalid-argument-type]: Argument to function `loads` is incorrect
  --> src/mdtest_snippet.py:3:12
   |
 1 | import json
