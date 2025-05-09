@@ -24,7 +24,7 @@ fn test_run_in_sub_directory() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
     Ok(())
 }
@@ -46,7 +46,7 @@ fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
     Ok(())
 }
@@ -62,7 +62,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     All checks passed!
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     WARN No python files found under the given path(s)
     ");
 
@@ -81,7 +81,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     // Test that we can set to false via config file
@@ -100,7 +100,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     // Ensure CLI takes precedence
@@ -119,7 +119,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
     Ok(())
 }
@@ -162,7 +162,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     assert_cmd_snapshot!(case.command().arg("--python-version").arg("3.12"), @r"
@@ -172,7 +172,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
     All checks passed!
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -216,7 +216,7 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "#);
 
     assert_cmd_snapshot!(case.command().arg("--python-platform").arg("all"), @r"
@@ -235,7 +235,7 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -301,7 +301,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")).arg("--extra-search-path").arg("../libs"), @r"
@@ -311,7 +311,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     All checks passed!
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -365,7 +365,7 @@ fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Re
     All checks passed!
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -415,7 +415,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     case.write_file(
@@ -444,7 +444,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -508,7 +508,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     assert_cmd_snapshot!(
@@ -549,7 +549,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "
     );
 
@@ -601,7 +601,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     assert_cmd_snapshot!(
@@ -631,7 +631,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "
     );
 
@@ -667,7 +667,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "#);
 
     Ok(())
@@ -687,7 +687,7 @@ fn cli_unknown_rules() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -712,7 +712,7 @@ fn exit_code_only_warnings() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -743,7 +743,7 @@ fn exit_code_only_info() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -774,7 +774,7 @@ fn exit_code_only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -799,7 +799,7 @@ fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -833,7 +833,7 @@ fn exit_code_no_errors_but_error_on_warning_is_enabled_in_configuration() -> any
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -874,7 +874,7 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -915,7 +915,7 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
     Found 2 diagnostics
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -956,7 +956,7 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -1021,7 +1021,7 @@ fn user_configuration() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "
     );
 
@@ -1066,7 +1066,7 @@ fn user_configuration() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "
     );
 
@@ -1133,7 +1133,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "
     );
 
@@ -1166,7 +1166,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "
     );
 
@@ -1197,7 +1197,7 @@ fn check_non_existing_path() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     WARN No python files found under the given path(s)
     "
     );
@@ -1224,7 +1224,7 @@ fn concise_diagnostics() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -1258,7 +1258,7 @@ fn concise_revealed_type() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "#);
 
     Ok(())
@@ -1295,7 +1295,7 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -1342,7 +1342,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     // Use default (which should be latest supported)
@@ -1371,7 +1371,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     All checks passed!
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -1397,7 +1397,7 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     // Short flag
@@ -1416,7 +1416,7 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -1449,7 +1449,7 @@ fn cli_config_args_overrides_knot_toml() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -1473,7 +1473,7 @@ fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -1488,7 +1488,6 @@ fn cli_config_args_invalid_option() -> anyhow::Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    warning: ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     error: TOML parse error at line 1, column 1
       |
     1 | bad-option=true
