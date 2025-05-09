@@ -197,9 +197,7 @@ impl<'a> ResolvedDiagnostic<'a> {
                 ResolvedAnnotation::new(path, &diagnostic_source, ann)
             })
             .collect();
-        let message = if diag.inner.message.as_str().is_empty() {
-            diag.inner.id.as_concise_str().to_string()
-        } else {
+        let message =
             // TODO: See the comment on `Renderable::id` for
             // a plausible better idea than smushing the ID
             // into the diagnostic message.
@@ -207,8 +205,7 @@ impl<'a> ResolvedDiagnostic<'a> {
                 "{id}: {message}",
                 id = diag.inner.id.as_concise_str(),
                 message = diag.inner.message.as_str(),
-            )
-        };
+            );
         ResolvedDiagnostic {
             severity: diag.inner.severity,
             message,

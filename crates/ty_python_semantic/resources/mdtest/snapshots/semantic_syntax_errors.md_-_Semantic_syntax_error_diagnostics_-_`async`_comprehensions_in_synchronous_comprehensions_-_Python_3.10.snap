@@ -32,7 +32,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/semantic_syn
 # Diagnostics
 
 ```
-error: invalid-syntax
+error: invalid-syntax: 
  --> src/mdtest_snippet.py:6:19
   |
 4 | async def f():
