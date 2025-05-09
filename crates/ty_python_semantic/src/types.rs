@@ -5096,7 +5096,7 @@ impl<'db> Type<'db> {
             ),
 
             Type::ProtocolInstance(instance) => {
-                Type::ProtocolInstance(instance.apply_specialization(db, specialization))
+                Type::ProtocolInstance(instance.apply_specialization(db, type_mapping))
             }
 
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {

@@ -8,7 +8,7 @@ use crate::{
     db::Db,
     semantic_index::{symbol_table, use_def_map},
     symbol::{symbol_from_bindings, symbol_from_declarations},
-    types::{ClassBase, ClassLiteral, KnownFunction, Specialization, Type, TypeQualifiers},
+    types::{ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers},
 };
 
 impl<'db> ClassLiteral<'db> {
@@ -147,23 +147,27 @@ impl<'db> ProtocolInterface<'db> {
         }
     }
 
-    pub(super) fn specialized_and_normalized(
+    pub(super) fn specialized_and_normalized<'a>(
         self,
         db: &'db dyn Db,
-        specialization: Specialization<'db>,
+        type_mapping: TypeMapping<'a, 'db>,
     ) -> Self {
-        Self::new(
-            db,
-            self._members(db)
-                .iter()
-                .map(|(name, data)| {
-                    (
-                        name.clone(),
-                        data.apply_specialization(db, specialization).normalized(db),
-                    )
-                })
-                .collect::<BTreeMap<_, _>>(),
-        )
+        match self {
+            Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
+                db,
+                members
+                    .inner(db)
+                    .iter()
+                    .map(|(name, data)| {
+                        (
+                            name.clone(),
+                            data.apply_type_mapping(db, type_mapping).normalized(db),
+                        )
+                    })
+                    .collect::<BTreeMap<_, _>>(),
+            )),
+            Self::SelfReference => Self::SelfReference,
+        }
     }
 }
 
@@ -181,9 +185,9 @@ impl<'db> ProtocolMemberData<'db> {
         }
     }
 
-    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
         Self {
-            ty: self.ty.apply_specialization(db, specialization),
+            ty: self.ty.apply_type_mapping(db, type_mapping),
             qualifiers: self.qualifiers,
         }
     }
