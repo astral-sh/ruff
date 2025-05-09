@@ -43,6 +43,10 @@ impl AstIds {
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         self.uses_map[&key.into()]
     }
+
+    fn try_use_id(&self, key: impl Into<ExpressionNodeKey>) -> Option<ScopedUseId> {
+        self.uses_map.get(&key.into()).copied()
+    }
 }
 
 fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
@@ -56,12 +60,18 @@ pub struct ScopedUseId;
 pub trait HasScopedUseId {
     /// Returns the ID that uniquely identifies the use in `scope`.
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId;
+    fn try_scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Option<ScopedUseId>;
 }
 
 impl HasScopedUseId for ast::Identifier {
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
         let ast_ids = ast_ids(db, scope);
         ast_ids.use_id(self)
+    }
+
+    fn try_scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Option<ScopedUseId> {
+        let ast_ids = ast_ids(db, scope);
+        ast_ids.try_use_id(self)
     }
 }
 
@@ -70,12 +80,22 @@ impl HasScopedUseId for ast::ExprName {
         let expression_ref = ExprRef::from(self);
         expression_ref.scoped_use_id(db, scope)
     }
+
+    fn try_scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Option<ScopedUseId> {
+        let expression_ref = ExprRef::from(self);
+        expression_ref.try_scoped_use_id(db, scope)
+    }
 }
 
 impl HasScopedUseId for ast::ExprRef<'_> {
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
         let ast_ids = ast_ids(db, scope);
         ast_ids.use_id(*self)
+    }
+
+    fn try_scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Option<ScopedUseId> {
+        let ast_ids = ast_ids(db, scope);
+        ast_ids.try_use_id(*self)
     }
 }
 

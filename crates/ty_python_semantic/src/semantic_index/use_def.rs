@@ -265,7 +265,7 @@ use self::symbol_state::{
 };
 use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::ScopedUseId;
-use crate::semantic_index::definition::Definition;
+use crate::semantic_index::definition::{Definition, DefinitionTarget};
 use crate::semantic_index::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
 };
@@ -595,10 +595,10 @@ impl<'db> ConstraintsIterator<'_, 'db> {
         self,
         db: &'db dyn crate::Db,
         base_ty: Type<'db>,
-        symbol: ScopedSymbolId,
+        target: DefinitionTarget,
     ) -> Type<'db> {
         let constraint_tys: Vec<_> = self
-            .filter_map(|constraint| infer_narrowing_constraint(db, constraint, symbol))
+            .filter_map(|constraint| infer_narrowing_constraint(db, constraint, target))
             .collect();
 
         if constraint_tys.is_empty() {
