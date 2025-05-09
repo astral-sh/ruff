@@ -83,7 +83,7 @@ pub(crate) struct PatternPredicate<'db> {
 
     pub(crate) subject: Expression<'db>,
 
-    #[return_ref]
+    #[returns(ref)]
     pub(crate) kind: PatternPredicateKind<'db>,
 
     pub(crate) guard: Option<Expression<'db>>,

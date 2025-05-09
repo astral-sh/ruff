@@ -447,7 +447,7 @@ impl<'db> Bindings<'db> {
                             overload.parameter_types()
                         {
                             overload.set_return_type(Type::BooleanLiteral(
-                                literal.value(db).starts_with(&**prefix.value(db)),
+                                literal.value(db).starts_with(prefix.value(db)),
                             ));
                         }
                     }

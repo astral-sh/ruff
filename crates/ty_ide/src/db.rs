@@ -120,8 +120,8 @@ pub(crate) mod tests {
             !file.path(self).is_vendored_path()
         }
 
-        fn rule_selection(&self) -> Arc<RuleSelection> {
-            self.rule_selection.clone()
+        fn rule_selection(&self) -> &RuleSelection {
+            &self.rule_selection
         }
 
         fn lint_registry(&self) -> &LintRegistry {

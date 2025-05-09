@@ -149,7 +149,7 @@ impl SemanticDb for ProjectDatabase {
         project.is_file_open(self, file)
     }
 
-    fn rule_selection(&self) -> Arc<RuleSelection> {
+    fn rule_selection(&self) -> &RuleSelection {
         self.project().rules(self)
     }
 
@@ -327,7 +327,7 @@ pub(crate) mod tests {
             !file.path(self).is_vendored_path()
         }
 
-        fn rule_selection(&self) -> Arc<RuleSelection> {
+        fn rule_selection(&self) -> &RuleSelection {
             self.project().rules(self)
         }
 

@@ -239,7 +239,6 @@ impl<'db> ClassBase<'db> {
                 let (class_literal, specialization) = class.class_literal(db);
                 class_literal
                     .try_mro(db, specialization)
-                    .as_ref()
                     .is_err_and(MroError::is_cycle)
             }
             ClassBase::Dynamic(_) | ClassBase::Generic(_) | ClassBase::Protocol => false,
