@@ -319,13 +319,6 @@ class C[T]((yield from [object])):
     pass
 ```
 
-```py
-# error: [invalid-syntax] "yield expression cannot be used within a generic definition"
-# error: [invalid-syntax] "`yield from` statement outside of a function"
-class C[T]((yield from [object])):
-    pass
-```
-
 ## `await` outside async function
 
 This error includes `await`, `async for`, `async with`, and `async` comprehensions.
