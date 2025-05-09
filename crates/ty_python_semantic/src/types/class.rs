@@ -60,28 +60,6 @@ fn explicit_bases_cycle_initial<'db>(
     Box::default()
 }
 
-fn try_mro_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Result<Mro<'db>, MroError<'db>>,
-    _count: u32,
-    _self: ClassLiteral<'db>,
-    _specialization: Option<Specialization<'db>>,
-) -> salsa::CycleRecoveryAction<Result<Mro<'db>, MroError<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-#[expect(clippy::unnecessary_wraps)]
-fn try_mro_cycle_initial<'db>(
-    db: &'db dyn Db,
-    self_: ClassLiteral<'db>,
-    specialization: Option<Specialization<'db>>,
-) -> Result<Mro<'db>, MroError<'db>> {
-    Ok(Mro::from_error(
-        db,
-        self_.apply_optional_specialization(db, specialization),
-    ))
-}
-
 #[expect(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
 fn inheritance_cycle_recover<'db>(
     _db: &'db dyn Db,
@@ -97,6 +75,48 @@ fn inheritance_cycle_initial<'db>(
     _self: ClassLiteral<'db>,
 ) -> Option<InheritanceCycle> {
     None
+}
+
+fn try_mro_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Result<Mro<'db>, MroError<'db>>,
+    _count: u32,
+    _self: ClassLiteral<'db>,
+    _specialization: Option<Specialization<'db>>,
+) -> salsa::CycleRecoveryAction<Result<Mro<'db>, MroError<'db>>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn try_mro_cycle_initial<'db>(
+    db: &'db dyn Db,
+    self_: ClassLiteral<'db>,
+    specialization: Option<Specialization<'db>>,
+) -> Result<Mro<'db>, MroError<'db>> {
+    Err(MroError::cycle(
+        db,
+        self_.apply_optional_specialization(db, specialization),
+    ))
+}
+
+fn try_metaclass_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>>,
+    _count: u32,
+    _self: ClassLiteral<'db>,
+) -> salsa::CycleRecoveryAction<
+    Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>>,
+> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn try_metaclass_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self_: ClassLiteral<'db>,
+) -> Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>> {
+    Err(MetaclassError {
+        kind: MetaclassErrorKind::Cycle,
+    })
 }
 
 /// A category of classes with code generation capabilities (with synthesized methods).
@@ -462,6 +482,23 @@ pub struct ClassLiteral<'db> {
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
 }
 
+#[expect(clippy::trivially_copy_pass_by_ref, clippy::ref_option)]
+fn pep695_generic_context_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Option<GenericContext<'db>>,
+    _count: u32,
+    _self: ClassLiteral<'db>,
+) -> salsa::CycleRecoveryAction<Option<GenericContext<'db>>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn pep695_generic_context_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: ClassLiteral<'db>,
+) -> Option<GenericContext<'db>> {
+    None
+}
+
 #[salsa::tracked]
 impl<'db> ClassLiteral<'db> {
     /// Return `true` if this class represents `known_class`
@@ -487,7 +524,7 @@ impl<'db> ClassLiteral<'db> {
             .or_else(|| self.inherited_legacy_generic_context(db))
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial)]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
         let class_def_node = scope.node(db).expect_class();
@@ -786,7 +823,10 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
-    #[salsa::tracked]
+    #[salsa::tracked(
+        cycle_fn=try_metaclass_cycle_recover,
+        cycle_initial=try_metaclass_cycle_initial,
+    )]
     pub(super) fn try_metaclass(
         self,
         db: &'db dyn Db,
@@ -798,8 +838,15 @@ impl<'db> ClassLiteral<'db> {
 
         if base_classes.peek().is_some() && self.inheritance_cycle(db).is_some() {
             // We emit diagnostics for cyclic class definitions elsewhere.
-            // Avoid attempting to infer the metaclass if the class is cyclically defined:
-            // it would be easy to enter an infinite loop.
+            // Avoid attempting to infer the metaclass if the class is cyclically defined.
+            return Ok((SubclassOfType::subclass_of_unknown(), None));
+        }
+
+        if self
+            .try_mro(db, None)
+            .as_ref()
+            .is_err_and(MroError::is_cycle)
+        {
             return Ok((SubclassOfType::subclass_of_unknown(), None));
         }
 
@@ -2737,6 +2784,8 @@ pub(super) enum MetaclassErrorKind<'db> {
     NotCallable(Type<'db>),
     /// The metaclass is of a union type whose some members are not callable
     PartlyNotCallable(Type<'db>),
+    /// A cycle was encountered attempting to determine the metaclass
+    Cycle,
 }
 
 #[cfg(test)]

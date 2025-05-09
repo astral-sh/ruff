@@ -816,8 +816,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                         ));
                     }
                 }
-                // Attempting to determine the MRO of a class or if the class has a metaclass conflict
-                // is impossible if the class is cyclically defined; there's nothing more to do here.
+                // If a class is cyclically defined, that's a sufficient error to report; the
+                // following checks (which are all inheritance-based) aren't even relevant.
                 continue;
             }
 
@@ -921,6 +921,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 ));
                             }
                         }
+                        MroErrorKind::InheritanceCycle => {
+                            if let Some(builder) = self
+                                .context
+                                .report_lint(&CYCLIC_CLASS_DEFINITION, class_node)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Cyclic definition of `{}` (class cannot inherit from itself)",
+                                    class.name(self.db())
+                                ));
+                            }
+                        }
                     }
                 }
                 Ok(_) => check_class_slots(&self.context, class, class_node),
@@ -929,6 +940,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             // (4) Check that the class's metaclass can be determined without error.
             if let Err(metaclass_error) = class.try_metaclass(self.db()) {
                 match metaclass_error.reason() {
+                    MetaclassErrorKind::Cycle => {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&CYCLIC_CLASS_DEFINITION, class_node)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Cyclic definition of `{}`",
+                                class.name(self.db())
+                            ));
+                        }
+                    }
                     MetaclassErrorKind::NotCallable(ty) => {
                         if let Some(builder) =
                             self.context.report_lint(&INVALID_METACLASS, class_node)
