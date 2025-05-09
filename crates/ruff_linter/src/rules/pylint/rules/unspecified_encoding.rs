@@ -38,11 +38,6 @@ use crate::fix::edits::add_argument;
 /// open("file.txt", encoding="utf-8")
 /// ```
 ///
-/// ## References
-/// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
-///
-/// [PEP 597]: https://peps.python.org/pep-0597/
-///
 /// ## Fix safety
 /// This fix is always unsafe and may change the program's behavior. It forces
 /// `encoding="utf-8"` as the default, regardless of the platform’s actual default
@@ -53,6 +48,11 @@ use crate::fix::edits::add_argument;
 /// with open("test.txt", encoding="utf-8") as f:
 ///     print(f.read()) # after fix (on Windows): UnicodeDecodeError
 /// ```
+///
+/// ## References
+/// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
+///
+/// [PEP 597]: https://peps.python.org/pep-0597/
 #[derive(ViolationMetadata)]
 pub(crate) struct UnspecifiedEncoding {
     function_name: String,
