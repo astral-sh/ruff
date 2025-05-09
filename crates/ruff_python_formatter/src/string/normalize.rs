@@ -7,7 +7,8 @@ use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{
     str::{Quote, TripleQuotes},
     AnyStringFlags, BytesLiteral, FString, FStringElement, FStringElements, FStringFlags,
-    StringFlags, StringLikePart, StringLiteral, TStringElement, TStringElements, TStringFlags,
+    StringFlags, StringLikePart, StringLiteral, TString, TStringElement, TStringElements,
+    TStringFlags,
 };
 use ruff_text_size::{Ranged, TextRange, TextSlice};
 
@@ -1083,6 +1084,57 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
     ruff_python_ast::visitor::source_order::walk_f_string(&mut visitor, fstring);
 
     visitor.found
+}
+/// Returns `true` if `string` has any f-string expression element (direct or nested) with a debug expression and a format spec
+/// that contains the opposite quote. It's important to preserve the quote style for those f-strings
+/// because changing the quote style would result in invalid syntax.
+///
+/// ```python
+/// f'{1=: "abcd \'\'}'
+/// f'{x=:a{y:"abcd"}}'
+/// f'{x=:a{y:{z:"abcd"}}}'
+/// ```
+pub(super) fn is_tstring_with_quoted_format_spec_and_debug(
+    tstring: &TString,
+    context: &PyFormatContext,
+) -> bool {
+    fn has_format_spec_with_opposite_quote(
+        elements: &TStringElements,
+        flags: TStringFlags,
+        context: &PyFormatContext,
+        in_debug: bool,
+    ) -> bool {
+        elements.iter().any(|element| match element {
+            TStringElement::Literal(literal) => {
+                let content = context.source().slice(literal);
+
+                in_debug && contains_opposite_quote(content, flags.into())
+            }
+            TStringElement::Interpolation(expression) => {
+                expression.format_spec.as_deref().is_some_and(|spec| {
+                    has_format_spec_with_opposite_quote(
+                        &spec.elements,
+                        flags,
+                        context,
+                        in_debug || expression.debug_text.is_some(),
+                    )
+                })
+            }
+        })
+    }
+
+    tstring.elements.interpolations().any(|expression| {
+        if let Some(spec) = expression.format_spec.as_deref() {
+            return has_format_spec_with_opposite_quote(
+                &spec.elements,
+                tstring.flags,
+                context,
+                expression.debug_text.is_some(),
+            );
+        }
+
+        false
+    })
 }
 
 fn contains_opposite_quote(content: &str, flags: AnyStringFlags) -> bool {

@@ -21,7 +21,8 @@ use crate::prelude::*;
 use crate::string::docstring::needs_chaperone_space;
 use crate::string::normalize::{
     is_fstring_with_quoted_debug_expression, is_fstring_with_quoted_format_spec_and_debug,
-    is_fstring_with_triple_quoted_literal_expression_containing_quotes, QuoteMetadata,
+    is_fstring_with_triple_quoted_literal_expression_containing_quotes,
+    is_tstring_with_quoted_format_spec_and_debug, QuoteMetadata,
 };
 use crate::string::{normalize_string, StringLikeExtensions, StringNormalizer, StringQuotes};
 
@@ -148,6 +149,10 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
             // Some if a part requires preserving its quotes.
             let mut preserve_quotes_requirement: Option<Quote> = None;
 
+            // Whether one of the parts of a t-string is an
+            // f-string, e.g. t"{this}"f"{that}"
+            let mut seen_fstring_part_in_tstring = false;
+
             // Early exit if it's known that this string can't be joined
             for part in string.parts() {
                 // Similar to Black, don't collapse triple quoted and raw strings.
@@ -168,9 +173,29 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                     return None;
                 }
 
-                if let StringLikePart::FString(fstring) = part {
-                    if context.options().target_version().supports_pep_701() {
-                        if is_fstring_with_quoted_format_spec_and_debug(fstring, context) {
+                match part {
+                    StringLikePart::FString(fstring) => {
+                        if matches!(string, StringLike::TString(_)) {
+                            seen_fstring_part_in_tstring = true;
+                        }
+                        if context.options().target_version().supports_pep_701() {
+                            if is_fstring_with_quoted_format_spec_and_debug(fstring, context) {
+                                if preserve_quotes_requirement
+                                    .is_some_and(|quote| quote != part.flags().quote_style())
+                                {
+                                    return None;
+                                }
+                                preserve_quotes_requirement = Some(part.flags().quote_style());
+                            }
+                        }
+                        // Avoid invalid syntax for pre Python 312:
+                        // * When joining parts that have debug expressions with quotes: `f"{10 + len('bar')=}" f'{10 + len("bar")=}'
+                        // * When joining parts that contain triple quoted strings with quotes: `f"{'''test ' '''}" f'{"""other " """}'`
+                        else if is_fstring_with_quoted_debug_expression(fstring, context)
+                            || is_fstring_with_triple_quoted_literal_expression_containing_quotes(
+                                fstring, context,
+                            )
+                        {
                             if preserve_quotes_requirement
                                 .is_some_and(|quote| quote != part.flags().quote_style())
                             {
@@ -179,21 +204,22 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                             preserve_quotes_requirement = Some(part.flags().quote_style());
                         }
                     }
-                    // Avoid invalid syntax for pre Python 312:
-                    // * When joining parts that have debug expressions with quotes: `f"{10 + len('bar')=}" f'{10 + len("bar")=}'
-                    // * When joining parts that contain triple quoted strings with quotes: `f"{'''test ' '''}" f'{"""other " """}'`
-                    else if is_fstring_with_quoted_debug_expression(fstring, context)
-                        || is_fstring_with_triple_quoted_literal_expression_containing_quotes(
-                            fstring, context,
-                        )
-                    {
-                        if preserve_quotes_requirement
-                            .is_some_and(|quote| quote != part.flags().quote_style())
-                        {
-                            return None;
+                    StringLikePart::TString(tstring) => {
+                        if is_tstring_with_quoted_format_spec_and_debug(tstring, context) {
+                            if preserve_quotes_requirement
+                                .is_some_and(|quote| quote != part.flags().quote_style())
+                            {
+                                return None;
+                            }
+                            preserve_quotes_requirement = Some(part.flags().quote_style());
                         }
-                        preserve_quotes_requirement = Some(part.flags().quote_style());
                     }
+                    StringLikePart::Bytes(_) | StringLikePart::String(_) => {}
+                }
+
+                // Don't concatenate t-strings and f-strings
+                if seen_fstring_part_in_tstring {
+                    return None;
                 }
             }
 
