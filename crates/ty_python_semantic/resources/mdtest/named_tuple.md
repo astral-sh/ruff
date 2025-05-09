@@ -5,17 +5,6 @@ name, and not just by its numeric position within the tuple:
 
 ## `typing.NamedTuple`
 
-### Definition
-
-```py
-from typing import NamedTuple
-
-class Location(NamedTuple):
-    altitude: float = 0.0
-    latitude: float  # TODO: this should be an error. Fields without default values cannot come after fields with.
-    longitude: float
-```
-
 ### Basics
 
 ```py
@@ -67,6 +56,19 @@ reveal_type(alice2.id)  # revealed: @Todo(GenericAlias instance)
 reveal_type(alice2.name)  # revealed: @Todo(GenericAlias instance)
 ```
 
+### Definition
+
+TODO: Fields without default values should come before fields with.
+
+```py
+from typing import NamedTuple
+
+class Location(NamedTuple):
+    altitude: float = 0.0
+    latitude: float  # this should be an error
+    longitude: float
+```
+
 ### Multiple Inheritance
 
 Multiple inheritance is not supported for `NamedTuple` classes:
@@ -104,8 +106,10 @@ reveal_type(alice.level)  # revealed: int
 alice = SuperUser(1, "Alice", 3)
 ```
 
+TODO: If any fields added by the subclass conflict with those in the base class, that should be
+flagged.
+
 ```py
-# TODO: enforce that newly-added fields in subclass do not conflict with fields in base class
 from typing import NamedTuple
 
 class User(NamedTuple):
