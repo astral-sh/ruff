@@ -1824,7 +1824,7 @@ where
                     // Save the state immediately *after* visiting the `try` block
                     // but *before* we prepare for visiting the `except` block(s).
                     //
-                    // We will revert to this state prior to visiting the the `else` block,
+                    // We will revert to this state prior to visiting the `else` block,
                     // as there necessarily must have been 0 `except` blocks executed
                     // if we hit the `else` block.
                     let post_try_block_state = self.flow_snapshot();

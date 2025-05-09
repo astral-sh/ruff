@@ -2844,7 +2844,7 @@ impl Arguments {
         self.find_argument(name, position).map(ArgOrKeyword::value)
     }
 
-    /// Return the the argument with the given name or at the given position, or `None` if no such
+    /// Return the argument with the given name or at the given position, or `None` if no such
     /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
     /// positional arguments.
     pub fn find_argument(&self, name: &str, position: usize) -> Option<ArgOrKeyword> {

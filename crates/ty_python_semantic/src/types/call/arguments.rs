@@ -9,7 +9,7 @@ pub(crate) struct CallArguments<'a>(Vec<Argument<'a>>);
 
 impl<'a> CallArguments<'a> {
     /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
-    /// of this argument list. (If `bound_self` is none, we return the the argument list
+    /// of this argument list. (If `bound_self` is none, we return the argument list
     /// unmodified.)
     pub(crate) fn with_self(&self, bound_self: Option<Type<'_>>) -> Cow<Self> {
         if bound_self.is_some() {
@@ -87,7 +87,7 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
     }
 
     /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
-    /// of this argument list. (If `bound_self` is none, we return the the argument list
+    /// of this argument list. (If `bound_self` is none, we return the argument list
     /// unmodified.)
     pub(crate) fn with_self(&self, bound_self: Option<Type<'db>>) -> Cow<Self> {
         if let Some(bound_self) = bound_self {

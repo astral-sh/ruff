@@ -492,7 +492,7 @@ impl std::ops::DerefMut for DiagnosticGuard<'_, '_> {
 ///
 /// # Panics
 ///
-/// This panics when the the underlying diagnostic lacks a primary
+/// This panics when the underlying diagnostic lacks a primary
 /// annotation, or if it has one and its file doesn't match the file
 /// being type checked.
 impl Drop for DiagnosticGuard<'_, '_> {
