@@ -2662,6 +2662,47 @@ impl<'db> KnownClassLookupError<'db> {
     }
 }
 
+pub(crate) struct SliceLiteral {
+    pub(crate) start: Option<i32>,
+    pub(crate) stop: Option<i32>,
+    pub(crate) step: Option<i32>,
+}
+
+impl<'db> Type<'db> {
+    /// If this type represents a valid slice literal, returns a [`SliceLiteral`] describing it.
+    /// Otherwise returns `None`.
+    ///
+    /// The type must be a specialization of the `slice` builtin type, where the specialized
+    /// typevars are statically known integers or `None`.
+    pub(crate) fn slice_literal(self, db: &'db dyn Db) -> Option<SliceLiteral> {
+        let ClassType::Generic(alias) = self.into_nominal_instance()?.class() else {
+            return None;
+        };
+        if !alias.origin(db).is_known(db, KnownClass::Slice) {
+            return None;
+        }
+        let [start, stop, step] = alias.specialization(db).types(db).as_ref() else {
+            return None;
+        };
+
+        let to_u32 = |ty: &Type<'db>| match ty {
+            Type::IntLiteral(n) => i32::try_from(*n).map(Some).ok(),
+            Type::BooleanLiteral(b) => Some(Some(i32::from(*b))),
+            Type::NominalInstance(instance)
+                if instance.class().is_known(db, KnownClass::NoneType) =>
+            {
+                Some(None)
+            }
+            _ => None,
+        };
+        Some(SliceLiteral {
+            start: to_u32(start)?,
+            stop: to_u32(stop)?,
+            step: to_u32(step)?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(super) struct MetaclassError<'db> {
     kind: MetaclassErrorKind<'db>,

@@ -64,10 +64,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::BytesLiteral(_), _) => Ordering::Less,
         (_, Type::BytesLiteral(_)) => Ordering::Greater,
 
-        (Type::SliceLiteral(left), Type::SliceLiteral(right)) => left.cmp(right),
-        (Type::SliceLiteral(_), _) => Ordering::Less,
-        (_, Type::SliceLiteral(_)) => Ordering::Greater,
-
         (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => left.cmp(right),
         (Type::FunctionLiteral(_), _) => Ordering::Less,
         (_, Type::FunctionLiteral(_)) => Ordering::Greater,

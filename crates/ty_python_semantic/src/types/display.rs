@@ -228,28 +228,6 @@ impl Display for DisplayRepresentation<'_> {
 
                 escape.bytes_repr(TripleQuotes::No).write(f)
             }
-            Type::SliceLiteral(slice) => {
-                f.write_str("slice[")?;
-                if let Some(start) = slice.start(self.db) {
-                    write!(f, "Literal[{start}]")?;
-                } else {
-                    f.write_str("None")?;
-                }
-
-                f.write_str(", ")?;
-
-                if let Some(stop) = slice.stop(self.db) {
-                    write!(f, "Literal[{stop}]")?;
-                } else {
-                    f.write_str("None")?;
-                }
-
-                if let Some(step) = slice.step(self.db) {
-                    write!(f, ", Literal[{step}]")?;
-                }
-
-                f.write_str("]")
-            }
             Type::Tuple(tuple) => {
                 f.write_str("tuple[")?;
                 let elements = tuple.elements(self.db);
@@ -752,52 +730,8 @@ mod tests {
 
     use crate::db::tests::setup_db;
     use crate::symbol::typing_extensions_symbol;
-    use crate::types::{
-        KnownClass, Parameter, Parameters, Signature, SliceLiteralType, StringLiteralType, Type,
-    };
+    use crate::types::{KnownClass, Parameter, Parameters, Signature, StringLiteralType, Type};
     use crate::Db;
-
-    #[test]
-    fn test_slice_literal_display() {
-        let db = setup_db();
-
-        assert_eq!(
-            Type::SliceLiteral(SliceLiteralType::new(&db, None, None, None))
-                .display(&db)
-                .to_string(),
-            "slice[None, None]"
-        );
-        assert_eq!(
-            Type::SliceLiteral(SliceLiteralType::new(&db, Some(1), None, None))
-                .display(&db)
-                .to_string(),
-            "slice[Literal[1], None]"
-        );
-        assert_eq!(
-            Type::SliceLiteral(SliceLiteralType::new(&db, None, Some(2), None))
-                .display(&db)
-                .to_string(),
-            "slice[None, Literal[2]]"
-        );
-        assert_eq!(
-            Type::SliceLiteral(SliceLiteralType::new(&db, Some(1), Some(5), None))
-                .display(&db)
-                .to_string(),
-            "slice[Literal[1], Literal[5]]"
-        );
-        assert_eq!(
-            Type::SliceLiteral(SliceLiteralType::new(&db, Some(1), Some(5), Some(2)))
-                .display(&db)
-                .to_string(),
-            "slice[Literal[1], Literal[5], Literal[2]]"
-        );
-        assert_eq!(
-            Type::SliceLiteral(SliceLiteralType::new(&db, None, None, Some(2)))
-                .display(&db)
-                .to_string(),
-            "slice[None, None, Literal[2]]"
-        );
-    }
 
     #[test]
     fn string_literal_display() {

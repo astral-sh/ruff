@@ -125,6 +125,17 @@ static_assert(not is_assignable_to(Literal[b"foo"], Literal["foo"]))
 static_assert(not is_assignable_to(Literal["foo"], Literal[b"foo"]))
 ```
 
+### Slice literals
+
+The type of a slice literal is currently inferred as a specialization of `slice`.
+
+```py
+from ty_extensions import TypeOf, is_assignable_to, static_assert
+
+static_assert(is_assignable_to(TypeOf[1:2:3], slice))
+static_assert(is_assignable_to(TypeOf[1:2:3], slice[int]))
+```
+
 ## `type[…]` and class literals
 
 In the following tests, `TypeOf[str]` is a singleton type with a single inhabitant, the class `str`.
