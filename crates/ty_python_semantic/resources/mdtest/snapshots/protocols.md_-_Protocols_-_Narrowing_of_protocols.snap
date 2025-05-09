@@ -57,7 +57,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 # Diagnostics
 
 ```
-error: lint:invalid-argument-type: Class `HasX` cannot be used as the second argument to `isinstance`
+error: invalid-argument-type: Class `HasX` cannot be used as the second argument to `isinstance`
  --> src/mdtest_snippet.py:7:8
   |
 6 | def f(arg: object, arg2: type):
@@ -110,7 +110,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:invalid-argument-type: Class `HasX` cannot be used as the second argument to `issubclass`
+error: invalid-argument-type: Class `HasX` cannot be used as the second argument to `issubclass`
   --> src/mdtest_snippet.py:12:8
    |
 10 |         reveal_type(arg)  # revealed: ~HasX

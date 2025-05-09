@@ -31,7 +31,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable: Object of type `Test | Literal[42]` may not be iterable
+error: not-iterable: Object of type `Test | Literal[42]` may not be iterable
   --> src/mdtest_snippet.py:13:14
    |
 11 | def _(flag: bool):

@@ -24,7 +24,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_argu
 # Diagnostics
 
 ```
-error: lint:invalid-argument-type: Argument to this function is incorrect
+error: invalid-argument-type: Argument to this function is incorrect
  --> src/mdtest_snippet.py:7:5
   |
 5 | # error: [invalid-argument-type]
@@ -44,7 +44,7 @@ info: `lint:invalid-argument-type` is enabled by default
 ```
 
 ```
-error: lint:invalid-argument-type: Argument to this function is incorrect
+error: invalid-argument-type: Argument to this function is incorrect
  --> src/mdtest_snippet.py:7:10
   |
 5 | # error: [invalid-argument-type]
@@ -64,7 +64,7 @@ info: `lint:invalid-argument-type` is enabled by default
 ```
 
 ```
-error: lint:invalid-argument-type: Argument to this function is incorrect
+error: invalid-argument-type: Argument to this function is incorrect
  --> src/mdtest_snippet.py:7:15
   |
 5 | # error: [invalid-argument-type]

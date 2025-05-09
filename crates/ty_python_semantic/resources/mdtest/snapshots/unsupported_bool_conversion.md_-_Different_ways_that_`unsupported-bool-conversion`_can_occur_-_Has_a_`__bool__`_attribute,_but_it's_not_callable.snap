@@ -24,7 +24,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_
 # Diagnostics
 
 ```
-error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for type `NotBoolable`
+error: unsupported-bool-conversion: Boolean conversion is unsupported for type `NotBoolable`
  --> src/mdtest_snippet.py:7:8
   |
 6 | # error: [unsupported-bool-conversion]

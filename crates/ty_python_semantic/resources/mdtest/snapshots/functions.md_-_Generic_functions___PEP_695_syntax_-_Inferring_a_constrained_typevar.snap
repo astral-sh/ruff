@@ -80,7 +80,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:invalid-argument-type: Argument to this function is incorrect
+error: invalid-argument-type: Argument to this function is incorrect
   --> src/mdtest_snippet.py:10:15
    |
  8 | reveal_type(f(None))  # revealed: None

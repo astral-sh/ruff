@@ -273,7 +273,7 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_type_definition(), @r"
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
          --> main.py:2:19
           |
         2 |             class Test: ...
@@ -305,7 +305,7 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_type_definition(), @r"
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
          --> main.py:2:17
           |
         2 |             def foo(a, b): ...
@@ -343,7 +343,7 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_type_definition(), @r"
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
          --> main.py:3:17
           |
         3 |             def foo(a, b): ...
@@ -360,7 +360,7 @@ mod tests {
            |             ^
            |
 
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
          --> main.py:5:17
           |
         3 |             def foo(a, b): ...
@@ -394,7 +394,7 @@ mod tests {
         test.write_file("lib.py", "a = 10").unwrap();
 
         assert_snapshot!(test.goto_type_definition(), @r"
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
          --> lib.py:1:1
           |
         1 | a = 10
@@ -422,7 +422,7 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_type_definition(), @r#"
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
            --> stdlib/builtins.pyi:438:7
             |
         436 |     def __getitem__(self, key: int, /) -> str | int | None: ...
@@ -451,7 +451,7 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_type_definition(), @r#"
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
            --> stdlib/builtins.pyi:438:7
             |
         436 |     def __getitem__(self, key: int, /) -> str | int | None: ...
@@ -479,7 +479,7 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_type_definition(), @r"
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
          --> main.py:2:24
           |
         2 |             type Alias[T: int = bool] = list[T]
@@ -533,7 +533,7 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_type_definition(), @r#"
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
            --> stdlib/builtins.pyi:438:7
             |
         436 |     def __getitem__(self, key: int, /) -> str | int | None: ...
@@ -568,7 +568,7 @@ mod tests {
         //   the keyword is typed as a string. It's only the passed argument that
         //   is an int. Navigating to `str` would match pyright's behavior.
         assert_snapshot!(test.goto_type_definition(), @r"
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
            --> stdlib/builtins.pyi:231:7
             |
         229 | _LiteralInteger = _PositiveInteger | _NegativeInteger | Literal[0]  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs are fixed
@@ -602,7 +602,7 @@ f(**kwargs<CURSOR>)
         );
 
         assert_snapshot!(test.goto_type_definition(), @r#"
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
             --> stdlib/builtins.pyi:1086:7
              |
         1084 |     def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
@@ -633,7 +633,7 @@ f(**kwargs<CURSOR>)
         );
 
         assert_snapshot!(test.goto_type_definition(), @r"
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
            --> stdlib/builtins.pyi:438:7
             |
         436 |     def __getitem__(self, key: int, /) -> str | int | None: ...
@@ -667,7 +667,7 @@ f(**kwargs<CURSOR>)
         );
 
         assert_snapshot!(test.goto_type_definition(), @r"
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
          --> main.py:2:19
           |
         2 |             class X:
@@ -696,7 +696,7 @@ f(**kwargs<CURSOR>)
         );
 
         assert_snapshot!(test.goto_type_definition(), @r"
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
          --> main.py:2:17
           |
         2 |             def foo(a, b): ...
@@ -726,7 +726,7 @@ f(**kwargs<CURSOR>)
         );
 
         assert_snapshot!(test.goto_type_definition(), @r"
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
            --> stdlib/builtins.pyi:438:7
             |
         436 |     def __getitem__(self, key: int, /) -> str | int | None: ...
@@ -757,7 +757,7 @@ f(**kwargs<CURSOR>)
         );
 
         assert_snapshot!(test.goto_type_definition(), @r"
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
            --> stdlib/types.pyi:671:11
             |
         669 | if sys.version_info >= (3, 10):
@@ -774,7 +774,7 @@ f(**kwargs<CURSOR>)
           |                 ^
           |
 
-        info: lint:goto-type-definition: Type definition
+        info: goto-type-definition: Type definition
            --> stdlib/builtins.pyi:438:7
             |
         436 |     def __getitem__(self, key: int, /) -> str | int | None: ...
