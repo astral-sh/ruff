@@ -4,6 +4,7 @@ use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type};
 use crate::symbol::{Symbol, SymbolAndQualifiers};
 use crate::types::generics::TypeMapping;
+use crate::types::ClassLiteral;
 use crate::Db;
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -180,6 +181,19 @@ impl<'db> ProtocolInstanceType<'db> {
                 SynthesizedProtocolType::new(db, self.0.interface(db)),
             ))),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
+        }
+    }
+
+    /// Replace references to `class` with a self-reference marker
+    pub(super) fn replace_self_reference(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
+        match self.0 {
+            Protocol::FromClass(class_type) if class_type.class_literal(db).0 == class => {
+                ProtocolInstanceType(Protocol::Synthesized(SynthesizedProtocolType::new(
+                    db,
+                    ProtocolInterface::SelfReference,
+                )))
+            }
+            _ => self,
         }
     }
 

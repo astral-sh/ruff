@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
 use ruff_python_ast::name::Name;
 
@@ -56,24 +56,41 @@ impl<'db> Deref for ProtocolClassLiteral<'db> {
     }
 }
 
-/// The interface of a protocol: the members of that protocol, and the types of those members.
 #[salsa::interned(debug)]
-pub(super) struct ProtocolInterface<'db> {
+pub(super) struct ProtocolInterfaceMembers<'db> {
     #[returns(ref)]
-    _members: BTreeMap<Name, ProtocolMemberData<'db>>,
+    inner: BTreeMap<Name, ProtocolMemberData<'db>>,
+}
+
+/// The interface of a protocol: the members of that protocol, and the types of those members.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord)]
+pub(super) enum ProtocolInterface<'db> {
+    Members(ProtocolInterfaceMembers<'db>),
+    SelfReference,
 }
 
 impl<'db> ProtocolInterface<'db> {
-    /// Iterate over the members of this protocol.
+    fn empty(db: &'db dyn Db) -> Self {
+        Self::Members(ProtocolInterfaceMembers::new(db, BTreeMap::default()))
+    }
+
     pub(super) fn members<'a>(
-        &'a self,
+        self,
         db: &'db dyn Db,
-    ) -> impl ExactSizeIterator<Item = ProtocolMember<'a, 'db>> {
-        self._members(db).iter().map(|(name, data)| ProtocolMember {
-            name,
-            ty: data.ty,
-            qualifiers: data.qualifiers,
-        })
+    ) -> impl ExactSizeIterator<Item = ProtocolMember<'a, 'db>>
+    where
+        'db: 'a,
+    {
+        match self {
+            Self::Members(members) => {
+                Either::Left(members.inner(db).iter().map(|(name, data)| ProtocolMember {
+                    name,
+                    ty: data.ty,
+                    qualifiers: data.qualifiers,
+                }))
+            }
+            Self::SelfReference => Either::Right(std::iter::empty()),
+        }
     }
 
     pub(super) fn member_by_name<'a>(
@@ -81,25 +98,34 @@ impl<'db> ProtocolInterface<'db> {
         db: &'db dyn Db,
         name: &'a str,
     ) -> Option<ProtocolMember<'a, 'db>> {
-        self._members(db).get(name).map(|data| ProtocolMember {
-            name,
-            ty: data.ty,
-            qualifiers: data.qualifiers,
-        })
+        match self {
+            Self::Members(members) => members.inner(db).get(name).map(|data| ProtocolMember {
+                name,
+                ty: data.ty,
+                qualifiers: data.qualifiers,
+            }),
+            Self::SelfReference => None,
+        }
     }
 
     /// Return `true` if all members of this protocol are fully static.
     pub(super) fn is_fully_static(self, db: &'db dyn Db) -> bool {
-        cached_is_fully_static(db, self)
+        self.members(db).all(|member| member.ty.is_fully_static(db))
     }
 
     /// Return `true` if if all members on `self` are also members of `other`.
     ///
     /// TODO: this method should consider the types of the members as well as their names.
     pub(super) fn is_sub_interface_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self._members(db)
-            .keys()
-            .all(|member_name| other._members(db).contains_key(member_name))
+        match (self, other) {
+            (Self::Members(self_members), Self::Members(other_members)) => self_members
+                .inner(db)
+                .keys()
+                .all(|member_name| other_members.inner(db).contains_key(member_name)),
+            _ => {
+                unreachable!("Enclosing protocols should never be a self-reference marker")
+            }
+        }
     }
 
     /// Return `true` if any of the members of this protocol type contain any `Todo` types.
@@ -108,13 +134,17 @@ impl<'db> ProtocolInterface<'db> {
     }
 
     pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
-        Self::new(
-            db,
-            self._members(db)
-                .iter()
-                .map(|(name, data)| (name.clone(), data.normalized(db)))
-                .collect::<BTreeMap<_, _>>(),
-        )
+        match self {
+            Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
+                db,
+                members
+                    .inner(db)
+                    .iter()
+                    .map(|(name, data)| (name.clone(), data.normalized(db)))
+                    .collect::<BTreeMap<_, _>>(),
+            )),
+            Self::SelfReference => Self::SelfReference,
+        }
     }
 }
 
@@ -245,13 +275,14 @@ fn cached_protocol_interface<'db>(
                 })
                 .filter(|(name, _, _)| !excluded_from_proto_members(name))
                 .map(|(name, ty, qualifiers)| {
+                    let ty = ty.replace_self_reference(db, class);
                     let member = ProtocolMemberData { ty, qualifiers };
                     (name.clone(), member)
                 }),
         );
     }
 
-    ProtocolInterface::new(db, members)
+    ProtocolInterface::Members(ProtocolInterfaceMembers::new(db, members))
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -268,30 +299,5 @@ fn proto_interface_cycle_initial<'db>(
     db: &'db dyn Db,
     _class: ClassLiteral<'db>,
 ) -> ProtocolInterface<'db> {
-    ProtocolInterface::new(db, BTreeMap::default())
-}
-
-#[salsa::tracked(cycle_fn=is_fully_static_cycle_recover, cycle_initial=is_fully_static_cycle_initial)]
-fn cached_is_fully_static<'db>(db: &'db dyn Db, interface: ProtocolInterface<'db>) -> bool {
-    interface
-        .members(db)
-        .all(|member| member.ty.is_fully_static(db))
-}
-
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn is_fully_static_cycle_recover(
-    _db: &dyn Db,
-    _value: &bool,
-    _count: u32,
-    _interface: ProtocolInterface<'_>,
-) -> salsa::CycleRecoveryAction<bool> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn is_fully_static_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _interface: ProtocolInterface<'db>,
-) -> bool {
-    // Assume that the protocol is fully static until we find members that indicate otherwise.
-    true
+    ProtocolInterface::empty(db)
 }

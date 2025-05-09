@@ -1569,11 +1569,11 @@ from typing import Protocol, Any
 from ty_extensions import is_fully_static, static_assert, is_assignable_to, is_subtype_of, is_equivalent_to
 
 class RecursiveFullyStatic(Protocol):
-    parent: RecursiveFullyStatic | None
+    parent: RecursiveFullyStatic
     x: int
 
 class RecursiveNonFullyStatic(Protocol):
-    parent: RecursiveNonFullyStatic | None
+    parent: RecursiveNonFullyStatic
     x: Any
 
 static_assert(is_fully_static(RecursiveFullyStatic))
@@ -1582,16 +1582,111 @@ static_assert(not is_fully_static(RecursiveNonFullyStatic))
 static_assert(not is_subtype_of(RecursiveFullyStatic, RecursiveNonFullyStatic))
 static_assert(not is_subtype_of(RecursiveNonFullyStatic, RecursiveFullyStatic))
 
-# TODO: currently leads to a stack overflow
-# static_assert(is_assignable_to(RecursiveFullyStatic, RecursiveNonFullyStatic))
-# static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveFullyStatic))
+static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveNonFullyStatic))
+static_assert(is_assignable_to(RecursiveFullyStatic, RecursiveNonFullyStatic))
+static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveFullyStatic))
 
 class AlsoRecursiveFullyStatic(Protocol):
-    parent: AlsoRecursiveFullyStatic | None
+    parent: AlsoRecursiveFullyStatic
     x: int
 
-# TODO: currently leads to a stack overflow
-# static_assert(is_equivalent_to(AlsoRecursiveFullyStatic, RecursiveFullyStatic))
+static_assert(is_equivalent_to(AlsoRecursiveFullyStatic, RecursiveFullyStatic))
+
+class RecursiveOptionalParent(Protocol):
+    parent: RecursiveOptionalParent | None
+
+static_assert(is_fully_static(RecursiveOptionalParent))
+
+static_assert(is_assignable_to(RecursiveOptionalParent, RecursiveOptionalParent))
+
+static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveOptionalParent))
+static_assert(not is_assignable_to(RecursiveOptionalParent, RecursiveNonFullyStatic))
+
+class Other(Protocol):
+    z: str
+
+def _(rec: RecursiveFullyStatic, other: Other):
+    reveal_type(rec.parent.parent.parent)  # revealed: RecursiveFullyStatic
+
+    rec.parent.parent.parent = rec
+    rec = rec.parent.parent.parent
+
+    rec.parent.parent.parent = other  # error: [invalid-assignment]
+    other = rec.parent.parent.parent  # error: [invalid-assignment]
+
+class Foo(Protocol):
+    @property
+    def x(self) -> "Foo": ...
+
+class Bar(Protocol):
+    @property
+    def x(self) -> "Bar": ...
+
+# TODO: this should pass
+# error: [static-assert-error]
+static_assert(is_equivalent_to(Foo, Bar))
+```
+
+### Nested occurrences of self-reference
+
+Make sure that we handle self-reference correctly, even if the self-reference appears deeply nested
+within the type of a protocol member:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, Callable
+from ty_extensions import Intersection, Not, is_fully_static, is_assignable_to, is_equivalent_to, static_assert
+
+class C: ...
+
+class GenericC[T](Protocol):
+    pass
+
+class Recursive(Protocol):
+    direct: Recursive
+
+    union: None | Recursive
+
+    intersection1: Intersection[C, Recursive]
+    intersection2: Intersection[C, Not[Recursive]]
+
+    t: tuple[int, tuple[str, Recursive]]
+
+    callable1: Callable[[int], Recursive]
+    callable2: Callable[[Recursive], int]
+
+    subtype_of: type[Recursive]
+
+    generic: GenericC[Recursive]
+
+    def method(self, x: Recursive) -> Recursive: ...
+
+    nested: Recursive | Callable[[Recursive | Recursive, tuple[Recursive, Recursive]], Recursive | Recursive]
+
+static_assert(is_fully_static(Recursive))
+static_assert(is_equivalent_to(Recursive, Recursive))
+static_assert(is_assignable_to(Recursive, Recursive))
+
+def _(r: Recursive):
+    reveal_type(r.direct)  # revealed: Recursive
+    reveal_type(r.union)  # revealed: None | Recursive
+    reveal_type(r.intersection1)  # revealed: C & Recursive
+    reveal_type(r.intersection2)  # revealed: C & ~Recursive
+    reveal_type(r.t)  # revealed: tuple[int, tuple[str, Recursive]]
+    reveal_type(r.callable1)  # revealed: (int, /) -> Recursive
+    reveal_type(r.callable2)  # revealed: (Recursive, /) -> int
+    reveal_type(r.subtype_of)  # revealed: type[Recursive]
+    reveal_type(r.generic)  # revealed: GenericC[Recursive]
+    reveal_type(r.method(r))  # revealed: Recursive
+    reveal_type(r.nested)  # revealed: Recursive | ((Recursive, tuple[Recursive, Recursive], /) -> Recursive)
+
+    reveal_type(r.method(r).callable1(1).direct.t[1][1])  # revealed: Recursive
 ```
 
 ### Regression test: narrowing with self-referential protocols
