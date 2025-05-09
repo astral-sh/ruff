@@ -9,6 +9,7 @@ aioredis
 aiortc
 alectryon
 alerta
+altair
 anyio
 apprise
 arviz
@@ -24,6 +25,7 @@ boostedblob
 check-jsonschema
 cki-lib
 cloud-init
+colour
 com2ann
 comtypes
 cwltool
@@ -40,6 +42,7 @@ git-revise
 graphql-core
 httpx-caching
 hydra-zen
+ibis
 ignite
 imagehash
 isort
