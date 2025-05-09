@@ -1,6 +1,4 @@
 //! Generate a Markdown-compatible listing of configuration options for `pyproject.toml`.
-//!
-//! Used for <https://docs.astral.sh/ruff/settings/>.
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use anyhow::bail;

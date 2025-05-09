@@ -33,7 +33,7 @@ Valid severities are:
 
 **Default value**: `{...}`
 
-**Type**: `dict[str, ignore | warn | error]`
+**Type**: `dict[RuleName, "ignore" | "warn" | "error"]`
 
 **Example usage** (`pyproject.toml`):
 
@@ -91,8 +91,8 @@ python = "./.venv"
 #### [`python-platform`]
 
 Specifies the target platform that will be used to analyze the source code.
-If specified, ty will tailor its use of type stub files,
-which conditionalize type definitions based on the platform.
+If specified, ty will understand conditions based on comparisons with `sys.platform`, such
+as are commonly found in typeshed to reflect the differing contents of the standard library across platforms.
 
 If no platform is specified, ty will use the current platform:
 - `win32` for Windows
@@ -122,7 +122,9 @@ The version should be specified as a string in the format `M.m` where `M` is the
 and `m` is the minor (e.g. `"3.0"` or `"3.6"`).
 If a version is provided, ty will generate errors if the source code makes use of language features
 that are not supported in that version.
-It will also tailor its use of type stub files, which conditionalizes type definitions based on the version.
+It will also understand conditionals based on comparisons with `sys.version_info`, such
+as are commonly found in typeshed to reflect the differing contents of the standard
+library across Python versions.
 
 **Default value**: `"3.13"`
 
@@ -160,7 +162,7 @@ typeshed = "/path/to/custom/typeshed"
 
 #### [`root`]
 
-The root of the project, used for finding first-party modules.
+The root(s) of the project, used for finding first-party modules.
 
 **Default value**: `[".", "./src"]`
 

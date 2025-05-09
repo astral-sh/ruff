@@ -42,7 +42,7 @@ pub struct Options {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"{...}"#,
-        value_type = r#"dict[str, ignore | warn | error]"#,
+        value_type = r#"dict[RuleName, "ignore" | "warn" | "error"]"#,
         example = r#"
             [tool.ty.rules]
             possibly-unresolved-reference = "warn"
@@ -269,7 +269,9 @@ pub struct EnvironmentOptions {
     /// and `m` is the minor (e.g. `"3.0"` or `"3.6"`).
     /// If a version is provided, ty will generate errors if the source code makes use of language features
     /// that are not supported in that version.
-    /// It will also tailor its use of type stub files, which conditionalizes type definitions based on the version.
+    /// It will also understand conditionals based on comparisons with `sys.version_info`, such
+    /// as are commonly found in typeshed to reflect the differing contents of the standard
+    /// library across Python versions.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#""3.13""#,
@@ -281,8 +283,8 @@ pub struct EnvironmentOptions {
     pub python_version: Option<RangedValue<PythonVersion>>,
 
     /// Specifies the target platform that will be used to analyze the source code.
-    /// If specified, ty will tailor its use of type stub files,
-    /// which conditionalize type definitions based on the platform.
+    /// If specified, ty will understand conditions based on comparisons with `sys.platform`, such
+    /// as are commonly found in typeshed to reflect the differing contents of the standard library across platforms.
     ///
     /// If no platform is specified, ty will use the current platform:
     /// - `win32` for Windows
@@ -350,7 +352,7 @@ pub struct EnvironmentOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SrcOptions {
-    /// The root of the project, used for finding first-party modules.
+    /// The root(s) of the project, used for finding first-party modules.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"[".", "./src"]"#,
