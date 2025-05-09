@@ -61,7 +61,23 @@ Calling a non-callable object will raise a `TypeError` at runtime.
 <summary>detects when an argument is used as both a value and a type form in a call</summary>
 
 ### What it does
-Checks whether an argument is used as both a value and a type form in a call
+Checks whether an argument is used as both a value and a type form in a call.
+
+### Why is this bad?
+Such calls have confusing semantics and often indicate a logic error.
+
+### Examples
+```python
+from typing import reveal_type
+from ty_extensions import is_fully_static
+
+if flag:
+    f = repr  # Expects a value
+else:
+    f = is_fully_static  # Expects a type form
+
+f(int)  # error
+```
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20conflicting-argument-forms)
@@ -83,9 +99,19 @@ A variable with two conflicting declarations likely indicates a mistake.
 Moreover, it could lead to incorrect or ill-defined type inference for
 other code that relies on these variables.
 
+### Examples
+```python
+if b:
+    a: int
+else:
+    a: str
+
+a = 1
+```
+
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20conflicting-declarations)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L125)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L141)
 </details>
 
 ## `conflicting-metaclass`
@@ -95,11 +121,28 @@ other code that relies on these variables.
 <details>
 <summary>detects conflicting metaclasses</summary>
 
-TODO #14889
+### What it does
+Checks for class definitions where the metaclass of the class
+being created would not be a subclass of the metaclasses of
+all the class's bases.
+
+### Why is it bad?
+Such a class definition raises a `TypeError` at runtime.
+
+### Examples
+```python
+class M1(type): ...
+class M2(type): ...
+class A(metaclass=M1): ...
+class B(metaclass=M2): ...
+
+## TypeError: metaclass conflict
+class C(A, B): ...
+```
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20conflicting-metaclass)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L140)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L166)
 </details>
 
 ## `cyclic-class-definition`
@@ -110,14 +153,27 @@ TODO #14889
 <summary>detects cyclic class definitions</summary>
 
 ### What it does
-Checks for class definitions with a cyclic inheritance chain.
+Checks for class definitions in stub files that inherit
+(directly or indirectly) from themselves.
 
 ### Why is it bad?
-TODO #14889
+Although forward references are natively supported in stub files,
+inheritance cycles are still disallowed, as it is impossible to
+resolve a consistent [method resolution order] for a class that
+inherits from itself.
+
+### Examples
+```python
+## foo.pyi
+class A(B): ...
+class B(A): ...
+```
+
+[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20cyclic-class-definition)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L149)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L192)
 </details>
 
 ## `division-by-zero`
@@ -140,7 +196,7 @@ Dividing by zero raises a `ZeroDivisionError` at runtime.
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20division-by-zero)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L162)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L218)
 </details>
 
 ## `duplicate-base`
@@ -154,11 +210,19 @@ Dividing by zero raises a `ZeroDivisionError` at runtime.
 Checks for class definitions with duplicate bases.
 
 ### Why is this bad?
-Class definitions with duplicate bases raise a `TypeError` at runtime.
+Class definitions with duplicate bases raise `TypeError` at runtime.
+
+### Examples
+```python
+class A: ...
+
+## TypeError: duplicate base class
+class B(A, A): ...
+```
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20duplicate-base)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L180)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L236)
 </details>
 
 ## `escape-character-in-forward-annotation`
@@ -295,7 +359,7 @@ TypeError: multiple bases have instance lay-out conflict
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20incompatible-slots)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L193)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L257)
 </details>
 
 ## `inconsistent-mro`
@@ -306,14 +370,25 @@ TypeError: multiple bases have instance lay-out conflict
 <summary>detects class definitions with an inconsistent MRO</summary>
 
 ### What it does
-Checks for classes with an inconsistent method resolution order (MRO).
+Checks for classes with an inconsistent [method resolution order] (MRO).
 
 ### Why is this bad?
 Classes with an inconsistent MRO will raise a `TypeError` at runtime.
 
+### Examples
+```python
+class A: ...
+class B(A): ...
+
+## TypeError: Cannot create a consistent method resolution order
+class C(A, B): ...
+```
+
+[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20inconsistent-mro)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L279)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L343)
 </details>
 
 ## `index-out-of-bounds`
@@ -330,9 +405,15 @@ a container.
 ### Why is this bad?
 Using an out of bounds index will raise an `IndexError` at runtime.
 
+### Examples
+```python
+t = (0, 1, 2)
+t[3]  # IndexError: tuple index out of range
+```
+
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20index-out-of-bounds)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L292)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L367)
 </details>
 
 ## `invalid-argument-type`
@@ -358,7 +439,7 @@ func("foo")  # error: [invalid-argument-type]
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-argument-type)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L306)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L387)
 </details>
 
 ## `invalid-assignment`
@@ -368,11 +449,24 @@ func("foo")  # error: [invalid-argument-type]
 <details>
 <summary>detects invalid assignments</summary>
 
-TODO #14889
+### What it does
+Checks for assignments where the type of the value
+is not [assignable to] the type of the assignee.
+
+### Why is this bad?
+Such assignments break the rules of the type system and
+weaken a type checker's ability to accurately reason about your code.
+
+### Examples
+```python
+a: int = ''
+```
+
+[assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-assignment)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L346)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L427)
 </details>
 
 ## `invalid-attribute-access`
@@ -383,20 +477,29 @@ TODO #14889
 <summary>Invalid attribute access</summary>
 
 ### What it does
-Makes sure that instance attribute accesses are valid.
+Checks for assignments to class variables from instances
+and assignments to instance variables from its class.
+
+### Why is this bad?
+Incorrect assignments break the rules of the type system and
+weaken a type checker's ability to accurately reason about your code.
 
 ### Examples
 ```python
 class C:
-  var: ClassVar[int] = 1
+    class_var: ClassVar[int] = 1
+    instance_var: int
 
-C.var = 3  # okay
-C().var = 3  # error: Cannot assign to class variable
+C.class_var = 3  # okay
+C().class_var = 3  # error: Cannot assign to class variable
+
+C().instance_var = 3  # okay
+C.instance_var = 3  # error: Cannot assign to instance variable
 ```
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-attribute-access)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1099)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1311)
 </details>
 
 ## `invalid-base`
@@ -404,13 +507,13 @@ C().var = 3  # error: Cannot assign to class variable
 **Default level**: error
 
 <details>
-<summary>detects class definitions with an invalid base</summary>
+<summary>detects invalid bases in class definitions</summary>
 
 TODO #14889
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-base)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L355)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L449)
 </details>
 
 ## `invalid-context-manager`
@@ -420,11 +523,23 @@ TODO #14889
 <details>
 <summary>detects expressions used in with statements that don't implement the context manager protocol</summary>
 
-TODO #14889
+### What it does
+Checks for expressions used in `with` statements
+that do not implement the context manager protocol.
+
+### Why is this bad?
+Such a statement will raise `TypeError` at runtime.
+
+### Examples
+```python
+## TypeError: 'int' object does not support the context manager protocol
+with 1:
+    print(2)
+```
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-context-manager)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L364)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L458)
 </details>
 
 ## `invalid-declaration`
@@ -434,11 +549,25 @@ TODO #14889
 <details>
 <summary>detects invalid declarations</summary>
 
-TODO #14889
+### What it does
+Checks for declarations where the inferred type of an existing symbol
+is not [assignable to] its post-hoc declared type.
+
+### Why is this bad?
+Such declarations break the rules of the type system and
+weaken a type checker's ability to accurately reason about your code.
+
+### Examples
+```python
+a = 1
+a: str
+```
+
+[assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-declaration)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L373)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L479)
 </details>
 
 ## `invalid-exception-caught`
@@ -479,7 +608,7 @@ except ZeroDivisionError:
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-exception-caught)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L382)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L502)
 </details>
 
 ## `invalid-generic-class`
@@ -510,7 +639,7 @@ class C[U](Generic[T]): ...
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-generic-class)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L418)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L538)
 </details>
 
 ## `invalid-legacy-type-variable`
@@ -543,7 +672,7 @@ def f(t: TypeVar("U")): ...
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-legacy-type-variable)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L444)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L564)
 </details>
 
 ## `invalid-metaclass`
@@ -575,7 +704,7 @@ class B(metaclass=f): ...
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-metaclass)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L472)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L592)
 </details>
 
 ## `invalid-overload`
@@ -623,7 +752,7 @@ def foo(x: int) -> int: ...
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-overload)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L499)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L619)
 </details>
 
 ## `invalid-parameter-default`
@@ -634,14 +763,21 @@ def foo(x: int) -> int: ...
 <summary>detects default values that can't be assigned to the parameter's annotated type</summary>
 
 ### What it does
-Checks for default values that can't be assigned to the parameter's annotated type.
+Checks for default values that can't be
+assigned to the parameter's annotated type.
 
 ### Why is this bad?
-TODO #14889
+This breaks the rules of the type system and
+weakens a type checker's ability to accurately reason about your code.
+
+### Examples
+```python
+def f(a: int = ''): ...
+```
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-parameter-default)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L542)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L662)
 </details>
 
 ## `invalid-protocol`
@@ -674,7 +810,7 @@ TypeError: Protocols can only inherit from other protocols, got <class 'int'>
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-protocol)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L251)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L315)
 </details>
 
 ## `invalid-raise`
@@ -722,7 +858,7 @@ def g():
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-raise)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L555)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L682)
 </details>
 
 ## `invalid-return-type`
@@ -746,7 +882,7 @@ def func() -> int:
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-return-type)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L327)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L408)
 </details>
 
 ## `invalid-super-argument`
@@ -790,7 +926,7 @@ super(B, A)  # error: `A` does not satisfy `issubclass(A, B)`
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-super-argument)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L598)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L725)
 </details>
 
 ## `invalid-syntax-in-forward-annotation`
@@ -825,9 +961,15 @@ code seen only by the type checker, and not at runtime. Normally this flag is im
 must be assigned the value `False` at runtime; the type checker will consider its value to
 be `True`. If annotated, it must be annotated as a type that can accept `bool` values.
 
+### Examples
+```python
+TYPE_CHECKING: str
+TYPE_CHECKING = ''
+```
+
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-type-checking-constant)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L637)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L764)
 </details>
 
 ## `invalid-type-form`
@@ -838,14 +980,24 @@ be `True`. If annotated, it must be annotated as a type that can accept `bool` v
 <summary>detects invalid type forms</summary>
 
 ### What it does
-Checks for invalid type expressions.
+Checks for expressions that are used as type expressions
+but cannot validly be interpreted as such.
 
 ### Why is this bad?
-TODO #14889
+Such expressions cannot be understood by ty.
+In some cases, they might raise errors at runtime.
+
+### Examples
+```python
+from typing import Annotated
+
+a: type[1]  # `1` is not a type
+b: Annotated[int]  # `Annotated` expects at least two arguments
+```
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-type-form)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L655)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L788)
 </details>
 
 ## `invalid-type-variable-constraints`
@@ -855,11 +1007,31 @@ TODO #14889
 <details>
 <summary>detects invalid type variable constraints</summary>
 
-TODO #14889
+### What it does
+Checks for constrained [type variables] with only one constraint.
+
+### Why is this bad?
+A constrained type variable must have at least two constraints.
+
+### Examples
+```python
+from typing import TypeVar
+
+T = TypeVar('T', str)  # invalid constrained TypeVar
+```
+
+Use instead:
+```python
+T = TypeVar('T', str, int)  # valid constrained TypeVar
+## or
+T = TypeVar('T', bound=str)  # valid bound TypeVar
+```
+
+[type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-type-variable-constraints)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L668)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L811)
 </details>
 
 ## `missing-argument`
@@ -883,7 +1055,7 @@ func()  # TypeError: func() missing 1 required positional argument: 'x'
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20missing-argument)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L677)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L840)
 </details>
 
 ## `no-matching-overload`
@@ -911,7 +1083,7 @@ func("string")  # error: [no-matching-overload]
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20no-matching-overload)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L696)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L859)
 </details>
 
 ## `non-subscriptable`
@@ -934,7 +1106,7 @@ Subscripting an object that does not support it will raise a `TypeError` at runt
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20non-subscriptable)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L719)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L882)
 </details>
 
 ## `not-iterable`
@@ -959,7 +1131,7 @@ for i in 34:  # TypeError: 'int' object is not iterable
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20not-iterable)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L737)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L900)
 </details>
 
 ## `parameter-already-assigned`
@@ -985,7 +1157,7 @@ f(1, x=2)  # Error raised here
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20parameter-already-assigned)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L788)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L951)
 </details>
 
 ## `raw-string-type-annotation`
@@ -1028,6 +1200,11 @@ def test(): -> "int":
 ### What it does
 Makes sure that the argument of `static_assert` is statically known to be true.
 
+### Why is this bad?
+A `static_assert` call represents an explicit request from the user
+for the type checker to emit an error if the argument cannot be verified
+to evaluate to `True` in a boolean context.
+
 ### Examples
 ```python
 from ty_extensions import static_assert
@@ -1039,7 +1216,7 @@ static_assert(int(2.0 * 3.0) == 6)  # error: does not have a statically known tr
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20static-assert-error)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1080)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1287)
 </details>
 
 ## `subclass-of-final-class`
@@ -1067,7 +1244,7 @@ class B(A): ...  # Error raised here
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20subclass-of-final-class)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L858)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1042)
 </details>
 
 ## `too-many-positional-arguments`
@@ -1093,7 +1270,7 @@ f("foo")  # Error raised here
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20too-many-positional-arguments)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L903)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1087)
 </details>
 
 ## `type-assertion-failure`
@@ -1120,7 +1297,7 @@ def _(x: int):
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20type-assertion-failure)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L881)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1065)
 </details>
 
 ## `unavailable-implicit-super-arguments`
@@ -1164,7 +1341,7 @@ class A:
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unavailable-implicit-super-arguments)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L924)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1108)
 </details>
 
 ## `unknown-argument`
@@ -1190,7 +1367,7 @@ f(x=1, y=2)  # Error raised here
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unknown-argument)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L979)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1165)
 </details>
 
 ## `unresolved-attribute`
@@ -1204,11 +1381,20 @@ f(x=1, y=2)  # Error raised here
 Checks for unresolved attributes.
 
 ### Why is this bad?
-Accessing an unbound attribute will raise an `AttributeError` at runtime. An unresolved attribute is not guaranteed to exist from the type alone, so this could also indicate that the object is not of the type that the user expects.
+Accessing an unbound attribute will raise an `AttributeError` at runtime.
+An unresolved attribute is not guaranteed to exist from the type alone,
+so this could also indicate that the object is not of the type that the user expects.
+
+### Examples
+```python
+class A: ...
+
+A().foo  # AttributeError: 'A' object has no attribute 'foo'
+```
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unresolved-attribute)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1000)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1186)
 </details>
 
 ## `unresolved-import`
@@ -1222,12 +1408,17 @@ Accessing an unbound attribute will raise an `AttributeError` at runtime. An unr
 Checks for import statements for which the module cannot be resolved.
 
 ### Why is this bad?
-Importing a module that cannot be resolved will raise an `ImportError`
+Importing a module that cannot be resolved will raise a `ModuleNotFoundError`
 at runtime.
+
+### Examples
+```python
+import foo  # ModuleNotFoundError: No module named 'foo'
+```
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unresolved-import)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1013)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1208)
 </details>
 
 ## `unresolved-reference`
@@ -1251,7 +1442,7 @@ print(x)  # NameError: name 'x' is not defined
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unresolved-reference)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1027)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1227)
 </details>
 
 ## `unsupported-bool-conversion`
@@ -1287,7 +1478,7 @@ b1 < b2 < b1  # exception raised here
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unsupported-bool-conversion)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L757)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L920)
 </details>
 
 ## `unsupported-operator`
@@ -1305,9 +1496,16 @@ the operands don't support the operator.
 Attempting to use an unsupported operator will raise a `TypeError` at
 runtime.
 
+### Examples
+```python
+class A: ...
+
+A() + A()  # TypeError: unsupported operand type(s) for +: 'A' and 'A'
+```
+
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unsupported-operator)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1046)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1246)
 </details>
 
 ## `zero-stepsize-in-slice`
@@ -1331,7 +1529,7 @@ l[1:10:0]  # ValueError: slice step cannot be zero
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20zero-stepsize-in-slice)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1061)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1268)
 </details>
 
 ## `call-possibly-unbound-method`
@@ -1394,9 +1592,18 @@ Checks for possibly unbound attributes.
 ### Why is this bad?
 Attempting to access an unbound attribute will raise an `AttributeError` at runtime.
 
+### Examples
+```python
+class A:
+    if b:
+        c = 0
+
+A.c  # AttributeError: type object 'A' has no attribute 'c'
+```
+
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-unbound-attribute)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L809)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L972)
 </details>
 
 ## `possibly-unbound-import`
@@ -1413,9 +1620,21 @@ Checks for imports of symbols that may be unbound.
 Importing an unbound module or name will raise a `ModuleNotFoundError`
 or `ImportError` at runtime.
 
+### Examples
+```python
+## module.py
+import datetime
+
+if datetime.date.today().weekday() != 6:
+    a = 1
+
+## main.py
+from module import a  # ImportError: cannot import name 'a' from 'module'
+```
+
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-unbound-import)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L822)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L994)
 </details>
 
 ## `redundant-cast`
@@ -1441,7 +1660,7 @@ cast(int, f())  # Redundant
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20redundant-cast)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1118)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1339)
 </details>
 
 ## `undefined-reveal`
@@ -1458,11 +1677,13 @@ Checks for calls to `reveal_type` without importing it.
 Using `reveal_type` without importing it will raise a `NameError` at runtime.
 
 ### Examples
-TODO #14889
+```python
+reveal_type(1)  # NameError: name 'reveal_type' is not defined
+```
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20undefined-reveal)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L963)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1147)
 </details>
 
 ## `unknown-rule`
@@ -1519,7 +1740,7 @@ print(x)  # NameError: name 'x' is not defined
 
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-unresolved-reference)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L836)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1020)
 </details>
 
 ## `unused-ignore-comment`
