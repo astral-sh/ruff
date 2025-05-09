@@ -1,5 +1,4 @@
 //! Generate a Markdown-compatible listing of configuration options for `pyproject.toml`.
-#![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use anyhow::bail;
 use itertools::Itertools;

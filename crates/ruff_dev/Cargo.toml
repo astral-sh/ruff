@@ -11,6 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ty = { workspace = true }
 ty_project = { workspace = true, features = ["schemars"] }
 ruff = { workspace = true }
 ruff_diagnostics = { workspace = true }
@@ -32,6 +33,7 @@ imara-diff = { workspace = true }
 indicatif = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
+markdown = { version = "1.0.0" }
 pretty_assertions = { workspace = true }
 rayon = { workspace = true }
 regex = { workspace = true }

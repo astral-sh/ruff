@@ -11,7 +11,7 @@ use ty_python_semantic::lint;
 #[derive(Debug, Parser)]
 #[command(author, name = "ty", about = "An extremely fast Python type checker.")]
 #[command(long_version = crate::version::version())]
-pub(crate) struct Args {
+pub struct Cli {
     #[command(subcommand)]
     pub(crate) command: Command,
 }

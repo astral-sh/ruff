@@ -1,5 +1,4 @@
 //! Generate Markdown documentation for applicable rules.
-#![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use std::collections::HashSet;
 use std::fmt::Write as _;
