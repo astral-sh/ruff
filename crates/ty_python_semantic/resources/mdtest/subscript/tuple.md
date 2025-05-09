@@ -70,7 +70,7 @@ def _(m: int, n: int):
 
     tuple_slice = t[m:n]
     # TODO: Should be `tuple[Literal[1, 'a', b"b"] | None, ...]`
-    reveal_type(tuple_slice)  # revealed: @Todo(full tuple[...] support)
+    reveal_type(tuple_slice)  # revealed: tuple[Unknown, ...]
 ```
 
 ## Inheritance
@@ -101,7 +101,7 @@ class A: ...
 def _(c: Tuple, d: Tuple[int, A], e: Tuple[Any, ...]):
     reveal_type(c)  # revealed: tuple[Unknown, ...]
     reveal_type(d)  # revealed: tuple[int, A]
-    reveal_type(e)  # revealed: @Todo(full tuple[...] support)
+    reveal_type(e)  # revealed: tuple[Any, ...]
 ```
 
 ### Inheritance
