@@ -19,8 +19,10 @@ use ruff_python_ast::PythonVersion;
 
 type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 
+#[derive(Debug)]
 pub(crate) enum PythonEnvironment {
     Virtual(VirtualEnvironment),
+    System(SystemEnvironment),
 }
 
 impl PythonEnvironment {
@@ -30,9 +32,18 @@ impl PythonEnvironment {
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Self> {
         let path = SysPrefixPath::new(path, origin, system)?;
-        // TODO(zanieb): Add support for non-virtual environments
-        let venv = VirtualEnvironment::new(path, origin, system)?;
-        Ok(Self::Virtual(venv))
+
+        // Attempt to inspect as a virtual environment first
+        // TODO(zanieb): Consider avoiding the clone here by checking for `pyvenv.cfg` ahead-of-time
+        match VirtualEnvironment::new(path.clone(), origin, system) {
+            Ok(venv) => Ok(Self::Virtual(venv)),
+            // If there's not a `pyvenv.cfg` marker, attempt to inspect as a system environment
+            //
+            Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(_, _)) => {
+                Ok(Self::System(SystemEnvironment::new(path)))
+            }
+            Err(err) => Err(err),
+        }
     }
 
     /// Returns the `site-packages` directories for this Python environment.
@@ -43,7 +54,8 @@ impl PythonEnvironment {
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Vec<SystemPathBuf>> {
         match self {
-            Self::Virtual(venv) => venv.site_packages_directories(system),
+            Self::Virtual(env) => env.site_packages_directories(system),
+            Self::System(env) => env.site_packages_directories(system),
         }
     }
 }
@@ -225,6 +237,43 @@ System site-packages will not be used for module resolution.",
         }
 
         tracing::debug!("Resolved site-packages directories for this virtual environment are: {site_packages_directories:?}");
+        Ok(site_packages_directories)
+    }
+}
+
+/// A Python environment that is _not_ a virtual environment.
+///
+/// This environment may or may not be one that is managed by the operating system itself, e.g.,
+/// this captures both Homebrew-installed Python versions and the bundled macOS Python installation.
+#[derive(Debug)]
+pub(crate) struct SystemEnvironment {
+    root_path: SysPrefixPath,
+}
+
+impl SystemEnvironment {
+    /// Create a new system environment from the given path.
+    ///
+    /// At this time, there is no eager validation and this is infallible. Instead, validation
+    /// will occur in [`site_packages_directory_from_sys_prefix`] — which will fail if there is not
+    /// a Python environment at the given path.
+    pub(crate) fn new(path: SysPrefixPath) -> Self {
+        Self { root_path: path }
+    }
+
+    /// Return a list of `site-packages` directories that are available from this environment.
+    ///
+    /// See the documentation for [`site_packages_directory_from_sys_prefix`] for more details.
+    pub(crate) fn site_packages_directories(
+        &self,
+        system: &dyn System,
+    ) -> SitePackagesDiscoveryResult<Vec<SystemPathBuf>> {
+        let SystemEnvironment { root_path } = self;
+
+        let site_packages_directories = vec![site_packages_directory_from_sys_prefix(
+            root_path, None, system,
+        )?];
+
+        tracing::debug!("Resolved site-packages directories for this environment are: {site_packages_directories:?}");
         Ok(site_packages_directories)
     }
 }
@@ -655,13 +704,8 @@ mod tests {
             )
             .unwrap();
 
-            #[expect(
-                irrefutable_let_patterns,
-                reason = "Only the virtual environment variant is implemented"
-            )]
-            let PythonEnvironment::Virtual(venv) = &env
-            else {
-                panic!("Expected a virtual environment");
+            let PythonEnvironment::Virtual(venv) = &env else {
+                panic!("Expected a virtual environment; got {env:?}");
             };
 
             assert_eq!(
