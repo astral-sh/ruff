@@ -62,6 +62,11 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity)?;
 
+    tracing::warn!(
+        "ty is pre-release software and not ready for production use. \
+            Expect to encounter bugs, missing features, and fatal errors.",
+    );
+
     tracing::debug!("Version: {}", version::version());
 
     // The base path to which all CLI arguments are relative to.
