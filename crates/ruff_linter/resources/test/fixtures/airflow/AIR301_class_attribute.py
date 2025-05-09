@@ -83,8 +83,7 @@ not_an_error.get_conn_uri()
 
 # airflow.providers_manager
 pm = ProvidersManager()
-pm.initialize_providers_asset_uri_resources()
-pm.dataset_factories
+pm.initialize_providers_dataset_uri_resources()
 pm.dataset_factories
 pm.dataset_uri_handlers
 pm.dataset_to_openlineage_converters
