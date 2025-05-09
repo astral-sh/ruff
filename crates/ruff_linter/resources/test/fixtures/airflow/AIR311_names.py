@@ -13,6 +13,10 @@ from airflow.decorators import dag, setup, task, task_group, teardown
 from airflow.io.path import ObjectStoragePath
 from airflow.io.storage import attach
 from airflow.models import DAG as DAGFromModel
+from airflow.models import (
+    Connection,
+    Variable,
+)
 from airflow.models.baseoperator import chain, chain_linear, cross_downstream
 from airflow.models.baseoperatorlink import BaseOperatorLink
 from airflow.models.dag import DAG as DAGFromDag
@@ -42,7 +46,9 @@ ObjectStoragePath()
 attach()
 
 # airflow.models
+Connection()
 DAGFromModel()
+Variable()
 
 # airflow.models.baseoperator
 chain()
