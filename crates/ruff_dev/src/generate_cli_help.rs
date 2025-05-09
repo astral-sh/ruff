@@ -1,5 +1,4 @@
 //! Generate CLI help.
-#![allow(clippy::print_stdout)]
 
 use std::path::PathBuf;
 use std::{fs, str};

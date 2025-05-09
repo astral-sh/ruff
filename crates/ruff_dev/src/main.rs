@@ -2,6 +2,8 @@
 //!
 //! Within the ruff repository you can run it with `cargo dev`.
 
+#![allow(clippy::print_stdout, clippy::print_stderr)]
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use ruff::{args::GlobalConfigArgs, check};
@@ -15,6 +17,7 @@ mod generate_docs;
 mod generate_json_schema;
 mod generate_options;
 mod generate_rules_table;
+mod generate_ty_cli_reference;
 mod generate_ty_options;
 mod generate_ty_rules;
 mod generate_ty_schema;

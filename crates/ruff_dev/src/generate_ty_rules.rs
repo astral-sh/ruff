@@ -1,5 +1,4 @@
 //! Generates the rules table for ty
-#![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use std::borrow::Cow;
 use std::fmt::Write as _;
