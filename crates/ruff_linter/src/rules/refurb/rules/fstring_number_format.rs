@@ -28,7 +28,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// ## Fix safety
 /// The fix is only marked as safe for integer literals, all other cases
-/// are unsafe, as they may change the runtime behaviour of the program
+/// are display-only, as they may change the runtime behaviour of the program
 /// or introduce syntax errors.
 #[derive(ViolationMetadata)]
 pub(crate) struct FStringNumberFormat {

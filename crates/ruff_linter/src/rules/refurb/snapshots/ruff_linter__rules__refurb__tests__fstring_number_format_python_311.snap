@@ -170,7 +170,7 @@ FURB116.py:32:7: FURB116 Replace `bin` call with `f"{d:b}"`
 31 | # autofix is display-only
 32 | print(bin(d)[2:])
    |       ^^^^^^^^^^ FURB116
-33 | # no autofix
+33 | # no autofix for Python 3.11 and earlier, as it introduces a syntax error
 34 | print(bin(len("xyz").numerator)[2:])
    |
    = help: Replace with `f"{d:b}"`
@@ -181,14 +181,14 @@ FURB116.py:32:7: FURB116 Replace `bin` call with `f"{d:b}"`
 31 31 | # autofix is display-only
 32    |-print(bin(d)[2:])
    32 |+print(f"{d:b}")
-33 33 | # no autofix
+33 33 | # no autofix for Python 3.11 and earlier, as it introduces a syntax error
 34 34 | print(bin(len("xyz").numerator)[2:])
 35 35 | 
 
 FURB116.py:34:7: FURB116 Replace `bin` call with f-string
    |
 32 | print(bin(d)[2:])
-33 | # no autofix
+33 | # no autofix for Python 3.11 and earlier, as it introduces a syntax error
 34 | print(bin(len("xyz").numerator)[2:])
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB116
 35 |

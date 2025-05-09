@@ -30,7 +30,7 @@ print(bin(3.14j)[2:])
 d = datetime.datetime.now(tz=datetime.UTC)
 # autofix is display-only
 print(bin(d)[2:])
-# no autofix
+# no autofix for Python 3.11 and earlier, as it introduces a syntax error
 print(bin(len("xyz").numerator)[2:])
 
 # autofix is display-only
