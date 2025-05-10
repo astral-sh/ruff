@@ -29,6 +29,11 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// pairwise(letters)  # ("A", "B"), ("B", "C"), ("C", "D")
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because the import `from itertools import pairwise` could
+/// be shadowed by a custom pairwise function in the same scope.
+///
 /// ## References
 /// - [Python documentation: `itertools.pairwise`](https://docs.python.org/3/library/itertools.html#itertools.pairwise)
 #[derive(ViolationMetadata)]
