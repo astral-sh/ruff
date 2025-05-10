@@ -170,7 +170,6 @@ fn run_test(
 
     let mut typeshed_files = vec![];
     let mut has_custom_versions_file = false;
-    let mut has_custom_pyvenv_cfg_file = false;
 
     let test_files: Vec<_> = test
         .files()
@@ -196,9 +195,8 @@ fn run_test(
                 }
             } else if let Some(python_path) = python_path {
                 if let Ok(relative_path) = full_path.strip_prefix(python_path) {
-                    if relative_path.as_str() == "pyvenv.cfg" {
-                        has_custom_pyvenv_cfg_file = true;
-                    } else {
+                    // Construct the path to the site-packages directory
+                    if relative_path.as_str() != "pyvenv.cfg" {
                         let mut new_path = SystemPathBuf::new();
                         for component in full_path.components() {
                             let component = component.as_str();
@@ -253,16 +251,6 @@ fn run_test(
                     content
                 });
             db.write_file(&versions_file, contents).unwrap();
-        }
-    }
-
-    if let Some(python_path) = python_path {
-        if !has_custom_pyvenv_cfg_file {
-            let pyvenv_cfg_file = python_path.join("pyvenv.cfg");
-            let home_directory = SystemPathBuf::from(format!("/Python{python_version}"));
-            db.create_directory_all(&home_directory).unwrap();
-            db.write_file(&pyvenv_cfg_file, format!("home = {home_directory}"))
-                .unwrap();
         }
     }
 
