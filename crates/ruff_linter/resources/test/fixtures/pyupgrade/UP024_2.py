@@ -6,14 +6,16 @@ from .mmap import error
 raise error
 
 # Testing the modules
-import socket, mmap, select
+import socket, mmap, select, resource
 raise socket.error
 raise mmap.error
 raise select.error
+raise resource.error
 
 raise socket.error()
 raise mmap.error(1)
 raise select.error(1, 2)
+raise resource.error(1, "strerror", "filename")
 
 raise socket.error(
     1,
@@ -29,6 +31,9 @@ raise error(1)
 
 from select import error
 raise error(1, 2)
+
+from resource import error
+raise error(1, "strerror", "filename")
 
 # Testing the names
 raise EnvironmentError
