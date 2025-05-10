@@ -14,7 +14,7 @@ use ruff_python_ast::PythonVersion;
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{vendored_typeshed_versions, TypeshedVersions};
-use crate::site_packages::{SitePackagesDiscoveryError, SysPrefixPathOrigin, VirtualEnvironment};
+use crate::site_packages::{PythonEnvironment, SitePackagesDiscoveryError, SysPrefixPathOrigin};
 use crate::{Program, PythonPath, SearchPathSettings};
 
 use super::module::{Module, ModuleKind};
@@ -243,8 +243,8 @@ impl SearchPaths {
                 //  than the one resolved in the program settings because it indicates
                 //  that the `target-version` is incorrectly configured or that the
                 //  venv is out of date.
-                VirtualEnvironment::new(sys_prefix, *origin, system)
-                    .and_then(|venv| venv.site_packages_directories(system))?
+                PythonEnvironment::new(sys_prefix, *origin, system)
+                    .and_then(|env| env.site_packages_directories(system))?
             }
 
             PythonPath::Discover(root) => {
@@ -262,7 +262,7 @@ impl SearchPaths {
                         vec![]
                     };
 
-                    match VirtualEnvironment::new(
+                    match PythonEnvironment::new(
                         virtual_env_path.clone(),
                         SysPrefixPathOrigin::LocalVenv,
                         system,
