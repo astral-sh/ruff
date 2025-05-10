@@ -935,6 +935,24 @@ impl<'db> Parameters<'db> {
         }
     }
 
+    pub(crate) fn set_first_type(&mut self, ty: Type<'db>) -> Self {
+        Self {
+            value: self
+                .value
+                .iter()
+                .enumerate()
+                .map(|(i, param)| {
+                    if i == 0 {
+                        param.clone().with_annotated_type(ty)
+                    } else {
+                        param.clone()
+                    }
+                })
+                .collect(),
+            is_gradual: self.is_gradual,
+        }
+    }
+
     pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
         self.value.as_slice()
     }
@@ -1032,32 +1050,16 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
-        let positional_or_keyword = args.iter().enumerate().map(|(index, arg)| {
-            // TODO: Check for classmethod decorator
-            if index == 0 && arg.name() == "self" {
-                Parameter {
-                    annotated_type: Some(
-                        Type::KnownInstance(KnownInstanceType::TypingSelf)
-                            .in_type_expression(db, definition.scope(db))
-                            .unwrap(),
-                    ),
-                    kind: ParameterKind::PositionalOrKeyword {
-                        name: arg.parameter.name.id.clone(),
-                        default_type: default_type(arg),
-                    },
-                    form: ParameterForm::Value,
-                }
-            } else {
-                Parameter::from_node_and_kind(
-                    db,
-                    definition,
-                    &arg.parameter,
-                    ParameterKind::PositionalOrKeyword {
-                        name: arg.parameter.name.id.clone(),
-                        default_type: default_type(arg),
-                    },
-                )
-            }
+        let positional_or_keyword = args.iter().enumerate().map(|(_, arg)| {
+            Parameter::from_node_and_kind(
+                db,
+                definition,
+                &arg.parameter,
+                ParameterKind::PositionalOrKeyword {
+                    name: arg.parameter.name.id.clone(),
+                    default_type: default_type(arg),
+                },
+            )
         });
         let variadic = vararg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(
