@@ -562,18 +562,27 @@ python-version = "3.12"
 ```py
 from typing import Any, Callable
 
-class A[T]:
-    def __init__(self, x: T) -> None: ...
+class A:
+    def __init__(self, x: int) -> None: ...
 
-a: Callable[[int], A[int]] = A[int]
+a: Callable[[int], A] = A
+
+def _(x: type[A]) -> None:
+    def foo(y: Callable[[int], A]) -> None: ...
+    foo(x)
 
 class B[T]:
-    def __new__(cls, *args: Any, **kwargs: Any) -> "B[T]":
+    def __init__(self, x: T) -> None: ...
+
+b: Callable[[int], B[int]] = B[int]
+
+class C[T]:
+    def __new__(cls, *args: Any, **kwargs: Any) -> "C[T]":
         return super().__new__(cls)
 
     def __init__(self, x: T) -> None: ...
 
-b: Callable[[int], B[int]] = B[int]
+c: Callable[[int], C[int]] = C[int]
 ```
 
 ### Overloads
