@@ -39,7 +39,9 @@ impl PythonEnvironment {
             Ok(venv) => Ok(Self::Virtual(venv)),
             // If there's not a `pyvenv.cfg` marker, attempt to inspect as a system environment
             //
-            Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(_, _)) => {
+            Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(_, _))
+                if !origin.must_be_virtual_env() =>
+            {
                 Ok(Self::System(SystemEnvironment::new(path)))
             }
             Err(err) => Err(err),
@@ -531,6 +533,17 @@ pub enum SysPrefixPathOrigin {
     LocalVenv,
 }
 
+impl SysPrefixPathOrigin {
+    /// Whether the given `sys.prefix` path must be a virtual environment (rather than a system
+    /// Python environment).
+    pub(crate) fn must_be_virtual_env(self) -> bool {
+        match self {
+            Self::LocalVenv | Self::VirtualEnvVar => true,
+            Self::PythonCliFlag | Self::Derived => false,
+        }
+    }
+}
+
 impl Display for SysPrefixPathOrigin {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -626,6 +639,7 @@ mod tests {
         system: TestSystem,
         minor_version: u8,
         free_threaded: bool,
+        origin: SysPrefixPathOrigin,
         virtual_env: Option<VirtualEnvironmentTestCase>,
     }
 
@@ -636,6 +650,7 @@ mod tests {
                 system,
                 minor_version,
                 free_threaded,
+                origin: _,
                 virtual_env,
             } = self;
             let memory_fs = system.memory_file_system();
@@ -706,14 +721,17 @@ mod tests {
             venv_sys_prefix
         }
 
+        #[track_caller]
+        fn err(self) -> SitePackagesDiscoveryError {
+            PythonEnvironment::new(self.build(), self.origin, &self.system)
+                .expect_err("Expected environment construction to fail")
+        }
+
+        #[track_caller]
         fn run(self) {
             let env_path = self.build();
-            let env = PythonEnvironment::new(
-                env_path.clone(),
-                SysPrefixPathOrigin::VirtualEnvVar,
-                &self.system,
-            )
-            .unwrap();
+            let env = PythonEnvironment::new(env_path.clone(), self.origin, &self.system)
+                .expect("Expected environment construction to succeed");
 
             let expect_virtual_env = self.virtual_env.is_some();
             match env {
@@ -747,7 +765,7 @@ mod tests {
                 venv.root_path,
                 SysPrefixPath {
                     inner: self.system.canonicalize_path(expected_env_path).unwrap(),
-                    origin: SysPrefixPathOrigin::VirtualEnvVar,
+                    origin: self.origin,
                 }
             );
             assert_eq!(
@@ -830,7 +848,7 @@ mod tests {
                 env.root_path,
                 SysPrefixPath {
                     inner: self.system.canonicalize_path(expected_env_path).unwrap(),
-                    origin: SysPrefixPathOrigin::VirtualEnvVar,
+                    origin: self.origin,
                 }
             );
 
@@ -863,6 +881,7 @@ mod tests {
             system: TestSystem::default(),
             minor_version: 12,
             free_threaded: false,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
             virtual_env: None,
         };
         test.run();
@@ -874,9 +893,42 @@ mod tests {
             system: TestSystem::default(),
             minor_version: 13,
             free_threaded: true,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
             virtual_env: None,
         };
         test.run();
+    }
+
+    #[test]
+    fn cannot_find_site_packages_directory_no_virtual_env_at_origin_virtual_env_var() {
+        let test = PythonEnvironmentTestCase {
+            system: TestSystem::default(),
+            minor_version: 13,
+            free_threaded: false,
+            origin: SysPrefixPathOrigin::VirtualEnvVar,
+            virtual_env: None,
+        };
+        let err = test.err();
+        assert!(
+            matches!(err, SitePackagesDiscoveryError::NoPyvenvCfgFile(..)),
+            "Got {err:?}",
+        );
+    }
+
+    #[test]
+    fn cannot_find_site_packages_directory_no_virtual_env_at_origin_local_venv() {
+        let test = PythonEnvironmentTestCase {
+            system: TestSystem::default(),
+            minor_version: 13,
+            free_threaded: false,
+            origin: SysPrefixPathOrigin::LocalVenv,
+            virtual_env: None,
+        };
+        let err = test.err();
+        assert!(
+            matches!(err, SitePackagesDiscoveryError::NoPyvenvCfgFile(..)),
+            "Got {err:?}",
+        );
     }
 
     #[test]
@@ -885,6 +937,7 @@ mod tests {
             system: TestSystem::default(),
             minor_version: 12,
             free_threaded: false,
+            origin: SysPrefixPathOrigin::VirtualEnvVar,
             virtual_env: Some(VirtualEnvironmentTestCase {
                 system_site_packages: false,
                 pyvenv_cfg_version_field: None,
@@ -899,6 +952,7 @@ mod tests {
             system: TestSystem::default(),
             minor_version: 12,
             free_threaded: false,
+            origin: SysPrefixPathOrigin::VirtualEnvVar,
             virtual_env: Some(VirtualEnvironmentTestCase {
                 system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version = 3.12"),
@@ -913,6 +967,7 @@ mod tests {
             system: TestSystem::default(),
             minor_version: 12,
             free_threaded: false,
+            origin: SysPrefixPathOrigin::VirtualEnvVar,
             virtual_env: Some(VirtualEnvironmentTestCase {
                 system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version_info = 3.12"),
@@ -927,6 +982,7 @@ mod tests {
             system: TestSystem::default(),
             minor_version: 12,
             free_threaded: false,
+            origin: SysPrefixPathOrigin::VirtualEnvVar,
             virtual_env: Some(VirtualEnvironmentTestCase {
                 system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version_info = 3.12.0rc2"),
@@ -941,6 +997,7 @@ mod tests {
             system: TestSystem::default(),
             minor_version: 13,
             free_threaded: true,
+            origin: SysPrefixPathOrigin::VirtualEnvVar,
             virtual_env: Some(VirtualEnvironmentTestCase {
                 system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version_info = 3.13"),
@@ -955,6 +1012,7 @@ mod tests {
             system: TestSystem::default(),
             minor_version: 13,
             free_threaded: true,
+            origin: SysPrefixPathOrigin::VirtualEnvVar,
             virtual_env: Some(VirtualEnvironmentTestCase {
                 system_site_packages: true,
                 pyvenv_cfg_version_field: Some("version_info = 3.13"),
