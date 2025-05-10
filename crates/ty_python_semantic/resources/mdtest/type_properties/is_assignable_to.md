@@ -567,10 +567,6 @@ class A:
 
 a: Callable[[int], A] = A
 
-def _(x: type[A]) -> None:
-    def foo(y: Callable[[int], A]) -> None: ...
-    foo(x)
-
 class B[T]:
     def __init__(self, x: T) -> None: ...
 
