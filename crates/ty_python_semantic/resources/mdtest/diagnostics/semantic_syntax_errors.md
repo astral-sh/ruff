@@ -298,15 +298,15 @@ python-version = "3.12"
 ```
 
 ```py
+def _():
 # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
 # error: [invalid-syntax] "yield expression cannot be used within a TypeVar bound"
-# error: [invalid-syntax] "`yield` statement outside of a function"
-type X[T: (yield 1)] = int
+    type X[T: (yield 1)] = int
 
+def _():
 # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
 # error: [invalid-syntax] "yield expression cannot be used within a type alias"
-# error: [invalid-syntax] "`yield` statement outside of a function"
-type Y = (yield 1)
+    type Y = (yield 1)
 
 # error: [invalid-type-form] "Named expressions are not allowed in type expressions"
 # error: [invalid-syntax] "named expression cannot be used within a generic definition"
