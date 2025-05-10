@@ -19,6 +19,47 @@ use ruff_python_ast::PythonVersion;
 
 type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 
+#[derive(Debug)]
+pub(crate) enum PythonEnvironment {
+    Virtual(VirtualEnvironment),
+    System(SystemEnvironment),
+}
+
+impl PythonEnvironment {
+    pub(crate) fn new(
+        path: impl AsRef<SystemPath>,
+        origin: SysPrefixPathOrigin,
+        system: &dyn System,
+    ) -> SitePackagesDiscoveryResult<Self> {
+        let path = SysPrefixPath::new(path, origin, system)?;
+
+        // Attempt to inspect as a virtual environment first
+        // TODO(zanieb): Consider avoiding the clone here by checking for `pyvenv.cfg` ahead-of-time
+        match VirtualEnvironment::new(path.clone(), origin, system) {
+            Ok(venv) => Ok(Self::Virtual(venv)),
+            // If there's not a `pyvenv.cfg` marker, attempt to inspect as a system environment
+            //
+            Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(_, _)) => {
+                Ok(Self::System(SystemEnvironment::new(path)))
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Returns the `site-packages` directories for this Python environment.
+    ///
+    /// See the documentation for [`site_packages_directory_from_sys_prefix`] for more details.
+    pub(crate) fn site_packages_directories(
+        &self,
+        system: &dyn System,
+    ) -> SitePackagesDiscoveryResult<Vec<SystemPathBuf>> {
+        match self {
+            Self::Virtual(env) => env.site_packages_directories(system),
+            Self::System(env) => env.site_packages_directories(system),
+        }
+    }
+}
+
 /// Abstraction for a Python virtual environment.
 ///
 /// Most of this information is derived from the virtual environment's `pyvenv.cfg` file.
@@ -26,7 +67,7 @@ type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 /// depends on the tool that was used to create the virtual environment.
 #[derive(Debug)]
 pub(crate) struct VirtualEnvironment {
-    venv_path: SysPrefixPath,
+    root_path: SysPrefixPath,
     base_executable_home_path: PythonHomePath,
     include_system_site_packages: bool,
 
@@ -43,15 +84,7 @@ pub(crate) struct VirtualEnvironment {
 
 impl VirtualEnvironment {
     pub(crate) fn new(
-        path: impl AsRef<SystemPath>,
-        origin: SysPrefixPathOrigin,
-        system: &dyn System,
-    ) -> SitePackagesDiscoveryResult<Self> {
-        Self::new_impl(path.as_ref(), origin, system)
-    }
-
-    fn new_impl(
-        path: &SystemPath,
+        path: SysPrefixPath,
         origin: SysPrefixPathOrigin,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Self> {
@@ -59,8 +92,7 @@ impl VirtualEnvironment {
             index.checked_add(1).and_then(NonZeroUsize::new).unwrap()
         }
 
-        let venv_path = SysPrefixPath::new(path, origin, system)?;
-        let pyvenv_cfg_path = venv_path.join("pyvenv.cfg");
+        let pyvenv_cfg_path = path.join("pyvenv.cfg");
         tracing::debug!("Attempting to parse virtual environment metadata at '{pyvenv_cfg_path}'");
 
         let pyvenv_cfg = system
@@ -150,7 +182,7 @@ impl VirtualEnvironment {
         });
 
         let metadata = Self {
-            venv_path,
+            root_path: path,
             base_executable_home_path,
             include_system_site_packages,
             version,
@@ -162,20 +194,20 @@ impl VirtualEnvironment {
 
     /// Return a list of `site-packages` directories that are available from this virtual environment
     ///
-    /// See the documentation for `site_packages_dir_from_sys_prefix` for more details.
+    /// See the documentation for [`site_packages_directory_from_sys_prefix`] for more details.
     pub(crate) fn site_packages_directories(
         &self,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Vec<SystemPathBuf>> {
         let VirtualEnvironment {
-            venv_path,
+            root_path,
             base_executable_home_path,
             include_system_site_packages,
             version,
         } = self;
 
         let mut site_packages_directories = vec![site_packages_directory_from_sys_prefix(
-            venv_path, *version, system,
+            root_path, *version, system,
         )?];
 
         if *include_system_site_packages {
@@ -199,7 +231,7 @@ impl VirtualEnvironment {
                     "Failed to resolve `sys.prefix` of the system Python installation \
 from the `home` value in the `pyvenv.cfg` file at `{}`. \
 System site-packages will not be used for module resolution.",
-                    venv_path.join("pyvenv.cfg")
+                    root_path.join("pyvenv.cfg")
                 );
             }
         }
@@ -209,12 +241,49 @@ System site-packages will not be used for module resolution.",
     }
 }
 
+/// A Python environment that is _not_ a virtual environment.
+///
+/// This environment may or may not be one that is managed by the operating system itself, e.g.,
+/// this captures both Homebrew-installed Python versions and the bundled macOS Python installation.
+#[derive(Debug)]
+pub(crate) struct SystemEnvironment {
+    root_path: SysPrefixPath,
+}
+
+impl SystemEnvironment {
+    /// Create a new system environment from the given path.
+    ///
+    /// At this time, there is no eager validation and this is infallible. Instead, validation
+    /// will occur in [`site_packages_directory_from_sys_prefix`] — which will fail if there is not
+    /// a Python environment at the given path.
+    pub(crate) fn new(path: SysPrefixPath) -> Self {
+        Self { root_path: path }
+    }
+
+    /// Return a list of `site-packages` directories that are available from this environment.
+    ///
+    /// See the documentation for [`site_packages_directory_from_sys_prefix`] for more details.
+    pub(crate) fn site_packages_directories(
+        &self,
+        system: &dyn System,
+    ) -> SitePackagesDiscoveryResult<Vec<SystemPathBuf>> {
+        let SystemEnvironment { root_path } = self;
+
+        let site_packages_directories = vec![site_packages_directory_from_sys_prefix(
+            root_path, None, system,
+        )?];
+
+        tracing::debug!("Resolved site-packages directories for this environment are: {site_packages_directories:?}");
+        Ok(site_packages_directories)
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum SitePackagesDiscoveryError {
     #[error("Invalid {1}: `{0}` could not be canonicalized")]
-    VenvDirCanonicalizationError(SystemPathBuf, SysPrefixPathOrigin, #[source] io::Error),
+    EnvDirCanonicalizationError(SystemPathBuf, SysPrefixPathOrigin, #[source] io::Error),
     #[error("Invalid {1}: `{0}` does not point to a directory on disk")]
-    VenvDirIsNotADirectory(SystemPathBuf, SysPrefixPathOrigin),
+    EnvDirNotDirectory(SystemPathBuf, SysPrefixPathOrigin),
     #[error("{0} points to a broken venv with no pyvenv.cfg file")]
     NoPyvenvCfgFile(SysPrefixPathOrigin, #[source] io::Error),
     #[error("Failed to parse the pyvenv.cfg file at {0} because {1}")]
@@ -401,7 +470,7 @@ impl SysPrefixPath {
         let canonicalized = system
             .canonicalize_path(unvalidated_path)
             .map_err(|io_err| {
-                SitePackagesDiscoveryError::VenvDirCanonicalizationError(
+                SitePackagesDiscoveryError::EnvDirCanonicalizationError(
                     unvalidated_path.to_path_buf(),
                     origin,
                     io_err,
@@ -414,7 +483,7 @@ impl SysPrefixPath {
                 origin,
             })
             .ok_or_else(|| {
-                SitePackagesDiscoveryError::VenvDirIsNotADirectory(
+                SitePackagesDiscoveryError::EnvDirNotDirectory(
                     unvalidated_path.to_path_buf(),
                     origin,
                 )
@@ -628,15 +697,19 @@ mod tests {
 
         fn test(self) {
             let venv_path = self.build_mock_venv();
-            let venv = VirtualEnvironment::new(
+            let env = PythonEnvironment::new(
                 venv_path.clone(),
                 SysPrefixPathOrigin::VirtualEnvVar,
                 &self.system,
             )
             .unwrap();
 
+            let PythonEnvironment::Virtual(venv) = &env else {
+                panic!("Expected a virtual environment; got {env:?}");
+            };
+
             assert_eq!(
-                venv.venv_path,
+                venv.root_path,
                 SysPrefixPath {
                     inner: self.system.canonicalize_path(&venv_path).unwrap(),
                     origin: SysPrefixPathOrigin::VirtualEnvVar,
@@ -663,7 +736,7 @@ mod tests {
             };
             assert_eq!(venv.base_executable_home_path, expected_home);
 
-            let site_packages_directories = venv.site_packages_directories(&self.system).unwrap();
+            let site_packages_directories = env.site_packages_directories(&self.system).unwrap();
             let expected_venv_site_packages = if cfg!(target_os = "windows") {
                 SystemPathBuf::from(r"\.venv\Lib\site-packages")
             } else if self.free_threaded {
@@ -782,8 +855,8 @@ mod tests {
     fn reject_venv_that_does_not_exist() {
         let system = TestSystem::default();
         assert!(matches!(
-            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system),
-            Err(SitePackagesDiscoveryError::VenvDirCanonicalizationError(..))
+            PythonEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system),
+            Err(SitePackagesDiscoveryError::EnvDirCanonicalizationError(..))
         ));
     }
 
@@ -795,25 +868,30 @@ mod tests {
             .write_file_all("/.venv", "")
             .unwrap();
         assert!(matches!(
-            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system),
-            Err(SitePackagesDiscoveryError::VenvDirIsNotADirectory(..))
+            PythonEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system),
+            Err(SitePackagesDiscoveryError::EnvDirNotDirectory(..))
         ));
     }
 
     #[test]
-    fn reject_venv_with_no_pyvenv_cfg_file() {
+    fn env_with_no_pyvenv_cfg_file() {
         let system = TestSystem::default();
         system
             .memory_file_system()
             .create_directory_all("/.venv")
             .unwrap();
-        assert!(matches!(
-            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system),
-            Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(
-                SysPrefixPathOrigin::VirtualEnvVar,
-                _
-            ))
-        ));
+        let env =
+            PythonEnvironment::new("/.venv", SysPrefixPathOrigin::PythonCliFlag, &system).unwrap();
+        let PythonEnvironment::System(env) = env else {
+            panic!("Expected a system environment; got {env:?}");
+        };
+        assert!(
+            env.root_path
+                == SysPrefixPath {
+                    inner: system.canonicalize_path(SystemPath::new("/.venv")).unwrap(),
+                    origin: SysPrefixPathOrigin::PythonCliFlag,
+                }
+        );
     }
 
     #[test]
@@ -825,7 +903,7 @@ mod tests {
             .write_file_all(&pyvenv_cfg_path, "home = bar = /.venv/bin")
             .unwrap();
         let venv_result =
-            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
+            PythonEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
         assert!(matches!(
             venv_result,
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
@@ -845,7 +923,7 @@ mod tests {
             .write_file_all(&pyvenv_cfg_path, "home =")
             .unwrap();
         let venv_result =
-            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
+            PythonEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
         assert!(matches!(
             venv_result,
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
@@ -865,7 +943,7 @@ mod tests {
             .write_file_all(&pyvenv_cfg_path, "= whatever")
             .unwrap();
         let venv_result =
-            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
+            PythonEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
         assert!(matches!(
             venv_result,
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
@@ -883,7 +961,7 @@ mod tests {
         let pyvenv_cfg_path = SystemPathBuf::from("/.venv/pyvenv.cfg");
         memory_fs.write_file_all(&pyvenv_cfg_path, "").unwrap();
         let venv_result =
-            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
+            PythonEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
         assert!(matches!(
             venv_result,
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
@@ -903,7 +981,7 @@ mod tests {
             .write_file_all(&pyvenv_cfg_path, "home = foo")
             .unwrap();
         let venv_result =
-            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
+            PythonEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
         assert!(matches!(
             venv_result,
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
