@@ -104,7 +104,7 @@ impl Options {
                 default
             });
         ProgramSettings {
-            python_version,
+            python_version: Some(python_version),
             python_platform,
             search_paths: self.to_search_path_settings(project_root, system),
         }
