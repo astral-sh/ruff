@@ -247,6 +247,34 @@ impl SearchPaths {
                     .and_then(|venv| venv.site_packages_directories(system))?
             }
 
+            PythonPath::Resolve(target, origin) => {
+                tracing::debug!("Resolving Python at `{target}`");
+
+                let root = system
+                    // If given a file, assume it's a Python executable, e.g., `.venv/bin/python3`,
+                    // and search for a virtual environment in the root directory. Ideally, we'd
+                    // invoke the target to determine `sys.prefix` here, but that's more complicated
+                    // and may be deferred to uv.
+                    .is_file(target)
+                    .then(|| target.as_path())
+                    .take_if(|target| {
+                        // Avoid using the target if it doesn't look like a Python executable, e.g.,
+                        // to deny cases like `.venv/bin/foo`
+                        target
+                            .file_name()
+                            .is_some_and(|name| name.starts_with("python"))
+                    })
+                    .and_then(SystemPath::parent)
+                    .and_then(SystemPath::parent)
+                    .take_if(|root| system.is_file(&root.join("pyvenv.cfg")))
+                    // If not a file, or if there's no `pyenv.cfg` file, use the path as given
+                    // and allow let `VirtualEnvironment::new` handle the error.
+                    .unwrap_or(target);
+
+                VirtualEnvironment::new(root, *origin, system)
+                    .and_then(|venv| venv.site_packages_directories(system))?
+            }
+
             PythonPath::Discover(root) => {
                 tracing::debug!("Discovering virtual environment in `{root}`");
                 let virtual_env_path = discover_venv_in(db.system(), root);
