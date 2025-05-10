@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR301_block_fix.py:5:1: AIR301 [*] `airflow.datasets.manager.DatasetManager` is removed in Airflow 3.0
+  |
+3 | from airflow.datasets.manager import DatasetManager
+4 |
+5 | DatasetManager()
+  | ^^^^^^^^^^^^^^ AIR301
+6 |
+7 | from airflow import datasets
+  |
+  = help: Use `airflow.assets.manager.AssetManager` instead
+
+ℹ Safe fix
+1 1 | from __future__ import annotations
+2 2 | 
+3 3 | from airflow.datasets.manager import DatasetManager
+  4 |+from airflow.assets.manager import AssetManager
+4 5 | 
+5   |-DatasetManager()
+  6 |+AssetManager()
+6 7 | 
+7 8 | from airflow import datasets
+8 9 | 
+
+AIR301_block_fix.py:9:18: AIR301 `airflow.datasets.manager.DatasetManager` is removed in Airflow 3.0
+  |
+7 | from airflow import datasets
+8 |
+9 | datasets.manager.DatasetManager()
+  |                  ^^^^^^^^^^^^^^ AIR301
+  |
+  = help: Use `airflow.assets.manager.AssetManager` instead

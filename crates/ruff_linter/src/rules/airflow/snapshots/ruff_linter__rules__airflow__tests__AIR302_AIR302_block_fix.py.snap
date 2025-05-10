@@ -1,0 +1,32 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302_block_fix.py:5:1: AIR302 [*] `airflow.operators.http_operator.SimpleHttpOperator` is moved into `http` provider in Airflow 3.0;
+  |
+3 | from airflow.operators.http_operator import SimpleHttpOperator
+4 |
+5 | SimpleHttpOperator()
+  | ^^^^^^^^^^^^^^^^^^ AIR302
+  |
+  = help: Install `apache-airflow-providers-http>=5.0.0` and use `airflow.providers.http.operators.http.HttpOperator` instead.
+
+ℹ Safe fix
+1 1 | from __future__ import annotations
+2 2 | 
+3 3 | from airflow.operators.http_operator import SimpleHttpOperator
+  4 |+from airflow.providers.http.operators.http import HttpOperator
+4 5 | 
+5   |-SimpleHttpOperator()
+  6 |+HttpOperator()
+6 7 | 
+7 8 | 
+8 9 | from airflow.operators import http_operator
+
+AIR302_block_fix.py:10:15: AIR302 `airflow.operators.http_operator.SimpleHttpOperator` is moved into `http` provider in Airflow 3.0;
+   |
+ 8 | from airflow.operators import http_operator
+ 9 |
+10 | http_operator.SimpleHttpOperator()
+   |               ^^^^^^^^^^^^^^^^^^ AIR302
+   |
+   = help: Install `apache-airflow-providers-http>=5.0.0` and use `airflow.providers.http.operators.http.HttpOperator` instead.
