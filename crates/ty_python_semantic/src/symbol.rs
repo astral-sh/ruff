@@ -3,10 +3,10 @@ use ruff_db::files::File;
 use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
+use crate::semantic_index::target::{ScopeId, ScopedTargetId};
 use crate::semantic_index::{global_scope, use_def_map, DeclarationWithConstraint};
 use crate::semantic_index::{
-    symbol_table, BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
+    target_table, BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
 };
 use crate::types::{
     binding_type, declaration_type, todo_type, KnownClass, Truthiness, Type, TypeAndQualifiers,
@@ -212,8 +212,8 @@ pub(crate) fn class_symbol<'db>(
     scope: ScopeId<'db>,
     name: &str,
 ) -> SymbolAndQualifiers<'db> {
-    symbol_table(db, scope)
-        .symbol_id_by_name(name)
+    target_table(db, scope)
+        .target_id_by_name(name)
         .map(|symbol| {
             let symbol_and_quals = symbol_by_id(db, scope, symbol, RequiresExplicitReExport::No);
 
@@ -559,7 +559,7 @@ fn symbol_cycle_recover<'db>(
     _value: &SymbolAndQualifiers<'db>,
     _count: u32,
     _scope: ScopeId<'db>,
-    _symbol_id: ScopedSymbolId,
+    _target_id: ScopedTargetId,
     _requires_explicit_reexport: RequiresExplicitReExport,
 ) -> salsa::CycleRecoveryAction<SymbolAndQualifiers<'db>> {
     salsa::CycleRecoveryAction::Iterate
@@ -568,7 +568,7 @@ fn symbol_cycle_recover<'db>(
 fn symbol_cycle_initial<'db>(
     _db: &'db dyn Db,
     _scope: ScopeId<'db>,
-    _symbol_id: ScopedSymbolId,
+    _target_id: ScopedTargetId,
     _requires_explicit_reexport: RequiresExplicitReExport,
 ) -> SymbolAndQualifiers<'db> {
     Symbol::bound(Type::Never).into()
@@ -578,7 +578,7 @@ fn symbol_cycle_initial<'db>(
 fn symbol_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
-    symbol_id: ScopedSymbolId,
+    target_id: ScopedTargetId,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> SymbolAndQualifiers<'db> {
     let use_def = use_def_map(db, scope);
@@ -586,7 +586,7 @@ fn symbol_by_id<'db>(
     // If the symbol is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
 
-    let declarations = use_def.public_declarations(symbol_id);
+    let declarations = use_def.public_declarations(target_id);
     let declared = symbol_from_declarations_impl(db, declarations, requires_explicit_reexport);
 
     match declared {
@@ -602,7 +602,7 @@ fn symbol_by_id<'db>(
             symbol: Symbol::Type(declared_ty, Boundness::PossiblyUnbound),
             qualifiers,
         }) => {
-            let bindings = use_def.public_bindings(symbol_id);
+            let bindings = use_def.public_bindings(target_id);
             let inferred = symbol_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
             let symbol = match inferred {
@@ -627,7 +627,7 @@ fn symbol_by_id<'db>(
             symbol: Symbol::Unbound,
             qualifiers: _,
         }) => {
-            let bindings = use_def.public_bindings(symbol_id);
+            let bindings = use_def.public_bindings(target_id);
             let inferred = symbol_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
             // `__slots__` is a symbol with special behavior in Python's runtime. It can be
@@ -639,10 +639,14 @@ fn symbol_by_id<'db>(
             // `TYPE_CHECKING` is a special variable that should only be assigned `False`
             // at runtime, but is always considered `True` in type checking.
             // See mdtest/known_constants.md#user-defined-type_checking for details.
-            let is_considered_non_modifiable = matches!(
-                symbol_table(db, scope).symbol(symbol_id).name().as_str(),
-                "__slots__" | "TYPE_CHECKING"
-            );
+            let is_considered_non_modifiable = target_table(db, scope).target(target_id).is_name()
+                && matches!(
+                    target_table(db, scope)
+                        .target(target_id)
+                        .expect_name()
+                        .as_str(),
+                    "__slots__" | "TYPE_CHECKING"
+                );
 
             if scope.file(db).is_stub(db.upcast()) {
                 // We generally trust module-level undeclared symbols in stubs and do not union
@@ -704,8 +708,8 @@ fn symbol_impl<'db>(
         }
     }
 
-    symbol_table(db, scope)
-        .symbol_id_by_name(name)
+    target_table(db, scope)
+        .target_id_by_name(name)
         .map(|symbol| symbol_by_id(db, scope, symbol, requires_explicit_reexport))
         .unwrap_or_default()
 }
@@ -815,7 +819,7 @@ fn symbol_from_bindings_impl<'db>(
             }
 
             let binding_ty = binding_type(db, binding);
-            Some(narrowing_constraint.narrow(db, binding_ty, binding.symbol(db)))
+            Some(narrowing_constraint.narrow(db, binding_ty, binding.target(db)))
         },
     );
 
@@ -950,8 +954,8 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
     let Some(all_names) = dunder_all_names(db, definition.file(db)) else {
         return false;
     };
-    let table = symbol_table(db, definition.scope(db));
-    let symbol_name = table.symbol(definition.symbol(db)).name();
+    let table = target_table(db, definition.scope(db));
+    let symbol_name = table.target(definition.target(db)).expect_name();
     all_names.contains(symbol_name)
 }
 
@@ -959,7 +963,8 @@ mod implicit_globals {
     use ruff_python_ast as ast;
 
     use crate::db::Db;
-    use crate::semantic_index::{self, symbol_table, use_def_map};
+    use crate::semantic_index::target::Target;
+    use crate::semantic_index::{self, target_table, use_def_map};
     use crate::symbol::SymbolAndQualifiers;
     use crate::types::{KnownClass, Type};
 
@@ -967,11 +972,11 @@ mod implicit_globals {
 
     pub(crate) fn module_type_implicit_global_declaration<'db>(
         db: &'db dyn Db,
-        name: &str,
+        target: &Target,
     ) -> SymbolFromDeclarationsResult<'db> {
         if !module_type_symbols(db)
             .iter()
-            .any(|module_type_member| &**module_type_member == name)
+            .any(|module_type_member| Some(module_type_member) == target.as_name())
         {
             return Ok(Symbol::Unbound.into());
         }
@@ -980,8 +985,8 @@ mod implicit_globals {
             return Ok(Symbol::Unbound.into());
         };
         let module_type_scope = module_type_class.body_scope(db);
-        let symbol_table = symbol_table(db, module_type_scope);
-        let Some(symbol_id) = symbol_table.symbol_id_by_name(name) else {
+        let symbol_table = target_table(db, module_type_scope);
+        let Some(symbol_id) = symbol_table.target_id_by_target(target) else {
             return Ok(Symbol::Unbound.into());
         };
         symbol_from_declarations(
@@ -1058,12 +1063,12 @@ mod implicit_globals {
         };
 
         let module_type_scope = module_type.body_scope(db);
-        let module_type_symbol_table = symbol_table(db, module_type_scope);
+        let module_type_symbol_table = target_table(db, module_type_scope);
 
         module_type_symbol_table
-            .symbols()
-            .filter(|symbol| symbol.is_declared())
-            .map(semantic_index::symbol::Symbol::name)
+            .targets()
+            .filter(|symbol| symbol.is_declared() && symbol.is_name())
+            .map(semantic_index::target::Target::expect_name)
             .filter(|symbol_name| {
                 !matches!(&***symbol_name, "__dict__" | "__getattr__" | "__init__")
             })

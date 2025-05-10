@@ -7,7 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
-use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
+use crate::semantic_index::target::{FileScopeId, ScopeId, ScopedTargetId};
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::Db;
 
@@ -28,8 +28,8 @@ pub struct Definition<'db> {
     /// The scope in which the definition occurs.
     pub(crate) file_scope: FileScopeId,
 
-    /// The symbol defined.
-    pub(crate) symbol: ScopedSymbolId,
+    /// The target defined.
+    pub(crate) target: ScopedTargetId,
 
     /// WARNING: Only access this field when doing type inference for the same
     /// file as where `Definition` is defined to avoid cross-file query dependencies.
@@ -232,7 +232,7 @@ pub(crate) struct ImportDefinitionNodeRef<'a> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct StarImportDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::StmtImportFrom,
-    pub(crate) symbol_id: ScopedSymbolId,
+    pub(crate) target_id: ScopedTargetId,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -323,10 +323,10 @@ impl<'db> DefinitionNodeRef<'db> {
                 is_reexported,
             }),
             DefinitionNodeRef::ImportStar(star_import) => {
-                let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
+                let StarImportDefinitionNodeRef { node, target_id } = star_import;
                 DefinitionKind::StarImport(StarImportDefinitionKind {
                     node: AstNodeRef::new(parsed, node),
-                    symbol_id,
+                    target_id,
                 })
             }
             DefinitionNodeRef::Function(function) => {
@@ -450,7 +450,7 @@ impl<'db> DefinitionNodeRef<'db> {
 
             // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
             // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
-            Self::ImportStar(StarImportDefinitionNodeRef { node, symbol_id: _ }) => node
+            Self::ImportStar(StarImportDefinitionNodeRef { node, target_id: _ }) => node
                 .names
                 .iter()
                 .find(|alias| &alias.name == "*")
@@ -709,7 +709,7 @@ impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
 #[derive(Clone, Debug)]
 pub struct StarImportDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
-    symbol_id: ScopedSymbolId,
+    target_id: ScopedTargetId,
 }
 
 impl StarImportDefinitionKind {
@@ -731,8 +731,8 @@ impl StarImportDefinitionKind {
             )
     }
 
-    pub(crate) fn symbol_id(&self) -> ScopedSymbolId {
-        self.symbol_id
+    pub(crate) fn target_id(&self) -> ScopedTargetId {
+        self.target_id
     }
 }
 

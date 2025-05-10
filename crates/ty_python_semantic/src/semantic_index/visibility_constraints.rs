@@ -183,7 +183,7 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
 };
-use crate::semantic_index::symbol_table;
+use crate::semantic_index::target_table;
 use crate::symbol::{imported_symbol, RequiresExplicitReExport};
 use crate::types::{infer_expression_type, Truthiness, Type};
 use crate::Db;
@@ -654,8 +654,8 @@ impl VisibilityConstraints {
             }
             PredicateNode::Pattern(inner) => Self::analyze_single_pattern_predicate(db, inner),
             PredicateNode::StarImportPlaceholder(star_import) => {
-                let symbol_table = symbol_table(db, star_import.scope(db));
-                let symbol_name = symbol_table.symbol(star_import.symbol_id(db)).name();
+                let target_table = target_table(db, star_import.scope(db));
+                let symbol_name = target_table.target(star_import.symbol_id(db)).expect_name();
                 let referenced_file = star_import.referenced_file(db);
 
                 let requires_explicit_reexport = match dunder_all_names(db, referenced_file) {

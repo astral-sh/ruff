@@ -55,8 +55,8 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::narrowing_constraints::ConstraintKey;
-use crate::semantic_index::symbol::{
-    FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind, ScopedSymbolId,
+use crate::semantic_index::target::{
+    FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind, ScopedTargetId,
 };
 use crate::semantic_index::{semantic_index, EagerSnapshotResult, SemanticIndex};
 use crate::symbol::{
@@ -1090,7 +1090,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 let function = ty.inner_type().into_function_literal()?;
                 if function.has_known_decorator(self.db(), FunctionDecorators::OVERLOAD) {
-                    Some(definition.symbol(self.db()))
+                    Some(definition.target(self.db()))
                 } else {
                     None
                 }
@@ -1428,19 +1428,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             .is_binding());
 
         let file_scope_id = binding.file_scope(self.db());
-        let symbol_table = self.index.symbol_table(file_scope_id);
+        let target_table = self.index.target_table(file_scope_id);
         let use_def = self.index.use_def_map(file_scope_id);
         let mut bound_ty = ty;
-        let symbol_id = binding.symbol(self.db());
 
         let global_use_def_map = self.index.use_def_map(FileScopeId::global());
-        let symbol_name = symbol_table.symbol(symbol_id).name();
-        let skip_non_global_scopes = self.skip_non_global_scopes(file_scope_id, symbol_id);
+        let target_id = binding.target(self.db());
+        let target = target_table.target(target_id);
+        let skip_non_global_scopes = self.skip_non_global_scopes(file_scope_id, target_id);
         let declarations = if skip_non_global_scopes {
+            let target = target_table.target(target_id);
             match self
                 .index
-                .symbol_table(FileScopeId::global())
-                .symbol_id_by_name(symbol_name)
+                .target_table(FileScopeId::global())
+                .target_id_by_target(target)
             {
                 Some(id) => global_use_def_map.public_declarations(id),
                 // This case is a syntax error (load before global declaration) but ignore that here
@@ -1458,7 +1459,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     || self.scope().file_scope_id(self.db()).is_global()
                 {
                     let module_type_declarations =
-                        module_type_implicit_global_declaration(self.db(), symbol_name)?;
+                        module_type_implicit_global_declaration(self.db(), target)?;
                     symbol.or_fall_back_to(self.db(), || module_type_declarations)
                 } else {
                     symbol
@@ -1470,11 +1471,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             })
             .unwrap_or_else(|(ty, conflicting)| {
                 // TODO point out the conflicting declarations in the diagnostic?
-                let symbol_table = self.index.symbol_table(binding.file_scope(self.db()));
-                let symbol_name = symbol_table.symbol(binding.symbol(self.db())).name();
+                let target_table = self.index.target_table(binding.file_scope(self.db()));
+                let target = target_table.target(binding.target(self.db()));
                 if let Some(builder) = self.context.report_lint(&CONFLICTING_DECLARATIONS, node) {
                     builder.into_diagnostic(format_args!(
-                        "Conflicting declared types for `{symbol_name}`: {}",
+                        "Conflicting declared types for `{target}`: {}",
                         conflicting.display(self.db())
                     ));
                 }
@@ -1489,17 +1490,17 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types.bindings.insert(binding, bound_ty);
     }
 
-    /// Returns `true` if `symbol_id` should be looked up in the global scope, skipping intervening
+    /// Returns `true` if `target_id` should be looked up in the global scope, skipping intervening
     /// local scopes.
     fn skip_non_global_scopes(
         &self,
         file_scope_id: FileScopeId,
-        symbol_id: ScopedSymbolId,
+        target_id: ScopedTargetId,
     ) -> bool {
         !file_scope_id.is_global()
             && self
                 .index
-                .symbol_is_global_in_scope(symbol_id, file_scope_id)
+                .symbol_is_global_in_scope(target_id, file_scope_id)
     }
 
     fn add_declaration(
@@ -1520,13 +1521,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             .or_fall_back_to(self.db(), || {
                 // Fallback to bindings declared on `types.ModuleType` if it's a global symbol
                 let scope = self.scope().file_scope_id(self.db());
-                if scope.is_global() {
+                let target_table = self.index.target_table(scope);
+                let target = target_table.target(declaration.target(self.db()));
+                if scope.is_global() && target.is_name() {
                     module_type_implicit_global_symbol(
                         self.db(),
-                        self.index
-                            .symbol_table(scope)
-                            .symbol(declaration.symbol(self.db()))
-                            .name(),
+                        target.expect_name(),
                     )
                 } else {
                     Symbol::Unbound.into()
@@ -1573,8 +1573,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             } => {
                 let file_scope_id = self.scope().file_scope_id(self.db());
                 if file_scope_id.is_global() {
-                    let symbol_table = self.index.symbol_table(file_scope_id);
-                    let symbol_name = symbol_table.symbol(definition.symbol(self.db())).name();
+                    let target_table = self.index.target_table(file_scope_id);
+                    let symbol_name = target_table.target(definition.target(self.db()));
                     if let Some(module_type_implicit_declaration) =
                         module_type_implicit_global_declaration(self.db(), symbol_name)
                             .ok()
@@ -4013,12 +4013,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             .map(|star_import| {
                 let symbol_table = self
                     .index
-                    .symbol_table(self.scope().file_scope_id(self.db()));
+                    .target_table(self.scope().file_scope_id(self.db()));
                 (star_import, symbol_table)
             });
 
         let name = if let Some((star_import, symbol_table)) = star_import_info.as_ref() {
-            symbol_table.symbol(star_import.symbol_id()).name()
+            symbol_table.target(star_import.target_id()).expect_name()
         } else {
             &alias.name.id
         };
@@ -5415,7 +5415,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let db = self.db();
         let scope = self.scope();
         let file_scope_id = scope.file_scope_id(db);
-        let symbol_table = self.index.symbol_table(file_scope_id);
+        let symbol_table = self.index.target_table(file_scope_id);
         let use_def = self.index.use_def_map(file_scope_id);
 
         let mut constraint_keys = vec![];
@@ -5424,8 +5424,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             for (enclosing_scope_file_id, constraint_key) in constraint_keys {
                 let use_def = self.index.use_def_map(*enclosing_scope_file_id);
                 let constraints = use_def.narrowing_constraints_at_use(*constraint_key);
-                let symbol_table = self.index.symbol_table(*enclosing_scope_file_id);
-                let symbol = symbol_table.symbol_id_by_name(symbol_name).unwrap();
+                let symbol_table = self.index.target_table(*enclosing_scope_file_id);
+                let symbol = symbol_table.target_id_by_name(symbol_name).unwrap();
 
                 ty = constraints.narrow(db, ty, symbol);
             }
@@ -5434,8 +5434,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // If we're inferring types of deferred expressions, always treat them as public symbols
         let (local_scope_symbol, use_id) = if self.is_deferred() {
-            let symbol = if let Some(symbol_id) = symbol_table.symbol_id_by_name(symbol_name) {
-                symbol_from_bindings(db, use_def.public_bindings(symbol_id))
+            let symbol = if let Some(target_id) = symbol_table.target_id_by_name(symbol_name) {
+                symbol_from_bindings(db, use_def.public_bindings(target_id))
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -5451,7 +5451,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         let symbol = SymbolAndQualifiers::from(local_scope_symbol).or_fall_back_to(db, || {
-            let has_bindings_in_this_scope = match symbol_table.symbol_by_name(symbol_name) {
+            let has_bindings_in_this_scope = match symbol_table.target_by_name(symbol_name) {
                 Some(symbol) => symbol.is_bound(),
                 None => {
                     assert!(
@@ -5465,8 +5465,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             let current_file = self.file();
 
             let skip_non_global_scopes = symbol_table
-                .symbol_id_by_name(symbol_name)
-                .is_some_and(|symbol_id| self.skip_non_global_scopes(file_scope_id, symbol_id));
+                .target_id_by_name(symbol_name)
+                .is_some_and(|target_id| self.skip_non_global_scopes(file_scope_id, target_id));
 
             if skip_non_global_scopes {
                 return global_symbol(self.db(), self.file(), symbol_name);
@@ -5550,8 +5550,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     continue;
                 }
 
-                let enclosing_symbol_table = self.index.symbol_table(enclosing_scope_file_id);
-                let Some(enclosing_symbol) = enclosing_symbol_table.symbol_by_name(symbol_name)
+                let enclosing_symbol_table = self.index.target_table(enclosing_scope_file_id);
+                let Some(enclosing_symbol) = enclosing_symbol_table.target_by_name(symbol_name)
                 else {
                     continue;
                 };
@@ -9029,8 +9029,8 @@ fn contains_string_literal(expr: &ast::Expr) -> bool {
 mod tests {
     use crate::db::tests::{setup_db, TestDb};
     use crate::semantic_index::definition::Definition;
-    use crate::semantic_index::symbol::FileScopeId;
-    use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
+    use crate::semantic_index::target::FileScopeId;
+    use crate::semantic_index::{global_scope, semantic_index, target_table, use_def_map};
     use crate::symbol::global_symbol;
     use crate::types::check_types;
     use ruff_db::diagnostic::Diagnostic;
@@ -9306,7 +9306,7 @@ mod tests {
     fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
         let scope = global_scope(db, file);
         use_def_map(db, scope)
-            .public_bindings(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
+            .public_bindings(target_table(db, scope).target_id_by_name(name).unwrap())
             .find_map(|b| b.binding)
             .expect("no binding found")
     }

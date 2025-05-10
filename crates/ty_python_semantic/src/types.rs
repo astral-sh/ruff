@@ -35,7 +35,7 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId};
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::symbol::ScopeId;
+use crate::semantic_index::target::ScopeId;
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{
