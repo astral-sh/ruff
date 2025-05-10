@@ -46,12 +46,7 @@ impl Violation for Airflow3MovedToProvider {
             ProviderReplacement::None => {
                 format!("`{deprecated}` is removed in Airflow 3.0")
             }
-            ProviderReplacement::ProviderName {
-                name: _,
-                provider,
-                version: _,
-            }
-            | ProviderReplacement::AutoImport {
+            ProviderReplacement::AutoImport {
                 name: _,
                 module: _,
                 provider,
@@ -72,15 +67,6 @@ impl Violation for Airflow3MovedToProvider {
         let Airflow3MovedToProvider { replacement, .. } = self;
         match replacement {
             ProviderReplacement::None => {None}
-            ProviderReplacement::ProviderName {
-                name,
-                provider,
-                version,
-            } => {
-                Some(format!(
-                    "Install `apache-airflow-providers-{provider}>={version}` and use `{name}` instead."
-                ))
-            },
             ProviderReplacement::AutoImport {
                 name,
                 module,
@@ -122,7 +108,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
     };
 
     let replacement = match qualified_name.segments() {
-        // ProviderName: for cases that only one name has been moved
         // apache-airflow-providers-amazon
         ["airflow", "hooks", "S3_hook", rest @ ("S3Hook" | "provide_bucket_name")] => {
             ProviderReplacement::SourceModuleMovedToProvider {
@@ -238,8 +223,9 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         }
         ["airflow", "operators", "druid_check_operator", "DruidCheckOperator"]
         | ["airflow", "operators", "presto_check_operator", "PrestoCheckOperator"] => {
-            ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLCheckOperator",
+            ProviderReplacement::AutoImport {
+                module: "airflow.providers.common.sql.operators.sql",
+                name: "SQLCheckOperator",
                 provider: "common-sql",
                 version: "1.1.0",
             }
@@ -255,8 +241,9 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             }
         }
         ["airflow", "operators", "presto_check_operator", "PrestoIntervalCheckOperator"] => {
-            ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator",
+            ProviderReplacement::AutoImport {
+                module: "airflow.providers.common.sql.operators.sql",
+                name: "SQLIntervalCheckOperator",
                 provider: "common-sql",
                 version: "1.1.0",
             }
@@ -281,8 +268,9 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             }
         }
         ["airflow", "operators", "presto_check_operator", "PrestoValueCheckOperator"] => {
-            ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLValueCheckOperator",
+            ProviderReplacement::AutoImport {
+                module: "airflow.providers.common.sql.operators.sql",
+                name: "SQLValueCheckOperator",
                 provider: "common-sql",
                 version: "1.1.0",
             }
@@ -320,8 +308,9 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         | ["airflow", "operators", "oracle_operator", "OracleOperator"]
         | ["airflow", "operators", "postgres_operator", "PostgresOperator"]
         | ["airflow", "operators", "sqlite_operator", "SqliteOperator"] => {
-            ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLExecuteQueryOperator",
+            ProviderReplacement::AutoImport {
+                module: "airflow.providers.common.sql.operators.sql",
+                name: "SQLExecuteQueryOperator",
                 provider: "common-sql",
                 version: "1.3.0",
             }
@@ -876,6 +865,14 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         },
 
         // apache-airflow-providers-standard
+        ["airflow", "hooks", "subprocess", rest @ ("SubprocessResult" | "working_directory")] => {
+            ProviderReplacement::SourceModuleMovedToProvider {
+                name: (*rest).to_string(),
+                module: "airflow.providers.standard.hooks.subprocess",
+                provider: "standard",
+                version: "0.0.3",
+            }
+        }
         ["airflow", "operators", "bash_operator", "BashOperator"] => {
             ProviderReplacement::AutoImport {
                 module: "airflow.providers.standard.operators.bash",
@@ -890,6 +887,22 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
                 module: "airflow.providers.standard.operators.trigger_dagrun",
                 provider: "standard",
                 version: "0.0.2",
+            }
+        }
+        ["airflow", "operators", "trigger_dagrun", "TriggerDagRunLink"] => {
+            ProviderReplacement::AutoImport {
+                module: "airflow.providers.standard.operators.trigger_dagrun",
+                name: "TriggerDagRunLink",
+                provider: "standard",
+                version: "0.0.2",
+            }
+        }
+        ["airflow", "operators", "datetime", "target_times_as_dates"] => {
+            ProviderReplacement::AutoImport {
+                module: "airflow.providers.standard.operators.datetime",
+                name: "target_times_as_dates",
+                provider: "standard",
+                version: "0.0.1",
             }
         }
         ["airflow", "operators", "dummy" | "dummy_operator", "EmptyOperator" | "DummyOperator"] => {
@@ -917,14 +930,28 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1",
         },
-        ["airflow", "sensors", "external_task_sensor", rest @ ("ExternalTaskMarker" | "ExternalTaskSensor" | "ExternalTaskSensorLink")] => {
-            ProviderReplacement::SourceModuleMovedToProvider {
-                name: (*rest).to_string(),
+        ["airflow", "sensors", "external_task", "ExternalTaskSensorLink"] => {
+            ProviderReplacement::AutoImport {
                 module: "airflow.providers.standard.sensors.external_task",
+                name: "ExternalDagLink",
                 provider: "standard",
                 version: "0.0.3",
             }
         }
+        ["airflow", "sensors", "external_task_sensor", rest @ ("ExternalTaskMarker" | "ExternalTaskSensor" | "ExternalTaskSensorLink")] => {
+            ProviderReplacement::SourceModuleMovedToProvider {
+                module: "airflow.providers.standard.sensors.external_task",
+                name: (*rest).to_string(),
+                provider: "standard",
+                version: "0.0.3",
+            }
+        }
+        ["airflow", "sensors", "time_delta", "WaitSensor"] => ProviderReplacement::AutoImport {
+            module: "airflow.providers.standard.sensors.time_delta",
+            name: "WaitSensor",
+            provider: "standard",
+            version: "0.0.1",
+        },
 
         _ => return,
     };

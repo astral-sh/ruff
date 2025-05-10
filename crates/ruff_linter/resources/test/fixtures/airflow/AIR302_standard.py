@@ -47,3 +47,16 @@ from airflow.operators.dummy_operator import (
 
 DummyOperator()
 EmptyOperator()
+
+from airflow.hooks.subprocess import SubprocessResult
+SubprocessResult()
+from airflow.hooks.subprocess import working_directory
+working_directory()
+from airflow.operators.datetime import target_times_as_dates
+target_times_as_dates()
+from airflow.operators.trigger_dagrun import TriggerDagRunLink
+TriggerDagRunLink()
+from airflow.sensors.external_task import ExternalTaskSensorLink
+ExternalTaskSensorLink()
+from airflow.sensors.time_delta import WaitSensor
+WaitSensor()
