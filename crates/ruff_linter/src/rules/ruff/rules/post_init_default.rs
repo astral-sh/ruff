@@ -63,8 +63,9 @@ use super::helpers::{dataclass_kind, DataclassKind};
 ///
 /// ## Fix safety
 ///
-/// This fix is always marked as unsafe because it assumes that the user always
-/// wants `__post_init__` args to be `InitVar`s.
+/// This fix is always marked as unsafe because, although switching to `InitVar` is usually correct,
+/// it is incorrect when the parameter is not intended to be part of the public API or when the value
+/// is meant to be shared across all instances.
 ///
 /// ## References
 /// - [Python documentation: Post-init processing](https://docs.python.org/3/library/dataclasses.html#post-init-processing)
