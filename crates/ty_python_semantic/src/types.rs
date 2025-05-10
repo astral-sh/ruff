@@ -1,4 +1,4 @@
-use infer::enclosing_class_symbol;
+use infer::enclosing_class_definition;
 use itertools::Either;
 
 use std::slice::Iter;
@@ -4798,7 +4798,7 @@ impl<'db> Type<'db> {
 
                 KnownInstanceType::TypingSelf => {
                     let index = semantic_index(db, scope_id.file(db));
-                    let Some(class_ty) = enclosing_class_symbol(db, index, scope_id) else {
+                    let Some(class_def) = enclosing_class_definition(db, index, scope_id) else {
                         return Err(InvalidTypeExpressionError {
                             fallback_type: Type::unknown(),
                             invalid_expressions: smallvec::smallvec![
@@ -4806,13 +4806,9 @@ impl<'db> Type<'db> {
                             ],
                         });
                     };
-                    let Some(TypeDefinition::Class(class_def)) = class_ty.definition(db) else {
-                        debug_assert!(
-                            false,
-                            "enclosing_class_symbol must return a type with class definition"
-                        );
-                        return Ok(Type::unknown());
-                    };
+                    let class_ty = infer_definition_types(db, class_def)
+                        .declaration_type(class_def)
+                        .inner_type();
                     let Some(instance) = class_ty.to_instance(db) else {
                         debug_assert!(
                             false,

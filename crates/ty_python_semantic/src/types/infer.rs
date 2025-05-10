@@ -317,29 +317,43 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     unpacker.finish()
 }
 
+/// Returns the definition of the nearest enclosing class for the given scope.
+///
+/// This function walks up the ancestor scopes starting from the given scope,
+/// and finds the closest class definition.
+///
+/// Returns `None` if no enclosing class is found.a
+pub(crate) fn enclosing_class_definition<'db>(
+    db: &'db dyn Db,
+    semantic: &SemanticIndex<'db>,
+    scope: ScopeId,
+) -> Option<Definition<'db>> {
+    semantic
+        .ancestor_scopes(scope.file_scope_id(db))
+        .find_map(|(_, ancestor_scope)| {
+            if let NodeWithScopeKind::Class(class) = ancestor_scope.node() {
+                let definition = semantic.expect_single_definition(class.node());
+                Some(definition)
+            } else {
+                None
+            }
+        })
+}
+
 /// Returns the type of the nearest enclosing class for the given scope.
 ///
 /// This function walks up the ancestor scopes starting from the given scope,
 /// and finds the closest class definition.
 ///
 /// Returns `None` if no enclosing class is found.a
-pub(crate) fn enclosing_class_symbol<'db>(
+pub(crate) fn enclosing_class_type<'db>(
     db: &'db dyn Db,
     semantic: &SemanticIndex<'db>,
     scope: ScopeId,
 ) -> Option<Type<'db>> {
-    semantic
-        .ancestor_scopes(scope.file_scope_id(db))
-        .find_map(|(_, ancestor_scope)| {
-            if let NodeWithScopeKind::Class(class) = ancestor_scope.node() {
-                let definition = semantic.expect_single_definition(class.node());
-                let result = infer_definition_types(db, definition);
-
-                Some(result.declaration_type(definition).inner_type())
-            } else {
-                None
-            }
-        })
+    let definition = enclosing_class_definition(db, semantic, scope)?;
+    let result = infer_definition_types(db, definition);
+    return Some(result.declaration_type(definition).inner_type());
 }
 
 /// A region within which we can infer types.
@@ -4975,7 +4989,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             [] => {
                                                 let scope = self.scope();
 
-                                                let Some(enclosing_class) = enclosing_class_symbol(
+                                                let Some(enclosing_class) = enclosing_class_type(
                                                     self.db(),
                                                     self.index,
                                                     scope,
