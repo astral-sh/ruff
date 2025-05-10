@@ -13,3 +13,19 @@ slow-timeout =  { period = "1s", terminate-after = 60 }
 
 # Show slow jobs in the final summary
 final-status-level = "slow"
+
+[profile.ci-short]
+# Print out output for failing tests as soon as they fail, and also at the end
+# of the run (for easy scrollability).
+failure-output = "immediate-final"
+# Do not cancel the test run on the first failure.
+fail-fast = false
+
+status-level = "pass"
+
+# Mark tests that take longer than 1s as slow.
+# Terminate after 60s as a stop-gap measure to terminate on deadlock.
+slow-timeout =  { period = "1s", terminate-after = 60 }
+
+# Show slow jobs in the final summary
+final-status-level = "slow"
