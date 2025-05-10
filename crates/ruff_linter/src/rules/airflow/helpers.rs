@@ -24,11 +24,6 @@ pub(crate) enum Replacement {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ProviderReplacement {
     None,
-    ProviderName {
-        name: &'static str,
-        provider: &'static str,
-        version: &'static str,
-    },
     AutoImport {
         module: &'static str,
         name: &'static str,
