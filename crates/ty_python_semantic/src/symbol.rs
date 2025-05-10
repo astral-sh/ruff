@@ -318,16 +318,26 @@ pub(crate) fn imported_symbol<'db>(
     // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
     // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
     // module we're dealing with.
-    symbol_impl(db, global_scope(db, file), name, requires_explicit_reexport).or_fall_back_to(
-        db,
-        || {
+    let result = symbol_impl(db, global_scope(db, file), name, requires_explicit_reexport)
+        .or_fall_back_to(db, || {
             if name == "__getattr__" {
                 Symbol::Unbound.into()
             } else {
                 KnownClass::ModuleType.to_instance(db).member(db, name)
             }
-        },
-    )
+        });
+
+    if result
+        .symbol
+        .ignore_possibly_unbound()
+        .is_some_and(|ty| ty.is_never())
+    {
+        // `Never` could be the result of a self-referential import (`from foo import bar` inside `foo`).
+        // Check if `bar` is a submodule:
+        return KnownClass::ModuleType.to_instance(db).member(db, name);
+    }
+
+    result
 }
 
 /// Lookup the type of `symbol` in the builtins namespace.
