@@ -7242,7 +7242,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if !value_ty.into_class_literal().is_some_and(|class| {
                         class
                             .iter_mro(self.db(), None)
-                            .any(|base| matches!(base, ClassBase::Generic(_)))
+                            .contains(&ClassBase::Generic)
                     }) {
                         report_non_subscriptable(
                             &self.context,
