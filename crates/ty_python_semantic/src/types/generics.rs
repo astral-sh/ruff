@@ -1,6 +1,7 @@
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
+use crate::semantic_index::definition::Definition;
 use crate::semantic_index::SemanticIndex;
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
@@ -18,6 +19,13 @@ pub struct GenericContext<'db> {
     #[returns(ref)]
     pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
     pub(crate) origin: GenericContextOrigin,
+
+    /// The class, function, or alias definition that this generic context belongs to. This is
+    /// optional so that we can infer a type for `typing.Generic[...]` independent of whether it
+    /// appears in a base class list or not. When processing the base class list for a legacy
+    /// generic class, we will use [`with_definition`](Self::with_definition) to attach the class's
+    /// definition to the generic context.
+    pub(crate) definition: Option<Definition<'db>>,
 }
 
 impl<'db> GenericContext<'db> {
@@ -26,12 +34,18 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         index: &'db SemanticIndex<'db>,
         type_params_node: &ast::TypeParams,
+        definition: Definition<'db>,
     ) -> Self {
         let variables: FxOrderSet<_> = type_params_node
             .iter()
             .filter_map(|type_param| Self::variable_from_type_param(db, index, type_param))
             .collect();
-        Self::new(db, variables, GenericContextOrigin::TypeParameterList)
+        Self::new(
+            db,
+            variables,
+            GenericContextOrigin::TypeParameterList,
+            Some(definition),
+        )
     }
 
     fn variable_from_type_param(
@@ -61,6 +75,7 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         parameters: &Parameters<'db>,
         return_type: Option<Type<'db>>,
+        definition: Definition<'db>,
     ) -> Option<Self> {
         let mut variables = FxOrderSet::default();
         for param in parameters {
@@ -81,6 +96,7 @@ impl<'db> GenericContext<'db> {
             db,
             variables,
             GenericContextOrigin::LegacyGenericFunction,
+            Some(definition),
         ))
     }
 
@@ -89,6 +105,7 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn from_base_classes(
         db: &'db dyn Db,
         bases: impl Iterator<Item = Type<'db>>,
+        definition: Definition<'db>,
     ) -> Option<Self> {
         let mut variables = FxOrderSet::default();
         for base in bases {
@@ -97,7 +114,16 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::new(db, variables, GenericContextOrigin::Inherited))
+        Some(Self::new(
+            db,
+            variables,
+            GenericContextOrigin::Inherited,
+            Some(definition),
+        ))
+    }
+
+    pub(crate) fn with_definition(self, db: &'db dyn Db, definition: Definition<'db>) -> Self {
+        Self::new(db, self.variables(db), self.origin(db), Some(definition))
     }
 
     pub(crate) fn len(self, db: &'db dyn Db) -> usize {

@@ -277,7 +277,7 @@ impl<'db> Signature<'db> {
             }
         });
         let legacy_generic_context =
-            GenericContext::from_function_params(db, &parameters, return_ty);
+            GenericContext::from_function_params(db, &parameters, return_ty, definition);
 
         if generic_context.is_some() && legacy_generic_context.is_some() {
             // TODO: Raise a diagnostic!

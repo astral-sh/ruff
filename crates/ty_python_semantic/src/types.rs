@@ -6809,7 +6809,7 @@ impl<'db> FunctionType<'db> {
         let definition = self.definition(db);
         let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
-            GenericContext::from_type_params(db, index, type_params)
+            GenericContext::from_type_params(db, index, type_params, definition)
         });
         let mut signature = Signature::from_function(
             db,
