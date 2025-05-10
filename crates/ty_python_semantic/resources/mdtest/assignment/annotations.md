@@ -56,13 +56,13 @@ reveal_type(a)  # revealed: tuple[()]
 reveal_type(b)  # revealed: tuple[int]
 reveal_type(c)  # revealed: tuple[str, int]
 reveal_type(d)  # revealed: tuple[tuple[str, str], tuple[int, int]]
+reveal_type(e)  # revealed: tuple[str, ...]
 
-# TODO: homogeneous tuples, PEP-646 tuples, generics
-reveal_type(e)  # revealed: @Todo(full tuple[...] support)
+# TODO: PEP-646 tuples
 reveal_type(f)  # revealed: @Todo(full tuple[...] support)
 reveal_type(g)  # revealed: @Todo(full tuple[...] support)
-reveal_type(h)  # revealed: tuple[list[int], list[int]]
 
+reveal_type(h)  # revealed: tuple[list[int], list[int]]
 reveal_type(i)  # revealed: tuple[str | int, str | int]
 reveal_type(j)  # revealed: tuple[str | int]
 ```

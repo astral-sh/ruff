@@ -17,6 +17,9 @@ def _(x: tuple[int, str], y: tuple[None, tuple[int]]):
 
 ```py
 def _(x: tuple[int, ...], y: tuple[str, ...]):
-    reveal_type(x + y)  # revealed: @Todo(full tuple[...] support)
-    reveal_type(x + (1, 2))  # revealed: @Todo(full tuple[...] support)
+    # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `tuple[int, ...]` and `tuple[str, ...]`"
+    reveal_type(x + y)  # revealed: Unknown
+
+    # TODO: should be `tuple[int, ...]`
+    reveal_type(x + (1, 2))  # revealed: tuple[_T_co, ...]
 ```

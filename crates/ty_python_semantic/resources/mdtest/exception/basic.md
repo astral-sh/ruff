@@ -45,6 +45,8 @@ def foo(
     x: type[AttributeError],
     y: tuple[type[OSError], type[RuntimeError]],
     z: tuple[type[BaseException], ...],
+    zz: tuple[type[TypeError | RuntimeError], ...],
+    zzz: type[BaseException] | tuple[type[BaseException], ...],
 ):
     try:
         help()
@@ -53,8 +55,11 @@ def foo(
     except y as f:
         reveal_type(f)  # revealed: OSError | RuntimeError
     except z as g:
-        # TODO: should be `BaseException`
-        reveal_type(g)  # revealed: @Todo(full tuple[...] support)
+        reveal_type(g)  # revealed: BaseException
+    except zz as h:
+        reveal_type(h)  # revealed: TypeError | RuntimeError
+    except zzz as i:
+        reveal_type(i)  # revealed: BaseException
 ```
 
 ## Invalid exception handlers
@@ -86,9 +91,9 @@ def foo(
     # error: [invalid-exception-caught]
     except y as f:
         reveal_type(f)  # revealed: OSError | RuntimeError | Unknown
+    # error: [invalid-exception-caught]
     except z as g:
-        # TODO: should emit a diagnostic here:
-        reveal_type(g)  # revealed: @Todo(full tuple[...] support)
+        reveal_type(g)  # revealed: Unknown
 ```
 
 ## Object raised is not an exception
