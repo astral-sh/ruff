@@ -652,6 +652,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::InvalidStarExpression
             | SemanticSyntaxErrorKind::AsyncComprehensionInSyncComprehension(_)
             | SemanticSyntaxErrorKind::DuplicateParameter(_)
+            | SemanticSyntaxErrorKind::DuplicateKeywordArgs(_)
             | SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel => {
                 if is_semantic_errors_enabled(self.settings) {
                     self.semantic_errors.borrow_mut().push(error);
