@@ -1,0 +1,111 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/t_string_empty_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..14,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..5,
+                    value: TString(
+                        ExprTString {
+                            range: 0..5,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 0..5,
+                                            elements: [
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 2..4,
+                                                        interpolation: Name(
+                                                            ExprName {
+                                                                range: 3..3,
+                                                                id: Name(""),
+                                                                ctx: Invalid,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 6..13,
+                    value: TString(
+                        ExprTString {
+                            range: 6..13,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 6..13,
+                                            elements: [
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 8..12,
+                                                        interpolation: Name(
+                                                            ExprName {
+                                                                range: 9..9,
+                                                                id: Name(""),
+                                                                ctx: Invalid,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | t"{}"
+  |    ^ Syntax Error: Expected an expression
+2 | t"{  }"
+  |
+
+
+  |
+1 | t"{}"
+2 | t"{  }"
+  |      ^ Syntax Error: Expected an expression
+  |

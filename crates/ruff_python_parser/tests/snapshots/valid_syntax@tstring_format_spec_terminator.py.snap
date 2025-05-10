@@ -1,0 +1,138 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/tstring_format_spec_terminator.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..43,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..19,
+                    value: TString(
+                        ExprTString {
+                            range: 0..19,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 0..19,
+                                            elements: [
+                                                Literal(
+                                                    TStringLiteralElement {
+                                                        range: 2..8,
+                                                        value: "hello ",
+                                                    },
+                                                ),
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 8..12,
+                                                        interpolation: Name(
+                                                            ExprName {
+                                                                range: 9..10,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            TStringFormatSpec {
+                                                                range: 11..11,
+                                                                elements: [],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                                Literal(
+                                                    TStringLiteralElement {
+                                                        range: 12..18,
+                                                        value: " world",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 20..42,
+                    value: TString(
+                        ExprTString {
+                            range: 20..42,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 20..42,
+                                            elements: [
+                                                Literal(
+                                                    TStringLiteralElement {
+                                                        range: 22..28,
+                                                        value: "hello ",
+                                                    },
+                                                ),
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 28..35,
+                                                        interpolation: Name(
+                                                            ExprName {
+                                                                range: 29..30,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            TStringFormatSpec {
+                                                                range: 31..34,
+                                                                elements: [
+                                                                    Literal(
+                                                                        TStringLiteralElement {
+                                                                            range: 31..34,
+                                                                            value: ".3f",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                                Literal(
+                                                    TStringLiteralElement {
+                                                        range: 35..41,
+                                                        value: " world",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

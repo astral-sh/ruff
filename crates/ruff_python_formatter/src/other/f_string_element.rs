@@ -8,7 +8,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextSlice};
 
 use crate::comments::{dangling_open_parenthesis_comments, trailing_comments};
-use crate::context::{FStringState, NodeLevel, WithFStringState, WithNodeLevel};
+use crate::context::{FTStringState, NodeLevel, WithFTStringState, WithNodeLevel};
 use crate::expression::left_most;
 use crate::prelude::*;
 use crate::string::normalize_string;
@@ -214,8 +214,8 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
 
             let item = format_with(|f: &mut PyFormatter| {
                 // Update the context to be inside the f-string expression element.
-                let f = &mut WithFStringState::new(
-                    FStringState::InsideExpressionElement(self.context),
+                let f = &mut WithFTStringState::new(
+                    FTStringState::InsideExpressionElement(self.context),
                     f,
                 );
 
