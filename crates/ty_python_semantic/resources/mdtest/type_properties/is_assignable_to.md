@@ -552,6 +552,30 @@ c: Callable[[str], Any] = int
 c: Callable[[str], Any] = object
 ```
 
+### Generic class literal types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable
+
+class A[T]:
+    def __init__(self, x: T) -> None: ...
+
+a: Callable[[int], A[int]] = A[int]
+
+class B[T]:
+    def __new__(cls, *args: Any, **kwargs: Any) -> "B[T]":
+        return super().__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+b: Callable[[int], B[int]] = B[int]
+```
+
 ### Overloads
 
 `overloaded.pyi`:

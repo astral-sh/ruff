@@ -1262,12 +1262,18 @@ class C: ...
 # TODO: This assertion should be true once we understand `Self`
 # error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
 static_assert(is_subtype_of(TypeOf[C], Callable[[], C]))
+
+class D[T]:
+    def __init__(self, x: T) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[D[int]], Callable[[int], D[int]]))
+static_assert(not is_subtype_of(TypeOf[D[int]], Callable[[str], D[int]]))
 ```
 
 #### Classes with `__init__` and `__new__`
 
 ```py
-from typing import Callable, overload, Self
+from typing import Callable, overload, Self, Any
 from ty_extensions import TypeOf, static_assert, is_subtype_of
 
 class A:
@@ -1289,7 +1295,7 @@ static_assert(is_subtype_of(TypeOf[B], Callable[[int], int]))
 static_assert(not is_subtype_of(TypeOf[B], Callable[[str], B]))
 
 class C:
-    def __new__(cls, *args, **kwargs) -> "C":
+    def __new__(cls, *args: Any, **kwargs: Any) -> "C":
         return super().__new__(cls)
 
     def __init__(self, x: int) -> None: ...
@@ -1311,6 +1317,15 @@ class E:
 
 static_assert(is_subtype_of(TypeOf[E], Callable[[int], D]))
 static_assert(is_subtype_of(TypeOf[E], Callable[[], int]))
+
+class F[T]:
+    def __new__(cls, x: T) -> "F[T]":
+        return super().__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[F[int]], Callable[[int], F[int]]))
+static_assert(not is_subtype_of(TypeOf[F[int]], Callable[[str], F[int]]))
 ```
 
 #### Classes with `__call__`, `__new__` and `__init__`

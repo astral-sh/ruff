@@ -1307,8 +1307,14 @@ impl<'db> Type<'db> {
             }
 
             (Type::ClassLiteral(class_literal), Type::Callable(_)) => {
-                class_literal.into_callable(db).is_subtype_of(db, target)
+                ClassType::NonGeneric(class_literal)
+                    .into_callable(db)
+                    .is_subtype_of(db, target)
             }
+
+            (Type::GenericAlias(alias), Type::Callable(_)) => ClassType::Generic(alias)
+                .into_callable(db)
+                .is_subtype_of(db, target),
 
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
@@ -1569,8 +1575,14 @@ impl<'db> Type<'db> {
             }
 
             (Type::ClassLiteral(class_literal), Type::Callable(_)) => {
-                class_literal.into_callable(db).is_assignable_to(db, target)
+                ClassType::NonGeneric(class_literal)
+                    .into_callable(db)
+                    .is_assignable_to(db, target)
             }
+
+            (Type::GenericAlias(alias), Type::Callable(_)) => ClassType::Generic(alias)
+                .into_callable(db)
+                .is_assignable_to(db, target),
 
             (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
                 self_function_literal

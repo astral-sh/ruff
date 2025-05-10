@@ -447,6 +447,134 @@ impl<'db> ClassType<'db> {
             .own_instance_member(db, name)
             .map_type(|ty| ty.apply_optional_specialization(db, specialization))
     }
+
+    pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
+        let self_ty = Type::from(self);
+        let metaclass_dunder_call_function_symbol = self_ty
+            .member_lookup_with_policy(
+                db,
+                "__call__".into(),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .symbol;
+
+        if let Symbol::Type(Type::BoundMethod(metaclass_dunder_call_function), _) =
+            metaclass_dunder_call_function_symbol
+        {
+            // TODO: this intentionally diverges from step 1 in
+            // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
+            // by always respecting the signature of the metaclass `__call__`, rather than
+            // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
+            return metaclass_dunder_call_function.into_callable_type(db);
+        }
+
+        let dunder_new_function_symbol = self_ty
+            .member_lookup_with_policy(
+                db,
+                "__new__".into(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .symbol;
+
+        let dunder_new_function =
+            if let Symbol::Type(Type::FunctionLiteral(dunder_new_function), _) =
+                dunder_new_function_symbol
+            {
+                // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
+                // then we should ignore the `__init__` and just return the `__new__` method.
+                let new_return_ty = match dunder_new_function.signature(db) {
+                    FunctionSignature::Single(signature)
+                    | FunctionSignature::Overloaded(_, Some(signature)) => signature.return_ty,
+                    FunctionSignature::Overloaded(..) => None,
+                };
+
+                let dunder_new_bound_method =
+                    dunder_new_function.into_bound_method_type(db, self_ty);
+
+                if let Some(new_return_ty) = new_return_ty {
+                    if !new_return_ty.to_meta_type(db).is_subtype_of(db, self_ty) {
+                        return dunder_new_bound_method;
+                    }
+                }
+                Some(dunder_new_bound_method)
+            } else {
+                None
+            };
+
+        let dunder_init_function_symbol = self_ty
+            .member_lookup_with_policy(
+                db,
+                "__init__".into(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .symbol;
+
+        let correct_return_type = self_ty.to_instance(db).unwrap_or_else(Type::unknown);
+
+        // If the class defines an `__init__` method, then we synthesize a `__init__` method
+        // that has the same parameters as the `__init__` method after it is bound, and with the return type
+        // of the concrete value of `Self`.
+        let synthesized_dunder_init_callable =
+            if let Symbol::Type(Type::FunctionLiteral(dunder_init_function), _) =
+                dunder_init_function_symbol
+            {
+                let synthesized_signature = |signature: Signature<'db>| {
+                    Signature::new(signature.parameters().clone(), Some(correct_return_type))
+                        .bind_self()
+                };
+
+                let synthesized_dunder_init_signature = match dunder_init_function.signature(db) {
+                    FunctionSignature::Single(signature) => {
+                        CallableType::single(db, synthesized_signature(signature.clone()))
+                    }
+                    FunctionSignature::Overloaded(overloads, _) => CallableType::from_overloads(
+                        db,
+                        overloads
+                            .iter()
+                            .map(Clone::clone)
+                            .map(synthesized_signature),
+                    ),
+                };
+                Some(Type::Callable(synthesized_dunder_init_signature))
+            } else {
+                None
+            };
+
+        match (dunder_new_function, synthesized_dunder_init_callable) {
+            (Some(dunder_new_function), Some(synthesized_dunder_init_callable)) => {
+                UnionType::from_elements(
+                    db,
+                    vec![dunder_new_function, synthesized_dunder_init_callable],
+                )
+            }
+            (Some(dunder_constructor_function), None)
+            | (None, Some(dunder_constructor_function)) => dunder_constructor_function,
+            (None, None) => {
+                // If no `__new__` or `__init__` method is found, then we fall back to looking for
+                // an `object.__new__` method.
+                let new_function_symbol = self_ty
+                    .member_lookup_with_policy(
+                        db,
+                        "__new__".into(),
+                        MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                    )
+                    .symbol;
+
+                if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
+                    new_function.into_bound_method_type(db, self_ty)
+                } else {
+                    // Fallback if no `object.__new__` is found.
+                    Type::Callable(CallableType::single(
+                        db,
+                        Signature::new(Parameters::empty(), Some(correct_return_type)),
+                    ))
+                }
+            }
+        }
+    }
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
@@ -939,134 +1067,6 @@ impl<'db> ClassLiteral<'db> {
             candidate.metaclass.into(),
             metaclass_literal.dataclass_transformer_params(db),
         ))
-    }
-
-    pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
-        let self_ty = Type::from(self);
-        let metaclass_dunder_call_function_symbol = self_ty
-            .member_lookup_with_policy(
-                db,
-                "__call__".into(),
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-            )
-            .symbol;
-
-        if let Symbol::Type(Type::BoundMethod(metaclass_dunder_call_function), _) =
-            metaclass_dunder_call_function_symbol
-        {
-            // TODO: this intentionally diverges from step 1 in
-            // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
-            // by always respecting the signature of the metaclass `__call__`, rather than
-            // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
-            return metaclass_dunder_call_function.into_callable_type(db);
-        }
-
-        let dunder_new_function_symbol = self_ty
-            .member_lookup_with_policy(
-                db,
-                "__new__".into(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-            )
-            .symbol;
-
-        let dunder_new_function =
-            if let Symbol::Type(Type::FunctionLiteral(dunder_new_function), _) =
-                dunder_new_function_symbol
-            {
-                // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
-                // then we should ignore the `__init__` and just return the `__new__` method.
-                let new_return_ty = match dunder_new_function.signature(db) {
-                    FunctionSignature::Single(signature)
-                    | FunctionSignature::Overloaded(_, Some(signature)) => signature.return_ty,
-                    FunctionSignature::Overloaded(..) => None,
-                };
-
-                let dunder_new_bound_method =
-                    dunder_new_function.into_bound_method_type(db, self_ty);
-
-                if let Some(new_return_ty) = new_return_ty {
-                    if !new_return_ty.to_meta_type(db).is_subtype_of(db, self_ty) {
-                        return dunder_new_bound_method;
-                    }
-                }
-                Some(dunder_new_bound_method)
-            } else {
-                None
-            };
-
-        let dunder_init_function_symbol = self_ty
-            .member_lookup_with_policy(
-                db,
-                "__init__".into(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-            )
-            .symbol;
-
-        let correct_return_type = self_ty.to_instance(db).unwrap_or_else(Type::unknown);
-
-        // If the class defines an `__init__` method, then we synthesize a `__init__` method
-        // that has the same parameters as the `__init__` method after it is bound, and with the return type
-        // of the concrete value of `Self`.
-        let synthesized_dunder_init_callable =
-            if let Symbol::Type(Type::FunctionLiteral(dunder_init_function), _) =
-                dunder_init_function_symbol
-            {
-                let synthesized_signature = |signature: Signature<'db>| {
-                    Signature::new(signature.parameters().clone(), Some(correct_return_type))
-                        .bind_self()
-                };
-
-                let synthesized_dunder_init_signature = match dunder_init_function.signature(db) {
-                    FunctionSignature::Single(signature) => {
-                        CallableType::single(db, synthesized_signature(signature.clone()))
-                    }
-                    FunctionSignature::Overloaded(overloads, _) => CallableType::from_overloads(
-                        db,
-                        overloads
-                            .iter()
-                            .map(Clone::clone)
-                            .map(synthesized_signature),
-                    ),
-                };
-                Some(Type::Callable(synthesized_dunder_init_signature))
-            } else {
-                None
-            };
-
-        match (dunder_new_function, synthesized_dunder_init_callable) {
-            (Some(dunder_new_function), Some(synthesized_dunder_init_callable)) => {
-                UnionType::from_elements(
-                    db,
-                    vec![dunder_new_function, synthesized_dunder_init_callable],
-                )
-            }
-            (Some(dunder_constructor_function), None)
-            | (None, Some(dunder_constructor_function)) => dunder_constructor_function,
-            (None, None) => {
-                // If no `__new__` or `__init__` method is found, then we fall back to looking for
-                // an `object.__new__` method.
-                let new_function_symbol = self_ty
-                    .member_lookup_with_policy(
-                        db,
-                        "__new__".into(),
-                        MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-                    )
-                    .symbol;
-
-                if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
-                    new_function.into_bound_method_type(db, self_ty)
-                } else {
-                    // Fallback if no `object.__new__` is found.
-                    Type::Callable(CallableType::single(
-                        db,
-                        Signature::new(Parameters::empty(), Some(correct_return_type)),
-                    ))
-                }
-            }
-        }
     }
 
     /// Returns the class member of this class named `name`.
