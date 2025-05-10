@@ -1005,8 +1005,7 @@ impl<'db> ClassLiteral<'db> {
             )
             .symbol;
 
-        // TODO: should be the concrete value of `Self`
-        let correct_return_type = Type::instance(db, ClassType::NonGeneric(self));
+        let correct_return_type = self_ty.to_instance(db).unwrap_or_else(Type::unknown);
 
         // If the class defines an `__init__` method, then we synthesize a `__init__` method
         // that has the same parameters as the `__init__` method after it is bound, and with the return type

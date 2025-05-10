@@ -1267,11 +1267,11 @@ static_assert(is_subtype_of(TypeOf[C], Callable[[], C]))
 #### Classes with `__init__` and `__new__`
 
 ```py
-from typing import Callable, overload
+from typing import Callable, overload, Self
 from ty_extensions import TypeOf, static_assert, is_subtype_of
 
 class A:
-    def __new__(cls, a: int) -> "A":
+    def __new__(cls, a: int) -> Self:
         return super().__new__(cls)
 
     def __init__(self, a: int) -> None: ...
