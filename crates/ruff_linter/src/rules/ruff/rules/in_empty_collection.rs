@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -48,6 +49,14 @@ pub(crate) fn in_empty_collection(checker: &Checker, compare: &ast::ExprCompare)
     };
 
     let semantic = checker.semantic();
+
+    if is_empty(right, semantic) {
+        checker.report_diagnostic(Diagnostic::new(InEmptyCollection, compare.range()));
+    }
+}
+
+fn is_empty(expr: &Expr, semantic: &SemanticModel) -> bool {
+    let set_methods = ["set", "frozenset"];
     let collection_methods = [
         "list",
         "tuple",
@@ -59,7 +68,7 @@ pub(crate) fn in_empty_collection(checker: &Checker, compare: &ast::ExprCompare)
         "str",
     ];
 
-    let is_empty_collection = match right {
+    match expr {
         Expr::List(ast::ExprList { elts, .. }) => elts.is_empty(),
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.is_empty(),
         Expr::Set(ast::ExprSet { elts, .. }) => elts.is_empty(),
@@ -75,15 +84,19 @@ pub(crate) fn in_empty_collection(checker: &Checker, compare: &ast::ExprCompare)
             arguments,
             range: _,
         }) => {
-            arguments.is_empty()
-                && collection_methods
+            if arguments.is_empty() {
+                collection_methods
                     .iter()
                     .any(|s| semantic.match_builtin_expr(func, s))
+            } else if let Some(arg) = arguments.find_positional(0) {
+                set_methods
+                    .iter()
+                    .any(|s| semantic.match_builtin_expr(func, s))
+                    && is_empty(arg, semantic)
+            } else {
+                false
+            }
         }
         _ => false,
-    };
-
-    if is_empty_collection {
-        checker.report_diagnostic(Diagnostic::new(InEmptyCollection, compare.range()));
     }
 }
