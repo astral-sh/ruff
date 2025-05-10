@@ -1194,6 +1194,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::FromisoformatReplaceZ) {
                 refurb::rules::fromisoformat_replace_z(checker, call);
             }
+            if checker.enabled(Rule::ReimplementedChainFromIterable) {
+                refurb::rules::reimplemented_chain_from_iterable_call(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[
@@ -1616,6 +1619,15 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::ReimplementedStarmap) {
                 refurb::rules::reimplemented_starmap(checker, &comp.into());
             }
+            if checker.enabled(Rule::ReimplementedChainFromIterable) {
+                refurb::rules::reimplemented_chain_from_iterable_comprehension(
+                    checker,
+                    comp.into(),
+                    elt,
+                    generators,
+                    comp.into(),
+                );
+            }
         }
         Expr::SetComp(
             comp @ ast::ExprSetComp {
@@ -1645,6 +1657,15 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.enabled(Rule::ReimplementedStarmap) {
                 refurb::rules::reimplemented_starmap(checker, &comp.into());
+            }
+            if checker.enabled(Rule::ReimplementedChainFromIterable) {
+                refurb::rules::reimplemented_chain_from_iterable_comprehension(
+                    checker,
+                    comp.into(),
+                    elt,
+                    generators,
+                    comp.into(),
+                );
             }
         }
         Expr::DictComp(
@@ -1689,7 +1710,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
         Expr::Generator(
             generator @ ast::ExprGenerator {
                 generators,
-                elt: _,
+                elt,
                 range: _,
                 parenthesized: _,
             },
@@ -1710,6 +1731,15 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.enabled(Rule::ReimplementedStarmap) {
                 refurb::rules::reimplemented_starmap(checker, &generator.into());
+            }
+            if checker.enabled(Rule::ReimplementedChainFromIterable) {
+                refurb::rules::reimplemented_chain_from_iterable_comprehension(
+                    checker,
+                    generator.into(),
+                    elt,
+                    generators,
+                    generator.into(),
+                );
             }
         }
         Expr::BoolOp(bool_op) => {
