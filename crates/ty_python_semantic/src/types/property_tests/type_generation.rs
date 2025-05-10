@@ -1,8 +1,8 @@
 use crate::db::tests::TestDb;
 use crate::symbol::{builtins_symbol, known_module_symbol};
 use crate::types::{
-    BoundMethodType, CallableType, IntersectionBuilder, KnownClass, KnownInstanceType, Parameter,
-    Parameters, Signature, SubclassOfType, TupleType, Type, UnionType,
+    BoundMethodType, CallableType, IntersectionBuilder, KnownInstanceType, Parameter, Parameters,
+    Signature, SubclassOfType, TupleType, Type, UnionType,
 };
 use crate::{Db, KnownModule};
 use hashbrown::HashSet;
@@ -26,13 +26,16 @@ pub(crate) enum Ty {
     BytesLiteral(&'static str),
     // BuiltinInstance("str") corresponds to an instance of the builtin `str` class
     BuiltinInstance(&'static str),
+    // Instances of members of the `types` module
+    TypesModuleInstance(&'static str),
+    // Instances of members of the `typing_extensions` module
+    TypingExtensionsInstance(&'static str),
     /// Members of the `abc` stdlib module
     AbcInstance(&'static str),
     AbcClassLiteral(&'static str),
     TypingLiteral,
     // BuiltinClassLiteral("str") corresponds to the builtin `str` class object itself
     BuiltinClassLiteral(&'static str),
-    KnownClassInstance(KnownClass),
     Union(Vec<Ty>),
     Intersection {
         pos: Vec<Ty>,
@@ -119,6 +122,19 @@ fn create_bound_method<'db>(
 
 impl Ty {
     pub(crate) fn into_type(self, db: &TestDb) -> Type<'_> {
+        #[track_caller]
+        fn known_module_instance<'db>(
+            db: &'db TestDb,
+            module: KnownModule,
+            name: &str,
+        ) -> Type<'db> {
+            known_module_symbol(db, module, name)
+                .symbol
+                .expect_type()
+                .to_instance(db)
+                .unwrap()
+        }
+
         match self {
             Ty::Never => Type::Never,
             Ty::Unknown => Type::unknown(),
@@ -129,22 +145,17 @@ impl Ty {
             Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
             Ty::LiteralString => Type::LiteralString,
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
-            Ty::BuiltinInstance(s) => builtins_symbol(db, s)
-                .symbol
-                .expect_type()
-                .to_instance(db)
-                .unwrap(),
-            Ty::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
-                .symbol
-                .expect_type()
-                .to_instance(db)
-                .unwrap(),
+            Ty::BuiltinInstance(s) => known_module_instance(db, KnownModule::Builtins, s),
+            Ty::TypesModuleInstance(s) => known_module_instance(db, KnownModule::Types, s),
+            Ty::AbcInstance(s) => known_module_instance(db, KnownModule::Abc, s),
+            Ty::TypingExtensionsInstance(s) => {
+                known_module_instance(db, KnownModule::TypingExtensions, s)
+            }
             Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .symbol
                 .expect_type(),
             Ty::TypingLiteral => Type::KnownInstance(KnownInstanceType::Literal),
             Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).symbol.expect_type(),
-            Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
             Ty::Union(tys) => {
                 UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
             }
@@ -216,17 +227,15 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
         Ty::LiteralString,
         Ty::BytesLiteral(""),
         Ty::BytesLiteral("\x00"),
-        Ty::KnownClassInstance(KnownClass::Object),
-        Ty::KnownClassInstance(KnownClass::Str),
-        Ty::KnownClassInstance(KnownClass::Int),
-        Ty::KnownClassInstance(KnownClass::Bool),
-        Ty::KnownClassInstance(KnownClass::List),
-        Ty::KnownClassInstance(KnownClass::Tuple),
-        Ty::KnownClassInstance(KnownClass::FunctionType),
-        Ty::KnownClassInstance(KnownClass::SpecialForm),
-        Ty::KnownClassInstance(KnownClass::TypeVar),
-        Ty::KnownClassInstance(KnownClass::TypeAliasType),
-        Ty::KnownClassInstance(KnownClass::NoDefaultType),
+        Ty::BuiltinInstance("object"),
+        Ty::BuiltinInstance("str"),
+        Ty::BuiltinInstance("int"),
+        Ty::BuiltinInstance("bool"),
+        Ty::TypesModuleInstance("FunctionType"),
+        Ty::TypingExtensionsInstance("_SpecialForm"),
+        Ty::TypingExtensionsInstance("TypeVar"),
+        Ty::TypingExtensionsInstance("TypeAliasType"),
+        Ty::TypingExtensionsInstance("_NoDefaultType"),
         Ty::TypingLiteral,
         Ty::BuiltinClassLiteral("str"),
         Ty::BuiltinClassLiteral("int"),
