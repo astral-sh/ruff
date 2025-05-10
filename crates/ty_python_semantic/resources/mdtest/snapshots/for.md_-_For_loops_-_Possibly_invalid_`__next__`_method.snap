@@ -51,7 +51,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable: Object of type `Iterable1` may not be iterable
+error[not-iterable]: Object of type `Iterable1` may not be iterable
   --> src/mdtest_snippet.py:28:14
    |
 27 |     # error: [not-iterable]
@@ -61,17 +61,18 @@ error: lint:not-iterable: Object of type `Iterable1` may not be iterable
    |
 info: Its `__iter__` method returns an object of type `Iterator1`, which may have an invalid `__next__` method
 info: Expected signature for `__next__` is `def __next__(self): ...`)
+info: `not-iterable` is enabled by default
 
 ```
 
 ```
-info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:29:9
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:29:21
    |
 27 |     # error: [not-iterable]
 28 |     for x in Iterable1():
 29 |         reveal_type(x)  # revealed: int | str
-   |         ^^^^^^^^^^^^^^ `int | str`
+   |                     ^ `int | str`
 30 |
 31 |     # error: [not-iterable]
    |
@@ -79,7 +80,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:not-iterable: Object of type `Iterable2` may not be iterable
+error[not-iterable]: Object of type `Iterable2` may not be iterable
   --> src/mdtest_snippet.py:32:14
    |
 31 |     # error: [not-iterable]
@@ -89,17 +90,18 @@ error: lint:not-iterable: Object of type `Iterable2` may not be iterable
 34 |         reveal_type(y)  # revealed: int | Unknown
    |
 info: Its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that may not be callable
+info: `not-iterable` is enabled by default
 
 ```
 
 ```
-info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:34:9
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:34:21
    |
 32 |     for y in Iterable2():
 33 |         # TODO: `int` would probably be better here:
 34 |         reveal_type(y)  # revealed: int | Unknown
-   |         ^^^^^^^^^^^^^^ `int | Unknown`
+   |                     ^ `int | Unknown`
    |
 
 ```

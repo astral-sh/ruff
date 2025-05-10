@@ -44,7 +44,7 @@ mod tests {
             Path::new("perflint").join(path).as_path(),
             &LinterSettings {
                 preview: PreviewMode::Enabled,
-                unresolved_target_version: PythonVersion::PY310,
+                unresolved_target_version: PythonVersion::PY310.into(),
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;

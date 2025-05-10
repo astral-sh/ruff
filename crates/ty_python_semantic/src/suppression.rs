@@ -33,7 +33,7 @@ declare_lint! {
     pub(crate) static UNUSED_IGNORE_COMMENT = {
         summary: "detects unused `type: ignore` comments",
         status: LintStatus::preview("1.0.0"),
-        default_level: Level::Warn,
+        default_level: Level::Ignore,
     }
 }
 
@@ -86,7 +86,7 @@ declare_lint! {
     }
 }
 
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(returns(ref))]
 pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     let parsed = parsed_module(db.upcast(), file);
     let source = source_text(db.upcast(), file);

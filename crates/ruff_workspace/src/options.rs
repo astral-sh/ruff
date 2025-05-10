@@ -6,7 +6,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
 
-use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 use ruff_formatter::IndentStyle;
 use ruff_graph::Direction;
@@ -32,6 +31,7 @@ use ruff_linter::settings::types::{
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
+use ruff_options_metadata::{OptionsMetadata, Visit};
 use ruff_python_ast::name::Name;
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 use ruff_python_semantic::NameImports;

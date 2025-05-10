@@ -4,7 +4,7 @@ use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion}
 use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
 use colored::Colorize;
-use ruff_db::diagnostic::{Diagnostic, DiagnosticAsStrError, DiagnosticId};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::File;
 use ruff_db::source::{line_index, source_text, SourceText};
 use ruff_source_file::{LineIndex, OneIndexed};
@@ -168,29 +168,24 @@ fn maybe_add_undefined_reveal_clarification(
 
 impl Unmatched for &Diagnostic {
     fn unmatched(&self) -> String {
-        let id = self.id();
-        let id = id.as_str().unwrap_or_else(|error| match error {
-            DiagnosticAsStrError::Category { name, .. } => name,
-        });
-
         maybe_add_undefined_reveal_clarification(
             self,
-            format_args!(r#"[{id}] "{message}""#, message = self.concise_message()),
+            format_args!(
+                r#"[{id}] "{message}""#,
+                id = self.id(),
+                message = self.concise_message()
+            ),
         )
     }
 }
 
 impl UnmatchedWithColumn for &Diagnostic {
     fn unmatched_with_column(&self, column: OneIndexed) -> String {
-        let id = self.id();
-        let id = id.as_str().unwrap_or_else(|error| match error {
-            DiagnosticAsStrError::Category { name, .. } => name,
-        });
-
         maybe_add_undefined_reveal_clarification(
             self,
             format_args!(
                 r#"{column} [{id}] "{message}""#,
+                id = self.id(),
                 message = self.concise_message()
             ),
         )
@@ -284,7 +279,7 @@ impl Matcher {
             ParsedAssertion::Error(error) => {
                 let position = unmatched.iter().position(|diagnostic| {
                     let lint_name_matches = !error.rule.is_some_and(|rule| {
-                        !(diagnostic.id().is_lint_named(rule) || diagnostic.id().matches(rule))
+                        !(diagnostic.id().is_lint_named(rule) || diagnostic.id().as_str() == rule)
                     });
                     let column_matches = error
                         .column

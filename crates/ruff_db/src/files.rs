@@ -277,7 +277,7 @@ impl std::panic::RefUnwindSafe for Files {}
 #[salsa::input]
 pub struct File {
     /// The path of the file (immutable).
-    #[return_ref]
+    #[returns(ref)]
     pub path: FilePath,
 
     /// The unix permissions of the file. Only supported on unix systems. Always `None` on Windows

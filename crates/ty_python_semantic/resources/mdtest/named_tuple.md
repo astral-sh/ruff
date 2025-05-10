@@ -37,6 +37,10 @@ Person(3, "Eve", 99, "extra")
 
 # error: [invalid-argument-type]
 Person(id="3", name="Eve")
+
+# TODO: over-writing NamedTuple fields should be an error
+alice.id = 42
+bob.age = None
 ```
 
 Alternative functional syntax:
@@ -48,8 +52,21 @@ alice2 = Person2(1, "Alice")
 # TODO: should be an error
 Person2(1)
 
-reveal_type(alice2.id)  # revealed: @Todo(GenericAlias instance)
-reveal_type(alice2.name)  # revealed: @Todo(GenericAlias instance)
+reveal_type(alice2.id)  # revealed: @Todo(functional `NamedTuple` syntax)
+reveal_type(alice2.name)  # revealed: @Todo(functional `NamedTuple` syntax)
+```
+
+### Definition
+
+TODO: Fields without default values should come before fields with.
+
+```py
+from typing import NamedTuple
+
+class Location(NamedTuple):
+    altitude: float = 0.0
+    latitude: float  # this should be an error
+    longitude: float
 ```
 
 ### Multiple Inheritance
@@ -87,6 +104,20 @@ reveal_type(alice.level)  # revealed: int
 # This is an error because `level` is not part of the signature:
 # error: [too-many-positional-arguments]
 alice = SuperUser(1, "Alice", 3)
+```
+
+TODO: If any fields added by the subclass conflict with those in the base class, that should be
+flagged.
+
+```py
+from typing import NamedTuple
+
+class User(NamedTuple):
+    id: int
+    name: str
+
+class SuperUser(User):
+    id: int  # this should be an error
 ```
 
 ### Generic named tuples

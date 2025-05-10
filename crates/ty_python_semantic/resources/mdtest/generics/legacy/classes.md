@@ -19,6 +19,16 @@ reveal_type(generic_context(SingleTypevar))  # revealed: tuple[T]
 reveal_type(generic_context(MultipleTypevars))  # revealed: tuple[T, S]
 ```
 
+Inheriting from `Generic` multiple times yields a `duplicate-base` diagnostic, just like any other
+class:
+
+```py
+class Bad(Generic[T], Generic[T]): ...  # error: [duplicate-base]
+
+# TODO: should emit an error (fails at runtime)
+class AlsoBad(Generic[T], Generic[S]): ...
+```
+
 You cannot use the same typevar more than once.
 
 ```py
@@ -29,7 +39,7 @@ class RepeatedTypevar(Generic[T, T]): ...
 You can only specialize `typing.Generic` with typevars (TODO: or param specs or typevar tuples).
 
 ```py
-# error: [invalid-argument-type] "`Literal[int]` is not a valid argument to `typing.Generic`"
+# error: [invalid-argument-type] "`<class 'int'>` is not a valid argument to `typing.Generic`"
 class GenericOfType(Generic[int]): ...
 ```
 
@@ -113,11 +123,11 @@ reveal_type(Bounded[int]())  # revealed: Bounded[int]
 reveal_type(Bounded[IntSubclass]())  # revealed: Bounded[IntSubclass]
 
 # TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `str`"
+# error: [invalid-argument-type] "Argument to class `Bounded` is incorrect: Expected `int`, found `str`"
 reveal_type(Bounded[str]())  # revealed: Unknown
 
 # TODO: update this diagnostic to talk about type parameters and specializations
-# error:  [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `int | str`"
+# error:  [invalid-argument-type] "Argument to class `Bounded` is incorrect: Expected `int`, found `int | str`"
 reveal_type(Bounded[int | str]())  # revealed: Unknown
 
 reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion[int]
@@ -146,8 +156,19 @@ reveal_type(Constrained[str]())  # revealed: Constrained[str]
 reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
 
 # TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int | str`, found `object`"
+# error: [invalid-argument-type] "Argument to class `Constrained` is incorrect: Expected `int | str`, found `object`"
 reveal_type(Constrained[object]())  # revealed: Unknown
+```
+
+If the type variable has a default, it can be omitted:
+
+```py
+WithDefaultU = TypeVar("WithDefaultU", default=int)
+
+class WithDefault(Generic[T, WithDefaultU]): ...
+
+reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
+reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
 ```
 
 ## Inferring generic class parameters
@@ -329,16 +350,27 @@ propagate through:
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+W = TypeVar("W")
 
-class Base(Generic[T]):
-    x: T | None = None
+class Parent(Generic[T]):
+    x: T
 
-class ExplicitlyGenericSub(Base[T], Generic[T]): ...
-class ImplicitlyGenericSub(Base[T]): ...
+class ExplicitlyGenericChild(Parent[U], Generic[U]): ...
+class ExplicitlyGenericGrandchild(ExplicitlyGenericChild[V], Generic[V]): ...
+class ExplicitlyGenericGreatgrandchild(ExplicitlyGenericGrandchild[W], Generic[W]): ...
+class ImplicitlyGenericChild(Parent[U]): ...
+class ImplicitlyGenericGrandchild(ImplicitlyGenericChild[V]): ...
+class ImplicitlyGenericGreatgrandchild(ImplicitlyGenericGrandchild[W]): ...
 
-reveal_type(Base[int].x)  # revealed: int | None
-reveal_type(ExplicitlyGenericSub[int].x)  # revealed: int | None
-reveal_type(ImplicitlyGenericSub[int].x)  # revealed: int | None
+reveal_type(Parent[int]().x)  # revealed: int
+reveal_type(ExplicitlyGenericChild[int]().x)  # revealed: int
+reveal_type(ImplicitlyGenericChild[int]().x)  # revealed: int
+reveal_type(ExplicitlyGenericGrandchild[int]().x)  # revealed: int
+reveal_type(ImplicitlyGenericGrandchild[int]().x)  # revealed: int
+reveal_type(ExplicitlyGenericGreatgrandchild[int]().x)  # revealed: int
+reveal_type(ImplicitlyGenericGreatgrandchild[int]().x)  # revealed: int
 ```
 
 ## Generic methods
@@ -361,6 +393,67 @@ c: C[int] = C[int]()
 reveal_type(c.method("string"))  # revealed: Literal["string"]
 ```
 
+## Specializations propagate
+
+In a specialized generic alias, the specialization is applied to the attributes and methods of the
+class.
+
+```py
+from typing import Generic, TypeVar, Protocol
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class LinkedList(Generic[T]): ...
+
+class C(Generic[T, U]):
+    x: T
+    y: U
+
+    def method1(self) -> T:
+        return self.x
+
+    def method2(self) -> U:
+        return self.y
+
+    def method3(self) -> LinkedList[T]:
+        return LinkedList[T]()
+
+c = C[int, str]()
+reveal_type(c.x)  # revealed: int
+reveal_type(c.y)  # revealed: str
+reveal_type(c.method1())  # revealed: int
+reveal_type(c.method2())  # revealed: str
+reveal_type(c.method3())  # revealed: LinkedList[int]
+
+class SomeProtocol(Protocol[T]):
+    x: T
+
+class Foo:
+    x: int
+
+class D(Generic[T, U]):
+    x: T
+    y: U
+
+    def method1(self) -> T:
+        return self.x
+
+    def method2(self) -> U:
+        return self.y
+
+    def method3(self) -> SomeProtocol[T]:
+        return Foo()
+
+d = D[int, str]()
+reveal_type(d.x)  # revealed: int
+reveal_type(d.y)  # revealed: str
+reveal_type(d.method1())  # revealed: int
+reveal_type(d.method2())  # revealed: str
+reveal_type(d.method3())  # revealed: SomeProtocol[int]
+reveal_type(d.method3().x)  # revealed: int
+```
+
 ## Cyclic class definitions
 
 ### F-bounded quantification
@@ -380,7 +473,7 @@ T = TypeVar("T")
 class Base(Generic[T]): ...
 class Sub(Base[Sub]): ...
 
-reveal_type(Sub)  # revealed: Literal[Sub]
+reveal_type(Sub)  # revealed: <class 'Sub'>
 ```
 
 #### With string forward references
@@ -395,7 +488,7 @@ T = TypeVar("T")
 class Base(Generic[T]): ...
 class Sub(Base["Sub"]): ...
 
-reveal_type(Sub)  # revealed: Literal[Sub]
+reveal_type(Sub)  # revealed: <class 'Sub'>
 ```
 
 #### Without string forward references

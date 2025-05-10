@@ -31,7 +31,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 # Diagnostics
 
 ```
-error: lint:invalid-return-type: Return type does not match returned value
+error[invalid-return-type]: Return type does not match returned value
  --> src/mdtest_snippet.py:1:22
   |
 1 | def f(cond: bool) -> str:
@@ -45,11 +45,12 @@ error: lint:invalid-return-type: Return type does not match returned value
 7 |
 8 | def f(cond: bool) -> str:
   |
+info: `invalid-return-type` is enabled by default
 
 ```
 
 ```
-error: lint:invalid-return-type: Return type does not match returned value
+error[invalid-return-type]: Return type does not match returned value
   --> src/mdtest_snippet.py:8:22
    |
  6 |         return 1
@@ -63,11 +64,12 @@ error: lint:invalid-return-type: Return type does not match returned value
 12 |     else:
 13 |         # error: [invalid-return-type]
    |
+info: `invalid-return-type` is enabled by default
 
 ```
 
 ```
-error: lint:invalid-return-type: Return type does not match returned value
+error[invalid-return-type]: Return type does not match returned value
   --> src/mdtest_snippet.py:14:16
    |
 12 |     else:
@@ -84,5 +86,6 @@ error: lint:invalid-return-type: Return type does not match returned value
  9 |     if cond:
 10 |         # error: [invalid-return-type]
    |
+info: `invalid-return-type` is enabled by default
 
 ```

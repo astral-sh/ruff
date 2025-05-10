@@ -25,7 +25,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_argu
 # Diagnostics
 
 ```
-error: lint:invalid-argument-type: Argument to this function is incorrect
+error[invalid-argument-type]: Argument to function `foo` is incorrect
  --> src/mdtest_snippet.py:8:8
   |
 6 |     return x * y * z
@@ -44,5 +44,6 @@ info: Function defined here
 4 |     z: int,
 5 | ) -> int:
   |
+info: `invalid-argument-type` is enabled by default
 
 ```

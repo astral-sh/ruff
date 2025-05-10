@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use annotate::annotate_imports;
 use block::{Block, Trailer};
 pub(crate) use categorize::categorize;
-use categorize::categorize_imports;
+use categorize::{categorize_imports, MatchSourceStrategy};
 pub use categorize::{ImportSection, ImportType};
 use comments::Comment;
 use normalize::normalize_imports;
@@ -76,6 +76,7 @@ pub(crate) fn format_imports(
     source_type: PySourceType,
     target_version: PythonVersion,
     settings: &Settings,
+    match_source_strategy: MatchSourceStrategy,
     tokens: &Tokens,
 ) -> String {
     let trailer = &block.trailer;
@@ -103,6 +104,7 @@ pub(crate) fn format_imports(
             package,
             target_version,
             settings,
+            match_source_strategy,
         );
 
         if !block_output.is_empty() && !output.is_empty() {
@@ -159,6 +161,7 @@ fn format_import_block(
     package: Option<PackageRoot<'_>>,
     target_version: PythonVersion,
     settings: &Settings,
+    match_source_strategy: MatchSourceStrategy,
 ) -> String {
     #[derive(Debug, Copy, Clone, PartialEq, Eq)]
     enum LineInsertion {
@@ -169,7 +172,6 @@ fn format_import_block(
         Inserted,
     }
 
-    // Categorize by type (e.g., first-party vs. third-party).
     let mut block_by_type = categorize_imports(
         block,
         src,
@@ -180,6 +182,7 @@ fn format_import_block(
         settings.no_sections,
         &settings.section_order,
         &settings.default_section,
+        match_source_strategy,
     );
 
     let mut output = String::new();

@@ -18,8 +18,8 @@ use ty_ide::{goto_type_definition, hover, inlay_hints, MarkupKind};
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
-use ty_project::ProjectMetadata;
 use ty_project::{Db, ProjectDatabase};
+use ty_project::{DummyReporter, ProjectMetadata};
 use ty_python_semantic::Program;
 use wasm_bindgen::prelude::*;
 
@@ -186,7 +186,7 @@ impl Workspace {
 
     /// Checks all open files
     pub fn check(&self) -> Result<Vec<Diagnostic>, Error> {
-        let result = self.db.check().map_err(into_error)?;
+        let result = self.db.check(&DummyReporter).map_err(into_error)?;
 
         Ok(result.into_iter().map(Diagnostic::wrap).collect())
     }
@@ -373,7 +373,7 @@ impl Diagnostic {
         self.inner.primary_span().and_then(|span| {
             Some(Range::from_file_range(
                 &workspace.db,
-                FileRange::new(span.file(), span.range()?),
+                FileRange::new(span.expect_ty_file(), span.range()?),
                 workspace.position_encoding,
             ))
         })
@@ -383,7 +383,7 @@ impl Diagnostic {
     pub fn display(&self, workspace: &Workspace) -> JsString {
         let config = DisplayDiagnosticConfig::default().color(false);
         self.inner
-            .display(workspace.db.upcast(), &config)
+            .display(&workspace.db.upcast(), &config)
             .to_string()
             .into()
     }

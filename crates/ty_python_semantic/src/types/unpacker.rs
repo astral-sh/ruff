@@ -226,7 +226,7 @@ impl<'db> Unpacker<'db> {
         // If there is a starred expression, it will consume all of the types at that location.
         let Some(starred_index) = targets.iter().position(ast::Expr::is_starred_expr) else {
             // Otherwise, the types will be unpacked 1-1 to the targets.
-            return Cow::Borrowed(tuple_ty.elements(self.db()).as_ref());
+            return Cow::Borrowed(tuple_ty.elements(self.db()));
         };
 
         if tuple_ty.len(self.db()) >= targets.len() - 1 {

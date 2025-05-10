@@ -1,6 +1,7 @@
 # Tracing
 
-Traces are a useful tool to narrow down the location of a bug or, at least, to understand why the compiler is doing a particular thing.
+Traces are a useful tool to narrow down the location of a bug or, at least, to understand why the compiler is doing a
+particular thing.
 Note, tracing messages with severity `debug` or greater are user-facing. They should be phrased accordingly.
 Tracing spans are only shown when using `-vvv`.
 
@@ -9,20 +10,28 @@ Tracing spans are only shown when using `-vvv`.
 The CLI supports different verbosity levels.
 
 - default: Only show errors and warnings.
-- `-v` activates `info!`: Show generally useful information such as paths of configuration files, detected platform, etc., but it's not a lot of messages, it's something you'll activate in CI by default. cargo build e.g. shows you which packages are fresh.
-- `-vv` activates `debug!` and timestamps: This should be enough information to get to the bottom of bug reports. When you're processing many packages or files, you'll get pages and pages of output, but each line is link to a specific action or state change.
-- `-vvv` activates `trace!` (only in debug builds) and shows tracing-spans: At this level, you're logging everything. Most of this is wasted, it's really slow, we dump e.g. the entire resolution graph. Only useful to developers, and you almost certainly want to use `TY_LOG` to filter it down to the area your investigating.
+- `-v` activates `info!`: Show generally useful information such as paths of configuration files, detected platform,
+    etc., but it's not a lot of messages, it's something you'll activate in CI by default. cargo build e.g. shows you
+    which packages are fresh.
+- `-vv` activates `debug!` and timestamps: This should be enough information to get to the bottom of bug reports. When
+    you're processing many packages or files, you'll get pages and pages of output, but each line is link to a specific
+    action or state change.
+- `-vvv` activates `trace!` (only in debug builds) and shows tracing-spans: At this level, you're logging everything.
+    Most of this is wasted, it's really slow, we dump e.g. the entire resolution graph. Only useful to developers, and you
+    almost certainly want to use `TY_LOG` to filter it down to the area your investigating.
 
-## Better logging with `TY_LOG` and `RAYON_NUM_THREADS`
+## Better logging with `TY_LOG` and `TY_MAX_PARALLELISM`
 
 By default, the CLI shows messages from the `ruff` and `ty` crates. Tracing messages from other crates are not shown.
 The `TY_LOG` environment variable allows you to customize which messages are shown by specifying one
-or more [filter directives](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives).
+or
+more [filter directives](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives).
 
-The `RAYON_NUM_THREADS` environment variable, meanwhile, can be used to control the level of concurrency ty uses.
+The `TY_MAX_PARALLELISM` environment variable, meanwhile, can be used to control the level of parallelism ty uses.
 By default, ty will attempt to parallelize its work so that multiple files are checked simultaneously,
-but this can result in a confused logging output where messages from different threads are intertwined.
-To switch off concurrency entirely and have more readable logs, use `RAYON_NUM_THREADS=1`.
+but this can result in a confused logging output where messages from different threads are intertwined and non
+determinism.
+To switch off parallelism entirely and have more readable logs, use `TY_MAX_PARALLELISM=1` (or `RAYON_NUM_THREADS=1`).
 
 ### Examples
 
@@ -79,22 +88,24 @@ query to return the failure as part of the query's result or use a Salsa accumul
 
 ## Tracing in tests
 
-You can use `ruff_db::testing::setup_logging` or `ruff_db::testing::setup_logging_with_filter` to set up logging in tests.
+You can use `ruff_db::testing::setup_logging` or `ruff_db::testing::setup_logging_with_filter` to set up logging in
+tests.
 
 ```rust
 use ruff_db::testing::setup_logging;
 
 #[test]
 fn test() {
-  let _logging = setup_logging();
+    let _logging = setup_logging();
 
-  tracing::info!("This message will be printed to stderr");
+    tracing::info!("This message will be printed to stderr");
 }
 ```
 
 Note: Most test runners capture stderr and only show its output when a test fails.
 
-Note also that `setup_logging` only sets up logging for the current thread because [`set_global_default`](https://docs.rs/tracing/latest/tracing/subscriber/fn.set_global_default.html) can only be
+Note also that `setup_logging` only sets up logging for the current thread because
+[`set_global_default`](https://docs.rs/tracing/latest/tracing/subscriber/fn.set_global_default.html) can only be
 called **once**.
 
 ## Release builds
@@ -103,7 +114,8 @@ called **once**.
 
 ## Profiling
 
-ty generates a folded stack trace to the current directory named `tracing.folded` when setting the environment variable `TY_LOG_PROFILE` to `1` or `true`.
+ty generates a folded stack trace to the current directory named `tracing.folded` when setting the environment variable
+`TY_LOG_PROFILE` to `1` or `true`.
 
 ```bash
 TY_LOG_PROFILE=1 ty -- --current-directory=../test -vvv

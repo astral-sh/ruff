@@ -22,12 +22,12 @@ use ruff_linter::settings::types::{
     PythonVersion, UnsafeFixes,
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
+use ruff_options_metadata::{OptionEntry, OptionsMetadata};
 use ruff_python_ast as ast;
 use ruff_source_file::{LineIndex, OneIndexed, PositionEncoding};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
-use ruff_workspace::options_base::{OptionEntry, OptionsMetadata};
 use ruff_workspace::resolver::ConfigurationTransformer;
 use rustc_hash::FxHashMap;
 use toml;

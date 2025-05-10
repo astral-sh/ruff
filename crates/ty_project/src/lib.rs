@@ -18,7 +18,7 @@ use rustc_hash::FxHashSet;
 use salsa::Durability;
 use salsa::Setter;
 use std::backtrace::BacktraceStatus;
-use std::panic::{AssertUnwindSafe, UnwindSafe};
+use std::panic::{AssertUnwindSafe, RefUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::error;
@@ -60,21 +60,21 @@ pub struct Project {
     ///
     /// Setting the open files to a non-`None` value changes `check` to only check the
     /// open files rather than all files in the project.
-    #[return_ref]
+    #[returns(as_deref)]
     #[default]
     open_fileset: Option<Arc<FxHashSet<File>>>,
 
     /// The first-party files of this project.
     #[default]
-    #[return_ref]
+    #[returns(ref)]
     file_set: IndexedFiles,
 
     /// The metadata describing the project, including the unresolved options.
-    #[return_ref]
+    #[returns(ref)]
     pub metadata: ProjectMetadata,
 
     /// The resolved project settings.
-    #[return_ref]
+    #[returns(ref)]
     pub settings: Settings,
 
     /// The paths that should be included when checking this project.
@@ -98,12 +98,30 @@ pub struct Project {
     /// in an IDE when the user only wants to check the open tabs. This could be modeled
     /// with `included_paths` too but it would require an explicit walk dir step that's simply unnecessary.
     #[default]
-    #[return_ref]
+    #[returns(deref)]
     included_paths_list: Vec<SystemPathBuf>,
 
     /// Diagnostics that were generated when resolving the project settings.
-    #[return_ref]
+    #[returns(deref)]
     settings_diagnostics: Vec<OptionDiagnostic>,
+}
+
+/// A progress reporter.
+pub trait Reporter: Default + Send + Sync + RefUnwindSafe + 'static {
+    /// Initialize the reporter with the number of files.
+    fn set_files(&self, files: usize);
+
+    /// Report the completion of a given file.
+    fn report_file(&self, file: &File);
+}
+
+/// A no-op implementation of [`Reporter`].
+#[derive(Default)]
+pub struct DummyReporter;
+
+impl Reporter for DummyReporter {
+    fn set_files(&self, _files: usize) {}
+    fn report_file(&self, _file: &File) {}
 }
 
 #[salsa::tracked]
@@ -131,7 +149,7 @@ impl Project {
     /// This is a salsa query to prevent re-computing queries if other, unrelated
     /// settings change. For example, we don't want that changing the terminal settings
     /// invalidates any type checking queries.
-    #[salsa::tracked]
+    #[salsa::tracked(returns(deref))]
     pub fn rules(self, db: &dyn Db) -> Arc<RuleSelection> {
         self.settings(db).to_rules()
     }
@@ -157,7 +175,7 @@ impl Project {
                 self.set_settings(db).to(settings);
             }
 
-            if self.settings_diagnostics(db) != &settings_diagnostics {
+            if self.settings_diagnostics(db) != settings_diagnostics {
                 self.set_settings_diagnostics(db).to(settings_diagnostics);
             }
 
@@ -168,7 +186,7 @@ impl Project {
     }
 
     /// Checks all open files in the project and its dependencies.
-    pub(crate) fn check(self, db: &ProjectDatabase) -> Vec<Diagnostic> {
+    pub(crate) fn check(self, db: &ProjectDatabase, reporter: &impl Reporter) -> Vec<Diagnostic> {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
 
@@ -182,6 +200,7 @@ impl Project {
         );
 
         let files = ProjectFiles::new(db, self);
+        reporter.set_files(files.len());
 
         diagnostics.extend(
             files
@@ -190,63 +209,34 @@ impl Project {
                 .map(IOErrorDiagnostic::to_diagnostic),
         );
 
-        let file_diagnostics = Arc::new(std::sync::Mutex::new(vec![]));
+        let file_diagnostics = std::sync::Mutex::new(vec![]);
 
         {
-            let file_diagnostics = Arc::clone(&file_diagnostics);
             let db = db.clone();
-            let project_span = project_span.clone();
+            let file_diagnostics = &file_diagnostics;
+            let project_span = &project_span;
 
             rayon::scope(move |scope| {
                 for file in &files {
-                    let result = Arc::clone(&file_diagnostics);
                     let db = db.clone();
-                    let project_span = project_span.clone();
-
                     scope.spawn(move |_| {
                         let check_file_span =
-                            tracing::debug_span!(parent: &project_span, "check_file", ?file);
+                            tracing::debug_span!(parent: project_span, "check_file", ?file);
                         let _entered = check_file_span.entered();
 
-                        let file_diagnostics = check_file_impl(&db, file);
-                        result.lock().unwrap().extend(file_diagnostics);
+                        let result = check_file_impl(&db, file);
+                        file_diagnostics.lock().unwrap().extend(result);
+
+                        reporter.report_file(&file);
                     });
                 }
             });
         }
 
-        let mut file_diagnostics = Arc::into_inner(file_diagnostics)
-            .unwrap()
-            .into_inner()
-            .unwrap();
-        // We sort diagnostics in a way that keeps them in source order
-        // and grouped by file. After that, we fall back to severity
-        // (with fatal messages sorting before info messages) and then
-        // finally the diagnostic ID.
-        file_diagnostics.sort_by(|d1, d2| {
-            if let (Some(span1), Some(span2)) = (d1.primary_span(), d2.primary_span()) {
-                let order = span1
-                    .file()
-                    .path(db)
-                    .as_str()
-                    .cmp(span2.file().path(db).as_str());
-                if order.is_ne() {
-                    return order;
-                }
-
-                if let (Some(range1), Some(range2)) = (span1.range(), span2.range()) {
-                    let order = range1.start().cmp(&range2.start());
-                    if order.is_ne() {
-                        return order;
-                    }
-                }
-            }
-            // Reverse so that, e.g., Fatal sorts before Info.
-            let order = d1.severity().cmp(&d2.severity()).reverse();
-            if order.is_ne() {
-                return order;
-            }
-            d1.id().cmp(&d2.id())
+        let mut file_diagnostics = file_diagnostics.into_inner().unwrap();
+        file_diagnostics.sort_by(|left, right| {
+            left.rendering_sort_key(db)
+                .cmp(&right.rendering_sort_key(db))
         });
         diagnostics.extend(file_diagnostics);
         diagnostics
@@ -308,7 +298,7 @@ impl Project {
     /// This can be useful to check arbitrary files, but it isn't something we recommend.
     /// We should try to support this use case but it's okay if there are some limitations around it.
     fn included_paths_or_root(self, db: &dyn Db) -> &[SystemPathBuf] {
-        match &**self.included_paths_list(db) {
+        match self.included_paths_list(db) {
             [] => std::slice::from_ref(&self.metadata(db).root),
             paths => paths,
         }
@@ -316,7 +306,7 @@ impl Project {
 
     /// Returns the open files in the project or `None` if the entire project should be checked.
     pub fn open_files(self, db: &dyn Db) -> Option<&FxHashSet<File>> {
-        self.open_fileset(db).as_deref()
+        self.open_fileset(db)
     }
 
     /// Sets the open files in the project.
@@ -515,6 +505,13 @@ impl<'a> ProjectFiles<'a> {
         match self {
             ProjectFiles::OpenFiles(_) => &[],
             ProjectFiles::Indexed(indexed) => indexed.diagnostics(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            ProjectFiles::OpenFiles(open_files) => open_files.len(),
+            ProjectFiles::Indexed(indexed) => indexed.len(),
         }
     }
 }

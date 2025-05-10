@@ -54,7 +54,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable: Object of type `Iterable1` may not be iterable
+error[not-iterable]: Object of type `Iterable1` may not be iterable
   --> src/mdtest_snippet.py:31:14
    |
 30 |     # error: [not-iterable]
@@ -64,17 +64,18 @@ error: lint:not-iterable: Object of type `Iterable1` may not be iterable
 33 |         reveal_type(x)  # revealed: bytes | str | Unknown
    |
 info: It may not have an `__iter__` method and its `__getitem__` attribute (with type `(bound method Iterable1.__getitem__(item: int) -> str) | None`) may not be callable
+info: `not-iterable` is enabled by default
 
 ```
 
 ```
-info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:33:9
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:33:21
    |
 31 |     for x in Iterable1():
 32 |         # TODO: `bytes | str` might be better
 33 |         reveal_type(x)  # revealed: bytes | str | Unknown
-   |         ^^^^^^^^^^^^^^ `bytes | str | Unknown`
+   |                     ^ `bytes | str | Unknown`
 34 |
 35 |     # error: [not-iterable]
    |
@@ -82,7 +83,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:not-iterable: Object of type `Iterable2` may not be iterable
+error[not-iterable]: Object of type `Iterable2` may not be iterable
   --> src/mdtest_snippet.py:36:14
    |
 35 |     # error: [not-iterable]
@@ -92,17 +93,18 @@ error: lint:not-iterable: Object of type `Iterable2` may not be iterable
    |
 info: It may not have an `__iter__` method and its `__getitem__` method (with type `(bound method Iterable2.__getitem__(item: int) -> str) | (bound method Iterable2.__getitem__(item: str) -> int)`) may have an incorrect signature for the old-style iteration protocol
 info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
+info: `not-iterable` is enabled by default
 
 ```
 
 ```
-info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:37:9
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:37:21
    |
 35 |     # error: [not-iterable]
 36 |     for y in Iterable2():
 37 |         reveal_type(y)  # revealed: bytes | str | int
-   |         ^^^^^^^^^^^^^^ `bytes | str | int`
+   |                     ^ `bytes | str | int`
    |
 
 ```

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use js_sys::Error;
-use ruff_linter::message::{DiagnosticMessage, Message, SyntaxErrorMessage};
+use ruff_linter::message::{DiagnosticMessage, Message};
 use ruff_linter::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -166,7 +166,8 @@ impl Workspace {
         let target_version = self.settings.linter.unresolved_target_version;
 
         // Parse once.
-        let options = ParseOptions::from(source_type).with_target_version(target_version);
+        let options =
+            ParseOptions::from(source_type).with_target_version(target_version.parser_version());
         let parsed = parse_unchecked(source_kind.source_code(), options)
             .try_into_module()
             .expect("`PySourceType` always parses to a `ModModule`.");
@@ -229,15 +230,13 @@ impl Workspace {
                             .collect(),
                     }),
                 },
-                Message::SyntaxError(SyntaxErrorMessage { message, range, .. }) => {
-                    ExpandedMessage {
-                        code: None,
-                        message,
-                        start_location: source_code.line_column(range.start()).into(),
-                        end_location: source_code.line_column(range.end()).into(),
-                        fix: None,
-                    }
-                }
+                Message::SyntaxError(_) => ExpandedMessage {
+                    code: None,
+                    message: message.body().to_string(),
+                    start_location: source_code.line_column(message.range().start()).into(),
+                    end_location: source_code.line_column(message.range().end()).into(),
+                    fix: None,
+                },
             })
             .collect();
 

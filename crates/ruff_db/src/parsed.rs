@@ -20,7 +20,7 @@ use crate::Db;
 /// reflected in the changed AST offsets.
 /// The other reason is that Ruff's AST doesn't implement `Eq` which Sala requires
 /// for determining if a query result is unchanged.
-#[salsa::tracked(return_ref, no_eq)]
+#[salsa::tracked(returns(ref), no_eq)]
 pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     let _span = tracing::trace_span!("parsed_module", ?file).entered();
 

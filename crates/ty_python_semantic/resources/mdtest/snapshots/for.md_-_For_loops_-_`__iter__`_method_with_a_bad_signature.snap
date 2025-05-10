@@ -30,7 +30,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable: Object of type `Iterable` is not iterable
+error[not-iterable]: Object of type `Iterable` is not iterable
   --> src/mdtest_snippet.py:12:10
    |
 11 | # error: [not-iterable]
@@ -40,17 +40,18 @@ error: lint:not-iterable: Object of type `Iterable` is not iterable
    |
 info: Its `__iter__` method has an invalid signature
 info: Expected signature `def __iter__(self): ...`
+info: `not-iterable` is enabled by default
 
 ```
 
 ```
-info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:13:5
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:13:17
    |
 11 | # error: [not-iterable]
 12 | for x in Iterable():
 13 |     reveal_type(x)  # revealed: int
-   |     ^^^^^^^^^^^^^^ `int`
+   |                 ^ `int`
    |
 
 ```

@@ -31,7 +31,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 # Diagnostics
 
 ```
-error: lint:invalid-overload: Overloaded non-stub function `func` must have an implementation
+error[invalid-overload]: Overloaded non-stub function `func` must have an implementation
  --> src/mdtest_snippet.py:7:5
   |
 5 | @overload
@@ -41,11 +41,12 @@ error: lint:invalid-overload: Overloaded non-stub function `func` must have an i
 8 |
 9 | class Foo:
   |
+info: `invalid-overload` is enabled by default
 
 ```
 
 ```
-error: lint:invalid-overload: Overloaded non-stub function `method` must have an implementation
+error[invalid-overload]: Overloaded non-stub function `method` must have an implementation
   --> src/mdtest_snippet.py:14:9
    |
 12 |     @overload
@@ -53,5 +54,6 @@ error: lint:invalid-overload: Overloaded non-stub function `method` must have an
 14 |     def method(self, x: str) -> str: ...
    |         ^^^^^^
    |
+info: `invalid-overload` is enabled by default
 
 ```

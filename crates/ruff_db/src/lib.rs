@@ -1,11 +1,10 @@
-use std::hash::BuildHasherDefault;
-
-use ruff_python_ast::PythonVersion;
-use rustc_hash::FxHasher;
-
 use crate::files::Files;
 use crate::system::System;
 use crate::vendored::VendoredFileSystem;
+use ruff_python_ast::PythonVersion;
+use rustc_hash::FxHasher;
+use std::hash::BuildHasherDefault;
+use std::num::NonZeroUsize;
 
 pub mod diagnostic;
 pub mod display;
@@ -37,15 +36,40 @@ pub trait Upcast<T: ?Sized> {
     fn upcast_mut(&mut self) -> &mut T;
 }
 
+/// Returns the maximum number of tasks that ty is allowed
+/// to process in parallel.
+///
+/// Returns [`std::thread::available_parallelism`], unless the environment
+/// variable `TY_MAX_PARALLELISM` or `RAYON_NUM_THREADS` is set. `TY_MAX_PARALLELISM` takes
+/// precedence over `RAYON_NUM_THREADS`.
+///
+/// Falls back to `1` if `available_parallelism` is not available.
+///
+/// Setting `TY_MAX_PARALLELISM` to `2` only restricts the number of threads that ty spawns
+/// to process work in parallel. For example, to index a directory or checking the files of a project.
+/// ty can still spawn more threads for other tasks, e.g. to wait for a Ctrl+C signal or
+/// watching the files for changes.
+pub fn max_parallelism() -> NonZeroUsize {
+    std::env::var("TY_MAX_PARALLELISM")
+        .or_else(|_| std::env::var("RAYON_NUM_THREADS"))
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_else(|| {
+            std::thread::available_parallelism().unwrap_or_else(|_| NonZeroUsize::new(1).unwrap())
+        })
+}
+
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     use crate::files::Files;
     use crate::system::TestSystem;
     use crate::system::{DbWithTestSystem, System};
     use crate::vendored::VendoredFileSystem;
-    use crate::Db;
+    use crate::{Db, Upcast};
+
+    type Events = Arc<Mutex<Vec<salsa::Event>>>;
 
     /// Database that can be used for testing.
     ///
@@ -57,36 +81,37 @@ mod tests {
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
-        events: Arc<std::sync::Mutex<Vec<salsa::Event>>>,
+        events: Events,
     }
 
     impl TestDb {
         pub(crate) fn new() -> Self {
+            let events = Events::default();
             Self {
-                storage: salsa::Storage::default(),
+                storage: salsa::Storage::new(Some(Box::new({
+                    let events = events.clone();
+                    move |event| {
+                        tracing::trace!("event: {:?}", event);
+                        let mut events = events.lock().unwrap();
+                        events.push(event);
+                    }
+                }))),
                 system: TestSystem::default(),
                 vendored: VendoredFileSystem::default(),
-                events: std::sync::Arc::default(),
+                events,
                 files: Files::default(),
             }
         }
 
         /// Empties the internal store of salsa events that have been emitted,
         /// and returns them as a `Vec` (equivalent to [`std::mem::take`]).
-        ///
-        /// ## Panics
-        /// If there are pending database snapshots.
         pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
-            let inner = Arc::get_mut(&mut self.events)
-                .expect("expected no pending salsa database snapshots.");
+            let mut events = self.events.lock().unwrap();
 
-            std::mem::take(inner.get_mut().unwrap())
+            std::mem::take(&mut *events)
         }
 
         /// Clears the emitted salsa events.
-        ///
-        /// ## Panics
-        /// If there are pending database snapshots.
         pub(crate) fn clear_salsa_events(&mut self) {
             self.take_salsa_events();
         }
@@ -111,7 +136,16 @@ mod tests {
         }
 
         fn python_version(&self) -> ruff_python_ast::PythonVersion {
-            ruff_python_ast::PythonVersion::latest()
+            ruff_python_ast::PythonVersion::latest_ty()
+        }
+    }
+
+    impl Upcast<dyn Db> for TestDb {
+        fn upcast(&self) -> &(dyn Db + 'static) {
+            self
+        }
+        fn upcast_mut(&mut self) -> &mut (dyn Db + 'static) {
+            self
         }
     }
 
@@ -126,12 +160,5 @@ mod tests {
     }
 
     #[salsa::db]
-    impl salsa::Database for TestDb {
-        fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
-            let event = event();
-            tracing::trace!("event: {:?}", event);
-            let mut events = self.events.lock().unwrap();
-            events.push(event);
-        }
-    }
+    impl salsa::Database for TestDb {}
 }

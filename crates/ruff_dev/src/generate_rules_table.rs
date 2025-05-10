@@ -11,8 +11,8 @@ use strum::IntoEnumIterator;
 use ruff_diagnostics::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_linter::upstream_categories::UpstreamCategoryAndPrefix;
+use ruff_options_metadata::OptionsMetadata;
 use ruff_workspace::options::Options;
-use ruff_workspace::options_base::OptionsMetadata;
 
 const FIX_SYMBOL: &str = "🛠️";
 const PREVIEW_SYMBOL: &str = "🧪";

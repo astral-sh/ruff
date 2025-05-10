@@ -12,7 +12,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
 use ruff_python_ast::{self as ast, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
-    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
+    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
 use ruff_text_size::TextRange;
 
@@ -42,7 +42,7 @@ use crate::semantic_index::symbol::{
     ScopedSymbolId, SymbolTableBuilder,
 };
 use crate::semantic_index::use_def::{
-    EagerBindingsKey, FlowSnapshot, ScopedEagerBindingsId, UseDefMapBuilder,
+    EagerSnapshotKey, FlowSnapshot, ScopedEagerSnapshotId, UseDefMapBuilder,
 };
 use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraintsBuilder,
@@ -106,10 +106,15 @@ pub(super) struct SemanticIndexBuilder<'db> {
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
+    globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedSymbolId>>,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
-    eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
+    /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
+    ///
+    /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
+    generator_functions: FxHashSet<FileScopeId>,
+    eager_snapshots: FxHashMap<EagerSnapshotKey, ScopedEagerSnapshotId>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 }
@@ -140,10 +145,12 @@ impl<'db> SemanticIndexBuilder<'db> {
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
+            globals_by_scope: FxHashMap::default(),
 
             imported_modules: FxHashSet::default(),
+            generator_functions: FxHashSet::default(),
 
-            eager_bindings: FxHashMap::default(),
+            eager_snapshots: FxHashMap::default(),
 
             python_version: Program::get(db).python_version(db),
             source_text: OnceCell::new(),
@@ -226,8 +233,8 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
         let parent = self.current_scope();
-        let reachabililty = self.current_use_def_map().reachability;
-        self.push_scope_with_parent(node, Some(parent), reachabililty);
+        let reachability = self.current_use_def_map().reachability;
+        self.push_scope_with_parent(node, Some(parent), reachability);
     }
 
     fn push_scope_with_parent(
@@ -248,13 +255,15 @@ impl<'db> SemanticIndexBuilder<'db> {
             children_start..children_start,
             reachability,
         );
+        let is_class_scope = scope.kind().is_class();
         self.try_node_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTableBuilder::default());
         self.instance_attribute_tables
             .push(SymbolTableBuilder::default());
-        self.use_def_maps.push(UseDefMapBuilder::default());
+        self.use_def_maps
+            .push(UseDefMapBuilder::new(is_class_scope));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
         let scope_id = ScopeId::new(self.db, self.file, file_scope_id, countme::Count::default());
@@ -298,12 +307,6 @@ impl<'db> SemanticIndexBuilder<'db> {
             let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
             let enclosing_symbol_table = &self.symbol_tables[enclosing_scope_id];
 
-            // Names bound in class scopes are never visible to nested scopes, so we never need to
-            // save eager scope bindings in a class scope.
-            if enclosing_scope_kind.is_class() {
-                continue;
-            }
-
             for nested_symbol in self.symbol_tables[popped_scope_id].symbols() {
                 // Skip this symbol if this enclosing scope doesn't contain any bindings for it.
                 // Note that even if this symbol is bound in the popped scope,
@@ -316,24 +319,26 @@ impl<'db> SemanticIndexBuilder<'db> {
                     continue;
                 };
                 let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);
-                if !enclosing_symbol.is_bound() {
-                    continue;
-                }
 
-                // Snapshot the bindings of this symbol that are visible at this point in this
+                // Snapshot the state of this symbol that are visible at this point in this
                 // enclosing scope.
-                let key = EagerBindingsKey {
+                let key = EagerSnapshotKey {
                     enclosing_scope: enclosing_scope_id,
                     enclosing_symbol: enclosing_symbol_id,
                     nested_scope: popped_scope_id,
                 };
-                let eager_bindings = self.use_def_maps[enclosing_scope_id]
-                    .snapshot_eager_bindings(enclosing_symbol_id);
-                self.eager_bindings.insert(key, eager_bindings);
+                let eager_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_eager_state(
+                    enclosing_symbol_id,
+                    enclosing_scope_kind,
+                    enclosing_symbol.is_bound(),
+                );
+                self.eager_snapshots.insert(key, eager_snapshot);
             }
 
             // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
             // eagerly, even if we would encounter another eager enclosing scope later on.
+            // Also, narrowing constraints outside a lazy scope are not applicable.
+            // TODO: If the symbol has never been rewritten, they are applicable.
             if !enclosing_scope_kind.is_eager() {
                 break;
             }
@@ -1080,7 +1085,9 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
-        self.eager_bindings.shrink_to_fit();
+        self.generator_functions.shrink_to_fit();
+        self.eager_snapshots.shrink_to_fit();
+        self.globals_by_scope.shrink_to_fit();
 
         SemanticIndex {
             symbol_tables,
@@ -1089,14 +1096,16 @@ impl<'db> SemanticIndexBuilder<'db> {
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope,
+            globals_by_scope: self.globals_by_scope,
             ast_ids,
             scopes_by_expression: self.scopes_by_expression,
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
-            eager_bindings: self.eager_bindings,
+            eager_snapshots: self.eager_snapshots,
             semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
+            generator_functions: self.generator_functions,
         }
     }
 
@@ -1470,23 +1479,37 @@ where
                 aug_assign @ ast::StmtAugAssign {
                     range: _,
                     target,
-                    op: _,
+                    op,
                     value,
                 },
             ) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
                 self.visit_expr(value);
 
-                // See https://docs.python.org/3/library/ast.html#ast.AugAssign
-                if matches!(
-                    **target,
-                    ast::Expr::Attribute(_) | ast::Expr::Subscript(_) | ast::Expr::Name(_)
-                ) {
-                    self.push_assignment(aug_assign.into());
-                    self.visit_expr(target);
-                    self.pop_assignment();
-                } else {
-                    self.visit_expr(target);
+                match &**target {
+                    ast::Expr::Name(ast::ExprName { id, .. })
+                        if id == "__all__" && op.is_add() && self.in_module_scope() =>
+                    {
+                        if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) =
+                            &**value
+                        {
+                            if attr == "__all__" {
+                                self.add_standalone_expression(value);
+                            }
+                        }
+
+                        self.push_assignment(aug_assign.into());
+                        self.visit_expr(target);
+                        self.pop_assignment();
+                    }
+                    ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+                        self.push_assignment(aug_assign.into());
+                        self.visit_expr(target);
+                        self.pop_assignment();
+                    }
+                    _ => {
+                        self.visit_expr(target);
+                    }
                 }
             }
             ast::Stmt::If(node) => {
@@ -1801,7 +1824,7 @@ where
                     // Save the state immediately *after* visiting the `try` block
                     // but *before* we prepare for visiting the `except` block(s).
                     //
-                    // We will revert to this state prior to visiting the the `else` block,
+                    // We will revert to this state prior to visiting the `else` block,
                     // as there necessarily must have been 0 `except` blocks executed
                     // if we hit the `else` block.
                     let post_try_block_state = self.flow_snapshot();
@@ -1893,7 +1916,44 @@ where
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
             }
-
+            ast::Stmt::Global(ast::StmtGlobal { range: _, names }) => {
+                for name in names {
+                    let symbol_id = self.add_symbol(name.id.clone());
+                    let symbol_table = self.current_symbol_table();
+                    let symbol = symbol_table.symbol(symbol_id);
+                    if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
+                                name: name.to_string(),
+                                start: name.range.start(),
+                            },
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
+                    let scope_id = self.current_scope();
+                    self.globals_by_scope
+                        .entry(scope_id)
+                        .or_default()
+                        .insert(symbol_id);
+                }
+                walk_stmt(self, stmt);
+            }
+            ast::Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
+                for target in targets {
+                    if let ast::Expr::Name(ast::ExprName { id, .. }) = target {
+                        let symbol_id = self.add_symbol(id.clone());
+                        self.current_symbol_table().mark_symbol_used(symbol_id);
+                    }
+                }
+                walk_stmt(self, stmt);
+            }
+            ast::Stmt::Expr(ast::StmtExpr { value, range: _ }) if self.in_module_scope() => {
+                if let Some(expr) = dunder_all_extend_argument(value) {
+                    self.add_standalone_expression(expr);
+                }
+                self.visit_expr(value);
+            }
             _ => {
                 walk_stmt(self, stmt);
             }
@@ -2305,6 +2365,13 @@ where
 
                 walk_expr(self, expr);
             }
+            ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
+                let scope = self.current_scope();
+                if self.scopes[scope].kind() == ScopeKind::Function {
+                    self.generator_functions.insert(scope);
+                }
+                walk_expr(self, expr);
+            }
             _ => {
                 walk_expr(self, expr);
             }
@@ -2375,7 +2442,8 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
         self.source_text().as_str()
     }
 
-    // TODO(brent) handle looking up `global` bindings
+    // We handle the one syntax error that relies on this method (`LoadBeforeGlobalDeclaration`)
+    // directly in `visit_stmt`, so this just returns a placeholder value.
     fn global(&self, _name: &str) -> Option<TextRange> {
         None
     }
@@ -2574,4 +2642,44 @@ impl<'a> Unpackable<'a> {
             },
         }
     }
+}
+
+/// Returns the single argument to `__all__.extend()`, if it is a call to `__all__.extend()`
+/// where it looks like the argument might be a `submodule.__all__` expression.
+/// Else, returns `None`.
+fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
+    let ast::ExprCall {
+        func,
+        arguments:
+            ast::Arguments {
+                args,
+                keywords,
+                range: _,
+            },
+        ..
+    } = value.as_call_expr()?;
+
+    let ast::ExprAttribute { value, attr, .. } = func.as_attribute_expr()?;
+
+    let ast::ExprName { id, .. } = value.as_name_expr()?;
+
+    if id != "__all__" {
+        return None;
+    }
+
+    if attr != "extend" {
+        return None;
+    }
+
+    if !keywords.is_empty() {
+        return None;
+    }
+
+    let [single_argument] = &**args else {
+        return None;
+    };
+
+    let ast::ExprAttribute { value, attr, .. } = single_argument.as_attribute_expr()?;
+
+    (attr == "__all__").then_some(value)
 }

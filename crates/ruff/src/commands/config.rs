@@ -2,8 +2,8 @@ use anyhow::{anyhow, Result};
 
 use crate::args::HelpFormat;
 
+use ruff_options_metadata::OptionsMetadata;
 use ruff_workspace::options::Options;
-use ruff_workspace::options_base::OptionsMetadata;
 
 #[expect(clippy::print_stdout)]
 pub(crate) fn config(key: Option<&str>, format: HelpFormat) -> Result<()> {

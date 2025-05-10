@@ -6,7 +6,7 @@ pub trait Db: SemanticDb + Upcast<dyn SemanticDb> + Upcast<dyn SourceDb> {}
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     use super::Db;
     use ruff_db::files::{File, Files};
@@ -16,6 +16,8 @@ pub(crate) mod tests {
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
     use ty_python_semantic::{default_lint_registry, Db as SemanticDb, Program};
 
+    type Events = Arc<Mutex<Vec<salsa::Event>>>;
+
     #[salsa::db]
     #[derive(Clone)]
     pub(crate) struct TestDb {
@@ -23,31 +25,35 @@ pub(crate) mod tests {
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
-        events: Arc<std::sync::Mutex<Vec<salsa::Event>>>,
+        events: Events,
         rule_selection: Arc<RuleSelection>,
     }
 
     #[expect(dead_code)]
     impl TestDb {
         pub(crate) fn new() -> Self {
+            let events = Events::default();
             Self {
-                storage: salsa::Storage::default(),
+                storage: salsa::Storage::new(Some(Box::new({
+                    let events = events.clone();
+                    move |event| {
+                        tracing::trace!("event: {event:?}");
+                        let mut events = events.lock().unwrap();
+                        events.push(event);
+                    }
+                }))),
                 system: TestSystem::default(),
                 vendored: ty_vendored::file_system().clone(),
-                events: Arc::default(),
+                events,
                 files: Files::default(),
                 rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
             }
         }
 
         /// Takes the salsa events.
-        ///
-        /// ## Panics
-        /// If there are any pending salsa snapshots.
         pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
-            let inner = Arc::get_mut(&mut self.events).expect("no pending salsa snapshots");
+            let mut events = self.events.lock().unwrap();
 
-            let events = inner.get_mut().unwrap();
             std::mem::take(&mut *events)
         }
 
@@ -114,8 +120,8 @@ pub(crate) mod tests {
             !file.path(self).is_vendored_path()
         }
 
-        fn rule_selection(&self) -> Arc<RuleSelection> {
-            self.rule_selection.clone()
+        fn rule_selection(&self) -> &RuleSelection {
+            &self.rule_selection
         }
 
         fn lint_registry(&self) -> &LintRegistry {
@@ -127,12 +133,5 @@ pub(crate) mod tests {
     impl Db for TestDb {}
 
     #[salsa::db]
-    impl salsa::Database for TestDb {
-        fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
-            let event = event();
-            tracing::trace!("event: {event:?}");
-            let mut events = self.events.lock().unwrap();
-            events.push(event);
-        }
-    }
+    impl salsa::Database for TestDb {}
 }

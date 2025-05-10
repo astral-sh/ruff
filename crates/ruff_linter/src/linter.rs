@@ -35,7 +35,7 @@ use crate::registry::{AsRule, Rule, RuleSet};
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TestRule, TEST_RULES};
 use crate::settings::types::UnsafeFixes;
-use crate::settings::{flags, LinterSettings};
+use crate::settings::{flags, LinterSettings, TargetVersion};
 use crate::source_kind::SourceKind;
 use crate::{directives, fs, warn_user_once, Locator};
 
@@ -111,7 +111,7 @@ pub fn check_path(
     source_kind: &SourceKind,
     source_type: PySourceType,
     parsed: &Parsed<ModModule>,
-    target_version: PythonVersion,
+    target_version: TargetVersion,
 ) -> Vec<Message> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
@@ -160,7 +160,7 @@ pub fn check_path(
             locator,
             comment_ranges,
             settings,
-            target_version,
+            target_version.linter_version(),
         ));
     }
 
@@ -215,7 +215,7 @@ pub fn check_path(
                     package,
                     source_type,
                     cell_offsets,
-                    target_version,
+                    target_version.linter_version(),
                 );
 
                 diagnostics.extend(import_diagnostics);
@@ -390,7 +390,7 @@ pub fn add_noqa_to_path(
 ) -> Result<usize> {
     // Parse once.
     let target_version = settings.resolve_target_version(path);
-    let parsed = parse_unchecked_source(source_kind, source_type, target_version);
+    let parsed = parse_unchecked_source(source_kind, source_type, target_version.parser_version());
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -451,11 +451,13 @@ pub fn lint_only(
 ) -> LinterResult {
     let target_version = settings.resolve_target_version(path);
 
-    if matches!(target_version, PythonVersion::PY314) && !is_py314_support_enabled(settings) {
+    if matches!(target_version, TargetVersion(Some(PythonVersion::PY314)))
+        && !is_py314_support_enabled(settings)
+    {
         warn_user_once!("Support for Python 3.14 is under development and may be unstable. Enable `preview` to remove this warning.");
     }
 
-    let parsed = source.into_parsed(source_kind, source_type, target_version);
+    let parsed = source.into_parsed(source_kind, source_type, target_version.parser_version());
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -563,14 +565,17 @@ pub fn lint_fix<'a>(
 
     let target_version = settings.resolve_target_version(path);
 
-    if matches!(target_version, PythonVersion::PY314) && !is_py314_support_enabled(settings) {
+    if matches!(target_version, TargetVersion(Some(PythonVersion::PY314)))
+        && !is_py314_support_enabled(settings)
+    {
         warn_user_once!("Support for Python 3.14 is under development and may be unstable. Enable `preview` to remove this warning.");
     }
 
     // Continuously fix until the source code stabilizes.
     loop {
         // Parse once.
-        let parsed = parse_unchecked_source(&transformed, source_type, target_version);
+        let parsed =
+            parse_unchecked_source(&transformed, source_type, target_version.parser_version());
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(transformed.source_code());
@@ -972,8 +977,9 @@ mod tests {
         settings: &LinterSettings,
     ) -> Vec<Message> {
         let source_type = PySourceType::from(path);
+        let target_version = settings.resolve_target_version(path);
         let options =
-            ParseOptions::from(source_type).with_target_version(settings.unresolved_target_version);
+            ParseOptions::from(source_type).with_target_version(target_version.parser_version());
         let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
             .try_into_module()
             .expect("PySourceType always parses into a module");
@@ -998,7 +1004,7 @@ mod tests {
             source_kind,
             source_type,
             &parsed,
-            settings.unresolved_target_version,
+            target_version,
         );
         messages.sort_by_key(Ranged::start);
         messages
@@ -1063,6 +1069,142 @@ mod tests {
         PythonVersion::PY310,
         "MultipleCaseAssignment"
     )]
+    #[test_case(
+        "duplicate_match_key",
+        "
+        match x:
+            case {'key': 1, 'key': 2}:
+                pass
+        ",
+        PythonVersion::PY310,
+        "DuplicateMatchKey"
+    )]
+    #[test_case(
+        "duplicate_match_class_attribute",
+        "
+        match x:
+            case Point(x=1, x=2):
+                pass
+        ",
+        PythonVersion::PY310,
+        "DuplicateMatchClassAttribute"
+    )]
+    #[test_case(
+        "invalid_star_expression",
+        "
+        def func():
+            return *x
+        ",
+        PythonVersion::PY310,
+        "InvalidStarExpression"
+    )]
+    #[test_case(
+        "invalid_star_expression_for",
+        "
+        for *x in range(10):
+            pass
+        ",
+        PythonVersion::PY310,
+        "InvalidStarExpression"
+    )]
+    #[test_case(
+        "invalid_star_expression_yield",
+        "
+        def func():
+            yield *x
+        ",
+        PythonVersion::PY310,
+        "InvalidStarExpression"
+    )]
+    #[test_case(
+        "irrefutable_case_pattern_wildcard",
+        "
+        match value:
+            case _:
+                pass
+            case 1:
+                pass
+        ",
+        PythonVersion::PY310,
+        "IrrefutableCasePattern"
+    )]
+    #[test_case(
+        "irrefutable_case_pattern_capture",
+        "
+        match value:
+            case irrefutable:
+                pass
+            case 1:
+                pass
+        ",
+        PythonVersion::PY310,
+        "IrrefutableCasePattern"
+    )]
+    #[test_case(
+        "single_starred_assignment",
+        "*a = [1, 2, 3, 4]",
+        PythonVersion::PY310,
+        "SingleStarredAssignment"
+    )]
+    #[test_case(
+        "write_to_debug",
+        "
+        __debug__ = False
+        ",
+        PythonVersion::PY310,
+        "WriteToDebug"
+    )]
+    #[test_case(
+        "write_to_debug_in_function_param",
+        "
+        def process(__debug__):
+            pass
+        ",
+        PythonVersion::PY310,
+        "WriteToDebug"
+    )]
+    #[test_case(
+        "write_to_debug_class_type_param",
+        "
+        class Generic[__debug__]:
+            pass
+        ",
+        PythonVersion::PY312,
+        "WriteToDebug"
+    )]
+    #[test_case(
+        "invalid_expression_yield_in_type_param",
+        "
+        type X[T: (yield 1)] = int
+        ",
+        PythonVersion::PY312,
+        "InvalidExpression"
+    )]
+    #[test_case(
+        "invalid_expression_yield_in_type_alias",
+        "
+        type Y = (yield 1)
+        ",
+        PythonVersion::PY312,
+        "InvalidExpression"
+    )]
+    #[test_case(
+        "invalid_expression_walrus_in_return_annotation",
+        "
+        def f[T](x: int) -> (y := 3): return x
+        ",
+        PythonVersion::PY312,
+        "InvalidExpression"
+    )]
+    #[test_case(
+        "invalid_expression_yield_from_in_base_class",
+        "
+        class C[T]((yield from [object])):
+            pass
+        ",
+        PythonVersion::PY312,
+        "InvalidExpression"
+    )]
     fn test_semantic_errors(
         name: &str,
         contents: &str,
@@ -1074,7 +1216,7 @@ mod tests {
             contents,
             &LinterSettings {
                 rules: settings::rule_table::RuleTable::empty(),
-                unresolved_target_version: python_version,
+                unresolved_target_version: python_version.into(),
                 preview: settings::types::PreviewMode::Enabled,
                 ..Default::default()
             },
@@ -1092,7 +1234,7 @@ mod tests {
             &SourceKind::IpyNotebook(Notebook::from_path(path)?),
             path,
             &LinterSettings {
-                unresolved_target_version: python_version,
+                unresolved_target_version: python_version.into(),
                 rules: settings::rule_table::RuleTable::empty(),
                 preview: settings::types::PreviewMode::Enabled,
                 ..Default::default()
@@ -1110,6 +1252,8 @@ mod tests {
         Rule::LoadBeforeGlobalDeclaration,
         Path::new("load_before_global_declaration.py")
     )]
+    #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async_function.py"))]
+    #[test_case(Rule::AwaitOutsideAsync, Path::new("async_comprehension.py"))]
     fn test_syntax_errors(rule: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let path = Path::new("resources/test/fixtures/syntax_errors").join(path);
@@ -1156,7 +1300,7 @@ mod tests {
         "pyi019_adds_typing_extensions",
 		PYI019_EXAMPLE,
 		&LinterSettings {
-			unresolved_target_version: PythonVersion::PY310,
+			unresolved_target_version: PythonVersion::PY310.into(),
 			typing_extensions: true,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
@@ -1165,7 +1309,7 @@ mod tests {
         "pyi019_does_not_add_typing_extensions",
 		PYI019_EXAMPLE,
 		&LinterSettings {
-			unresolved_target_version: PythonVersion::PY310,
+			unresolved_target_version: PythonVersion::PY310.into(),
 			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
@@ -1174,7 +1318,7 @@ mod tests {
         "pyi019_adds_typing_without_extensions_disabled",
 		PYI019_EXAMPLE,
 		&LinterSettings {
-			unresolved_target_version: PythonVersion::PY311,
+			unresolved_target_version: PythonVersion::PY311.into(),
 			typing_extensions: true,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
@@ -1183,7 +1327,7 @@ mod tests {
         "pyi019_adds_typing_with_extensions_disabled",
 		PYI019_EXAMPLE,
 		&LinterSettings {
-			unresolved_target_version: PythonVersion::PY311,
+			unresolved_target_version: PythonVersion::PY311.into(),
 			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
@@ -1195,7 +1339,7 @@ mod tests {
 			def __new__(cls) -> C: ...
 		",
 		&LinterSettings {
-			unresolved_target_version: PythonVersion { major: 3, minor: 10 },
+			unresolved_target_version: PythonVersion { major: 3, minor: 10 }.into(),
 			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::NonSelfReturnType)
 		}
@@ -1212,7 +1356,7 @@ mod tests {
 			return commons
 		"#,
 		&LinterSettings {
-			unresolved_target_version: PythonVersion { major: 3, minor: 8 },
+			unresolved_target_version: PythonVersion { major: 3, minor: 8 }.into(),
 			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::FastApiNonAnnotatedDependency)
 		}
@@ -1227,7 +1371,7 @@ mod tests {
 		"pyi026_disabled",
 		"Vector = list[float]",
 		&LinterSettings {
-			unresolved_target_version: PythonVersion { major: 3, minor: 9 },
+			unresolved_target_version: PythonVersion { major: 3, minor: 9 }.into(),
 			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::TypeAliasWithoutAnnotation)
 		}

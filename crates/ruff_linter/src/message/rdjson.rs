@@ -57,7 +57,8 @@ impl Serialize for ExpandedMessages<'_> {
 }
 
 fn message_to_rdjson_value(message: &Message) -> Value {
-    let source_code = message.source_file().to_source_code();
+    let source_file = message.source_file();
+    let source_code = source_file.to_source_code();
 
     let start_location = source_code.line_column(message.start());
     let end_location = source_code.line_column(message.end());

@@ -349,7 +349,7 @@ impl SearchPaths {
 /// The editable-install search paths for the first `site-packages` directory
 /// should come between the two `site-packages` directories when it comes to
 /// module-resolution priority.
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(returns(deref))]
 pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
     tracing::debug!("Resolving dynamic module resolution paths");
 
@@ -583,7 +583,7 @@ impl<'db> Iterator for PthFileIterator<'db> {
 /// This is needed because Salsa requires that all query arguments are salsa ingredients.
 #[salsa::interned(debug)]
 struct ModuleNameIngredient<'db> {
-    #[return_ref]
+    #[returns(ref)]
     pub(super) name: ModuleName,
 }
 

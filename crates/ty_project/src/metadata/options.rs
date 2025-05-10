@@ -3,7 +3,7 @@ use crate::Db;
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, Severity, Span};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath};
-use ruff_macros::Combine;
+use ruff_macros::{Combine, OptionsMetadata};
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -14,31 +14,63 @@ use ty_python_semantic::{ProgramSettings, PythonPath, PythonPlatform, SearchPath
 
 use super::settings::{Settings, TerminalSettings};
 
-/// The options for the project.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize)]
+#[derive(
+    Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize, OptionsMetadata,
+)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
     /// Configures the type checking environment.
+    #[option_group]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub environment: Option<EnvironmentOptions>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[option_group]
     pub src: Option<SrcOptions>,
 
-    /// Configures the enabled lints and their severity.
+    /// Configures the enabled rules and their severity.
+    ///
+    /// See [the rules documentation](https://github.com/astral-sh/ruff/blob/main/crates/ty/docs/rules.md) for a list of all available rules.
+    ///
+    /// Valid severities are:
+    ///
+    /// * `ignore`: Disable the rule.
+    /// * `warn`: Enable the rule and create a warning diagnostic.
+    /// * `error`: Enable the rule and create an error diagnostic.
+    ///   ty will exit with a non-zero code if any error diagnostics are emitted.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"{...}"#,
+        value_type = r#"dict[RuleName, "ignore" | "warn" | "error"]"#,
+        example = r#"
+            [tool.ty.rules]
+            possibly-unresolved-reference = "warn"
+            division-by-zero = "ignore"
+        "#
+    )]
     pub rules: Option<Rules>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[option_group]
     pub terminal: Option<TerminalOptions>,
 
+    /// Whether to automatically exclude files that are ignored by `.ignore`,
+    /// `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
+    /// Enabled by default.
+    #[option(
+        default = r#"true"#,
+        value_type = r#"bool"#,
+        example = r#"
+            respect-ignore-files = false
+        "#
+    )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub respect_ignore_files: Option<bool>,
 }
 
 impl Options {
-    pub(crate) fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
+    pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
         let _guard = ValueSourceGuard::new(source, true);
         let options = toml::from_str(content)?;
         Ok(options)
@@ -61,7 +93,7 @@ impl Options {
             .environment
             .as_ref()
             .and_then(|env| env.python_version.as_deref().copied())
-            .unwrap_or_default();
+            .unwrap_or(PythonVersion::latest_ty());
         let python_platform = self
             .environment
             .as_ref()
@@ -226,22 +258,33 @@ impl Options {
     }
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
+#[derive(
+    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
+)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct EnvironmentOptions {
     /// Specifies the version of Python that will be used to analyze the source code.
     /// The version should be specified as a string in the format `M.m` where `M` is the major version
-    /// and `m` is the minor (e.g. "3.0" or "3.6").
+    /// and `m` is the minor (e.g. `"3.0"` or `"3.6"`).
     /// If a version is provided, ty will generate errors if the source code makes use of language features
     /// that are not supported in that version.
-    /// It will also tailor its use of type stub files, which conditionalizes type definitions based on the version.
+    /// It will also understand conditionals based on comparisons with `sys.version_info`, such
+    /// as are commonly found in typeshed to reflect the differing contents of the standard
+    /// library across Python versions.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#""3.13""#,
+        value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | <major>.<minor>"#,
+        example = r#"
+            python-version = "3.12"
+        "#
+    )]
     pub python_version: Option<RangedValue<PythonVersion>>,
 
     /// Specifies the target platform that will be used to analyze the source code.
-    /// If specified, ty will tailor its use of type stub files,
-    /// which conditionalize type definitions based on the platform.
+    /// If specified, ty will understand conditions based on comparisons with `sys.platform`, such
+    /// as are commonly found in typeshed to reflect the differing contents of the standard library across platforms.
     ///
     /// If no platform is specified, ty will use the current platform:
     /// - `win32` for Windows
@@ -250,18 +293,40 @@ pub struct EnvironmentOptions {
     /// - `ios` for iOS
     /// - `linux` for everything else
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"<current-platform>"#,
+        value_type = r#""win32" | "darwin" | "android" | "ios" | "linux" | str"#,
+        example = r#"
+        # Tailor type stubs and conditionalized type definitions to windows.
+        python-platform = "win32"
+        "#
+    )]
     pub python_platform: Option<RangedValue<PythonPlatform>>,
 
     /// List of user-provided paths that should take first priority in the module resolution.
-    /// Examples in other type checkers are mypy's MYPYPATH environment variable,
-    /// or pyright's stubPath configuration setting.
+    /// Examples in other type checkers are mypy's `MYPYPATH` environment variable,
+    /// or pyright's `stubPath` configuration setting.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            extra-paths = ["~/shared/my-search-path"]
+        "#
+    )]
     pub extra_paths: Option<Vec<RelativePathBuf>>,
 
     /// Optional path to a "typeshed" directory on disk for us to use for standard-library types.
     /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
     /// bundled as a zip file in the binary
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"null"#,
+        value_type = "str",
+        example = r#"
+            typeshed = "/path/to/custom/typeshed"
+        "#
+    )]
     pub typeshed: Option<RelativePathBuf>,
 
     /// Path to the Python installation from which ty resolves type information and third-party dependencies.
@@ -271,15 +336,31 @@ pub struct EnvironmentOptions {
     ///
     /// This option is commonly used to specify the path to a virtual environment.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"null"#,
+        value_type = "str",
+        example = r#"
+            python = "./.venv"
+        "#
+    )]
     pub python: Option<RelativePathBuf>,
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
+#[derive(
+    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
+)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SrcOptions {
-    /// The root of the project, used for finding first-party modules.
+    /// The root(s) of the project, used for finding first-party modules.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"[".", "./src"]"#,
+        value_type = "list[str]",
+        example = r#"
+            root = ["./app"]
+        "#
+    )]
     pub root: Option<RelativePathBuf>,
 }
 
@@ -301,7 +382,9 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
     }
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
+#[derive(
+    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
+)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct TerminalOptions {
@@ -309,10 +392,25 @@ pub struct TerminalOptions {
     ///
     /// Defaults to `full`.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"full"#,
+        value_type = "full | concise",
+        example = r#"
+            output-format = "concise"
+        "#
+    )]
     pub output_format: Option<RangedValue<DiagnosticFormat>>,
     /// Use exit code 1 if there are any warning-level diagnostics.
     ///
     /// Defaults to `false`.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+        # Error if ty emits any warning-level diagnostics.
+        error-on-warning = true
+        "#
+    )]
     pub error_on_warning: Option<bool>,
 }
 

@@ -33,7 +33,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable: Object of type `NotIterable` is not iterable
+error[not-iterable]: Object of type `NotIterable` is not iterable
   --> src/mdtest_snippet.py:11:14
    |
 10 |     # error: [not-iterable]
@@ -42,11 +42,12 @@ error: lint:not-iterable: Object of type `NotIterable` is not iterable
 12 |         pass
    |
 info: Its `__iter__` attribute has type `int | None`, which is not callable
+info: `not-iterable` is enabled by default
 
 ```
 
 ```
-warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
+info[possibly-unresolved-reference]: Name `x` used when possibly not defined
   --> src/mdtest_snippet.py:16:17
    |
 14 |     # revealed: Unknown
@@ -54,17 +55,18 @@ warning: lint:possibly-unresolved-reference: Name `x` used when possibly not def
 16 |     reveal_type(x)
    |                 ^
    |
+info: `possibly-unresolved-reference` is enabled by default
 
 ```
 
 ```
-info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:16:5
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:16:17
    |
 14 |     # revealed: Unknown
 15 |     # error: [possibly-unresolved-reference]
 16 |     reveal_type(x)
-   |     ^^^^^^^^^^^^^^ `Unknown`
+   |                 ^ `Unknown`
    |
 
 ```

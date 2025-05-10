@@ -145,7 +145,7 @@ def f(x: int) -> int:
     return x**2
 
 # TODO: Should be `_lru_cache_wrapper[int]`
-reveal_type(f)  # revealed: _lru_cache_wrapper[_T]
+reveal_type(f)  # revealed: _lru_cache_wrapper[Unknown]
 
 # TODO: Should be `int`
 reveal_type(f(1))  # revealed: Unknown
@@ -207,7 +207,7 @@ first argument:
 def wrong_signature(f: int) -> str:
     return "a"
 
-# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `def f(x) -> Unknown`"
+# error: [invalid-argument-type] "Argument to function `wrong_signature` is incorrect: Expected `int`, found `def f(x) -> Unknown`"
 @wrong_signature
 def f(x): ...
 

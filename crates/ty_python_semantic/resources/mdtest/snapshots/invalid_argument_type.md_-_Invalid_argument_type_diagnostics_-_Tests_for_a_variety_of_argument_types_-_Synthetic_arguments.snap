@@ -23,7 +23,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_argu
 # Diagnostics
 
 ```
-error: lint:invalid-argument-type: Argument to this function is incorrect
+error[invalid-argument-type]: Argument to bound method `__call__` is incorrect
  --> src/mdtest_snippet.py:6:3
   |
 5 | c = C()
@@ -38,5 +38,6 @@ info: Function defined here
   |         ^^^^^^^^       ------ Parameter declared here
 3 |         return 1
   |
+info: `invalid-argument-type` is enabled by default
 
 ```

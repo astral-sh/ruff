@@ -32,17 +32,19 @@ struct TestDb {
     files: Files,
     system: TestSystem,
     vendored: VendoredFileSystem,
-    events: Arc<Mutex<Vec<salsa::Event>>>,
     rule_selection: Arc<RuleSelection>,
 }
 
 impl TestDb {
     fn new() -> Self {
         Self {
-            storage: salsa::Storage::default(),
+            storage: salsa::Storage::new(Some(Box::new({
+                move |event| {
+                    tracing::trace!("event: {:?}", event);
+                }
+            }))),
             system: TestSystem::default(),
             vendored: ty_vendored::file_system().clone(),
-            events: Arc::default(),
             files: Files::default(),
             rule_selection: RuleSelection::from_registry(default_lint_registry()).into(),
         }
@@ -93,8 +95,8 @@ impl SemanticDb for TestDb {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> Arc<RuleSelection> {
-        self.rule_selection.clone()
+    fn rule_selection(&self) -> &RuleSelection {
+        &self.rule_selection
     }
 
     fn lint_registry(&self) -> &LintRegistry {
@@ -103,14 +105,7 @@ impl SemanticDb for TestDb {
 }
 
 #[salsa::db]
-impl salsa::Database for TestDb {
-    fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
-        let event = event();
-        tracing::trace!("event: {:?}", event);
-        let mut events = self.events.lock().unwrap();
-        events.push(event);
-    }
-}
+impl salsa::Database for TestDb {}
 
 fn setup_db() -> TestDb {
     let db = TestDb::new();

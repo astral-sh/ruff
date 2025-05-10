@@ -1,4 +1,5 @@
 AutoSplit
+Expression
 PyGithub
 PyWinCtl
 SinbadCogs
@@ -8,6 +9,7 @@ aioredis
 aiortc
 alectryon
 alerta
+altair
 anyio
 apprise
 arviz
@@ -23,6 +25,7 @@ boostedblob
 check-jsonschema
 cki-lib
 cloud-init
+colour
 com2ann
 comtypes
 cwltool
@@ -44,17 +47,19 @@ imagehash
 isort
 itsdangerous
 janus
-jax
 jinja
 koda-validate
 kopf
 kornia
+manticore
+materialize
 meson
 mitmproxy
 mkdocs
 mkosi
 mongo-python-driver
 more-itertools
+mypy
 mypy-protobuf
 mypy_primer
 nionutils
@@ -63,11 +68,9 @@ openlibrary
 operator
 optuna
 paasta
-packaging
 paroxython
 parso
 pegen
-pip
 poetry
 porcupine
 ppb-vector
@@ -79,9 +82,9 @@ pydantic
 pyinstrument
 pyjwt
 pylox
-pyodide
 pyp
 pyppeteer
+pytest
 pytest-robotframework
 python-chess
 python-htmlgen
@@ -90,8 +93,8 @@ rclip
 rich
 rotki
 schema_salad
+scipy
 scrapy
-setuptools
 sockeye
 speedrun.com_global_scoreboard_webapp
 sphinx
@@ -99,7 +102,10 @@ starlette
 static-frame
 stone
 strawberry
+streamlit
+sympy
 tornado
+trio
 twine
 typeshed-stats
 urllib3

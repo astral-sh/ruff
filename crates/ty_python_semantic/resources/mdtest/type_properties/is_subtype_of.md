@@ -151,7 +151,8 @@ static_assert(not is_subtype_of(tuple[B1, B2], tuple[()]))
 static_assert(not is_subtype_of(tuple[B1, B2], tuple[A1]))
 static_assert(not is_subtype_of(tuple[B1, B2], tuple[A1, A2, Unrelated]))
 
-static_assert(is_subtype_of(tuple[int], tuple))
+# TODO: should pass
+static_assert(is_subtype_of(tuple[int], tuple[object, ...]))  # error: [static-assert-error]
 ```
 
 ## Union types
@@ -334,10 +335,14 @@ static_assert(is_subtype_of(TypeOf[typing], ModuleType))
 
 ### Slice literals
 
+The type of a slice literal is currently inferred as a specialization of `slice`.
+
 ```py
 from ty_extensions import TypeOf, is_subtype_of, static_assert
 
-static_assert(is_subtype_of(TypeOf[1:2:3], slice))
+# slice's default specialization is slice[Any, Any, Any], which does not participate in subtyping.
+static_assert(not is_subtype_of(TypeOf[1:2:3], slice))
+static_assert(is_subtype_of(TypeOf[1:2:3], slice[int]))
 ```
 
 ### Special forms

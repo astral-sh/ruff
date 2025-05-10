@@ -289,11 +289,11 @@ impl Violation for UnixCommandWildcardInjection {
 }
 
 /// Check if an expression is a trusted input for subprocess.run.
-/// We assume that any str or list[str] literal can be trusted.
+/// We assume that any str, list[str] or tuple[str] literal can be trusted.
 fn is_trusted_input(arg: &Expr) -> bool {
     match arg {
         Expr::StringLiteral(_) => true,
-        Expr::List(ast::ExprList { elts, .. }) => {
+        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             elts.iter().all(|elt| matches!(elt, Expr::StringLiteral(_)))
         }
         Expr::Named(named) => is_trusted_input(&named.value),

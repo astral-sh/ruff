@@ -1,6 +1,8 @@
 use anyhow::Context;
 use insta::internals::SettingsBindDropGuard;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
+use ruff_python_ast::PythonVersion;
+use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
@@ -12,7 +14,7 @@ fn test_run_in_sub_directory() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: invalid-syntax
+    error[invalid-syntax]
      --> <temp_dir>/test.py:1:2
       |
     1 | ~
@@ -22,6 +24,7 @@ fn test_run_in_sub_directory() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
     Ok(())
 }
@@ -33,7 +36,7 @@ fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: invalid-syntax
+    error[invalid-syntax]
      --> .test.py:1:2
       |
     1 | ~
@@ -43,6 +46,7 @@ fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
     Ok(())
 }
@@ -58,6 +62,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     All checks passed!
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     WARN No python files found under the given path(s)
     ");
 
@@ -66,7 +71,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: invalid-syntax
+    error[invalid-syntax]
      --> test.py:1:2
       |
     1 | ~
@@ -76,6 +81,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     // Test that we can set to false via config file
@@ -84,7 +90,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: invalid-syntax
+    error[invalid-syntax]
      --> test.py:1:2
       |
     1 | ~
@@ -94,6 +100,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     // Ensure CLI takes precedence
@@ -102,7 +109,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: invalid-syntax
+    error[invalid-syntax]
      --> test.py:1:2
       |
     1 | ~
@@ -112,6 +119,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
     Ok(())
 }
@@ -142,17 +150,19 @@ fn config_override_python_version() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: lint:unresolved-attribute: Type `<module 'sys'>` has no attribute `last_exc`
+    error[unresolved-attribute]: Type `<module 'sys'>` has no attribute `last_exc`
      --> test.py:5:7
       |
     4 | # Access `sys.last_exc` that was only added in Python 3.12
     5 | print(sys.last_exc)
       |       ^^^^^^^^^^^^
       |
+    info: `unresolved-attribute` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     assert_cmd_snapshot!(case.command().arg("--python-version").arg("3.12"), @r"
@@ -162,6 +172,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
     All checks passed!
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -193,36 +204,38 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    info: revealed-type: Revealed type
-     --> test.py:5:1
+    info[revealed-type]: Revealed type
+     --> test.py:5:13
       |
     3 | from typing_extensions import reveal_type
     4 |
     5 | reveal_type(sys.platform)
-      | ^^^^^^^^^^^^^^^^^^^^^^^^^ `Literal["linux"]`
+      |             ^^^^^^^^^^^^ `Literal["linux"]`
       |
 
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "#);
 
     assert_cmd_snapshot!(case.command().arg("--python-platform").arg("all"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
-    info: revealed-type: Revealed type
-     --> test.py:5:1
+    info[revealed-type]: Revealed type
+     --> test.py:5:13
       |
     3 | from typing_extensions import reveal_type
     4 |
     5 | reveal_type(sys.platform)
-      | ^^^^^^^^^^^^^^^^^^^^^^^^^ `LiteralString`
+      |             ^^^^^^^^^^^^ `LiteralString`
       |
 
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -275,7 +288,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: lint:unresolved-import: Cannot resolve import `utils`
+    error[unresolved-import]: Cannot resolve imported module `utils`
      --> test.py:2:6
       |
     2 | from utils import add
@@ -283,10 +296,12 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     3 |
     4 | stat = add(10, 15)
       |
+    info: `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")).arg("--extra-search-path").arg("../libs"), @r"
@@ -296,6 +311,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     All checks passed!
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -349,6 +365,7 @@ fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Re
     All checks passed!
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -365,17 +382,17 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
             for a in range(0, int(y)):
                 x = a
 
-            print(x)  # possibly-unresolved-reference
+            prin(x)  # unresolved-reference
             "#,
     )?;
 
-    // Assert that there's a possibly unresolved reference diagnostic
-    // and that division-by-zero has a severity of error by default.
+    // Assert that there's an `unresolved-reference` diagnostic (error)
+    // and a `division-by-zero` diagnostic (error).
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    error: lint:division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
       |
     2 | y = 4 / 0
@@ -383,19 +400,22 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
+    info: `division-by-zero` is enabled by default
 
-    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> test.py:7:7
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> test.py:7:1
       |
     5 |     x = a
     6 |
-    7 | print(x)  # possibly-unresolved-reference
-      |       ^
+    7 | prin(x)  # unresolved-reference
+      | ^^^^
       |
+    info: `unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     case.write_file(
@@ -403,7 +423,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
         r#"
         [tool.ty.rules]
         division-by-zero = "warn" # demote to warn
-        possibly-unresolved-reference = "ignore"
+        unresolved-reference = "ignore"
     "#,
     )?;
 
@@ -411,7 +431,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: lint:division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
       |
     2 | y = 4 / 0
@@ -419,10 +439,12 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
+    info: `division-by-zero` was selected in the configuration file
 
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -441,17 +463,17 @@ fn cli_rule_severity() -> anyhow::Result<()> {
         for a in range(0, int(y)):
             x = a
 
-        print(x)  # possibly-unresolved-reference
+        prin(x)  # unresolved-reference
         "#,
     )?;
 
-    // Assert that there's a possibly unresolved reference diagnostic
-    // and that division-by-zero has a severity of error by default.
+    // Assert that there's an `unresolved-reference` diagnostic (error),
+    // a `division-by-zero` (error) and a unresolved-import (error) diagnostic by default.
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    error: lint:unresolved-import: Cannot resolve import `does_not_exit`
+    error[unresolved-import]: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
@@ -459,8 +481,9 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | y = 4 / 0
       |
+    info: `unresolved-import` is enabled by default
 
-    error: lint:division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:4:5
       |
     2 | import does_not_exit
@@ -470,26 +493,29 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     5 |
     6 | for a in range(0, int(y)):
       |
+    info: `division-by-zero` is enabled by default
 
-    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> test.py:9:7
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> test.py:9:1
       |
     7 |     x = a
     8 |
-    9 | print(x)  # possibly-unresolved-reference
-      |       ^
+    9 | prin(x)  # unresolved-reference
+      | ^^^^
       |
+    info: `unresolved-reference` is enabled by default
 
     Found 3 diagnostics
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     assert_cmd_snapshot!(
         case
             .command()
             .arg("--ignore")
-            .arg("possibly-unresolved-reference")
+            .arg("unresolved-reference")
             .arg("--warn")
             .arg("division-by-zero")
             .arg("--warn")
@@ -498,7 +524,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: lint:unresolved-import: Cannot resolve import `does_not_exit`
+    warning[unresolved-import]: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
@@ -506,8 +532,9 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | y = 4 / 0
       |
+    info: `unresolved-import` was selected on the command line
 
-    warning: lint:division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:4:5
       |
     2 | import does_not_exit
@@ -517,10 +544,12 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     5 |
     6 | for a in range(0, int(y)):
       |
+    info: `division-by-zero` was selected on the command line
 
     Found 2 diagnostics
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "
     );
 
@@ -539,17 +568,17 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
         for a in range(0, int(y)):
             x = a
 
-        print(x)  # possibly-unresolved-reference
+        prin(x)  # unresolved-reference
         "#,
     )?;
 
-    // Assert that there's a possibly unresolved reference diagnostic
-    // and that division-by-zero has a severity of error by default.
+    // Assert that there's a `unresolved-reference` diagnostic (error)
+    // and a `division-by-zero` (error) by default.
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    error: lint:division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
       |
     2 | y = 4 / 0
@@ -557,36 +586,39 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
+    info: `division-by-zero` is enabled by default
 
-    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> test.py:7:7
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> test.py:7:1
       |
     5 |     x = a
     6 |
-    7 | print(x)  # possibly-unresolved-reference
-      |       ^
+    7 | prin(x)  # unresolved-reference
+      | ^^^^
       |
+    info: `unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     assert_cmd_snapshot!(
         case
             .command()
-            .arg("--error")
-            .arg("possibly-unresolved-reference")
+            .arg("--warn")
+            .arg("unresolved-reference")
             .arg("--warn")
             .arg("division-by-zero")
             // Override the error severity with warning
             .arg("--ignore")
-            .arg("possibly-unresolved-reference"),
+            .arg("unresolved-reference"),
         @r"
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: lint:division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
       |
     2 | y = 4 / 0
@@ -594,10 +626,12 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
+    info: `division-by-zero` was selected on the command line
 
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "
     );
 
@@ -622,7 +656,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: unknown-rule
+    warning[unknown-rule]
      --> pyproject.toml:3:1
       |
     2 | [tool.ty.rules]
@@ -633,6 +667,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "#);
 
     Ok(())
@@ -647,11 +682,12 @@ fn cli_unknown_rules() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: unknown-rule: Unknown lint rule `division-by-zer`
+    warning[unknown-rule]: Unknown lint rule `division-by-zer`
 
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -661,20 +697,22 @@ fn cli_unknown_rules() -> anyhow::Result<()> {
 fn exit_code_only_warnings() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: lint:unresolved-reference: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
+    info: `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -694,17 +732,18 @@ fn exit_code_only_info() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    info: revealed-type: Revealed type
-     --> test.py:3:1
+    info[revealed-type]: Revealed type
+     --> test.py:3:13
       |
     2 | from typing_extensions import reveal_type
     3 | reveal_type(1)
-      | ^^^^^^^^^^^^^^ `Literal[1]`
+      |             ^ `Literal[1]`
       |
 
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -724,17 +763,18 @@ fn exit_code_only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    info: revealed-type: Revealed type
-     --> test.py:3:1
+    info[revealed-type]: Revealed type
+     --> test.py:3:13
       |
     2 | from typing_extensions import reveal_type
     3 | reveal_type(1)
-      | ^^^^^^^^^^^^^^ `Literal[1]`
+      |             ^ `Literal[1]`
       |
 
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -744,20 +784,22 @@ fn exit_code_only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
 fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
-    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r"
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning").arg("--warn").arg("unresolved-reference"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    warning: lint:unresolved-reference: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
+    info: `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -776,20 +818,22 @@ fn exit_code_no_errors_but_error_on_warning_is_enabled_in_configuration() -> any
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    warning: lint:unresolved-reference: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
+    info: `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -805,29 +849,32 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    warning: lint:unresolved-reference: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:2:7
       |
     2 | print(x)     # [unresolved-reference]
       |       ^
     3 | print(4[1])  # [non-subscriptable]
       |
+    info: `unresolved-reference` was selected on the command line
 
-    error: lint:non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    error[non-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
       |
     2 | print(x)     # [unresolved-reference]
     3 | print(4[1])  # [non-subscriptable]
       |       ^
       |
+    info: `non-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -843,29 +890,32 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
         "###,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--error-on-warning"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    warning: lint:unresolved-reference: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:2:7
       |
     2 | print(x)     # [unresolved-reference]
       |       ^
     3 | print(4[1])  # [non-subscriptable]
       |
+    info: `unresolved-reference` was selected on the command line
 
-    error: lint:non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    error[non-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
       |
     2 | print(x)     # [unresolved-reference]
     3 | print(4[1])  # [non-subscriptable]
       |       ^
       |
+    info: `non-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -881,29 +931,32 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--exit-zero"), @r"
+    assert_cmd_snapshot!(case.command().arg("--exit-zero").arg("--warn").arg("unresolved-reference"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: lint:unresolved-reference: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:2:7
       |
     2 | print(x)     # [unresolved-reference]
       |       ^
     3 | print(4[1])  # [non-subscriptable]
       |
+    info: `unresolved-reference` was selected on the command line
 
-    error: lint:non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    error[non-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
       |
     2 | print(x)     # [unresolved-reference]
     3 | print(4[1])  # [non-subscriptable]
       |       ^
       |
+    info: `non-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -927,7 +980,7 @@ fn user_configuration() -> anyhow::Result<()> {
             for a in range(0, int(y)):
                 x = a
 
-            print(x)
+            prin(x)
             "#,
         ),
     ])?;
@@ -942,10 +995,10 @@ fn user_configuration() -> anyhow::Result<()> {
     assert_cmd_snapshot!(
         case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
         @r"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
-    warning: lint:division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> main.py:2:5
       |
     2 | y = 4 / 0
@@ -953,23 +1006,26 @@ fn user_configuration() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
+    info: `division-by-zero` was selected in the configuration file
 
-    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> main.py:7:7
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> main.py:7:1
       |
     5 |     x = a
     6 |
-    7 | print(x)
-      |       ^
+    7 | prin(x)
+      | ^^^^
       |
+    info: `unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "
     );
 
-    // The user-level configuration promotes `possibly-unresolved-reference` to an error.
+    // The user-level configuration sets the severity for `unresolved-reference` to warn.
     // Changing the level for `division-by-zero` has no effect, because the project-level configuration
     // has higher precedence.
     case.write_file(
@@ -977,17 +1033,17 @@ fn user_configuration() -> anyhow::Result<()> {
         r#"
         [rules]
         division-by-zero = "error"
-        possibly-unresolved-reference = "error"
+        unresolved-reference = "warn"
         "#,
     )?;
 
     assert_cmd_snapshot!(
         case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
         @r"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
-    warning: lint:division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> main.py:2:5
       |
     2 | y = 4 / 0
@@ -995,19 +1051,22 @@ fn user_configuration() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
+    info: `division-by-zero` was selected in the configuration file
 
-    error: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> main.py:7:7
+    warning[unresolved-reference]: Name `prin` used when not defined
+     --> main.py:7:1
       |
     5 |     x = a
     6 |
-    7 | print(x)
-      |       ^
+    7 | prin(x)
+      | ^^^^
       |
+    info: `unresolved-reference` was selected in the configuration file
 
     Found 2 diagnostics
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "
     );
 
@@ -1045,14 +1104,15 @@ fn check_specific_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: lint:division-by-zero: Cannot divide object of type `Literal[4]` by zero
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> project/main.py:2:5
       |
     2 | y = 4 / 0  # error: division-by-zero
       |     ^^^^^
       |
+    info: `division-by-zero` is enabled by default
 
-    error: lint:unresolved-import: Cannot resolve import `main2`
+    error[unresolved-import]: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
     2 | from main2 import z  # error: unresolved-import
@@ -1060,17 +1120,20 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
+    info: `unresolved-import` is enabled by default
 
-    error: lint:unresolved-import: Cannot resolve import `does_not_exist`
+    error[unresolved-import]: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
+    info: `unresolved-import` is enabled by default
 
     Found 3 diagnostics
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "
     );
 
@@ -1082,7 +1145,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: lint:unresolved-import: Cannot resolve import `main2`
+    error[unresolved-import]: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
     2 | from main2 import z  # error: unresolved-import
@@ -1090,17 +1153,20 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
+    info: `unresolved-import` is enabled by default
 
-    error: lint:unresolved-import: Cannot resolve import `does_not_exist`
+    error[unresolved-import]: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
+    info: `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "
     );
 
@@ -1124,13 +1190,14 @@ fn check_non_existing_path() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: io: `<temp_dir>/project/main.py`: No such file or directory (os error 2)
+    error[io]: `<temp_dir>/project/main.py`: No such file or directory (os error 2)
 
-    error: io: `<temp_dir>/project/tests`: No such file or directory (os error 2)
+    error[io]: `<temp_dir>/project/tests`: No such file or directory (os error 2)
 
     Found 2 diagnostics
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     WARN No python files found under the given path(s)
     "
     );
@@ -1148,15 +1215,16 @@ fn concise_diagnostics() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @r"
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise").arg("--warn").arg("unresolved-reference"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    warning[lint:unresolved-reference] test.py:2:7: Name `x` used when not defined
-    error[lint:non-subscriptable] test.py:3:7: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    warning[unresolved-reference] test.py:2:7: Name `x` used when not defined
+    error[non-subscriptable] test.py:3:7: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
     Found 2 diagnostics
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -1186,11 +1254,251 @@ fn concise_revealed_type() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    info[revealed-type] test.py:5:1: Revealed type: `Literal["hello"]`
+    info[revealed-type] test.py:5:13: Revealed type: `Literal["hello"]`
     Found 1 diagnostic
 
     ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
+    let mut content = String::new();
+    writeln!(
+        &mut content,
+        "
+        from typing_extensions import reveal_type
+        total = 1{plus_one_repeated}
+        reveal_type(total)
+        ",
+        plus_one_repeated = " + 1".repeat(2000 - 1)
+    )?;
+
+    let case = TestCase::with_file("test.py", &ruff_python_trivia::textwrap::dedent(&content))?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    info[revealed-type]: Revealed type
+     --> test.py:4:13
+      |
+    2 | from typing_extensions import reveal_type
+    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1...
+    4 | reveal_type(total)
+      |             ^^^^^ `Literal[2000]`
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "ty.toml",
+            &*format!(
+                r#"
+                [environment]
+                python-version = "{}"
+                python-platform = "linux"
+                "#,
+                PythonVersion::default()
+            ),
+        ),
+        (
+            "main.py",
+            r#"
+            import os
+
+            os.grantpt(1) # only available on unix, Python 3.13 or newer
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-attribute]: Type `<module 'os'>` has no attribute `grantpt`
+     --> main.py:4:1
+      |
+    2 | import os
+    3 |
+    4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
+      | ^^^^^^^^^^
+      |
+    info: `unresolved-attribute` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // Use default (which should be latest supported)
+    let case = TestCase::with_files([
+        (
+            "ty.toml",
+            r#"
+            [environment]
+            python-platform = "linux"
+            "#,
+        ),
+        (
+            "main.py",
+            r#"
+            import os
+
+            os.grantpt(1) # only available on unix, Python 3.13 or newer
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
+    let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
+
+    // Long flag
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=true"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       ^
+      |
+    info: `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // Short flag
+    assert_cmd_snapshot!(case.command().arg("-c").arg("terminal.error-on-warning=true"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `x` used when not defined
+     --> test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       ^
+      |
+    info: `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn cli_config_args_overrides_knot_toml() -> anyhow::Result<()> {
+    let case = TestCase::with_files(vec![
+        (
+            "knot.toml",
+            r#"
+            [terminal]
+            error-on-warning = true
+            "#,
+        ),
+        ("test.py", r"print(x)  # [unresolved-reference]"),
+    ])?;
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=false"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       ^
+      |
+    info: `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
+    let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=true").arg("--config").arg("terminal.error-on-warning=false"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       ^
+      |
+    info: `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn cli_config_args_invalid_option() -> anyhow::Result<()> {
+    let case = TestCase::with_file("test.py", r"print(1)")?;
+    assert_cmd_snapshot!(case.command().arg("--config").arg("bad-option=true"), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: TOML parse error at line 1, column 1
+      |
+    1 | bad-option=true
+      | ^^^^^^^^^^
+    unknown field `bad-option`, expected one of `environment`, `src`, `rules`, `terminal`, `respect-ignore-files`
+
+
+    Usage: ty <COMMAND>
+
+    For more information, try '--help'.
+    ");
 
     Ok(())
 }

@@ -439,7 +439,7 @@ impl LintCacheData {
             .map(|msg| {
                 // Make sure that all message use the same source file.
                 assert_eq!(
-                    &msg.file,
+                    msg.file,
                     messages.first().unwrap().source_file(),
                     "message uses a different source file"
                 );
@@ -616,7 +616,7 @@ mod tests {
         let settings = Settings {
             cache_dir,
             linter: LinterSettings {
-                unresolved_target_version: PythonVersion::latest(),
+                unresolved_target_version: PythonVersion::latest().into(),
                 ..Default::default()
             },
             ..Settings::default()

@@ -33,7 +33,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/instances/ric
 # Diagnostics
 
 ```
-error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for type `NotBoolable`
+error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable`
   --> src/mdtest_snippet.py:12:1
    |
 11 | # error: [unsupported-bool-conversion]
@@ -43,11 +43,12 @@ error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for t
 14 | 10 < Comparable() < Comparable()
    |
 info: `__bool__` on `NotBoolable` must be callable
+info: `unsupported-bool-conversion` is enabled by default
 
 ```
 
 ```
-error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for type `NotBoolable`
+error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable`
   --> src/mdtest_snippet.py:14:1
    |
 12 | 10 < Comparable() < 20
@@ -58,5 +59,6 @@ error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for t
 16 | Comparable() < Comparable()  # fine
    |
 info: `__bool__` on `NotBoolable` must be callable
+info: `unsupported-bool-conversion` is enabled by default
 
 ```

@@ -18,12 +18,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unpacking.md
 # Diagnostics
 
 ```
-error: lint:not-iterable: Object of type `Literal[1]` is not iterable
+error[not-iterable]: Object of type `Literal[1]` is not iterable
  --> src/mdtest_snippet.py:1:8
   |
 1 | a, b = 1  # error: [not-iterable]
   |        ^
   |
 info: It doesn't have an `__iter__` method or a `__getitem__` method
+info: `not-iterable` is enabled by default
 
 ```

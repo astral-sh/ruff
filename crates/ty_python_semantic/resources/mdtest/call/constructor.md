@@ -75,7 +75,8 @@ constructor from it.
 from typing_extensions import Self
 
 class Base:
-    def __new__(cls, x: int) -> Self: ...
+    def __new__(cls, x: int) -> Self:
+        return cls()
 
 class Foo(Base): ...
 
@@ -98,8 +99,10 @@ def _(flag: bool) -> None:
             def __new__(cls, x: int, y: int = 1): ...
 
     reveal_type(Foo(1))  # revealed: Foo
-    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["1"]`"
+    # error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `int`, found `Literal["1"]`"
+    # error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `int`, found `Literal["1"]`"
     reveal_type(Foo("1"))  # revealed: Foo
+    # error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
     # error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
     reveal_type(Foo())  # revealed: Foo
     # error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 1, got 2"
@@ -229,8 +232,10 @@ def _(flag: bool) -> None:
             def __init__(self, x: int, y: int = 1): ...
 
     reveal_type(Foo(1))  # revealed: Foo
-    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["1"]`"
+    # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `int`, found `Literal["1"]`"
+    # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `int`, found `Literal["1"]`"
     reveal_type(Foo("1"))  # revealed: Foo
+    # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
     # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
     reveal_type(Foo())  # revealed: Foo
     # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"

@@ -23,6 +23,7 @@ ruff_index = { path = "crates/ruff_index" }
 ruff_linter = { path = "crates/ruff_linter" }
 ruff_macros = { path = "crates/ruff_macros" }
 ruff_notebook = { path = "crates/ruff_notebook" }
+ruff_options_metadata = { path = "crates/ruff_options_metadata" }
 ruff_python_ast = { path = "crates/ruff_python_ast" }
 ruff_python_codegen = { path = "crates/ruff_python_codegen" }
 ruff_python_formatter = { path = "crates/ruff_python_formatter" }
@@ -37,6 +38,7 @@ ruff_source_file = { path = "crates/ruff_source_file" }
 ruff_text_size = { path = "crates/ruff_text_size" }
 ruff_workspace = { path = "crates/ruff_workspace" }
 
+ty = { path = "crates/ty" }
 ty_ide = { path = "crates/ty_ide" }
 ty_project = { path = "crates/ty_project", default-features = false }
 ty_python_semantic = { path = "crates/ty_python_semantic" }
@@ -124,7 +126,7 @@ rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "42f15835c0005c4b37aaf5bc1a15e3e1b3df14b7" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "7edce6e248f35c8114b4b021cdb474a3fb2813b3" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
@@ -182,7 +184,7 @@ wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false }
 
 [workspace.metadata.cargo-shear]
-ignored = ["getrandom"]
+ignored = ["getrandom", "ruff_options_metadata"]
 
 
 [workspace.lints.rust]
@@ -268,75 +270,3 @@ debug = 1
 # The profile that 'cargo dist' will build with.
 [profile.dist]
 inherits = "release"
-
-# Config for 'dist'
-[workspace.metadata.dist]
-# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.28.4"
-# Make distability of apps opt-in instead of opt-out
-dist = false
-# CI backends to support
-ci = "github"
-# The installers to generate for each app
-installers = ["shell", "powershell"]
-# The archive format to use for windows builds (defaults .zip)
-windows-archive = ".zip"
-# The archive format to use for non-windows builds (defaults .tar.xz)
-unix-archive = ".tar.gz"
-# Target platforms to build apps for (Rust target-triple syntax)
-targets = [
-    "aarch64-apple-darwin",
-    "aarch64-pc-windows-msvc",
-    "aarch64-unknown-linux-gnu",
-    "aarch64-unknown-linux-musl",
-    "arm-unknown-linux-musleabihf",
-    "armv7-unknown-linux-gnueabihf",
-    "armv7-unknown-linux-musleabihf",
-    "i686-pc-windows-msvc",
-    "i686-unknown-linux-gnu",
-    "i686-unknown-linux-musl",
-    "powerpc64-unknown-linux-gnu",
-    "powerpc64le-unknown-linux-gnu",
-    "s390x-unknown-linux-gnu",
-    "x86_64-apple-darwin",
-    "x86_64-pc-windows-msvc",
-    "x86_64-unknown-linux-gnu",
-    "x86_64-unknown-linux-musl",
-]
-# Whether to auto-include files like READMEs, LICENSEs, and CHANGELOGs (default true)
-auto-includes = false
-# Whether dist should create a Github Release or use an existing draft
-create-release = true
-# Which actions to run on pull requests
-pr-run-mode = "plan"
-# Whether CI should trigger releases with dispatches instead of tag pushes
-dispatch-releases = true
-# Which phase dist should use to create the GitHub release
-github-release = "announce"
-# Whether CI should include auto-generated code to build local artifacts
-build-local-artifacts = false
-# Local artifacts jobs to run in CI
-local-artifacts-jobs = ["./build-binaries", "./build-docker"]
-# Publish jobs to run in CI
-publish-jobs = ["./publish-pypi", "./publish-wasm"]
-# Post-announce jobs to run in CI
-post-announce-jobs = [
-    "./notify-dependents",
-    "./publish-docs",
-    "./publish-playground",
-]
-# Custom permissions for GitHub Jobs
-github-custom-job-permissions = { "build-docker" = { packages = "write", contents = "read" }, "publish-wasm" = { contents = "read", id-token = "write", packages = "write" } }
-# Whether to install an updater program
-install-updater = false
-# Path that installers should place binaries in
-install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
-
-[workspace.metadata.dist.github-custom-runners]
-global = "depot-ubuntu-latest-4"
-
-[workspace.metadata.dist.github-action-commits]
-"actions/checkout" = "85e6279cec87321a52edac9c87bce653a07cf6c2" # v4
-"actions/upload-artifact" = "6027e3dd177782cd8ab9af838c04fd81a07f1d47" # v4.6.2
-"actions/download-artifact" = "d3f86a106a0bac45b974a628896c90dbdf5c8093" # v4.3.0
-"actions/attest-build-provenance" = "c074443f1aee8d4aeeae555aebba3282517141b2" #v2.2.3

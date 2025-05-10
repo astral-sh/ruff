@@ -92,7 +92,7 @@ impl NotebookDocument {
         };
 
         ruff_notebook::Notebook::from_raw_notebook(raw_notebook, false)
-            .unwrap_or_else(|err| panic!("Server notebook document could not be converted to Ruff's notebook document format: {err}"))
+            .unwrap_or_else(|err| panic!("Server notebook document could not be converted to ty's notebook document format: {err}"))
     }
 
     pub(crate) fn update(

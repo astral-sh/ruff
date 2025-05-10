@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.11.9
+
+### Preview features
+
+- Default to latest supported Python version for version-related syntax errors ([#17529](https://github.com/astral-sh/ruff/pull/17529))
+- Implement deferred annotations for Python 3.14 ([#17658](https://github.com/astral-sh/ruff/pull/17658))
+- \[`airflow`\] Fix `SQLTableCheckOperator` typo (`AIR302`) ([#17946](https://github.com/astral-sh/ruff/pull/17946))
+- \[`airflow`\] Remove `airflow.utils.dag_parsing_context.get_parsing_context` (`AIR301`) ([#17852](https://github.com/astral-sh/ruff/pull/17852))
+- \[`airflow`\] Skip attribute check in try catch block (`AIR301`) ([#17790](https://github.com/astral-sh/ruff/pull/17790))
+- \[`flake8-bandit`\] Mark tuples of string literals as trusted input in `S603` ([#17801](https://github.com/astral-sh/ruff/pull/17801))
+- \[`isort`\] Check full module path against project root(s) when categorizing first-party imports ([#16565](https://github.com/astral-sh/ruff/pull/16565))
+- \[`ruff`\] Add new rule `in-empty-collection` (`RUF060`) ([#16480](https://github.com/astral-sh/ruff/pull/16480))
+
+### Bug fixes
+
+- Fix missing `combine` call for `lint.typing-extensions` setting ([#17823](https://github.com/astral-sh/ruff/pull/17823))
+- \[`flake8-async`\] Fix module name in `ASYNC110`, `ASYNC115`, and `ASYNC116` fixes ([#17774](https://github.com/astral-sh/ruff/pull/17774))
+- \[`pyupgrade`\] Add spaces between tokens as necessary to avoid syntax errors in `UP018` autofix ([#17648](https://github.com/astral-sh/ruff/pull/17648))
+- \[`refurb`\] Fix false positive for float and complex numbers in `FURB116` ([#17661](https://github.com/astral-sh/ruff/pull/17661))
+- [parser] Flag single unparenthesized generator expr with trailing comma in arguments. ([#17893](https://github.com/astral-sh/ruff/pull/17893))
+
+### Documentation
+
+- Add instructions on how to upgrade to a newer Rust version ([#17928](https://github.com/astral-sh/ruff/pull/17928))
+- Update code of conduct email address ([#17875](https://github.com/astral-sh/ruff/pull/17875))
+- Add fix safety sections to `PLC2801`, `PLR1722`, and `RUF013` ([#17825](https://github.com/astral-sh/ruff/pull/17825), [#17826](https://github.com/astral-sh/ruff/pull/17826), [#17759](https://github.com/astral-sh/ruff/pull/17759))
+- Add link to `check-typed-exception` from `S110` and `S112` ([#17786](https://github.com/astral-sh/ruff/pull/17786))
+
+### Other changes
+
+- Allow passing a virtual environment to `ruff analyze graph` ([#17743](https://github.com/astral-sh/ruff/pull/17743))
+
 ## 0.11.8
 
 ### Preview features

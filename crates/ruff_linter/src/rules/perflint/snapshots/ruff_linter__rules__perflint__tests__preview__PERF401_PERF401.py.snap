@@ -223,7 +223,7 @@ PERF401.py:142:9: PERF401 [*] Use a list comprehension to create a transformed l
 
 PERF401.py:149:9: PERF401 [*] Use a list comprehension to create a transformed list
     |
-147 |     tmp = 1; result = []  # commment should be protected
+147 |     tmp = 1; result = []  # comment should be protected
 148 |     for i in range(10):
 149 |         result.append(i + 1)  # PERF401
     |         ^^^^^^^^^^^^^^^^^^^^ PERF401
@@ -234,10 +234,10 @@ PERF401.py:149:9: PERF401 [*] Use a list comprehension to create a transformed l
 144 144 | 
 145 145 | def f():
 146 146 |     # make sure that `tmp` is not deleted
-147     |-    tmp = 1; result = []  # commment should be protected
+147     |-    tmp = 1; result = []  # comment should be protected
 148     |-    for i in range(10):
 149     |-        result.append(i + 1)  # PERF401
-    147 |+    tmp = 1  # commment should be protected
+    147 |+    tmp = 1  # comment should be protected
     148 |+    result = [i + 1 for i in range(10)]  # PERF401
 150 149 | 
 151 150 | 
@@ -245,7 +245,7 @@ PERF401.py:149:9: PERF401 [*] Use a list comprehension to create a transformed l
 
 PERF401.py:156:9: PERF401 [*] Use a list comprehension to create a transformed list
     |
-154 |     result = []; tmp = 1  # commment should be protected
+154 |     result = []; tmp = 1  # comment should be protected
 155 |     for i in range(10):
 156 |         result.append(i + 1)  # PERF401
     |         ^^^^^^^^^^^^^^^^^^^^ PERF401
@@ -256,10 +256,10 @@ PERF401.py:156:9: PERF401 [*] Use a list comprehension to create a transformed l
 151 151 | 
 152 152 | def f():
 153 153 |     # make sure that `tmp` is not deleted
-154     |-    result = []; tmp = 1  # commment should be protected
+154     |-    result = []; tmp = 1  # comment should be protected
 155     |-    for i in range(10):
 156     |-        result.append(i + 1)  # PERF401
-    154 |+    tmp = 1  # commment should be protected
+    154 |+    tmp = 1  # comment should be protected
     155 |+    result = [i + 1 for i in range(10)]  # PERF401
 157 156 | 
 158 157 | 

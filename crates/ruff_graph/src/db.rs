@@ -88,8 +88,8 @@ impl Db for ModuleDb {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> Arc<RuleSelection> {
-        self.rule_selection.clone()
+    fn rule_selection(&self) -> &RuleSelection {
+        &self.rule_selection
     }
 
     fn lint_registry(&self) -> &LintRegistry {
@@ -98,6 +98,4 @@ impl Db for ModuleDb {
 }
 
 #[salsa::db]
-impl salsa::Database for ModuleDb {
-    fn salsa_event(&self, _event: &dyn Fn() -> salsa::Event) {}
-}
+impl salsa::Database for ModuleDb {}

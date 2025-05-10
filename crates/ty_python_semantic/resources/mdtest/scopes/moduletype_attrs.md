@@ -13,8 +13,7 @@ reveal_type(__loader__)  # revealed: LoaderProtocol | None
 reveal_type(__package__)  # revealed: str | None
 reveal_type(__doc__)  # revealed: str | None
 reveal_type(__spec__)  # revealed: ModuleSpec | None
-
-reveal_type(__path__)  # revealed: @Todo(specialized non-generic class)
+reveal_type(__path__)  # revealed: MutableSequence[str]
 
 class X:
     reveal_type(__name__)  # revealed: str
@@ -56,7 +55,7 @@ reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name:
 # These come from `builtins.object`, not `types.ModuleType`:
 reveal_type(typing.__eq__)  # revealed: bound method ModuleType.__eq__(value: object, /) -> bool
 
-reveal_type(typing.__class__)  # revealed: Literal[ModuleType]
+reveal_type(typing.__class__)  # revealed: <class 'ModuleType'>
 
 reveal_type(typing.__dict__)  # revealed: dict[str, Any]
 ```

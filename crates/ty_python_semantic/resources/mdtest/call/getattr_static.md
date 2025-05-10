@@ -115,7 +115,7 @@ inspect.getattr_static()
 # error: [missing-argument] "No argument provided for required parameter `attr`"
 inspect.getattr_static(C())
 
-# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `str`, found `Literal[1]`"
+# error: [invalid-argument-type] "Argument to function `getattr_static` is incorrect: Expected `str`, found `Literal[1]`"
 inspect.getattr_static(C(), 1)
 
 # error: [too-many-positional-arguments] "Too many positional arguments to function `getattr_static`: expected 3, got 4"

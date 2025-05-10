@@ -19,8 +19,8 @@ use crate::Db;
 #[salsa::input(debug)]
 pub struct FileRoot {
     /// The path of a root is guaranteed to never change.
-    #[return_ref]
-    path_buf: SystemPathBuf,
+    #[returns(deref)]
+    pub path: SystemPathBuf,
 
     /// The kind of the root at the time of its creation.
     kind_at_time_of_creation: FileRootKind,
@@ -32,10 +32,6 @@ pub struct FileRoot {
 }
 
 impl FileRoot {
-    pub fn path(self, db: &dyn Db) -> &SystemPath {
-        self.path_buf(db)
-    }
-
     pub fn durability(self, db: &dyn Db) -> salsa::Durability {
         self.kind_at_time_of_creation(db).durability()
     }

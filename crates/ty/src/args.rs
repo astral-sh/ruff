@@ -1,19 +1,22 @@
 use crate::logging::Verbosity;
 use crate::python_version::PythonVersion;
+use clap::error::ErrorKind;
 use clap::{ArgAction, ArgMatches, Error, Parser};
 use ruff_db::system::SystemPathBuf;
+use ty_project::combine::Combine;
 use ty_project::metadata::options::{EnvironmentOptions, Options, TerminalOptions};
-use ty_project::metadata::value::{RangedValue, RelativePathBuf};
+use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
 use ty_python_semantic::lint;
 
 #[derive(Debug, Parser)]
 #[command(author, name = "ty", about = "An extremely fast Python type checker.")]
-#[command(version)]
-pub(crate) struct Args {
+#[command(long_version = crate::version::version())]
+pub struct Cli {
     #[command(subcommand)]
     pub(crate) command: Command,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, clap::Subcommand)]
 pub(crate) enum Command {
     /// Check a project for type errors.
@@ -24,6 +27,10 @@ pub(crate) enum Command {
 
     /// Display ty's version
     Version,
+
+    /// Generate shell completion
+    #[clap(hide = true)]
+    GenerateShellCompletion { shell: clap_complete_command::Shell },
 }
 
 #[derive(Debug, Parser)]
@@ -82,6 +89,9 @@ pub(crate) struct CheckCommand {
     #[clap(flatten)]
     pub(crate) rules: RulesArg,
 
+    #[clap(flatten)]
+    pub(crate) config: ConfigsArg,
+
     /// The format to use for printing diagnostic messages.
     #[arg(long)]
     pub(crate) output_format: Option<OutputFormat>,
@@ -136,7 +146,7 @@ impl CheckCommand {
             .no_respect_ignore_files
             .then_some(false)
             .or(self.respect_ignore_files);
-        Options {
+        let options = Options {
             environment: Some(EnvironmentOptions {
                 python_version: self
                     .python_version
@@ -162,7 +172,9 @@ impl CheckCommand {
             rules,
             respect_ignore_files,
             ..Default::default()
-        }
+        };
+        // Merge with options passed in via --config
+        options.combine(self.config.into_options().unwrap_or_default())
     }
 }
 
@@ -294,4 +306,56 @@ pub(crate) enum TerminalColor {
 
     /// Never display colors.
     Never,
+}
+/// A TOML `<KEY> = <VALUE>` pair
+/// (such as you might find in a `ty.toml` configuration file)
+/// overriding a specific configuration option.
+/// Overrides of individual settings using this option always take precedence
+/// over all configuration files.
+#[derive(Debug, Clone)]
+pub(crate) struct ConfigsArg(Option<Options>);
+
+impl clap::FromArgMatches for ConfigsArg {
+    fn from_arg_matches(matches: &ArgMatches) -> Result<Self, Error> {
+        let combined = matches
+            .get_many::<String>("config")
+            .into_iter()
+            .flatten()
+            .map(|s| {
+                Options::from_toml_str(s, ValueSource::Cli)
+                    .map_err(|err| Error::raw(ErrorKind::InvalidValue, err.to_string()))
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .reduce(|acc, item| item.combine(acc));
+        Ok(Self(combined))
+    }
+
+    fn update_from_arg_matches(&mut self, matches: &ArgMatches) -> Result<(), Error> {
+        self.0 = Self::from_arg_matches(matches)?.0;
+        Ok(())
+    }
+}
+
+impl clap::Args for ConfigsArg {
+    fn augment_args(cmd: clap::Command) -> clap::Command {
+        cmd.arg(
+            clap::Arg::new("config")
+                .short('c')
+                .long("config")
+                .value_name("CONFIG_OPTION")
+                .help("A TOML `<KEY> = <VALUE>` pair")
+                .action(ArgAction::Append),
+        )
+    }
+
+    fn augment_args_for_update(cmd: clap::Command) -> clap::Command {
+        Self::augment_args(cmd)
+    }
+}
+
+impl ConfigsArg {
+    pub(crate) fn into_options(self) -> Option<Options> {
+        self.0
+    }
 }

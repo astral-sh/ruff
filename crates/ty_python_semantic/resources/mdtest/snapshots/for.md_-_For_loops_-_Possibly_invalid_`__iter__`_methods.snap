@@ -47,7 +47,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable: Object of type `Iterable1` may not be iterable
+error[not-iterable]: Object of type `Iterable1` may not be iterable
   --> src/mdtest_snippet.py:17:14
    |
 16 |     # error: [not-iterable]
@@ -58,17 +58,18 @@ error: lint:not-iterable: Object of type `Iterable1` may not be iterable
 info: Its `__iter__` method may have an invalid signature
 info: Type of `__iter__` is `(bound method Iterable1.__iter__() -> Iterator) | (bound method Iterable1.__iter__(invalid_extra_arg) -> Iterator)`
 info: Expected signature for `__iter__` is `def __iter__(self): ...`
+info: `not-iterable` is enabled by default
 
 ```
 
 ```
-info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:18:9
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:18:21
    |
 16 |     # error: [not-iterable]
 17 |     for x in Iterable1():
 18 |         reveal_type(x)  # revealed: int
-   |         ^^^^^^^^^^^^^^ `int`
+   |                     ^ `int`
 19 |
 20 |     class Iterable2:
    |
@@ -76,7 +77,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:not-iterable: Object of type `Iterable2` may not be iterable
+error[not-iterable]: Object of type `Iterable2` may not be iterable
   --> src/mdtest_snippet.py:28:14
    |
 27 |     # error: [not-iterable]
@@ -86,17 +87,18 @@ error: lint:not-iterable: Object of type `Iterable2` may not be iterable
 30 |         reveal_type(x)  # revealed: int | Unknown
    |
 info: Its `__iter__` attribute (with type `(bound method Iterable2.__iter__() -> Iterator) | None`) may not be callable
+info: `not-iterable` is enabled by default
 
 ```
 
 ```
-info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:30:9
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:30:21
    |
 28 |     for x in Iterable2():
 29 |         # TODO: `int` would probably be better here:
 30 |         reveal_type(x)  # revealed: int | Unknown
-   |         ^^^^^^^^^^^^^^ `int | Unknown`
+   |                     ^ `int | Unknown`
    |
 
 ```

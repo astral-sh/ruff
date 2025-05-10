@@ -20,7 +20,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/shadowing.md
 # Diagnostics
 
 ```
-error: lint:invalid-assignment: Implicit shadowing of class `C`
+error[invalid-assignment]: Implicit shadowing of class `C`
  --> src/mdtest_snippet.py:3:1
   |
 1 | class C: ...
@@ -29,5 +29,6 @@ error: lint:invalid-assignment: Implicit shadowing of class `C`
   | ^
   |
 info: Annotate to make it explicit if this is intentional
+info: `invalid-assignment` is enabled by default
 
 ```

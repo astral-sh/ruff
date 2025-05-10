@@ -34,7 +34,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/tuples.md
 # Diagnostics
 
 ```
-error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for type `NotBoolable | Literal[False]`
+error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable | Literal[False]`
   --> src/mdtest_snippet.py:15:1
    |
 14 | # error: [unsupported-bool-conversion]
@@ -44,5 +44,6 @@ error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for t
 17 | a < b  # fine
    |
 info: `__bool__` on `NotBoolable | Literal[False]` must be callable
+info: `unsupported-bool-conversion` is enabled by default
 
 ```

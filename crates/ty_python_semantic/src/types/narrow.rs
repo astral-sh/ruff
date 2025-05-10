@@ -1,5 +1,4 @@
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
-use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
@@ -17,11 +16,10 @@ use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
-use std::sync::Arc;
 
 use super::UnionType;
 
-/// Return the type constraint that `test` (if true) would place on `definition`, if any.
+/// Return the type constraint that `test` (if true) would place on `symbol`, if any.
 ///
 /// For example, if we have this code:
 ///
@@ -35,12 +33,12 @@ use super::UnionType;
 /// The `test` expression `x is not None` places the constraint "not None" on the definition of
 /// `x`, so in that case we'd return `Some(Type::Intersection(negative=[Type::None]))`.
 ///
-/// But if we called this with the same `test` expression, but the `definition` of `y`, no
-/// constraint is applied to that definition, so we'd just return `None`.
+/// But if we called this with the same `test` expression, but the `symbol` of `y`, no
+/// constraint is applied to that symbol, so we'd just return `None`.
 pub(crate) fn infer_narrowing_constraint<'db>(
     db: &'db dyn Db,
     predicate: Predicate<'db>,
-    definition: Definition<'db>,
+    symbol: ScopedSymbolId,
 ) -> Option<Type<'db>> {
     let constraints = match predicate.node {
         PredicateNode::Expression(expression) => {
@@ -60,14 +58,13 @@ pub(crate) fn infer_narrowing_constraint<'db>(
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
     if let Some(constraints) = constraints {
-        constraints.get(&definition.symbol(db)).copied()
+        constraints.get(&symbol).copied()
     } else {
         None
     }
 }
 
-#[allow(clippy::ref_option)]
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(returns(as_ref))]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -75,9 +72,8 @@ fn all_narrowing_constraints_for_pattern<'db>(
     NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), true).finish()
 }
 
-#[allow(clippy::ref_option)]
 #[salsa::tracked(
-    return_ref,
+    returns(as_ref),
     cycle_fn=constraints_for_expression_cycle_recover,
     cycle_initial=constraints_for_expression_cycle_initial,
 )]
@@ -88,9 +84,8 @@ fn all_narrowing_constraints_for_expression<'db>(
     NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), true).finish()
 }
 
-#[allow(clippy::ref_option)]
 #[salsa::tracked(
-    return_ref,
+    returns(as_ref),
     cycle_fn=negative_constraints_for_expression_cycle_recover,
     cycle_initial=negative_constraints_for_expression_cycle_initial,
 )]
@@ -101,8 +96,7 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
     NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), false).finish()
 }
 
-#[allow(clippy::ref_option)]
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(returns(as_ref))]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -110,7 +104,7 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
     NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), false).finish()
 }
 
-#[allow(clippy::ref_option)]
+#[expect(clippy::ref_option)]
 fn constraints_for_expression_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Option<NarrowingConstraints<'db>>,
@@ -287,7 +281,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let expression_node = expression.node_ref(self.db).node();
+        let expression_node = expression.node_ref(self.db);
         self.evaluate_expression_node_predicate(expression_node, expression, is_positive)
     }
 
@@ -345,7 +339,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             })
     }
 
-    fn symbols(&self) -> Arc<SymbolTable> {
+    fn symbols(&self) -> &'db SymbolTable {
         symbol_table(self.db, self.scope())
     }
 
