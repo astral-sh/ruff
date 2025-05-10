@@ -18,7 +18,7 @@ use smallvec::{smallvec, SmallVec};
 use super::{definition_expression_type, DynamicType, Type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, Specialization, TypeMapping};
-use crate::types::{todo_type, ClassLiteral, TypeVarInstance};
+use crate::types::{todo_type, ClassLiteral, KnownInstanceType, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
@@ -1032,16 +1032,32 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
-        let positional_or_keyword = args.iter().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                &arg.parameter,
-                ParameterKind::PositionalOrKeyword {
-                    name: arg.parameter.name.id.clone(),
-                    default_type: default_type(arg),
-                },
-            )
+        let positional_or_keyword = args.iter().enumerate().map(|(index, arg)| {
+            // TODO: Check for classmethod decorator
+            if index == 0 && arg.name() == "self" {
+                Parameter {
+                    annotated_type: Some(
+                        Type::KnownInstance(KnownInstanceType::TypingSelf)
+                            .in_type_expression(db, definition.scope(db))
+                            .unwrap(),
+                    ),
+                    kind: ParameterKind::PositionalOrKeyword {
+                        name: arg.parameter.name.id.clone(),
+                        default_type: default_type(arg),
+                    },
+                    form: ParameterForm::Value,
+                }
+            } else {
+                Parameter::from_node_and_kind(
+                    db,
+                    definition,
+                    &arg.parameter,
+                    ParameterKind::PositionalOrKeyword {
+                        name: arg.parameter.name.id.clone(),
+                        default_type: default_type(arg),
+                    },
+                )
+            }
         });
         let variadic = vararg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(

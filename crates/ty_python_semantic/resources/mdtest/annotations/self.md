@@ -29,12 +29,10 @@ class Shape:
         return inner()
 
     def implicit_self(self) -> Self:
-        # TODO: first argument in a method should be considered as "typing.Self"
         reveal_type(self)  # revealed: Unknown
         return self
 
-# TODO: should be `list[Shape]`
-reveal_type(Shape().nested_type())  # revealed: list[Self]
+reveal_type(Shape().nested_type())  # revealed: list[Shape]
 
 reveal_type(Shape().nested_func())  # revealed: Shape
 
