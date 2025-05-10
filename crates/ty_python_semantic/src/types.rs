@@ -662,7 +662,7 @@ impl<'db> Type<'db> {
 
     pub fn contains_todo(&self, db: &'db dyn Db) -> bool {
         match self {
-            Self::Dynamic(DynamicType::Todo(_)) => true,
+            Self::Dynamic(DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec) => true,
 
             Self::AlwaysFalsy
             | Self::AlwaysTruthy
@@ -703,7 +703,9 @@ impl<'db> Type<'db> {
             }
 
             Self::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
-                SubclassOfInner::Dynamic(DynamicType::Todo(_)) => true,
+                SubclassOfInner::Dynamic(
+                    DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec,
+                ) => true,
                 SubclassOfInner::Dynamic(DynamicType::Unknown | DynamicType::Any) => false,
                 SubclassOfInner::Class(_) => false,
             },
@@ -5502,6 +5504,9 @@ pub enum DynamicType {
     ///
     /// This variant should be created with the `todo_type!` macro.
     Todo(TodoType),
+    /// A special Todo-variant for PEP-695 `ParamSpec` types. A temporary variant to detect and special-
+    /// case the handling of these types in `Callable` annotations.
+    TodoPEP695ParamSpec,
 }
 
 impl std::fmt::Display for DynamicType {
@@ -5512,6 +5517,13 @@ impl std::fmt::Display for DynamicType {
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type
             DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
+            DynamicType::TodoPEP695ParamSpec => {
+                if cfg!(debug_assertions) {
+                    f.write_str("@Todo(ParamSpec)")
+                } else {
+                    f.write_str("@Todo")
+                }
+            }
         }
     }
 }

@@ -2612,7 +2612,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             default,
         } = node;
         self.infer_optional_expression(default.as_deref());
-        let pep_695_todo = todo_type!("PEP-695 ParamSpec definition types");
+        let pep_695_todo = Type::Dynamic(DynamicType::TodoPEP695ParamSpec);
         self.add_declaration_with_binding(
             node.into(),
             definition,
@@ -5797,8 +5797,16 @@ impl<'db> TypeInferenceBuilder<'db> {
             | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
             (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
-            (todo @ Type::Dynamic(DynamicType::Todo(_)), _, _)
-            | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
+            (
+                todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec),
+                _,
+                _,
+            )
+            | (
+                _,
+                todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec),
+                _,
+            ) => Some(todo),
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
@@ -8651,9 +8659,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // `Callable[]`.
                 return None;
             }
+            ast::Expr::Name(name)
+                if self.infer_name_load(name)
+                    == Type::Dynamic(DynamicType::TodoPEP695ParamSpec) =>
+            {
+                return Some(Parameters::todo());
+            }
             _ => {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, parameters) {
-                    // TODO: Check whether `Expr::Name` is a ParamSpec
                     builder.into_diagnostic(format_args!(
                         "The first argument to `Callable` \
                          must be either a list of types, \

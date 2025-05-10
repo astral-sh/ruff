@@ -249,10 +249,12 @@ Using a `ParamSpec` in a `Callable` annotation:
 ```py
 from typing_extensions import Callable
 
-# TODO: Not an error; remove once `ParamSpec` is supported
-# error: [invalid-type-form]
 def _[**P1](c: Callable[P1, int]):
-    reveal_type(c)  # revealed: (...) -> Unknown
+    reveal_type(P1.args)  # revealed: @Todo(ParamSpec)
+    reveal_type(P1.kwargs)  # revealed: @Todo(ParamSpec)
+
+    # TODO: Signature should be (**P1) -> int
+    reveal_type(c)  # revealed: (...) -> int
 ```
 
 And, using the legacy syntax:
