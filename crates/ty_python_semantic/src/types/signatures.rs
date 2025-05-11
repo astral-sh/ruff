@@ -309,12 +309,16 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn apply_specialization(
-        &self,
+    pub(crate) fn apply_optional_specialization(
+        self,
         db: &'db dyn Db,
-        specialization: Specialization<'db>,
+        specialization: Option<Specialization<'db>>,
     ) -> Self {
-        self.apply_type_mapping(db, specialization.type_mapping())
+        if let Some(specialization) = specialization {
+            self.apply_type_mapping(db, specialization.type_mapping())
+        } else {
+            self
+        }
     }
 
     pub(crate) fn apply_type_mapping<'a>(

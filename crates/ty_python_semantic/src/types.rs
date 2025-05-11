@@ -6737,20 +6737,30 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
+        let specialization = self.specialization(db);
         if let Some(overloaded) = self.to_overloaded(db) {
             FunctionSignature::Overloaded(
                 overloaded
                     .overloads
                     .iter()
                     .copied()
-                    .map(|overload| overload.internal_signature(db))
+                    .map(|overload| {
+                        overload
+                            .internal_signature(db)
+                            .apply_optional_specialization(db, specialization)
+                    })
                     .collect(),
-                overloaded
-                    .implementation
-                    .map(|implementation| implementation.internal_signature(db)),
+                overloaded.implementation.map(|implementation| {
+                    implementation
+                        .internal_signature(db)
+                        .apply_optional_specialization(db, specialization)
+                }),
             )
         } else {
-            FunctionSignature::Single(self.internal_signature(db))
+            FunctionSignature::Single(
+                self.internal_signature(db)
+                    .apply_optional_specialization(db, specialization),
+            )
         }
     }
 
@@ -6772,17 +6782,13 @@ impl<'db> FunctionType<'db> {
             let index = semantic_index(db, scope.file(db));
             GenericContext::from_type_params(db, index, type_params)
         });
-        let mut signature = Signature::from_function(
+        Signature::from_function(
             db,
             generic_context,
             self.inherited_generic_context(db),
             definition,
             function_stmt_node,
-        );
-        if let Some(specialization) = self.specialization(db) {
-            signature = signature.apply_specialization(db, specialization);
-        }
-        signature
+        )
     }
 
     pub(crate) fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {

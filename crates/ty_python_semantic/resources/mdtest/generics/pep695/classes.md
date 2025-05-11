@@ -347,6 +347,26 @@ reveal_type(c.method2())  # revealed: str
 reveal_type(c.method3())  # revealed: LinkedList[int]
 ```
 
+When a method is overloaded, the specialization is applied to all overloads.
+
+```py
+from typing import overload
+
+class WithOverloadedMethod[T]:
+    @overload
+    def method(self, x: T) -> T:
+        return x
+
+    @overload
+    def method[S](self, x: S) -> S | T:
+        return x
+
+    def method[S](self, x: S | T) -> S | T:
+        return x
+
+reveal_type(WithOverloadedMethod[int].method)  # revealed: Overload[(self, x: int) -> int, (self, x: S) -> S | int]
+```
+
 ## Cyclic class definitions
 
 ### F-bounded quantification
