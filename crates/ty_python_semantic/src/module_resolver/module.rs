@@ -114,8 +114,7 @@ pub enum KnownModule {
     TypingExtensions,
     Typing,
     Sys,
-    #[allow(dead_code)]
-    Abc, // currently only used in tests
+    Abc,
     Dataclasses,
     Collections,
     Inspect,

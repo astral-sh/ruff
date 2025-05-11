@@ -26,10 +26,6 @@ pub enum ClassBase<'db> {
 }
 
 impl<'db> ClassBase<'db> {
-    pub(crate) const fn any() -> Self {
-        Self::Dynamic(DynamicType::Any)
-    }
-
     pub(crate) const fn unknown() -> Self {
         Self::Dynamic(DynamicType::Unknown)
     }
@@ -164,7 +160,6 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::AlwaysTruthy
                 | KnownInstanceType::AlwaysFalsy => None,
                 KnownInstanceType::Unknown => Some(Self::unknown()),
-                KnownInstanceType::Any => Some(Self::any()),
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
                 KnownInstanceType::Dict => {
                     Self::try_from_type(db, KnownClass::Dict.to_class_literal(db))

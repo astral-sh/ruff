@@ -2432,25 +2432,6 @@ impl<'db> Type<'db> {
                         ))
                         .into(),
                     ),
-                    // TODO:
-                    // We currently hard-code the knowledge that the following known classes are not
-                    // descriptors, i.e. that they have no `__get__` method. This is not wrong and
-                    // potentially even beneficial for performance, but it's not very principled.
-                    // This case can probably be removed eventually, but we include it at the moment
-                    // because we make extensive use of these types in our test suite. Note that some
-                    // builtin types are not included here, since they do not have generic bases and
-                    // are correctly handled by the `find_name_in_mro` method.
-                    (
-                        Some(
-                            KnownClass::Int
-                            | KnownClass::Str
-                            | KnownClass::Bytes
-                            | KnownClass::Tuple
-                            | KnownClass::Slice
-                            | KnownClass::Range,
-                        ),
-                        "__get__" | "__set__" | "__delete__",
-                    ) => Some(Symbol::Unbound.into()),
 
                     _ => Some(class.class_member(db, name, policy)),
                 }
@@ -2460,25 +2441,6 @@ impl<'db> Type<'db> {
                 Some(ClassType::from(*alias).class_member(db, name, policy))
             }
 
-            Type::SubclassOf(subclass_of)
-                if name == "__get__"
-                    && matches!(
-                        subclass_of
-                            .subclass_of()
-                            .into_class()
-                            .and_then(|c| c.known(db)),
-                        Some(
-                            KnownClass::Int
-                                | KnownClass::Str
-                                | KnownClass::Bytes
-                                | KnownClass::Tuple
-                                | KnownClass::Slice
-                                | KnownClass::Range,
-                        )
-                    ) =>
-            {
-                Some(Symbol::Unbound.into())
-            }
             Type::SubclassOf(subclass_of_ty) => {
                 subclass_of_ty.find_name_in_mro_with_policy(db, name, policy)
             }
@@ -4771,7 +4733,6 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
                 KnownInstanceType::Never | KnownInstanceType::NoReturn => Ok(Type::Never),
                 KnownInstanceType::LiteralString => Ok(Type::LiteralString),
-                KnownInstanceType::Any => Ok(Type::any()),
                 KnownInstanceType::Unknown => Ok(Type::unknown()),
                 KnownInstanceType::AlwaysTruthy => Ok(Type::AlwaysTruthy),
                 KnownInstanceType::AlwaysFalsy => Ok(Type::AlwaysFalsy),
