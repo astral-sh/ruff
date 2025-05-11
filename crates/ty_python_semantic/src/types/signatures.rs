@@ -195,6 +195,10 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
+    pub(crate) fn as_slice(&self) -> &[Signature<'db>] {
+        self.overloads.as_slice()
+    }
+
     fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
         if self.callable_type == before {
             self.callable_type = after;
@@ -1747,7 +1751,10 @@ mod tests {
         // With no decorators, internal and external signature are the same
         assert_eq!(
             func.signature(&db),
-            &FunctionSignature::Single(expected_sig)
+            &FunctionSignature {
+                overloads: CallableSignature::single(Type::FunctionLiteral(func), expected_sig),
+                implementation: None
+            },
         );
     }
 }
