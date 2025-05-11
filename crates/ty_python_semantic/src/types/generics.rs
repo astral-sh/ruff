@@ -2,6 +2,8 @@ use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
 use crate::semantic_index::SemanticIndex;
+use crate::types::class::ClassType;
+use crate::types::instance::NominalInstanceType;
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
     declaration_type, todo_type, KnownInstanceType, Type, TypeVarBoundOrConstraints,
@@ -668,6 +670,23 @@ impl<'db> SpecializationBuilder<'db> {
                     {
                         self.infer(*formal_element, *actual_element)?;
                     }
+                }
+            }
+
+            (
+                Type::NominalInstance(NominalInstanceType {
+                    class: ClassType::Generic(formal_alias),
+                }),
+                Type::NominalInstance(NominalInstanceType {
+                    class: ClassType::Generic(actual_alias),
+                }),
+            ) if formal_alias.origin(self.db) == actual_alias.origin(self.db) => {
+                let formal_specialization = formal_alias.specialization(self.db).types(self.db);
+                let actual_specialization = actual_alias.specialization(self.db).types(self.db);
+                for (formal_ty, actual_ty) in
+                    formal_specialization.iter().zip(actual_specialization)
+                {
+                    self.infer(*formal_ty, *actual_ty)?;
                 }
             }
 

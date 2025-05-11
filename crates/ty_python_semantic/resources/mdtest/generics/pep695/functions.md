@@ -67,8 +67,11 @@ process for arbitrarily-nested generic types in parameters.
 def f[T](x: list[T]) -> T:
     return x[0]
 
-# TODO: revealed: float
-reveal_type(f([1.0, 2.0]))  # revealed: Unknown
+def deep(x: list[str]) -> None:
+    reveal_type(f(x))  # revealed: str
+
+def deeper(x: list[set[str]]) -> None:
+    reveal_type(f(x))  # revealed: set[str]
 ```
 
 ## Inferring a bound typevar

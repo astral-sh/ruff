@@ -49,7 +49,7 @@ impl<'db> Type<'db> {
 pub struct NominalInstanceType<'db> {
     // Keep this field private, so that the only way of constructing `NominalInstanceType` instances
     // is through the `Type::instance` constructor function.
-    class: ClassType<'db>,
+    pub(super) class: ClassType<'db>,
 }
 
 impl<'db> NominalInstanceType<'db> {
