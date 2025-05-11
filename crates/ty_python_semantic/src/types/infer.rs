@@ -322,7 +322,7 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
 /// This function walks up the ancestor scopes starting from the given scope,
 /// and finds the closest class definition.
 ///
-/// Returns `None` if no enclosing class is found.a
+/// Returns `None` if no enclosing class is found.
 pub(crate) fn enclosing_class_definition<'db>(
     db: &'db dyn Db,
     semantic: &SemanticIndex<'db>,
@@ -340,12 +340,29 @@ pub(crate) fn enclosing_class_definition<'db>(
         })
 }
 
+pub(crate) fn enclosing_function_definition<'db>(
+    db: &'db dyn Db,
+    semantic: &SemanticIndex<'db>,
+    scope: ScopeId,
+) -> Option<Definition<'db>> {
+    semantic
+        .ancestor_scopes(scope.file_scope_id(db))
+        .find_map(|(_, ancestor_scope)| {
+            if let NodeWithScopeKind::Function(func) = ancestor_scope.node() {
+                let definition = semantic.expect_single_definition(func.node());
+                Some(definition)
+            } else {
+                None
+            }
+        })
+}
+
 /// Returns the type of the nearest enclosing class for the given scope.
 ///
 /// This function walks up the ancestor scopes starting from the given scope,
 /// and finds the closest class definition.
 ///
-/// Returns `None` if no enclosing class is found.a
+/// Returns `None` if no enclosing class is found.
 pub(crate) fn enclosing_class_type<'db>(
     db: &'db dyn Db,
     semantic: &SemanticIndex<'db>,
@@ -354,6 +371,19 @@ pub(crate) fn enclosing_class_type<'db>(
     let definition = enclosing_class_definition(db, semantic, scope)?;
     let result = infer_definition_types(db, definition);
     return Some(result.declaration_type(definition).inner_type());
+}
+
+pub(crate) fn enclosing_function_type<'db>(
+    db: &'db dyn Db,
+    semantic: &SemanticIndex<'db>,
+    scope: ScopeId,
+) -> Option<FunctionType<'db>> {
+    let definition = enclosing_function_definition(db, semantic, scope)?;
+    let result = infer_definition_types(db, definition);
+    let Type::FunctionLiteral(t) = result.declaration_type(definition).inner_type() else {
+        return None;
+    };
+    return Some(t);
 }
 
 /// A region within which we can infer types.
@@ -2102,7 +2132,48 @@ impl<'db> TypeInferenceBuilder<'db> {
             let ty = if let Some(default_ty) = default_ty {
                 UnionType::from_elements(self.db(), [Type::unknown(), default_ty])
             } else {
-                Type::unknown()
+                let func =
+                    enclosing_function_definition(self.db(), self.index, self.scope()).unwrap();
+                let DefinitionKind::Function(func_def) = func.kind(self.db()) else {
+                    panic!("Expected function definition");
+                };
+                let func_type =
+                    enclosing_function_type(self.db(), self.index, self.scope()).unwrap();
+                // TODO: Enum or something better
+                let mut first_self_or_cls = 1;
+
+                if func_type.has_known_decorator(self.db(), FunctionDecorators::CLASSMETHOD) {
+                    first_self_or_cls = 2;
+                }
+                // if func_type
+                //     .has_known_decorator(self.db(), FunctionDecorators::STATICMETHOD)
+                // {
+                //     first_self_or_cls = 3;
+                // }
+
+                // If this parameter is the first parameter
+                if func_def
+                    .parameters
+                    .index(parameter.name())
+                    .is_some_and(|index| index == 0)
+                {
+                    // if the first parameter is `self`
+                    if first_self_or_cls == 1 {
+                        let ty = Type::KnownInstance(KnownInstanceType::TypingSelf)
+                            .in_type_expression(self.db(), self.scope())
+                            .unwrap();
+                        ty
+                    // TODO: if the first parameter is `cls`
+                    } else if first_self_or_cls == 2 {
+                        // type[Self]
+                        Type::unknown()
+                    // TODO: This is a static method
+                    } else {
+                        Type::unknown()
+                    }
+                } else {
+                    Type::unknown()
+                }
             };
             self.add_binding(parameter.into(), definition, ty);
         }
@@ -4778,6 +4849,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         let bindings = Bindings::match_parameters(signatures, &call_arguments);
         let call_argument_types =
             self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
+        match bindings.callable_type() {
+            Type::BoundMethod(bound) => {
+                if bound.function(self.db()).name(self.db()) == "implicit_self" {
+                    dbg!("here");
+                }
+            }
+            _ => {}
+        };
 
         match bindings.check_types(self.db(), &call_argument_types) {
             Ok(mut bindings) => {
