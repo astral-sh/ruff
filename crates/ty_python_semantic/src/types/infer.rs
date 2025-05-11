@@ -8045,9 +8045,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                             )
                         }
                     }
-                    Type::KnownInstance(KnownInstanceType::Any) => {
-                        SubclassOfType::subclass_of_any()
-                    }
                     Type::KnownInstance(KnownInstanceType::Unknown) => {
                         SubclassOfType::subclass_of_unknown()
                     }
@@ -8486,7 +8483,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::NoReturn
             | KnownInstanceType::Never
-            | KnownInstanceType::Any
             | KnownInstanceType::AlwaysTruthy
             | KnownInstanceType::AlwaysFalsy => {
                 self.infer_type_expression(arguments_slice);

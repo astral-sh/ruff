@@ -185,9 +185,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
         (Type::KnownInstance(left_instance), Type::KnownInstance(right_instance)) => {
             match (left_instance, right_instance) {
-                (KnownInstanceType::Any, _) => Ordering::Less,
-                (_, KnownInstanceType::Any) => Ordering::Greater,
-
                 (KnownInstanceType::Tuple, _) => Ordering::Less,
                 (_, KnownInstanceType::Tuple) => Ordering::Greater,
 
