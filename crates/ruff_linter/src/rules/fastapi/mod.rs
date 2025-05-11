@@ -17,6 +17,10 @@ mod tests {
     #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002_0.py"))]
     #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002_1.py"))]
     #[test_case(Rule::FastApiUnusedPathParameter, Path::new("FAST003.py"))]
+    #[test_case(
+        Rule::FastApiUnusedPathParameter,
+        Path::new("FAST003_external_dependency.py")
+    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(

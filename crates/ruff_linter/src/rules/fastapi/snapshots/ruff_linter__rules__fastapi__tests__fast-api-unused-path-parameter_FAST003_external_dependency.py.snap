@@ -1,0 +1,84 @@
+---
+source: crates/ruff_linter/src/rules/fastapi/mod.rs
+---
+FAST003_external_dependency.py:10:31: FAST003 [*] Parameter `user_id` appears in route path, but not in `get_item_details` signature
+   |
+ 8 | router = APIRouter()
+ 9 |
+10 | @router.get("/items/{item_id}/{user_id}")
+   |                               ^^^^^^^^^ FAST003
+11 | def get_item_details(
+12 |     item_id: int,
+   |
+   = help: Add `user_id` to function signature
+
+ℹ Unsafe fix
+9  9  | 
+10 10 | @router.get("/items/{item_id}/{user_id}")
+11 11 | def get_item_details(
+12    |-    item_id: int,
+   12 |+    item_id: int, user_id,
+13 13 |     # user_id is in path but missing here
+14 14 |     current_user: str = Depends(get_user),
+15 15 | ):
+
+FAST003_external_dependency.py:18:21: FAST003 [*] Parameter `user_param` appears in route path, but not in `get_user_info` signature
+   |
+16 |     return {"item_id": item_id, "user": current_user}
+17 |
+18 | @router.get("/users/{user_param}")
+   |                     ^^^^^^^^^^^^ FAST003
+19 | def get_user_info(
+20 |     # user_param is in path but missing here
+   |
+   = help: Add `user_param` to function signature
+
+ℹ Unsafe fix
+18 18 | @router.get("/users/{user_param}")
+19 19 | def get_user_info(
+20 20 |     # user_param is in path but missing here
+21    |-    current_user: str = Depends(get_user),
+   21 |+    user_param, current_user: str = Depends(get_user),
+22 22 |     admin_user: str = Depends(get_user) # Another one
+23 23 | ):
+24 24 |     return {"user_param": "...", "user": current_user}
+
+FAST003_external_dependency.py:27:28: FAST003 [*] Parameter `user_id` appears in route path, but not in `get_address` signature
+   |
+26 | # Case from the issue
+27 | @router.get("/{address_id}/{user_id}")
+   |                            ^^^^^^^^^ FAST003
+28 | def get_address(
+29 |     address_id: int,
+   |
+   = help: Add `user_id` to function signature
+
+ℹ Unsafe fix
+26 26 | # Case from the issue
+27 27 | @router.get("/{address_id}/{user_id}")
+28 28 | def get_address(
+29    |-    address_id: int,
+   29 |+    address_id: int, user_id,
+30 30 |     # user_id is missing
+31 31 |     current_user: str = Depends(get_user),
+32 32 | ):
+
+FAST003_external_dependency.py:44:24: FAST003 [*] Parameter `product_id` appears in route path, but not in `get_product` signature
+   |
+43 | # Control case: Missing path param, no Depends, should fail
+44 | @router.get("/products/{product_id}")
+   |                        ^^^^^^^^^^^^ FAST003
+45 | def get_product(
+46 |     # product_id is missing
+   |
+   = help: Add `product_id` to function signature
+
+ℹ Unsafe fix
+42 42 | 
+43 43 | # Control case: Missing path param, no Depends, should fail
+44 44 | @router.get("/products/{product_id}")
+45    |-def get_product(
+   45 |+def get_product(product_id
+46 46 |     # product_id is missing
+47 47 | ):
+48 48 |     return {"product_id": "..." }

@@ -156,9 +156,6 @@ pub(crate) fn fastapi_unused_path_parameter(
 
         if let Some(parameter_names) = dependency.parameter_names() {
             named_args.extend_from_slice(parameter_names);
-        } else {
-            // If we can't determine the dependency, we can't really do anything.
-            return;
         }
     }
 

@@ -380,3 +380,103 @@ FAST003.py:160:19: FAST003 [*] Parameter `thing_id` appears in route path, but n
 162 162 | 
 163 163 | 
 164 164 | ### No errors
+
+FAST003.py:169:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `double` signature
+    |
+167 | @app.get("/things/{thing_id}")
+168 | async def single(other: Annotated[str, Depends(takes_thing_id)]): ...
+169 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^ FAST003
+170 | async def double(other: Annotated[str, Depends(something_else), Depends(takes_thing_id)]): ...
+171 | @app.get("/things/{thing_id}")
+    |
+    = help: Add `thing_id` to function signature
+
+ℹ Unsafe fix
+167 167 | @app.get("/things/{thing_id}")
+168 168 | async def single(other: Annotated[str, Depends(takes_thing_id)]): ...
+169 169 | @app.get("/things/{thing_id}")
+170     |-async def double(other: Annotated[str, Depends(something_else), Depends(takes_thing_id)]): ...
+    170 |+async def double(other: Annotated[str, Depends(something_else), Depends(takes_thing_id)], thing_id): ...
+171 171 | @app.get("/things/{thing_id}")
+172 172 | async def double(other: Annotated[str, Depends(takes_thing_id), Depends(something_else)]): ...
+173 173 | @app.get("/things/{thing_id}")
+
+FAST003.py:171:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `double` signature
+    |
+169 | @app.get("/things/{thing_id}")
+170 | async def double(other: Annotated[str, Depends(something_else), Depends(takes_thing_id)]): ...
+171 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^ FAST003
+172 | async def double(other: Annotated[str, Depends(takes_thing_id), Depends(something_else)]): ...
+173 | @app.get("/things/{thing_id}")
+    |
+    = help: Add `thing_id` to function signature
+
+ℹ Unsafe fix
+169 169 | @app.get("/things/{thing_id}")
+170 170 | async def double(other: Annotated[str, Depends(something_else), Depends(takes_thing_id)]): ...
+171 171 | @app.get("/things/{thing_id}")
+172     |-async def double(other: Annotated[str, Depends(takes_thing_id), Depends(something_else)]): ...
+    172 |+async def double(other: Annotated[str, Depends(takes_thing_id), Depends(something_else)], thing_id): ...
+173 173 | @app.get("/things/{thing_id}")
+174 174 | async def default(other: str = Depends(takes_thing_id)): ...
+175 175 | @app.get("/things/{thing_id}")
+
+FAST003.py:175:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `unknown_1` signature
+    |
+173 | @app.get("/things/{thing_id}")
+174 | async def default(other: str = Depends(takes_thing_id)): ...
+175 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^ FAST003
+176 | async def unknown_1(other: str = Depends(unknown_unresolved)): ...
+177 | @app.get("/things/{thing_id}")
+    |
+    = help: Add `thing_id` to function signature
+
+ℹ Unsafe fix
+173 173 | @app.get("/things/{thing_id}")
+174 174 | async def default(other: str = Depends(takes_thing_id)): ...
+175 175 | @app.get("/things/{thing_id}")
+176     |-async def unknown_1(other: str = Depends(unknown_unresolved)): ...
+    176 |+async def unknown_1(thing_id, other: str = Depends(unknown_unresolved)): ...
+177 177 | @app.get("/things/{thing_id}")
+178 178 | async def unknown_2(other: str = Depends(unknown_not_function)): ...
+179 179 | @app.get("/things/{thing_id}")
+
+FAST003.py:177:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `unknown_2` signature
+    |
+175 | @app.get("/things/{thing_id}")
+176 | async def unknown_1(other: str = Depends(unknown_unresolved)): ...
+177 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^ FAST003
+178 | async def unknown_2(other: str = Depends(unknown_not_function)): ...
+179 | @app.get("/things/{thing_id}")
+    |
+    = help: Add `thing_id` to function signature
+
+ℹ Unsafe fix
+175 175 | @app.get("/things/{thing_id}")
+176 176 | async def unknown_1(other: str = Depends(unknown_unresolved)): ...
+177 177 | @app.get("/things/{thing_id}")
+178     |-async def unknown_2(other: str = Depends(unknown_not_function)): ...
+    178 |+async def unknown_2(thing_id, other: str = Depends(unknown_not_function)): ...
+179 179 | @app.get("/things/{thing_id}")
+180 180 | async def unknown_3(other: str = Depends(unknown_imported)): ...
+
+FAST003.py:179:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `unknown_3` signature
+    |
+177 | @app.get("/things/{thing_id}")
+178 | async def unknown_2(other: str = Depends(unknown_not_function)): ...
+179 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^ FAST003
+180 | async def unknown_3(other: str = Depends(unknown_imported)): ...
+    |
+    = help: Add `thing_id` to function signature
+
+ℹ Unsafe fix
+177 177 | @app.get("/things/{thing_id}")
+178 178 | async def unknown_2(other: str = Depends(unknown_not_function)): ...
+179 179 | @app.get("/things/{thing_id}")
+180     |-async def unknown_3(other: str = Depends(unknown_imported)): ...
+    180 |+async def unknown_3(thing_id, other: str = Depends(unknown_imported)): ...
