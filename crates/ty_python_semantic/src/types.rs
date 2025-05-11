@@ -2939,6 +2939,12 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
+            Type::ClassLiteral(class)
+                if name == "__dataclass_fields__" && class.dataclass_params(db).is_some() =>
+            {
+                // Make this class look like a subclass of the `DataClassInstance` protocol
+                Symbol::bound(Type::any()).into()
+            }
             Type::BoundMethod(bound_method) => match name_str {
                 "__self__" => Symbol::bound(bound_method.self_instance(db)).into(),
                 "__func__" => {

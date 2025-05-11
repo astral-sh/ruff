@@ -616,6 +616,18 @@ reveal_type(C.__init__)  # revealed: (field: str | int = int) -> None
 
 To do
 
+## `dataclass.fields`
+
+```py
+from dataclasses import dataclass, fields
+
+@dataclass
+class Foo:
+    x: int
+
+reveal_type(fields(Foo))  # revealed: @Todo(full tuple[...] support)
+```
+
 ## Other special cases
 
 ### `dataclasses.dataclass`
