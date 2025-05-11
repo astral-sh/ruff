@@ -221,6 +221,35 @@ def generator():
 reveal_type(generator())  # revealed: None
 ```
 
+The return type of a recursive function is also inferred.
+
+```py
+def fibonacci(n: int):
+    if n == 0:
+        return 0
+    elif n == 1:
+        return 1
+    else:
+        return fibonacci(n - 1) + fibonacci(n - 2)
+
+reveal_type(fibonacci(5))  # revealed: int
+
+def even(n: int):
+    if n == 0:
+        return True
+    else:
+        return odd(n - 1)
+
+def odd(n: int):
+    if n == 0:
+        return False
+    else:
+        return even(n - 1)
+
+reveal_type(even(1))  # revealed: bool
+reveal_type(odd(1))  # revealed: bool
+```
+
 ### Class method
 
 If a method's return type is not annotated, it is also inferred, but the inferred type is a union of

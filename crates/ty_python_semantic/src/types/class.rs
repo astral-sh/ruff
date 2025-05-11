@@ -878,7 +878,7 @@ impl<'db> ClassLiteral<'db> {
             // TODO: Other keyword arguments?
             let arguments = CallArgumentTypes::positional([name, bases, namespace]);
 
-            let return_ty_result = match metaclass.try_call(db, &arguments, None) {
+            let return_ty_result = match metaclass.try_call(db, &arguments) {
                 Ok(bindings) => Ok(bindings.return_type(db)),
 
                 Err(CallError(CallErrorKind::NotCallable, bindings)) => Err(MetaclassError {
