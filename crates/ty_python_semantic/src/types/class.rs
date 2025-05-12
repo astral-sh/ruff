@@ -2709,7 +2709,7 @@ impl<'db> Type<'db> {
     /// The type must be a specialization of the `slice` builtin type, where the specialized
     /// typevars are statically known integers or `None`.
     pub(crate) fn slice_literal(self, db: &'db dyn Db) -> Option<SliceLiteral> {
-        let ClassType::Generic(alias) = self.into_nominal_instance()?.class() else {
+        let ClassType::Generic(alias) = self.into_nominal_instance()?.class else {
             return None;
         };
         if !alias.origin(db).is_known(db, KnownClass::Slice) {
@@ -2723,7 +2723,7 @@ impl<'db> Type<'db> {
             Type::IntLiteral(n) => i32::try_from(*n).map(Some).ok(),
             Type::BooleanLiteral(b) => Some(Some(i32::from(*b))),
             Type::NominalInstance(instance)
-                if instance.class().is_known(db, KnownClass::NoneType) =>
+                if instance.class.is_known(db, KnownClass::NoneType) =>
             {
                 Some(None)
             }

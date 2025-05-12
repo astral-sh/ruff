@@ -60,10 +60,6 @@ pub struct NominalInstanceType<'db> {
 }
 
 impl<'db> NominalInstanceType<'db> {
-    pub(super) fn class(self) -> ClassType<'db> {
-        self.class
-    }
-
     pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
         // N.B. The subclass relation is fully static
         self.class.is_subclass_of(db, other.class)
