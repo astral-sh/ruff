@@ -352,13 +352,13 @@ pub struct EnvironmentOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SrcOptions {
-    /// The root(s) of the project, used for finding first-party modules.
+    /// The root of the project, used for finding first-party modules.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"[".", "./src"]"#,
-        value_type = "list[str]",
+        value_type = "str",
         example = r#"
-            root = ["./app"]
+            root = "./app"
         "#
     )]
     pub root: Option<RelativePathBuf>,

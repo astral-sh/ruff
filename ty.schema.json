@@ -839,7 +839,7 @@
       "type": "object",
       "properties": {
         "root": {
-          "description": "The root(s) of the project, used for finding first-party modules.",
+          "description": "The root of the project, used for finding first-party modules.",
           "type": [
             "string",
             "null"
