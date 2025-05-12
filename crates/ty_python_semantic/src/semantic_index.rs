@@ -419,13 +419,13 @@ impl<'db> SemanticIndex<'db> {
                 return EagerSnapshotResult::NoLongerInEagerContext;
             }
         }
-        let Some(symbol_id) = self.target_tables[enclosing_scope].target_id_by_target(target)
+        let Some(target_id) = self.target_tables[enclosing_scope].target_id_by_target(target)
         else {
             return EagerSnapshotResult::NotFound;
         };
         let key = EagerSnapshotKey {
             enclosing_scope,
-            enclosing_target: symbol_id,
+            enclosing_target: target_id,
             nested_scope,
         };
         let Some(id) = self.eager_snapshots.get(&key) else {
@@ -445,9 +445,9 @@ pub struct AncestorsIter<'a> {
 }
 
 impl<'a> AncestorsIter<'a> {
-    fn new(module_symbol_table: &'a SemanticIndex, start: FileScopeId) -> Self {
+    fn new(module_table: &'a SemanticIndex, start: FileScopeId) -> Self {
         Self {
-            scopes: &module_symbol_table.scopes,
+            scopes: &module_table.scopes,
             next_id: Some(start),
         }
     }
@@ -473,9 +473,9 @@ pub struct DescendantsIter<'a> {
 }
 
 impl<'a> DescendantsIter<'a> {
-    fn new(symbol_table: &'a SemanticIndex, scope_id: FileScopeId) -> Self {
-        let scope = &symbol_table.scopes[scope_id];
-        let scopes = &symbol_table.scopes[scope.descendants()];
+    fn new(index: &'a SemanticIndex, scope_id: FileScopeId) -> Self {
+        let scope = &index.scopes[scope_id];
+        let scopes = &index.scopes[scope.descendants()];
 
         Self {
             next_id: scope_id + 1,
@@ -510,8 +510,8 @@ pub struct ChildrenIter<'a> {
 }
 
 impl<'a> ChildrenIter<'a> {
-    fn new(module_symbol_table: &'a SemanticIndex, parent: FileScopeId) -> Self {
-        let descendants = DescendantsIter::new(module_symbol_table, parent);
+    fn new(module_table: &'a SemanticIndex, parent: FileScopeId) -> Self {
+        let descendants = DescendantsIter::new(module_table, parent);
 
         Self {
             parent,

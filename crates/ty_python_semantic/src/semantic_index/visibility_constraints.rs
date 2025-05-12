@@ -184,7 +184,7 @@ use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
 };
 use crate::semantic_index::target_table;
-use crate::symbol::{imported_symbol, RequiresExplicitReExport};
+use crate::target::{imported_symbol, RequiresExplicitReExport};
 use crate::types::{infer_expression_type, Truthiness, Type};
 use crate::Db;
 
@@ -675,15 +675,16 @@ impl VisibilityConstraints {
                 };
 
                 match imported_symbol(db, referenced_file, symbol_name, requires_explicit_reexport)
-                    .symbol
+                    .target
                 {
-                    crate::symbol::Symbol::Type(_, crate::symbol::Boundness::Bound) => {
+                    crate::target::ResolvedTarget::Type(_, crate::target::Boundness::Bound) => {
                         Truthiness::AlwaysTrue
                     }
-                    crate::symbol::Symbol::Type(_, crate::symbol::Boundness::PossiblyUnbound) => {
-                        Truthiness::Ambiguous
-                    }
-                    crate::symbol::Symbol::Unbound => Truthiness::AlwaysFalse,
+                    crate::target::ResolvedTarget::Type(
+                        _,
+                        crate::target::Boundness::PossiblyUnbound,
+                    ) => Truthiness::Ambiguous,
+                    crate::target::ResolvedTarget::Unbound => Truthiness::AlwaysFalse,
                 }
             }
         }

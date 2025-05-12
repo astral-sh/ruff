@@ -11,7 +11,7 @@ use super::{
 };
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
-use crate::symbol::{Boundness, Symbol};
+use crate::target::{Boundness, ResolvedTarget};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
@@ -718,7 +718,7 @@ impl<'db> Bindings<'db> {
                             // TODO: we could emit a diagnostic here (if default is not set)
                             overload.set_return_type(
                                 match instance_ty.static_member(db, attr_name.value(db)) {
-                                    Symbol::Type(ty, Boundness::Bound) => {
+                                    ResolvedTarget::Type(ty, Boundness::Bound) => {
                                         if instance_ty.is_fully_static(db) {
                                             ty
                                         } else {
@@ -730,10 +730,10 @@ impl<'db> Bindings<'db> {
                                             union_with_default(ty)
                                         }
                                     }
-                                    Symbol::Type(ty, Boundness::PossiblyUnbound) => {
+                                    ResolvedTarget::Type(ty, Boundness::PossiblyUnbound) => {
                                         union_with_default(ty)
                                     }
-                                    Symbol::Unbound => default,
+                                    ResolvedTarget::Unbound => default,
                                 },
                             );
                         }

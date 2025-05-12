@@ -1,4 +1,4 @@
-use crate::symbol::SymbolAndQualifiers;
+use crate::target::TargetAndQualifiers;
 use crate::types::generics::TypeMapping;
 use crate::{Db, FxOrderSet};
 
@@ -99,7 +99,7 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         name: &str,
         policy: MemberLookupPolicy,
-    ) -> Option<SymbolAndQualifiers<'db>> {
+    ) -> Option<TargetAndQualifiers<'db>> {
         Type::from(self.subclass_of).find_name_in_mro_with_policy(db, name, policy)
     }
 

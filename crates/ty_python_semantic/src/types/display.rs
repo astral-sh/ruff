@@ -769,7 +769,7 @@ mod tests {
     use ruff_python_ast::name::Name;
 
     use crate::db::tests::setup_db;
-    use crate::symbol::typing_extensions_symbol;
+    use crate::target::typing_extensions_symbol;
     use crate::types::{KnownClass, Parameter, Parameters, Signature, StringLiteralType, Type};
     use crate::Db;
 
@@ -809,7 +809,7 @@ mod tests {
         );
 
         let iterator_synthesized = typing_extensions_symbol(&db, "Iterator")
-            .symbol
+            .target
             .ignore_possibly_unbound()
             .unwrap()
             .to_instance(&db)

@@ -6,7 +6,7 @@ use ruff_python_ast::name::Name;
 
 use crate::{
     semantic_index::{target_table, use_def_map},
-    symbol::{symbol_from_bindings, symbol_from_declarations},
+    target::{target_from_bindings, target_from_declarations},
     types::{
         ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
     },
@@ -324,11 +324,11 @@ fn cached_protocol_interface<'db>(
             use_def_map
                 .all_public_declarations()
                 .flat_map(|(target_id, declarations)| {
-                    symbol_from_declarations(db, declarations).map(|symbol| (target_id, symbol))
+                    target_from_declarations(db, declarations).map(|symbol| (target_id, symbol))
                 })
                 .filter_map(|(target_id, symbol)| {
                     symbol
-                        .symbol
+                        .target
                         .ignore_possibly_unbound()
                         .map(|ty| (target_id, ty, symbol.qualifiers))
                 })
@@ -344,7 +344,7 @@ fn cached_protocol_interface<'db>(
                     use_def_map
                         .all_public_bindings()
                         .filter_map(|(target_id, bindings)| {
-                            symbol_from_bindings(db, bindings)
+                            target_from_bindings(db, bindings)
                                 .ignore_possibly_unbound()
                                 .map(|ty| (target_id, ty, TypeQualifiers::default()))
                         }),

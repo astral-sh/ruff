@@ -1050,7 +1050,7 @@ impl<'db> UseDefMapBuilder<'db> {
                     &mut self.narrowing_constraints,
                     &mut self.visibility_constraints,
                 );
-                // Symbol not present in snapshot, so it's unbound/undeclared from that path.
+                // Target not present in snapshot, so it's unbound/undeclared from that path.
             }
         }
 
