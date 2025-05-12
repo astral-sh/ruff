@@ -14,7 +14,7 @@ use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{directory_watcher, ChangeEvent, ProjectWatcher};
-use ty_project::{Db, DummyReporter, ProjectDatabase, ProjectMetadata};
+use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 use ty_python_semantic::{resolve_module, ModuleName, PythonPlatform};
 
 struct TestCase {
@@ -1117,10 +1117,7 @@ print(sys.last_exc, os.getegid())
         Ok(())
     })?;
 
-    let diagnostics = case
-        .db
-        .check(&DummyReporter)
-        .context("Failed to check project.")?;
+    let diagnostics = case.db.check().context("Failed to check project.")?;
 
     assert_eq!(diagnostics.len(), 2);
     assert_eq!(
@@ -1145,10 +1142,7 @@ print(sys.last_exc, os.getegid())
     })
     .expect("Search path settings to be valid");
 
-    let diagnostics = case
-        .db
-        .check(&DummyReporter)
-        .context("Failed to check project.")?;
+    let diagnostics = case.db.check().context("Failed to check project.")?;
     assert!(diagnostics.is_empty());
 
     Ok(())
