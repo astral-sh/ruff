@@ -14,7 +14,10 @@ pub(super) use synthesized_protocol::SynthesizedProtocolType;
 impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         if class.class_literal(db).0.is_protocol(db) {
-            Self::ProtocolInstance(ProtocolInstanceType(Protocol::FromClass(class)))
+            Self::ProtocolInstance(ProtocolInstanceType {
+                inner: Protocol::FromClass(class),
+                _phantom: PhantomData,
+            })
         } else {
             Self::NominalInstance(NominalInstanceType {
                 class,
@@ -42,7 +45,7 @@ impl<'db> Type<'db> {
         // TODO: this should consider the types of the protocol members
         // as well as whether each member *exists* on `self`.
         protocol
-            .0
+            .inner
             .interface(db)
             .members(db)
             .all(|member| !self.member(db, member.name()).symbol.is_unbound())
@@ -138,21 +141,23 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
 /// A `ProtocolInstanceType` represents the set of all possible runtime objects
 /// that conform to the interface described by a certain protocol.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord, salsa::Update)]
-pub struct ProtocolInstanceType<'db>(
+pub struct ProtocolInstanceType<'db> {
+    pub(super) inner: Protocol<'db>,
+
     // Keep the inner field here private,
     // so that the only way of constructing `ProtocolInstanceType` instances
     // is through the `Type::instance` constructor function.
-    Protocol<'db>,
-);
+    _phantom: PhantomData<()>,
+}
 
 impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn inner(self) -> Protocol<'db> {
-        self.0
+        self.inner
     }
 
     /// Return the meta-type of this protocol-instance type.
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
-        match self.0 {
+        match self.inner {
             Protocol::FromClass(class) => SubclassOfType::from(db, class),
 
             // TODO: we can and should do better here.
@@ -180,22 +185,29 @@ impl<'db> ProtocolInstanceType<'db> {
         if object.satisfies_protocol(db, self) {
             return object;
         }
-        match self.0 {
-            Protocol::FromClass(_) => Type::ProtocolInstance(Self(Protocol::Synthesized(
-                SynthesizedProtocolType::new(db, self.0.interface(db)),
-            ))),
+        match self.inner {
+            Protocol::FromClass(_) => Type::ProtocolInstance(Self {
+                inner: Protocol::Synthesized(SynthesizedProtocolType::new(
+                    db,
+                    self.inner.interface(db),
+                )),
+                _phantom: PhantomData,
+            }),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
         }
     }
 
     /// Replace references to `class` with a self-reference marker
     pub(super) fn replace_self_reference(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
-        match self.0 {
+        match self.inner {
             Protocol::FromClass(class_type) if class_type.class_literal(db).0 == class => {
-                ProtocolInstanceType(Protocol::Synthesized(SynthesizedProtocolType::new(
-                    db,
-                    ProtocolInterface::SelfReference,
-                )))
+                ProtocolInstanceType {
+                    inner: Protocol::Synthesized(SynthesizedProtocolType::new(
+                        db,
+                        ProtocolInterface::SelfReference,
+                    )),
+                    _phantom: PhantomData,
+                }
             }
             _ => self,
         }
@@ -203,12 +215,12 @@ impl<'db> ProtocolInstanceType<'db> {
 
     /// Return `true` if any of the members of this protocol type contain any `Todo` types.
     pub(super) fn contains_todo(self, db: &'db dyn Db) -> bool {
-        self.0.interface(db).contains_todo(db)
+        self.inner.interface(db).contains_todo(db)
     }
 
     /// Return `true` if this protocol type is fully static.
     pub(super) fn is_fully_static(self, db: &'db dyn Db) -> bool {
-        self.0.interface(db).is_fully_static(db)
+        self.inner.interface(db).is_fully_static(db)
     }
 
     /// Return `true` if this protocol type is a subtype of the protocol `other`.
@@ -221,9 +233,9 @@ impl<'db> ProtocolInstanceType<'db> {
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
         other
-            .0
+            .inner
             .interface(db)
-            .is_sub_interface_of(db, self.0.interface(db))
+            .is_sub_interface_of(db, self.inner.interface(db))
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
@@ -270,13 +282,15 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         type_mapping: TypeMapping<'a, 'db>,
     ) -> Self {
-        match self.0 {
-            Protocol::FromClass(class) => Self(Protocol::FromClass(
-                class.apply_type_mapping(db, type_mapping),
-            )),
-            Protocol::Synthesized(synthesized) => Self(Protocol::Synthesized(
-                synthesized.apply_type_mapping(db, type_mapping),
-            )),
+        match self.inner {
+            Protocol::FromClass(class) => Self {
+                inner: Protocol::FromClass(class.apply_type_mapping(db, type_mapping)),
+                _phantom: PhantomData,
+            },
+            Protocol::Synthesized(synthesized) => Self {
+                inner: Protocol::Synthesized(synthesized.apply_type_mapping(db, type_mapping)),
+                _phantom: PhantomData,
+            },
         }
     }
 }
