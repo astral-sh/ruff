@@ -19,6 +19,7 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// arguments directly.
 ///
 /// ## Example
+///
 /// ```python
 /// def foo(bar):
 ///     return bar + 1
@@ -28,6 +29,7 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// def foo(bar):
 ///     return bar + 1
@@ -35,18 +37,23 @@ use crate::fix::edits::{remove_argument, Parentheses};
 ///
 /// print(foo(bar=2))  # prints 3
 /// ```
+///
 /// ## Fix safety
+///
 /// This rule's fix is marked as unsafe for dictionaries with comments interleaved between
 /// the items, as comments may be removed.
 ///
 /// For example, the fix would be marked as unsafe in the following case:
+///
 /// ```python
-/// foo(**{
-///     # comment
-///     "x": 1.0,
-///     # comment
-///     "y": 2.0,
-/// })
+/// foo(
+///     **{
+///         # comment
+///         "x": 1.0,
+///         # comment
+///         "y": 2.0,
+///     }
+/// )
 /// ```
 ///
 /// as this is converted to `foo(x=1.0, y=2.0)` without any of the comments.
