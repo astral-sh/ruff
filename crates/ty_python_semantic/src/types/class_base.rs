@@ -107,8 +107,19 @@ impl<'db> ClassBase<'db> {
             {
                 Self::try_from_type(db, todo_type!("GenericAlias instance"))
             }
+            Type::Intersection(inter) => {
+                let dynamic_element = inter
+                    .positive(db)
+                    .iter()
+                    .find_map(|elem| elem.into_dynamic())?;
+
+                if ty.is_disjoint_from(db, KnownClass::Type.to_instance(db)) {
+                    None
+                } else {
+                    Some(ClassBase::Dynamic(dynamic_element))
+                }
+            }
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
-            Type::Intersection(_) => None, // TODO -- probably incorrect?
             Type::NominalInstance(_) => None, // TODO -- handle `__mro_entries__`?
             Type::PropertyInstance(_) => None,
             Type::Never
