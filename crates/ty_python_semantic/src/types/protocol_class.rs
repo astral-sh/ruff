@@ -5,10 +5,12 @@ use itertools::{Either, Itertools};
 use ruff_python_ast::name::Name;
 
 use crate::{
-    db::Db,
     semantic_index::{symbol_table, use_def_map},
     symbol::{symbol_from_bindings, symbol_from_declarations},
-    types::{ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers},
+    types::{
+        ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
+    },
+    {Db, FxOrderSet},
 };
 
 impl<'db> ClassLiteral<'db> {
@@ -169,6 +171,21 @@ impl<'db> ProtocolInterface<'db> {
             Self::SelfReference => Self::SelfReference,
         }
     }
+
+    pub(super) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        match self {
+            Self::Members(members) => {
+                for data in members.inner(db).values() {
+                    data.find_legacy_typevars(db, typevars);
+                }
+            }
+            Self::SelfReference => {}
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]
@@ -190,6 +207,14 @@ impl<'db> ProtocolMemberData<'db> {
             ty: self.ty.apply_type_mapping(db, type_mapping),
             qualifiers: self.qualifiers,
         }
+    }
+
+    fn find_legacy_typevars(
+        &self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        self.ty.find_legacy_typevars(db, typevars);
     }
 }
 
