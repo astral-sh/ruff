@@ -1998,8 +1998,7 @@ impl<'db> KnownClass {
             | Self::UnionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
-            | Self::MethodWrapperType
-            | Self::Field => Truthiness::AlwaysTrue,
+            | Self::MethodWrapperType => Truthiness::AlwaysTrue,
 
             Self::NoneType => Truthiness::AlwaysFalse,
 
@@ -2040,7 +2039,8 @@ impl<'db> KnownClass {
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
             | Self::NotImplementedType
-            | Self::Classmethod => Truthiness::Ambiguous,
+            | Self::Classmethod
+            | Self::Field => Truthiness::Ambiguous,
         }
     }
 
