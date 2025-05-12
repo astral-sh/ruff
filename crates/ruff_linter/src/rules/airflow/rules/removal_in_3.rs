@@ -101,7 +101,6 @@ pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
             check_context_key_usage_in_call(checker, call_expr);
         }
         Expr::Attribute(attribute_expr @ ExprAttribute { range, .. }) => {
-            // check_name(checker, expr, attr.range());
             check_name(checker, expr, *range);
             check_class_attribute(checker, attribute_expr);
         }
@@ -998,11 +997,12 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             return;
         }
 
-        let import_target = if expr.is_attribute_expr() && name.contains(".") {
-            name.split(".").next().unwrap()
+        let import_target = if name.contains('.') {
+            name.split('.').next().unwrap()
         } else {
             name
         };
+
         diagnostic.try_set_fix(|| {
             let (import_edit, _) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from(module, import_target),

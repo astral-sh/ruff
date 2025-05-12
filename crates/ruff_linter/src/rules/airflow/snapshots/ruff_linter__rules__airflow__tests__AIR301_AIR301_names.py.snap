@@ -79,7 +79,7 @@ AIR301_names.py:56:1: AIR301 `airflow.api_connexion.security.requires_access` is
    |
    = help: Use `airflow.api_fastapi.core_api.security.requires_access_*` instead
 
-AIR301_names.py:60:1: AIR301 `airflow.configuration.get` is removed in Airflow 3.0
+AIR301_names.py:60:1: AIR301 [*] `airflow.configuration.get` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -87,7 +87,25 @@ AIR301_names.py:60:1: AIR301 `airflow.configuration.get` is removed in Airflow 3
    |
    = help: Use `airflow.configuration.conf.get` instead
 
-AIR301_names.py:60:6: AIR301 `airflow.configuration.getboolean` is removed in Airflow 3.0
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+conf.get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
+
+AIR301_names.py:60:6: AIR301 [*] `airflow.configuration.getboolean` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -95,7 +113,25 @@ AIR301_names.py:60:6: AIR301 `airflow.configuration.getboolean` is removed in Ai
    |
    = help: Use `airflow.configuration.conf.getboolean` instead
 
-AIR301_names.py:60:18: AIR301 `airflow.configuration.getfloat` is removed in Airflow 3.0
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+get, conf.getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
+
+AIR301_names.py:60:18: AIR301 [*] `airflow.configuration.getfloat` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -103,7 +139,25 @@ AIR301_names.py:60:18: AIR301 `airflow.configuration.getfloat` is removed in Air
    |
    = help: Use `airflow.configuration.conf.getfloat` instead
 
-AIR301_names.py:60:28: AIR301 `airflow.configuration.getint` is removed in Airflow 3.0
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+get, getboolean, conf.getfloat, getint, has_option, remove_option, as_dict, set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
+
+AIR301_names.py:60:28: AIR301 [*] `airflow.configuration.getint` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -111,7 +165,25 @@ AIR301_names.py:60:28: AIR301 `airflow.configuration.getint` is removed in Airfl
    |
    = help: Use `airflow.configuration.conf.getint` instead
 
-AIR301_names.py:60:36: AIR301 `airflow.configuration.has_option` is removed in Airflow 3.0
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+get, getboolean, getfloat, conf.getint, has_option, remove_option, as_dict, set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
+
+AIR301_names.py:60:36: AIR301 [*] `airflow.configuration.has_option` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -119,7 +191,25 @@ AIR301_names.py:60:36: AIR301 `airflow.configuration.has_option` is removed in A
    |
    = help: Use `airflow.configuration.conf.has_option` instead
 
-AIR301_names.py:60:48: AIR301 `airflow.configuration.remove_option` is removed in Airflow 3.0
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+get, getboolean, getfloat, getint, conf.has_option, remove_option, as_dict, set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
+
+AIR301_names.py:60:48: AIR301 [*] `airflow.configuration.remove_option` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -127,7 +217,25 @@ AIR301_names.py:60:48: AIR301 `airflow.configuration.remove_option` is removed i
    |
    = help: Use `airflow.configuration.conf.remove_option` instead
 
-AIR301_names.py:60:63: AIR301 `airflow.configuration.as_dict` is removed in Airflow 3.0
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+get, getboolean, getfloat, getint, has_option, conf.remove_option, as_dict, set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
+
+AIR301_names.py:60:63: AIR301 [*] `airflow.configuration.as_dict` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -135,13 +243,49 @@ AIR301_names.py:60:63: AIR301 `airflow.configuration.as_dict` is removed in Airf
    |
    = help: Use `airflow.configuration.conf.as_dict` instead
 
-AIR301_names.py:60:72: AIR301 `airflow.configuration.set` is removed in Airflow 3.0
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+get, getboolean, getfloat, getint, has_option, remove_option, conf.as_dict, set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
+
+AIR301_names.py:60:72: AIR301 [*] `airflow.configuration.set` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
    |                                                                        ^^^ AIR301
    |
    = help: Use `airflow.configuration.conf.set` instead
+
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+get, getboolean, getfloat, getint, has_option, remove_option, as_dict, conf.set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
 
 AIR301_names.py:64:1: AIR301 `airflow.contrib.aws_athena_hook.AWSAthenaHook` is removed in Airflow 3.0
    |
