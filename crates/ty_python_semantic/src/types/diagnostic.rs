@@ -11,7 +11,7 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{protocol_class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -1543,7 +1543,7 @@ pub(super) fn report_invalid_return_type(
         return;
     };
 
-    let return_type_span = Span::from(context.file()).with_range(return_type_range.range());
+    let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     diag.set_primary_message(format_args!(
@@ -1849,16 +1849,13 @@ pub(crate) fn report_duplicate_bases(
         ),
     );
     sub_diagnostic.annotate(
-        Annotation::secondary(
-            Span::from(context.file()).with_range(bases_list[*first_index].range()),
-        )
-        .message(format_args!(
+        Annotation::secondary(context.span(&bases_list[*first_index])).message(format_args!(
             "Class `{duplicate_name}` first included in bases list here"
         )),
     );
     for index in later_indices {
         sub_diagnostic.annotate(
-            Annotation::primary(Span::from(context.file()).with_range(bases_list[*index].range()))
+            Annotation::primary(context.span(&bases_list[*index]))
                 .message(format_args!("Class `{duplicate_name}` later repeated here")),
         );
     }

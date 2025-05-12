@@ -34,7 +34,7 @@
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
 use itertools::{Either, Itertools};
-use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
+use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, SubDiagnostic};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::{walk_expr, Visitor};
@@ -4808,12 +4808,31 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                     &TYPE_ASSERTION_FAILURE,
                                                     call_expression,
                                                 ) {
-                                                    builder.into_diagnostic(format_args!(
-                                                        "Actual type `{}` is not the same \
-                                                         as asserted type `{}`",
-                                                        actual_ty.display(self.db()),
-                                                        asserted_ty.display(self.db()),
-                                                    ));
+                                                    let mut diagnostic =
+                                                        builder.into_diagnostic(format_args!(
+                                                            "Argument does not have asserted type `{}`",
+                                                            asserted_ty.display(self.db())
+                                                        ));
+
+                                                    let mut subdiagnostic = SubDiagnostic::new(
+                                                        Severity::Info,
+                                                        format_args!(
+                                                            "`{}` is not an equivalent type to `{}`",
+                                                            actual_ty.display(self.db()),
+                                                            asserted_ty.display(self.db())
+                                                        ),
+                                                    );
+                                                    subdiagnostic.annotate(
+                                                        Annotation::primary(self.context.span(
+                                                            &call_expression.arguments.args[0],
+                                                        ))
+                                                        .message(format_args!(
+                                                            "Inferred type of argument is `{}`",
+                                                            actual_ty.display(self.db())
+                                                        )),
+                                                    );
+
+                                                    diagnostic.sub(subdiagnostic);
                                                 }
                                             }
                                         }
@@ -4825,10 +4844,28 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                     &TYPE_ASSERTION_FAILURE,
                                                     call_expression,
                                                 ) {
-                                                    builder.into_diagnostic(format_args!(
-                                                        "Expected type `Never`, got `{}` instead",
-                                                        actual_ty.display(self.db()),
-                                                    ));
+                                                    let mut diagnostic = builder.into_diagnostic(
+                                                        "Argument does not have expected type `Never`",
+                                                    );
+
+                                                    let mut subdiagnostic = SubDiagnostic::new(
+                                                        Severity::Info,
+                                                        format_args!(
+                                                            "`{}` is not an equivalent type to `Never`",
+                                                            actual_ty.display(self.db()),
+                                                        ),
+                                                    );
+                                                    subdiagnostic.annotate(
+                                                        Annotation::primary(self.context.span(
+                                                            &call_expression.arguments.args[0],
+                                                        ))
+                                                        .message(format_args!(
+                                                            "Inferred type of argument is `{}`",
+                                                            actual_ty.display(self.db())
+                                                        )),
+                                                    );
+
+                                                    diagnostic.sub(subdiagnostic);
                                                 }
                                             }
                                         }
