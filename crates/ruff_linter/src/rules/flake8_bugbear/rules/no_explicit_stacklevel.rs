@@ -60,6 +60,8 @@ pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
+    // When prefixes are supplied, stacklevel is implicitly overridden to be `max(2, stacklevel)`.
+    //
     // Signature as of Python 3.13 (https://docs.python.org/3/library/warnings.html#warnings.warn)
     // ```text
     //                  0       1               2            3                  4
@@ -69,7 +71,11 @@ pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
         .arguments
         .find_argument_value("stacklevel", 2)
         .is_some()
-        || call.arguments.find_keyword("skip_file_prefixes").is_some()
+        || call
+            .arguments
+            .find_keyword("skip_file_prefixes")
+            .and_then(|keyword| keyword.value.as_tuple_expr())
+            .is_some_and(|tuple| !tuple.elts.is_empty())
         || call
             .arguments
             .args

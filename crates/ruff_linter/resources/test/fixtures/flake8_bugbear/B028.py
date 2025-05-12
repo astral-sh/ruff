@@ -28,3 +28,5 @@ warnings.warn(
 
 # https://github.com/astral-sh/ruff/issues/18011
 warnings.warn("test", skip_file_prefixes=(os.path.dirname(__file__),))
+# trigger diagnostic if `skip_file_prefixes` is present and set to the default value
+warnings.warn("test", skip_file_prefixes=())
