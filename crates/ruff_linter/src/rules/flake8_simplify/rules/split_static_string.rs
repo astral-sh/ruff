@@ -62,6 +62,7 @@ impl Violation for SplitStaticString {
 /// SIM905
 pub(crate) fn split_static_string(
     checker: &Checker,
+    attr: &str,
     call: &ExprCall,
     str_value: &StringLiteralValue,
 ) {
@@ -72,13 +73,25 @@ pub(crate) fn split_static_string(
         return;
     };
 
+    // `split` vs `rsplit`.
+    let direction = if attr == "split" {
+        Direction::Left
+    } else {
+        Direction::Right
+    };
+
     let sep_arg = arguments.find_argument_value("sep", 0);
     let split_replacement = if let Some(sep) = sep_arg {
         match sep {
             Expr::NoneLiteral(_) => split_default(str_value, maxsplit_value),
             Expr::StringLiteral(sep_value) => {
                 let sep_value_str = sep_value.value.to_str();
-                Some(split_sep(str_value, sep_value_str, maxsplit_value))
+                Some(split_sep(
+                    str_value,
+                    sep_value_str,
+                    maxsplit_value,
+                    direction,
+                ))
             }
             // Ignore names until type inference is available.
             _ => {
@@ -163,12 +176,31 @@ fn split_default(str_value: &StringLiteralValue, max_split: i32) -> Option<Expr>
     }
 }
 
-fn split_sep(str_value: &StringLiteralValue, sep_value: &str, max_split: i32) -> Expr {
+fn split_sep(
+    str_value: &StringLiteralValue,
+    sep_value: &str,
+    max_split: i32,
+    direction: Direction,
+) -> Expr {
     let value = str_value.to_str();
     let list_items: Vec<&str> = if let Ok(split_n) = usize::try_from(max_split) {
-        value.splitn(split_n + 1, sep_value).collect()
+        match direction {
+            Direction::Left => value.splitn(split_n + 1, sep_value).collect(),
+            Direction::Right => {
+                let mut items: Vec<&str> = value.rsplitn(split_n + 1, sep_value).collect();
+                items.reverse();
+                items
+            }
+        }
     } else {
-        value.split(sep_value).collect()
+        match direction {
+            Direction::Left => value.split(sep_value).collect(),
+            Direction::Right => {
+                let mut items: Vec<&str> = value.rsplit(sep_value).collect();
+                items.reverse();
+                items
+            }
+        }
     };
 
     construct_replacement(&list_items, str_value.first_literal_flags())
@@ -206,4 +238,10 @@ fn get_maxsplit_value(arg: Option<&Expr>) -> Option<i32> {
         // Default value is -1 (no splits).
         Some(-1)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Direction {
+    Left,
+    Right,
 }

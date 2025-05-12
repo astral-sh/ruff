@@ -905,4 +905,4 @@ SIM905.py:112:7: SIM905 [*] Consider using a list literal instead of `str.split`
 110 110 | # https://github.com/astral-sh/ruff/issues/18042
 111 111 | print("a,b".rsplit(","))
 112     |-print("a,b,c".rsplit(",", 1))
-    112 |+print(["a", "b,c"])
+    112 |+print(["a,b", "c"])
