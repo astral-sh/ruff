@@ -2144,6 +2144,7 @@ impl<'db> Type<'db> {
             | Type::PropertyInstance(_) => true,
 
             Type::ProtocolInstance(protocol) => protocol.is_fully_static(db),
+            Type::NominalInstance(instance) => instance.is_fully_static(db),
 
             Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
                 None => true,
@@ -2159,24 +2160,8 @@ impl<'db> Type<'db> {
                 !matches!(bound_super.pivot_class(db), ClassBase::Dynamic(_))
                     && !matches!(bound_super.owner(db), SuperOwnerKind::Dynamic(_))
             }
-            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::NominalInstance(_) => {
-                // TODO: Ideally, we would iterate over the MRO of the class, check if all
-                // bases are fully static, and only return `true` if that is the case.
-                //
-                // This does not work yet, because we currently infer `Unknown` for some
-                // generic base classes that we don't understand yet. For example, `str`
-                // is defined as `class str(Sequence[str])` in typeshed and we currently
-                // compute its MRO as `(str, Unknown, object)`. This would make us think
-                // that `str` is a gradual type, which causes all sorts of downstream
-                // issues because it does not participate in equivalence/subtyping etc.
-                //
-                // Another problem is that we run into problems if we eagerly query the
-                // MRO of class literals here. I have not fully investigated this, but
-                // iterating over the MRO alone, without even acting on it, causes us to
-                // infer `Unknown` for many classes.
-
-                true
-            }
+            Type::ClassLiteral(class) => class.is_fully_static(db),
+            Type::GenericAlias(alias) => alias.is_fully_static(db),
             Type::Union(union) => union.is_fully_static(db),
             Type::Intersection(intersection) => intersection.is_fully_static(db),
             // TODO: Once we support them, make sure that we return `false` for other types

@@ -292,6 +292,10 @@ pub struct Specialization<'db> {
 }
 
 impl<'db> Specialization<'db> {
+    pub(crate) fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        self.types(db).iter().all(|ty| ty.is_fully_static(db))
+    }
+
     pub(crate) fn type_mapping(self) -> TypeMapping<'db, 'db> {
         TypeMapping::Specialization(self)
     }

@@ -112,7 +112,7 @@ from typing_extensions import _NoDefaultType
 static_assert(is_subtype_of(sys.version_info.__class__, AlwaysTruthy))
 static_assert(is_subtype_of(types.EllipsisType, AlwaysTruthy))
 static_assert(is_subtype_of(_NoDefaultType, AlwaysTruthy))
-static_assert(is_subtype_of(slice, AlwaysTruthy))
+static_assert(is_subtype_of(slice[int, int, int], AlwaysTruthy))
 static_assert(is_subtype_of(types.FunctionType, AlwaysTruthy))
 static_assert(is_subtype_of(types.MethodType, AlwaysTruthy))
 static_assert(is_subtype_of(typing.TypeVar, AlwaysTruthy))
