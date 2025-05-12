@@ -3,6 +3,7 @@ use rustc_hash::FxHashMap;
 
 use crate::semantic_index::SemanticIndex;
 use crate::types::class::ClassType;
+use crate::types::class_base::ClassBase;
 use crate::types::instance::NominalInstanceType;
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
@@ -679,16 +680,26 @@ impl<'db> SpecializationBuilder<'db> {
                     ..
                 }),
                 Type::NominalInstance(NominalInstanceType {
-                    class: ClassType::Generic(actual_alias),
+                    class: actual_class,
                     ..
                 }),
-            ) if formal_alias.origin(self.db) == actual_alias.origin(self.db) => {
-                let formal_specialization = formal_alias.specialization(self.db).types(self.db);
-                let actual_specialization = actual_alias.specialization(self.db).types(self.db);
-                for (formal_ty, actual_ty) in
-                    formal_specialization.iter().zip(actual_specialization)
-                {
-                    self.infer(*formal_ty, *actual_ty)?;
+            ) => {
+                let formal_origin = formal_alias.origin(self.db);
+                for base in actual_class.iter_mro(self.db) {
+                    let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
+                        continue;
+                    };
+                    if formal_origin != base_alias.origin(self.db) {
+                        continue;
+                    }
+                    let formal_specialization = formal_alias.specialization(self.db).types(self.db);
+                    let base_specialization = base_alias.specialization(self.db).types(self.db);
+                    for (formal_ty, base_ty) in
+                        formal_specialization.iter().zip(base_specialization)
+                    {
+                        self.infer(*formal_ty, *base_ty)?;
+                    }
+                    return Ok(());
                 }
             }
 

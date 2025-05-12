@@ -83,6 +83,16 @@ def deeper(x: list[set[str]]) -> None:
     reveal_type(f(x))  # revealed: set[str]
 ```
 
+This also works when passing in arguments that are subclasses of the parameter type.
+
+```py
+class Sub(list[int]): ...
+class GenericSub(list[T]): ...
+
+reveal_type(f(Sub()))  # revealed: int
+reveal_type(f(GenericSub[str]()))  # revealed: str
+```
+
 ## Inferring a bound typevar
 
 <!-- snapshot-diagnostics -->
