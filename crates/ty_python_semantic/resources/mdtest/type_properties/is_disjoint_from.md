@@ -375,6 +375,29 @@ class UsesMeta2(metaclass=Meta2): ...
 static_assert(is_disjoint_from(type[UsesMeta1], type[UsesMeta2]))
 ```
 
+### `property`
+
+```py
+from ty_extensions import is_disjoint_from, static_assert, TypeOf
+from typing import final
+
+class C:
+    @property
+    def prop(self) -> int:
+        return 1
+
+reveal_type(C.prop)  # revealed: property
+
+@final
+class D:
+    pass
+
+static_assert(not is_disjoint_from(int, TypeOf[C.prop]))
+static_assert(not is_disjoint_from(TypeOf[C.prop], int))
+static_assert(is_disjoint_from(TypeOf[C.prop], D))
+static_assert(is_disjoint_from(D, TypeOf[C.prop]))
+```
+
 ## Callables
 
 No two callable types are disjoint because there exists a non-empty callable type
