@@ -195,6 +195,10 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
+    pub(crate) fn as_slice(&self) -> &[Signature<'db>] {
+        self.overloads.as_slice()
+    }
+
     fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
         if self.callable_type == before {
             self.callable_type = after;
@@ -309,12 +313,16 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn apply_specialization(
-        &self,
+    pub(crate) fn apply_optional_specialization(
+        self,
         db: &'db dyn Db,
-        specialization: Specialization<'db>,
+        specialization: Option<Specialization<'db>>,
     ) -> Self {
-        self.apply_type_mapping(db, specialization.type_mapping())
+        if let Some(specialization) = specialization {
+            self.apply_type_mapping(db, specialization.type_mapping())
+        } else {
+            self
+        }
     }
 
     pub(crate) fn apply_type_mapping<'a>(
@@ -1743,7 +1751,10 @@ mod tests {
         // With no decorators, internal and external signature are the same
         assert_eq!(
             func.signature(&db),
-            &FunctionSignature::Single(expected_sig)
+            &FunctionSignature {
+                overloads: CallableSignature::single(Type::FunctionLiteral(func), expected_sig),
+                implementation: None
+            },
         );
     }
 }
