@@ -64,12 +64,10 @@ C.inferred_from_value = "overwritten on class"
 # This assignment is fine:
 c_instance.declared_and_bound = False
 
-# TODO: After this assignment to the attribute within this scope, we may eventually want to narrow
-# the `bool` type (see above) for this instance variable to `Literal[False]` here. This is unsound
-# in general (we don't know what else happened to `c_instance` between the assignment and the use
-# here), but mypy and pyright support this. In conclusion, this could be `bool` but should probably
-# be `Literal[False]`.
-reveal_type(c_instance.declared_and_bound)  # revealed: bool
+# Strictly speaking, infer this as `Literal[False]` rather than `bool` is unsound in general
+# (we don't know what else happened to `c_instance` between the assignment and the use here),
+# but mypy and pyright support this.
+reveal_type(c_instance.declared_and_bound)  # revealed: Literal[False]
 ```
 
 #### Variable declared in class body and possibly bound in `__init__`
@@ -720,11 +718,7 @@ reveal_type(C.pure_class_variable)  # revealed: Unknown
 # and the assignment is properly attributed to the class method.
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `pure_class_variable` from the class object `<class 'C'>`"
 C.pure_class_variable = "overwritten on class"
-
-# TODO: should be  `Unknown | Literal["value set in class method"]` or
-# Literal["overwritten on class"]`, once/if we support local narrowing.
-# error: [unresolved-attribute]
-reveal_type(C.pure_class_variable)  # revealed: Unknown
+reveal_type(C.pure_class_variable)  # revealed: Literal["overwritten on class"]
 
 c_instance = C()
 reveal_type(c_instance.pure_class_variable)  # revealed: Unknown | Literal["value set in class method"]
@@ -762,19 +756,12 @@ reveal_type(c_instance.variable_with_class_default2)  # revealed: Unknown | Lite
 c_instance.variable_with_class_default1 = "value set on instance"
 
 reveal_type(C.variable_with_class_default1)  # revealed: str
-
-# TODO: Could be Literal["value set on instance"], or still `str` if we choose not to
-# narrow the type.
-reveal_type(c_instance.variable_with_class_default1)  # revealed: str
+reveal_type(c_instance.variable_with_class_default1)  # revealed: Literal["value set on instance"]
 
 C.variable_with_class_default1 = "overwritten on class"
 
-# TODO: Could be `Literal["overwritten on class"]`, or still `str` if we choose not to
-# narrow the type.
-reveal_type(C.variable_with_class_default1)  # revealed: str
-
-# TODO: should still be `Literal["value set on instance"]`, or `str`.
-reveal_type(c_instance.variable_with_class_default1)  # revealed: str
+reveal_type(C.variable_with_class_default1)  # revealed: Literal["overwritten on class"]
+reveal_type(c_instance.variable_with_class_default1)  # revealed: Literal["value set on instance"]
 ```
 
 ### Inheritance of class/instance attributes

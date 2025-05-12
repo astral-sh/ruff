@@ -84,7 +84,7 @@ impl<'db> Unpacker<'db> {
         value_ty: Type<'db>,
     ) {
         match target {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 self.targets.insert(
                     target.scoped_expression_id(self.db(), self.target_scope),
                     value_ty,

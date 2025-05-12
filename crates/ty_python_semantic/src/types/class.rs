@@ -1569,7 +1569,7 @@ impl<'db> ClassLiteral<'db> {
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
-                            TargetKind::NameOrAttribute => {
+                            TargetKind::Single => {
                                 // We found an un-annotated attribute assignment of the form:
                                 //
                                 //     self.name = <value>
@@ -1595,7 +1595,7 @@ impl<'db> ClassLiteral<'db> {
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
-                            TargetKind::NameOrAttribute => {
+                            TargetKind::Single => {
                                 // We found an attribute assignment like:
                                 //
                                 //     for self.name in <iterable>:
@@ -1625,7 +1625,7 @@ impl<'db> ClassLiteral<'db> {
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
-                            TargetKind::NameOrAttribute => {
+                            TargetKind::Single => {
                                 // We found an attribute assignment like:
                                 //
                                 //     with <context_manager> as self.name:
@@ -1655,7 +1655,7 @@ impl<'db> ClassLiteral<'db> {
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
-                            TargetKind::NameOrAttribute => {
+                            TargetKind::Single => {
                                 // We found an attribute assignment like:
                                 //
                                 //     [... for self.name in <iterable>]

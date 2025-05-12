@@ -56,14 +56,11 @@ use crate::semantic_index::definition::{
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::narrowing_constraints::ConstraintKey;
 use crate::semantic_index::target::{
-    FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind, ScopedTargetId,
+    FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind, ScopedTargetId, Target,
 };
 use crate::semantic_index::{semantic_index, EagerSnapshotResult, SemanticIndex};
 use crate::symbol::{
-    builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, symbol,
-    symbol_from_bindings, symbol_from_declarations, typing_extensions_symbol, Boundness,
-    LookupError,
+    builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol, module_type_implicit_global_declaration, module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations, symbol_from_target_sequential, typing_extensions_symbol, Boundness, LookupError
 };
 use crate::types::call::{Argument, Bindings, CallArgumentTypes, CallArguments, CallError};
 use crate::types::class::{MetaclassErrorKind, SliceLiteral};
@@ -1427,7 +1424,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             .category(self.context.in_stub())
             .is_binding());
 
-        let file_scope_id = binding.file_scope(self.db());
+        let db = self.db();
+        let file_scope_id = binding.file_scope(db);
         let target_table = self.index.target_table(file_scope_id);
         let use_def = self.index.use_def_map(file_scope_id);
         let mut bound_ty = ty;
@@ -1467,21 +1465,32 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Ok(symbol)
             })
             .map(|SymbolAndQualifiers { symbol, .. }| {
+                let target = target_table.target(target_id);
+                if symbol.is_unbound() && !target.is_name() {
+                    if let Symbol::Type(ty, Boundness::Bound) = symbol_from_target_sequential(
+                        db,
+                        file_scope_id.to_scope_id(db, self.file()),
+                        target,
+                    )
+                    .symbol
+                    {
+                        return ty;
+                    }
+                }
                 symbol.ignore_possibly_unbound().unwrap_or(Type::unknown())
             })
             .unwrap_or_else(|(ty, conflicting)| {
                 // TODO point out the conflicting declarations in the diagnostic?
-                let target_table = self.index.target_table(binding.file_scope(self.db()));
-                let target = target_table.target(binding.target(self.db()));
+                let target = target_table.target(binding.target(db));
                 if let Some(builder) = self.context.report_lint(&CONFLICTING_DECLARATIONS, node) {
                     builder.into_diagnostic(format_args!(
                         "Conflicting declared types for `{target}`: {}",
-                        conflicting.display(self.db())
+                        conflicting.display(db)
                     ));
                 }
                 ty.inner_type()
             });
-        if !bound_ty.is_assignable_to(self.db(), declared_ty) {
+        if !bound_ty.is_assignable_to(db, declared_ty) {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
             bound_ty = declared_ty;
@@ -2502,7 +2511,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                     unpacked.expression_type(target_ast_id)
                 }
-                TargetKind::NameOrAttribute => self.infer_context_expression(
+                TargetKind::Single => self.infer_context_expression(
                     context_expr,
                     context_expr_ty,
                     with_item.is_async(),
@@ -3434,7 +3443,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
                 unpacked.expression_type(target_ast_id)
             }
-            TargetKind::NameOrAttribute => {
+            TargetKind::Single => {
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
                 // at runtime, but is always considered `True` in type checking.
                 // See mdtest/known_constants.md#user-defined-type_checking for details.
@@ -3689,6 +3698,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.store_expression_type(target, previous_value);
                 previous_value
             }
+            ast::Expr::Subscript(subscript) => {
+                let previous_value = self.infer_subscript_load(subscript);
+                self.store_expression_type(target, previous_value);
+                previous_value
+            }
             _ => self.infer_expression(target),
         };
         let value_type = self.infer_expression(value);
@@ -3745,12 +3759,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
                     unpacked.expression_type(target_ast_id)
                 }
-                TargetKind::NameOrAttribute => {
-                    iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                        err.fallback_element_type(self.db())
-                    })
-                }
+                TargetKind::Single => iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
+                    err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                    err.fallback_element_type(self.db())
+                }),
             }
         };
 
@@ -4614,12 +4626,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
                     unpacked.expression_type(target_ast_id)
                 }
-                TargetKind::NameOrAttribute => {
-                    iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                        err.fallback_element_type(self.db())
-                    })
-                }
+                TargetKind::Single => iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
+                    err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                    err.fallback_element_type(self.db())
+                }),
             }
         };
 
@@ -5411,6 +5421,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             id: symbol_name,
             ctx: _,
         } = name_node;
+        let Ok(target) = Target::try_from(symbol_name);
 
         let db = self.db();
         let scope = self.scope();
@@ -5425,7 +5436,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let use_def = self.index.use_def_map(*enclosing_scope_file_id);
                 let constraints = use_def.narrowing_constraints_at_use(*constraint_key);
                 let symbol_table = self.index.target_table(*enclosing_scope_file_id);
-                let symbol = symbol_table.target_id_by_name(symbol_name).unwrap();
+                let symbol = symbol_table.target_id_by_target(&target).unwrap();
 
                 ty = constraints.narrow(db, ty, symbol);
             }
@@ -5434,7 +5445,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // If we're inferring types of deferred expressions, always treat them as public symbols
         let (local_scope_symbol, use_id) = if self.is_deferred() {
-            let symbol = if let Some(target_id) = symbol_table.target_id_by_name(symbol_name) {
+            let symbol = if let Some(target_id) = symbol_table.target_id_by_target(&target) {
                 symbol_from_bindings(db, use_def.public_bindings(target_id))
             } else {
                 assert!(
@@ -5514,11 +5525,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // enclosing scopes that actually contain bindings that we should use when
                 // resolving the reference.)
                 if !self.is_deferred() {
-                    match self.index.eager_snapshot(
-                        enclosing_scope_file_id,
-                        symbol_name,
-                        file_scope_id,
-                    ) {
+                    match self
+                        .index
+                        .eager_snapshot(enclosing_scope_file_id, &target, file_scope_id)
+                    {
                         EagerSnapshotResult::FoundConstraint(constraint) => {
                             constraint_keys.push((
                                 enclosing_scope_file_id,
@@ -5577,7 +5587,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if !self.is_deferred() {
                         match self.index.eager_snapshot(
                             FileScopeId::global(),
-                            symbol_name,
+                            &target,
                             file_scope_id,
                         ) {
                             EagerSnapshotResult::FoundConstraint(constraint) => {
@@ -5681,6 +5691,44 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         let db = self.db();
+
+        if let Ok(target) = Target::try_from(attribute) {
+            let member = value_type.class_member_with_policy(
+                db,
+                attr.id.clone(),
+                MemberLookupPolicy::default(),
+            );
+            let member_is_property = member.symbol.ignore_possibly_unbound().is_some_and(|ty| {
+                ty.is_property_instance()
+                    || ty.into_union().is_some_and(|union| {
+                        union.elements(db).iter().any(Type::is_property_instance)
+                    })
+            });
+            let (_symbol, kind) = Type::try_call_dunder_get_on_attribute(
+                db,
+                member,
+                value_type,
+                value_type.to_meta_type(db),
+            );
+            // If the value class defines `__get__/__set__`, the value most recently assigned
+            // to the attribute may not necessarily be obtained here.
+            if !member_is_property && !kind.is_data() {
+                let scope = self.scope().file_scope_id(db);
+                let table = self.index.target_table(scope);
+                let use_def = self.index.use_def_map(scope);
+                if let Some(target_id) = table.target_id_by_target(&target) {
+                    let symbol = if self.is_deferred() {
+                        symbol_from_bindings(db, use_def.public_bindings(target_id))
+                    } else {
+                        let use_id = attribute.scoped_use_id(db, self.scope());
+                        symbol_from_bindings(db, use_def.bindings_at_use(use_id))
+                    };
+                    if let Symbol::Type(ty, Boundness::Bound) = symbol {
+                        return ty;
+                    }
+                }
+            }
+        }
 
         value_type
             .member(db, &attr.id)
@@ -7018,11 +7066,54 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_subscript_expression(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
         let ast::ExprSubscript {
+            value,
+            slice,
+            range: _,
+            ctx,
+        } = subscript;
+
+        match ctx {
+            ExprContext::Load => self.infer_subscript_load(subscript),
+            ExprContext::Store | ExprContext::Del => {
+                let value_ty = self.infer_expression(value);
+                let slice_ty = self.infer_expression(slice);
+                self.infer_subscript_expression_types(value, value_ty, slice_ty);
+                Type::Never
+            }
+            ExprContext::Invalid => {
+                let value_ty = self.infer_expression(value);
+                let slice_ty = self.infer_expression(slice);
+                self.infer_subscript_expression_types(value, value_ty, slice_ty);
+                Type::unknown()
+            }
+        }
+    }
+
+    fn infer_subscript_load(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
+        let ast::ExprSubscript {
             range: _,
             value,
             slice,
             ctx: _,
         } = subscript;
+
+        if let Ok(target) = Target::try_from(subscript) {
+            let db = self.db();
+            let scope = self.scope().file_scope_id(db);
+            let table = self.index.target_table(scope);
+            let use_def = self.index.use_def_map(scope);
+            if let Some(target_id) = table.target_id_by_target(&target) {
+                let symbol = if self.is_deferred() {
+                    symbol_from_bindings(db, use_def.public_bindings(target_id))
+                } else {
+                    let use_id = subscript.scoped_use_id(db, self.scope());
+                    symbol_from_bindings(db, use_def.bindings_at_use(use_id))
+                };
+                if let Symbol::Type(ty, Boundness::Bound) = symbol {
+                    return ty;
+                }
+            }
+        }
 
         // HACK ALERT: If we are subscripting a generic class, short-circuit the rest of the
         // subscript inference logic and treat this as an explicit specialization.

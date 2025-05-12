@@ -3,7 +3,7 @@ use ruff_db::files::File;
 use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::target::{ScopeId, ScopedTargetId};
+use crate::semantic_index::target::{ScopeId, ScopedTargetId, Target, TargetSubSegment};
 use crate::semantic_index::{global_scope, use_def_map, DeclarationWithConstraint};
 use crate::semantic_index::{
     target_table, BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
@@ -203,6 +203,14 @@ pub(crate) fn symbol<'db>(
     name: &str,
 ) -> SymbolAndQualifiers<'db> {
     symbol_impl(db, scope, name, RequiresExplicitReExport::No)
+}
+
+pub(crate) fn symbol_from_target_sequential<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    target: &Target,
+) -> SymbolAndQualifiers<'db> {
+    symbol_from_target_sequential_impl(db, scope, target, RequiresExplicitReExport::No)
 }
 
 /// Infer the public type of a class symbol (its type as seen from outside its scope) in the given
@@ -712,6 +720,41 @@ fn symbol_impl<'db>(
         .target_id_by_name(name)
         .map(|symbol| symbol_by_id(db, scope, symbol, requires_explicit_reexport))
         .unwrap_or_default()
+}
+
+fn symbol_from_target_sequential_impl<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    target: &Target,
+    requires_explicit_reexport: RequiresExplicitReExport,
+) -> SymbolAndQualifiers<'db> {
+    let _span = tracing::trace_span!("symbol_from_target_sequential", ?target).entered();
+
+    let mut result = target_table(db, scope)
+        .target_id_by_name(target.root_name())
+        .map(|symbol| symbol_by_id(db, scope, symbol, requires_explicit_reexport))
+        .unwrap_or_default();
+
+    for segment in target.sub_segments() {
+        let Symbol::Type(ty, Boundness::Bound) = result.symbol else {
+            return SymbolAndQualifiers::default();
+        };
+
+        match segment {
+            TargetSubSegment::Member(member) => {
+                result = ty.member(db, member);
+            }
+            // TODO:
+            TargetSubSegment::IntSubscript(_) => {
+                return SymbolAndQualifiers::default();
+            }
+            TargetSubSegment::StringSubscript(_) => {
+                return SymbolAndQualifiers::default();
+            }
+        }
+    }
+
+    result
 }
 
 /// Implementation of [`symbol_from_bindings`].

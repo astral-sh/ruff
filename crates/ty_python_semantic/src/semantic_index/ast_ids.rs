@@ -72,6 +72,20 @@ impl HasScopedUseId for ast::ExprName {
     }
 }
 
+impl HasScopedUseId for ast::ExprAttribute {
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
+        let expression_ref = ExprRef::from(self);
+        expression_ref.scoped_use_id(db, scope)
+    }
+}
+
+impl HasScopedUseId for ast::ExprSubscript {
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
+        let expression_ref = ExprRef::from(self);
+        expression_ref.scoped_use_id(db, scope)
+    }
+}
+
 impl HasScopedUseId for ast::ExprRef<'_> {
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
         let ast_ids = ast_ids(db, scope);

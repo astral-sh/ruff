@@ -503,6 +503,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         target: ScopedTargetId,
         definition_kind: DefinitionKind<'db>,
     ) -> Definition {
+        let category = definition_kind.category(self.source_type.is_stub());
         let definition = Definition::new(
             self.db,
             self.file,
@@ -512,6 +513,14 @@ impl<'db> SemanticIndexBuilder<'db> {
             false,
             countme::Count::default(),
         );
+
+        if category.is_binding() {
+            self.mark_target_bound(target);
+        }
+        if category.is_declaration() {
+            self.mark_target_declared(target);
+        }
+
         self.current_use_def_map_mut()
             .record_binding(target, definition);
         definition
@@ -676,30 +685,27 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_assignments.last_mut()
     }
 
-    /// Records the fact that we saw an attribute assignment of the form
-    /// `object.attr: <annotation>( = …)` or `object.attr = <value>`.
-    fn register_attribute_assignment(
+    /// Records the fact that we saw an attribute / subscript assignment of the form
+    /// `object{.attr|[index]}: <annotation>( = …)` or `object{.attr|[index]} = <value>`
+    fn register_attribute_subscript_assignment(
         &mut self,
-        object: &ast::Expr,
-        attr: &'db ast::Identifier,
+        expr: &ast::Expr,
         definition_kind: DefinitionKind<'db>,
     ) {
-        if self.is_method_of_class().is_some() {
-            // We only care about attribute assignments to the first parameter of a method,
-            // i.e. typically `self` or `cls`.
-            let accessed_object_refers_to_first_parameter = object
-                .as_name_expr()
-                .zip(self.current_first_parameter_name)
-                .map(|(name, fst)| name.id.as_str() == fst)
-                .unwrap_or(false);
+        if let Ok(mut target) = Target::try_from(expr) {
+            if self.is_method_of_class().is_some() {
+                // We specifically mark attribute assignments to the first parameter of a method,
+                // i.e. typically `self` or `cls`.
+                let accessed_object_refers_to_first_parameter = self
+                    .current_first_parameter_name
+                    .is_some_and(|fst| target.root_name().as_str() == fst);
 
-            if accessed_object_refers_to_first_parameter {
-                let mut target = Target::name(object.as_name_expr().unwrap().id.clone())
-                    .member(attr.id().clone());
-                target.mark_instance_attribute();
-                let id = self.add_target(target);
-                self.add_definition_by_definition_kind(id, definition_kind);
+                if accessed_object_refers_to_first_parameter && target.is_member() {
+                    target.mark_instance_attribute();
+                }
             }
+            let id = self.add_target(target);
+            self.add_definition_by_definition_kind(id, definition_kind);
         }
     }
 
@@ -1019,7 +1025,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                 ));
                 Some(unpackable.as_current_assignment(unpack))
             }
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 Some(unpackable.as_current_assignment(None))
             }
             _ => None,
@@ -1932,9 +1938,9 @@ where
             }
             ast::Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
                 for target in targets {
-                    if let ast::Expr::Name(ast::ExprName { id, .. }) = target {
-                        let symbol_id = self.add_symbol(id.clone());
-                        self.current_target_table().mark_target_used(symbol_id);
+                    if let Ok(target) = Target::try_from(target) {
+                        let target_id = self.add_target(target);
+                        self.current_target_table().mark_target_used(target_id);
                     }
                 }
                 walk_stmt(self, stmt);
@@ -2229,13 +2235,29 @@ where
 
                 self.simplify_visibility_constraints(pre_op);
             }
-            ast::Expr::Attribute(ast::ExprAttribute {
-                value: object,
-                attr,
-                ctx,
-                range: _,
-            }) => {
-                if ctx.is_store() {
+            ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
+            | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
+                let (is_use, is_definition) = match (ctx, self.current_assignment()) {
+                    (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
+                        // For augmented assignment, the target expression is also used.
+                        (true, true)
+                    }
+                    (ast::ExprContext::Load, _) => (true, false),
+                    (ast::ExprContext::Store, _) => (false, true),
+                    (ast::ExprContext::Del, _) => (false, true),
+                    (ast::ExprContext::Invalid, _) => (false, false),
+                };
+
+                if is_use {
+                    if let Ok(target) = Target::try_from(expr) {
+                        let target = self.add_target(target);
+                        self.mark_target_used(target);
+                        let use_id = self.current_ast_ids().record_use(expr);
+                        self.current_use_def_map_mut()
+                            .record_use(target, use_id, node_key);
+                    }
+                }
+                if is_definition {
                     match self.current_assignment() {
                         Some(CurrentAssignment::Assign { node, unpack, .. }) => {
                             // SAFETY: `value` and `expr` belong to the `self.module` tree
@@ -2245,9 +2267,8 @@ where
                                 unsafe { AstNodeRef::new(self.module.clone(), &node.value) },
                                 unsafe { AstNodeRef::new(self.module.clone(), expr) },
                             );
-                            self.register_attribute_assignment(
-                                object,
-                                attr,
+                            self.register_attribute_subscript_assignment(
+                                expr,
                                 DefinitionKind::Assignment(assignment),
                             );
                         }
@@ -2264,9 +2285,8 @@ where
                                 }),
                                 unsafe { AstNodeRef::new(self.module.clone(), expr) },
                             );
-                            self.register_attribute_assignment(
-                                object,
-                                attr,
+                            self.register_attribute_subscript_assignment(
+                                expr,
                                 DefinitionKind::AnnotatedAssignment(assignment),
                             );
                         }
@@ -2279,9 +2299,8 @@ where
                                 unsafe { AstNodeRef::new(self.module.clone(), expr) },
                                 node.is_async,
                             );
-                            self.register_attribute_assignment(
-                                object,
-                                attr,
+                            self.register_attribute_subscript_assignment(
+                                expr,
                                 DefinitionKind::For(assignment),
                             );
                         }
@@ -2299,9 +2318,8 @@ where
                                 unsafe { AstNodeRef::new(self.module.clone(), expr) },
                                 is_async,
                             );
-                            self.register_attribute_assignment(
-                                object,
-                                attr,
+                            self.register_attribute_subscript_assignment(
+                                expr,
                                 DefinitionKind::WithItem(assignment),
                             );
                         }
@@ -2324,9 +2342,8 @@ where
                             // Temporarily move to the scope of the method to which the instance attribute is defined.
                             // SAFETY: `self.scope_stack` is not empty because the targets in comprehensions should always introduce a new scope.
                             let scope = self.scope_stack.pop().expect("The popped scope must be a comprehension, which must have a parent scope");
-                            self.register_attribute_assignment(
-                                object,
-                                attr,
+                            self.register_attribute_subscript_assignment(
+                                expr,
                                 DefinitionKind::Comprehension(assignment),
                             );
                             self.scope_stack.push(scope);

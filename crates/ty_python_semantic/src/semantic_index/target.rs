@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::hash::{Hash, Hasher};
 use std::ops::Range;
 
-use bitflags::{bitflags, Flags};
+use bitflags::bitflags;
 use hashbrown::hash_map::RawEntryMut;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
@@ -18,7 +18,7 @@ use crate::semantic_index::{semantic_index, SemanticIndex, TargetSet};
 use crate::Db;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update)]
-enum TargetSubSegment {
+pub(crate) enum TargetSubSegment {
     /// A member access, e.g. `y` in `x.y`.
     Member(ast::name::Name),
     /// An integer index access, e.g. `1` in `x[1]`.
@@ -36,7 +36,7 @@ impl TargetSubSegment {
     }
 }
 
-/// A target value that can be the left side of a `Definition`.
+/// A single target value that can be the left side of a `Definition`.
 /// If you want to perform a comparison based on the equality of segments (without including flags), use [`TargetSegments`].
 #[derive(Eq, PartialEq, Debug)]
 pub struct Target {
@@ -75,38 +75,70 @@ impl TryFrom<ast::name::Name> for Target {
     }
 }
 
+impl TryFrom<&ast::ExprAttribute> for Target {
+    type Error = ();
+
+    fn try_from(attr: &ast::ExprAttribute) -> Result<Self, ()> {
+        let mut target = Target::try_from(&*attr.value)?;
+        target
+            .sub_segments
+            .push(TargetSubSegment::Member(attr.attr.id.clone()));
+        Ok(target)
+    }
+}
+
+impl TryFrom<ast::ExprAttribute> for Target {
+    type Error = ();
+
+    fn try_from(attr: ast::ExprAttribute) -> Result<Self, ()> {
+        let mut target = Target::try_from(&*attr.value)?;
+        target
+            .sub_segments
+            .push(TargetSubSegment::Member(attr.attr.id));
+        Ok(target)
+    }
+}
+
+impl TryFrom<&ast::ExprSubscript> for Target {
+    type Error = ();
+
+    fn try_from(subscript: &ast::ExprSubscript) -> Result<Self, ()> {
+        let mut target = Target::try_from(&*subscript.value)?;
+        match &*subscript.slice {
+            ast::Expr::NumberLiteral(number) if number.value.is_int() => {
+                target.sub_segments.push(TargetSubSegment::IntSubscript(
+                    number.value.as_int().unwrap().clone(),
+                ));
+            }
+            ast::Expr::StringLiteral(string) => {
+                target
+                    .sub_segments
+                    .push(TargetSubSegment::StringSubscript(string.value.to_string()));
+            }
+            _ => {
+                return Err(());
+            }
+        }
+        Ok(target)
+    }
+}
+
+impl TryFrom<ast::ExprSubscript> for Target {
+    type Error = ();
+
+    fn try_from(subscript: ast::ExprSubscript) -> Result<Self, ()> {
+        Target::try_from(&subscript)
+    }
+}
+
 impl TryFrom<&ast::Expr> for Target {
     type Error = ();
 
     fn try_from(expr: &ast::Expr) -> Result<Self, ()> {
         match expr {
             ast::Expr::Name(name) => Ok(Target::name(name.id.clone())),
-            ast::Expr::Attribute(attr) => {
-                let mut target = Target::try_from(&*attr.value)?;
-                target
-                    .sub_segments
-                    .push(TargetSubSegment::Member(attr.attr.id.clone()));
-                Ok(target)
-            }
-            ast::Expr::Subscript(subscript) => {
-                let mut target = Target::try_from(&*subscript.value)?;
-                match &*subscript.slice {
-                    ast::Expr::NumberLiteral(number) if number.value.is_int() => {
-                        target.sub_segments.push(TargetSubSegment::IntSubscript(
-                            number.value.as_int().unwrap().clone(),
-                        ));
-                    }
-                    ast::Expr::StringLiteral(string) => {
-                        target
-                            .sub_segments
-                            .push(TargetSubSegment::StringSubscript(string.value.to_string()));
-                    }
-                    _ => {
-                        return Err(());
-                    }
-                }
-                Ok(target)
-            }
+            ast::Expr::Attribute(attr) => Target::try_from(attr),
+            ast::Expr::Subscript(subscript) => Target::try_from(subscript),
             _ => Err(()),
         }
     }
@@ -121,12 +153,6 @@ impl Target {
         }
     }
 
-    pub(super) fn member(mut self, name: ast::name::Name) -> Self {
-        self.sub_segments.push(TargetSubSegment::Member(name));
-        self.flags.clear();
-        self
-    }
-
     fn insert_flags(&mut self, flags: TargetFlags) {
         self.flags.insert(flags);
     }
@@ -135,8 +161,12 @@ impl Target {
         self.flags.insert(TargetFlags::IS_INSTANCE_ATTRIBUTE);
     }
 
-    pub(super) fn root_name(&self) -> &Name {
+    pub(crate) fn root_name(&self) -> &Name {
         &self.root_name
+    }
+
+    pub(crate) fn sub_segments(&self) -> &[TargetSubSegment] {
+        &self.sub_segments
     }
 
     pub(crate) fn as_name(&self) -> Option<&Name> {
@@ -179,7 +209,13 @@ impl Target {
         self.sub_segments.is_empty()
     }
 
-    fn segments(&self) -> TargetSegments {
+    pub fn is_member(&self) -> bool {
+        self.sub_segments
+            .last()
+            .is_some_and(|last| last.as_member().is_some())
+    }
+
+    pub(crate) fn segments(&self) -> TargetSegments {
         TargetSegments {
             root_name: Some(&self.root_name),
             sub_segments: &self.sub_segments,

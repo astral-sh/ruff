@@ -20,7 +20,7 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::narrowing_constraints::ScopedNarrowingConstraint;
 use crate::semantic_index::target::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopedTargetId,
-    TargetTable,
+    Target, TargetTable,
 };
 use crate::semantic_index::use_def::{EagerSnapshotKey, ScopedEagerSnapshotId, UseDefMap};
 use crate::Db;
@@ -408,7 +408,7 @@ impl<'db> SemanticIndex<'db> {
     pub(crate) fn eager_snapshot(
         &self,
         enclosing_scope: FileScopeId,
-        symbol: &str,
+        target: &Target,
         nested_scope: FileScopeId,
     ) -> EagerSnapshotResult<'_, 'db> {
         for (ancestor_scope_id, ancestor_scope) in self.ancestor_scopes(nested_scope) {
@@ -419,7 +419,8 @@ impl<'db> SemanticIndex<'db> {
                 return EagerSnapshotResult::NoLongerInEagerContext;
             }
         }
-        let Some(symbol_id) = self.target_tables[enclosing_scope].target_id_by_name(symbol) else {
+        let Some(symbol_id) = self.target_tables[enclosing_scope].target_id_by_target(target)
+        else {
             return EagerSnapshotResult::NotFound;
         };
         let key = EagerSnapshotKey {
