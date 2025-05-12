@@ -60,10 +60,19 @@ pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
+    // Signature as of Python 3.13 (https://docs.python.org/3/library/warnings.html#warnings.warn)
+    // ```text
+    //                  0       1               2            3                  4
+    // warnings.warn(message, category=None, stacklevel=1, source=None, *, skip_file_prefixes=())
+    // ```
     if call
         .arguments
         .find_argument_value("stacklevel", 2)
         .is_some()
+        || call
+            .arguments
+            .find_argument_value("skip_file_prefixes", 4)
+            .is_some()
         || call
             .arguments
             .args

@@ -61,3 +61,5 @@ B028.py:22:1: B028 [*] No explicit `stacklevel` keyword argument found
 26    |-        source = None # no trailing comma
    26 |+        source = None, stacklevel=2 # no trailing comma
 27 27 |     )
+28 28 | 
+29 29 | # https://github.com/astral-sh/ruff/issues/18011

@@ -25,3 +25,6 @@ warnings.warn(
         # some comments here
         source = None # no trailing comma
     )
+
+# https://github.com/astral-sh/ruff/issues/18011
+warnings.warn("test", skip_file_prefixes=(os.path.dirname(__file__),))
