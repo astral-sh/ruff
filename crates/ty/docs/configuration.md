@@ -162,17 +162,17 @@ typeshed = "/path/to/custom/typeshed"
 
 #### `root`
 
-The root(s) of the project, used for finding first-party modules.
+The root of the project, used for finding first-party modules.
 
 **Default value**: `[".", "./src"]`
 
-**Type**: `list[str]`
+**Type**: `str`
 
 **Example usage** (`pyproject.toml`):
 
 ```toml
 [tool.ty.src]
-root = ["./app"]
+root = "./app"
 ```
 
 ---
