@@ -1958,6 +1958,8 @@ pub enum KnownClass {
     // backported as `builtins.ellipsis` by typeshed on Python <=3.9
     EllipsisType,
     NotImplementedType,
+    // dataclasses
+    Field,
 }
 
 impl<'db> KnownClass {
@@ -1996,7 +1998,8 @@ impl<'db> KnownClass {
             | Self::UnionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
-            | Self::MethodWrapperType => Truthiness::AlwaysTrue,
+            | Self::MethodWrapperType
+            | Self::Field => Truthiness::AlwaysTrue,
 
             Self::NoneType => Truthiness::AlwaysFalse,
 
@@ -2108,7 +2111,8 @@ impl<'db> KnownClass {
             | Self::VersionInfo
             | Self::EllipsisType
             | Self::NotImplementedType
-            | Self::UnionType => false,
+            | Self::UnionType
+            | Self::Field => false,
         }
     }
 
@@ -2181,6 +2185,7 @@ impl<'db> KnownClass {
                 }
             }
             Self::NotImplementedType => "_NotImplementedType",
+            Self::Field => "Field",
         }
     }
 
@@ -2405,6 +2410,7 @@ impl<'db> KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
+            Self::Field => KnownModule::Dataclasses,
         }
     }
 
@@ -2464,7 +2470,8 @@ impl<'db> KnownClass {
             | Self::ABCMeta
             | Self::Super
             | Self::NamedTuple
-            | Self::NewType => false,
+            | Self::NewType
+            | Self::Field => false,
         }
     }
 
@@ -2526,7 +2533,8 @@ impl<'db> KnownClass {
             | Self::Super
             | Self::UnionType
             | Self::NamedTuple
-            | Self::NewType => false,
+            | Self::NewType
+            | Self::Field => false,
         }
     }
 
@@ -2596,6 +2604,7 @@ impl<'db> KnownClass {
                 Self::EllipsisType
             }
             "_NotImplementedType" => Self::NotImplementedType,
+            "Field" => Self::Field,
             _ => return None,
         };
 
@@ -2659,7 +2668,8 @@ impl<'db> KnownClass {
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::NamedTuple
-            | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
+            | Self::NewType
+            | Self::Field => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
         }
     }
 }

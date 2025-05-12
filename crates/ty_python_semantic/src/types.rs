@@ -2947,7 +2947,7 @@ impl<'db> Type<'db> {
                     db,
                     [
                         KnownClass::Str.to_instance(db),
-                        todo_type!("dataclass.Field"),
+                        KnownClass::Field.to_specialized_instance(db, [Type::any()]),
                     ],
                 ))
                 .with_qualifiers(TypeQualifiers::CLASS_VAR)

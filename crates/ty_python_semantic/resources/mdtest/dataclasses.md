@@ -631,7 +631,7 @@ from dataclasses import dataclass, fields
 class Foo:
     x: int
 
-reveal_type(Foo.__dataclass_fields__)  # revealed: dict[str, @Todo(dataclass.Field)]
+reveal_type(Foo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
 reveal_type(fields(Foo))  # revealed: @Todo(full tuple[...] support)
 ```
 
