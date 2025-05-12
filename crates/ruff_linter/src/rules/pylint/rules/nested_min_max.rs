@@ -20,17 +20,6 @@ pub(crate) enum MinMax {
 /// Nested `min` and `max` calls can be flattened into a single call to improve
 /// readability.
 ///
-/// ## Fix safety
-/// This fix is always unsafe and may change the program's behavior for types without full
-/// equivalence relations, such as float comparisons involving `NaN`.
-/// ```python
-/// print(min(2.0, min(float("nan"), 1.0))) # before fix: 2.0
-/// print(min(2.0, float("nan"), 1.0))      # after fix: 1.0
-///
-/// print(max(1.0, max(float("nan"), 2.0))) # before fix: 1.0
-/// print(max(1.0, float("nan"), 2.0))      # after fix: 2.0
-/// ```
-///
 /// ## Example
 /// ```python
 /// minimum = min(1, 2, min(3, 4, 5))
@@ -43,6 +32,17 @@ pub(crate) enum MinMax {
 /// minimum = min(1, 2, 3, 4, 5)
 /// maximum = max(1, 2, 3, 4, 5)
 /// diff = maximum - minimum
+/// ```
+///
+/// ## Fix safety
+/// This fix is always unsafe and may change the program's behavior for types without full
+/// equivalence relations, such as float comparisons involving `NaN`.
+/// ```python
+/// print(min(2.0, min(float("nan"), 1.0))) # before fix: 2.0
+/// print(min(2.0, float("nan"), 1.0))      # after fix: 1.0
+///
+/// print(max(1.0, max(float("nan"), 2.0))) # before fix: 1.0
+/// print(max(1.0, float("nan"), 2.0))      # after fix: 2.0
 /// ```
 ///
 /// ## References
