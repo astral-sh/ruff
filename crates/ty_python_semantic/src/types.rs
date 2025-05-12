@@ -2101,9 +2101,11 @@ impl<'db> Type<'db> {
                 instance.is_disjoint_from(db, KnownClass::Tuple.to_instance(db))
             }
 
-            (Type::PropertyInstance(_), _) | (_, Type::PropertyInstance(_)) => KnownClass::Property
-                .to_instance(db)
-                .is_disjoint_from(db, other),
+            (Type::PropertyInstance(_), other) | (other, Type::PropertyInstance(_)) => {
+                KnownClass::Property
+                    .to_instance(db)
+                    .is_disjoint_from(db, other)
+            }
 
             (Type::BoundSuper(_), Type::BoundSuper(_)) => !self.is_equivalent_to(db, other),
             (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => KnownClass::Super
