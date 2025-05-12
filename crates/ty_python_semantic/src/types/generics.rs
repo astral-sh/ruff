@@ -676,9 +676,11 @@ impl<'db> SpecializationBuilder<'db> {
             (
                 Type::NominalInstance(NominalInstanceType {
                     class: ClassType::Generic(formal_alias),
+                    ..
                 }),
                 Type::NominalInstance(NominalInstanceType {
                     class: ClassType::Generic(actual_alias),
+                    ..
                 }),
             ) if formal_alias.origin(self.db) == actual_alias.origin(self.db) => {
                 let formal_specialization = formal_alias.specialization(self.db).types(self.db);
