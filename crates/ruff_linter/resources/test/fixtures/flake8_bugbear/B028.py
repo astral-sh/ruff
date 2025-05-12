@@ -30,3 +30,6 @@ warnings.warn(
 warnings.warn("test", skip_file_prefixes=(os.path.dirname(__file__),))
 # trigger diagnostic if `skip_file_prefixes` is present and set to the default value
 warnings.warn("test", skip_file_prefixes=())
+
+_my_prefixes = ("this","that")
+warnings.warn("test", skip_file_prefixes = _my_prefixes)

@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, fix::edits::add_argument};
@@ -71,11 +71,7 @@ pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
         .arguments
         .find_argument_value("stacklevel", 2)
         .is_some()
-        || call
-            .arguments
-            .find_keyword("skip_file_prefixes")
-            .and_then(|keyword| keyword.value.as_tuple_expr())
-            .is_some_and(|tuple| !tuple.elts.is_empty())
+        || is_skip_file_prefixes_param_set(&call.arguments)
         || call
             .arguments
             .args
@@ -101,4 +97,15 @@ pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
     diagnostic.set_fix(Fix::unsafe_edit(edit));
 
     checker.report_diagnostic(diagnostic);
+}
+
+/// Returns `true` if `skip_file_prefixes` is set to its non-default value.
+/// The default value of `skip_file_prefixes` is an empty tuple.
+fn is_skip_file_prefixes_param_set(arguments: &ast::Arguments) -> bool {
+    arguments
+        .find_keyword("skip_file_prefixes")
+        .is_some_and(|keyword| match &keyword.value {
+            Expr::Tuple(tuple) => !tuple.elts.is_empty(),
+            _ => true,
+        })
 }

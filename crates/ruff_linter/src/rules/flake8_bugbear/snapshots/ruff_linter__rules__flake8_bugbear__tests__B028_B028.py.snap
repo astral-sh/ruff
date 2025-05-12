@@ -70,6 +70,8 @@ B028.py:32:1: B028 [*] No explicit `stacklevel` keyword argument found
 31 | # trigger diagnostic if `skip_file_prefixes` is present and set to the default value
 32 | warnings.warn("test", skip_file_prefixes=())
    | ^^^^^^^^^^^^^ B028
+33 |
+34 | _my_prefixes = ("this","that")
    |
    = help: Set `stacklevel=2`
 
@@ -79,3 +81,6 @@ B028.py:32:1: B028 [*] No explicit `stacklevel` keyword argument found
 31 31 | # trigger diagnostic if `skip_file_prefixes` is present and set to the default value
 32    |-warnings.warn("test", skip_file_prefixes=())
    32 |+warnings.warn("test", skip_file_prefixes=(), stacklevel=2)
+33 33 | 
+34 34 | _my_prefixes = ("this","that")
+35 35 | warnings.warn("test", skip_file_prefixes = _my_prefixes)
