@@ -28,7 +28,7 @@ pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_type, infer_expression_types,
     infer_scope_types,
 };
-pub(crate) use self::narrow::KnownConstraintFunction;
+pub(crate) use self::narrow::ClassInfoConstraintFunction;
 pub(crate) use self::signatures::{CallableSignature, Signature, Signatures};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
@@ -6939,6 +6939,9 @@ pub enum KnownFunction {
     /// `builtins.issubclass`
     #[strum(serialize = "issubclass")]
     IsSubclass,
+    /// `builtins.hasattr`
+    #[strum(serialize = "hasattr")]
+    HasAttr,
     /// `builtins.reveal_type`, `typing.reveal_type` or `typing_extensions.reveal_type`
     RevealType,
     /// `builtins.len`
@@ -7005,10 +7008,10 @@ pub enum KnownFunction {
 }
 
 impl KnownFunction {
-    pub fn into_constraint_function(self) -> Option<KnownConstraintFunction> {
+    pub fn into_classinfo_constraint_function(self) -> Option<ClassInfoConstraintFunction> {
         match self {
-            Self::IsInstance => Some(KnownConstraintFunction::IsInstance),
-            Self::IsSubclass => Some(KnownConstraintFunction::IsSubclass),
+            Self::IsInstance => Some(ClassInfoConstraintFunction::IsInstance),
+            Self::IsSubclass => Some(ClassInfoConstraintFunction::IsSubclass),
             _ => None,
         }
     }
@@ -7027,7 +7030,9 @@ impl KnownFunction {
     /// Return `true` if `self` is defined in `module` at runtime.
     const fn check_module(self, module: KnownModule) -> bool {
         match self {
-            Self::IsInstance | Self::IsSubclass | Self::Len | Self::Repr => module.is_builtins(),
+            Self::IsInstance | Self::IsSubclass | Self::HasAttr | Self::Len | Self::Repr => {
+                module.is_builtins()
+            }
             Self::AssertType
             | Self::AssertNever
             | Self::Cast
@@ -8423,6 +8428,7 @@ pub(crate) mod tests {
                 KnownFunction::Len
                 | KnownFunction::Repr
                 | KnownFunction::IsInstance
+                | KnownFunction::HasAttr
                 | KnownFunction::IsSubclass => KnownModule::Builtins,
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,

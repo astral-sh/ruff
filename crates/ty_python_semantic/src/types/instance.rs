@@ -25,6 +25,15 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(super) fn synthesized_protocol<'a, M>(db: &'db dyn Db, members: M) -> Self
+    where
+        M: IntoIterator<Item = (&'a str, Type<'db>)>,
+    {
+        Self::ProtocolInstance(ProtocolInstanceType(Protocol::Synthesized(
+            SynthesizedProtocolType::new(db, ProtocolInterface::with_members(db, members)),
+        )))
+    }
+
     /// Return `true` if `self` conforms to the interface described by `protocol`.
     ///
     /// TODO: we may need to split this into two methods in the future, once we start

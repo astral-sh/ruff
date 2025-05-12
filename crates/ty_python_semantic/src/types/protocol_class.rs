@@ -70,6 +70,25 @@ pub(super) enum ProtocolInterface<'db> {
 }
 
 impl<'db> ProtocolInterface<'db> {
+    pub(super) fn with_members<'a, M>(db: &'db dyn Db, members: M) -> Self
+    where
+        M: IntoIterator<Item = (&'a str, Type<'db>)>,
+    {
+        let members: BTreeMap<_, _> = members
+            .into_iter()
+            .map(|(name, ty)| {
+                (
+                    Name::new(name),
+                    ProtocolMemberData {
+                        ty: ty.normalized(db),
+                        qualifiers: TypeQualifiers::default(),
+                    },
+                )
+            })
+            .collect();
+        Self::Members(ProtocolInterfaceMembers::new(db, members))
+    }
+
     fn empty(db: &'db dyn Db) -> Self {
         Self::Members(ProtocolInterfaceMembers::new(db, BTreeMap::default()))
     }
