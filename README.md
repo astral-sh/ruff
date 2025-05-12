@@ -34,7 +34,7 @@ An extremely fast Python linter and code formatter, written in Rust.
 - 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
 - 📏 Over [800 built-in rules](https://docs.astral.sh/ruff/rules/), with native re-implementations
     of popular Flake8 plugins, like flake8-bugbear
-- ⌨️ First-party integrations for [VS Code](https://github.com/astral-sh/ruff-vscode) or [other editors](https://docs.astral.sh/ruff/editors) like [Neovim](https://docs.astral.sh/ruff/editors/setup/#neovim), and [more development automation and environment management tools]([https://docs.astral.sh/ruff/editors/setup](https://docs.astral.sh/ruff/integrations)
+- ⌨️ First-party integration for [VS Code](https://github.com/astral-sh/ruff-vscode), and more integrations for [editors](https://docs.astral.sh/ruff/editors) and [development automation and environment management tools]([https://docs.astral.sh/ruff/editors/setup](https://docs.astral.sh/ruff/integrations)
 - 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://docs.astral.sh/ruff/configuration/#config-file-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
