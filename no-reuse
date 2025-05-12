@@ -1,0 +1,3012 @@
+   Compiling salsa v0.21.1 (/home/ibraheem/dev/astral/salsa)
+warning: unused variable: `cursor`
+   --> /home/ibraheem/dev/astral/salsa/src/interned.rs:337:17
+    |
+337 |         let mut cursor = shared.lru.back_mut();
+    |                 ^^^^^^ help: if this is intentional, prefix it with an underscore: `_cursor`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `prev_last_interned_at`
+   --> /home/ibraheem/dev/astral/salsa/src/interned.rs:272:25
+    |
+272 |                     let prev_last_interned_at = value_shared.last_interned_at;
+    |                         ^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_prev_last_interned_at`
+
+warning: variable does not need to be mutable
+   --> /home/ibraheem/dev/astral/salsa/src/interned.rs:337:13
+    |
+337 |         let mut cursor = shared.lru.back_mut();
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: unnecessary `unsafe` block
+   --> /home/ibraheem/dev/astral/salsa/src/interned.rs:517:13
+    |
+517 |             unsafe {
+    |             ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` on by default
+
+warning: field `id` is never read
+   --> /home/ibraheem/dev/astral/salsa/src/interned.rs:107:5
+    |
+103 | struct ValueShared {
+    |        ----------- field in this struct
+...
+107 |     id: Id,
+    |     ^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: method `is_stale` is never used
+   --> /home/ibraheem/dev/astral/salsa/src/interned.rs:752:8
+    |
+721 | impl RevisionQueue {
+    | ------------------ method in this implementation
+...
+752 |     fn is_stale(&self, revision: Revision) -> bool {
+    |        ^^^^^^^^
+
+warning: method `clear` is never used
+  --> /home/ibraheem/dev/astral/salsa/src/table/memo.rs:23:19
+   |
+22 | impl MemoTable {
+   | -------------- method in this implementation
+23 |     pub(crate) fn clear(&self) {
+   |                   ^^^^^
+
+   Compiling ruff_python_ast v0.0.0 (/home/ibraheem/dev/astral/ruff/crates/ruff_python_ast)
+   Compiling ruff_index v0.0.0 (/home/ibraheem/dev/astral/ruff/crates/ruff_index)
+warning: `salsa` (lib) generated 7 warnings (run `cargo fix --lib -p salsa` to apply 1 suggestion)
+   Compiling ruff_python_parser v0.0.0 (/home/ibraheem/dev/astral/ruff/crates/ruff_python_parser)
+   Compiling ruff_python_literal v0.0.0 (/home/ibraheem/dev/astral/ruff/crates/ruff_python_literal)
+   Compiling ruff_db v0.0.0 (/home/ibraheem/dev/astral/ruff/crates/ruff_db)
+   Compiling ty_python_semantic v0.0.0 (/home/ibraheem/dev/astral/ruff/crates/ty_python_semantic)
+   Compiling ty_vendored v0.0.0 (/home/ibraheem/dev/astral/ruff/crates/ty_vendored)
+   Compiling ty_test v0.0.0 (/home/ibraheem/dev/astral/ruff/crates/ty_test)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.45s
+    Starting 1 test across 2 binaries (455 skipped; run ID: 39ee54c9-40ae-40f8-822c-58b582ce59d2, nextest profile: default)
+        PASS [   0.098s] ty_python_semantic::mdtest mdtest__import_basic
+
+--- STDOUT:              ty_python_semantic::mdtest mdtest__import_basic ---
+
+running 1 test
+
+--------------------------------------------------
+
+test mdtest__import_basic ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 221 filtered out; finished in 0.10s
+
+
+--- STDERR:              ty_python_semantic::mdtest mdtest__import_basic ---
+2025-05-09T21:52:03.788190Z DEBUG ruff_db::files: Syncing all files
+2025-05-09T21:52:03.788224Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(18)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788230Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(18)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788232Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(18)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788235Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(24)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788236Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(24)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788237Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(24)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788239Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(28)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788240Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(28)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788241Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(28)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788243Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(2f)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788245Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(2f)), durability=Durability(2), changed_at=R22)
+2025-05-09T21:52:03.788247Z DEBUG ruff_db::files: Updating the status of `/src/a/__init__.py`
+2025-05-09T21:52:03.788251Z DEBUG salsa::runtime: new_revision: R22 -> R23
+2025-05-09T21:52:03.788295Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(2f)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788297Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(2f)), durability=Durability(2), changed_at=R22)
+2025-05-09T21:52:03.788299Z DEBUG ruff_db::files: Updating the revision of `/src/a/__init__.py`
+2025-05-09T21:52:03.788300Z DEBUG salsa::runtime: new_revision: R23 -> R24
+2025-05-09T21:52:03.788304Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(2f)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788306Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(2f)), durability=Durability(2), changed_at=R22)
+2025-05-09T21:52:03.788307Z DEBUG ruff_db::files: Updating the permissions of `/src/a/__init__.py`
+2025-05-09T21:52:03.788308Z DEBUG salsa::runtime: new_revision: R24 -> R25
+2025-05-09T21:52:03.788313Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(6)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788314Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(6)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788316Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(6)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788318Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(1d)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788319Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(1d)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788320Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(1d)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788322Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(10)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788324Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(10)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788325Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(10)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788327Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(2)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788328Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(2)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788329Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(2)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788331Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(15)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788333Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(15)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788334Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(15)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788337Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(26)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788338Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(26)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788340Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(26)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788342Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(8)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788343Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(8)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788345Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(8)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788347Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(2a)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788348Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(2a)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788349Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(2a)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788352Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(0)), durability=Durability(0), changed_at=R20)
+2025-05-09T21:52:03.788353Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.788354Z DEBUG ruff_db::files: Updating the status of `/src/mdtest_snippet.py`
+2025-05-09T21:52:03.788355Z DEBUG salsa::runtime: new_revision: R25 -> R26
+2025-05-09T21:52:03.788358Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(0)), durability=Durability(0), changed_at=R21)
+2025-05-09T21:52:03.788360Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.788361Z DEBUG ruff_db::files: Updating the revision of `/src/mdtest_snippet.py`
+2025-05-09T21:52:03.788362Z DEBUG salsa::runtime: new_revision: R26 -> R27
+2025-05-09T21:52:03.788365Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(0)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788367Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.788368Z DEBUG ruff_db::files: Updating the permissions of `/src/mdtest_snippet.py`
+2025-05-09T21:52:03.788369Z DEBUG salsa::runtime: new_revision: R27 -> R28
+2025-05-09T21:52:03.788373Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(31)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.788376Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(31)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788377Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(31)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788379Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(16)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788381Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(16)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788382Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(16)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788385Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(33)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.788387Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(33)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788388Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(33)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788390Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(29)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788392Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(29)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788393Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(29)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788395Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(22)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788396Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(22)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788398Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(22)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788400Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(30)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788401Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(30)), durability=Durability(2), changed_at=R22)
+2025-05-09T21:52:03.788402Z DEBUG ruff_db::files: Updating the status of `/src/a/b.py`
+2025-05-09T21:52:03.788404Z DEBUG salsa::runtime: new_revision: R28 -> R29
+2025-05-09T21:52:03.788406Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(30)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788408Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(30)), durability=Durability(2), changed_at=R22)
+2025-05-09T21:52:03.788409Z DEBUG ruff_db::files: Updating the revision of `/src/a/b.py`
+2025-05-09T21:52:03.788410Z DEBUG salsa::runtime: new_revision: R29 -> R30
+2025-05-09T21:52:03.788413Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(30)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788414Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(30)), durability=Durability(2), changed_at=R22)
+2025-05-09T21:52:03.788416Z DEBUG ruff_db::files: Updating the permissions of `/src/a/b.py`
+2025-05-09T21:52:03.788417Z DEBUG salsa::runtime: new_revision: R30 -> R31
+2025-05-09T21:52:03.788421Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(9)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788423Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(9)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788424Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(9)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788427Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(c)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788428Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(c)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788429Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(c)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788432Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(35)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.788434Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(35)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788435Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(35)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788437Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(e)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788438Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(e)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788440Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(e)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788443Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(13)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788444Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(13)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788445Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(13)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788447Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(f)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788448Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(f)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788450Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(f)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788452Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(2d)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788453Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(2d)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788454Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(2d)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788457Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(17)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788458Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(17)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788460Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(17)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788462Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(39)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.788463Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(39)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788464Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(39)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788466Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(36)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.788467Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(36)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788469Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(36)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788471Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(23)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788473Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(23)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788474Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(23)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788476Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(7)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788478Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(7)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788479Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(7)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788481Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(1e)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788483Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(1e)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788484Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(1e)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788486Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(19)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788487Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(19)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788488Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(19)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788490Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(3)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788492Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(3)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788493Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(3)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788495Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(38)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.788496Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(38)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788497Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(38)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788499Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(27)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788501Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(27)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788502Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(27)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788504Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(32)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.788505Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(32)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788506Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(32)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788509Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(2b)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788510Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(2b)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788511Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(2b)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788513Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(21)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788515Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(21)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788516Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(21)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788519Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(1a)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788520Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(1a)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788521Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(1a)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788524Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(34)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.788525Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(34)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788526Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(34)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788528Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(d)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788529Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(d)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788531Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(d)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788533Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(2c)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788534Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(2c)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788535Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(2c)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788537Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(20)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788539Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(20)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788540Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(20)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788542Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(a)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788543Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(a)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788544Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(a)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788547Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(5)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788548Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(5)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788549Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(5)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788551Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(1)), durability=Durability(0), changed_at=R17)
+2025-05-09T21:52:03.788552Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(1)), durability=Durability(0), changed_at=R18)
+2025-05-09T21:52:03.788554Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(1)), durability=Durability(0), changed_at=R19)
+2025-05-09T21:52:03.788556Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(14)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788557Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(14)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788558Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(14)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788561Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(4)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788562Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(4)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788563Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(4)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788565Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(37)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.788567Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(37)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788568Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(37)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788570Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(b)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788571Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(b)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788572Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(b)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788575Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(1f)), durability=Durability(1), changed_at=R1)
+2025-05-09T21:52:03.788576Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(1f)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788577Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(1f)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.788598Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(0)), durability=Durability(0), changed_at=R26)
+2025-05-09T21:52:03.788599Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.788600Z DEBUG ruff_db::files: Updating the status of `/src/mdtest_snippet.py`
+2025-05-09T21:52:03.788602Z DEBUG salsa::runtime: new_revision: R31 -> R32
+2025-05-09T21:52:03.788605Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(0)), durability=Durability(0), changed_at=R27)
+2025-05-09T21:52:03.788606Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.788607Z DEBUG ruff_db::files: Updating the revision of `/src/mdtest_snippet.py`
+2025-05-09T21:52:03.788608Z DEBUG salsa::runtime: new_revision: R32 -> R33
+2025-05-09T21:52:03.788611Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(0)), durability=Durability(0), changed_at=R28)
+2025-05-09T21:52:03.788613Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.788614Z DEBUG ruff_db::files: Updating the permissions of `/src/mdtest_snippet.py`
+2025-05-09T21:52:03.788615Z DEBUG salsa::runtime: new_revision: R33 -> R34
+2025-05-09T21:52:03.788620Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(0)), durability=Durability(0), changed_at=R32)
+2025-05-09T21:52:03.788638Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(2f)), durability=Durability(0), changed_at=R23)
+2025-05-09T21:52:03.788640Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(2f)), durability=Durability(2), changed_at=R22)
+2025-05-09T21:52:03.788641Z DEBUG ruff_db::files: Updating the status of `/src/a/__init__.py`
+2025-05-09T21:52:03.788642Z DEBUG salsa::runtime: new_revision: R34 -> R35
+2025-05-09T21:52:03.788645Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(2f)), durability=Durability(0), changed_at=R24)
+2025-05-09T21:52:03.788646Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(2f)), durability=Durability(2), changed_at=R22)
+2025-05-09T21:52:03.788647Z DEBUG ruff_db::files: Updating the revision of `/src/a/__init__.py`
+2025-05-09T21:52:03.788648Z DEBUG salsa::runtime: new_revision: R35 -> R36
+2025-05-09T21:52:03.788651Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(2f)), durability=Durability(0), changed_at=R25)
+2025-05-09T21:52:03.788653Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(2f)), durability=Durability(2), changed_at=R22)
+2025-05-09T21:52:03.788654Z DEBUG ruff_db::files: Updating the permissions of `/src/a/__init__.py`
+2025-05-09T21:52:03.788655Z DEBUG salsa::runtime: new_revision: R36 -> R37
+2025-05-09T21:52:03.788660Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(2f)), durability=Durability(0), changed_at=R35)
+2025-05-09T21:52:03.788680Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(35)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.788682Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(35)), durability=Durability(2), changed_at=R22)
+2025-05-09T21:52:03.788683Z DEBUG ruff_db::files: Updating the status of `/src/a/b/__init__.py`
+2025-05-09T21:52:03.788684Z DEBUG salsa::runtime: new_revision: R37 -> R38
+2025-05-09T21:52:03.788688Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(3), Id(35)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788689Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(35)), durability=Durability(2), changed_at=R22)
+2025-05-09T21:52:03.788690Z DEBUG ruff_db::files: Updating the revision of `/src/a/b/__init__.py`
+2025-05-09T21:52:03.788691Z DEBUG salsa::runtime: new_revision: R38 -> R39
+2025-05-09T21:52:03.788695Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(2), Id(35)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.788696Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(1), Id(35)), durability=Durability(2), changed_at=R22)
+2025-05-09T21:52:03.788697Z DEBUG ruff_db::files: Updating the permissions of `/src/a/b/__init__.py`
+2025-05-09T21:52:03.788698Z DEBUG salsa::runtime: new_revision: R39 -> R40
+2025-05-09T21:52:03.788703Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(35)), durability=Durability(1), changed_at=R38)
+2025-05-09T21:52:03.788720Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(4), Id(3a)), durability=Durability(0), changed_at=R40)
+2025-05-09T21:52:03.788726Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(8), Id(400)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.788728Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(7), Id(400)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.788731Z DEBUG ty_python_semantic::module_resolver::resolver: Adding first-party search path '/src'
+2025-05-09T21:52:03.788735Z DEBUG ty_python_semantic::module_resolver::resolver: Using vendored stdlib
+2025-05-09T21:52:03.789237Z DEBUG salsa::zalsa_local: report_tracked_read(input=DatabaseKeyIndex(IngredientIndex(9), Id(400)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789297Z DEBUG salsa::function::maybe_changed_after: parsed_module(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789303Z DEBUG salsa::function::maybe_changed_after: parsed_module(Id(0)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789309Z DEBUG salsa::function::maybe_changed_after: parsed_module(Id(0)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789310Z DEBUG salsa::function::maybe_changed_after: parsed_module(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789312Z DEBUG salsa::function::maybe_changed_after: parsed_module(Id(0)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789315Z DEBUG salsa::function::maybe_changed_after: source_text(Id(0)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.789317Z DEBUG salsa::function::maybe_changed_after: source_text(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789319Z DEBUG salsa::function::maybe_changed_after: source_text(Id(0)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789323Z DEBUG salsa::function::maybe_changed_after: source_text(Id(0)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.789324Z DEBUG salsa::function::maybe_changed_after: source_text(Id(0)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789326Z DEBUG salsa::function::maybe_changed_after: source_text(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789328Z DEBUG salsa::function::maybe_changed_after: source_text(Id(0)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789332Z  INFO salsa::function::execute: source_text(Id(0)): executing query
+2025-05-09T21:52:03.789335Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.path(Id(0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789340Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.path(Id(0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789343Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.path(Id(0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789344Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.revision(Id(0)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.789359Z  INFO salsa::function::execute: parsed_module(Id(0)): executing query
+2025-05-09T21:52:03.789362Z DEBUG salsa::function::maybe_changed_after: source_text(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.789364Z DEBUG salsa::zalsa_local: report_tracked_read(input=source_text(Id(0)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.789368Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.path(Id(0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789370Z DEBUG salsa::zalsa_local: report_tracked_read(input=Program.python_version(Id(400)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789389Z DEBUG salsa::zalsa_local: report_tracked_read(input=parsed_module(Id(0)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.789396Z DEBUG salsa::function::maybe_changed_after: check_types(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789399Z DEBUG salsa::function::maybe_changed_after: check_types(Id(0)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789402Z DEBUG salsa::function::maybe_changed_after: check_types(Id(0)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789403Z DEBUG salsa::function::maybe_changed_after: check_types(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789405Z DEBUG salsa::function::maybe_changed_after: check_types(Id(0)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789407Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.789410Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789412Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789415Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.789417Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789418Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789420Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789422Z DEBUG salsa::function::maybe_changed_after: parsed_module(Id(0)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.789424Z DEBUG salsa::function::maybe_changed_after: parsed_module(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.789426Z  INFO salsa::function::execute: semantic_index(Id(0)): executing query
+2025-05-09T21:52:03.789431Z DEBUG salsa::function::maybe_changed_after: parsed_module(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.789432Z DEBUG salsa::zalsa_local: report_tracked_read(input=parsed_module(Id(0)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.789434Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.path(Id(0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789437Z DEBUG salsa::zalsa_local: report_tracked_read(input=Program.python_version(Id(400)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789512Z  INFO salsa::function::execute: check_types(Id(0)): executing query
+2025-05-09T21:52:03.789518Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.path(Id(0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789520Z DEBUG ty_python_semantic::types: Checking file '/src/mdtest_snippet.py'
+2025-05-09T21:52:03.789523Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.789526Z DEBUG salsa::zalsa_local: report_tracked_read(input=semantic_index(Id(0)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.789531Z DEBUG salsa::function::maybe_changed_after: infer_scope_types(Id(800)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789533Z DEBUG salsa::function::maybe_changed_after: infer_scope_types(Id(800)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789536Z DEBUG salsa::function::maybe_changed_after: infer_scope_types(Id(800)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789538Z DEBUG salsa::function::maybe_changed_after: infer_scope_types(Id(800)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789539Z DEBUG salsa::function::maybe_changed_after: infer_scope_types(Id(800)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789542Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.789543Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.789545Z  INFO salsa::function::execute: infer_scope_types(Id(800)): executing query
+2025-05-09T21:52:03.789547Z DEBUG salsa::zalsa_local: report_tracked_read(input=ScopeId(Id(800)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.789551Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.789553Z DEBUG salsa::zalsa_local: report_tracked_read(input=semantic_index(Id(0)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.789555Z DEBUG salsa::zalsa_local: report_tracked_read(input=ScopeId(Id(800)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.789557Z DEBUG salsa::zalsa_local: report_tracked_read(input=ScopeId(Id(800)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.789559Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.789560Z DEBUG salsa::zalsa_local: report_tracked_read(input=semantic_index(Id(0)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.789562Z DEBUG salsa::zalsa_local: report_tracked_read(input=ScopeId(Id(800)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.789565Z DEBUG salsa::function::maybe_changed_after: parsed_module(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.789567Z DEBUG salsa::zalsa_local: report_tracked_read(input=parsed_module(Id(0)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.789571Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(c00)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789574Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(c00)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789576Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(c00)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789578Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(c00)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789579Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(c00)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789581Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.789583Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.789585Z  INFO salsa::function::execute: infer_definition_types(Id(c00)): executing query
+2025-05-09T21:52:03.789588Z DEBUG salsa::zalsa_local: report_tracked_read(input=Definition(Id(c00)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.789590Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.789591Z DEBUG salsa::zalsa_local: report_tracked_read(input=semantic_index(Id(0)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.789593Z DEBUG salsa::zalsa_local: report_tracked_read(input=Definition(Id(c00)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.789595Z DEBUG salsa::zalsa_local: report_tracked_read(input=Definition(Id(c00)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.789596Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.789598Z DEBUG salsa::zalsa_local: report_tracked_read(input=semantic_index(Id(0)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.789600Z DEBUG salsa::zalsa_local: report_tracked_read(input=ScopeId(Id(800)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.789602Z DEBUG salsa::zalsa_local: report_tracked_read(input=Definition.kind(Id(c00)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.789614Z DEBUG salsa::zalsa_local: report_tracked_read(input=ModuleNameIngredient(Id(1409)), durability=Durability(0), changed_at=R40)
+2025-05-09T21:52:03.789619Z  INFO salsa::function::execute: resolve_module_query(Id(1409)): executing query
+2025-05-09T21:52:03.789621Z DEBUG salsa::zalsa_local: report_tracked_read(input=ModuleNameIngredient(Id(1409)), durability=Durability(0), changed_at=R40)
+2025-05-09T21:52:03.789624Z DEBUG salsa::zalsa_local: report_tracked_read(input=Program.python_version(Id(400)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789632Z DEBUG salsa::zalsa_local: report_tracked_read(input=Program.search_paths(Id(400)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789641Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.status(Id(31)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.789645Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.status(Id(32)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.789648Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.status(Id(33)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.789652Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.status(Id(2f)), durability=Durability(0), changed_at=R35)
+2025-05-09T21:52:03.789655Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.status(Id(35)), durability=Durability(1), changed_at=R38)
+2025-05-09T21:52:03.789669Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.status(Id(3b)), durability=Durability(1), changed_at=R40)
+2025-05-09T21:52:03.789676Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.status(Id(3c)), durability=Durability(1), changed_at=R40)
+2025-05-09T21:52:03.789684Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.status(Id(3d)), durability=Durability(1), changed_at=R40)
+2025-05-09T21:52:03.789688Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.status(Id(3a)), durability=Durability(0), changed_at=R40)
+2025-05-09T21:52:03.789690Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.path(Id(3a)), durability=Durability(2), changed_at=R40)
+2025-05-09T21:52:03.789698Z DEBUG salsa::zalsa_local: report_tracked_read(input=resolve_module_query(Id(1409)), durability=Durability(0), changed_at=R40)
+2025-05-09T21:52:03.789707Z DEBUG salsa::zalsa_local: report_tracked_read(input=ModuleLiteralType(Id(180a)), durability=Durability(0), changed_at=R40)
+2025-05-09T21:52:03.789712Z DEBUG salsa::zalsa_local: report_tracked_read(input=ModuleNameIngredient(Id(1408)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.789715Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1408)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789717Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1408)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789720Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1408)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789722Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1408)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789723Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1408)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789726Z  INFO salsa::function::execute: resolve_module_query(Id(1408)): executing query
+2025-05-09T21:52:03.789728Z DEBUG salsa::zalsa_local: report_tracked_read(input=ModuleNameIngredient(Id(1408)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.789730Z DEBUG salsa::zalsa_local: report_tracked_read(input=Program.python_version(Id(400)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789734Z DEBUG salsa::zalsa_local: report_tracked_read(input=Program.search_paths(Id(400)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789737Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.status(Id(32)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.789740Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.status(Id(31)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.789743Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.status(Id(37)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.789748Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.status(Id(38)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.789751Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.status(Id(39)), durability=Durability(1), changed_at=R22)
+2025-05-09T21:52:03.789753Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.status(Id(2f)), durability=Durability(0), changed_at=R35)
+2025-05-09T21:52:03.789755Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.path(Id(2f)), durability=Durability(2), changed_at=R22)
+2025-05-09T21:52:03.789760Z DEBUG salsa::function::backdate: resolve_module_query(Id(1408)) value is equal, back-dating to R22
+2025-05-09T21:52:03.789764Z DEBUG salsa::zalsa_local: report_tracked_read(input=resolve_module_query(Id(1408)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.789768Z DEBUG salsa::zalsa_local: report_tracked_read(input=ModuleLiteralType(Id(1809)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.789771Z DEBUG salsa::zalsa_local: report_tracked_read(input=Definition.kind(Id(c00)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.789773Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.path(Id(0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789775Z DEBUG salsa::zalsa_local: report_tracked_read(input=Definition.kind(Id(c00)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.789777Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.path(Id(0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789784Z DEBUG salsa::function::execute: infer_definition_types(Id(c00)): execute: result.revisions = QueryRevisions {
+    changed_at: R40,
+    durability: Durability::LOW,
+    origin: Derived(
+        QueryEdges {
+            input_outputs: [
+                Input(
+                    Definition(Id(c00)),
+                ),
+                Input(
+                    semantic_index(Id(0)),
+                ),
+                Input(
+                    ScopeId(Id(800)),
+                ),
+                Input(
+                    Definition.kind(Id(c00)),
+                ),
+                Input(
+                    ModuleNameIngredient(Id(1409)),
+                ),
+                Input(
+                    resolve_module_query(Id(1409)),
+                ),
+                Input(
+                    ModuleLiteralType(Id(180a)),
+                ),
+                Input(
+                    ModuleNameIngredient(Id(1408)),
+                ),
+                Input(
+                    resolve_module_query(Id(1408)),
+                ),
+                Input(
+                    ModuleLiteralType(Id(1809)),
+                ),
+                Input(
+                    File.path(Id(0)),
+                ),
+            ],
+        },
+    ),
+    tracked_struct_ids: IdentityMap {
+        map: {},
+    },
+    accumulated: None,
+    accumulated_inputs: AtomicInputAccumulatedValues(
+        false,
+    ),
+    verified_final: true,
+    cycle_heads: CycleHeads(
+        [],
+    ),
+}
+2025-05-09T21:52:03.789802Z DEBUG salsa::function::backdate: infer_definition_types(Id(c00)) value is equal, back-dating to R22
+2025-05-09T21:52:03.789807Z DEBUG salsa::zalsa_local: report_tracked_read(input=infer_definition_types(Id(c00)), durability=Durability(0), changed_at=R22)
+2025-05-09T21:52:03.789817Z DEBUG salsa::zalsa_local: report_tracked_read(input=ScopeId(Id(800)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.789820Z DEBUG salsa::zalsa_local: report_tracked_read(input=ScopeId(Id(800)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.789822Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.789824Z DEBUG salsa::zalsa_local: report_tracked_read(input=semantic_index(Id(0)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.789826Z DEBUG salsa::zalsa_local: report_tracked_read(input=ScopeId(Id(800)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.789838Z DEBUG salsa::zalsa_local: report_tracked_read(input=module_type_symbols::interned_arguments(Id(2800)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.789842Z DEBUG salsa::function::maybe_changed_after: module_type_symbols(Id(2800)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789844Z DEBUG salsa::function::maybe_changed_after: module_type_symbols(Id(2800)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789847Z DEBUG salsa::function::maybe_changed_after: module_type_symbols(Id(2800)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789849Z DEBUG salsa::function::maybe_changed_after: module_type_symbols(Id(2800)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789850Z DEBUG salsa::function::maybe_changed_after: module_type_symbols(Id(2800)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789854Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1401)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.789856Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1401)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789857Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1401)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789860Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1401)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.789862Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1401)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789863Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1401)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789864Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1401)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789869Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(11)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.789873Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(11)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789875Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(11)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.789878Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(803)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.789881Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(803)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789883Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(803)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.789887Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2001)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.789889Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2001)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789892Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2001)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789895Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2001)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.789897Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2001)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789898Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2001)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789899Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2001)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789902Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(803)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.789904Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(803)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789907Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(803)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.789910Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(d48)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.789913Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(d48)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789915Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(d48)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789917Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(d48)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.789919Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(d48)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789920Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(d48)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789925Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(d48)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789927Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(11)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.789928Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(11)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789930Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(11)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.789960Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(11)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.789962Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(11)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789964Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(11)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789967Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(11)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.789969Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(11)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789970Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(11)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789971Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(11)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.789974Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1401)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.789975Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1401)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.789979Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(844)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.789982Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(844)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789983Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(844)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.789986Z DEBUG salsa::zalsa_local: report_tracked_read(input=module_type_symbols(Id(2800)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.789994Z DEBUG salsa::zalsa_local: report_tracked_read(input=ModuleNameIngredient(Id(1402)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.789997Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1402)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.789998Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1402)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790000Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1402)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790002Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1402)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790003Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1402)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790006Z DEBUG salsa::zalsa_local: report_tracked_read(input=resolve_module_query(Id(1402)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.790009Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(12)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790012Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(12)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.790014Z DEBUG salsa::zalsa_local: report_tracked_read(input=global_scope(Id(12)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.790017Z DEBUG salsa::zalsa_local: report_tracked_read(input=ModuleNameIngredient(Id(1402)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.790019Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1402)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790020Z DEBUG salsa::zalsa_local: report_tracked_read(input=resolve_module_query(Id(1402)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.790022Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(12)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790024Z DEBUG salsa::zalsa_local: report_tracked_read(input=global_scope(Id(12)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.790027Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(8e1)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790028Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(8e1)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.790030Z DEBUG salsa::zalsa_local: report_tracked_read(input=symbol_table(Id(8e1)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.790034Z DEBUG salsa::zalsa_local: report_tracked_read(input=module_type_symbols::interned_arguments(Id(2800)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.790036Z DEBUG salsa::function::maybe_changed_after: module_type_symbols(Id(2800)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790037Z DEBUG salsa::zalsa_local: report_tracked_read(input=module_type_symbols(Id(2800)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.790041Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.path(Id(0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.790044Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790045Z DEBUG salsa::zalsa_local: report_tracked_read(input=semantic_index(Id(0)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.790047Z DEBUG salsa::zalsa_local: report_tracked_read(input=ScopeId(Id(800)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.790051Z DEBUG salsa::function::maybe_changed_after: suppressions(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790054Z DEBUG salsa::function::maybe_changed_after: suppressions(Id(0)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790056Z DEBUG salsa::function::maybe_changed_after: suppressions(Id(0)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790058Z DEBUG salsa::function::maybe_changed_after: suppressions(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790060Z DEBUG salsa::function::maybe_changed_after: suppressions(Id(0)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790062Z DEBUG salsa::function::maybe_changed_after: parsed_module(Id(0)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790064Z DEBUG salsa::function::maybe_changed_after: parsed_module(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790067Z  INFO salsa::function::execute: suppressions(Id(0)): executing query
+2025-05-09T21:52:03.790070Z DEBUG salsa::function::maybe_changed_after: parsed_module(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790072Z DEBUG salsa::zalsa_local: report_tracked_read(input=parsed_module(Id(0)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.790075Z DEBUG salsa::function::maybe_changed_after: source_text(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790078Z DEBUG salsa::zalsa_local: report_tracked_read(input=source_text(Id(0)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.790087Z DEBUG salsa::function::backdate: suppressions(Id(0)) value is equal, back-dating to R1
+2025-05-09T21:52:03.790093Z DEBUG salsa::zalsa_local: report_tracked_read(input=suppressions(Id(0)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.790102Z DEBUG salsa::zalsa_local: report_tracked_read(input=ModuleNameIngredient(Id(1403)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.790104Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1403)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790106Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1403)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790108Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1403)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790109Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1403)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790110Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1403)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790114Z DEBUG salsa::zalsa_local: report_tracked_read(input=resolve_module_query(Id(1403)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.790116Z DEBUG salsa::zalsa_local: report_tracked_read(input=File.path(Id(1b)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.790118Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(1b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790120Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(1b)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.790121Z DEBUG salsa::zalsa_local: report_tracked_read(input=global_scope(Id(1b)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.790124Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(38a0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790125Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(38a0)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.790127Z DEBUG salsa::zalsa_local: report_tracked_read(input=symbol_table(Id(38a0)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.790133Z DEBUG salsa::zalsa_local: report_tracked_read(input=symbol_by_id::interned_arguments(Id(2002)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.790137Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2002)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790139Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2002)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790141Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2002)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790142Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2002)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790144Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2002)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790146Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(38a0)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790148Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(38a0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790150Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(38a0)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.790152Z DEBUG salsa::function::maybe_changed_after: infer_expression_type(Id(107b)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790155Z DEBUG salsa::function::maybe_changed_after: infer_expression_type(Id(107b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790157Z DEBUG salsa::function::maybe_changed_after: infer_expression_type(Id(107b)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790160Z DEBUG salsa::function::maybe_changed_after: infer_expression_type(Id(107b)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790162Z DEBUG salsa::function::maybe_changed_after: infer_expression_type(Id(107b)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790163Z DEBUG salsa::function::maybe_changed_after: infer_expression_type(Id(107b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790164Z DEBUG salsa::function::maybe_changed_after: infer_expression_type(Id(107b)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790167Z DEBUG salsa::function::maybe_changed_after: infer_expression_types(Id(107b)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790169Z DEBUG salsa::function::maybe_changed_after: infer_expression_types(Id(107b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790171Z DEBUG salsa::function::maybe_changed_after: infer_expression_types(Id(107b)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790173Z DEBUG salsa::function::maybe_changed_after: infer_expression_types(Id(107b)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790175Z DEBUG salsa::function::maybe_changed_after: infer_expression_types(Id(107b)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790177Z DEBUG salsa::function::maybe_changed_after: infer_expression_types(Id(107b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790178Z DEBUG salsa::function::maybe_changed_after: infer_expression_types(Id(107b)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790180Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790182Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790184Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.790203Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(369b)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790205Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(369b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790207Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(369b)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.790210Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c01)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790212Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c01)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790214Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c01)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R38 <= verified_at=R22) = false
+2025-05-09T21:52:03.790217Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c01)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790219Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c01)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790220Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c01)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790222Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c01)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R38 <= verified_at=R22) = false
+2025-05-09T21:52:03.790225Z DEBUG salsa::function::maybe_changed_after: imported_modules(Id(1b)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790227Z DEBUG salsa::function::maybe_changed_after: imported_modules(Id(1b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790230Z DEBUG salsa::function::maybe_changed_after: imported_modules(Id(1b)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R1 <= verified_at=R1) = true
+2025-05-09T21:52:03.790232Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(1c)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790234Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(1c)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790235Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(1c)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R1 <= verified_at=R1) = true
+2025-05-09T21:52:03.790237Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(3925)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790238Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(3925)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790240Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(3925)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R1 <= verified_at=R1) = true
+2025-05-09T21:52:03.790242Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2003)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790243Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2003)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790245Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2003)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790247Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2003)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}
+2025-05-09T21:52:03.790248Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2003)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790249Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2003)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790251Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2003)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790253Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(3925)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790254Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(3925)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790255Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(3925)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R1 <= verified_at=R1) = true
+2025-05-09T21:52:03.790258Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3d4a)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790259Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3d4a)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790260Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3d4a)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790263Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3d4a)): maybe_changed_after_cold, successful claim, revision = R1, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}
+2025-05-09T21:52:03.790264Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3d4a)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790265Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3d4a)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790267Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3d4a)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790269Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1c)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790270Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1c)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790271Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1c)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R1 <= verified_at=R1) = true
+2025-05-09T21:52:03.790287Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3d49)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790289Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3d49)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790290Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3d49)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790292Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3d49)): maybe_changed_after_cold, successful claim, revision = R1, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}
+2025-05-09T21:52:03.790293Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3d49)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790295Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3d49)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790296Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3d49)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790298Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1c)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790299Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1c)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790301Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3c93)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790302Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3c93)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790303Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3c93)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790305Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3c93)): maybe_changed_after_cold, successful claim, revision = R1, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}
+2025-05-09T21:52:03.790306Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3c93)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790308Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3c93)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790309Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3c93)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790311Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1c)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790312Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1c)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790314Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1405)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790316Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1405)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790317Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1405)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R38 <= verified_at=R22) = false
+2025-05-09T21:52:03.790319Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1405)): maybe_changed_after_cold, successful claim, revision = R1, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790321Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1405)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790322Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1405)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790323Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1405)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R38 <= verified_at=R22) = false
+2025-05-09T21:52:03.790327Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c02)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790329Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c02)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790330Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c02)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790332Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c02)): maybe_changed_after_cold, successful claim, revision = R1, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}
+2025-05-09T21:52:03.790333Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c02)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790335Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c02)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790336Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c02)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790338Z DEBUG salsa::function::maybe_changed_after: imported_modules(Id(1c)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790339Z DEBUG salsa::function::maybe_changed_after: imported_modules(Id(1c)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790341Z DEBUG salsa::function::maybe_changed_after: imported_modules(Id(1c)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R1 <= verified_at=R1) = true
+2025-05-09T21:52:03.790342Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(25)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790344Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(25)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790345Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(25)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.790347Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(39a1)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790348Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(39a1)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790349Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(39a1)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.790351Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2004)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790352Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2004)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790354Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2004)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790356Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2004)): maybe_changed_after_cold, successful claim, revision = R1, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}
+2025-05-09T21:52:03.790357Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2004)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790358Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2004)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790360Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2004)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790361Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(39a1)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790363Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(39a1)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790364Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(39a1)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R1 <= verified_at=R1) = true
+2025-05-09T21:52:03.790366Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3de5)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790367Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3de5)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790369Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3de5)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790371Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3de5)): maybe_changed_after_cold, successful claim, revision = R1, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}
+2025-05-09T21:52:03.790372Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3de5)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790373Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3de5)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790375Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3de5)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790376Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(25)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790377Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(25)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790379Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(25)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R1 <= verified_at=R1) = true
+2025-05-09T21:52:03.790419Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(25)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790421Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(25)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790422Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(25)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790424Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(25)): maybe_changed_after_cold, successful claim, revision = R1, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}
+2025-05-09T21:52:03.790426Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(25)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790427Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(25)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790428Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(25)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790430Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1405)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790432Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1405)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790437Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4400)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790440Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4400)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790442Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4400)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R38 <= verified_at=R22) = false
+2025-05-09T21:52:03.790445Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4400)): maybe_changed_after_cold, successful claim, revision = R1, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790447Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4400)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790449Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4400)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790450Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4400)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R38 <= verified_at=R22) = false
+2025-05-09T21:52:03.790452Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(25)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790454Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(25)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790456Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3c94)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790458Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3c94)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790459Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3c94)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790461Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3c94)): maybe_changed_after_cold, successful claim, revision = R1, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}
+2025-05-09T21:52:03.790462Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3c94)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790464Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3c94)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790465Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3c94)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790467Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1c)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790468Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1c)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790470Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1405)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790471Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1405)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790473Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c03)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790475Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c03)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790476Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c03)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790478Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c03)): maybe_changed_after_cold, successful claim, revision = R1, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}
+2025-05-09T21:52:03.790479Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c03)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790481Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c03)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790482Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c03)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790484Z DEBUG salsa::function::maybe_changed_after: imported_modules(Id(1c)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790485Z DEBUG salsa::function::maybe_changed_after: imported_modules(Id(1c)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790487Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(25)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790488Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(25)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790490Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(39a1)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790491Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(39a1)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790494Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2005)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790495Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2005)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790497Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2005)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790499Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2005)): maybe_changed_after_cold, successful claim, revision = R1, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}
+2025-05-09T21:52:03.790500Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2005)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790502Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2005)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790503Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2005)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790505Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(39a1)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790506Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(39a1)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790508Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3ed8)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790509Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3ed8)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790511Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3ed8)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R1 <= verified_at=R1) = true
+2025-05-09T21:52:03.790514Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4401)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790516Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4401)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790517Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4401)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.790519Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(1c)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790521Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(1c)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790522Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(1c)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R1 <= verified_at=R1) = true
+2025-05-09T21:52:03.790528Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1402)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790529Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1402)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790531Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(12)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790532Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(12)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790534Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(8e1)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790535Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(8e1)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790537Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2006)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790538Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2006)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790539Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2006)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790542Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2006)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790543Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2006)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790544Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2006)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790546Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2006)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790547Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(8e1)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790549Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(8e1)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790550Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(8e1)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.790552Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(2cb1)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790554Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(2cb1)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790555Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(2cb1)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790557Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(2cb1)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790558Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(2cb1)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790560Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(2cb1)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790561Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(2cb1)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790563Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(12)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790564Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(12)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790565Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(12)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.790676Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(12)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790677Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(12)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790679Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(12)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790681Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(12)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790682Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(12)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790684Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(12)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790685Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(12)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790687Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1402)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790688Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1402)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790692Z DEBUG salsa::function::maybe_changed_after: pep695_generic_context_(Id(2403)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790694Z DEBUG salsa::function::maybe_changed_after: pep695_generic_context_(Id(2403)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790696Z DEBUG salsa::function::maybe_changed_after: pep695_generic_context_(Id(2403)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790699Z DEBUG salsa::function::maybe_changed_after: pep695_generic_context_(Id(2403)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790701Z DEBUG salsa::function::maybe_changed_after: pep695_generic_context_(Id(2403)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790702Z DEBUG salsa::function::maybe_changed_after: pep695_generic_context_(Id(2403)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790704Z DEBUG salsa::function::maybe_changed_after: pep695_generic_context_(Id(2403)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790706Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(12)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790707Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(12)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790710Z DEBUG salsa::function::maybe_changed_after: explicit_bases_(Id(2403)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790712Z DEBUG salsa::function::maybe_changed_after: explicit_bases_(Id(2403)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790715Z DEBUG salsa::function::maybe_changed_after: explicit_bases_(Id(2403)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790718Z DEBUG salsa::function::maybe_changed_after: explicit_bases_(Id(2403)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790720Z DEBUG salsa::function::maybe_changed_after: explicit_bases_(Id(2403)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790721Z DEBUG salsa::function::maybe_changed_after: explicit_bases_(Id(2403)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790722Z DEBUG salsa::function::maybe_changed_after: explicit_bases_(Id(2403)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790724Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(12)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790726Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(12)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790731Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790733Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790735Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3762)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790737Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3762)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790738Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3762)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790741Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3762)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790742Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3762)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790744Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3762)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790745Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3762)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790747Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790748Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790750Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(1b)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790751Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(1b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790753Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(1b)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790754Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(1b)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790756Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(1b)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790757Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(1b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790759Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(1b)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790760Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1403)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790762Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1403)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790765Z DEBUG salsa::zalsa_local: report_tracked_read(input=symbol_by_id(Id(2002)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.790771Z DEBUG salsa::zalsa_local: report_tracked_read(input=ScopeId(Id(800)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.790773Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(0)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790775Z DEBUG salsa::zalsa_local: report_tracked_read(input=semantic_index(Id(0)), durability=Durability(0), changed_at=R33)
+2025-05-09T21:52:03.790777Z DEBUG salsa::zalsa_local: report_tracked_read(input=ScopeId(Id(800)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.790781Z DEBUG salsa::zalsa_local: report_tracked_read(input=FunctionType(Id(4402)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.790784Z DEBUG salsa::zalsa_local: report_tracked_read(input=ScopeId(Id(38c4)), durability=Durability(2), changed_at=R1)
+2025-05-09T21:52:03.790786Z DEBUG salsa::zalsa_local: report_tracked_read(input=FunctionType(Id(4402)), durability=Durability(0), changed_at=R1)
+2025-05-09T21:52:03.790790Z DEBUG salsa::function::maybe_changed_after: signature_(Id(4402)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790792Z DEBUG salsa::function::maybe_changed_after: signature_(Id(4402)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790795Z DEBUG salsa::function::maybe_changed_after: signature_(Id(4402)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790797Z DEBUG salsa::function::maybe_changed_after: signature_(Id(4402)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790798Z DEBUG salsa::function::maybe_changed_after: signature_(Id(4402)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790800Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4402)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790801Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4402)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790803Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4402)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790805Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4402)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790807Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4402)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790809Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4402)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790810Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4402)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790812Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790813Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790816Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790817Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790819Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3762)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790820Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3762)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790822Z DEBUG salsa::function::maybe_changed_after: infer_deferred_types(Id(3762)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790825Z DEBUG salsa::function::maybe_changed_after: infer_deferred_types(Id(3762)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790827Z DEBUG salsa::function::maybe_changed_after: infer_deferred_types(Id(3762)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790830Z DEBUG salsa::function::maybe_changed_after: infer_deferred_types(Id(3762)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790832Z DEBUG salsa::function::maybe_changed_after: infer_deferred_types(Id(3762)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790833Z DEBUG salsa::function::maybe_changed_after: infer_deferred_types(Id(3762)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790834Z DEBUG salsa::function::maybe_changed_after: infer_deferred_types(Id(3762)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790837Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790838Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790840Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(36e1)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790841Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(36e1)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790843Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(36e1)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790845Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(36e1)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790846Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(36e1)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790847Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(36e1)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790849Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(36e1)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790851Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790852Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790854Z DEBUG salsa::function::maybe_changed_after: infer_expression_types(Id(1072)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790856Z DEBUG salsa::function::maybe_changed_after: infer_expression_types(Id(1072)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790858Z DEBUG salsa::function::maybe_changed_after: infer_expression_types(Id(1072)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790860Z DEBUG salsa::function::maybe_changed_after: infer_expression_types(Id(1072)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790861Z DEBUG salsa::function::maybe_changed_after: infer_expression_types(Id(1072)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790863Z DEBUG salsa::function::maybe_changed_after: infer_expression_types(Id(1072)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790864Z DEBUG salsa::function::maybe_changed_after: infer_expression_types(Id(1072)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790866Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790867Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790869Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(36d7)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790870Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(36d7)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790872Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(36d7)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R38 <= verified_at=R22) = false
+2025-05-09T21:52:03.790873Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(36d7)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790875Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(36d7)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790876Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(36d7)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790878Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(36d7)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R38 <= verified_at=R22) = false
+2025-05-09T21:52:03.790879Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790880Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(1b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790882Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1405)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790884Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1405)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790886Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c04)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790887Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c04)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790889Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c04)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790891Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c04)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}
+2025-05-09T21:52:03.790893Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c04)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790894Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c04)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790895Z DEBUG salsa::function::maybe_changed_after: member_lookup_with_policy_(Id(1c04)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790897Z DEBUG salsa::function::maybe_changed_after: imported_modules(Id(1b)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790899Z DEBUG salsa::function::maybe_changed_after: imported_modules(Id(1b)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790901Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(25)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790902Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(25)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790904Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(39a1)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790906Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(39a1)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790908Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2007)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790909Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2007)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790911Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2007)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R38 <= verified_at=R22) = false
+2025-05-09T21:52:03.790917Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2007)): maybe_changed_after_cold, successful claim, revision = R1, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790918Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2007)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790920Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2007)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790921Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2007)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R38 <= verified_at=R22) = false
+2025-05-09T21:52:03.790923Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(39a1)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790925Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(39a1)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790927Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3e22)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790929Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3e22)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790930Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3e22)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790932Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3e22)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}
+2025-05-09T21:52:03.790934Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3e22)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790935Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3e22)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+})
+2025-05-09T21:52:03.790936Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3e22)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 1,
+    },
+}, last_changed=R38 <= verified_at=R1) = false
+2025-05-09T21:52:03.790938Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(25)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790939Z DEBUG salsa::function::maybe_changed_after: semantic_index(Id(25)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790941Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3de5)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790942Z DEBUG salsa::function::maybe_changed_after: infer_definition_types(Id(3de5)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790944Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4400)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790946Z DEBUG salsa::function::maybe_changed_after: to_overloaded_(Id(4400)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790947Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(25)): maybe_changed_after(revision = R1)
+2025-05-09T21:52:03.790949Z DEBUG salsa::function::maybe_changed_after: file_to_module(Id(25)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 40,
+    },
+})
+2025-05-09T21:52:03.790953Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1406)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790954Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1406)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790956Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1406)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R38 <= verified_at=R22) = false
+2025-05-09T21:52:03.790958Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1406)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790959Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1406)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790961Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1406)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790962Z DEBUG salsa::function::maybe_changed_after: resolve_module_query(Id(1406)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R38 <= verified_at=R22) = false
+2025-05-09T21:52:03.790965Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(2e)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790967Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(2e)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790968Z DEBUG salsa::function::maybe_changed_after: global_scope(Id(2e)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.790971Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(3aee)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790972Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(3aee)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790974Z DEBUG salsa::function::maybe_changed_after: symbol_table(Id(3aee)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
+2025-05-09T21:52:03.790976Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2008)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790977Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2008)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790979Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2008)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790980Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2008)): maybe_changed_after_cold, successful claim, revision = R22, old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}
+2025-05-09T21:52:03.790982Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2008)): deep_verify_memo(old_memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790983Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2008)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790985Z DEBUG salsa::function::maybe_changed_after: symbol_by_id(Id(2008)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R40 <= verified_at=R22) = false
+2025-05-09T21:52:03.790986Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(3aee)): maybe_changed_after(revision = R22)
+2025-05-09T21:52:03.790988Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(3aee)): shallow_verify_memo(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+})
+2025-05-09T21:52:03.790990Z DEBUG salsa::function::maybe_changed_after: use_def_map(Id(3aee)): check_durability(memo = Memo {
+    value: "Some(<value>)",
+    verified_at: AtomicRevision {
+        data: 22,
+    },
+}, last_changed=R1 <= verified_at=R22) = true
