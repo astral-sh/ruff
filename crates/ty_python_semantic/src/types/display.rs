@@ -10,9 +10,9 @@ use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    CallableType, FunctionSignature, IntersectionType, KnownClass, MethodWrapperKind, Protocol,
-    StringLiteralType, SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance,
-    UnionType, WrapperDescriptorKind,
+    CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol, StringLiteralType,
+    SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
+    WrapperDescriptorKind,
 };
 use crate::{Db, FxOrderSet};
 
@@ -118,8 +118,8 @@ impl Display for DisplayRepresentation<'_> {
                 // the generic type parameters to the signature, i.e.
                 // show `def foo[T](x: T) -> T`.
 
-                match signature {
-                    FunctionSignature::Single(signature) => {
+                match signature.overloads.as_slice() {
+                    [signature] => {
                         write!(
                             f,
                             // "def {name}{specialization}{signature}",
@@ -128,7 +128,7 @@ impl Display for DisplayRepresentation<'_> {
                             signature = signature.display(self.db)
                         )
                     }
-                    FunctionSignature::Overloaded(signatures, _) => {
+                    signatures => {
                         // TODO: How to display overloads?
                         f.write_str("Overload[")?;
                         let mut join = f.join(", ");
@@ -146,8 +146,8 @@ impl Display for DisplayRepresentation<'_> {
                 // TODO: use the specialization from the method. Similar to the comment above
                 // about the function specialization,
 
-                match function.signature(self.db) {
-                    FunctionSignature::Single(signature) => {
+                match function.signature(self.db).overloads.as_slice() {
+                    [signature] => {
                         write!(
                             f,
                             "bound method {instance}.{method}{signature}",
@@ -156,7 +156,7 @@ impl Display for DisplayRepresentation<'_> {
                             signature = signature.bind_self().display(self.db)
                         )
                     }
-                    FunctionSignature::Overloaded(signatures, _) => {
+                    signatures => {
                         // TODO: How to display overloads?
                         f.write_str("Overload[")?;
                         let mut join = f.join(", ");
