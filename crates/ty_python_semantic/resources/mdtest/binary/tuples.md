@@ -17,16 +17,7 @@ def _(x: tuple[int, str], y: tuple[None, tuple[int]]):
 
 ```py
 def _(x: tuple[int, ...], y: tuple[str, ...]):
-    # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `tuple[int, ...]` and `tuple[str, ...]`"
-    reveal_type(x + y)  # revealed: Unknown
-
-    # TODO: should be `tuple[int, ...]`, should not error
-    reveal_type(x + (1, 2))  # revealed: Unknown
-
-from typing import Literal
-from ty_extensions import static_assert, is_assignable_to
-
-static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Literal[1, 2], ...]))
-static_assert(is_assignable_to(tuple[Literal[1, 2], ...], tuple[int, ...]))
-static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[int, ...]))
+    # TODO: should be `tuple[int | str, ...]`
+    reveal_type(x + y)  # revealed: tuple[int | Unknown, ...]
+    reveal_type(x + (1, 2))  # revealed: tuple[int, ...]
 ```

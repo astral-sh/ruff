@@ -8037,7 +8037,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let ty = if return_todo {
-                    todo_type!("full tuple[...] support")
+                    todo_type!("PEP 646")
                 } else {
                     TupleType::from_elements(self.db(), element_types)
                 };
@@ -8053,7 +8053,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let single_element_ty = self.infer_type_expression(single_element);
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
                 {
-                    todo_type!("full tuple[...] support")
+                    todo_type!("PEP 646")
                 } else {
                     TupleType::from_elements(self.db(), std::iter::once(single_element_ty))
                 }

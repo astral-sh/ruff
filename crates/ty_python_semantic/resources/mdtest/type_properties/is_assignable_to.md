@@ -198,7 +198,7 @@ static_assert(is_assignable_to(Meta, type[Any]))
 static_assert(is_assignable_to(Meta, type[Unknown]))
 ```
 
-## Tuple types
+## Heterogeneous tuple types
 
 ```py
 from ty_extensions import static_assert, is_assignable_to, AlwaysTruthy, AlwaysFalsy
@@ -230,6 +230,31 @@ static_assert(not is_assignable_to(tuple[int], tuple[int, str]))
 static_assert(not is_assignable_to(tuple[int, str], tuple[int]))
 static_assert(not is_assignable_to(tuple[int, int], tuple[Literal[1], int]))
 static_assert(not is_assignable_to(tuple[Any, Literal[2]], tuple[int, str]))
+```
+
+## Assignability of heterogeneous tuple types to homogeneous tuple types
+
+While a homogeneous tuple type is not assignable to any heterogeneous tuple types, a heterogeneous
+tuple type can be assignable to a homogeneous tuple type
+
+```py
+from typing import Literal, Any, Sequence
+from ty_extensions import static_assert, is_assignable_to, Not, AlwaysFalsy
+
+static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Literal[1, 2], ...]))
+static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[int, ...]))
+static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[int | str, ...]))
+static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Any, ...]))
+static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Not[AlwaysFalsy], ...]))
+static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], Sequence[int]))
+
+static_assert(is_assignable_to(tuple[()], tuple[Literal[1, 2], ...]))
+static_assert(is_assignable_to(tuple[()], tuple[int, ...]))
+static_assert(is_assignable_to(tuple[()], tuple[int | str, ...]))
+static_assert(is_assignable_to(tuple[()], tuple[Not[AlwaysFalsy], ...]))
+static_assert(is_assignable_to(tuple[()], Sequence[int]))
+
+static_assert(not is_assignable_to(tuple[int, int], tuple[str, ...]))
 ```
 
 ## Union types

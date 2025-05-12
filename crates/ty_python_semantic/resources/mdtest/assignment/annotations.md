@@ -58,9 +58,8 @@ reveal_type(c)  # revealed: tuple[str, int]
 reveal_type(d)  # revealed: tuple[tuple[str, str], tuple[int, int]]
 reveal_type(e)  # revealed: tuple[str, ...]
 
-# TODO: PEP-646 tuples
-reveal_type(f)  # revealed: @Todo(full tuple[...] support)
-reveal_type(g)  # revealed: @Todo(full tuple[...] support)
+reveal_type(f)  # revealed: @Todo(PEP 646)
+reveal_type(g)  # revealed: @Todo(PEP 646)
 
 reveal_type(h)  # revealed: tuple[list[int], list[int]]
 reveal_type(i)  # revealed: tuple[str | int, str | int]

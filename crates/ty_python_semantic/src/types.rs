@@ -1484,10 +1484,10 @@ impl<'db> Type<'db> {
                     )
             }
 
-            // These special cases are required because the left-hand side tuple might be a
+            // This special case is required because the left-hand side tuple might be a
             // gradual type, so we can not rely on subtyping. This allows us to assign e.g.
             // `tuple[Any, int]` to `tuple`.
-
+            //
             // `tuple[A, B, C]` is assignable to `tuple[A | B | C, ...]`
             (Type::Tuple(tuple), _)
                 if KnownClass::Tuple
