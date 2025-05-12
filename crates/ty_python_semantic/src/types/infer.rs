@@ -4908,11 +4908,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             overload.parameter_types()
                                         {
                                             let db = self.db();
-                                            if (source_type.is_equivalent_to(db, *casted_type)
-                                                || source_type.normalized(db)
-                                                    == casted_type.normalized(db))
-                                                && !source_type.contains_todo(db)
-                                            {
+                                            if source_type.is_equivalent_to(db, *casted_type) {
                                                 if let Some(builder) = self
                                                     .context
                                                     .report_lint(&REDUNDANT_CAST, call_expression)

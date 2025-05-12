@@ -31,12 +31,6 @@ def function_returning_int() -> int:
 
 # error: [redundant-cast] "Value is already of type `int`"
 cast(int, function_returning_int())
-
-def function_returning_any() -> Any:
-    return "blah"
-
-# error: [redundant-cast] "Value is already of type `Any`"
-cast(Any, function_returning_any())
 ```
 
 Complex type expressions (which may be unsupported) do not lead to spurious `[redundant-cast]`
@@ -50,11 +44,8 @@ def f(x: Callable[[dict[str, int]], None], y: tuple[dict[str, int]]):
     b = cast(tuple[list[bytes]], y)
 ```
 
-A cast from `Todo` or `Unknown` to `Any` is not considered a "redundant cast": even if these are
-understood as gradually equivalent types by ty, they are understood as different types by human
-readers of ty's output. For `Unknown` in particular, we may consider it differently in the context
-of some opt-in diagnostics, as it indicates that the gradual type has come about due to an invalid
-annotation, missing annotation or missing type argument somewhere.
+Casting `Unknown` to `Unknown` or `Any` to `Any` is not considered redundant; these dynamic types
+may represent different static types, and erroring on this violates the gradual guarantee.
 
 ```py
 from ty_extensions import Unknown
@@ -66,5 +57,8 @@ def f(x: Any, y: Unknown, z: Any | str | int):
     b = cast(Any, y)
     reveal_type(b)  # revealed: Any
 
-    c = cast(str | int | Any, z)  # error: [redundant-cast]
+    c = cast(str | int | Any, z)
+
+    d = cast(y, y)
+    e = cast(x, x)
 ```
