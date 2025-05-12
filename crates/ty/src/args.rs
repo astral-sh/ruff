@@ -77,6 +77,15 @@ pub(crate) struct CheckCommand {
     pub(crate) extra_search_path: Option<Vec<SystemPathBuf>>,
 
     /// Python version to assume when resolving types.
+    ///
+    /// The Python version affects allowed syntax, type definitions of the standard library, and
+    /// type definitions of first- and third-party modules that are conditional on the Python version.
+    ///
+    /// By default, the Python version is inferred as the lower bound of the project's
+    /// `requires-python` field from the `pyproject.toml`, if available. Otherwise, the latest
+    /// stable version supported by ty is used, which is currently 3.13.
+    ///
+    /// ty will not infer the Python version from the Python environment at this time.
     #[arg(long, value_name = "VERSION", alias = "target-version")]
     pub(crate) python_version: Option<PythonVersion>,
 

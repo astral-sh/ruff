@@ -57,6 +57,15 @@ impl MarkdownTestConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct Environment {
     /// Target Python version to assume when resolving types.
+    ///
+    /// The Python version affects allowed syntax, type definitions of the standard library, and
+    /// type definitions of first- and third-party modules that are conditional on the Python version.
+    ///
+    /// By default, the Python version is inferred as the lower bound of the project's
+    /// `requires-python` field from the `pyproject.toml`, if available. Otherwise, the latest
+    /// stable version supported by ty is used, which is currently 3.13.
+    ///
+    /// ty will not infer the Python version from the Python environment at this time.
     pub(crate) python_version: Option<PythonVersion>,
 
     /// Target platform to assume when resolving types.
