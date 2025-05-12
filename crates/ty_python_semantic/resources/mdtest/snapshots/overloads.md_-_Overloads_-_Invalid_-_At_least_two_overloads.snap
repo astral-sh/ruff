@@ -47,7 +47,7 @@ error[invalid-overload]: Overloaded function `func` requires at least two overlo
   |     ^^^^
 8 |     return x
   |
-info: `invalid-overload` is enabled by default
+info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -62,6 +62,6 @@ error[invalid-overload]: Overloaded function `func` requires at least two overlo
   |     |
   |     Only one overload defined here
   |
-info: `invalid-overload` is enabled by default
+info: rule `invalid-overload` is enabled by default
 
 ```

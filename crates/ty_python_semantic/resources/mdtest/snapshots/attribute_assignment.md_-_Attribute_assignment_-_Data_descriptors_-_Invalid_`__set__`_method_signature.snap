@@ -35,6 +35,6 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr
 11 | instance.attr = 1  # error: [invalid-assignment]
    | ^^^^^^^^^^^^^
    |
-info: `invalid-assignment` is enabled by default
+info: rule `invalid-assignment` is enabled by default
 
 ```

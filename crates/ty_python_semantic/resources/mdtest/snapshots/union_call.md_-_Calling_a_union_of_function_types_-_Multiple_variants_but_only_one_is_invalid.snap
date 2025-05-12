@@ -49,6 +49,6 @@ info: Function defined here
   |
 info: Union variant `def f2(name: str) -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1(a: int) -> int) | (def f2(name: str) -> int)`
-info: `invalid-argument-type` is enabled by default
+info: rule `invalid-argument-type` is enabled by default
 
 ```

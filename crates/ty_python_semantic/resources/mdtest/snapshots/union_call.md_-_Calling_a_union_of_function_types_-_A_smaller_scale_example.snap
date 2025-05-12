@@ -50,7 +50,7 @@ info: Function defined here
   |
 info: Union variant `def f2(name: str) -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int)`
-info: `invalid-argument-type` is enabled by default
+info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -65,6 +65,6 @@ error[too-many-positional-arguments]: Too many positional arguments to function 
    |
 info: Union variant `def f1() -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int)`
-info: `too-many-positional-arguments` is enabled by default
+info: rule `too-many-positional-arguments` is enabled by default
 
 ```

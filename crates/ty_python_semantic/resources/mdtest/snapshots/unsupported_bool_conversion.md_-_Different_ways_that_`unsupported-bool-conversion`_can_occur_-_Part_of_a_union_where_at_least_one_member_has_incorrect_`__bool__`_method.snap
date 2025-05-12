@@ -39,6 +39,6 @@ error[unsupported-bool-conversion]: Boolean conversion is unsupported for union 
 15 | 10 and get() and True
    |        ^^^^^
    |
-info: `unsupported-bool-conversion` is enabled by default
+info: rule `unsupported-bool-conversion` is enabled by default
 
 ```

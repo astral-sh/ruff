@@ -40,6 +40,6 @@ info: Function defined here
   |     ^^^ ------ Parameter declared here
 5 |     return x * x
   |
-info: `invalid-argument-type` is enabled by default
+info: rule `invalid-argument-type` is enabled by default
 
 ```

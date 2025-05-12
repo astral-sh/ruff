@@ -75,7 +75,7 @@ error[call-non-callable]: Object of type `Literal[5]` is not callable
    |
 info: Union variant `Literal[5]` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
-info: `call-non-callable` is enabled by default
+info: rule `call-non-callable` is enabled by default
 
 ```
 
@@ -90,7 +90,7 @@ error[call-non-callable]: Object of type `PossiblyNotCallable` is not callable (
    |
 info: Union variant `PossiblyNotCallable` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
-info: `call-non-callable` is enabled by default
+info: rule `call-non-callable` is enabled by default
 
 ```
 
@@ -105,7 +105,7 @@ error[missing-argument]: No argument provided for required parameter `b` of func
    |
 info: Union variant `def f3(a: int, b: int) -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
-info: `missing-argument` is enabled by default
+info: rule `missing-argument` is enabled by default
 
 ```
 
@@ -120,7 +120,7 @@ error[no-matching-overload]: No overload of method wrapper `__get__` of function
    |
 info: Union variant `<method-wrapper `__get__` of `f`>` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
-info: `no-matching-overload` is enabled by default
+info: rule `no-matching-overload` is enabled by default
 
 ```
 
@@ -144,7 +144,7 @@ info: Function defined here
   |
 info: Union variant `def f2(name: str) -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
-info: `invalid-argument-type` is enabled by default
+info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -168,7 +168,7 @@ info: Type variable defined here
    |
 info: Union variant `def f4(x: T) -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
-info: `invalid-argument-type` is enabled by default
+info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -183,6 +183,6 @@ error[too-many-positional-arguments]: Too many positional arguments to function 
    |
 info: Union variant `def f1() -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
-info: `too-many-positional-arguments` is enabled by default
+info: rule `too-many-positional-arguments` is enabled by default
 
 ```

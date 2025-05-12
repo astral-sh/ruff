@@ -93,7 +93,7 @@ error[invalid-overload]: `@override` decorator should be applied only to the ove
    |         Implementation defined here
 28 |         return x
    |
-info: `invalid-overload` is enabled by default
+info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -109,7 +109,7 @@ error[invalid-overload]: `@override` decorator should be applied only to the ove
    |         Implementation defined here
 38 |         return x
    |
-info: `invalid-overload` is enabled by default
+info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -127,6 +127,6 @@ error[invalid-overload]: `@override` decorator should be applied only to the fir
 22 |     def method(self, x: str) -> str: ...
    |         ^^^^^^
    |
-info: `invalid-overload` is enabled by default
+info: rule `invalid-overload` is enabled by default
 
 ```

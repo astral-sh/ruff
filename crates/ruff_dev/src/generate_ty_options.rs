@@ -134,13 +134,13 @@ impl Set {
 fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[Set]) {
     let header_level = if parents.is_empty() { "###" } else { "####" };
 
-    let _ = writeln!(output, "{header_level} [`{name}`]");
+    let _ = writeln!(output, "{header_level} `{name}`");
 
     output.push('\n');
 
     if let Some(deprecated) = &field.deprecated {
-        output.push_str("!!! warning \"Deprecated\"\n");
-        output.push_str("    This option has been deprecated");
+        output.push_str("> [!WARN] \"Deprecated\"\n");
+        output.push_str("> This option has been deprecated");
 
         if let Some(since) = deprecated.since {
             write!(output, " in {since}").unwrap();

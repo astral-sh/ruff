@@ -42,7 +42,7 @@ error[not-iterable]: Object of type `NotIterable` is not iterable
 12 |         pass
    |
 info: Its `__iter__` attribute has type `int | None`, which is not callable
-info: `not-iterable` is enabled by default
+info: rule `not-iterable` is enabled by default
 
 ```
 
@@ -55,7 +55,7 @@ info[possibly-unresolved-reference]: Name `x` used when possibly not defined
 16 |     reveal_type(x)
    |                 ^
    |
-info: `possibly-unresolved-reference` is enabled by default
+info: rule `possibly-unresolved-reference` is enabled by default
 
 ```
 
