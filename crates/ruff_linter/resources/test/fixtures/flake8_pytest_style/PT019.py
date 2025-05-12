@@ -43,12 +43,7 @@ def test_thingy4(_foo, _bar):  # Error _bar is not defined in parametrize
 def test_thingy5(_foo, _bar):  # OK defined in parametrize
     pass
 
-x = ["_foo", "_bar"]
+x = "other"
 @pytest.mark.parametrize(x, [1, 2, 3])
-def test_thingy5(_foo, _bar):  # OK defined in parametrize
-    pass
-
-x = "_bar"
-@pytest.mark.parametrize(["_foo", x], [1, 2, 3])
-def test_thingy5(_foo, _bar):  # OK defined in parametrize
+def test_thingy5(_foo, _bar):  # known false negative, we don't try to resolve variables
     pass
