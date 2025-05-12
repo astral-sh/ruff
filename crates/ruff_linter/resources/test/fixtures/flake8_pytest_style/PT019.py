@@ -38,3 +38,17 @@ def test_thingy3(_foo, _bar):  # OK defined in parametrize
 @pytest.mark.parametrize(("_foo"), [1, 2, 3])
 def test_thingy4(_foo, _bar):  # Error _bar is not defined in parametrize
     pass
+
+@pytest.mark.parametrize(["   _foo", "   _bar    "], [1, 2, 3])
+def test_thingy5(_foo, _bar):  # OK defined in parametrize
+    pass
+
+x = ["_foo", "_bar"]
+@pytest.mark.parametrize(x, [1, 2, 3])
+def test_thingy5(_foo, _bar):  # OK defined in parametrize
+    pass
+
+x = "_bar"
+@pytest.mark.parametrize(["_foo", x], [1, 2, 3])
+def test_thingy5(_foo, _bar):  # OK defined in parametrize
+    pass
