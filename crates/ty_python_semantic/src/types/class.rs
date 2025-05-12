@@ -2656,7 +2656,8 @@ impl<'db> KnownClass {
             | Self::UnionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
-            | Self::WrapperDescriptorType => module == self.canonical_module(db),
+            | Self::WrapperDescriptorType
+            | Self::Field => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeVar
@@ -2668,8 +2669,7 @@ impl<'db> KnownClass {
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::NamedTuple
-            | Self::NewType
-            | Self::Field => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
+            | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
         }
     }
 }
