@@ -156,7 +156,8 @@ static_assert(is_subtype_of(tuple[int], tuple[object, ...]))
 ## Subtyping of heterogeneous tuple types and homogeneous tuple types
 
 While a homogeneous tuple type is not a subtype of any heterogeneous tuple types, a heterogeneous
-tuple type can be a subtype of a homogeneous tuple type
+tuple type can be a subtype of a homogeneous tuple type, and homogeneous tuple types can be subtypes
+of `Sequence`:
 
 ```py
 from typing import Literal, Any, Sequence
@@ -167,6 +168,7 @@ static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[int, ...]))
 static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[int | str, ...]))
 static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[Not[AlwaysFalsy], ...]))
 static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], Sequence[int]))
+static_assert(is_subtype_of(tuple[int, ...], Sequence[int]))
 
 static_assert(is_subtype_of(tuple[()], tuple[Literal[1, 2], ...]))
 static_assert(is_subtype_of(tuple[()], tuple[int, ...]))
@@ -176,6 +178,8 @@ static_assert(is_subtype_of(tuple[()], Sequence[int]))
 
 static_assert(not is_subtype_of(tuple[Literal[1], Literal[2]], tuple[Any, ...]))
 static_assert(not is_subtype_of(tuple[int, int], tuple[str, ...]))
+static_assert(not is_subtype_of(tuple[int, ...], Sequence[Any]))
+static_assert(not is_subtype_of(tuple[Any, ...], Sequence[int]))
 ```
 
 ## Union types
