@@ -1,4 +1,8 @@
-use std::{borrow::Cow, collections::hash_map::Entry};
+use std::{
+    borrow::Cow,
+    collections::hash_map::Entry,
+    fmt::{Display, Formatter},
+};
 
 use anyhow::bail;
 use ruff_db::system::{SystemPath, SystemPathBuf};
@@ -52,6 +56,28 @@ pub(crate) struct MarkdownTest<'m, 's> {
 }
 
 impl<'m, 's> MarkdownTest<'m, 's> {
+    const MAX_TITLE_LENGTH: usize = 20;
+    const ELLIPSIS: char = '\u{2026}';
+
+    fn trimmed_title(section: &Section) -> String {
+        let Section { id, title, .. } = section;
+
+        let trimmed = if title.len() < Self::MAX_TITLE_LENGTH {
+            title.to_string()
+        } else {
+            format!(
+                "{}{}",
+                title
+                    .chars()
+                    .take(Self::MAX_TITLE_LENGTH)
+                    .collect::<String>(),
+                Self::ELLIPSIS
+            )
+        };
+
+        format!("{id}. {trimmed}")
+    }
+
     pub(crate) fn name(&self) -> String {
         let mut name = String::new();
         let mut parent_id = self.section.parent_id;
@@ -61,12 +87,16 @@ impl<'m, 's> MarkdownTest<'m, 's> {
             if !name.is_empty() {
                 name.insert_str(0, " - ");
             }
-            name.insert_str(0, parent.title);
+            name.insert_str(0, &Self::trimmed_title(parent));
+
+            if name.contains("bool_conversion") || name.contains("occur") {
+                dbg!(&name);
+            }
         }
         if !name.is_empty() {
             name.push_str(" - ");
         }
-        name.push_str(self.section.title);
+        name.push_str(&Self::trimmed_title(self.section));
         name
     }
 
@@ -115,6 +145,12 @@ impl<'m, 's> Iterator for MarkdownTestIterator<'m, 's> {
 #[newtype_index]
 struct SectionId;
 
+impl Display for SectionId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// A single header section of a [`MarkdownTestSuite`], or the implicit root "section".
 ///
 /// A header section is the part of a Markdown file beginning with a `#`-prefixed header line, and
@@ -128,6 +164,7 @@ struct SectionId;
 struct Section<'s> {
     title: &'s str,
     level: u8,
+    id: SectionId,
     parent_id: Option<SectionId>,
     config: MarkdownTestConfig,
     snapshot_diagnostics: bool,
@@ -363,6 +400,7 @@ impl<'s> Parser<'s> {
         let root_section_id = sections.push(Section {
             title,
             level: 0,
+            id: sections.next_index(),
             parent_id: None,
             config: MarkdownTestConfig::default(),
             snapshot_diagnostics: false,
@@ -568,6 +606,7 @@ impl<'s> Parser<'s> {
         let section = Section {
             title,
             level: header_level.try_into()?,
+            id: self.sections.next_index(),
             parent_id: Some(parent),
             config: self.sections[parent].config.clone(),
             snapshot_diagnostics: self.sections[parent].snapshot_diagnostics,
