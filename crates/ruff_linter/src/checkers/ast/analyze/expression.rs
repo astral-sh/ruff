@@ -516,7 +516,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             if checker.enabled(Rule::SplitStaticString) {
                                 flake8_simplify::rules::split_static_string(
                                     checker,
-                                    attr,
                                     call,
                                     string_value,
                                 );
