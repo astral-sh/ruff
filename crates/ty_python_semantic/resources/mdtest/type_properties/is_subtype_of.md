@@ -150,9 +150,7 @@ static_assert(not is_subtype_of(tuple[B1, B2], tuple[Unrelated, Unrelated]))
 static_assert(not is_subtype_of(tuple[B1, B2], tuple[()]))
 static_assert(not is_subtype_of(tuple[B1, B2], tuple[A1]))
 static_assert(not is_subtype_of(tuple[B1, B2], tuple[A1, A2, Unrelated]))
-
-# TODO: should pass
-static_assert(is_subtype_of(tuple[int], tuple[object, ...]))  # error: [static-assert-error]
+static_assert(is_subtype_of(tuple[int], tuple[object, ...]))
 ```
 
 ## Union types

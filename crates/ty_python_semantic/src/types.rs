@@ -1273,17 +1273,10 @@ impl<'db> Type<'db> {
                     )
             }
 
-            // Other than the special tuple-to-tuple case handled, above,
-            // tuple subtyping delegates to `Instance(tuple)` in the same way as the literal types.
-            //
-            // All heterogeneous tuple types are subtypes of `Instance(<tuple>)`:
-            // `Instance(<some class T>)` expresses "the set of all possible instances of the class `T`";
-            // consequently, `Instance(<tuple>)` expresses "the set of all possible instances of the class `tuple`".
-            // This type can be spelled in type annotations as `tuple[object, ...]` (since `tuple` is covariant).
-            //
-            // Note that this is not the same type as the type spelled in type annotations as `tuple`;
-            // as that type is equivalent to `type[Any, ...]` (and therefore not a fully static type).
-            (Type::Tuple(_), _) => KnownClass::Tuple.to_instance(db).is_subtype_of(db, target),
+            // `tuple[A, B, C]` is a subtype of `tuple[A | B | C, ...]`
+            (Type::Tuple(tuple), _) => KnownClass::Tuple
+                .to_specialized_instance(db, [UnionType::from_elements(db, tuple.elements(db))])
+                .is_subtype_of(db, target),
 
             (Type::BoundSuper(_), Type::BoundSuper(_)) => self.is_equivalent_to(db, target),
             (Type::BoundSuper(_), _) => KnownClass::Super.to_instance(db).is_subtype_of(db, target),
@@ -1491,12 +1484,14 @@ impl<'db> Type<'db> {
                     )
             }
 
-            // This special case is required because the left-hand side tuple might be a
+            // These special cases are required because the left-hand side tuple might be a
             // gradual type, so we can not rely on subtyping. This allows us to assign e.g.
             // `tuple[Any, int]` to `tuple`.
-            (Type::Tuple(_), _)
+
+            // `tuple[A, B, C]` is assignable to `tuple[A | B | C, ...]`
+            (Type::Tuple(tuple), _)
                 if KnownClass::Tuple
-                    .to_instance(db)
+                    .to_specialized_instance(db, [UnionType::from_elements(db, tuple.elements(db))])
                     .is_assignable_to(db, target) =>
             {
                 true
