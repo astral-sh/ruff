@@ -8,7 +8,7 @@ pub fn main() -> ExitStatus {
 
         // Use `writeln` instead of `eprintln` to avoid panicking when the stderr pipe is broken.
         let mut stderr = io::stderr().lock();
-        //
+
         // This communicates that this isn't a linter error but ty itself hard-errored for
         // some reason (e.g. failed to resolve the configuration)
         writeln!(stderr, "{}", "ty failed".red().bold()).ok();
