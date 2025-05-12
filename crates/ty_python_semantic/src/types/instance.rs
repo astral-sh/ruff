@@ -151,10 +151,6 @@ pub struct ProtocolInstanceType<'db> {
 }
 
 impl<'db> ProtocolInstanceType<'db> {
-    pub(super) fn inner(self) -> Protocol<'db> {
-        self.inner
-    }
-
     /// Return the meta-type of this protocol-instance type.
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         match self.inner {
@@ -264,7 +260,7 @@ impl<'db> ProtocolInstanceType<'db> {
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        match self.inner() {
+        match self.inner {
             Protocol::FromClass(class) => class.instance_member(db, name),
             Protocol::Synthesized(synthesized) => synthesized
                 .interface()

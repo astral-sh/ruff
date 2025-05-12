@@ -5319,7 +5319,7 @@ impl<'db> Type<'db> {
 
             Self::TypeVar(var) => Some(TypeDefinition::TypeVar(var.definition(db))),
 
-            Self::ProtocolInstance(protocol) => match protocol.inner() {
+            Self::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(class) => Some(TypeDefinition::Class(class.definition(db))),
                 Protocol::Synthesized(_) => None,
             },
