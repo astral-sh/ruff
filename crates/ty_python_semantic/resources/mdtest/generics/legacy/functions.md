@@ -73,11 +73,11 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-def f(x: list[T]) -> T:
-    return x[0]
+def f(x: list[T]) -> list[T]:
+    return x
 
-# TODO: revealed: float
-reveal_type(f([1.0, 2.0]))  # revealed: Unknown
+# TODO: revealed: list[float]
+reveal_type(f([1.0, 2.0]))  # revealed: list[Unknown]
 ```
 
 ## Inferring a bound typevar

@@ -64,11 +64,11 @@ The matching up of call arguments and discovery of constraints on typevars can b
 process for arbitrarily-nested generic types in parameters.
 
 ```py
-def f[T](x: list[T]) -> T:
-    return x[0]
+def f[T](x: list[T]) -> list[T]:
+    return x
 
-# TODO: revealed: float
-reveal_type(f([1.0, 2.0]))  # revealed: Unknown
+# TODO: revealed: list[float]
+reveal_type(f([1.0, 2.0]))  # revealed: list[Unknown]
 ```
 
 ## Inferring a bound typevar
