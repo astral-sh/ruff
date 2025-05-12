@@ -11,6 +11,9 @@ use crate::types::{
     UnionBuilder,
 };
 use crate::Db;
+
+use ruff_python_stdlib::identifiers::is_identifier;
+
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
@@ -718,11 +721,16 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 if function == KnownFunction::HasAttr {
                     let attr = inference
                         .expression_type(second_arg.scoped_expression_id(self.db, scope))
-                        .into_string_literal()?;
+                        .into_string_literal()?
+                        .value(self.db);
+
+                    if !is_identifier(attr) {
+                        return None;
+                    }
 
                     let constraint = Type::synthesized_protocol(
                         self.db,
-                        [(attr.value(self.db), KnownClass::Object.to_instance(self.db))],
+                        [(attr, KnownClass::Object.to_instance(self.db))],
                     );
 
                     return Some(NarrowingConstraints::from_iter([(
