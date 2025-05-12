@@ -57,7 +57,7 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |
 info: It has no `__iter__` method and its `__getitem__` attribute is invalid
 info: `__getitem__` has type `CustomCallable`, which is not callable
-info: `not-iterable` is enabled by default
+info: rule `not-iterable` is enabled by default
 
 ```
 
@@ -87,7 +87,7 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
    |
 info: It has no `__iter__` method and its `__getitem__` attribute is invalid
 info: `__getitem__` has type `(bound method Iterable2.__getitem__(key: int) -> int) | None`, which is not callable
-info: `not-iterable` is enabled by default
+info: rule `not-iterable` is enabled by default
 
 ```
 

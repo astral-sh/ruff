@@ -40,6 +40,6 @@ info: Function defined here
 41 |     *,
 42 |     cls: type[JSONDecoder] | None = None,
    |
-info: `invalid-argument-type` is enabled by default
+info: rule `invalid-argument-type` is enabled by default
 
 ```

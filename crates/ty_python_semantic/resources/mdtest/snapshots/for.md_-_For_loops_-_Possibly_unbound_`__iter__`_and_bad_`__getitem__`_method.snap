@@ -46,7 +46,7 @@ error[not-iterable]: Object of type `Iterable` may not be iterable
    |
 info: It may not have an `__iter__` method and its `__getitem__` method has an incorrect signature for the old-style iteration protocol
 info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
-info: `not-iterable` is enabled by default
+info: rule `not-iterable` is enabled by default
 
 ```
 

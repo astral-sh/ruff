@@ -52,7 +52,7 @@ error[invalid-return-type]: Return type does not match returned value
 5 |
 6 | # error: [invalid-return-type]
   |
-info: `invalid-return-type` is enabled by default
+info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -66,7 +66,7 @@ error[invalid-return-type]: Function can implicitly return `None`, which is not 
 8 |     if cond:
 9 |         return 1
   |
-info: `invalid-return-type` is enabled by default
+info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -80,7 +80,7 @@ error[invalid-return-type]: Function can implicitly return `None`, which is not 
 13 |     if cond:
 14 |         raise ValueError()
    |
-info: `invalid-return-type` is enabled by default
+info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -94,6 +94,6 @@ error[invalid-return-type]: Function can implicitly return `None`, which is not 
 18 |     if cond:
 19 |         cond = False
    |
-info: `invalid-return-type` is enabled by default
+info: rule `invalid-return-type` is enabled by default
 
 ```

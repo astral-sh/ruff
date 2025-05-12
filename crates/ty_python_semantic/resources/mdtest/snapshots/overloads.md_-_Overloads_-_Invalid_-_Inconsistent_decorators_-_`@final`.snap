@@ -76,7 +76,7 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
    |         Implementation defined here
 19 |         return x
    |
-info: `invalid-overload` is enabled by default
+info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -92,7 +92,7 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
    |         Implementation defined here
 28 |         return x
    |
-info: `invalid-overload` is enabled by default
+info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -109,6 +109,6 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 15 |     def method2(self, x: str) -> str: ...
    |         ^^^^^^^
    |
-info: `invalid-overload` is enabled by default
+info: rule `invalid-overload` is enabled by default
 
 ```

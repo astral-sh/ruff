@@ -86,7 +86,7 @@ error[invalid-overload]: Overloaded function `try_from1` does not use the `@clas
 17 |         if isinstance(x, int):
 18 |             return cls(x)
    |
-info: `invalid-overload` is enabled by default
+info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -109,7 +109,7 @@ error[invalid-overload]: Overloaded function `try_from2` does not use the `@clas
 23 |     @overload
 24 |     @classmethod
    |
-info: `invalid-overload` is enabled by default
+info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -126,6 +126,6 @@ error[invalid-overload]: Overloaded function `try_from3` does not use the `@clas
 41 |         if isinstance(x, int):
 42 |             return cls(x)
    |
-info: `invalid-overload` is enabled by default
+info: rule `invalid-overload` is enabled by default
 
 ```

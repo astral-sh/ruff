@@ -45,7 +45,7 @@ error[invalid-return-type]: Return type does not match returned value
 7 |
 8 | def f(cond: bool) -> str:
   |
-info: `invalid-return-type` is enabled by default
+info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -64,7 +64,7 @@ error[invalid-return-type]: Return type does not match returned value
 12 |     else:
 13 |         # error: [invalid-return-type]
    |
-info: `invalid-return-type` is enabled by default
+info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -86,6 +86,6 @@ error[invalid-return-type]: Return type does not match returned value
  9 |     if cond:
 10 |         # error: [invalid-return-type]
    |
-info: `invalid-return-type` is enabled by default
+info: rule `invalid-return-type` is enabled by default
 
 ```

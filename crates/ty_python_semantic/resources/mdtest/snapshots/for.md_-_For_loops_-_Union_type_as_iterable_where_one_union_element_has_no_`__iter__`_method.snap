@@ -41,7 +41,7 @@ error[not-iterable]: Object of type `Test | Literal[42]` may not be iterable
 14 |         reveal_type(x)  # revealed: int
    |
 info: It may not have an `__iter__` method and it doesn't have a `__getitem__` method
-info: `not-iterable` is enabled by default
+info: rule `not-iterable` is enabled by default
 
 ```
 

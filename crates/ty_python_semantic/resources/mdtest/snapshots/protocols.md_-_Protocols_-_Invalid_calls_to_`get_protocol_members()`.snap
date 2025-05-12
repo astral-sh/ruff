@@ -52,7 +52,7 @@ info: `NotAProtocol` is declared here, but it is not a protocol class:
   |
 info: A class is only a protocol class if it directly inherits from `typing.Protocol` or `typing_extensions.Protocol`
 info: See https://typing.python.org/en/latest/spec/protocol.html#
-info: `invalid-argument-type` is enabled by default
+info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -79,6 +79,6 @@ info: `AlsoNotAProtocol` is declared here, but it is not a protocol class:
   |
 info: A class is only a protocol class if it directly inherits from `typing.Protocol` or `typing_extensions.Protocol`
 info: See https://typing.python.org/en/latest/spec/protocol.html#
-info: `invalid-argument-type` is enabled by default
+info: rule `invalid-argument-type` is enabled by default
 
 ```

@@ -51,7 +51,7 @@ error[call-non-callable]: Object of type `typing.Protocol` is not callable
 5 |
 6 | class MyProtocol(Protocol):
   |
-info: `call-non-callable` is enabled by default
+info: rule `call-non-callable` is enabled by default
 
 ```
 
@@ -87,7 +87,7 @@ info: Protocol classes cannot be instantiated
   |       ^^^^^^^^^^^^^^^^^^^^ `MyProtocol` declared as a protocol here
 7 |     x: int
   |
-info: `call-non-callable` is enabled by default
+info: rule `call-non-callable` is enabled by default
 
 ```
 
@@ -122,7 +122,7 @@ info: Protocol classes cannot be instantiated
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `GenericProtocol` declared as a protocol here
 13 |     x: T
    |
-info: `call-non-callable` is enabled by default
+info: rule `call-non-callable` is enabled by default
 
 ```
 

@@ -122,7 +122,7 @@ info: The definition of class `Foo` will raise `TypeError` at runtime
 4 |
 5 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
   |
-info: `duplicate-base` is enabled by default
+info: rule `duplicate-base` is enabled by default
 
 ```
 
@@ -174,7 +174,7 @@ info: The definition of class `Ham` will raise `TypeError` at runtime
 22 |     Eggs,
 23 | ): ...
    |
-info: `duplicate-base` is enabled by default
+info: rule `duplicate-base` is enabled by default
 
 ```
 
@@ -211,7 +211,7 @@ info: The definition of class `Ham` will raise `TypeError` at runtime
    |     ^^^^ Class `Eggs` later repeated here
 23 | ): ...
    |
-info: `duplicate-base` is enabled by default
+info: rule `duplicate-base` is enabled by default
 
 ```
 
@@ -250,7 +250,7 @@ info: The definition of class `Omelette` will raise `TypeError` at runtime
 31 |
 32 | reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
    |
-info: `duplicate-base` is enabled by default
+info: rule `duplicate-base` is enabled by default
 
 ```
 
@@ -309,7 +309,7 @@ info: The definition of class `VeryEggyOmelette` will raise `TypeError` at runti
    |     ^^^^ Class `Eggs` later repeated here
 47 | ): ...
    |
-info: `duplicate-base` is enabled by default
+info: rule `duplicate-base` is enabled by default
 
 ```
 
@@ -340,7 +340,7 @@ info: The definition of class `D` will raise `TypeError` at runtime
    |     ^ Class `A` later repeated here
 73 | ): ...
    |
-info: `duplicate-base` is enabled by default
+info: rule `duplicate-base` is enabled by default
 
 ```
 
@@ -383,7 +383,7 @@ info: The definition of class `E` will raise `TypeError` at runtime
 79 | ):
 80 |     # error: [unused-ignore-comment]
    |
-info: `duplicate-base` is enabled by default
+info: rule `duplicate-base` is enabled by default
 
 ```
 

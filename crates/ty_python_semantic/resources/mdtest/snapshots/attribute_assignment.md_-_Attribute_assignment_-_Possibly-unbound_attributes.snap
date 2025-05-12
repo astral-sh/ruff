@@ -36,7 +36,7 @@ warning[possibly-unbound-attribute]: Attribute `attr` on type `<class 'C'>` is p
 7 |
 8 |     instance = C()
   |
-info: `possibly-unbound-attribute` is enabled by default
+info: rule `possibly-unbound-attribute` is enabled by default
 
 ```
 
@@ -48,6 +48,6 @@ warning[possibly-unbound-attribute]: Attribute `attr` on type `C` is possibly un
 9 |     instance.attr = 1  # error: [possibly-unbound-attribute]
   |     ^^^^^^^^^^^^^
   |
-info: `possibly-unbound-attribute` is enabled by default
+info: rule `possibly-unbound-attribute` is enabled by default
 
 ```
