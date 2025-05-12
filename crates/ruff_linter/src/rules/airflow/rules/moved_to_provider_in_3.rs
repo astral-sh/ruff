@@ -938,47 +938,25 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
     );
 
     let semantic = checker.semantic();
-    match replacement {
-        ProviderReplacement::AutoImport {
-            module,
-            name,
-            provider: _,
-            version: _,
-        } => {
-            if is_guarded_by_try_except(expr, module, name, semantic) {
-                return;
-            }
-            diagnostic.try_set_fix(|| {
-                let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                    &ImportRequest::import_from(module, name),
-                    expr.start(),
-                    checker.semantic(),
-                )?;
-                let replacement_edit = Edit::range_replacement(binding, ranged.range());
-                Ok(Fix::safe_edits(import_edit, [replacement_edit]))
-            });
+    if let Some((module, name)) = match &replacement {
+        ProviderReplacement::AutoImport { module, name, .. } => Some((module, *name)),
+        ProviderReplacement::SourceModuleMovedToProvider { module, name, .. } => {
+            Some((module, name.as_str()))
         }
-        ProviderReplacement::SourceModuleMovedToProvider {
-            module,
-            name,
-            provider: _,
-            version: _,
-        } => {
-            if is_guarded_by_try_except(expr, module, name.as_str(), semantic) {
-                return;
-            }
-            diagnostic.try_set_fix(|| {
-                let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                    &ImportRequest::import_from(module, name.as_str()),
-                    expr.start(),
-                    checker.semantic(),
-                )?;
-                let replacement_edit = Edit::range_replacement(binding, ranged.range());
-                Ok(Fix::safe_edits(import_edit, [replacement_edit]))
-            });
+        _ => None,
+    } {
+        if is_guarded_by_try_except(expr, module, name, semantic) {
+            return;
         }
-        _ => {}
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import_from(module, name),
+                expr.start(),
+                checker.semantic(),
+            )?;
+            let replacement_edit = Edit::range_replacement(binding, ranged.range());
+            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
+        });
     }
-
     checker.report_diagnostic(diagnostic);
 }
