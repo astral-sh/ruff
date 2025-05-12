@@ -54,7 +54,7 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |
 info: It has no `__iter__` method and its `__getitem__` attribute is invalid
 info: `__getitem__` has type `(bound method Iterable1.__getitem__(item: int) -> str) | None`, which is not callable
-info: `not-iterable` is enabled by default
+info: rule `not-iterable` is enabled by default
 
 ```
 
@@ -83,7 +83,7 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
    |
 info: It has no `__iter__` method and its `__getitem__` method (with type `(bound method Iterable2.__getitem__(item: int) -> str) | (bound method Iterable2.__getitem__(item: str) -> int)`) may have an incorrect signature for the old-style iteration protocol
 info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
-info: `not-iterable` is enabled by default
+info: rule `not-iterable` is enabled by default
 
 ```
 

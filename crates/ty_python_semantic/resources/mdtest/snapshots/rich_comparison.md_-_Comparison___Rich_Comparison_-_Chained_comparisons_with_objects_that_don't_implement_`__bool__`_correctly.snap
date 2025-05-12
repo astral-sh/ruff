@@ -43,7 +43,7 @@ error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `
 14 | 10 < Comparable() < Comparable()
    |
 info: `__bool__` on `NotBoolable` must be callable
-info: `unsupported-bool-conversion` is enabled by default
+info: rule `unsupported-bool-conversion` is enabled by default
 
 ```
 
@@ -59,6 +59,6 @@ error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `
 16 | Comparable() < Comparable()  # fine
    |
 info: `__bool__` on `NotBoolable` must be callable
-info: `unsupported-bool-conversion` is enabled by default
+info: rule `unsupported-bool-conversion` is enabled by default
 
 ```

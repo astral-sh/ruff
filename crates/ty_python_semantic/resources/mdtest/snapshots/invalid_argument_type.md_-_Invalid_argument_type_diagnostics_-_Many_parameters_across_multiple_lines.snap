@@ -44,6 +44,6 @@ info: Function defined here
 4 |     z: int,
 5 | ) -> int:
   |
-info: `invalid-argument-type` is enabled by default
+info: rule `invalid-argument-type` is enabled by default
 
 ```

@@ -58,7 +58,7 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
 info: Its `__iter__` method may have an invalid signature
 info: Type of `__iter__` is `(bound method Iterable1.__iter__() -> Iterator) | (bound method Iterable1.__iter__(invalid_extra_arg) -> Iterator)`
 info: Expected signature for `__iter__` is `def __iter__(self): ...`
-info: `not-iterable` is enabled by default
+info: rule `not-iterable` is enabled by default
 
 ```
 
@@ -87,7 +87,7 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
 30 |         reveal_type(x)  # revealed: int | Unknown
    |
 info: Its `__iter__` attribute (with type `(bound method Iterable2.__iter__() -> Iterator) | None`) may not be callable
-info: `not-iterable` is enabled by default
+info: rule `not-iterable` is enabled by default
 
 ```
 

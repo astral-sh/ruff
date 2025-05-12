@@ -82,6 +82,6 @@ info: Type variable defined here
   |       ^^^^^^
 4 |     return x
   |
-info: `invalid-argument-type` is enabled by default
+info: rule `invalid-argument-type` is enabled by default
 
 ```

@@ -40,7 +40,7 @@ error[not-iterable]: Object of type `Iterable` is not iterable
    |
 info: Its `__iter__` method has an invalid signature
 info: Expected signature `def __iter__(self): ...`
-info: `not-iterable` is enabled by default
+info: rule `not-iterable` is enabled by default
 
 ```
 

@@ -34,7 +34,7 @@ error[not-iterable]: Object of type `Bad` is not iterable
 8 |     reveal_type(x)  # revealed: Unknown
   |
 info: It has no `__iter__` method and its `__getitem__` attribute has type `None`, which is not callable
-info: `not-iterable` is enabled by default
+info: rule `not-iterable` is enabled by default
 
 ```
 

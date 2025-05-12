@@ -29,6 +29,6 @@ error[not-iterable]: Object of type `Literal[123]` is not iterable
 3 |     pass
   |
 info: It doesn't have an `__iter__` method or a `__getitem__` method
-info: `not-iterable` is enabled by default
+info: rule `not-iterable` is enabled by default
 
 ```

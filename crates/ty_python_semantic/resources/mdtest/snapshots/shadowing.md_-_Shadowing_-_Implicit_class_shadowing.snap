@@ -29,6 +29,6 @@ error[invalid-assignment]: Implicit shadowing of class `C`
   | ^
   |
 info: Annotate to make it explicit if this is intentional
-info: `invalid-assignment` is enabled by default
+info: rule `invalid-assignment` is enabled by default
 
 ```

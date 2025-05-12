@@ -40,6 +40,6 @@ error[unresolved-import]: Cannot resolve imported module `....foo`
 2 |
 3 | stat = add(10, 15)
   |
-info: `unresolved-import` is enabled by default
+info: rule `unresolved-import` is enabled by default
 
 ```

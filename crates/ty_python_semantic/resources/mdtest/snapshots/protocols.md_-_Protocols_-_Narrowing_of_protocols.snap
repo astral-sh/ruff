@@ -77,7 +77,7 @@ info: `HasX` is declared as a protocol class, but it is not declared as runtime-
   |
 info: A protocol class can only be used in `isinstance` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
 info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
-info: `invalid-argument-type` is enabled by default
+info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -131,7 +131,7 @@ info: `HasX` is declared as a protocol class, but it is not declared as runtime-
   |
 info: A protocol class can only be used in `issubclass` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
 info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
-info: `invalid-argument-type` is enabled by default
+info: rule `invalid-argument-type` is enabled by default
 
 ```
 

@@ -35,7 +35,7 @@ error[not-iterable]: Object of type `Bad` is not iterable
 9 |     reveal_type(x)  # revealed: Unknown
   |
 info: Its `__iter__` method returns an object of type `int`, which has no `__next__` method
-info: `not-iterable` is enabled by default
+info: rule `not-iterable` is enabled by default
 
 ```
 

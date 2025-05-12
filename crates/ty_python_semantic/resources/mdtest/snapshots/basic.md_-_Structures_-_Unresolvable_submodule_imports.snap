@@ -36,7 +36,7 @@ error[unresolved-import]: Cannot resolve imported module `a.foo`
 3 |
 4 | # Topmost component unresolvable:
   |
-info: `unresolved-import` is enabled by default
+info: rule `unresolved-import` is enabled by default
 
 ```
 
@@ -48,6 +48,6 @@ error[unresolved-import]: Cannot resolve imported module `b.foo`
 5 | import b.foo  # error: [unresolved-import] "Cannot resolve imported module `b.foo`"
   |        ^^^^^
   |
-info: `unresolved-import` is enabled by default
+info: rule `unresolved-import` is enabled by default
 
 ```

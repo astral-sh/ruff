@@ -46,7 +46,7 @@ error[not-iterable]: Object of type `Test | Test2` may not be iterable
 19 |         reveal_type(x)  # revealed: int
    |
 info: Its `__iter__` method returns an object of type `TestIter | int`, which may not have a `__next__` method
-info: `not-iterable` is enabled by default
+info: rule `not-iterable` is enabled by default
 
 ```
 

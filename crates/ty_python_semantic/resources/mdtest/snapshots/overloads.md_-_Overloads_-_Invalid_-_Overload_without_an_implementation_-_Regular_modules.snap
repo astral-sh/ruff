@@ -41,7 +41,7 @@ error[invalid-overload]: Overloaded non-stub function `func` must have an implem
 8 |
 9 | class Foo:
   |
-info: `invalid-overload` is enabled by default
+info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -54,6 +54,6 @@ error[invalid-overload]: Overloaded non-stub function `method` must have an impl
 14 |     def method(self, x: str) -> str: ...
    |         ^^^^^^
    |
-info: `invalid-overload` is enabled by default
+info: rule `invalid-overload` is enabled by default
 
 ```
