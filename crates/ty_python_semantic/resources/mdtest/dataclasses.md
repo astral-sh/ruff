@@ -618,6 +618,12 @@ To do
 
 ## `dataclass.fields`
 
+Dataclasses have `__dataclass_fields__` in them, which makes them a subtype of the
+`DataclassInstance` protocol.
+
+Here, we verify that dataclasses can be passed to `dataclasses.fields` without any errors, and that
+the return type of `dataclasses.fields` is correct.
+
 ```py
 from dataclasses import dataclass, fields
 
@@ -625,6 +631,7 @@ from dataclasses import dataclass, fields
 class Foo:
     x: int
 
+reveal_type(Foo.__dataclass_fields__)  # revealed: dict[str, @Todo(dataclass.Field)]
 reveal_type(fields(Foo))  # revealed: @Todo(full tuple[...] support)
 ```
 
