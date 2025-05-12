@@ -18,7 +18,7 @@ use rustc_hash::FxHashSet;
 use salsa::Durability;
 use salsa::Setter;
 use std::backtrace::BacktraceStatus;
-use std::panic::{AssertUnwindSafe, RefUnwindSafe, UnwindSafe};
+use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::error;
@@ -107,9 +107,9 @@ pub struct Project {
 }
 
 /// A progress reporter.
-pub trait Reporter: Default + Send + Sync + RefUnwindSafe + 'static {
+pub trait Reporter: Send + Sync {
     /// Initialize the reporter with the number of files.
-    fn set_files(&self, files: usize);
+    fn set_files(&mut self, files: usize);
 
     /// Report the completion of a given file.
     fn report_file(&self, file: &File);
@@ -120,7 +120,7 @@ pub trait Reporter: Default + Send + Sync + RefUnwindSafe + 'static {
 pub struct DummyReporter;
 
 impl Reporter for DummyReporter {
-    fn set_files(&self, _files: usize) {}
+    fn set_files(&mut self, _files: usize) {}
     fn report_file(&self, _file: &File) {}
 }
 
@@ -186,7 +186,11 @@ impl Project {
     }
 
     /// Checks all open files in the project and its dependencies.
-    pub(crate) fn check(self, db: &ProjectDatabase, reporter: &impl Reporter) -> Vec<Diagnostic> {
+    pub(crate) fn check(
+        self,
+        db: &ProjectDatabase,
+        mut reporter: AssertUnwindSafe<&mut dyn Reporter>,
+    ) -> Vec<Diagnostic> {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
 
@@ -215,6 +219,7 @@ impl Project {
             let db = db.clone();
             let file_diagnostics = &file_diagnostics;
             let project_span = &project_span;
+            let reporter = &reporter;
 
             rayon::scope(move |scope| {
                 for file in &files {
