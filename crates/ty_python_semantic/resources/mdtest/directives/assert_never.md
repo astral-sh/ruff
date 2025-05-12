@@ -2,6 +2,8 @@
 
 ## Basic functionality
 
+<!-- snapshot-diagnostics -->
+
 `assert_never` makes sure that the type of the argument is `Never`. If it is not, a
 `type-assertion-failure` diagnostic is emitted.
 
@@ -25,8 +27,6 @@ def _(never: Never, any_: Any, unknown: Unknown, flag: bool):
 ```
 
 ## Use case: Type narrowing and exhaustiveness checking
-
-<!-- snapshot-diagnostics -->
 
 ```toml
 [environment]

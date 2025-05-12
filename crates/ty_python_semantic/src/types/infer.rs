@@ -4814,14 +4814,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                             asserted_ty.display(self.db())
                                                         ));
 
-                                                    let mut subdiagnostic = SubDiagnostic::new(
-                                                        Severity::Info,
-                                                        format_args!(
-                                                            "`{}` is not an equivalent type to `{}`",
-                                                            actual_ty.display(self.db()),
-                                                            asserted_ty.display(self.db())
-                                                        ),
-                                                    );
+                                                    diagnostic.set_primary_message(format_args!(
+                                                        "Expected object of type `{asserted_type}`",
+                                                        asserted_type =
+                                                            asserted_ty.display(self.db()),
+                                                    ));
+
+                                                    let mut subdiagnostic =
+                                                        SubDiagnostic::new(
+                                                            Severity::Info,
+                                                            "Asserted type is not equivalent to the inferred type",
+                                                        );
                                                     subdiagnostic.annotate(
                                                         Annotation::primary(self.context.span(
                                                             &call_expression.arguments.args[0],
@@ -4847,14 +4850,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                     let mut diagnostic = builder.into_diagnostic(
                                                         "Argument does not have expected type `Never`",
                                                     );
-
-                                                    let mut subdiagnostic = SubDiagnostic::new(
-                                                        Severity::Info,
-                                                        format_args!(
-                                                            "`{}` is not an equivalent type to `Never`",
-                                                            actual_ty.display(self.db()),
-                                                        ),
+                                                    diagnostic.set_primary_message(
+                                                        "Expected object of type `Never`",
                                                     );
+
+                                                    let mut subdiagnostic =
+                                                        SubDiagnostic::new(Severity::Info, "Inferred type is not equivalent to `Never`");
                                                     subdiagnostic.annotate(
                                                         Annotation::primary(self.context.span(
                                                             &call_expression.arguments.args[0],
