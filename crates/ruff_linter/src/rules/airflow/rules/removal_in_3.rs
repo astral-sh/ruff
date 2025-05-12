@@ -865,10 +865,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         _ => return,
     };
 
-    if is_guarded_by_try_except(expr, &replacement, semantic) {
-        return;
-    }
-
     let mut diagnostic = Diagnostic::new(
         Airflow3Removal {
             deprecated: qualified_name.to_string(),
@@ -876,8 +872,15 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
         range,
     );
-
-    if let Replacement::AutoImport { module, name } = replacement {
+    let semantic = checker.semantic();
+    if let Some((module, name)) = match &replacement {
+        Replacement::AutoImport { module, name } => Some((module, *name)),
+        Replacement::SourceModuleMoved { module, name } => Some((module, name.as_str())),
+        _ => None,
+    } {
+        if is_guarded_by_try_except(expr, module, name, semantic) {
+            return;
+        }
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from(module, name),
