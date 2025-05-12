@@ -154,6 +154,29 @@ reveal_type(E.__mro__)  # revealed: tuple[<class 'E'>, <class 'B'>, <class 'C'>,
 reveal_type(F.__mro__)
 ```
 
+## Inheritance with intersections that include `Unknown`
+
+An intersection that includes `Unknown` or `Any` is permitted as long as the intersection is not
+disjoint from `type`.
+
+```py
+from does_not_exist import DoesNotExist  # error: [unresolved-import]
+
+reveal_type(DoesNotExist)  # revealed: Unknown
+
+if hasattr(DoesNotExist, "__mro__"):
+    reveal_type(DoesNotExist)  # revealed: Unknown & <Protocol with members '__mro__'>
+
+    class Foo(DoesNotExist): ...  # no error!
+    reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+
+if not isinstance(DoesNotExist, type):
+    reveal_type(DoesNotExist)  # revealed: Unknown & ~type
+
+    class Foo(DoesNotExist): ...  # error: [invalid-base]
+    reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+```
+
 ## `__bases__` lists that cause errors at runtime
 
 If the class's `__bases__` cause an exception to be raised at runtime and therefore the class
