@@ -313,10 +313,10 @@ def _():
 def f[T](x: int) -> (y := 3):
     return x
 
-# error: [invalid-syntax] "`yield from` statement outside of a function"
-# error: [invalid-syntax] "yield expression cannot be used within a generic definition"
-class C[T]((yield from [object])):
-    pass
+def _():
+    # error: [invalid-syntax] "yield expression cannot be used within a generic definition"
+    class C[T]((yield from [object])):
+        pass
 ```
 
 ## `await` outside async function
