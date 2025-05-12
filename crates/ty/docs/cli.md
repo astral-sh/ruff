@@ -63,7 +63,10 @@ ty check [OPTIONS] [PATH]...
 <p>ty will search in the resolved environments's <code>site-packages</code> directories for type information and third-party imports.</p>
 </dd><dt id="ty-check--python-platform"><a href="#ty-check--python-platform"><code>--python-platform</code></a>, <code>--platform</code> <i>platform</i></dt><dd><p>Target platform to assume when resolving types.</p>
 <p>This is used to specialize the type of <code>sys.platform</code> and will affect the visibility of platform-specific functions and attributes. If the value is set to <code>all</code>, no assumptions are made about the target platform. If unspecified, the current system's platform will be used.</p>
-</dd><dt id="ty-check--python-version"><a href="#ty-check--python-version"><code>--python-version</code></a>, <code>--target-version</code> <i>version</i></dt><dd><p>Python version to assume when resolving types</p>
+</dd><dt id="ty-check--python-version"><a href="#ty-check--python-version"><code>--python-version</code></a>, <code>--target-version</code> <i>version</i></dt><dd><p>Python version to assume when resolving types.</p>
+<p>The Python version affects allowed syntax, type definitions of the standard library, and type definitions of first- and third-party modules that are conditional on the Python version.</p>
+<p>By default, the Python version is inferred as the lower bound of the project's <code>requires-python</code> field from the <code>pyproject.toml</code>, if available. Otherwise, the latest stable version supported by ty is used, which is currently 3.13.</p>
+<p>ty will not infer the Python version from the Python environment at this time.</p>
 <p>Possible values:</p>
 <ul>
 <li><code>3.7</code></li>
