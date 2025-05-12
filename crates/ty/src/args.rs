@@ -51,14 +51,20 @@ pub(crate) struct CheckCommand {
     #[arg(long, value_name = "PROJECT")]
     pub(crate) project: Option<SystemPathBuf>,
 
-    /// Path to the Python installation from which ty resolves type information and third-party dependencies.
+    /// Path to the Python environment.
     ///
-    /// If not specified, ty will look at the `VIRTUAL_ENV` environment variable.
+    /// ty uses the Python environment to resolve type information and third-party dependencies.
     ///
-    /// ty will search in the path's `site-packages` directories for type information and
-    /// third-party imports.
+    /// If not specified, ty will attempt to infer it from the `VIRTUAL_ENV` environment variable or
+    /// discover a `.venv` directory in the project root or working directory.
     ///
-    /// This option is commonly used to specify the path to a virtual environment.
+    /// If a path to a Python interpreter is provided, e.g., `.venv/bin/python3`, ty will attempt to
+    /// find an environment two directories up from the interpreter's path, e.g., `.venv`. At this
+    /// time, ty does not invoke the interpreter to determine the location of the environment. This
+    /// means that ty will not resolve dynamic executables such as a shim.
+    ///
+    /// ty will search in the resolved environments's `site-packages` directories for type
+    /// information and third-party imports.
     #[arg(long, value_name = "PATH")]
     pub(crate) python: Option<SystemPathBuf>,
 
