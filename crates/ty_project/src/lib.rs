@@ -605,7 +605,7 @@ where
                 "This indicates a bug in ty.",
             ));
 
-            let report_message = "If you could open an issue at https://github.com/astral-sh/ty/issues/new?title=%5Bpanic%5D we'd be very appreciative!";
+            let report_message = "If you could open an issue at https://github.com/astral-sh/ty/issues/new?title=%5Bpanic%5D, we'd be very appreciative!";
             diagnostic.sub(SubDiagnostic::new(Severity::Info, report_message));
             diagnostic.sub(SubDiagnostic::new(
                 Severity::Info,
