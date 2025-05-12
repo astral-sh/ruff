@@ -69,10 +69,7 @@ pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
         .arguments
         .find_argument_value("stacklevel", 2)
         .is_some()
-        || call
-            .arguments
-            .find_argument_value("skip_file_prefixes", 4)
-            .is_some()
+        || call.arguments.find_keyword("skip_file_prefixes").is_some()
         || call
             .arguments
             .args
