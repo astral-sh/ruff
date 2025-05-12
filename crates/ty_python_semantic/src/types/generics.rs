@@ -4,7 +4,7 @@ use rustc_hash::FxHashMap;
 use crate::semantic_index::SemanticIndex;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
-use crate::types::instance::NominalInstanceType;
+use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
     declaration_type, todo_type, KnownInstanceType, Type, TypeVarBoundOrConstraints,
@@ -630,7 +630,10 @@ impl<'db> SpecializationBuilder<'db> {
         // ```
         //
         // without specializing `T` to `None`.
-        if !actual.is_never() && actual.is_subtype_of(self.db, formal) {
+        if !matches!(formal, Type::ProtocolInstance(_))
+            && !actual.is_never()
+            && actual.is_subtype_of(self.db, formal)
+        {
             return Ok(());
         }
 
@@ -677,6 +680,14 @@ impl<'db> SpecializationBuilder<'db> {
             (
                 Type::NominalInstance(NominalInstanceType {
                     class: ClassType::Generic(formal_alias),
+                    ..
+                })
+                // TODO: This will only handle classes that explicit implement a generic protocol
+                // by listing it as a base class. To handle classes that implicitly implement a
+                // generic protocol, we will need to check the types of the protocol members to be
+                // able to infer the specialization of the protocol that the class implements.
+                | Type::ProtocolInstance(ProtocolInstanceType {
+                    inner: Protocol::FromClass(ClassType::Generic(formal_alias)),
                     ..
                 }),
                 Type::NominalInstance(NominalInstanceType {

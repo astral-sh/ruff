@@ -61,17 +61,42 @@ reveal_type(f("string"))  # revealed: Literal["string"]
 ## Inferring “deep” generic parameter types
 
 The matching up of call arguments and discovery of constraints on typevars can be a recursive
-process for arbitrarily-nested generic types in parameters.
+process for arbitrarily-nested generic classes and protocols in parameters.
+
+TODO: Note that we can currently only infer a specialization for a generic protocol when the
+argument _explicitly_ implements the protocol by listing it as a base class.
 
 ```py
-def f[T](x: list[T]) -> T:
+from typing import Protocol, TypeVar
+
+S = TypeVar("S")
+
+class CanIndex(Protocol[S]):
+    def __getitem__(self, index: int) -> S: ...
+
+class ExplicitlyImplements[T](CanIndex[T]): ...
+
+def takes_in_list[T](x: list[T]) -> T:
     return x[0]
 
-def deep(x: list[str]) -> None:
-    reveal_type(f(x))  # revealed: str
+def takes_in_protocol[T](x: CanIndex[T]) -> T:
+    return x[0]
 
-def deeper(x: list[set[str]]) -> None:
-    reveal_type(f(x))  # revealed: set[str]
+def deep_list(x: list[str]) -> None:
+    reveal_type(takes_in_list(x))  # revealed: str
+    # TODO: revealed: str
+    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+
+def deeper_list(x: list[set[str]]) -> None:
+    reveal_type(takes_in_list(x))  # revealed: set[str]
+    # TODO: revealed: set[str]
+    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+
+def deep_explicit(x: ExplicitlyImplements[str]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: str
+
+def deeper_explicit(x: ExplicitlyImplements[set[str]]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
 ```
 
 This also works when passing in arguments that are subclasses of the parameter type.
@@ -80,8 +105,19 @@ This also works when passing in arguments that are subclasses of the parameter t
 class Sub(list[int]): ...
 class GenericSub[T](list[T]): ...
 
-reveal_type(f(Sub()))  # revealed: int
-reveal_type(f(GenericSub[str]()))  # revealed: str
+reveal_type(takes_in_list(Sub()))  # revealed: int
+# TODO: revealed: int
+reveal_type(takes_in_protocol(Sub()))  # revealed: Unknown
+
+reveal_type(takes_in_list(GenericSub[str]()))  # revealed: str
+# TODO: revealed: str
+reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: Unknown
+
+class ExplicitSub(ExplicitlyImplements[int]): ...
+class ExplicitGenericSub[T](ExplicitlyImplements[T]): ...
+
+reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: int
+reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 ```
 
 ## Inferring a bound typevar
