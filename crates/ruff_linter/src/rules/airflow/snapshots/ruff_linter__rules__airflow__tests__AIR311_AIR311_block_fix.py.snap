@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR311_block_fix.py:5:1: AIR311 [*] `airflow.timetables.datasets.DatasetOrTimeSchedule` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  |
+3 | from airflow.timetables.datasets import DatasetOrTimeSchedule
+4 |
+5 | DatasetOrTimeSchedule()
+  | ^^^^^^^^^^^^^^^^^^^^^ AIR311
+6 |
+7 | from airflow.timetables import datasets
+  |
+  = help: Use `airflow.timetables.assets.AssetOrTimeSchedule` instead
+
+ℹ Safe fix
+1 1 | from __future__ import annotations
+2 2 | 
+3 3 | from airflow.timetables.datasets import DatasetOrTimeSchedule
+  4 |+from airflow.timetables.assets import AssetOrTimeSchedule
+4 5 | 
+5   |-DatasetOrTimeSchedule()
+  6 |+AssetOrTimeSchedule()
+6 7 | 
+7 8 | from airflow.timetables import datasets
+8 9 | 
+
+AIR311_block_fix.py:9:10: AIR311 `airflow.timetables.datasets.DatasetOrTimeSchedule` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  |
+7 | from airflow.timetables import datasets
+8 |
+9 | datasets.DatasetOrTimeSchedule()
+  |          ^^^^^^^^^^^^^^^^^^^^^ AIR311
+  |
+  = help: Use `airflow.timetables.assets.AssetOrTimeSchedule` instead
