@@ -13,6 +13,7 @@ use itertools::Itertools;
 use log::{debug, error};
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelBridge};
+use ruff_linter::{codes::Rule, registry::AsRule};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
@@ -348,7 +349,7 @@ impl FileCache {
                     .iter()
                     .map(|msg| {
                         Message::Diagnostic(DiagnosticMessage {
-                            name: msg.name.clone(),
+                            name: msg.rule.pascal_name(),
                             body: msg.body.clone(),
                             suggestion: msg.suggestion.clone(),
                             range: msg.range,
@@ -446,7 +447,7 @@ impl LintCacheData {
                     "message uses a different source file"
                 );
                 CacheMessage {
-                    name: msg.name.clone(),
+                    rule: msg.rule(),
                     body: msg.body.clone(),
                     suggestion: msg.suggestion.clone(),
                     range: msg.range,
@@ -468,8 +469,8 @@ impl LintCacheData {
 /// On disk representation of a diagnostic message.
 #[derive(Deserialize, Debug, Serialize, PartialEq)]
 pub(super) struct CacheMessage {
-    /// The identifier of the diagnostic, used to align the diagnostic with a rule.
-    name: String,
+    /// The rule for the cached diagnostic.
+    rule: Rule,
     /// The message body to display to the user, to explain the diagnostic.
     body: String,
     /// The message to display to the user, to explain the suggested fix.

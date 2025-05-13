@@ -403,6 +403,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_message_formats_match_arms = quote!();
     let mut rule_fixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
+    let mut rule_pascal_match_arms = quote!();
 
     let mut from_impls_for_diagnostic_kind = quote!();
 
@@ -425,6 +426,9 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
         // Enable conversion from `DiagnosticKind` to `Rule`.
         from_impls_for_diagnostic_kind
             .extend(quote! {#(#attrs)* stringify!(#name) => Rule::#name,});
+
+        // Enable conversion from a `Rule` to its Pascal-case variant name.
+        rule_pascal_match_arms.extend(quote! {#(#attrs)* Rule::#name => stringify!(#name),});
     }
 
     quote! {
@@ -443,6 +447,8 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             ::ruff_macros::CacheKey,
             AsRefStr,
             ::strum_macros::IntoStaticStr,
+            ::serde::Serialize,
+            ::serde::Deserialize,
         )]
         #[repr(u16)]
         #[strum(serialize_all = "kebab-case")]
@@ -464,11 +470,16 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             pub const fn fixable(&self) -> ruff_diagnostics::FixAvailability {
                 match self { #rule_fixable_match_arms }
             }
+
+            /// Returns the Pascal-case variant name of this rule.
+            pub const fn pascal_name(&self) -> &'static str {
+                match self { #rule_pascal_match_arms }
+            }
         }
 
         impl AsRule for ruff_diagnostics::Diagnostic {
             fn rule(&self) -> Rule {
-                match self.name.as_str() {
+                match self.name {
                     #from_impls_for_diagnostic_kind
                     _ => unreachable!("invalid rule name: {}", self.name),
                 }
@@ -477,7 +488,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
         impl AsRule for crate::message::DiagnosticMessage {
             fn rule(&self) -> Rule {
-                match self.name.as_str() {
+                match self.name {
                     #from_impls_for_diagnostic_kind
                     _ => unreachable!("invalid rule name: {}", self.name),
                 }

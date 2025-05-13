@@ -273,7 +273,7 @@ fn to_lsp_diagnostic(
                 new_text: noqa_edit.into_content().unwrap_or_default().into_string(),
             });
             serde_json::to_value(AssociatedDiagnosticData {
-                title: suggestion.unwrap_or(name),
+                title: suggestion.unwrap_or_else(|| name.to_string()),
                 noqa_edit,
                 edits,
                 code: rule.noqa_code().to_string(),
