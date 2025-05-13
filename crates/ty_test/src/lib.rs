@@ -56,7 +56,10 @@ pub fn run(
     let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
     for test in suite.tests() {
-        if filter.as_ref().is_some_and(|f| !test.name().contains(f)) {
+        if filter
+            .as_ref()
+            .is_some_and(|f| !test.uncontracted_name().contains(f))
+        {
             continue;
         }
 

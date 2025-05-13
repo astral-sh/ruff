@@ -1,0 +1,45 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_argument_type.md - Invalid argument type diagnostics - Test calling a function whose type is vendored from `typeshed`
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_argument_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | import json
+2 | 
+3 | json.loads(5)  # error: [invalid-argument-type]
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to function `loads` is incorrect
+ --> src/mdtest_snippet.py:3:12
+  |
+1 | import json
+2 |
+3 | json.loads(5)  # error: [invalid-argument-type]
+  |            ^ Expected `str | bytes | bytearray`, found `Literal[5]`
+  |
+info: Function defined here
+  --> stdlib/json/__init__.pyi:39:5
+   |
+37 |     **kwds: Any,
+38 | ) -> None: ...
+39 | def loads(
+   |     ^^^^^
+40 |     s: str | bytes | bytearray,
+   |     -------------------------- Parameter declared here
+41 |     *,
+42 |     cls: type[JSONDecoder] | None = None,
+   |
+info: rule `invalid-argument-type` is enabled by default
+
+```
