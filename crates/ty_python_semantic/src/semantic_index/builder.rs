@@ -2501,16 +2501,8 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
     }
 
     fn in_function_scope(&self) -> bool {
-        for scope_info in self.scope_stack.iter().rev() {
-            let scope = &self.scopes[scope_info.file_scope_id];
-            match scope.kind() {
-                ScopeKind::Lambda | ScopeKind::Function => {
-                    return true;
-                }
-                _ => {}
-            }
-        }
-        false
+        let kind = self.scopes[self.current_scope()].kind();
+        matches!(kind, ScopeKind::Function | ScopeKind::Lambda)
     }
 
     fn in_generator_scope(&self) -> bool {
