@@ -27,7 +27,6 @@ class Point:
     def replace_with(self, other: "Point") -> None:
         self.x, self.y = other.x, other.y
 
-
 p = Point()
 reveal_type(p.x)  # revealed: Unknown | int
 reveal_type(p.y)  # revealed: Unknown | int
