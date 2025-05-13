@@ -632,7 +632,7 @@ class Foo:
     x: int
 
 reveal_type(Foo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
-reveal_type(fields(Foo))  # revealed: @Todo(full tuple[...] support)
+reveal_type(fields(Foo))  # revealed: tuple[Field[Any], ...]
 ```
 
 ## Other special cases
