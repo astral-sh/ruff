@@ -103,7 +103,7 @@ impl<'m, 's> MarkdownTest<'m, 's> {
 
         while let Some(next_id) = parent_id {
             let parent = &self.suite.sections[next_id];
-            name_fragments.push(parent.title);
+            name_fragments.insert(0, parent.title);
             parent_id = parent.parent_id;
         }
 
