@@ -13,8 +13,7 @@ from typing_extensions import TypeVarTuple
 Ts = TypeVarTuple("Ts")
 
 def append_int(*args: *Ts) -> tuple[*Ts, int]:
-    # TODO: tuple[*Ts]
-    reveal_type(args)  # revealed: tuple[Unknown, ...]
+    reveal_type(args)  # revealed: @Todo(PEP 646)
 
     return (*args, 1)
 

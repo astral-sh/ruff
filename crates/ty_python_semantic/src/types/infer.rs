@@ -2107,9 +2107,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
     ) {
         if let Some(annotation) = parameter.annotation() {
-            let _annotated_ty = self.file_expression_type(annotation);
-            // TODO `tuple[annotated_type, ...]`
-            let ty = KnownClass::Tuple.to_instance(self.db());
+            let ty = if annotation.is_starred_expr() {
+                todo_type!("PEP 646")
+            } else {
+                let annotated_type = self.file_expression_type(annotation);
+                KnownClass::Tuple.to_specialized_instance(self.db(), [annotated_type])
+            };
+
             self.add_declaration_with_binding(
                 parameter.into(),
                 definition,
@@ -2119,8 +2123,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.add_binding(
                 parameter.into(),
                 definition,
-                // TODO `tuple[Unknown, ...]`
-                KnownClass::Tuple.to_instance(self.db()),
+                KnownClass::Tuple.to_specialized_instance(self.db(), [Type::unknown()]),
             );
         }
     }

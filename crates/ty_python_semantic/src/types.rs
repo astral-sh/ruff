@@ -1274,9 +1274,7 @@ impl<'db> Type<'db> {
             }
 
             // `tuple[A, B, C]` is a subtype of `tuple[A | B | C, ...]`
-            (Type::Tuple(tuple), _) => KnownClass::Tuple
-                .to_specialized_instance(db, [UnionType::from_elements(db, tuple.elements(db))])
-                .is_subtype_of(db, target),
+            (Type::Tuple(tuple), _) => tuple.homogeneous_supertype(db).is_subtype_of(db, target),
 
             (Type::BoundSuper(_), Type::BoundSuper(_)) => self.is_equivalent_to(db, target),
             (Type::BoundSuper(_), _) => KnownClass::Super.to_instance(db).is_subtype_of(db, target),
@@ -1490,9 +1488,7 @@ impl<'db> Type<'db> {
             //
             // `tuple[A, B, C]` is assignable to `tuple[A | B | C, ...]`
             (Type::Tuple(tuple), _)
-                if KnownClass::Tuple
-                    .to_specialized_instance(db, [UnionType::from_elements(db, tuple.elements(db))])
-                    .is_assignable_to(db, target) =>
+                if tuple.homogeneous_supertype(db).is_assignable_to(db, target) =>
             {
                 true
             }
@@ -1955,9 +1951,9 @@ impl<'db> Type<'db> {
                 !known_instance.is_instance_of(db, instance.class())
             }
 
-            (known_instance_ty @ Type::KnownInstance(_), Type::Tuple(_))
-            | (Type::Tuple(_), known_instance_ty @ Type::KnownInstance(_)) => {
-                known_instance_ty.is_disjoint_from(db, KnownClass::Tuple.to_instance(db))
+            (known_instance_ty @ Type::KnownInstance(_), Type::Tuple(tuple))
+            | (Type::Tuple(tuple), known_instance_ty @ Type::KnownInstance(_)) => {
+                known_instance_ty.is_disjoint_from(db, tuple.homogeneous_supertype(db))
             }
 
             (Type::BooleanLiteral(..), Type::NominalInstance(instance))
@@ -2083,17 +2079,9 @@ impl<'db> Type<'db> {
                         .any(|(e1, e2)| e1.is_disjoint_from(db, *e2))
             }
 
-            (Type::Tuple(..), instance @ Type::NominalInstance(_))
-            | (instance @ Type::NominalInstance(_), Type::Tuple(..)) => {
-                // We cannot be sure if the tuple is disjoint from the instance because:
-                //   - 'other' might be the homogeneous arbitrary-length tuple type
-                //     tuple[T, ...] (which we don't have support for yet); if all of
-                //     our element types are not disjoint with T, this is not disjoint
-                //   - 'other' might be a user subtype of tuple, which, if generic
-                //     over the same or compatible *Ts, would overlap with tuple.
-                //
-                // TODO: add checks for the above cases once we support them
-                instance.is_disjoint_from(db, KnownClass::Tuple.to_instance(db))
+            (Type::Tuple(tuple), instance @ Type::NominalInstance(_))
+            | (instance @ Type::NominalInstance(_), Type::Tuple(tuple)) => {
+                instance.is_disjoint_from(db, tuple.homogeneous_supertype(db))
             }
 
             (Type::PropertyInstance(_), other) | (other, Type::PropertyInstance(_)) => {
@@ -2583,7 +2571,7 @@ impl<'db> Type<'db> {
                 KnownClass::Str.to_instance(db).instance_member(db, name)
             }
             Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db).instance_member(db, name),
-            Type::Tuple(_) => KnownClass::Tuple.to_instance(db).instance_member(db, name),
+            Type::Tuple(tuple) => tuple.homogeneous_supertype(db).instance_member(db, name),
 
             Type::AlwaysTruthy | Type::AlwaysFalsy => Type::object(db).instance_member(db, name),
             Type::ModuleLiteral(_) => KnownClass::ModuleType
@@ -3568,8 +3556,10 @@ impl<'db> Type<'db> {
                                     db,
                                     [
                                         KnownClass::Str.to_instance(db),
-                                        // TODO: tuple[str, ...]
-                                        KnownClass::Tuple.to_instance(db),
+                                        KnownClass::Tuple.to_specialized_instance(
+                                            db,
+                                            [KnownClass::Str.to_instance(db)],
+                                        ),
                                     ],
                                 )),
                             Parameter::positional_only(Some(Name::new_static("start")))
@@ -3849,6 +3839,9 @@ impl<'db> Type<'db> {
                 }
 
                 Some(KnownClass::Type) => {
+                    let str_instance = KnownClass::Str.to_instance(db);
+                    let type_instance = KnownClass::Type.to_instance(db);
+
                     // ```py
                     // class type:
                     //     @overload
@@ -3864,20 +3857,26 @@ impl<'db> Type<'db> {
                                     Name::new_static("o"),
                                 ))
                                 .with_annotated_type(Type::any())]),
-                                Some(KnownClass::Type.to_instance(db)),
+                                Some(type_instance),
                             ),
                             Signature::new(
                                 Parameters::new([
                                     Parameter::positional_only(Some(Name::new_static("name")))
-                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                        .with_annotated_type(str_instance),
                                     Parameter::positional_only(Some(Name::new_static("bases")))
-                                        // TODO: Should be tuple[type, ...] once we have support for homogenous tuples
-                                        .with_annotated_type(KnownClass::Tuple.to_instance(db)),
+                                        .with_annotated_type(
+                                            KnownClass::Tuple
+                                                .to_specialized_instance(db, [type_instance]),
+                                        ),
                                     Parameter::positional_only(Some(Name::new_static("dict")))
-                                        // TODO: Should be `dict[str, Any]` once we have support for generics
-                                        .with_annotated_type(KnownClass::Dict.to_instance(db)),
+                                        .with_annotated_type(
+                                            KnownClass::Dict.to_specialized_instance(
+                                                db,
+                                                [str_instance, Type::any()],
+                                            ),
+                                        ),
                                 ]),
-                                Some(KnownClass::Type.to_instance(db)),
+                                Some(type_instance),
                             ),
                         ],
                     );
@@ -7919,6 +7918,11 @@ pub struct TupleType<'db> {
 }
 
 impl<'db> TupleType<'db> {
+    fn homogeneous_supertype(self, db: &'db dyn Db) -> Type<'db> {
+        KnownClass::Tuple
+            .to_specialized_instance(db, [UnionType::from_elements(db, self.elements(db))])
+    }
+
     pub(crate) fn from_elements<T: Into<Type<'db>>>(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = T>,
