@@ -51,7 +51,9 @@ redeclaration:
 ```py
 __file__ = None
 __path__: list[str] = []
-__doc__: int = 42
+__doc__: int  # error: [invalid-declaration] "Cannot declare type `int` for inferred type `str | None`"
+# error: [invalid-declaration] "Cannot shadow implicit global attribute `__package__` with declaration of type `int`"
+__package__: int = 42
 __spec__ = 42  # error: [invalid-assignment] "Object of type `Literal[42]` is not assignable to `ModuleSpec | None`"
 ```
 
@@ -62,7 +64,7 @@ import module
 
 reveal_type(module.__file__)  # revealed: Unknown | None
 reveal_type(module.__path__)  # revealed: list[str]
-reveal_type(module.__doc__)  # revealed: int
+reveal_type(module.__doc__)  # revealed: Unknown
 reveal_type(module.__spec__)  # revealed: Unknown | ModuleSpec | None
 
 def nested_scope():
@@ -153,12 +155,14 @@ reveal_type(__name__)  # revealed: str
 The same is true if the name is annotated:
 
 ```py
+# error: [invalid-declaration] "Cannot shadow implicit global attribute `__file__` with declaration of type `int`"
 __file__: int = 42
 
 def returns_bool() -> bool:
     return True
 
 if returns_bool():
+    # error: [invalid-declaration] "Cannot shadow implicit global attribute `__name__` with declaration of type `int`"
     __name__: int = 1
 
 reveal_type(__file__)  # revealed: Literal[42]

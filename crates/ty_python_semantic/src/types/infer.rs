@@ -1503,6 +1503,23 @@ impl<'db> TypeInferenceBuilder<'db> {
         let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
         let inferred_ty = symbol_from_bindings(self.db(), prior_bindings)
+            .with_qualifiers(TypeQualifiers::empty())
+            .or_fall_back_to(self.db(), || {
+                // Fallback to bindings declared on `types.ModuleType` if it's a global symbol
+                let scope = self.scope().file_scope_id(self.db());
+                if scope.is_global() {
+                    module_type_implicit_global_symbol(
+                        self.db(),
+                        self.index
+                            .symbol_table(scope)
+                            .symbol(declaration.symbol(self.db()))
+                            .name(),
+                    )
+                } else {
+                    Symbol::Unbound.into()
+                }
+            })
+            .symbol
             .ignore_possibly_unbound()
             .unwrap_or(Type::Never);
         let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_type()) {
@@ -1541,6 +1558,34 @@ impl<'db> TypeInferenceBuilder<'db> {
                 declared_ty,
                 inferred_ty,
             } => {
+                let file_scope_id = self.scope().file_scope_id(self.db());
+                if file_scope_id.is_global() {
+                    let symbol_table = self.index.symbol_table(file_scope_id);
+                    let symbol_name = symbol_table.symbol(definition.symbol(self.db())).name();
+                    if let Some(module_type_implicit_declaration) =
+                        module_type_implicit_global_declaration(self.db(), symbol_name)
+                            .ok()
+                            .and_then(|sym| sym.symbol.ignore_possibly_unbound())
+                    {
+                        let declared_type = declared_ty.inner_type();
+                        if !declared_type
+                            .is_assignable_to(self.db(), module_type_implicit_declaration)
+                        {
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_DECLARATION, node)
+                            {
+                                let mut diagnostic = builder.into_diagnostic(format_args!(
+                                    "Cannot shadow implicit global attribute `{symbol_name}` with declaration of type `{}`",
+                                    declared_type.display(self.db())
+                                ));
+                                diagnostic.info(format_args!("The global symbol `{}` must always have a type assignable to `{}`",
+                                    symbol_name,
+                                    module_type_implicit_declaration.display(self.db())
+                                ));
+                            }
+                        }
+                    }
+                }
                 if inferred_ty.is_assignable_to(self.db(), declared_ty.inner_type()) {
                     (declared_ty, inferred_ty)
                 } else {
