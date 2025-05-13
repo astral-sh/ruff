@@ -9,7 +9,7 @@ Welcome! We're happy to have you here. Thank you in advance for your contributio
 
 ## The Basics
 
-Ty welcomes contributions in the form of pull requests.
+We welcome contributions in the form of pull requests.
 
 For small changes (e.g., bug fixes), feel free to submit a PR.
 
@@ -22,7 +22,7 @@ that are ready for contributions.
 
 ### Prerequisites
 
-Ty is written in Rust. You'll need to install the
+ty is written in Rust. You'll need to install the
 [Rust toolchain](https://www.rust-lang.org/tools/install) for development.
 
 You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
@@ -81,10 +81,10 @@ operation and debugging issues; see [`crates/ty/docs/tracing.md`](./docs/tracing
 
 ### Project Structure
 
-ty is structured as a monorepo with a [flat crate structure](https://matklad.github.io/2021/08/22/large-rust-workspaces.html),
+The codebase is structured as a monorepo with a [flat crate structure](https://matklad.github.io/2021/08/22/large-rust-workspaces.html),
 such that all crates are contained in a flat `crates` directory.
 
-The vast majority of the code lives in the `ty_python_semantic` crate (located at
+The vast majority of ty's code lives in the `ty_python_semantic` crate (located at
 `crates/ty_python_semantic`). As a contributor, that's the crate that'll probably be most relevant
 to you.
 
@@ -118,7 +118,7 @@ context necessary to understand the feature being demonstrated.
 
 ### Property tests
 
-Ty uses property-based testing to test the core type relations. These tests are located in
+ty uses property-based testing to test the core type relations. These tests are located in
 [`crates/ty_python_semantic/src/types/property_tests.rs`](../ty_python_semantic/src/types/property_tests.rs).
 
 The property tests do not run in CI on every PR, just once daily. It is advisable to run them
