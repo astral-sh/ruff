@@ -177,6 +177,23 @@ if not isinstance(DoesNotExist, type):
     reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
 ```
 
+## Inheritance from `type[Any]` and `type[Unknown]`
+
+Inheritance from `type[Any]` and `type[Unknown]` is also permitted, in keeping with the gradual
+guarantee:
+
+```py
+from typing import Any
+from ty_extensions import Unknown, Intersection
+
+def f(x: type[Any], y: Intersection[Unknown, type[Any]]):
+    class Foo(x): ...
+    reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Any, <class 'object'>]
+
+    class Bar(y): ...
+    reveal_type(Bar.__mro__)  # revealed: tuple[<class 'Bar'>, Unknown, <class 'object'>]
+```
+
 ## `__bases__` lists that cause errors at runtime
 
 If the class's `__bases__` cause an exception to be raised at runtime and therefore the class
