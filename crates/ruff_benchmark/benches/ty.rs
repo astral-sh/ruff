@@ -59,40 +59,7 @@ type KeyDiagnosticFields = (
     Severity,
 );
 
-// left: [
-// (Lint(LintName("invalid-argument-type")), Some("/src/tomllib/_parser.py"), Some(8224..8254), "Argument to function `skip_until` is incorrect", Error),
-// (Lint(LintName("invalid-argument-type")), Some("/src/tomllib/_parser.py"), Some(16914..16948), "Argument to function `skip_until` is incorrect", Error),
-// (Lint(LintName("invalid-argument-type")), Some("/src/tomllib/_parser.py"), Some(17319..17363), "Argument to function `skip_until` is incorrect", Error),
-// ]
-//right: [
-// (Lint(LintName("invalid-argument-type")), Some("/src/tomllib/_parser.py"), Some(8224..8254), "Argument to this function is incorrect", Error),
-// (Lint(LintName("invalid-argument-type")), Some("/src/tomllib/_parser.py"), Some(16914..16948), "Argument to this function is incorrect", Error),
-// (Lint(LintName("invalid-argument-type")), Some("/src/tomllib/_parser.py"), Some(17319..17363), "Argument to this function is incorrect", Error),
-// ]
-
-static EXPECTED_TOMLLIB_DIAGNOSTICS: &[KeyDiagnosticFields] = &[
-    (
-        DiagnosticId::lint("invalid-argument-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(8224..8254),
-        "Argument to function `skip_until` is incorrect",
-        Severity::Error,
-    ),
-    (
-        DiagnosticId::lint("invalid-argument-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(16914..16948),
-        "Argument to function `skip_until` is incorrect",
-        Severity::Error,
-    ),
-    (
-        DiagnosticId::lint("invalid-argument-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(17319..17363),
-        "Argument to function `skip_until` is incorrect",
-        Severity::Error,
-    ),
-];
+static EXPECTED_TOMLLIB_DIAGNOSTICS: &[KeyDiagnosticFields] = &[];
 
 fn tomllib_path(file: &TestFile) -> SystemPathBuf {
     SystemPathBuf::from("src").join(file.name())

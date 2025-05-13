@@ -19,7 +19,7 @@ class Shape:
         reveal_type(self)  # revealed: Self
         return self
 
-    def nested_type(self) -> list[Self]:
+    def nested_type(self: Self) -> list[Self]:
         return [self]
 
     def nested_func(self: Self) -> Self:
@@ -33,9 +33,7 @@ class Shape:
         reveal_type(self)  # revealed: Unknown
         return self
 
-# TODO: should be `list[Shape]`
-reveal_type(Shape().nested_type())  # revealed: list[Self]
-
+reveal_type(Shape().nested_type())  # revealed: list[Shape]
 reveal_type(Shape().nested_func())  # revealed: Shape
 
 class Circle(Shape):

@@ -4,8 +4,8 @@ use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type};
 use crate::symbol::{Symbol, SymbolAndQualifiers};
 use crate::types::generics::TypeMapping;
-use crate::types::ClassLiteral;
-use crate::Db;
+use crate::types::{ClassLiteral, TypeVarInstance};
+use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
@@ -131,6 +131,14 @@ impl<'db> NominalInstanceType<'db> {
         Self {
             class: self.class.apply_type_mapping(db, type_mapping),
         }
+    }
+
+    pub(super) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        self.class.find_legacy_typevars(db, typevars);
     }
 }
 
@@ -270,7 +278,7 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    pub(super) fn apply_specialization<'a>(
+    pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: TypeMapping<'a, 'db>,
@@ -282,6 +290,21 @@ impl<'db> ProtocolInstanceType<'db> {
             Protocol::Synthesized(synthesized) => Self(Protocol::Synthesized(
                 synthesized.apply_type_mapping(db, type_mapping),
             )),
+        }
+    }
+
+    pub(super) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        match self.0 {
+            Protocol::FromClass(class) => {
+                class.find_legacy_typevars(db, typevars);
+            }
+            Protocol::Synthesized(synthesized) => {
+                synthesized.find_legacy_typevars(db, typevars);
+            }
         }
     }
 }
@@ -310,9 +333,10 @@ impl<'db> Protocol<'db> {
 }
 
 mod synthesized_protocol {
-    use crate::db::Db;
     use crate::types::generics::TypeMapping;
     use crate::types::protocol_class::ProtocolInterface;
+    use crate::types::TypeVarInstance;
+    use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
     ///
@@ -337,6 +361,14 @@ mod synthesized_protocol {
             type_mapping: TypeMapping<'a, 'db>,
         ) -> Self {
             Self(self.0.specialized_and_normalized(db, type_mapping))
+        }
+
+        pub(super) fn find_legacy_typevars(
+            self,
+            db: &'db dyn Db,
+            typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        ) {
+            self.0.find_legacy_typevars(db, typevars);
         }
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {
