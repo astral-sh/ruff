@@ -2107,9 +2107,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
     ) {
         if let Some(annotation) = parameter.annotation() {
-            let _annotated_ty = self.file_expression_type(annotation);
-            // TODO `tuple[annotated_type, ...]`
-            let ty = KnownClass::Tuple.to_instance(self.db());
+            let ty = if annotation.is_starred_expr() {
+                todo_type!("PEP 646")
+            } else {
+                let annotated_type = self.file_expression_type(annotation);
+                KnownClass::Tuple.to_specialized_instance(self.db(), [annotated_type])
+            };
+
             self.add_declaration_with_binding(
                 parameter.into(),
                 definition,
@@ -2119,8 +2123,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.add_binding(
                 parameter.into(),
                 definition,
-                // TODO `tuple[Unknown, ...]`
-                KnownClass::Tuple.to_instance(self.db()),
+                KnownClass::Tuple.to_specialized_instance(self.db(), [Type::unknown()]),
             );
         }
     }
@@ -2473,16 +2476,32 @@ impl<'db> TypeInferenceBuilder<'db> {
         except_handler_definition: &ExceptHandlerDefinitionKind,
         definition: Definition<'db>,
     ) {
+        fn extract_tuple_specialization<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+            let class = ty.into_nominal_instance()?.class();
+            if !class.is_known(db, KnownClass::Tuple) {
+                return None;
+            }
+            let ClassType::Generic(class) = class else {
+                return None;
+            };
+            let specialization = class.specialization(db).types(db)[0];
+            let specialization_instance = specialization.to_instance(db)?;
+
+            specialization_instance
+                .is_assignable_to(db, KnownClass::BaseException.to_instance(db))
+                .then_some(specialization_instance)
+        }
+
         let node = except_handler_definition.handled_exceptions();
 
         // If there is no handled exception, it's invalid syntax;
         // a diagnostic will have already been emitted
         let node_ty = node.map_or(Type::unknown(), |ty| self.infer_expression(ty));
+        let type_base_exception = KnownClass::BaseException.to_subclass_of(self.db());
 
         // If it's an `except*` handler, this won't actually be the type of the bound symbol;
         // it will actually be the type of the generic parameters to `BaseExceptionGroup` or `ExceptionGroup`.
         let symbol_ty = if let Type::Tuple(tuple) = node_ty {
-            let type_base_exception = KnownClass::BaseException.to_subclass_of(self.db());
             let mut builder = UnionBuilder::new(self.db());
             for element in tuple.elements(self.db()).iter().copied() {
                 builder = builder.add(
@@ -2500,27 +2519,37 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
             }
             builder.build()
-        } else if node_ty.is_subtype_of(self.db(), KnownClass::Tuple.to_instance(self.db())) {
-            todo_type!("Homogeneous tuple in exception handler")
+        } else if node_ty.is_assignable_to(self.db(), type_base_exception) {
+            node_ty.to_instance(self.db()).expect(
+                "`Type::to_instance()` should always return `Some()` \
+                    if called on a type assignable to `type[BaseException]`",
+            )
+        } else if node_ty.is_assignable_to(
+            self.db(),
+            KnownClass::Tuple.to_specialized_instance(self.db(), [type_base_exception]),
+        ) {
+            extract_tuple_specialization(self.db(), node_ty)
+                .unwrap_or_else(|| KnownClass::BaseException.to_instance(self.db()))
+        } else if node_ty.is_assignable_to(
+            self.db(),
+            UnionType::from_elements(
+                self.db(),
+                [
+                    type_base_exception,
+                    KnownClass::Tuple.to_specialized_instance(self.db(), [type_base_exception]),
+                ],
+            ),
+        ) {
+            KnownClass::BaseException.to_instance(self.db())
         } else {
-            let type_base_exception = KnownClass::BaseException.to_subclass_of(self.db());
-            if node_ty.is_assignable_to(self.db(), type_base_exception) {
-                node_ty.to_instance(self.db()).expect(
-                    "`Type::to_instance()` should always return `Some()` \
-                        if called on a type assignable to `type[BaseException]`",
-                )
-            } else {
-                if let Some(node) = node {
-                    report_invalid_exception_caught(&self.context, node, node_ty);
-                }
-                Type::unknown()
+            if let Some(node) = node {
+                report_invalid_exception_caught(&self.context, node, node_ty);
             }
+            Type::unknown()
         };
 
         let symbol_ty = if except_handler_definition.is_star() {
             // TODO: we should infer `ExceptionGroup` if `node_ty` is a subtype of `tuple[type[Exception], ...]`
-            // (needs support for homogeneous tuples).
-            //
             // TODO: should be generic with `symbol_ty` as the generic parameter
             KnownClass::BaseExceptionGroup.to_instance(self.db())
         } else {
@@ -7961,7 +7990,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             match element {
-                ast::Expr::EllipsisLiteral(_) | ast::Expr::Starred(_) => true,
+                ast::Expr::Starred(_) => true,
                 ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => {
                     let value_ty = if builder.deferred_state.in_string_annotation() {
                         // Using `.expression_type` does not work in string annotations, because
@@ -7971,17 +8000,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                         builder.expression_type(value)
                     };
 
-                    matches!(value_ty, Type::KnownInstance(KnownInstanceType::Unpack))
+                    value_ty == Type::KnownInstance(KnownInstanceType::Unpack)
                 }
                 _ => false,
             }
         }
 
-        // TODO:
-        // - homogeneous tuples
-        // - PEP 646
+        // TODO: PEP 646
         match tuple_slice {
             ast::Expr::Tuple(elements) => {
+                if let [element, ellipsis @ ast::Expr::EllipsisLiteral(_)] = &*elements.elts {
+                    self.infer_expression(ellipsis);
+                    let result = KnownClass::Tuple
+                        .to_specialized_instance(self.db(), [self.infer_type_expression(element)]);
+                    self.store_expression_type(tuple_slice, result);
+                    return result;
+                }
+
                 let mut element_types = Vec::with_capacity(elements.len());
 
                 // Whether to infer `Todo` for the whole tuple
@@ -7996,7 +8031,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let ty = if return_todo {
-                    todo_type!("full tuple[...] support")
+                    todo_type!("PEP 646")
                 } else {
                     TupleType::from_elements(self.db(), element_types)
                 };
@@ -8012,7 +8047,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let single_element_ty = self.infer_type_expression(single_element);
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
                 {
-                    todo_type!("full tuple[...] support")
+                    todo_type!("PEP 646")
                 } else {
                     TupleType::from_elements(self.db(), std::iter::once(single_element_ty))
                 }
