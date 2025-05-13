@@ -66,6 +66,8 @@ pub struct NominalInstanceType<'db> {
 }
 
 impl<'db> NominalInstanceType<'db> {
+    // Keep this field private, so that the only way of constructing `NominalInstanceType` instances
+    // is through the `Type::instance` constructor function.
     fn from_class(class: ClassType<'db>) -> Self {
         Self {
             class,
@@ -166,6 +168,8 @@ pub struct ProtocolInstanceType<'db> {
 }
 
 impl<'db> ProtocolInstanceType<'db> {
+    // Keep this field private, so that the only way of constructing `ProtocolInstanceType` instances
+    // is through the `Type::instance` constructor function.
     fn from_class(class: ClassType<'db>) -> Self {
         Self {
             inner: Protocol::FromClass(class),
@@ -173,6 +177,8 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    // Keep this field private, so that the only way of constructing `ProtocolInstanceType` instances
+    // is through the `Type::instance` constructor function.
     fn synthesized(synthesized: SynthesizedProtocolType<'db>) -> Self {
         Self {
             inner: Protocol::Synthesized(synthesized),
