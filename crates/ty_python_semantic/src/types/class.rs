@@ -164,10 +164,12 @@ pub struct GenericAlias<'db> {
 
 impl<'db> GenericAlias<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        eprintln!("HERES {}", std::backtrace::Backtrace::capture());
         self.origin(db).definition(db)
     }
 
     fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+        eprintln!("HERES {}", std::backtrace::Backtrace::capture());
         Self::new(
             db,
             self.origin(db),
@@ -652,15 +654,18 @@ impl<'db> ClassLiteral<'db> {
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::explicit_bases_query: {}", self.name(db));
 
+        tracing::warn!("HERE");
         let class_stmt = self.node(db);
         let class_definition =
             semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
 
-        class_stmt
+        let x = class_stmt
             .bases()
             .iter()
             .map(|base_node| definition_expression_type(db, class_definition, base_node))
-            .collect()
+            .collect();
+        tracing::warn!("HERE2");
+        x
     }
 
     /// Iterate over this class's explicit bases, filtering out any bases that are not class
@@ -761,6 +766,11 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Result<Mro<'db>, MroError<'db>> {
         tracing::trace!("ClassLiteral::try_mro: {}", self.name(db));
+        eprintln!(
+            "__try_mro__ class: {:?}, specialization: {:?}",
+            salsa::plumbing::AsId::as_id(&self),
+            specialization.map(|s| salsa::plumbing::AsId::as_id(&s))
+        );
         Mro::of_class(db, self, specialization)
     }
 
