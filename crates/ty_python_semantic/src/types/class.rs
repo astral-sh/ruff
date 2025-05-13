@@ -1958,6 +1958,8 @@ pub enum KnownClass {
     // backported as `builtins.ellipsis` by typeshed on Python <=3.9
     EllipsisType,
     NotImplementedType,
+    // dataclasses
+    Field,
 }
 
 impl<'db> KnownClass {
@@ -2037,7 +2039,8 @@ impl<'db> KnownClass {
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
             | Self::NotImplementedType
-            | Self::Classmethod => Truthiness::Ambiguous,
+            | Self::Classmethod
+            | Self::Field => Truthiness::Ambiguous,
         }
     }
 
@@ -2108,7 +2111,8 @@ impl<'db> KnownClass {
             | Self::VersionInfo
             | Self::EllipsisType
             | Self::NotImplementedType
-            | Self::UnionType => false,
+            | Self::UnionType
+            | Self::Field => false,
         }
     }
 
@@ -2181,6 +2185,7 @@ impl<'db> KnownClass {
                 }
             }
             Self::NotImplementedType => "_NotImplementedType",
+            Self::Field => "Field",
         }
     }
 
@@ -2405,6 +2410,7 @@ impl<'db> KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
+            Self::Field => KnownModule::Dataclasses,
         }
     }
 
@@ -2464,7 +2470,8 @@ impl<'db> KnownClass {
             | Self::ABCMeta
             | Self::Super
             | Self::NamedTuple
-            | Self::NewType => false,
+            | Self::NewType
+            | Self::Field => false,
         }
     }
 
@@ -2526,7 +2533,8 @@ impl<'db> KnownClass {
             | Self::Super
             | Self::UnionType
             | Self::NamedTuple
-            | Self::NewType => false,
+            | Self::NewType
+            | Self::Field => false,
         }
     }
 
@@ -2596,6 +2604,7 @@ impl<'db> KnownClass {
                 Self::EllipsisType
             }
             "_NotImplementedType" => Self::NotImplementedType,
+            "Field" => Self::Field,
             _ => return None,
         };
 
@@ -2647,7 +2656,8 @@ impl<'db> KnownClass {
             | Self::UnionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
-            | Self::WrapperDescriptorType => module == self.canonical_module(db),
+            | Self::WrapperDescriptorType
+            | Self::Field => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeVar

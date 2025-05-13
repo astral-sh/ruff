@@ -2,7 +2,6 @@ use super::context::InferContext;
 use super::mro::DuplicateBaseError;
 use super::{ClassLiteral, KnownClass};
 use crate::db::Db;
-use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
 use crate::types::string_annotation::{
@@ -11,8 +10,10 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{protocol_class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
+use crate::{declare_lint, Program};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
@@ -1543,7 +1544,7 @@ pub(super) fn report_invalid_return_type(
         return;
     };
 
-    let return_type_span = Span::from(context.file()).with_range(return_type_range.range());
+    let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     diag.set_primary_message(format_args!(
@@ -1650,7 +1651,24 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
     };
 
     let ast::ExprName { id, .. } = expr_name_node;
-    builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
+    let mut diagnostic = builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
+    if let Some(version_added_to_builtins) = version_builtin_was_added(id) {
+        diagnostic.info(format_args!(
+            "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
+        ));
+
+        // TODO: can we tell the user *why* we're inferring this target version?
+        // CLI flag? pyproject.toml? Python environment?
+        diagnostic.info(format_args!(
+            "The inferred target version of your project is Python {}",
+            Program::get(context.db()).python_version(context.db())
+        ));
+
+        diagnostic.info(
+            "If using a pyproject.toml file, \
+            consider adjusting the `project.requires-python` or `tool.ty.environment.python-version` field"
+        );
+    }
 }
 
 pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
@@ -1849,16 +1867,13 @@ pub(crate) fn report_duplicate_bases(
         ),
     );
     sub_diagnostic.annotate(
-        Annotation::secondary(
-            Span::from(context.file()).with_range(bases_list[*first_index].range()),
-        )
-        .message(format_args!(
+        Annotation::secondary(context.span(&bases_list[*first_index])).message(format_args!(
             "Class `{duplicate_name}` first included in bases list here"
         )),
     );
     for index in later_indices {
         sub_diagnostic.annotate(
-            Annotation::primary(Span::from(context.file()).with_range(bases_list[*index].range()))
+            Annotation::primary(context.span(&bases_list[*index]))
                 .message(format_args!("Class `{duplicate_name}` later repeated here")),
         );
     }

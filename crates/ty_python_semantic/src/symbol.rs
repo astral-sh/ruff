@@ -982,12 +982,18 @@ mod implicit_globals {
         db: &'db dyn Db,
         name: &str,
     ) -> SymbolAndQualifiers<'db> {
+        // We special-case `__file__` here because we know that for an internal implicit global
+        // lookup in a Python module, it is always a string, even though typeshed says `str |
+        // None`.
+        if name == "__file__" {
+            Symbol::bound(KnownClass::Str.to_instance(db)).into()
+        }
         // In general we wouldn't check to see whether a symbol exists on a class before doing the
         // `.member()` call on the instance type -- we'd just do the `.member`() call on the instance
         // type, since it has the same end result. The reason to only call `.member()` on `ModuleType`
         // when absolutely necessary is that this function is used in a very hot path (name resolution
         // in `infer.rs`). We use less idiomatic (and much more verbose) code here as a micro-optimisation.
-        if module_type_symbols(db)
+        else if module_type_symbols(db)
             .iter()
             .any(|module_type_member| &**module_type_member == name)
         {

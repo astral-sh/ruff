@@ -3946,26 +3946,34 @@ impl<'db> TypeInferenceBuilder<'db> {
             &alias.name.id
         };
 
+        // Avoid looking up attributes on a module if a module imports from itself
+        // (e.g. `from parent import submodule` inside the `parent` module).
+        let import_is_self_referential = module_ty
+            .into_module_literal()
+            .is_some_and(|module| self.file() == module.module(self.db()).file());
+
         // First try loading the requested attribute from the module.
-        if let Symbol::Type(ty, boundness) = module_ty.member(self.db(), name).symbol {
-            if &alias.name != "*" && boundness == Boundness::PossiblyUnbound {
-                // TODO: Consider loading _both_ the attribute and any submodule and unioning them
-                // together if the attribute exists but is possibly-unbound.
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&POSSIBLY_UNBOUND_IMPORT, AnyNodeRef::Alias(alias))
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Member `{name}` of module `{module_name}` is possibly unbound",
-                    ));
+        if !import_is_self_referential {
+            if let Symbol::Type(ty, boundness) = module_ty.member(self.db(), name).symbol {
+                if &alias.name != "*" && boundness == Boundness::PossiblyUnbound {
+                    // TODO: Consider loading _both_ the attribute and any submodule and unioning them
+                    // together if the attribute exists but is possibly-unbound.
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&POSSIBLY_UNBOUND_IMPORT, AnyNodeRef::Alias(alias))
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Member `{name}` of module `{module_name}` is possibly unbound",
+                        ));
+                    }
                 }
+                self.add_declaration_with_binding(
+                    alias.into(),
+                    definition,
+                    &DeclaredAndInferredType::AreTheSame(ty),
+                );
+                return;
             }
-            self.add_declaration_with_binding(
-                alias.into(),
-                definition,
-                &DeclaredAndInferredType::AreTheSame(ty),
-            );
-            return;
         }
 
         // If the module doesn't bind the symbol, check if it's a submodule.  This won't get
@@ -4834,12 +4842,27 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                     &TYPE_ASSERTION_FAILURE,
                                                     call_expression,
                                                 ) {
-                                                    builder.into_diagnostic(format_args!(
-                                                        "Actual type `{}` is not the same \
-                                                         as asserted type `{}`",
-                                                        actual_ty.display(self.db()),
-                                                        asserted_ty.display(self.db()),
-                                                    ));
+                                                    let mut diagnostic =
+                                                        builder.into_diagnostic(format_args!(
+                                                            "Argument does not have asserted type `{}`",
+                                                            asserted_ty.display(self.db()),
+                                                        ));
+                                                    diagnostic.annotate(
+                                                        Annotation::secondary(self.context.span(
+                                                            &call_expression.arguments.args[0],
+                                                        ))
+                                                        .message(format_args!(
+                                                            "Inferred type of argument is `{}`",
+                                                            actual_ty.display(self.db()),
+                                                        )),
+                                                    );
+                                                    diagnostic.info(
+                                                        format_args!(
+                                                            "`{asserted_type}` and `{inferred_type}` are not equivalent types",
+                                                            asserted_type = asserted_ty.display(self.db()),
+                                                            inferred_type = actual_ty.display(self.db()),
+                                                        )
+                                                    );
                                                 }
                                             }
                                         }
@@ -4851,10 +4874,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                     &TYPE_ASSERTION_FAILURE,
                                                     call_expression,
                                                 ) {
-                                                    builder.into_diagnostic(format_args!(
-                                                        "Expected type `Never`, got `{}` instead",
-                                                        actual_ty.display(self.db()),
-                                                    ));
+                                                    let mut diagnostic = builder.into_diagnostic(
+                                                        "Argument does not have asserted type `Never`",
+                                                    );
+                                                    diagnostic.annotate(
+                                                        Annotation::secondary(self.context.span(
+                                                            &call_expression.arguments.args[0],
+                                                        ))
+                                                        .message(format_args!(
+                                                            "Inferred type of argument is `{}`",
+                                                            actual_ty.display(self.db())
+                                                        )),
+                                                    );
+                                                    diagnostic.info(
+                                                        format_args!(
+                                                            "`Never` and `{inferred_type}` are not equivalent types",
+                                                            inferred_type = actual_ty.display(self.db()),
+                                                        )
+                                                    );
                                                 }
                                             }
                                         }

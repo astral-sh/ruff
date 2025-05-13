@@ -616,6 +616,25 @@ reveal_type(C.__init__)  # revealed: (field: str | int = int) -> None
 
 To do
 
+## `dataclass.fields`
+
+Dataclasses have `__dataclass_fields__` in them, which makes them a subtype of the
+`DataclassInstance` protocol.
+
+Here, we verify that dataclasses can be passed to `dataclasses.fields` without any errors, and that
+the return type of `dataclasses.fields` is correct.
+
+```py
+from dataclasses import dataclass, fields
+
+@dataclass
+class Foo:
+    x: int
+
+reveal_type(Foo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+reveal_type(fields(Foo))  # revealed: tuple[Field[Any], ...]
+```
+
 ## Other special cases
 
 ### `dataclasses.dataclass`
