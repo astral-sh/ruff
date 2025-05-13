@@ -66,6 +66,10 @@ impl<'db> NominalInstanceType<'db> {
         self.class
     }
 
+    pub(super) fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        self.class.is_fully_static(db)
+    }
+
     pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
         // N.B. The subclass relation is fully static
         self.class.is_subclass_of(db, other.class)

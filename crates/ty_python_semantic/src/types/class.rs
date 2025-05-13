@@ -167,6 +167,10 @@ impl<'db> GenericAlias<'db> {
         self.origin(db).definition(db)
     }
 
+    pub(crate) fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        self.origin(db).is_fully_static(db) && self.specialization(db).is_fully_static(db)
+    }
+
     fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
         Self::new(
             db,
@@ -244,6 +248,13 @@ impl<'db> ClassType<'db> {
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
+    }
+
+    pub(crate) fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::NonGeneric(class_literal) => class_literal.is_fully_static(db),
+            Self::Generic(alias) => alias.is_fully_static(db),
+        }
     }
 
     /// Return `true` if this class represents the builtin class `object`
@@ -504,6 +515,14 @@ impl<'db> ClassLiteral<'db> {
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
+    }
+
+    #[expect(clippy::unused_self)]
+    pub(crate) fn is_fully_static(self, _db: &'db dyn Db) -> bool {
+        // TODO: Ideally, we would iterate over the MRO of the class, check if all
+        // bases are fully static, and only return `true` if that is the case. But there may be
+        // cycle issues trying to infer base classes this eagerly.
+        true
     }
 
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {

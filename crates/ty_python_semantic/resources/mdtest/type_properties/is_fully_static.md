@@ -130,3 +130,13 @@ static_assert(is_fully_static(TypeOf[static]))
 static_assert(not is_fully_static(CallableTypeOf[gradual]))
 static_assert(is_fully_static(CallableTypeOf[static]))
 ```
+
+## Generics
+
+```py
+from typing import Any
+from ty_extensions import static_assert, is_fully_static
+
+static_assert(is_fully_static(list[int]))
+static_assert(not is_fully_static(list[Any]))
+```
