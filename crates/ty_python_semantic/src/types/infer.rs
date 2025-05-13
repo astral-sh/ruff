@@ -45,7 +45,7 @@ use salsa;
 use salsa::plumbing::AsId;
 
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
-use crate::module_resolver::{file_to_module, resolve_module};
+use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
@@ -3948,8 +3948,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // Avoid looking up attributes on a module if a module imports from itself
         // (e.g. `from parent import submodule` inside the `parent` module).
-        let import_is_self_referential =
-            file_to_module(self.db(), self.file()).is_some_and(|m| m.name() == &module_name);
+        let import_is_self_referential = module_ty
+            .into_module_literal()
+            .is_some_and(|module| self.file() == module.module(self.db()).file());
 
         // First try loading the requested attribute from the module.
         if !import_is_self_referential {
