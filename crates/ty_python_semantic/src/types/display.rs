@@ -76,7 +76,7 @@ impl Display for DisplayRepresentation<'_> {
                     (ClassType::Generic(alias), _) => alias.display(self.db).fmt(f),
                 }
             }
-            Type::ProtocolInstance(protocol) => match protocol.inner() {
+            Type::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(ClassType::NonGeneric(class)) => {
                     f.write_str(class.name(self.db))
                 }
