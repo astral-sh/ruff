@@ -234,9 +234,6 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
             visitor.visit_expr(test);
             visitor.visit_body(body);
             for clause in elif_else_clauses {
-                if let Some(test) = &mut clause.test {
-                    visitor.visit_expr(test);
-                }
                 walk_elif_else_clause(visitor, clause);
             }
         }
