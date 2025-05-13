@@ -56,7 +56,10 @@ pub fn run(
     let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
     for test in suite.tests() {
-        if filter.as_ref().is_some_and(|f| !test.name().contains(f)) {
+        if filter
+            .as_ref()
+            .is_some_and(|f| !test.uncontracted_name().contains(f))
+        {
             continue;
         }
 
@@ -420,7 +423,7 @@ fn create_diagnostic_snapshot(
     let mut snapshot = String::new();
     writeln!(snapshot).unwrap();
     writeln!(snapshot, "---").unwrap();
-    writeln!(snapshot, "mdtest name: {}", test.name()).unwrap();
+    writeln!(snapshot, "mdtest name: {}", test.uncontracted_name()).unwrap();
     writeln!(snapshot, "mdtest path: {relative_fixture_path}").unwrap();
     writeln!(snapshot, "---").unwrap();
     writeln!(snapshot).unwrap();

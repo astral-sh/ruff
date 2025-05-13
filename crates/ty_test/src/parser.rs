@@ -1,4 +1,9 @@
-use std::{borrow::Cow, collections::hash_map::Entry};
+use std::{
+    borrow::Cow,
+    collections::hash_map::Entry,
+    fmt::{Formatter, LowerHex, Write},
+    hash::Hash,
+};
 
 use anyhow::bail;
 use ruff_db::system::{SystemPath, SystemPathBuf};
@@ -9,6 +14,7 @@ use ruff_python_ast::PySourceType;
 use ruff_python_trivia::Cursor;
 use ruff_source_file::{LineIndex, LineRanges, OneIndexed};
 use ruff_text_size::{TextLen, TextRange, TextSize};
+use rustc_stable_hash::{FromStableHash, SipHasher128Hash, StableSipHasher128};
 
 use crate::config::MarkdownTestConfig;
 
@@ -39,6 +45,25 @@ impl<'s> MarkdownTestSuite<'s> {
     }
 }
 
+struct Hash128([u64; 2]);
+
+impl FromStableHash for Hash128 {
+    type Hash = SipHasher128Hash;
+
+    fn from(SipHasher128Hash(hash): SipHasher128Hash) -> Hash128 {
+        Hash128(hash)
+    }
+}
+
+impl LowerHex for Hash128 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let Self(hash) = self;
+
+        // Only write the first half for concision
+        write!(f, "{:x}", hash[0])
+    }
+}
+
 /// A single test inside a [`MarkdownTestSuite`].
 ///
 /// A test is a single header section (or the implicit root section, if there are no Markdown
@@ -52,22 +77,61 @@ pub(crate) struct MarkdownTest<'m, 's> {
 }
 
 impl<'m, 's> MarkdownTest<'m, 's> {
-    pub(crate) fn name(&self) -> String {
-        let mut name = String::new();
+    const MAX_TITLE_LENGTH: usize = 20;
+    const ELLIPSIS: char = '\u{2026}';
+
+    fn contracted_title(title: &str) -> String {
+        if title.len() <= Self::MAX_TITLE_LENGTH {
+            return (*title).to_string();
+        }
+
+        format!(
+            "{}{}",
+            title
+                .chars()
+                .take(Self::MAX_TITLE_LENGTH)
+                .collect::<String>(),
+            Self::ELLIPSIS
+        )
+    }
+
+    fn joined_name(&self, contracted: bool) -> String {
+        let mut name_fragments = vec![];
         let mut parent_id = self.section.parent_id;
+
         while let Some(next_id) = parent_id {
             let parent = &self.suite.sections[next_id];
+            name_fragments.insert(0, parent.title);
             parent_id = parent.parent_id;
-            if !name.is_empty() {
-                name.insert_str(0, " - ");
-            }
-            name.insert_str(0, parent.title);
         }
-        if !name.is_empty() {
-            name.push_str(" - ");
+
+        name_fragments.push(self.section.title);
+
+        let full_name = name_fragments.join(" - ");
+
+        if !contracted {
+            return full_name;
         }
-        name.push_str(self.section.title);
-        name
+
+        let mut contracted_name = name_fragments
+            .iter()
+            .map(|fragment| Self::contracted_title(fragment))
+            .collect::<Vec<_>>()
+            .join(" - ");
+
+        let mut hasher = StableSipHasher128::new();
+        full_name.hash(&mut hasher);
+        let _ = write!(contracted_name, " ({:x})", hasher.finish::<Hash128>());
+
+        contracted_name
+    }
+
+    pub(crate) fn uncontracted_name(&self) -> String {
+        self.joined_name(false)
+    }
+
+    pub(crate) fn name(&self) -> String {
+        self.joined_name(true)
     }
 
     pub(crate) fn files(&self) -> impl Iterator<Item = &'m EmbeddedFile<'s>> {
@@ -762,6 +826,8 @@ mod tests {
     use ruff_python_ast::PySourceType;
     use ruff_python_trivia::textwrap::dedent;
 
+    use insta::assert_snapshot;
+
     use crate::parser::EmbeddedFilePath;
 
     #[test]
@@ -786,7 +852,7 @@ mod tests {
             panic!("expected one test");
         };
 
-        assert_eq!(test.name(), "file.md");
+        assert_snapshot!(test.name(), @"file.md (a8decfe8bd23e259)");
 
         let [file] = test.files().collect::<Vec<_>>()[..] else {
             panic!("expected one file");
@@ -814,7 +880,7 @@ mod tests {
             panic!("expected one test");
         };
 
-        assert_eq!(test.name(), "file.md");
+        assert_snapshot!(test.name(), @"file.md (a8decfe8bd23e259)");
 
         let [file] = test.files().collect::<Vec<_>>()[..] else {
             panic!("expected one file");
@@ -865,9 +931,9 @@ mod tests {
             panic!("expected three tests");
         };
 
-        assert_eq!(test1.name(), "file.md - One");
-        assert_eq!(test2.name(), "file.md - Two");
-        assert_eq!(test3.name(), "file.md - Three");
+        assert_snapshot!(test1.name(), @"file.md - One (9f620a533a21278)");
+        assert_snapshot!(test2.name(), @"file.md - Two (1b4d4ef5a2cebbdc)");
+        assert_snapshot!(test3.name(), @"file.md - Three (26479e23633dda57)");
 
         let [file] = test1.files().collect::<Vec<_>>()[..] else {
             panic!("expected one file");
@@ -935,8 +1001,8 @@ mod tests {
             panic!("expected two tests");
         };
 
-        assert_eq!(test1.name(), "file.md - One");
-        assert_eq!(test2.name(), "file.md - Two");
+        assert_snapshot!(test1.name(), @"file.md - One (9f620a533a21278)");
+        assert_snapshot!(test2.name(), @"file.md - Two (1b4d4ef5a2cebbdc)");
 
         let [main, foo] = test1.files().collect::<Vec<_>>()[..] else {
             panic!("expected two files");
@@ -1331,7 +1397,7 @@ mod tests {
             panic!("expected one test");
         };
 
-        assert_eq!(test.name(), "file.md - A test");
+        assert_snapshot!(test.name(), @"file.md - A test (1b4e27e6123dc8e7)");
     }
 
     #[test]
