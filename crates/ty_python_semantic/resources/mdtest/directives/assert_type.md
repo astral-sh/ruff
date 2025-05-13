@@ -2,6 +2,8 @@
 
 ## Basic
 
+<!-- snapshot-diagnostics -->
+
 ```py
 from typing_extensions import assert_type
 

@@ -4834,12 +4834,27 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                     &TYPE_ASSERTION_FAILURE,
                                                     call_expression,
                                                 ) {
-                                                    builder.into_diagnostic(format_args!(
-                                                        "Actual type `{}` is not the same \
-                                                         as asserted type `{}`",
-                                                        actual_ty.display(self.db()),
-                                                        asserted_ty.display(self.db()),
-                                                    ));
+                                                    let mut diagnostic =
+                                                        builder.into_diagnostic(format_args!(
+                                                            "Argument does not have asserted type `{}`",
+                                                            asserted_ty.display(self.db()),
+                                                        ));
+                                                    diagnostic.annotate(
+                                                        Annotation::secondary(self.context.span(
+                                                            &call_expression.arguments.args[0],
+                                                        ))
+                                                        .message(format_args!(
+                                                            "Inferred type of argument is `{}`",
+                                                            actual_ty.display(self.db()),
+                                                        )),
+                                                    );
+                                                    diagnostic.info(
+                                                        format_args!(
+                                                            "`{asserted_type}` and `{inferred_type}` are not equivalent types",
+                                                            asserted_type = asserted_ty.display(self.db()),
+                                                            inferred_type = actual_ty.display(self.db()),
+                                                        )
+                                                    );
                                                 }
                                             }
                                         }
@@ -4851,10 +4866,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                     &TYPE_ASSERTION_FAILURE,
                                                     call_expression,
                                                 ) {
-                                                    builder.into_diagnostic(format_args!(
-                                                        "Expected type `Never`, got `{}` instead",
-                                                        actual_ty.display(self.db()),
-                                                    ));
+                                                    let mut diagnostic = builder.into_diagnostic(
+                                                        "Argument does not have asserted type `Never`",
+                                                    );
+                                                    diagnostic.annotate(
+                                                        Annotation::secondary(self.context.span(
+                                                            &call_expression.arguments.args[0],
+                                                        ))
+                                                        .message(format_args!(
+                                                            "Inferred type of argument is `{}`",
+                                                            actual_ty.display(self.db())
+                                                        )),
+                                                    );
+                                                    diagnostic.info(
+                                                        format_args!(
+                                                            "`Never` and `{inferred_type}` are not equivalent types",
+                                                            inferred_type = actual_ty.display(self.db()),
+                                                        )
+                                                    );
                                                 }
                                             }
                                         }
