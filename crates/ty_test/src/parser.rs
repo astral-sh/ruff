@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     collections::hash_map::Entry,
-    fmt::{Display, Formatter, LowerHex, Write},
+    fmt::{Formatter, LowerHex, Write},
     hash::Hash,
 };
 
