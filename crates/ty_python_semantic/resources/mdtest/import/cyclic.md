@@ -37,6 +37,7 @@ See: <https://github.com/astral-sh/ty/issues/113>
 ```py
 from pkg.sub import A
 
+# TODO: This should be `<class 'A'>`
 reveal_type(A)  # revealed: Never
 ```
 
@@ -77,4 +78,31 @@ reveal_type(x)  # revealed: Unknown
 ```py
 # error: [unresolved-import]
 from module import x
+```
+
+### Normal self-referential import
+
+Some modules like `sys` in typeshed import themselves. Here, we make sure that this does not lead to
+cycles or unresolved imports.
+
+`module/__init__.py`:
+
+```py
+import module  # self-referential import
+
+from module.sub import x
+```
+
+`module/sub.py`:
+
+```py
+x: int = 1
+```
+
+`main.py`:
+
+```py
+from module import x
+
+reveal_type(x)  # revealed: int
 ```
