@@ -12,7 +12,8 @@ use crate::rules::{
     flake8_builtins, flake8_debugger, flake8_django, flake8_errmsg, flake8_import_conventions,
     flake8_pie, flake8_pyi, flake8_pytest_style, flake8_raise, flake8_return, flake8_simplify,
     flake8_slots, flake8_tidy_imports, flake8_type_checking, mccabe, pandas_vet, pep8_naming,
-    perflint, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops,
+    perflint, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops, 
+    ptqacore,
 };
 use ruff_python_ast::PythonVersion;
 
@@ -130,6 +131,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }
+            }
+            if checker.enabled(Rule::MissingAllureId){
+                ptqacore::rules::missing_allure_id(checker, function_def);
             }
             if checker.source_type.is_stub() {
                 if checker.enabled(Rule::PassStatementStubBody) {
@@ -552,6 +556,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ImplicitClassVarInDataclass) {
                 ruff::rules::implicit_class_var_in_dataclass(checker, class_def);
+            }
+            if checker.enabled(Rule::MissingTeamMarker) {
+                ptqacore::rules::team_marker_exists(checker, class_def);
             }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {

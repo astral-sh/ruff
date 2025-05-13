@@ -1,0 +1,40 @@
+---
+source: crates/ruff_linter/src/rules/ptqacore/mod.rs
+---
+PTQA002.py:5:1: PTQA002 Test class is missing a `@pytest.mark.team_*` decorator
+  |
+3 |   # Examples for rule PTQA002: test classes (name starts with "Test") must have a decorator @pytest.mark.team_<word>
+4 |
+5 | / class TestNoDecorator:                # PTQA002
+6 | |     def test_something(self):
+7 | |         assert True
+  | |___________________^ PTQA002
+8 |
+9 |   @pytest.mark.team_alpha                # OK
+  |
+
+PTQA002.py:24:1: PTQA002 Test class is missing a `@pytest.mark.team_*` decorator
+   |
+22 |           assert True
+23 |
+24 | / @pytest.mark.other_mark                # PTQA002: wrong marker, not team_*
+25 | | class TestWrongMarker:
+26 | |     def test_wrong(self):
+27 | |         assert True
+   | |___________________^ PTQA002
+28 |
+29 |   @pytest.mark.team_delta
+   |
+
+PTQA002.py:44:1: PTQA002 Test class is missing a `@pytest.mark.team_*` decorator
+   |
+42 |           assert True
+43 |
+44 | / @pytest.mark.team_delta.extra            # PTQA002: dot in team name invalid
+45 | | class TestWithDotInTeam:
+46 | |     def test_dot(self):
+47 | |         assert True
+   | |___________________^ PTQA002
+48 |
+49 |   @pytest.mark.team_underscore_allowed    # OK: underscores allowed within team name
+   |

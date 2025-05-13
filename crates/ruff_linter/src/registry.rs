@@ -211,6 +211,9 @@ pub enum Linter {
     /// [tryceratops](https://pypi.org/project/tryceratops/)
     #[prefix = "TRY"]
     Tryceratops,
+    /// [ptqa](https:://127.0.0.1/)
+    #[prefix = "PTQA"]
+    PTQACORE
 }
 
 pub trait RuleNamespace: Sized {

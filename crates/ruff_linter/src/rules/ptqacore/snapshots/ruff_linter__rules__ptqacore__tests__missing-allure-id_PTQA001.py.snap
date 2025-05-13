@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/ptqacore/mod.rs
+---
+PTQA001.py:5:1: PTQA001 Test is missing an `@allure.id(...)` decorator
+  |
+3 |   # Examples for rule PTQA001: test_* functions must have a decorator @allure.id("__ЧИСЛО__")
+4 |
+5 | / def test_no_decorator():  # PTQA001
+6 | |     assert True
+  | |_______________^ PTQA001
+7 |
+8 |   @allure.id("123")          # OK
+  |
+
+PTQA001.py:33:1: PTQA001 Test is missing an `@allure.id(...)` decorator
+   |
+31 |       assert True
+32 |
+33 | / @allure.tag("regression")   # PTQA001: missing @allure.id
+34 | | def test_missing_id_but_has_other_decorator():
+35 | |     assert True
+   | |_______________^ PTQA001
+36 |
+37 |   @allure.id("42")
+   |
+
+PTQA001.py:56:1: PTQA001 Test is missing an `@allure.id(...)` decorator
+   |
+54 |       assert True
+55 |
+56 | / def test_another_missing_one():      # PTQA001
+57 | |     pass
+   | |________^ PTQA001
+   |

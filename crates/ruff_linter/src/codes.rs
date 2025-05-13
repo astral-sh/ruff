@@ -1142,6 +1142,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "014") => (RuleGroup::Preview, rules::flake8_logging::rules::ExcInfoOutsideExceptHandler),
         (Flake8Logging, "015") => (RuleGroup::Stable, rules::flake8_logging::rules::RootLoggerCall),
 
+        (PTQACORE, "001") => (RuleGroup::Stable, rules::ptqacore::rules::MissingAllureId),
+        (PTQACORE, "002") => (RuleGroup::Stable, rules::ptqacore::rules::MissingTeamMarker),
+
         _ => return None,
     })
 }
