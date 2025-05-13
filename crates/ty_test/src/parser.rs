@@ -80,7 +80,6 @@ impl<'m, 's> MarkdownTest<'m, 's> {
     const MAX_TITLE_LENGTH: usize = 20;
     const ELLIPSIS: char = '\u{2026}';
 
-    #[inline]
     fn contracted_title(title: &str) -> String {
         if title.len() <= Self::MAX_TITLE_LENGTH {
             return (*title).to_string();
@@ -96,7 +95,6 @@ impl<'m, 's> MarkdownTest<'m, 's> {
         )
     }
 
-    #[inline]
     fn joined_name(&self, contracted: bool) -> String {
         let mut name_fragments = vec![];
         let mut parent_id = self.section.parent_id;
