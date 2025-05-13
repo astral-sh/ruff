@@ -349,7 +349,7 @@ impl FileCache {
                     .iter()
                     .map(|msg| {
                         Message::Diagnostic(DiagnosticMessage {
-                            name: msg.rule.pascal_name(),
+                            name: msg.rule.into(),
                             body: msg.body.clone(),
                             suggestion: msg.suggestion.clone(),
                             range: msg.range,
