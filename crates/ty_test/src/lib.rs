@@ -420,7 +420,7 @@ fn create_diagnostic_snapshot(
     let mut snapshot = String::new();
     writeln!(snapshot).unwrap();
     writeln!(snapshot, "---").unwrap();
-    writeln!(snapshot, "mdtest name: {}", test.name()).unwrap();
+    writeln!(snapshot, "mdtest name: {}", test.uncontracted_name()).unwrap();
     writeln!(snapshot, "mdtest path: {relative_fixture_path}").unwrap();
     writeln!(snapshot, "---").unwrap();
     writeln!(snapshot).unwrap();

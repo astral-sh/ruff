@@ -59,10 +59,10 @@ impl<'m, 's> MarkdownTest<'m, 's> {
     const MAX_TITLE_LENGTH: usize = 20;
     const ELLIPSIS: char = '\u{2026}';
 
-    fn trimmed_title(section: &Section) -> String {
-        let Section { id, title, .. } = section;
+    fn possibly_contracted_title(section: &Section, contracted: bool) -> String {
+        let Section { title, .. } = section;
 
-        let trimmed = if title.len() < Self::MAX_TITLE_LENGTH {
+        if !contracted || title.len() < Self::MAX_TITLE_LENGTH {
             title.to_string()
         } else {
             format!(
@@ -73,12 +73,10 @@ impl<'m, 's> MarkdownTest<'m, 's> {
                     .collect::<String>(),
                 Self::ELLIPSIS
             )
-        };
-
-        format!("{id}. {trimmed}")
+        }
     }
 
-    pub(crate) fn name(&self) -> String {
+    fn joined_name(&self, contracted: bool) -> String {
         let mut name = String::new();
         let mut parent_id = self.section.parent_id;
         while let Some(next_id) = parent_id {
@@ -87,7 +85,7 @@ impl<'m, 's> MarkdownTest<'m, 's> {
             if !name.is_empty() {
                 name.insert_str(0, " - ");
             }
-            name.insert_str(0, &Self::trimmed_title(parent));
+            name.insert_str(0, &Self::possibly_contracted_title(parent, contracted));
 
             if name.contains("bool_conversion") || name.contains("occur") {
                 dbg!(&name);
@@ -96,8 +94,21 @@ impl<'m, 's> MarkdownTest<'m, 's> {
         if !name.is_empty() {
             name.push_str(" - ");
         }
-        name.push_str(&Self::trimmed_title(self.section));
+        name.push_str(&Self::possibly_contracted_title(self.section, contracted));
+
+        if contracted {
+            name.push_str(&format!(" ({})", self.section.id));
+        }
+
         name
+    }
+
+    pub(crate) fn uncontracted_name(&self) -> String {
+        self.joined_name(false)
+    }
+
+    pub(crate) fn name(&self) -> String {
+        self.joined_name(true)
     }
 
     pub(crate) fn files(&self) -> impl Iterator<Item = &'m EmbeddedFile<'s>> {

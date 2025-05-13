@@ -1,0 +1,54 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: attribute_assignment.md - Attribute assignment - Pure instance attributes
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_assignment.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class C:
+2 |     def __init__(self):
+3 |         self.attr: int = 0
+4 | 
+5 | instance = C()
+6 | instance.attr = 1  # fine
+7 | instance.attr = "wrong"  # error: [invalid-assignment]
+8 | 
+9 | C.attr = 1  # error: [invalid-attribute-access]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to attribute `attr` of type `int`
+ --> src/mdtest_snippet.py:7:1
+  |
+5 | instance = C()
+6 | instance.attr = 1  # fine
+7 | instance.attr = "wrong"  # error: [invalid-assignment]
+  | ^^^^^^^^^^^^^
+8 |
+9 | C.attr = 1  # error: [invalid-attribute-access]
+  |
+info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[invalid-attribute-access]: Cannot assign to instance attribute `attr` from the class object `<class 'C'>`
+ --> src/mdtest_snippet.py:9:1
+  |
+7 | instance.attr = "wrong"  # error: [invalid-assignment]
+8 |
+9 | C.attr = 1  # error: [invalid-attribute-access]
+  | ^^^^^^
+  |
+info: rule `invalid-attribute-access` is enabled by default
+
+```
