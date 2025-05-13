@@ -60,9 +60,10 @@ use crate::semantic_index::symbol::{
 };
 use crate::semantic_index::{semantic_index, EagerSnapshotResult, SemanticIndex};
 use crate::symbol::{
-    builtins_module_scope, builtins_symbol, explicit_global_symbol,
-    module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
-    typing_extensions_symbol, Boundness, LookupError,
+    builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol, symbol,
+    symbol_from_bindings, symbol_from_declarations, typing_extensions_symbol, Boundness,
+    LookupError,
 };
 use crate::types::call::{Argument, Bindings, CallArgumentTypes, CallArguments, CallError};
 use crate::types::class::{MetaclassErrorKind, SliceLiteral};
@@ -1420,8 +1421,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let symbol_id = binding.symbol(self.db());
 
         let global_use_def_map = self.index.use_def_map(FileScopeId::global());
-        let declarations = if self.skip_non_global_scopes(file_scope_id, symbol_id) {
-            let symbol_name = symbol_table.symbol(symbol_id).name();
+        let symbol_name = symbol_table.symbol(symbol_id).name();
+        let skip_non_global_scopes = self.skip_non_global_scopes(file_scope_id, symbol_id);
+        let declarations = if skip_non_global_scopes {
             match self
                 .index
                 .symbol_table(FileScopeId::global())
@@ -1436,6 +1438,20 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         let declared_ty = symbol_from_declarations(self.db(), declarations)
+            .and_then(|symbol| {
+                let symbol = if matches!(symbol.symbol, Symbol::Type(_, Boundness::Bound)) {
+                    symbol
+                } else if skip_non_global_scopes
+                    || self.scope().file_scope_id(self.db()).is_global()
+                {
+                    let module_type_declarations =
+                        module_type_implicit_global_declaration(self.db(), symbol_name)?;
+                    symbol.or_fall_back_to(self.db(), || module_type_declarations)
+                } else {
+                    symbol
+                };
+                Ok(symbol)
+            })
             .map(|SymbolAndQualifiers { symbol, .. }| {
                 symbol.ignore_possibly_unbound().unwrap_or(Type::unknown())
             })
@@ -5386,11 +5402,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .is_some_and(|symbol_id| self.skip_non_global_scopes(file_scope_id, symbol_id));
 
             if skip_non_global_scopes {
-                return symbol(
-                    db,
-                    FileScopeId::global().to_scope_id(db, current_file),
-                    symbol_name,
-                );
+                return global_symbol(self.db(), self.file(), symbol_name);
             }
 
             // If it's a function-like scope and there is one or more binding in this scope (but

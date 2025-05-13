@@ -40,6 +40,37 @@ reveal_type(__dict__)
 reveal_type(__init__)
 ```
 
+## `ModuleType` globals combined with explicit assignments and declarations
+
+A `ModuleType` attribute can be overridden in the global scope with a different type, but it must be
+a type assignable to the declaration on `ModuleType` unless it is accompanied by an explicit
+redeclaration:
+
+`module.py`:
+
+```py
+__file__ = None
+__path__: list[str] = []
+__doc__: int = 42
+__spec__ = 42  # error: [invalid-assignment] "Object of type `Literal[42]` is not assignable to `ModuleSpec | None`"
+```
+
+`main.py`:
+
+```py
+import module
+
+reveal_type(module.__file__)  # revealed: Unknown | None
+reveal_type(module.__path__)  # revealed: list[str]
+reveal_type(module.__doc__)  # revealed: int
+reveal_type(module.__spec__)  # revealed: Unknown | ModuleSpec | None
+
+def nested_scope():
+    global __loader__
+    reveal_type(__loader__)  # revealed: LoaderProtocol | None
+    __loader__ = 56  # error: [invalid-assignment] "Object of type `Literal[56]` is not assignable to `LoaderProtocol | None`"
+```
+
 ## Accessed as attributes
 
 `ModuleType` attributes can also be accessed as attributes on module-literal types. The special
@@ -105,16 +136,16 @@ defined as a global, however, a name lookup should union the `ModuleType` type w
 conditionally defined type:
 
 ```py
-__file__ = 42
+__file__ = "foo"
 
 def returns_bool() -> bool:
     return True
 
 if returns_bool():
-    __name__ = 1
+    __name__ = 1  # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `str`"
 
-reveal_type(__file__)  # revealed: Literal[42]
-reveal_type(__name__)  # revealed: Literal[1] | str
+reveal_type(__file__)  # revealed: Literal["foo"]
+reveal_type(__name__)  # revealed: str
 ```
 
 ## Conditionally global or `ModuleType` attribute, with annotation
