@@ -5353,36 +5353,6 @@ impl<'db> Type<'db> {
     /// Returns a tuple of two spans. The first is
     /// the span for the identifier of the function
     /// definition for `self`. The second is
-    /// the span for the return type in the function
-    /// definition for `self`.
-    ///
-    /// If there are no meaningful spans, then this
-    /// returns `None`. For example, when this type
-    /// isn't callable or if the function has no
-    /// declared return type.
-    ///
-    /// # Performance
-    ///
-    /// Note that this may introduce cross-module
-    /// dependencies. This can have an impact on
-    /// the effectiveness of incremental caching
-    /// and should therefore be used judiciously.
-    ///
-    /// An example of a good use case is to improve
-    /// a diagnostic.
-    fn return_type_span(&self, db: &'db dyn Db) -> Option<(Span, Span)> {
-        match *self {
-            Type::FunctionLiteral(function) => function.return_type_span(db),
-            Type::BoundMethod(bound_method) => {
-                Type::FunctionLiteral(bound_method.function(db)).return_type_span(db)
-            }
-            _ => None,
-        }
-    }
-
-    /// Returns a tuple of two spans. The first is
-    /// the span for the identifier of the function
-    /// definition for `self`. The second is
     /// the span for the parameter in the function
     /// definition for `self`.
     ///
@@ -5410,9 +5380,34 @@ impl<'db> Type<'db> {
     ) -> Option<(Span, Span)> {
         match *self {
             Type::FunctionLiteral(function) => function.parameter_span(db, parameter_index),
-            Type::BoundMethod(bound_method) => {
-                Type::FunctionLiteral(bound_method.function(db)).parameter_span(db, parameter_index)
-            }
+            Type::BoundMethod(bound_method) => bound_method
+                .function(db)
+                .parameter_span(db, parameter_index),
+            _ => None,
+        }
+    }
+
+    /// Returns a collection of useful spans for a
+    /// function signature. These are useful for
+    /// creating annotations on diagnostics.
+    ///
+    /// If there are no meaningful spans, then this
+    /// returns `None`. For example, when this type
+    /// isn't callable.
+    ///
+    /// # Performance
+    ///
+    /// Note that this may introduce cross-module
+    /// dependencies. This can have an impact on
+    /// the effectiveness of incremental caching
+    /// and should therefore be used judiciously.
+    ///
+    /// An example of a good use case is to improve
+    /// a diagnostic.
+    fn function_spans(&self, db: &'db dyn Db) -> Option<FunctionSpans> {
+        match *self {
+            Type::FunctionLiteral(function) => function.spans(db),
+            Type::BoundMethod(bound_method) => bound_method.function(db).spans(db),
             _ => None,
         }
     }
@@ -6297,7 +6292,8 @@ impl<'db> BoolError<'db> {
                     .member(context.db(), "__bool__")
                     .into_lookup_result()
                     .ok()
-                    .and_then(|quals| quals.inner_type().return_type_span(context.db()))
+                    .and_then(|quals| quals.inner_type().function_spans(context.db()))
+                    .and_then(|spans| Some((spans.name, spans.return_type?)))
                 {
                     sub.annotate(
                         Annotation::primary(return_type_span).message("Incorrect return type"),
@@ -6897,37 +6893,6 @@ impl<'db> FunctionType<'db> {
     /// Returns a tuple of two spans. The first is
     /// the span for the identifier of the function
     /// definition for `self`. The second is
-    /// the span for the return type in the function
-    /// definition for `self`.
-    ///
-    /// If there are no meaningful spans, then this
-    /// returns `None`. For example, when this type
-    /// isn't callable or if the function has no
-    /// declared return type.
-    ///
-    /// # Performance
-    ///
-    /// Note that this may introduce cross-module
-    /// dependencies. This can have an impact on
-    /// the effectiveness of incremental caching
-    /// and should therefore be used judiciously.
-    ///
-    /// An example of a good use case is to improve
-    /// a diagnostic.
-    fn return_type_span(&self, db: &'db dyn Db) -> Option<(Span, Span)> {
-        let function_scope = self.body_scope(db);
-        let span = Span::from(function_scope.file(db));
-        let node = function_scope.node(db);
-        let func_def = node.as_function()?;
-        let return_type_range = func_def.returns.as_ref()?.range();
-        let name_span = span.clone().with_range(func_def.name.range);
-        let return_type_span = span.with_range(return_type_range);
-        Some((name_span, return_type_span))
-    }
-
-    /// Returns a tuple of two spans. The first is
-    /// the span for the identifier of the function
-    /// definition for `self`. The second is
     /// the span for the parameter in the function
     /// definition for `self`.
     ///
@@ -6949,7 +6914,7 @@ impl<'db> FunctionType<'db> {
     /// An example of a good use case is to improve
     /// a diagnostic.
     fn parameter_span(
-        &self,
+        self,
         db: &'db dyn Db,
         parameter_index: Option<usize>,
     ) -> Option<(Span, Span)> {
@@ -6970,6 +6935,55 @@ impl<'db> FunctionType<'db> {
         let parameter_span = span.with_range(range);
         Some((name_span, parameter_span))
     }
+
+    /// Returns a collection of useful spans for a
+    /// function signature. These are useful for
+    /// creating annotations on diagnostics.
+    ///
+    /// # Performance
+    ///
+    /// Note that this may introduce cross-module
+    /// dependencies. This can have an impact on
+    /// the effectiveness of incremental caching
+    /// and should therefore be used judiciously.
+    ///
+    /// An example of a good use case is to improve
+    /// a diagnostic.
+    fn spans(self, db: &'db dyn Db) -> Option<FunctionSpans> {
+        let function_scope = self.body_scope(db);
+        let span = Span::from(function_scope.file(db));
+        let node = function_scope.node(db);
+        let func_def = node.as_function()?;
+        let return_type_range = func_def.returns.as_ref().map(|returns| returns.range());
+        let mut signature = func_def.name.range.cover(func_def.parameters.range);
+        if let Some(return_type_range) = return_type_range {
+            signature = signature.cover(return_type_range);
+        }
+        Some(FunctionSpans {
+            signature: span.clone().with_range(signature),
+            name: span.clone().with_range(func_def.name.range),
+            parameters: span.clone().with_range(func_def.parameters.range),
+            return_type: return_type_range.map(|range| span.clone().with_range(range)),
+        })
+    }
+}
+
+/// A collection of useful spans for annotating functions.
+///
+/// This can be retrieved via `FunctionType::spans` or
+/// `Type::function_spans`.
+struct FunctionSpans {
+    /// The span of the entire function "signature." This includes
+    /// the name, parameter list and return type (if present).
+    signature: Span,
+    /// The span of the function name. i.e., `foo` in `def foo(): ...`.
+    name: Span,
+    /// The span of the parameter list, including the opening and
+    /// closing parentheses.
+    #[expect(dead_code)]
+    parameters: Span,
+    /// The span of the annotated return type, if present.
+    return_type: Option<Span>,
 }
 
 fn signature_cycle_recover<'db>(
