@@ -37,7 +37,7 @@ See: <https://github.com/astral-sh/ty/issues/113>
 ```py
 from pkg.sub import A
 
-reveal_type(A)  # revealed: Unknown
+reveal_type(A)  # revealed: Never
 ```
 
 `pkg/outer.py`:
@@ -75,5 +75,6 @@ reveal_type(x)  # revealed: Unknown
 `module.py`:
 
 ```py
+# error: [unresolved-import]
 from module import x
 ```

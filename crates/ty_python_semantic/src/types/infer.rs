@@ -45,7 +45,7 @@ use salsa;
 use salsa::plumbing::AsId;
 
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
-use crate::module_resolver::resolve_module;
+use crate::module_resolver::{file_to_module, resolve_module};
 use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
@@ -3946,26 +3946,33 @@ impl<'db> TypeInferenceBuilder<'db> {
             &alias.name.id
         };
 
+        // Avoid looking up attributes on a module if a module imports from itself
+        // (e.g. `from parent import submodule` inside the `parent` module).
+        let import_is_self_referential =
+            file_to_module(self.db(), self.file()).is_some_and(|m| m.name() == &module_name);
+
         // First try loading the requested attribute from the module.
-        if let Symbol::Type(ty, boundness) = module_ty.member(self.db(), name).symbol {
-            if &alias.name != "*" && boundness == Boundness::PossiblyUnbound {
-                // TODO: Consider loading _both_ the attribute and any submodule and unioning them
-                // together if the attribute exists but is possibly-unbound.
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&POSSIBLY_UNBOUND_IMPORT, AnyNodeRef::Alias(alias))
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Member `{name}` of module `{module_name}` is possibly unbound",
-                    ));
+        if !import_is_self_referential {
+            if let Symbol::Type(ty, boundness) = module_ty.member(self.db(), name).symbol {
+                if &alias.name != "*" && boundness == Boundness::PossiblyUnbound {
+                    // TODO: Consider loading _both_ the attribute and any submodule and unioning them
+                    // together if the attribute exists but is possibly-unbound.
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&POSSIBLY_UNBOUND_IMPORT, AnyNodeRef::Alias(alias))
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Member `{name}` of module `{module_name}` is possibly unbound",
+                        ));
+                    }
                 }
+                self.add_declaration_with_binding(
+                    alias.into(),
+                    definition,
+                    &DeclaredAndInferredType::AreTheSame(ty),
+                );
+                return;
             }
-            self.add_declaration_with_binding(
-                alias.into(),
-                definition,
-                &DeclaredAndInferredType::AreTheSame(ty),
-            );
-            return;
         }
 
         // If the module doesn't bind the symbol, check if it's a submodule.  This won't get
