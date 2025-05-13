@@ -474,7 +474,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     }
                     // Treat `bool` as `Literal[True, False]`.
                     Type::NominalInstance(instance)
-                        if instance.class().is_known(db, KnownClass::Bool) =>
+                        if instance.class.is_known(db, KnownClass::Bool) =>
                     {
                         UnionType::from_elements(
                             db,
@@ -505,7 +505,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         match (lhs_ty, rhs_ty) {
             (Type::NominalInstance(instance), Type::IntLiteral(i))
-                if instance.class().is_known(self.db, KnownClass::Bool) =>
+                if instance.class.is_known(self.db, KnownClass::Bool) =>
             {
                 if i == 0 {
                     Some(Type::BooleanLiteral(false).negate(self.db))

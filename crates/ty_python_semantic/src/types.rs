@@ -562,25 +562,22 @@ impl<'db> Type<'db> {
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
         self.into_nominal_instance()
-            .is_some_and(|instance| instance.class().is_known(db, KnownClass::NoneType))
+            .is_some_and(|instance| instance.class.is_known(db, KnownClass::NoneType))
     }
 
     fn is_bool(&self, db: &'db dyn Db) -> bool {
         self.into_nominal_instance()
-            .is_some_and(|instance| instance.class().is_known(db, KnownClass::Bool))
+            .is_some_and(|instance| instance.class.is_known(db, KnownClass::Bool))
     }
 
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
-        self.into_nominal_instance().is_some_and(|instance| {
-            instance
-                .class()
-                .is_known(db, KnownClass::NotImplementedType)
-        })
+        self.into_nominal_instance()
+            .is_some_and(|instance| instance.class.is_known(db, KnownClass::NotImplementedType))
     }
 
     pub fn is_object(&self, db: &'db dyn Db) -> bool {
         self.into_nominal_instance()
-            .is_some_and(|instance| instance.class().is_object(db))
+            .is_some_and(|instance| instance.class.is_object(db))
     }
 
     pub const fn is_todo(&self) -> bool {
@@ -1063,7 +1060,7 @@ impl<'db> Type<'db> {
             (_, Type::Never) => false,
 
             // Everything is a subtype of `object`.
-            (_, Type::NominalInstance(instance)) if instance.class().is_object(db) => true,
+            (_, Type::NominalInstance(instance)) if instance.class.is_object(db) => true,
 
             // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
@@ -1373,7 +1370,7 @@ impl<'db> Type<'db> {
 
             // All types are assignable to `object`.
             // TODO this special case might be removable once the below cases are comprehensive
-            (_, Type::NominalInstance(instance)) if instance.class().is_object(db) => true,
+            (_, Type::NominalInstance(instance)) if instance.class.is_object(db) => true,
 
             // In general, a TypeVar `T` is not assignable to a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is assignable to `S`.
@@ -1547,7 +1544,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::NominalInstance(instance), Type::Callable(_))
-                if instance.class().is_subclass_of_any_or_unknown(db) =>
+                if instance.class.is_subclass_of_any_or_unknown(db) =>
             {
                 true
             }
@@ -1616,7 +1613,7 @@ impl<'db> Type<'db> {
             }
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
-                n.class().is_object(db) && protocol.normalized(db) == nominal
+                n.class.is_object(db) && protocol.normalized(db) == nominal
             }
             _ => self == other && self.is_fully_static(db) && other.is_fully_static(db),
         }
@@ -1671,7 +1668,7 @@ impl<'db> Type<'db> {
             }
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
-                n.class().is_object(db) && protocol.normalized(db) == nominal
+                n.class.is_object(db) && protocol.normalized(db) == nominal
             }
             _ => false,
         }
@@ -1883,7 +1880,7 @@ impl<'db> Type<'db> {
             // member on `protocol`.
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
-                n.class().is_final(db) && !nominal.satisfies_protocol(db, protocol)
+                n.class.is_final(db) && !nominal.satisfies_protocol(db, protocol)
             }
 
             (
@@ -1948,7 +1945,7 @@ impl<'db> Type<'db> {
 
             (Type::KnownInstance(known_instance), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::KnownInstance(known_instance)) => {
-                !known_instance.is_instance_of(db, instance.class())
+                !known_instance.is_instance_of(db, instance.class)
             }
 
             (known_instance_ty @ Type::KnownInstance(_), Type::Tuple(tuple))
@@ -1960,7 +1957,7 @@ impl<'db> Type<'db> {
             | (Type::NominalInstance(instance), Type::BooleanLiteral(..)) => {
                 // A `Type::BooleanLiteral()` must be an instance of exactly `bool`
                 // (it cannot be an instance of a `bool` subclass)
-                !KnownClass::Bool.is_subclass_of(db, instance.class())
+                !KnownClass::Bool.is_subclass_of(db, instance.class)
             }
 
             (Type::BooleanLiteral(..), _) | (_, Type::BooleanLiteral(..)) => true,
@@ -1969,7 +1966,7 @@ impl<'db> Type<'db> {
             | (Type::NominalInstance(instance), Type::IntLiteral(..)) => {
                 // A `Type::IntLiteral()` must be an instance of exactly `int`
                 // (it cannot be an instance of an `int` subclass)
-                !KnownClass::Int.is_subclass_of(db, instance.class())
+                !KnownClass::Int.is_subclass_of(db, instance.class)
             }
 
             (Type::IntLiteral(..), _) | (_, Type::IntLiteral(..)) => true,
@@ -1981,7 +1978,7 @@ impl<'db> Type<'db> {
             | (Type::NominalInstance(instance), Type::StringLiteral(..) | Type::LiteralString) => {
                 // A `Type::StringLiteral()` or a `Type::LiteralString` must be an instance of exactly `str`
                 // (it cannot be an instance of a `str` subclass)
-                !KnownClass::Str.is_subclass_of(db, instance.class())
+                !KnownClass::Str.is_subclass_of(db, instance.class)
             }
 
             (Type::LiteralString, Type::LiteralString) => false,
@@ -1991,7 +1988,7 @@ impl<'db> Type<'db> {
             | (Type::NominalInstance(instance), Type::BytesLiteral(..)) => {
                 // A `Type::BytesLiteral()` must be an instance of exactly `bytes`
                 // (it cannot be an instance of a `bytes` subclass)
-                !KnownClass::Bytes.is_subclass_of(db, instance.class())
+                !KnownClass::Bytes.is_subclass_of(db, instance.class)
             }
 
             // A class-literal type `X` is always disjoint from an instance type `Y`,
@@ -2012,7 +2009,7 @@ impl<'db> Type<'db> {
             | (Type::NominalInstance(instance), Type::FunctionLiteral(..)) => {
                 // A `Type::FunctionLiteral()` must be an instance of exactly `types.FunctionType`
                 // (it cannot be an instance of a `types.FunctionType` subclass)
-                !KnownClass::FunctionType.is_subclass_of(db, instance.class())
+                !KnownClass::FunctionType.is_subclass_of(db, instance.class)
             }
 
             (Type::BoundMethod(_), other) | (other, Type::BoundMethod(_)) => KnownClass::MethodType
@@ -2440,7 +2437,7 @@ impl<'db> Type<'db> {
             // i.e. Type::NominalInstance(type). So looking up a name in the MRO of
             // `Type::NominalInstance(type)` is equivalent to looking up the name in the
             // MRO of the class `object`.
-            Type::NominalInstance(instance) if instance.class().is_known(db, KnownClass::Type) => {
+            Type::NominalInstance(instance) if instance.class.is_known(db, KnownClass::Type) => {
                 KnownClass::Object
                     .to_class_literal(db)
                     .find_name_in_mro_with_policy(db, name, policy)
@@ -2530,7 +2527,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Never => Symbol::bound(self).into(),
 
-            Type::NominalInstance(instance) => instance.class().instance_member(db, name),
+            Type::NominalInstance(instance) => instance.class.instance_member(db, name),
 
             Type::ProtocolInstance(protocol) => protocol.instance_member(db, name),
 
@@ -2978,7 +2975,7 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance)
                 if matches!(name.as_str(), "major" | "minor")
-                    && instance.class().is_known(db, KnownClass::VersionInfo) =>
+                    && instance.class.is_known(db, KnownClass::VersionInfo) =>
             {
                 let python_version = Program::get(db).python_version(db);
                 let segment = if name == "major" {
@@ -3050,7 +3047,7 @@ impl<'db> Type<'db> {
                     // resolve the attribute.
                     if matches!(
                         self.into_nominal_instance()
-                            .and_then(|instance| instance.class().known(db)),
+                            .and_then(|instance| instance.class.known(db)),
                         Some(KnownClass::ModuleType | KnownClass::GenericAlias)
                     ) {
                         return Symbol::Unbound.into();
@@ -3309,7 +3306,7 @@ impl<'db> Type<'db> {
                 }
             },
 
-            Type::NominalInstance(instance) => match instance.class().known(db) {
+            Type::NominalInstance(instance) => match instance.class.known(db) {
                 Some(known_class) => known_class.bool(),
                 None => try_dunder_bool()?,
             },
@@ -4863,7 +4860,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) => Ok(*self),
 
-            Type::NominalInstance(instance) => match instance.class().known(db) {
+            Type::NominalInstance(instance) => match instance.class.known(db) {
                 Some(KnownClass::TypeVar) => Ok(todo_type!(
                     "Support for `typing.TypeVar` instances in type expressions"
                 )),
@@ -5291,7 +5288,7 @@ impl<'db> Type<'db> {
             }
             Self::GenericAlias(alias) => Some(TypeDefinition::Class(alias.definition(db))),
             Self::NominalInstance(instance) => {
-                Some(TypeDefinition::Class(instance.class().definition(db)))
+                Some(TypeDefinition::Class(instance.class.definition(db)))
             }
             Self::KnownInstance(instance) => match instance {
                 KnownInstanceType::TypeVar(var) => {
@@ -8046,7 +8043,7 @@ impl<'db> SuperOwnerKind<'db> {
                 Either::Left(ClassBase::Dynamic(dynamic).mro(db, None))
             }
             SuperOwnerKind::Class(class) => Either::Right(class.iter_mro(db)),
-            SuperOwnerKind::Instance(instance) => Either::Right(instance.class().iter_mro(db)),
+            SuperOwnerKind::Instance(instance) => Either::Right(instance.class.iter_mro(db)),
         }
     }
 
@@ -8062,7 +8059,7 @@ impl<'db> SuperOwnerKind<'db> {
         match self {
             SuperOwnerKind::Dynamic(_) => None,
             SuperOwnerKind::Class(class) => Some(class),
-            SuperOwnerKind::Instance(instance) => Some(instance.class()),
+            SuperOwnerKind::Instance(instance) => Some(instance.class),
         }
     }
 
@@ -8240,7 +8237,7 @@ impl<'db> BoundSuperType<'db> {
                     .expect("Calling `find_name_in_mro` on dynamic type should return `Some`")
             }
             SuperOwnerKind::Class(class) => class,
-            SuperOwnerKind::Instance(instance) => instance.class(),
+            SuperOwnerKind::Instance(instance) => instance.class,
         };
 
         let (class_literal, _) = class.class_literal(db);

@@ -88,14 +88,12 @@ def takes_in_protocol(x: CanIndex[T]) -> T:
     return x[0]
 
 def deep_list(x: list[str]) -> None:
-    # TODO: revealed: list[str]
-    reveal_type(takes_in_list(x))  # revealed: list[Unknown]
+    reveal_type(takes_in_list(x))  # revealed: list[str]
     # TODO: revealed: str
     reveal_type(takes_in_protocol(x))  # revealed: Unknown
 
 def deeper_list(x: list[set[str]]) -> None:
-    # TODO: revealed: list[set[str]]
-    reveal_type(takes_in_list(x))  # revealed: list[Unknown]
+    reveal_type(takes_in_list(x))  # revealed: list[set[str]]
     # TODO: revealed: set[str]
     reveal_type(takes_in_protocol(x))  # revealed: Unknown
 
@@ -119,13 +117,11 @@ This also works when passing in arguments that are subclasses of the parameter t
 class Sub(list[int]): ...
 class GenericSub(list[T]): ...
 
-# TODO: revealed: list[int]
-reveal_type(takes_in_list(Sub()))  # revealed: list[Unknown]
+reveal_type(takes_in_list(Sub()))  # revealed: list[int]
 # TODO: revealed: int
 reveal_type(takes_in_protocol(Sub()))  # revealed: Unknown
 
-# TODO: revealed: list[str]
-reveal_type(takes_in_list(GenericSub[str]()))  # revealed: list[Unknown]
+reveal_type(takes_in_list(GenericSub[str]()))  # revealed: list[str]
 # TODO: revealed: str
 reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: Unknown
 

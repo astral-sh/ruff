@@ -1,5 +1,7 @@
 //! Instance types: both nominal and structural.
 
+use std::marker::PhantomData;
+
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type};
 use crate::symbol::{Symbol, SymbolAndQualifiers};
@@ -14,7 +16,10 @@ impl<'db> Type<'db> {
         if class.class_literal(db).0.is_protocol(db) {
             Self::ProtocolInstance(ProtocolInstanceType(Protocol::FromClass(class)))
         } else {
-            Self::NominalInstance(NominalInstanceType { class })
+            Self::NominalInstance(NominalInstanceType {
+                class,
+                _phantom: PhantomData,
+            })
         }
     }
 
@@ -56,16 +61,14 @@ impl<'db> Type<'db> {
 /// A type representing the set of runtime objects which are instances of a certain nominal class.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update)]
 pub struct NominalInstanceType<'db> {
+    pub(super) class: ClassType<'db>,
+
     // Keep this field private, so that the only way of constructing `NominalInstanceType` instances
     // is through the `Type::instance` constructor function.
-    class: ClassType<'db>,
+    _phantom: PhantomData<()>,
 }
 
 impl<'db> NominalInstanceType<'db> {
-    pub(super) fn class(self) -> ClassType<'db> {
-        self.class
-    }
-
     pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
         // N.B. The subclass relation is fully static
         self.class.is_subclass_of(db, other.class)
@@ -130,6 +133,7 @@ impl<'db> NominalInstanceType<'db> {
     ) -> Self {
         Self {
             class: self.class.apply_type_mapping(db, type_mapping),
+            _phantom: PhantomData,
         }
     }
 
