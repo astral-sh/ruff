@@ -36,7 +36,7 @@ uv tool install pre-commit
 pre-commit install
 ```
 
-We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `cargo nextest run`),
+We recommend [nextest](https://nexte.st/) to run ty's test suite (via `cargo nextest run`),
 though it's not strictly necessary:
 
 ```shell
@@ -76,7 +76,7 @@ prior to merging.
 
 ### Project Structure
 
-Ruff is structured as a monorepo with a [flat crate structure](https://matklad.github.io/2021/08/22/large-rust-workspaces.html),
+ty is structured as a monorepo with a [flat crate structure](https://matklad.github.io/2021/08/22/large-rust-workspaces.html),
 such that all crates are contained in a flat `crates` directory.
 
 The vast majority of the code lives in the `ty_python_semantic` crate (located at
@@ -96,7 +96,7 @@ crates shared with Ruff, such as `ruff_db`, `ruff_python_ast`, and `ruff_python_
 - `ty_vendored`: A vendored copy of [typeshed](https://github.com/python/typeshed), which holds type
     annotations for the Python standard library.
 - `ty_wasm`: library crate for exposing ty as a WebAssembly module. Powers the
-    [Ty Playground](https://play.ty.dev/).
+    [ty Playground](https://play.ty.dev/).
 
 ## Writing tests
 
