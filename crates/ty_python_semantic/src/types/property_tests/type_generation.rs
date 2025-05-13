@@ -1,8 +1,9 @@
 use crate::db::tests::TestDb;
 use crate::symbol::{builtins_symbol, known_module_symbol};
 use crate::types::{
-    BoundMethodType, CallableType, IntersectionBuilder, KnownClass, KnownInstanceType, Parameter,
-    Parameters, Signature, SubclassOfType, TupleType, Type, UnionType,
+    BoundMethodType, BoundSuperType, CallableType, IntersectionBuilder, KnownClass,
+    KnownInstanceType, Parameter, Parameters, Signature, SubclassOfType, TupleType, Type,
+    UnionType,
 };
 use crate::{Db, KnownModule};
 use hashbrown::HashSet;
@@ -52,6 +53,10 @@ pub(crate) enum Ty {
     Callable {
         params: CallableParams,
         returns: Option<Box<Ty>>,
+    },
+    BoundSuper {
+        pivot: SuperParamKind,
+        owner: SuperParamKind,
     },
 }
 
@@ -115,6 +120,29 @@ fn create_bound_method<'db>(
         function.expect_function_literal(),
         builtins_class.to_instance(db).unwrap(),
     ))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum SuperParamKind {
+    BuiltinClass(&'static str),
+    BuiltinInstance(&'static str),
+    Unknown,
+}
+
+impl SuperParamKind {
+    fn into_type(self, db: &TestDb) -> Type<'_> {
+        match self {
+            SuperParamKind::BuiltinClass(class_name) => {
+                builtins_symbol(db, class_name).symbol.expect_type()
+            }
+            SuperParamKind::BuiltinInstance(class_name) => builtins_symbol(db, class_name)
+                .symbol
+                .expect_type()
+                .to_instance(db)
+                .unwrap(),
+            SuperParamKind::Unknown => Type::unknown(),
+        }
+    }
 }
 
 impl Ty {
@@ -195,6 +223,10 @@ impl Ty {
                     returns.map(|ty| ty.into_type(db)),
                 ),
             )),
+            Ty::BoundSuper { pivot, owner } => {
+                BoundSuperType::build(db, pivot.into_type(db), owner.into_type(db))
+                    .expect("Failed to build a BoundSuperType")
+            }
         }
     }
 }
@@ -252,6 +284,18 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
         Ty::BuiltinsBoundMethod {
             class: "int",
             method: "bit_length",
+        },
+        Ty::BoundSuper {
+            pivot: SuperParamKind::BuiltinClass("int"),
+            owner: SuperParamKind::BuiltinInstance("bool"),
+        },
+        Ty::BoundSuper {
+            pivot: SuperParamKind::BuiltinClass("int"),
+            owner: SuperParamKind::BuiltinClass("bool"),
+        },
+        Ty::BoundSuper {
+            pivot: SuperParamKind::Unknown,
+            owner: SuperParamKind::Unknown,
         },
     ])
     .unwrap()
