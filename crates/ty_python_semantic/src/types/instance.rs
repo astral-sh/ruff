@@ -14,15 +14,9 @@ pub(super) use synthesized_protocol::SynthesizedProtocolType;
 impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         if class.class_literal(db).0.is_protocol(db) {
-            Self::ProtocolInstance(ProtocolInstanceType {
-                inner: Protocol::FromClass(class),
-                _phantom: PhantomData,
-            })
+            Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
         } else {
-            Self::NominalInstance(NominalInstanceType {
-                class,
-                _phantom: PhantomData,
-            })
+            Self::NominalInstance(NominalInstanceType::from_class(class))
         }
     }
 
@@ -37,13 +31,9 @@ impl<'db> Type<'db> {
     where
         M: IntoIterator<Item = (&'a str, Type<'db>)>,
     {
-        Self::ProtocolInstance(ProtocolInstanceType {
-            inner: Protocol::Synthesized(SynthesizedProtocolType::new(
-                db,
-                ProtocolInterface::with_members(db, members),
-            )),
-            _phantom: PhantomData,
-        })
+        Self::ProtocolInstance(ProtocolInstanceType::synthesized(
+            SynthesizedProtocolType::new(db, ProtocolInterface::with_members(db, members)),
+        ))
     }
 
     /// Return `true` if `self` conforms to the interface described by `protocol`.
@@ -76,6 +66,13 @@ pub struct NominalInstanceType<'db> {
 }
 
 impl<'db> NominalInstanceType<'db> {
+    fn from_class(class: ClassType<'db>) -> Self {
+        Self {
+            class,
+            _phantom: PhantomData,
+        }
+    }
+
     pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
         // N.B. The subclass relation is fully static
         self.class.is_subclass_of(db, other.class)
@@ -138,10 +135,7 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         type_mapping: TypeMapping<'a, 'db>,
     ) -> Self {
-        Self {
-            class: self.class.apply_type_mapping(db, type_mapping),
-            _phantom: PhantomData,
-        }
+        Self::from_class(self.class.apply_type_mapping(db, type_mapping))
     }
 
     pub(super) fn find_legacy_typevars(
@@ -172,6 +166,20 @@ pub struct ProtocolInstanceType<'db> {
 }
 
 impl<'db> ProtocolInstanceType<'db> {
+    fn from_class(class: ClassType<'db>) -> Self {
+        Self {
+            inner: Protocol::FromClass(class),
+            _phantom: PhantomData,
+        }
+    }
+
+    fn synthesized(synthesized: SynthesizedProtocolType<'db>) -> Self {
+        Self {
+            inner: Protocol::Synthesized(synthesized),
+            _phantom: PhantomData,
+        }
+    }
+
     /// Return the meta-type of this protocol-instance type.
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         match self.inner {
@@ -203,13 +211,9 @@ impl<'db> ProtocolInstanceType<'db> {
             return object;
         }
         match self.inner {
-            Protocol::FromClass(_) => Type::ProtocolInstance(Self {
-                inner: Protocol::Synthesized(SynthesizedProtocolType::new(
-                    db,
-                    self.inner.interface(db),
-                )),
-                _phantom: PhantomData,
-            }),
+            Protocol::FromClass(_) => Type::ProtocolInstance(Self::synthesized(
+                SynthesizedProtocolType::new(db, self.inner.interface(db)),
+            )),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
         }
     }
@@ -218,13 +222,10 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn replace_self_reference(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
         match self.inner {
             Protocol::FromClass(class_type) if class_type.class_literal(db).0 == class => {
-                ProtocolInstanceType {
-                    inner: Protocol::Synthesized(SynthesizedProtocolType::new(
-                        db,
-                        ProtocolInterface::SelfReference,
-                    )),
-                    _phantom: PhantomData,
-                }
+                ProtocolInstanceType::synthesized(SynthesizedProtocolType::new(
+                    db,
+                    ProtocolInterface::SelfReference,
+                ))
             }
             _ => self,
         }
@@ -300,14 +301,12 @@ impl<'db> ProtocolInstanceType<'db> {
         type_mapping: TypeMapping<'a, 'db>,
     ) -> Self {
         match self.inner {
-            Protocol::FromClass(class) => Self {
-                inner: Protocol::FromClass(class.apply_type_mapping(db, type_mapping)),
-                _phantom: PhantomData,
-            },
-            Protocol::Synthesized(synthesized) => Self {
-                inner: Protocol::Synthesized(synthesized.apply_type_mapping(db, type_mapping)),
-                _phantom: PhantomData,
-            },
+            Protocol::FromClass(class) => {
+                Self::from_class(class.apply_type_mapping(db, type_mapping))
+            }
+            Protocol::Synthesized(synthesized) => {
+                Self::synthesized(synthesized.apply_type_mapping(db, type_mapping))
+            }
         }
     }
 
