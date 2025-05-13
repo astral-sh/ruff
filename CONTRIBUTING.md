@@ -4,8 +4,8 @@ Welcome! We're happy to have you here. Thank you in advance for your contributio
 
 > [!NOTE]
 >
-> This guide is for Ruff. If you're looking to contribute to ty, please see
-> [the ty contributing guide](./crates/ty/CONTRIBUTING.md).
+> This guide is for Ruff. If you're looking to contribute to ty, please see [the ty contributing
+> guide](https://github.com/astral-sh/ruff/blob/main/crates/ty/CONTRIBUTING.md).
 
 ## The Basics
 
