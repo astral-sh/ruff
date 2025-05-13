@@ -116,6 +116,15 @@ demonstrating the effect of the change.
 We write mdtests in a "literate" style, with prose explaining the motivation of each test, and any
 context necessary to understand the feature being demonstrated.
 
+### Property tests
+
+Ty uses property-based testing to test the core type relations. These tests are located in
+[`crates/ty_python_semantic/src/types/property_tests.rs`](../ty_python_semantic/src/types/property_tests.rs).
+
+The property tests do not run in CI on every PR, just once daily. It is advisable to run them
+locally after modifying core type relation methods (`is_subtype_of`, `is_equivalent_to`, etc.) to
+ensure that the changes do not break any of the properties.
+
 ## Ecosystem CI (mypy-primer)
 
 GitHub Actions will run your changes against a number of real-world projects from GitHub and
