@@ -1,6 +1,8 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::rules::airflow::helpers::{is_guarded_by_try_except, Replacement};
+use crate::rules::airflow::helpers::{
+    is_airflow_builtin_or_provider, is_guarded_by_try_except, Replacement,
+};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_callable;
@@ -54,15 +56,14 @@ impl Violation for Airflow3Removal {
             replacement,
         } = self;
         match replacement {
-            Replacement::None => format!("`{deprecated}` is removed in Airflow 3.0"),
-            Replacement::Name(_) => {
+            Replacement::None
+            | Replacement::Name(_)
+            | Replacement::AutoImport { module: _, name: _ }
+            | Replacement::SourceModuleMoved { module: _, name: _ } => {
                 format!("`{deprecated}` is removed in Airflow 3.0")
             }
             Replacement::Message(message) => {
                 format!("`{deprecated}` is removed in Airflow 3.0; {message}")
-            }
-            Replacement::AutoImport { path: _, name: _ } => {
-                format!("`{deprecated}` is removed in Airflow 3.0")
             }
         }
     }
@@ -71,7 +72,12 @@ impl Violation for Airflow3Removal {
         let Airflow3Removal { replacement, .. } = self;
         match replacement {
             Replacement::Name(name) => Some(format!("Use `{name}` instead")),
-            Replacement::AutoImport { path, name } => Some(format!("Use `{path}.{name}` instead")),
+            Replacement::AutoImport { module, name } => {
+                Some(format!("Use `{module}.{name}` instead"))
+            }
+            Replacement::SourceModuleMoved { module, name } => {
+                Some(format!("Use `{module}.{name}` instead"))
+            }
             _ => None,
         }
     }
@@ -203,14 +209,9 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
             // without replacement
             checker.report_diagnostics(diagnostic_for_argument(arguments, "default_view", None));
             checker.report_diagnostics(diagnostic_for_argument(arguments, "orientation", None));
-            checker.report_diagnostics(diagnostic_for_argument(
-                arguments,
-                "sla_miss_callback",
-                None,
-            ));
         }
-        _ => {
-            if is_airflow_auth_manager(qualified_name.segments()) {
+        segments => {
+            if is_airflow_auth_manager(segments) {
                 if !arguments.is_empty() {
                     checker.report_diagnostic(Diagnostic::new(
                         Airflow3Removal {
@@ -222,20 +223,19 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                         arguments.range(),
                     ));
                 }
-            } else if is_airflow_task_handler(qualified_name.segments()) {
+            } else if is_airflow_task_handler(segments) {
                 checker.report_diagnostics(diagnostic_for_argument(
                     arguments,
                     "filename_template",
                     None,
                 ));
-            } else if is_airflow_operator(qualified_name.segments()) {
-                checker.report_diagnostics(diagnostic_for_argument(arguments, "sla", None));
+            } else if is_airflow_builtin_or_provider(segments, "operators", "Operator") {
                 checker.report_diagnostics(diagnostic_for_argument(
                     arguments,
                     "task_concurrency",
                     Some("max_active_tis_per_dag"),
                 ));
-                match qualified_name.segments() {
+                match segments {
                     ["airflow", .., "operators", "trigger_dagrun", "TriggerDagRunOperator"] => {
                         checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
@@ -575,34 +575,30 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
         ["airflow", "api_connexion", "security", "requires_access_dataset"] => {
             Replacement::AutoImport {
-                path: "airflow.api_connexion.security",
+                module: "airflow.api_connexion.security",
                 name: "requires_access_asset",
             }
         }
 
         // airflow.auth.managers
         ["airflow", "auth", "managers", "models", "resource_details", "DatasetDetails"] => {
-            Replacement::Name(
-                "airflow.api_fastapi.auth.managers.models.resource_details.AssetDetails",
-            )
+            Replacement::AutoImport {
+                module: "airflow.api_fastapi.auth.managers.models.resource_details",
+                name: "AssetDetails",
+            }
         }
         ["airflow", "auth", "managers", "base_auth_manager", "is_authorized_dataset"] => {
-            Replacement::Name(
-                "airflow.api_fastapi.auth.managers.base_auth_manager.is_authorized_asset",
-            )
+            Replacement::AutoImport {
+                module: "airflow.api_fastapi.auth.managers.base_auth_manager",
+                name: "is_authorized_asset",
+            }
         }
 
         // airflow.configuration
-        ["airflow", "configuration", rest @ ..] => match &rest {
-            ["get"] => Replacement::Name("airflow.configuration.conf.get"),
-            ["getboolean"] => Replacement::Name("airflow.configuration.conf.getboolean"),
-            ["getfloat"] => Replacement::Name("airflow.configuration.conf.getfloat"),
-            ["getint"] => Replacement::Name("airflow.configuration.conf.getint"),
-            ["has_option"] => Replacement::Name("airflow.configuration.conf.has_option"),
-            ["remove_option"] => Replacement::Name("airflow.configuration.conf.remove_option"),
-            ["as_dict"] => Replacement::Name("airflow.configuration.conf.as_dict"),
-            ["set"] => Replacement::Name("airflow.configuration.conf.set"),
-            _ => return,
+        ["airflow", "configuration", rest @ ("as_dict" | "get" | "getboolean" | "getfloat" | "getint" | "has_option"
+        | "remove_option" | "set")] => Replacement::SourceModuleMoved {
+            module: "airflow.configuration.conf",
+            name: (*rest).to_string(),
         },
 
         // airflow.contrib.*
@@ -610,28 +606,24 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             Replacement::Message("The whole `airflow.contrib` module has been removed.")
         }
 
-        // airflow.datasets
-        ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => Replacement::AutoImport {
-            path: "airflow.sdk",
-            name: "Asset",
-        },
-        ["airflow", "datasets", rest @ ..] => match &rest {
-            ["DatasetAliasEvent"] => Replacement::None,
-            ["DatasetAlias"] => Replacement::Name("airflow.sdk.AssetAlias"),
-            ["DatasetAll"] => Replacement::Name("airflow.sdk.AssetAll"),
-            ["DatasetAny"] => Replacement::Name("airflow.sdk.AssetAny"),
-            ["expand_alias_to_datasets"] => Replacement::Name("airflow.sdk.expand_alias_to_assets"),
-            ["metadata", "Metadata"] => Replacement::Name("airflow.sdk.Metadata"),
-            // airflow.datasets.manager
-            ["manager", "DatasetManager"] => Replacement::Name("airflow.assets.AssetManager"),
-            ["manager", "dataset_manager"] => {
-                Replacement::Name("airflow.assets.manager.asset_manager")
-            }
-            ["manager", "resolve_dataset_manager"] => {
-                Replacement::Name("airflow.assets.resolve_asset_manager")
-            }
+        // airflow.datasets.manager
+        ["airflow", "datasets", "manager", rest] => match *rest {
+            "DatasetManager" => Replacement::AutoImport {
+                module: "airflow.assets.manager",
+                name: "AssetManager",
+            },
+            "dataset_manager" => Replacement::AutoImport {
+                module: "airflow.assets.manager",
+                name: "asset_manager",
+            },
+            "resolve_dataset_manager" => Replacement::AutoImport {
+                module: "airflow.assets.manager",
+                name: "resolve_asset_manager",
+            },
             _ => return,
         },
+        // airflow.datasets
+        ["airflow", "datasets", "DatasetAliasEvent"] => Replacement::None,
 
         // airflow.hooks
         ["airflow", "hooks", "base_hook", "BaseHook"] => {
@@ -639,43 +631,37 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.lineage.hook
-        ["airflow", "lineage", "hook", "DatasetLineageInfo"] => {
-            Replacement::Name("airflow.lineage.hook.AssetLineageInfo")
-        }
+        ["airflow", "lineage", "hook", "DatasetLineageInfo"] => Replacement::AutoImport {
+            module: "airflow.lineage.hook",
+            name: "AssetLineageInfo",
+        },
 
         // airflow.listeners.spec
-        ["airflow", "listeners", "spec", "dataset", rest @ ..] => match &rest {
-            ["on_dataset_created"] => {
-                Replacement::Name("airflow.listeners.spec.asset.on_asset_created")
-            }
-            ["on_dataset_changed"] => {
-                Replacement::Name("airflow.listeners.spec.asset.on_asset_changed")
-            }
+        // TODO: this is removed
+        ["airflow", "listeners", "spec", "dataset", rest] => match *rest {
+            "on_dataset_created" => Replacement::AutoImport {
+                module: "airflow.listeners.spec.asset",
+                name: "on_asset_created",
+            },
+            "on_dataset_changed" => Replacement::AutoImport {
+                module: "airflow.listeners.spec.asset",
+                name: "on_asset_changed",
+            },
             _ => return,
         },
 
         // airflow.metrics.validators
-        ["airflow", "metrics", "validators", rest @ ..] => match &rest {
-            ["AllowListValidator"] => {
-                Replacement::Name("airflow.metrics.validators.PatternAllowListValidator")
-            }
-            ["BlockListValidator"] => {
-                Replacement::Name("airflow.metrics.validators.PatternBlockListValidator")
-            }
+        ["airflow", "metrics", "validators", rest] => match *rest {
+            "AllowListValidator" => Replacement::AutoImport {
+                module: "airflow.metrics.validators",
+                name: "PatternAllowListValidator",
+            },
+            "BlockListValidator" => Replacement::AutoImport {
+                module: "airflow.metrics.validators",
+                name: "PatternBlockListValidator",
+            },
             _ => return,
         },
-
-        // airflow.models.baseoperator
-        ["airflow", "models", "baseoperator", "chain"] => Replacement::Name("airflow.sdk.chain"),
-        ["airflow", "models", "baseoperator", "chain_linear"] => {
-            Replacement::Name("airflow.sdk.chain_linear")
-        }
-        ["airflow", "models", "baseoperator", "cross_downstream"] => {
-            Replacement::Name("airflow.sdk.cross_downstream")
-        }
-        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => {
-            Replacement::Name("airflow.sdk.definitions.baseoperatorlink.BaseOperatorLink")
-        }
 
         // airflow.notifications
         ["airflow", "notifications", "basenotifier", "BaseNotifier"] => {
@@ -686,77 +672,35 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "operators", "subdag", ..] => {
             Replacement::Message("The whole `airflow.subdag` module has been removed.")
         }
-        ["airflow", "operators", "branch_operator", "BaseBranchOperator"] => {
-            Replacement::Name("airflow.operators.branch.BaseBranchOperator")
-        }
-        ["airflow", "operators", "dummy" | "dummy_operator", "EmptyOperator" | "DummyOperator"] => {
-            Replacement::Name("airflow.operators.empty.EmptyOperator")
-        }
-        ["airflow", "operators", "email_operator", "EmailOperator"] => {
-            Replacement::Name("airflow.operators.email.EmailOperator")
-        }
-        ["airflow", "operators", "dagrun_operator", "TriggerDagRunLink"] => {
-            Replacement::Name("airflow.operators.trigger_dagrun.TriggerDagRunLink")
-        }
-        ["airflow", "operators", "dagrun_operator", "TriggerDagRunOperator"] => {
-            Replacement::Name("airflow.operators.trigger_dagrun.TriggerDagRunOperator")
-        }
-        ["airflow", "operators", "python_operator", "BranchPythonOperator"] => {
-            Replacement::Name("airflow.operators.python.BranchPythonOperator")
-        }
-        ["airflow", "operators", "python_operator", "PythonOperator"] => {
-            Replacement::Name("airflow.operators.python.PythonOperator")
-        }
-        ["airflow", "operators", "python_operator", "PythonVirtualenvOperator"] => {
-            Replacement::Name("airflow.operators.python.PythonVirtualenvOperator")
-        }
-        ["airflow", "operators", "python_operator", "ShortCircuitOperator"] => {
-            Replacement::Name("airflow.operators.python.ShortCircuitOperator")
-        }
-        ["airflow", "operators", "latest_only_operator", "LatestOnlyOperator"] => {
-            Replacement::Name("airflow.operators.latest_only.LatestOnlyOperator")
-        }
+        ["airflow", "operators", "python", "get_current_context"] => Replacement::AutoImport {
+            module: "airflow.sdk",
+            name: "get_current_context",
+        },
 
         // airflow.secrets
-        ["airflow", "secrets", "local_filesystem", "load_connections"] => {
-            Replacement::Name("airflow.secrets.local_filesystem.load_connections_dict")
-        }
+        ["airflow", "secrets", "local_filesystem", "load_connections"] => Replacement::AutoImport {
+            module: "airflow.secrets.local_filesystem",
+            name: "load_connections_dict",
+        },
 
         // airflow.security
-        ["airflow", "security", "permissions", "RESOURCE_DATASET"] => {
-            Replacement::Name("airflow.security.permissions.RESOURCE_ASSET")
-        }
+        ["airflow", "security", "permissions", "RESOURCE_DATASET"] => Replacement::AutoImport {
+            module: "airflow.security.permissions",
+            name: "RESOURCE_ASSET",
+        },
 
         // airflow.sensors
         ["airflow", "sensors", "base_sensor_operator", "BaseSensorOperator"] => {
             Replacement::Name("airflow.sdk.bases.sensor.BaseSensorOperator")
         }
-        ["airflow", "sensors", "date_time_sensor", "DateTimeSensor"] => {
-            Replacement::Name("airflow.sensors.date_time.DateTimeSensor")
-        }
-        ["airflow", "sensors", "external_task" | "external_task_sensor", "ExternalTaskMarker"] => {
-            Replacement::Name("airflow.sensors.external_task.ExternalTaskMarker")
-        }
-        ["airflow", "sensors", "external_task" | "external_task_sensor", "ExternalTaskSensorLink"] => {
-            Replacement::Name("airflow.sensors.external_task.ExternalDagLink")
-        }
-        ["airflow", "sensors", "external_task" | "external_task_sensor", "ExternalTaskSensor"] => {
-            Replacement::Name("airflow.sensors.external_task.ExternalTaskSensor")
-        }
-        ["airflow", "sensors", "time_delta_sensor", "TimeDeltaSensor"] => {
-            Replacement::Name("airflow.sensors.time_delta.TimeDeltaSensor")
-        }
 
         // airflow.timetables
-        ["airflow", "timetables", rest @ ..] => match &rest {
-            ["datasets", "DatasetOrTimeSchedule"] => {
-                Replacement::Name("airflow.timetables.assets.AssetOrTimeSchedule")
+        ["airflow", "timetables", "simple", "DatasetTriggeredTimetable"] => {
+            Replacement::AutoImport {
+                module: "airflow.timetables.simple",
+                name: "AssetTriggeredTimetable",
             }
-            ["simple", "DatasetTriggeredTimetable"] => {
-                Replacement::Name("airflow.timetables.simple.AssetTriggeredTimetable")
-            }
-            _ => return,
-        },
+        }
 
         // airflow.triggers
         ["airflow", "triggers", "external_task", "TaskStateTrigger"] => Replacement::None,
@@ -765,11 +709,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "utils", rest @ ..] => match &rest {
             // airflow.utils.dag_cycle_tester
             ["dag_cycle_tester", "test_cycle"] => Replacement::None,
-
-            // airflow.utils.dag_parsing_context
-            ["dag_parsing_context", "get_parsing_context"] => {
-                Replacement::Name("airflow.sdk.get_parsing_context")
-            }
 
             // airflow.utils.db
             ["db", "create_session"] => Replacement::None,
@@ -810,12 +749,14 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.www
+        // TODO: www has been removed
         ["airflow", "www", "auth", "has_access"] => {
             Replacement::Name("airflow.www.auth.has_access_*")
         }
-        ["airflow", "www", "auth", "has_access_dataset"] => {
-            Replacement::Name("airflow.www.auth.has_access_dataset.has_access_asset")
-        }
+        ["airflow", "www", "auth", "has_access_dataset"] => Replacement::AutoImport {
+            module: "airflow.www.auth",
+            name: "has_access_asset",
+        },
         ["airflow", "www", "utils", "get_sensitive_variables_fields"] => {
             Replacement::Name("airflow.utils.log.secrets_masker.get_sensitive_variables_fields")
         }
@@ -824,31 +765,39 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.providers.amazon
-        ["airflow", "providers", "amazon", "aws", rest @ ..] => match &rest {
-            ["datasets", "s3", "create_dataset"] => {
-                Replacement::Name("airflow.providers.amazon.aws.assets.s3.create_asset")
-            }
-            ["datasets", "s3", "convert_dataset_to_openlineage"] => Replacement::Name(
-                "airflow.providers.amazon.aws.assets.s3.convert_asset_to_openlineage",
-            ),
-            ["datasets", "s3", "sanitize_uri"] => {
+        ["airflow", "providers", "amazon", "aws", "datasets", "s3", rest] => match *rest {
+            "create_dataset" => Replacement::AutoImport {
+                module: "airflow.providers.amazon.aws.assets.s3",
+                name: "create_asset",
+            },
+            "convert_dataset_to_openlineage" => Replacement::AutoImport {
+                module: "airflow.providers.amazon.aws.assets.s3",
+                name: "convert_asset_to_openlineage",
+            },
+            "sanitize_uri" => {
                 Replacement::Name("airflow.providers.amazon.aws.assets.s3.sanitize_uri")
             }
-            ["auth_manager", "avp", "entities", "AvpEntities", "DATASET"] => Replacement::Name(
-                "airflow.providers.amazon.aws.auth_manager.avp.entities.AvpEntities.ASSET",
-            ),
             _ => return,
         },
+        ["airflow", "providers", "amazon", "aws", "auth_manager", "avp", "entities", "AvpEntities", "DATASET"] => {
+            Replacement::AutoImport {
+                module: "airflow.providers.amazon.aws.auth_manager.avp.entities.AvpEntities",
+                name: "ASSET",
+            }
+        }
 
         // airflow.providers.common.io
-        ["airflow", "providers", "common", "io", rest @ ..] => match &rest {
-            ["datasets", "file", "create_dataset"] => {
-                Replacement::Name("airflow.providers.common.io.assets.file.create_asset")
-            }
-            ["datasets", "file", "convert_dataset_to_openlineage"] => Replacement::Name(
-                "airflow.providers.common.io.assets.file.convert_asset_to_openlineage",
-            ),
-            ["datasets", "file", "sanitize_uri"] => {
+        // airflow.providers.common.io.datasets.file
+        ["airflow", "providers", "common", "io", "datasets", "file", rest] => match *rest {
+            "create_dataset" => Replacement::AutoImport {
+                module: "airflow.providers.common.io.assets.file",
+                name: "create_asset",
+            },
+            "convert_dataset_to_openlineage" => Replacement::AutoImport {
+                module: "airflow.providers.common.io.assets.file",
+                name: "convert_asset_to_openlineage",
+            },
+            "sanitize_uri" => {
                 Replacement::Name("airflow.providers.common.io.assets.file.sanitize_uri")
             }
             _ => return,
@@ -856,23 +805,28 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
         // airflow.providers.fab
         ["airflow", "providers", "fab", "auth_manager", "fab_auth_manager", "is_authorized_dataset"] => {
-            Replacement::Name(
-                "airflow.providers.fab.auth_manager.fab_auth_manager.is_authorized_asset",
-            )
+            Replacement::AutoImport {
+                module: "airflow.providers.fab.auth_manager.fab_auth_manager",
+                name: "is_authorized_asset",
+            }
         }
 
         // airflow.providers.google
-        ["airflow", "providers", "google", rest @ ..] => match &rest {
-            ["datasets", "bigquery", "create_dataset"] => {
-                Replacement::Name("airflow.providers.google.assets.bigquery.create_asset")
-            }
-            ["datasets", "gcs", "create_dataset"] => {
-                Replacement::Name("airflow.providers.google.assets.gcs.create_asset")
-            }
-            ["datasets", "gcs", "convert_dataset_to_openlineage"] => Replacement::Name(
-                "airflow.providers.google.assets.gcs.convert_asset_to_openlineage",
-            ),
-            ["datasets", "gcs", "sanitize_uri"] => {
+        // airflow.providers.google.datasets
+        ["airflow", "providers", "google", "datasets", rest @ ..] => match &rest {
+            ["bigquery", "create_dataset"] => Replacement::AutoImport {
+                module: "airflow.providers.google.assets.bigquery",
+                name: "create_asset",
+            },
+            ["gcs", "create_dataset"] => Replacement::AutoImport {
+                module: "airflow.providers.google.assets.gcs",
+                name: "create_asset",
+            },
+            ["gcs", "convert_dataset_to_openlineage"] => Replacement::AutoImport {
+                module: "airflow.providers.google.assets.gcs",
+                name: "convert_asset_to_openlineage",
+            },
+            ["gcs", "sanitize_uri"] => {
                 Replacement::Name("airflow.providers.google.assets.gcs.sanitize_uri")
             }
             _ => return,
@@ -889,14 +843,17 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.providers.openlineage
-        ["airflow", "providers", "openlineage", rest @ ..] => match &rest {
-            ["utils", "utils", "DatasetInfo"] => {
-                Replacement::Name("airflow.providers.openlineage.utils.utils.AssetInfo")
-            }
+        // airflow.providers.openlineage.utils.utils
+        ["airflow", "providers", "openlineage", "utils", "utils", rest] => match *rest {
+            "DatasetInfo" => Replacement::AutoImport {
+                module: "airflow.providers.openlineage.utils.utils",
+                name: "AssetInfo",
+            },
 
-            ["utils", "utils", "translate_airflow_dataset"] => Replacement::Name(
-                "airflow.providers.openlineage.utils.utils.translate_airflow_asset",
-            ),
+            "translate_airflow_dataset" => Replacement::AutoImport {
+                module: "airflow.providers.openlineage.utils.utils",
+                name: "translate_airflow_asset",
+            },
             _ => return,
         },
 
@@ -908,10 +865,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         _ => return,
     };
 
-    if is_guarded_by_try_except(expr, &replacement, semantic) {
-        return;
-    }
-
     let mut diagnostic = Diagnostic::new(
         Airflow3Removal {
             deprecated: qualified_name.to_string(),
@@ -919,11 +872,18 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
         range,
     );
-
-    if let Replacement::AutoImport { path, name } = replacement {
+    let semantic = checker.semantic();
+    if let Some((module, name)) = match &replacement {
+        Replacement::AutoImport { module, name } => Some((module, *name)),
+        Replacement::SourceModuleMoved { module, name } => Some((module, name.as_str())),
+        _ => None,
+    } {
+        if is_guarded_by_try_except(expr, module, name, semantic) {
+            return;
+        }
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(path, name),
+                &ImportRequest::import_from(module, name),
                 expr.start(),
                 checker.semantic(),
             )?;
@@ -1021,12 +981,6 @@ fn is_airflow_hook(segments: &[&str]) -> bool {
     is_airflow_builtin_or_provider(segments, "hooks", "Hook")
 }
 
-/// Check whether the symbol is coming from the `operators` builtin or provider module which ends
-/// with `Operator`.
-fn is_airflow_operator(segments: &[&str]) -> bool {
-    is_airflow_builtin_or_provider(segments, "operators", "Operator")
-}
-
 /// Check whether the symbol is coming from the `log` builtin or provider module which ends
 /// with `TaskHandler`.
 fn is_airflow_task_handler(segments: &[&str]) -> bool {
@@ -1050,44 +1004,6 @@ fn is_airflow_auth_manager(segments: &[&str]) -> bool {
                 (rest.iter().position(|&s| s == "auth_manager"), rest.last())
             {
                 pos + 1 < rest.len() && last_element.ends_with("AuthManager")
-            } else {
-                false
-            }
-        }
-
-        _ => false,
-    }
-}
-
-/// Check whether the segments corresponding to the fully qualified name points to a symbol that's
-/// either a builtin or coming from one of the providers in Airflow.
-///
-/// The pattern it looks for are:
-/// - `airflow.providers.**.<module>.**.*<symbol_suffix>` for providers
-/// - `airflow.<module>.**.*<symbol_suffix>` for builtins
-///
-/// where `**` is one or more segments separated by a dot, and `*` is one or more characters.
-///
-/// Examples for the above patterns:
-/// - `airflow.providers.google.cloud.secrets.secret_manager.CloudSecretManagerBackend` (provider)
-/// - `airflow.secrets.base_secrets.BaseSecretsBackend` (builtin)
-fn is_airflow_builtin_or_provider(segments: &[&str], module: &str, symbol_suffix: &str) -> bool {
-    match segments {
-        ["airflow", "providers", rest @ ..] => {
-            if let (Some(pos), Some(last_element)) =
-                (rest.iter().position(|&s| s == module), rest.last())
-            {
-                // Check that the module is not the last element i.e., there's a symbol that's
-                // being used from the `module` that ends with `symbol_suffix`.
-                pos + 1 < rest.len() && last_element.ends_with(symbol_suffix)
-            } else {
-                false
-            }
-        }
-
-        ["airflow", first, rest @ ..] => {
-            if let Some(last) = rest.last() {
-                *first == module && last.ends_with(symbol_suffix)
             } else {
                 false
             }

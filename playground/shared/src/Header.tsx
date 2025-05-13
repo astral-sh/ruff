@@ -17,7 +17,7 @@ export default function Header({
 }: {
   edit: number | null;
   theme: Theme;
-  logo: "ruff" | "astral";
+  logo: "ruff" | "ty";
   version: string | null;
   onChangeTheme: (theme: Theme) => void;
   onReset?(): void;
@@ -77,13 +77,7 @@ function Divider() {
   );
 }
 
-function Logo({
-  name,
-  className,
-}: {
-  name: "ruff" | "astral";
-  className: string;
-}) {
+function Logo({ name, className }: { name: "ruff" | "ty"; className: string }) {
   switch (name) {
     case "ruff":
       return (
@@ -100,7 +94,7 @@ function Logo({
           />
         </svg>
       );
-    case "astral":
+    case "ty":
       return (
         <svg
           height={32}

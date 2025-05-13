@@ -24,7 +24,7 @@ pub enum Emit {
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
-#[allow(clippy::struct_excessive_bools)] // It's only the dev cli anyways
+#[expect(clippy::struct_excessive_bools)] // It's only the dev cli anyways
 pub struct Cli {
     /// Python files to format. If there are none, stdin will be used. `-` as stdin is not supported
     pub files: Vec<PathBuf>,

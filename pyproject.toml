@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.11.4"
+version = "0.11.9"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -60,7 +60,7 @@ include = [
 [tool.ruff]
 target-version = "py38"
 extend-exclude = [
-    "crates/red_knot_vendored/vendor/",
+    "crates/ty_vendored/vendor/",
     "crates/ruff/resources/",
     "crates/ruff_linter/resources/",
     "crates/ruff_python_formatter/resources/",
@@ -99,7 +99,7 @@ required-imports = ["from __future__ import annotations"]
 [tool.black]
 force-exclude = '''
 /(
-  | crates/red_knot_vendored/vendor
+  | crates/ty_vendored/vendor
   | crates/ruff_linter/resources
   | crates/ruff_python_formatter/resources
   | crates/ruff_python_parser/resources
@@ -110,7 +110,7 @@ force-exclude = '''
 major_labels = []  # Ruff never uses the major version number
 minor_labels = ["breaking"]   # Bump the minor version on breaking changes
 
-changelog_ignore_labels = ["internal", "ci", "red-knot", "testing"]
+changelog_ignore_labels = ["internal", "ci", "testing", "ty"]
 
 changelog_sections.breaking = "Breaking changes"
 changelog_sections.preview = "Preview features"

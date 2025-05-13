@@ -1,0 +1,34 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: shadowing.md - Shadowing - Implicit class shadowing
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/shadowing.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class C: ...
+2 | 
+3 | C = 1  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Implicit shadowing of class `C`
+ --> src/mdtest_snippet.py:3:1
+  |
+1 | class C: ...
+2 |
+3 | C = 1  # error: [invalid-assignment]
+  | ^
+  |
+info: Annotate to make it explicit if this is intentional
+info: rule `invalid-assignment` is enabled by default
+
+```

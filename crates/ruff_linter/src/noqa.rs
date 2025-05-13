@@ -238,7 +238,7 @@ impl<'a> FileNoqaDirectives<'a> {
                     let no_indentation_at_offset =
                         indentation_at_offset(range.start(), locator.contents()).is_none();
                     if !warnings.is_empty() || no_indentation_at_offset {
-                        #[allow(deprecated)]
+                        #[expect(deprecated)]
                         let line = locator.compute_line_index(range.start());
                         let path_display = relativize_path(path);
 
@@ -268,7 +268,7 @@ impl<'a> FileNoqaDirectives<'a> {
                                 {
                                     Some(rule.noqa_code())
                                 } else {
-                                    #[allow(deprecated)]
+                                    #[expect(deprecated)]
                                     let line = locator.compute_line_index(range.start());
                                     let path_display = relativize_path(path);
                                     warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
@@ -285,7 +285,7 @@ impl<'a> FileNoqaDirectives<'a> {
                     });
                 }
                 Err(err) => {
-                    #[allow(deprecated)]
+                    #[expect(deprecated)]
                     let line = locator.compute_line_index(range.start());
                     let path_display = relativize_path(path);
                     warn!("Invalid `# ruff: noqa` directive at {path_display}:{line}: {err}");
@@ -1053,7 +1053,7 @@ impl<'a> NoqaDirectives<'a> {
                     directive,
                 })) => {
                     if !warnings.is_empty() {
-                        #[allow(deprecated)]
+                        #[expect(deprecated)]
                         let line = locator.compute_line_index(range.start());
                         let path_display = relativize_path(path);
                         for warning in warnings {
@@ -1073,7 +1073,7 @@ impl<'a> NoqaDirectives<'a> {
                                 )
                                 .is_err()
                                 {
-                                    #[allow(deprecated)]
+                                    #[expect(deprecated)]
                                     let line = locator.compute_line_index(range.start());
                                     let path_display = relativize_path(path);
                                     warn!("Invalid rule code provided to `# noqa` at {path_display}:{line}: {code}");
@@ -1091,7 +1091,7 @@ impl<'a> NoqaDirectives<'a> {
                     });
                 }
                 Err(err) => {
-                    #[allow(deprecated)]
+                    #[expect(deprecated)]
                     let line = locator.compute_line_index(range.start());
                     let path_display = relativize_path(path);
                     warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");

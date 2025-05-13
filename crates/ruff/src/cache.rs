@@ -86,7 +86,7 @@ pub(crate) struct Cache {
     changes: Mutex<Vec<Change>>,
     /// The "current" timestamp used as cache for the updates of
     /// [`FileCache::last_seen`]
-    #[allow(clippy::struct_field_names)]
+    #[expect(clippy::struct_field_names)]
     last_seen_cache: u64,
 }
 
@@ -146,7 +146,7 @@ impl Cache {
         Cache::new(path, package)
     }
 
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     fn new(path: PathBuf, package: PackageCache) -> Self {
         Cache {
             path,
@@ -204,7 +204,7 @@ impl Cache {
     }
 
     /// Applies the pending changes without storing the cache to disk.
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     pub(crate) fn save(&mut self) -> bool {
         /// Maximum duration for which we keep a file in cache that hasn't been seen.
         const MAX_LAST_SEEN: Duration = Duration::from_secs(30 * 24 * 60 * 60); // 30 days.
@@ -439,7 +439,7 @@ impl LintCacheData {
             .map(|msg| {
                 // Make sure that all message use the same source file.
                 assert_eq!(
-                    &msg.file,
+                    msg.file,
                     messages.first().unwrap().source_file(),
                     "message uses a different source file"
                 );
@@ -616,7 +616,7 @@ mod tests {
         let settings = Settings {
             cache_dir,
             linter: LinterSettings {
-                unresolved_target_version: PythonVersion::latest(),
+                unresolved_target_version: PythonVersion::latest().into(),
                 ..Default::default()
             },
             ..Settings::default()
@@ -834,7 +834,6 @@ mod tests {
         // Regression test for issue #3086.
 
         #[cfg(unix)]
-        #[allow(clippy::items_after_statements)]
         fn flip_execute_permission_bit(path: &Path) -> io::Result<()> {
             use std::os::unix::fs::PermissionsExt;
             let file = fs::OpenOptions::new().write(true).open(path)?;
@@ -843,7 +842,6 @@ mod tests {
         }
 
         #[cfg(windows)]
-        #[allow(clippy::items_after_statements)]
         fn flip_read_only_permission(path: &Path) -> io::Result<()> {
             let file = fs::OpenOptions::new().write(true).open(path)?;
             let mut perms = file.metadata()?.permissions();

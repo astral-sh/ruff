@@ -38,6 +38,11 @@ use crate::checkers::ast::Checker;
 ///     nums.add(num + 5)
 /// ```
 ///
+/// ## Fix safety
+/// This fix is always unsafe because it changes the program’s behavior. Replacing the
+/// original set with a copy during iteration allows code that would previously raise a
+/// `RuntimeError` to run without error.
+///
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]

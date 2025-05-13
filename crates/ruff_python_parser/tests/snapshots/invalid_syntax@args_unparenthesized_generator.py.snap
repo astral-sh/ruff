@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/args_unparenthesized_generator.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..65,
+        range: 0..92,
         body: [
             Expr(
                 StmtExpr {
@@ -194,6 +193,82 @@ Module(
                     ),
                 },
             ),
+            Expr(
+                StmtExpr {
+                    range: 65..91,
+                    value: Call(
+                        ExprCall {
+                            range: 65..91,
+                            func: Name(
+                                ExprName {
+                                    range: 65..68,
+                                    id: Name("sum"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 68..91,
+                                args: [
+                                    Generator(
+                                        ExprGenerator {
+                                            range: 69..89,
+                                            elt: Name(
+                                                ExprName {
+                                                    range: 69..70,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            generators: [
+                                                Comprehension {
+                                                    range: 71..89,
+                                                    target: Name(
+                                                        ExprName {
+                                                            range: 75..76,
+                                                            id: Name("x"),
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    iter: Call(
+                                                        ExprCall {
+                                                            range: 80..89,
+                                                            func: Name(
+                                                                ExprName {
+                                                                    range: 80..85,
+                                                                    id: Name("range"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            arguments: Arguments {
+                                                                range: 85..89,
+                                                                args: [
+                                                                    NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            range: 86..88,
+                                                                            value: Int(
+                                                                                10,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                                keywords: [],
+                                                            },
+                                                        },
+                                                    ),
+                                                    ifs: [],
+                                                    is_async: false,
+                                                },
+                                            ],
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -204,6 +279,7 @@ Module(
 1 | sum(x for x in range(10), 5)
   |     ^^^^^^^^^^^^^^^^^^^^ Syntax Error: Unparenthesized generator expression cannot be used here
 2 | total(1, 2, x for x in range(5), 6)
+3 | sum(x for x in range(10),)
   |
 
 
@@ -211,4 +287,13 @@ Module(
 1 | sum(x for x in range(10), 5)
 2 | total(1, 2, x for x in range(5), 6)
   |             ^^^^^^^^^^^^^^^^^^^ Syntax Error: Unparenthesized generator expression cannot be used here
+3 | sum(x for x in range(10),)
+  |
+
+
+  |
+1 | sum(x for x in range(10), 5)
+2 | total(1, 2, x for x in range(5), 6)
+3 | sum(x for x in range(10),)
+  |     ^^^^^^^^^^^^^^^^^^^^ Syntax Error: Unparenthesized generator expression cannot be used here
   |

@@ -1,0 +1,117 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+resources/test/fixtures/syntax_errors/yield_scope.py:1:1: F704 `yield` statement outside of a function
+  |
+1 | yield  # error
+  | ^^^^^ F704
+2 | yield 1  # error
+3 | yield from 1  # error
+  |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:2:1: F704 `yield` statement outside of a function
+  |
+1 | yield  # error
+2 | yield 1  # error
+  | ^^^^^^^ F704
+3 | yield from 1  # error
+4 | await 1  # error
+  |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:3:1: F704 `yield from` statement outside of a function
+  |
+1 | yield  # error
+2 | yield 1  # error
+3 | yield from 1  # error
+  | ^^^^^^^^^^^^ F704
+4 | await 1  # error
+5 | [(yield x) for x in range(3)]  # error
+  |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:4:1: F704 `await` statement outside of a function
+  |
+2 | yield 1  # error
+3 | yield from 1  # error
+4 | await 1  # error
+  | ^^^^^^^ F704
+5 | [(yield x) for x in range(3)]  # error
+  |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:5:3: F704 `yield` statement outside of a function
+  |
+3 | yield from 1  # error
+4 | await 1  # error
+5 | [(yield x) for x in range(3)]  # error
+  |   ^^^^^^^ F704
+  |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:23:9: F704 `yield` statement outside of a function
+   |
+21 | def outer():
+22 |     class C:
+23 |         yield 1  # error
+   |         ^^^^^^^ F704
+24 |
+25 |     [(yield 1) for x in range(3)]  # error
+   |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:25:7: F704 `yield` statement outside of a function
+   |
+23 |         yield 1  # error
+24 |
+25 |     [(yield 1) for x in range(3)]  # error
+   |       ^^^^^^^ F704
+26 |     ((yield 1) for x in range(3))  # error
+27 |     {(yield 1) for x in range(3)}  # error
+   |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:26:7: F704 `yield` statement outside of a function
+   |
+25 |     [(yield 1) for x in range(3)]  # error
+26 |     ((yield 1) for x in range(3))  # error
+   |       ^^^^^^^ F704
+27 |     {(yield 1) for x in range(3)}  # error
+28 |     {(yield 1): 0 for x in range(3)}  # error
+   |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:27:7: F704 `yield` statement outside of a function
+   |
+25 |     [(yield 1) for x in range(3)]  # error
+26 |     ((yield 1) for x in range(3))  # error
+27 |     {(yield 1) for x in range(3)}  # error
+   |       ^^^^^^^ F704
+28 |     {(yield 1): 0 for x in range(3)}  # error
+29 |     {0: (yield 1) for x in range(3)}  # error
+   |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:28:7: F704 `yield` statement outside of a function
+   |
+26 |     ((yield 1) for x in range(3))  # error
+27 |     {(yield 1) for x in range(3)}  # error
+28 |     {(yield 1): 0 for x in range(3)}  # error
+   |       ^^^^^^^ F704
+29 |     {0: (yield 1) for x in range(3)}  # error
+   |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:29:10: F704 `yield` statement outside of a function
+   |
+27 |     {(yield 1) for x in range(3)}  # error
+28 |     {(yield 1): 0 for x in range(3)}  # error
+29 |     {0: (yield 1) for x in range(3)}  # error
+   |          ^^^^^^^ F704
+   |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:36:10: F704 `await` statement outside of a function
+   |
+35 |     class C:
+36 |         [await x for x in range(3)]  # error, classes break async scope
+   |          ^^^^^^^ F704
+37 |
+38 |     lambda x: await x  # okay for now, lambda breaks _async_ scope but is a function
+   |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:41:1: F704 `await` statement outside of a function
+   |
+41 | await 1  # error
+   | ^^^^^^^ F704
+   |

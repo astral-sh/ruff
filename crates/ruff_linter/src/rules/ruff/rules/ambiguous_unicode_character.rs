@@ -8,6 +8,7 @@ use ruff_python_ast::{self as ast, StringLike};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_unicode_to_unicode_confusables_enabled;
 use crate::registry::AsRule;
 use crate::rules::ruff::rules::confusables::confusable;
 use crate::rules::ruff::rules::Context;
@@ -264,9 +265,9 @@ fn ambiguous_unicode_character(
             // Check if the boundary character is itself an ambiguous unicode character, in which
             // case, it's always included as a diagnostic.
             if !current_char.is_ascii() {
-                if let Some(representant) = confusable(current_char as u32)
-                    .filter(|representant| settings.preview.is_enabled() || representant.is_ascii())
-                {
+                if let Some(representant) = confusable(current_char as u32).filter(|representant| {
+                    is_unicode_to_unicode_confusables_enabled(settings) || representant.is_ascii()
+                }) {
                     let candidate = Candidate::new(
                         TextSize::try_from(relative_offset).unwrap() + range.start(),
                         current_char,
@@ -280,9 +281,9 @@ fn ambiguous_unicode_character(
         } else if current_char.is_ascii() {
             // The current word contains at least one ASCII character.
             word_flags |= WordFlags::ASCII;
-        } else if let Some(representant) = confusable(current_char as u32)
-            .filter(|representant| settings.preview.is_enabled() || representant.is_ascii())
-        {
+        } else if let Some(representant) = confusable(current_char as u32).filter(|representant| {
+            is_unicode_to_unicode_confusables_enabled(settings) || representant.is_ascii()
+        }) {
             // The current word contains an ambiguous unicode character.
             word_candidates.push(Candidate::new(
                 TextSize::try_from(relative_offset).unwrap() + range.start(),

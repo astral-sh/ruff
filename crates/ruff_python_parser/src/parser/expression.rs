@@ -661,117 +661,120 @@ impl<'src> Parser<'src> {
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
 
-        self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
-            let argument_start = parser.node_start();
-            if parser.eat(TokenKind::DoubleStar) {
-                let value = parser.parse_conditional_expression_or_higher();
-
-                keywords.push(ast::Keyword {
-                    arg: None,
-                    value: value.expr,
-                    range: parser.node_range(argument_start),
-                });
-
-                seen_keyword_unpacking = true;
-            } else {
-                let start = parser.node_start();
-                let mut parsed_expr = parser
-                    .parse_named_expression_or_higher(ExpressionContext::starred_conditional());
-
-                match parser.current_token_kind() {
-                    TokenKind::Async | TokenKind::For => {
-                        if parsed_expr.is_unparenthesized_starred_expr() {
-                            parser.add_error(
-                                ParseErrorType::IterableUnpackingInComprehension,
-                                &parsed_expr,
-                            );
-                        }
-
-                        parsed_expr = Expr::Generator(parser.parse_generator_expression(
-                            parsed_expr.expr,
-                            start,
-                            Parenthesized::No,
-                        ))
-                        .into();
-                    }
-                    _ => {
-                        if seen_keyword_unpacking && parsed_expr.is_unparenthesized_starred_expr() {
-                            parser.add_error(
-                                ParseErrorType::InvalidArgumentUnpackingOrder,
-                                &parsed_expr,
-                            );
-                        }
-                    }
-                }
-
-                let arg_range = parser.node_range(start);
-                if parser.eat(TokenKind::Equal) {
-                    seen_keyword_argument = true;
-                    let arg = if let ParsedExpr {
-                        expr: Expr::Name(ident_expr),
-                        is_parenthesized,
-                    } = parsed_expr
-                    {
-                        // test_ok parenthesized_kwarg_py37
-                        // # parse_options: {"target-version": "3.7"}
-                        // f((a)=1)
-
-                        // test_err parenthesized_kwarg_py38
-                        // # parse_options: {"target-version": "3.8"}
-                        // f((a)=1)
-                        // f((a) = 1)
-                        // f( ( a ) = 1)
-
-                        if is_parenthesized {
-                            parser.add_unsupported_syntax_error(
-                                UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
-                                arg_range,
-                            );
-                        }
-
-                        ast::Identifier {
-                            id: ident_expr.id,
-                            range: ident_expr.range,
-                        }
-                    } else {
-                        // TODO(dhruvmanila): Parser shouldn't drop the `parsed_expr` if it's
-                        // not a name expression. We could add the expression into `args` but
-                        // that means the error is a missing comma instead.
-                        parser.add_error(
-                            ParseErrorType::OtherError("Expected a parameter name".to_string()),
-                            &parsed_expr,
-                        );
-                        ast::Identifier {
-                            id: Name::empty(),
-                            range: parsed_expr.range(),
-                        }
-                    };
-
+        let has_trailing_comma =
+            self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
+                let argument_start = parser.node_start();
+                if parser.eat(TokenKind::DoubleStar) {
                     let value = parser.parse_conditional_expression_or_higher();
 
                     keywords.push(ast::Keyword {
-                        arg: Some(arg),
+                        arg: None,
                         value: value.expr,
                         range: parser.node_range(argument_start),
                     });
+
+                    seen_keyword_unpacking = true;
                 } else {
-                    if !parsed_expr.is_unparenthesized_starred_expr() {
-                        if seen_keyword_unpacking {
-                            parser.add_error(
-                                ParseErrorType::PositionalAfterKeywordUnpacking,
-                                &parsed_expr,
-                            );
-                        } else if seen_keyword_argument {
-                            parser.add_error(
-                                ParseErrorType::PositionalAfterKeywordArgument,
-                                &parsed_expr,
-                            );
+                    let start = parser.node_start();
+                    let mut parsed_expr = parser
+                        .parse_named_expression_or_higher(ExpressionContext::starred_conditional());
+
+                    match parser.current_token_kind() {
+                        TokenKind::Async | TokenKind::For => {
+                            if parsed_expr.is_unparenthesized_starred_expr() {
+                                parser.add_error(
+                                    ParseErrorType::IterableUnpackingInComprehension,
+                                    &parsed_expr,
+                                );
+                            }
+
+                            parsed_expr = Expr::Generator(parser.parse_generator_expression(
+                                parsed_expr.expr,
+                                start,
+                                Parenthesized::No,
+                            ))
+                            .into();
+                        }
+                        _ => {
+                            if seen_keyword_unpacking
+                                && parsed_expr.is_unparenthesized_starred_expr()
+                            {
+                                parser.add_error(
+                                    ParseErrorType::InvalidArgumentUnpackingOrder,
+                                    &parsed_expr,
+                                );
+                            }
                         }
                     }
-                    args.push(parsed_expr.expr);
+
+                    let arg_range = parser.node_range(start);
+                    if parser.eat(TokenKind::Equal) {
+                        seen_keyword_argument = true;
+                        let arg = if let ParsedExpr {
+                            expr: Expr::Name(ident_expr),
+                            is_parenthesized,
+                        } = parsed_expr
+                        {
+                            // test_ok parenthesized_kwarg_py37
+                            // # parse_options: {"target-version": "3.7"}
+                            // f((a)=1)
+
+                            // test_err parenthesized_kwarg_py38
+                            // # parse_options: {"target-version": "3.8"}
+                            // f((a)=1)
+                            // f((a) = 1)
+                            // f( ( a ) = 1)
+
+                            if is_parenthesized {
+                                parser.add_unsupported_syntax_error(
+                                    UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
+                                    arg_range,
+                                );
+                            }
+
+                            ast::Identifier {
+                                id: ident_expr.id,
+                                range: ident_expr.range,
+                            }
+                        } else {
+                            // TODO(dhruvmanila): Parser shouldn't drop the `parsed_expr` if it's
+                            // not a name expression. We could add the expression into `args` but
+                            // that means the error is a missing comma instead.
+                            parser.add_error(
+                                ParseErrorType::OtherError("Expected a parameter name".to_string()),
+                                &parsed_expr,
+                            );
+                            ast::Identifier {
+                                id: Name::empty(),
+                                range: parsed_expr.range(),
+                            }
+                        };
+
+                        let value = parser.parse_conditional_expression_or_higher();
+
+                        keywords.push(ast::Keyword {
+                            arg: Some(arg),
+                            value: value.expr,
+                            range: parser.node_range(argument_start),
+                        });
+                    } else {
+                        if !parsed_expr.is_unparenthesized_starred_expr() {
+                            if seen_keyword_unpacking {
+                                parser.add_error(
+                                    ParseErrorType::PositionalAfterKeywordUnpacking,
+                                    &parsed_expr,
+                                );
+                            } else if seen_keyword_argument {
+                                parser.add_error(
+                                    ParseErrorType::PositionalAfterKeywordArgument,
+                                    &parsed_expr,
+                                );
+                            }
+                        }
+                        args.push(parsed_expr.expr);
+                    }
                 }
-            }
-        });
+            });
 
         self.expect(TokenKind::Rpar);
 
@@ -781,7 +784,7 @@ impl<'src> Parser<'src> {
             keywords: keywords.into_boxed_slice(),
         };
 
-        self.validate_arguments(&arguments);
+        self.validate_arguments(&arguments, has_trailing_comma);
 
         arguments
     }
@@ -2521,9 +2524,9 @@ impl<'src> Parser<'src> {
 
     /// Performs the following validations on the function call arguments:
     /// 1. There aren't any duplicate keyword argument
-    /// 2. If there are more than one argument (positional or keyword), all generator expressions
-    ///    present should be parenthesized.
-    fn validate_arguments(&mut self, arguments: &ast::Arguments) {
+    /// 2. If there are more than one argument (positional or keyword) or a single argument with a
+    ///    trailing comma, all generator expressions present should be parenthesized.
+    fn validate_arguments(&mut self, arguments: &ast::Arguments, has_trailing_comma: bool) {
         let mut all_arg_names =
             FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
 
@@ -2541,7 +2544,7 @@ impl<'src> Parser<'src> {
             }
         }
 
-        if arguments.len() > 1 {
+        if has_trailing_comma || arguments.len() > 1 {
             for arg in &*arguments.args {
                 if let Some(ast::ExprGenerator {
                     range,
@@ -2550,11 +2553,14 @@ impl<'src> Parser<'src> {
                 }) = arg.as_generator_expr()
                 {
                     // test_ok args_unparenthesized_generator
+                    // zip((x for x in range(10)), (y for y in range(10)))
                     // sum(x for x in range(10))
+                    // sum((x for x in range(10)),)
 
                     // test_err args_unparenthesized_generator
                     // sum(x for x in range(10), 5)
                     // total(1, 2, x for x in range(5), 6)
+                    // sum(x for x in range(10),)
                     self.add_error(ParseErrorType::UnparenthesizedGeneratorExpression, range);
                 }
             }

@@ -5,7 +5,7 @@ use lsp_types as types;
 use lsp_types::InitializeParams;
 use std::num::NonZeroUsize;
 // The new PanicInfoHook name requires MSRV >= 1.82
-#[allow(deprecated)]
+#[expect(deprecated)]
 use std::panic::PanicInfo;
 use std::str::FromStr;
 use types::ClientCapabilities;
@@ -59,6 +59,7 @@ impl Server {
 
         let client_capabilities = init_params.capabilities;
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
+
         let server_capabilities = Self::server_capabilities(position_encoding);
 
         let connection = connection.initialize_finish(
@@ -98,6 +99,8 @@ impl Server {
             workspace_settings.unwrap_or_default(),
         )?;
 
+        tracing::debug!("Negotiated position encoding: {position_encoding:?}");
+
         Ok(Self {
             connection,
             worker_threads,
@@ -113,7 +116,7 @@ impl Server {
 
     pub fn run(self) -> crate::Result<()> {
         // The new PanicInfoHook name requires MSRV >= 1.82
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         type PanicHook = Box<dyn Fn(&PanicInfo<'_>) + 'static + Sync + Send>;
         struct RestorePanicHook {
             hook: Option<PanicHook>,
@@ -167,7 +170,6 @@ impl Server {
         .join()
     }
 
-    #[allow(clippy::needless_pass_by_value)] // this is because we aren't using `next_request_id` yet.
     fn event_loop(
         connection: &Connection,
         client_capabilities: &ClientCapabilities,

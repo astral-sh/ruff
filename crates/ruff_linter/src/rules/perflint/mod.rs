@@ -1,6 +1,6 @@
 //! Rules from [perflint](https://pypi.org/project/perflint/).
+mod helpers;
 pub(crate) mod rules;
-
 #[cfg(test)]
 mod tests {
     use std::path::Path;
@@ -31,7 +31,8 @@ mod tests {
         Ok(())
     }
 
-    // TODO: remove this test case when the fix for `perf401` is stabilized
+    // TODO: remove this test case when the fixes for `perf401` and `perf403` are stabilized
+    #[test_case(Rule::ManualDictComprehension, Path::new("PERF403.py"))]
     #[test_case(Rule::ManualListComprehension, Path::new("PERF401.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
@@ -43,7 +44,7 @@ mod tests {
             Path::new("perflint").join(path).as_path(),
             &LinterSettings {
                 preview: PreviewMode::Enabled,
-                unresolved_target_version: PythonVersion::PY310,
+                unresolved_target_version: PythonVersion::PY310.into(),
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;

@@ -4,9 +4,9 @@
 use itertools::Itertools;
 use std::fmt::Write;
 
+use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
 use ruff_python_trivia::textwrap;
 use ruff_workspace::options::Options;
-use ruff_workspace::options_base::{OptionField, OptionSet, OptionsMetadata, Visit};
 
 pub(crate) fn generate() -> String {
     let mut output = String::new();

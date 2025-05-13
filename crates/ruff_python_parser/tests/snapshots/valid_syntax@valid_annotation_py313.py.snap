@@ -1,0 +1,178 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/valid_annotation_py313.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..144,
+        body: [
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 44..55,
+                    target: Name(
+                        ExprName {
+                            range: 44..45,
+                            id: Name("a"),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Named(
+                        ExprNamed {
+                            range: 48..54,
+                            target: Name(
+                                ExprName {
+                                    range: 48..49,
+                                    id: Name("x"),
+                                    ctx: Store,
+                                },
+                            ),
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 53..54,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    value: None,
+                    simple: true,
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 56..107,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("outer"),
+                        range: 60..65,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 65..67,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        AnnAssign(
+                            StmtAnnAssign {
+                                range: 73..85,
+                                target: Name(
+                                    ExprName {
+                                        range: 73..74,
+                                        id: Name("b"),
+                                        ctx: Store,
+                                    },
+                                ),
+                                annotation: Yield(
+                                    ExprYield {
+                                        range: 77..84,
+                                        value: Some(
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 83..84,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                                value: None,
+                                simple: true,
+                            },
+                        ),
+                        AnnAssign(
+                            StmtAnnAssign {
+                                range: 90..107,
+                                target: Name(
+                                    ExprName {
+                                        range: 90..91,
+                                        id: Name("c"),
+                                        ctx: Store,
+                                    },
+                                ),
+                                annotation: YieldFrom(
+                                    ExprYieldFrom {
+                                        range: 94..106,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 105..106,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                value: None,
+                                simple: true,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 108..143,
+                    is_async: true,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("outer"),
+                        range: 118..123,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 123..125,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        AnnAssign(
+                            StmtAnnAssign {
+                                range: 131..143,
+                                target: Name(
+                                    ExprName {
+                                        range: 131..132,
+                                        id: Name("d"),
+                                        ctx: Store,
+                                    },
+                                ),
+                                annotation: Await(
+                                    ExprAwait {
+                                        range: 135..142,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 141..142,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                value: None,
+                                simple: true,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

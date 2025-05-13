@@ -571,7 +571,7 @@ impl<'a> FlatBinaryExpressionSlice<'a> {
             "Operand slice must contain at least one operand"
         );
 
-        #[allow(unsafe_code)]
+        #[expect(unsafe_code)]
         unsafe {
             // SAFETY: `BinaryChainSlice` has the same layout as a slice because it uses `repr(transparent)`
             &*(std::ptr::from_ref::<[OperandOrOperator<'a>]>(slice)

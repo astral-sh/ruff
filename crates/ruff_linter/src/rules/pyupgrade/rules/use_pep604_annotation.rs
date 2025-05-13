@@ -11,7 +11,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix::edits::pad;
-use crate::settings::types::PreviewMode;
+use crate::preview::is_defer_optional_to_up045_enabled;
 
 /// ## What it does
 /// Check for type annotations that can be rewritten based on [PEP 604] syntax.
@@ -150,15 +150,16 @@ pub(crate) fn non_pep604_annotation(
 
     match operator {
         Pep604Operator::Optional => {
-            let (rule, diagnostic_kind) = match checker.settings.preview {
-                PreviewMode::Disabled => (
-                    Rule::NonPEP604AnnotationUnion,
-                    DiagnosticKind::from(NonPEP604AnnotationUnion),
-                ),
-                PreviewMode::Enabled => (
+            let (rule, diagnostic_kind) = if is_defer_optional_to_up045_enabled(checker.settings) {
+                (
                     Rule::NonPEP604AnnotationOptional,
                     DiagnosticKind::from(NonPEP604AnnotationOptional),
-                ),
+                )
+            } else {
+                (
+                    Rule::NonPEP604AnnotationUnion,
+                    DiagnosticKind::from(NonPEP604AnnotationUnion),
+                )
             };
 
             if !checker.enabled(rule) {

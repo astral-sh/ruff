@@ -2,6 +2,8 @@
 //!
 //! Within the ruff repository you can run it with `cargo dev`.
 
+#![allow(clippy::print_stdout, clippy::print_stderr)]
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use ruff::{args::GlobalConfigArgs, check};
@@ -13,9 +15,12 @@ mod generate_all;
 mod generate_cli_help;
 mod generate_docs;
 mod generate_json_schema;
-mod generate_knot_schema;
 mod generate_options;
 mod generate_rules_table;
+mod generate_ty_cli_reference;
+mod generate_ty_options;
+mod generate_ty_rules;
+mod generate_ty_schema;
 mod print_ast;
 mod print_cst;
 mod print_tokens;
@@ -34,18 +39,20 @@ struct Args {
 }
 
 #[derive(Subcommand)]
-#[allow(clippy::large_enum_variant)]
+#[expect(clippy::large_enum_variant)]
 enum Command {
     /// Run all code and documentation generation steps.
     GenerateAll(generate_all::Args),
     /// Generate JSON schema for the TOML configuration file.
     GenerateJSONSchema(generate_json_schema::Args),
-    /// Generate JSON schema for the Red Knot TOML configuration file.
-    GenerateKnotSchema(generate_knot_schema::Args),
+    /// Generate JSON schema for the ty TOML configuration file.
+    GenerateTySchema(generate_ty_schema::Args),
     /// Generate a Markdown-compatible table of supported lint rules.
     GenerateRulesTable,
+    GenerateTyRules(generate_ty_rules::Args),
     /// Generate a Markdown-compatible listing of configuration options.
     GenerateOptions,
+    GenerateTyOptions(generate_ty_options::Args),
     /// Generate CLI help.
     GenerateCliHelp(generate_cli_help::Args),
     /// Generate Markdown docs.
@@ -82,13 +89,15 @@ fn main() -> Result<ExitCode> {
         command,
         global_options,
     } = Args::parse();
-    #[allow(clippy::print_stdout)]
+    #[expect(clippy::print_stdout)]
     match command {
         Command::GenerateAll(args) => generate_all::main(&args)?,
         Command::GenerateJSONSchema(args) => generate_json_schema::main(&args)?,
-        Command::GenerateKnotSchema(args) => generate_knot_schema::main(&args)?,
+        Command::GenerateTySchema(args) => generate_ty_schema::main(&args)?,
         Command::GenerateRulesTable => println!("{}", generate_rules_table::generate()),
+        Command::GenerateTyRules(args) => generate_ty_rules::main(&args)?,
         Command::GenerateOptions => println!("{}", generate_options::generate()),
+        Command::GenerateTyOptions(args) => generate_ty_options::main(&args)?,
         Command::GenerateCliHelp(args) => generate_cli_help::main(&args)?,
         Command::GenerateDocs(args) => generate_docs::main(&args)?,
         Command::PrintAST(args) => print_ast::main(&args)?,

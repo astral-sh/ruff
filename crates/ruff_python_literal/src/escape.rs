@@ -103,11 +103,7 @@ impl std::fmt::Display for StrRepr<'_, '_> {
 impl UnicodeEscape<'_> {
     const REPR_RESERVED_LEN: usize = 2; // for quotes
 
-    #[allow(
-        clippy::cast_possible_wrap,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss
-    )]
+    #[expect(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
     pub fn repr_layout(source: &str, preferred_quote: Quote) -> EscapeLayout {
         Self::output_layout_with_checker(source, preferred_quote, |a, b| {
             Some((a as isize).checked_add(b as isize)? as usize)
@@ -265,11 +261,7 @@ impl<'a> AsciiEscape<'a> {
 }
 
 impl AsciiEscape<'_> {
-    #[allow(
-        clippy::cast_possible_wrap,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss
-    )]
+    #[expect(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
     pub fn repr_layout(source: &[u8], preferred_quote: Quote) -> EscapeLayout {
         Self::output_layout_with_checker(source, preferred_quote, 3, |a, b| {
             Some((a as isize).checked_add(b as isize)? as usize)

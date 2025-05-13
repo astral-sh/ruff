@@ -40,6 +40,12 @@ use crate::registry::Rule;
 /// foo["baz"]  # 2
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing a repeated dictionary key
+/// may delete comments that are attached to the removed key-value pair. This can also change
+/// the program's behavior if the value expressions have side effects.
+///
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[derive(ViolationMetadata)]
@@ -105,6 +111,12 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 /// }
 /// foo[baz]  # 2
 /// ```
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing a repeated dictionary key
+/// may delete comments that are attached to the removed key-value pair. This can also change
+/// the program's behavior if the value expressions have side effects.
 ///
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)

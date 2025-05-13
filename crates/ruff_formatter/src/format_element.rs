@@ -519,7 +519,7 @@ impl TextWidth {
             let char_width = match c {
                 '\t' => indent_width.value(),
                 '\n' => return TextWidth::Multiline,
-                #[allow(clippy::cast_possible_truncation)]
+                #[expect(clippy::cast_possible_truncation)]
                 c => c.width().unwrap_or(0) as u32,
             };
             width += char_width;

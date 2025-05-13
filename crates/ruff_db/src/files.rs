@@ -94,7 +94,9 @@ impl Files {
                     .root(db, path)
                     .map_or(Durability::default(), |root| root.durability(db));
 
-                let builder = File::builder(FilePath::System(absolute)).durability(durability);
+                let builder = File::builder(FilePath::System(absolute))
+                    .durability(durability)
+                    .path_durability(Durability::HIGH);
 
                 let builder = match metadata {
                     Ok(metadata) if metadata.file_type().is_file() => builder
@@ -159,9 +161,11 @@ impl Files {
         tracing::trace!("Adding virtual file {}", path);
         let virtual_file = VirtualFile(
             File::builder(FilePath::SystemVirtual(path.to_path_buf()))
+                .path_durability(Durability::HIGH)
                 .status(FileStatus::Exists)
                 .revision(FileRevision::zero())
                 .permissions(None)
+                .permissions_durability(Durability::HIGH)
                 .new(db),
         );
         self.inner
@@ -272,8 +276,8 @@ impl std::panic::RefUnwindSafe for Files {}
 /// A file that's either stored on the host system's file system or in the vendored file system.
 #[salsa::input]
 pub struct File {
-    /// The path of the file.
-    #[return_ref]
+    /// The path of the file (immutable).
+    #[returns(ref)]
     pub path: FilePath,
 
     /// The unix permissions of the file. Only supported on unix systems. Always `None` on Windows
@@ -424,9 +428,19 @@ impl File {
 
     /// Returns `true` if the file should be analyzed as a type stub.
     pub fn is_stub(self, db: &dyn Db) -> bool {
-        self.path(db)
-            .extension()
-            .is_some_and(|extension| PySourceType::from_extension(extension).is_stub())
+        self.source_type(db).is_stub()
+    }
+
+    pub fn source_type(self, db: &dyn Db) -> PySourceType {
+        match self.path(db) {
+            FilePath::System(path) => path
+                .extension()
+                .map_or(PySourceType::Python, PySourceType::from_extension),
+            FilePath::Vendored(_) => PySourceType::Stub,
+            FilePath::SystemVirtual(path) => path
+                .extension()
+                .map_or(PySourceType::Python, PySourceType::from_extension),
+        }
     }
 }
 

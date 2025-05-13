@@ -92,7 +92,7 @@ impl std::fmt::Display for IndentStyle {
     }
 }
 
-/// The visual width of a indentation.
+/// The visual width of an indentation.
 ///
 /// Determines the visual width of a tab character (`\t`) and the number of
 /// spaces per indent when using [`IndentStyle::Space`].
@@ -207,7 +207,7 @@ pub trait FormatOptions {
     /// What's the max width of a line. Defaults to 80.
     fn line_width(&self) -> LineWidth;
 
-    /// Derives the print options from the these format options
+    /// Derives the print options from these format options
     fn as_print_options(&self) -> PrinterOptions;
 }
 
@@ -925,7 +925,7 @@ pub struct FormatState<Context> {
     group_id_builder: UniqueGroupIdBuilder,
 }
 
-#[allow(clippy::missing_fields_in_debug)]
+#[expect(clippy::missing_fields_in_debug)]
 impl<Context> std::fmt::Debug for FormatState<Context>
 where
     Context: std::fmt::Debug,

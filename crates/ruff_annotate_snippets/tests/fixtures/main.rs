@@ -7,7 +7,6 @@ use snapbox::Data;
 use std::error::Error;
 
 fn main() {
-    #[cfg(not(windows))]
     tryfn::Harness::new("tests/fixtures/", setup, test)
         .select(["*/*.toml"])
         .test();

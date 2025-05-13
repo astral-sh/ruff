@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::helpers::AsyncModule;
 use ruff_python_ast::PythonVersion;
 
-#[allow(clippy::doc_link_with_quotes)]
+#[expect(clippy::doc_link_with_quotes)]
 /// ## What it does
 /// Checks for `async` function definitions with `timeout` parameters.
 ///

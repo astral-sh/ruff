@@ -8,10 +8,9 @@ use ruff_python_semantic::analyze::class::is_metaclass;
 use ruff_python_semantic::analyze::function_type::{self, FunctionType};
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_python_semantic::{Binding, ResolvedReference, ScopeId, SemanticModel};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::Checker;
-use crate::importer::{ImportRequest, ResolutionError};
+use crate::checkers::ast::{Checker, TypingImporter};
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -71,6 +70,16 @@ use ruff_python_ast::PythonVersion;
 /// The fix is only marked as unsafe if there is the possibility that it might delete a comment
 /// from your code.
 ///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for Python versions
+/// before 3.11, its diagnostic will not be emitted, and no fix will be offered, if
+/// `typing_extensions` imports have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
+///
 /// [PEP 673]: https://peps.python.org/pep-0673/#motivation
 /// [PEP-695]: https://peps.python.org/pep-0695/
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
@@ -110,6 +119,7 @@ pub(crate) fn custom_type_var_instead_of_self(
     let semantic = checker.semantic();
     let current_scope = &semantic.scopes[binding.scope];
     let function_def = binding.statement(semantic)?.as_function_def_stmt()?;
+    let importer = checker.typing_importer("Self", PythonVersion::PY311)?;
 
     let ast::StmtFunctionDef {
         name: function_name,
@@ -179,6 +189,7 @@ pub(crate) fn custom_type_var_instead_of_self(
     diagnostic.try_set_fix(|| {
         replace_custom_typevar_with_self(
             checker,
+            &importer,
             function_def,
             custom_typevar,
             self_or_cls_parameter,
@@ -311,13 +322,14 @@ fn custom_typevar<'a>(
 /// * If it was a PEP-695 type variable, removes that `TypeVar` from the PEP-695 type-parameter list
 fn replace_custom_typevar_with_self(
     checker: &Checker,
+    importer: &TypingImporter,
     function_def: &ast::StmtFunctionDef,
     custom_typevar: TypeVar,
     self_or_cls_parameter: &ast::ParameterWithDefault,
     self_or_cls_annotation: &ast::Expr,
 ) -> anyhow::Result<Fix> {
     // (1) Import `Self` (if necessary)
-    let (import_edit, self_symbol_binding) = import_self(checker, function_def.start())?;
+    let (import_edit, self_symbol_binding) = importer.import(function_def.start())?;
 
     // (2) Remove the first parameter's annotation
     let mut other_edits = vec![Edit::deletion(
@@ -365,24 +377,6 @@ fn replace_custom_typevar_with_self(
         other_edits,
         applicability,
     ))
-}
-
-/// Attempt to create an [`Edit`] that imports `Self`.
-///
-/// On Python <3.11, `Self` is imported from `typing_extensions`;
-/// on Python >=3.11, it is imported from `typing`.
-/// This is because it was added to the `typing` module on Python 3.11,
-/// but is available from the backport package `typing_extensions` on all versions.
-fn import_self(checker: &Checker, position: TextSize) -> Result<(Edit, String), ResolutionError> {
-    let source_module = if checker.target_version() >= PythonVersion::PY311 {
-        "typing"
-    } else {
-        "typing_extensions"
-    };
-    let request = ImportRequest::import_from(source_module, "Self");
-    checker
-        .importer()
-        .get_or_import_symbol(&request, position, checker.semantic())
 }
 
 /// Returns a series of [`Edit`]s that modify all references to the given `typevar`.

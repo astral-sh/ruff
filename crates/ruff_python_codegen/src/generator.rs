@@ -1365,7 +1365,7 @@ impl<'a> Generator<'a> {
 
         if !conversion.is_none() {
             self.p("!");
-            #[allow(clippy::cast_possible_truncation)]
+
             self.p(&format!("{}", conversion as u8 as char));
         }
 

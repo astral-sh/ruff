@@ -32,6 +32,7 @@ import concurrent.futures
 import enum
 import subprocess
 import tempfile
+from collections.abc import Callable
 from dataclasses import KW_ONLY, dataclass
 from functools import partial
 from pathlib import Path
@@ -47,17 +48,15 @@ Seed = NewType("Seed", int)
 ExitCode = NewType("ExitCode", int)
 
 
-def redknot_contains_bug(code: str, *, red_knot_executable: Path) -> bool:
+def ty_contains_bug(code: str, *, ty_executable: Path) -> bool:
     """Return `True` if the code triggers a panic in type-checking code."""
     with tempfile.TemporaryDirectory() as tempdir:
-        Path(tempdir, "pyproject.toml").write_text('[project]\n\tname = "fuzz-input"')
-        Path(tempdir, "input.py").write_text(code)
+        input_file = Path(tempdir, "input.py")
+        input_file.write_text(code)
         completed_process = subprocess.run(
-            [red_knot_executable, "check", "--project", tempdir],
-            capture_output=True,
-            text=True,
+            [ty_executable, "check", input_file], capture_output=True, text=True
         )
-    return completed_process.returncode != 0 and completed_process.returncode != 1
+    return completed_process.returncode not in {0, 1, 2}
 
 
 def ruff_contains_bug(code: str, *, ruff_executable: Path) -> bool:
@@ -86,8 +85,8 @@ def contains_bug(code: str, *, executable: Executable, executable_path: Path) ->
     match executable:
         case Executable.RUFF:
             return ruff_contains_bug(code, ruff_executable=executable_path)
-        case Executable.RED_KNOT:
-            return redknot_contains_bug(code, red_knot_executable=executable_path)
+        case Executable.TY:
+            return ty_contains_bug(code, ty_executable=executable_path)
         case _ as unreachable:
             assert_never(unreachable)
 
@@ -121,6 +120,8 @@ class FuzzResult:
     maybe_bug: MinimizedSourceCode | None
     # The executable we're testing
     executable: Executable
+    _: KW_ONLY
+    only_new_bugs: bool
 
     def print_description(self, index: int, num_seeds: int) -> None:
         """Describe the results of fuzzing the parser with this seed."""
@@ -132,12 +133,14 @@ class FuzzResult:
         )
         print(f"{msg:<60} {progress:>15}", flush=True)
 
+        new = "new " if self.only_new_bugs else ""
+
         if self.maybe_bug:
             match self.executable:
                 case Executable.RUFF:
-                    panic_message = "The following code triggers a parser bug:"
-                case Executable.RED_KNOT:
-                    panic_message = "The following code triggers a red-knot panic:"
+                    panic_message = f"The following code triggers a {new}parser bug:"
+                case Executable.TY:
+                    panic_message = f"The following code triggers a {new}ty panic:"
                 case _ as unreachable:
                     assert_never(unreachable)
 
@@ -149,48 +152,67 @@ class FuzzResult:
 
 def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
     """Return a `FuzzResult` instance describing the fuzzing result from this seed."""
+    # TODO(carljm) remove once we debug the slowness of these seeds
+    skip_check = seed in {120, 160, 335}
+
     code = generate_random_code(seed)
-    has_bug = (
-        contains_new_bug(
+    bug_found = False
+    minimizer_callback: Callable[[str], bool] | None = None
+
+    if args.baseline_executable_path is None:
+        only_new_bugs = False
+        if not skip_check and contains_bug(
+            code, executable=args.executable, executable_path=args.test_executable_path
+        ):
+            bug_found = True
+            minimizer_callback = partial(
+                contains_bug,
+                executable=args.executable,
+                executable_path=args.test_executable_path,
+            )
+    else:
+        only_new_bugs = True
+        if not skip_check and contains_new_bug(
             code,
             executable=args.executable,
             test_executable_path=args.test_executable_path,
             baseline_executable_path=args.baseline_executable_path,
-        )
-        if args.baseline_executable_path is not None
-        else contains_bug(
-            code, executable=args.executable, executable_path=args.test_executable_path
-        )
-    )
-    if has_bug:
-        callback = partial(
-            contains_bug,
-            executable=args.executable,
-            executable_path=args.test_executable_path,
-        )
-        try:
-            maybe_bug = MinimizedSourceCode(minimize_repro(code, callback))
-        except CouldNotMinimize as e:
-            # This is to double-check that there isn't a bug in
-            # `pysource-minimize`/`pysource-codegen`.
-            # `pysource-minimize` *should* never produce code that's invalid syntax.
-            try:
-                ast.parse(code)
-            except SyntaxError:
-                raise e from None
-            else:
-                maybe_bug = MinimizedSourceCode(code)
+        ):
+            bug_found = True
+            minimizer_callback = partial(
+                contains_new_bug,
+                executable=args.executable,
+                test_executable_path=args.test_executable_path,
+                baseline_executable_path=args.baseline_executable_path,
+            )
 
-    else:
-        maybe_bug = None
-    return FuzzResult(seed, maybe_bug, args.executable)
+    if not bug_found:
+        return FuzzResult(seed, None, args.executable, only_new_bugs=only_new_bugs)
+
+    assert minimizer_callback is not None
+
+    try:
+        maybe_bug = MinimizedSourceCode(minimize_repro(code, minimizer_callback))
+    except CouldNotMinimize as e:
+        # This is to double-check that there isn't a bug in
+        # `pysource-minimize`/`pysource-codegen`.
+        # `pysource-minimize` *should* never produce code that's invalid syntax.
+        try:
+            ast.parse(code)
+        except SyntaxError:
+            raise e from None
+        else:
+            maybe_bug = MinimizedSourceCode(code)
+
+    return FuzzResult(seed, maybe_bug, args.executable, only_new_bugs=only_new_bugs)
 
 
 def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
     num_seeds = len(args.seeds)
     print(
         f"Concurrently running the fuzzer on "
-        f"{num_seeds} randomly generated source-code files..."
+        f"{num_seeds} randomly generated source-code "
+        f"file{'s' if num_seeds != 1 else ''}..."
     )
     bugs: list[FuzzResult] = []
     with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -218,7 +240,8 @@ def run_fuzzer_sequentially(args: ResolvedCliArgs) -> list[FuzzResult]:
     num_seeds = len(args.seeds)
     print(
         f"Sequentially running the fuzzer on "
-        f"{num_seeds} randomly generated source-code files..."
+        f"{num_seeds} randomly generated source-code "
+        f"file{'s' if num_seeds != 1 else ''}..."
     )
     bugs: list[FuzzResult] = []
     for i, seed in enumerate(args.seeds, start=1):
@@ -270,7 +293,7 @@ def parse_seed_argument(arg: str) -> int | range:
 
 class Executable(enum.StrEnum):
     RUFF = "ruff"
-    RED_KNOT = "red_knot"
+    TY = "ty"
 
 
 @dataclass(slots=True)

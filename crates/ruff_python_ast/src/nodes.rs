@@ -26,20 +26,6 @@ use crate::{
     TypeParam,
 };
 
-/// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ModModule {
-    pub range: TextRange,
-    pub body: Vec<Stmt>,
-}
-
-/// See also [Expression](https://docs.python.org/3/library/ast.html#ast.Expression)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ModExpression {
-    pub range: TextRange,
-    pub body: Box<Expr>,
-}
-
 impl StmtClassDef {
     /// Return an iterator over the bases of the class.
     pub fn bases(&self) -> &[Expr] {
@@ -102,6 +88,19 @@ impl Expr {
 }
 
 impl ExprRef<'_> {
+    /// See [`Expr::is_literal_expr`].
+    pub fn is_literal_expr(&self) -> bool {
+        matches!(
+            self,
+            ExprRef::StringLiteral(_)
+                | ExprRef::BytesLiteral(_)
+                | ExprRef::NumberLiteral(_)
+                | ExprRef::BooleanLiteral(_)
+                | ExprRef::NoneLiteral(_)
+                | ExprRef::EllipsisLiteral(_)
+        )
+    }
+
     pub fn precedence(&self) -> OperatorPrecedence {
         OperatorPrecedence::from(self)
     }
@@ -353,7 +352,7 @@ impl Deref for FStringLiteralElement {
 /// Transforms a value prior to formatting it.
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, is_macro::Is)]
 #[repr(i8)]
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 pub enum ConversionFlag {
     /// No conversion
     None = -1, // CPython uses -1
@@ -2845,7 +2844,7 @@ impl Arguments {
         self.find_argument(name, position).map(ArgOrKeyword::value)
     }
 
-    /// Return the the argument with the given name or at the given position, or `None` if no such
+    /// Return the argument with the given name or at the given position, or `None` if no such
     /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
     /// positional arguments.
     pub fn find_argument(&self, name: &str, position: usize) -> Option<ArgOrKeyword> {

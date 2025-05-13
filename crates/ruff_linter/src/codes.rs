@@ -61,7 +61,7 @@ pub enum RuleGroup {
 
 #[ruff_macros::map_codes]
 pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
-    #[allow(clippy::enum_glob_use)]
+    #[expect(clippy::enum_glob_use)]
     use Linter::*;
 
     #[rustfmt::skip]
@@ -1014,7 +1014,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "057") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryRound),
         (Ruff, "058") => (RuleGroup::Preview, rules::ruff::rules::StarmapZip),
         (Ruff, "059") => (RuleGroup::Preview, rules::ruff::rules::UnusedUnpackedVariable),
-        (Ruff, "060") => (RuleGroup::Preview, rules::ruff::rules::MultipleYieldsInContextManager),
+        (Ruff, "060") => (RuleGroup::Preview, rules::ruff::rules::InEmptyCollection),
+        (Ruff, "062") => (RuleGroup::Preview, rules::ruff::rules::MultipleYieldsInContextManager),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
         (Ruff, "102") => (RuleGroup::Preview, rules::ruff::rules::InvalidRuleCode),
@@ -1073,6 +1074,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Airflow, "002") => (RuleGroup::Preview, rules::airflow::rules::AirflowDagNoScheduleArgument),
         (Airflow, "301") => (RuleGroup::Preview, rules::airflow::rules::Airflow3Removal),
         (Airflow, "302") => (RuleGroup::Preview, rules::airflow::rules::Airflow3MovedToProvider),
+        (Airflow, "311") => (RuleGroup::Preview, rules::airflow::rules::Airflow3SuggestedUpdate),
+        (Airflow, "312") => (RuleGroup::Preview, rules::airflow::rules::Airflow3SuggestedToMoveToProvider),
 
         // perflint
         (Perflint, "101") => (RuleGroup::Stable, rules::perflint::rules::UnnecessaryListCast),

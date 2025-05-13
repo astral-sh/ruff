@@ -55,7 +55,7 @@ use crate::checkers::ast::Checker;
 /// across multiple lines and some of the lines have trailing comments.
 ///
 /// ## References
-/// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
+/// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.python.org/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 ///
 /// [PEP 586](https://peps.python.org/pep-0586/)
 #[derive(ViolationMetadata)]

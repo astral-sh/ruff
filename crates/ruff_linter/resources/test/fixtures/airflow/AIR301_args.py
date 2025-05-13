@@ -22,12 +22,6 @@ DAG(dag_id="class_schedule_interval", schedule_interval="@hourly")
 DAG(dag_id="class_timetable", timetable=NullTimetable())
 
 
-def sla_callback(*arg, **kwargs):
-    pass
-
-
-DAG(dag_id="class_sla_callback", sla_miss_callback=sla_callback)
-
 DAG(dag_id="class_fail_stop", fail_stop=True)
 
 DAG(dag_id="class_default_view", default_view="dag_default_view")
@@ -50,11 +44,6 @@ def decorator_schedule_interval():
 
 @dag(timetable=NullTimetable())
 def decorator_timetable():
-    pass
-
-
-@dag(sla_miss_callback=sla_callback)
-def decorator_sla_callback():
     pass
 
 

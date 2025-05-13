@@ -691,7 +691,6 @@ pub(crate) fn normalize_string(
                     }
 
                     if !new_flags.is_triple_quoted() {
-                        #[allow(clippy::if_same_then_else)]
                         if next == opposite_quote {
                             // Remove the escape by ending before the backslash and starting again with the quote
                             chars.next();

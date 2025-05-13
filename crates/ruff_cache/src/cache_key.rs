@@ -213,7 +213,7 @@ macro_rules! impl_cache_key_tuple {
 
     ( $($name:ident)+) => (
         impl<$($name: CacheKey),+> CacheKey for ($($name,)+) where last_type!($($name,)+): ?Sized {
-            #[allow(non_snake_case)]
+            #[expect(non_snake_case)]
             #[inline]
             fn cache_key(&self, state: &mut CacheKeyHasher) {
                 let ($(ref $name,)+) = *self;

@@ -19,7 +19,7 @@ use crate::rules::{
 use crate::settings::LinterSettings;
 use crate::Locator;
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn check_tokens(
     tokens: &Tokens,
     path: &Path,

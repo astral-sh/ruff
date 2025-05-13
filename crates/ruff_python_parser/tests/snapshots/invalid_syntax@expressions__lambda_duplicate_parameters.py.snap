@@ -285,6 +285,16 @@ Module(
 ## Errors
 
   |
+7 | lambda a, *a: 1
+8 |
+9 | lambda a, *, **a: 1
+  |              ^^^ Syntax Error: Expected one or more keyword parameter after '*' separator
+  |
+
+
+## Semantic Syntax Errors
+
+  |
 1 | lambda a, a: 1
   |           ^ Syntax Error: Duplicate parameter "a"
 2 |
@@ -319,14 +329,6 @@ Module(
   |            ^ Syntax Error: Duplicate parameter "a"
 8 |
 9 | lambda a, *, **a: 1
-  |
-
-
-  |
-7 | lambda a, *a: 1
-8 |
-9 | lambda a, *, **a: 1
-  |              ^^^ Syntax Error: Expected one or more keyword parameter after '*' separator
   |
 
 

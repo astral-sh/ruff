@@ -107,7 +107,7 @@ fn query_name<Q>(_query: &Q) -> &'static str {
         .unwrap_or(full_qualified_query_name)
 }
 
-/// Sets up logging for the current thread. It captures all `red_knot` and `ruff` events.
+/// Sets up logging for the current thread. It captures all `ty` and `ruff` events.
 ///
 /// Useful for capturing the tracing output in a failing test.
 ///
@@ -128,7 +128,7 @@ pub fn setup_logging() -> LoggingGuard {
 /// # Examples
 /// ```
 /// use ruff_db::testing::setup_logging_with_filter;
-/// let _logging = setup_logging_with_filter("red_knot_module_resolver::resolver");
+/// let _logging = setup_logging_with_filter("ty_module_resolver::resolver");
 /// ```
 ///
 /// # Filter
@@ -148,11 +148,7 @@ impl LoggingBuilder {
     pub fn new() -> Self {
         Self {
             filter: EnvFilter::default()
-                .add_directive(
-                    "red_knot=trace"
-                        .parse()
-                        .expect("Hardcoded directive to be valid"),
-                )
+                .add_directive("ty=trace".parse().expect("Hardcoded directive to be valid"))
                 .add_directive(
                     "ruff=trace"
                         .parse()

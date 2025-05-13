@@ -1,0 +1,53 @@
+[package]
+name = "ty_project"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ruff_cache = { workspace = true }
+ruff_db = { workspace = true, features = ["cache", "serde"] }
+ruff_macros = { workspace = true }
+ruff_options_metadata = { workspace = true }
+ruff_python_ast = { workspace = true, features = ["serde"] }
+ruff_python_formatter = { workspace = true, optional = true }
+ruff_text_size = { workspace = true }
+ty_ide = { workspace = true }
+ty_python_semantic = { workspace = true, features = ["serde"] }
+ty_vendored = { workspace = true }
+
+anyhow = { workspace = true }
+crossbeam = { workspace = true }
+glob = { workspace = true }
+notify = { workspace = true }
+pep440_rs = { workspace = true, features = ["version-ranges"] }
+rayon = { workspace = true }
+rustc-hash = { workspace = true }
+salsa = { workspace = true }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+ruff_db = { workspace = true, features = ["testing"] }
+glob = { workspace = true }
+insta = { workspace = true, features = ["redactions", "ron"] }
+
+[features]
+default = ["zstd"]
+deflate = ["ty_vendored/deflate"]
+schemars = ["dep:schemars", "ruff_db/schemars", "ty_python_semantic/schemars"]
+zstd = ["ty_vendored/zstd"]
+format = ["ruff_python_formatter"]
+
+[lints]
+workspace = true

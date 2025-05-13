@@ -15,7 +15,7 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult, ParseSource};
-use ruff_linter::message::{Message, SyntaxErrorMessage};
+use ruff_linter::message::Message;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::settings::types::UnsafeFixes;
@@ -102,11 +102,7 @@ impl Diagnostics {
                 let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
                 let dummy = SourceFileBuilder::new(name, "").finish();
                 Self::new(
-                    vec![Message::SyntaxError(SyntaxErrorMessage {
-                        message: err.to_string(),
-                        range: TextRange::default(),
-                        file: dummy,
-                    })],
+                    vec![Message::syntax_error(err, TextRange::default(), dummy)],
                     FxHashMap::default(),
                 )
             }

@@ -79,7 +79,7 @@ impl Violation for FastApiUnusedPathParameter {
             function_name,
             is_positional,
         } = self;
-        #[allow(clippy::if_not_else)]
+        #[expect(clippy::if_not_else)]
         if !is_positional {
             format!("Parameter `{arg_name}` appears in route path, but not in `{function_name}` signature")
         } else {
@@ -190,7 +190,7 @@ pub(crate) fn fastapi_unused_path_parameter(
                 function_name: function_def.name.to_string(),
                 is_positional,
             },
-            #[allow(clippy::cast_possible_truncation)]
+            #[expect(clippy::cast_possible_truncation)]
             diagnostic_range
                 .add_start(TextSize::from(range.start as u32 + 1))
                 .sub_end(TextSize::from((path.len() - range.end + 1) as u32)),
@@ -424,7 +424,7 @@ impl<'a> Iterator for PathParamIterator<'a> {
                     let param_name_end = param_content.find(':').unwrap_or(param_content.len());
                     let param_name = &param_content[..param_name_end].trim();
 
-                    #[allow(clippy::range_plus_one)]
+                    #[expect(clippy::range_plus_one)]
                     return Some((param_name, start..end + 1));
                 }
             }

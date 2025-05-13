@@ -84,6 +84,8 @@ mod tests {
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.pyi"))]
     #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046.py"))]
+    #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046_CR.py"))]
+    #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046_LF.py"))]
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_if.py"))]
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_for.py"))]
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_while.py"))]
@@ -97,8 +99,9 @@ mod tests {
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_1.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_2.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_3.py"))]
-    #[test_case(Rule::MultipleYieldsInContextManager, Path::new("RUF060.py"))]
-    #[test_case(Rule::MultipleYieldsInContextManager, Path::new("RUF060_1.py"))]
+    #[test_case(Rule::InEmptyCollection, Path::new("RUF060.py"))]
+    #[test_case(Rule::MultipleYieldsInContextManager, Path::new("RUF062.py"))]
+    #[test_case(Rule::MultipleYieldsInContextManager, Path::new("RUF062_1.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
@@ -135,7 +138,7 @@ mod tests {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: false,
                 },
-                unresolved_target_version: PythonVersion::PY310,
+                unresolved_target_version: PythonVersion::PY310.into(),
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
         )?;
@@ -318,6 +321,37 @@ mod tests {
     }
 
     #[test]
+    fn ruff_noqa_filedirective_unused() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_6.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruff_noqa_filedirective_unused_last_of_many() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_7.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::UnusedNOQA,
+                    Rule::FStringMissingPlaceholders,
+                    Rule::LineTooLong,
+                    Rule::UnusedVariable,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn invalid_rule_code_external_rules() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF102.py"),
@@ -326,7 +360,6 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::InvalidRuleCode)
             },
         )?;
-
         assert_messages!(diagnostics);
         Ok(())
     }

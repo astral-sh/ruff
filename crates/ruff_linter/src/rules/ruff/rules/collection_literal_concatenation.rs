@@ -5,6 +5,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::preview::is_support_slices_in_literal_concatenation_enabled;
 
 /// ## What it does
 /// Checks for uses of the `+` operator to concatenate collections.
@@ -32,6 +33,12 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// foo = [2, 3, 4]
 /// bar = [1, *foo, 5, 6]
 /// ```
+///
+/// ## Fix safety
+///
+/// The fix is always marked as unsafe because the `+` operator uses the `__add__` magic method and
+/// `*`-unpacking uses the `__iter__` magic method. Both of these could have custom
+/// implementations, causing the fix to change program behaviour.
 ///
 /// ## References
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
@@ -191,7 +198,8 @@ pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let should_support_slices = checker.settings.preview.is_enabled();
+    let should_support_slices =
+        is_support_slices_in_literal_concatenation_enabled(checker.settings);
 
     let Some((new_expr, type_)) = concatenate_expressions(expr, should_support_slices) else {
         return;
