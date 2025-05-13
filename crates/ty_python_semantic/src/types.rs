@@ -946,6 +946,19 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns the fallback instance type that a literal is an instance of, or `None` if the type
+    /// is not a literal.
+    pub fn literal_fallback_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::StringLiteral(_) | Type::LiteralString => Some(KnownClass::Str.to_instance(db)),
+            Type::BooleanLiteral(_) => Some(KnownClass::Bool.to_instance(db)),
+            Type::IntLiteral(_) => Some(KnownClass::Int.to_instance(db)),
+            Type::BytesLiteral(_) => Some(KnownClass::Bytes.to_instance(db)),
+            Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
+            _ => None,
+        }
+    }
+
     /// Return a "normalized" version of `self` that ensures that equivalent types have the same Salsa ID.
     ///
     /// A normalized type:
@@ -1181,19 +1194,16 @@ impl<'db> Type<'db> {
             // Except for the special `LiteralString` case above,
             // most `Literal` types delegate to their instance fallbacks
             // unless `self` is exactly equivalent to `target` (handled above)
-            (Type::StringLiteral(_) | Type::LiteralString, _) => {
-                KnownClass::Str.to_instance(db).is_subtype_of(db, target)
-            }
-            (Type::BooleanLiteral(_), _) => {
-                KnownClass::Bool.to_instance(db).is_subtype_of(db, target)
-            }
-            (Type::IntLiteral(_), _) => KnownClass::Int.to_instance(db).is_subtype_of(db, target),
-            (Type::BytesLiteral(_), _) => {
-                KnownClass::Bytes.to_instance(db).is_subtype_of(db, target)
-            }
-            (Type::ModuleLiteral(_), _) => KnownClass::ModuleType
-                .to_instance(db)
-                .is_subtype_of(db, target),
+            (
+                Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BooleanLiteral(_)
+                | Type::IntLiteral(_)
+                | Type::BytesLiteral(_)
+                | Type::ModuleLiteral(_),
+                _,
+            ) => (self.literal_fallback_instance(db))
+                .is_some_and(|instance| instance.is_subtype_of(db, target)),
 
             (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
                 self_function_literal
