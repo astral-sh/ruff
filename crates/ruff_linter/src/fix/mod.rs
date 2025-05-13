@@ -158,7 +158,7 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
 
 #[cfg(test)]
 mod tests {
-    use ruff_diagnostics::{DiagnosticKind, Edit, Fix, SourceMarker};
+    use ruff_diagnostics::{Diagnostic, Edit, Fix, SourceMarker};
     use ruff_source_file::SourceFileBuilder;
     use ruff_text_size::{Ranged, TextSize};
 
@@ -173,17 +173,20 @@ mod tests {
         edit: impl IntoIterator<Item = Edit>,
     ) -> Vec<DiagnosticMessage> {
         // The choice of rule here is arbitrary.
-        let kind = DiagnosticKind::from(MissingNewlineAtEndOfFile);
         edit.into_iter()
-            .map(|edit| DiagnosticMessage {
-                name: kind.name.clone(),
-                body: kind.body.clone(),
-                suggestion: kind.suggestion.clone(),
-                range: edit.range(),
-                fix: Some(Fix::safe_edit(edit)),
-                parent: None,
-                file: SourceFileBuilder::new(filename, source).finish(),
-                noqa_offset: TextSize::default(),
+            .map(|edit| {
+                let range = edit.range();
+                let diagnostic = Diagnostic::new(MissingNewlineAtEndOfFile, range);
+                DiagnosticMessage {
+                    name: diagnostic.kind.name,
+                    body: diagnostic.kind.body,
+                    suggestion: diagnostic.kind.suggestion,
+                    range,
+                    fix: Some(Fix::safe_edit(edit)),
+                    parent: None,
+                    file: SourceFileBuilder::new(filename, source).finish(),
+                    noqa_offset: TextSize::default(),
+                }
             })
             .collect()
     }
