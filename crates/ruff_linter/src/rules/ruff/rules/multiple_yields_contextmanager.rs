@@ -39,7 +39,7 @@ impl Violation for MultipleYieldsInContextManager {
     }
 }
 
-/// RUF060
+/// RUF062
 pub(crate) fn multiple_yields_in_contextmanager(
     checker: &Checker,
     function_def: &ast::StmtFunctionDef,
