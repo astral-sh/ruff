@@ -74,6 +74,11 @@ from Ruff ones.
 Your pull request will be reviewed by a maintainer, which may involve a few rounds of iteration
 prior to merging.
 
+### Debugging ty
+
+ty can optionally emit extensive tracing output, which can be very useful in understanding its
+operation and debugging issues; see [`crates/ty/docs/tracing.md`](./docs/tracing.md) for details.
+
 ### Project Structure
 
 ty is structured as a monorepo with a [flat crate structure](https://matklad.github.io/2021/08/22/large-rust-workspaces.html),
