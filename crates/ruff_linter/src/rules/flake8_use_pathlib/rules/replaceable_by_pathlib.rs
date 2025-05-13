@@ -306,7 +306,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
         _ => return,
     };
 
-    if checker.enabled(diagnostic.kind.rule()) {
+    if checker.enabled(diagnostic.rule()) {
         checker.report_diagnostic(diagnostic);
     }
 }

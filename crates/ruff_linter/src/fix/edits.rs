@@ -746,9 +746,9 @@ x = 1 \
                 iter,
             ));
             DiagnosticMessage {
-                name: diag.kind.name,
-                body: diag.kind.body,
-                suggestion: diag.kind.suggestion,
+                name: diag.name,
+                body: diag.body,
+                suggestion: diag.suggestion,
                 range: diag.range,
                 fix: diag.fix,
                 parent: diag.parent,

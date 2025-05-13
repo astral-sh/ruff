@@ -178,9 +178,9 @@ mod tests {
                 let range = edit.range();
                 let diagnostic = Diagnostic::new(MissingNewlineAtEndOfFile, range);
                 DiagnosticMessage {
-                    name: diagnostic.kind.name,
-                    body: diagnostic.kind.body,
-                    suggestion: diagnostic.kind.suggestion,
+                    name: diagnostic.name,
+                    body: diagnostic.body,
+                    suggestion: diagnostic.suggestion,
                     range,
                     fix: Some(Fix::safe_edit(edit)),
                     parent: None,

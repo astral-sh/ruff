@@ -378,7 +378,7 @@ impl Candidate {
                     char_range,
                 ),
             };
-            if settings.rules.enabled(diagnostic.kind.rule()) {
+            if settings.rules.enabled(diagnostic.rule()) {
                 return Some(diagnostic);
             }
         }

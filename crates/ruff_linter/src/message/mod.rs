@@ -98,9 +98,9 @@ impl Message {
     ) -> Message {
         Message::Diagnostic(DiagnosticMessage {
             range: diagnostic.range(),
-            name: diagnostic.kind.name,
-            body: diagnostic.kind.body,
-            suggestion: diagnostic.kind.suggestion,
+            name: diagnostic.name,
+            body: diagnostic.body,
+            suggestion: diagnostic.suggestion,
             fix: diagnostic.fix,
             parent: diagnostic.parent,
             file,

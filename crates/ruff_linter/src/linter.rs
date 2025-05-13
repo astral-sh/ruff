@@ -308,7 +308,7 @@ pub fn check_path(
         RuleSet::empty()
     };
     if !per_file_ignores.is_empty() {
-        diagnostics.retain(|diagnostic| !per_file_ignores.contains(diagnostic.kind.rule()));
+        diagnostics.retain(|diagnostic| !per_file_ignores.contains(diagnostic.rule()));
     }
 
     // Enforce `noqa` directives.
@@ -338,7 +338,7 @@ pub fn check_path(
     if parsed.has_valid_syntax() {
         // Remove fixes for any rules marked as unfixable.
         for diagnostic in &mut diagnostics {
-            if !settings.rules.should_fix(diagnostic.kind.rule()) {
+            if !settings.rules.should_fix(diagnostic.rule()) {
                 diagnostic.fix = None;
             }
         }
@@ -349,7 +349,7 @@ pub fn check_path(
                 if let Some(fix) = diagnostic.fix.take() {
                     let fixed_applicability = settings
                         .fix_safety
-                        .resolve_applicability(diagnostic.kind.rule(), fix.applicability());
+                        .resolve_applicability(diagnostic.rule(), fix.applicability());
                     diagnostic.set_fix(fix.with_applicability(fixed_applicability));
                 }
             }

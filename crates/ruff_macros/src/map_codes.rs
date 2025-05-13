@@ -466,8 +466,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             }
         }
 
-
-        impl AsRule for ruff_diagnostics::DiagnosticKind {
+        impl AsRule for ruff_diagnostics::Diagnostic {
             fn rule(&self) -> Rule {
                 match self.name.as_str() {
                     #from_impls_for_diagnostic_kind

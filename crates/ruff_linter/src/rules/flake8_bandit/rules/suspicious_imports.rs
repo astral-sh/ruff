@@ -1,7 +1,7 @@
 //! Check for imports of or from suspicious modules.
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_imports.html>
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::{Ranged, TextRange};
@@ -560,13 +560,9 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
     }
 }
 
-fn check_and_push_diagnostic<T: Into<DiagnosticKind>>(
-    checker: &Checker,
-    diagnostic: T,
-    range: TextRange,
-) {
+fn check_and_push_diagnostic<T: Violation>(checker: &Checker, diagnostic: T, range: TextRange) {
     let diagnostic = Diagnostic::new(diagnostic, range);
-    if checker.enabled(diagnostic.kind.rule()) {
+    if checker.enabled(diagnostic.rule()) {
         checker.report_diagnostic(diagnostic);
     }
 }

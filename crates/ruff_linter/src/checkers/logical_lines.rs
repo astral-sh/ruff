@@ -178,7 +178,7 @@ pub(crate) fn check_logical_lines(
                 indent_size,
                 range,
             ) {
-                if settings.rules.enabled(diagnostic.kind.rule()) {
+                if settings.rules.enabled(diagnostic.rule()) {
                     context.push_diagnostic(diagnostic);
                 }
             }
@@ -207,7 +207,7 @@ impl<'a> LogicalLinesContext<'a> {
     }
 
     pub(crate) fn push_diagnostic(&mut self, diagnostic: Diagnostic) {
-        if self.settings.rules.enabled(diagnostic.kind.rule()) {
+        if self.settings.rules.enabled(diagnostic.rule()) {
             self.diagnostics.push(diagnostic);
         }
     }

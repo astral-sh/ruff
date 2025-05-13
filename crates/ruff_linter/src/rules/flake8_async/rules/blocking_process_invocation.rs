@@ -147,7 +147,7 @@ pub(crate) fn blocking_process_invocation(checker: &Checker, call: &ast::ExprCal
         _ => return,
     };
 
-    if checker.enabled(diagnostic.kind.rule()) {
+    if checker.enabled(diagnostic.rule()) {
         checker.report_diagnostic(diagnostic);
     }
 }

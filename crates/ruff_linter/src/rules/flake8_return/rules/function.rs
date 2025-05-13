@@ -674,7 +674,7 @@ fn superfluous_else_node(
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
-            if checker.enabled(diagnostic.kind.rule()) {
+            if checker.enabled(diagnostic.rule()) {
                 diagnostic.try_set_fix(|| {
                     remove_else(
                         elif_else,
@@ -692,7 +692,7 @@ fn superfluous_else_node(
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
-            if checker.enabled(diagnostic.kind.rule()) {
+            if checker.enabled(diagnostic.rule()) {
                 diagnostic.try_set_fix(|| {
                     remove_else(
                         elif_else,
@@ -711,7 +711,7 @@ fn superfluous_else_node(
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
-            if checker.enabled(diagnostic.kind.rule()) {
+            if checker.enabled(diagnostic.rule()) {
                 diagnostic.try_set_fix(|| {
                     remove_else(
                         elif_else,
@@ -730,7 +730,7 @@ fn superfluous_else_node(
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
-            if checker.enabled(diagnostic.kind.rule()) {
+            if checker.enabled(diagnostic.rule()) {
                 diagnostic.try_set_fix(|| {
                     remove_else(
                         elif_else,

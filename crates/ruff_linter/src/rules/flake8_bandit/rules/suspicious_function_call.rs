@@ -1214,7 +1214,7 @@ fn suspicious_function(
         _ => return,
     };
 
-    if checker.enabled(diagnostic.kind.rule()) {
+    if checker.enabled(diagnostic.rule()) {
         checker.report_diagnostic(diagnostic);
     }
 }
