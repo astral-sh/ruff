@@ -80,13 +80,13 @@ struct YieldPathTracker {
 }
 
 impl YieldPathTracker {
-    fn would_increment_check_yield_stack_top(&mut self, by: usize) {
+    fn would_increment_scope_yields(&mut self, by: usize) {
         match self.yield_stack.pop() {
-            Some(root) => {
-                if root + by > 1 {
+            Some(scope_yields) => {
+                if scope_yields + by > 1 {
                     self.has_multiple_yields = true;
                 }
-                self.yield_stack.push(root);
+                self.yield_stack.push(scope_yields);
             }
             None => {
                 debug_assert!(false, "Invalid yield stack size when traversing AST");
@@ -94,14 +94,14 @@ impl YieldPathTracker {
             }
         }
     }
-    fn apply_increment_check_yield_stack_top(&mut self, by: usize) {
+    fn apply_increment_scope_yields(&mut self, by: usize) {
         match self.yield_stack.pop() {
-            Some(root) => {
-                let new_root = root + by;
-                if new_root > 1 {
+            Some(scope_yields) => {
+                let updated_scope_yields = scope_yields + by;
+                if updated_scope_yields > 1 {
                     self.has_multiple_yields = true;
                 }
-                self.yield_stack.push(new_root);
+                self.yield_stack.push(updated_scope_yields);
             }
             None => {
                 self.yield_stack.push(by);
@@ -110,7 +110,7 @@ impl YieldPathTracker {
         }
     }
 
-    fn check_then_null_yield_counts_top(&mut self) {
+    fn reset_scope_yields(&mut self) {
         match self.yield_stack.pop() {
             Some(root) => {
                 if root > 1 {
@@ -126,23 +126,17 @@ impl YieldPathTracker {
     }
 
     fn pop_yields(&mut self) -> usize {
-        match self.yield_stack.pop() {
-            Some(counts) => counts,
-            None => {
-                debug_assert!(false, "Invalid yield stack size when traversing AST");
-                0
-            }
-        }
+        self.yield_stack.pop().unwrap_or_else(|| {
+            debug_assert!(false, "Invalid yield stack size when traversing AST");
+            0
+        })
     }
 
     fn pop_returns(&mut self) -> bool {
-        match self.return_stack.pop() {
-            Some(returns) => returns,
-            None => {
-                debug_assert!(false, "Invalid return stack size when traversing AST");
-                false
-            }
-        }
+        self.return_stack.pop().unwrap_or_else(|| {
+            debug_assert!(false, "Invalid return stack size when traversing AST");
+            false
+        })
     }
 
     fn handle_exclusive_branches(&mut self, branch_count: usize) {
@@ -157,11 +151,11 @@ impl YieldPathTracker {
                 max_yields_no_return_branches = max_yields_no_return_branches.max(branch_yields);
             }
         }
-        self.would_increment_check_yield_stack_top(max_yields_return_branches);
-        self.apply_increment_check_yield_stack_top(max_yields_no_return_branches);
+        self.would_increment_scope_yields(max_yields_return_branches);
+        self.apply_increment_scope_yields(max_yields_no_return_branches);
     }
 
-    fn push_tracking_frame(&mut self) {
+    fn push_new_scope(&mut self) {
         self.yield_stack.push(0);
         self.return_stack.push(false);
     }
@@ -192,7 +186,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                 // Track for primary control flow structures
                 // Optional branches like else/finally clauses are handled in leave_node
                 // Except is handled in leave node to maintain logical locality
-                self.push_tracking_frame();
+                self.push_new_scope();
             }
             _ => {}
         }
@@ -234,8 +228,8 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                     // Finally always executes; can ignore earlier returns
                     let max_path_yields =
                         try_yields + max_except_yields.max(else_yields) + finally_yields;
-                    self.would_increment_check_yield_stack_top(max_path_yields);
-                    self.check_then_null_yield_counts_top();
+                    self.would_increment_scope_yields(max_path_yields);
+                    self.reset_scope_yields();
                 } else {
                     // Since the code preceding yields is most likely to fail, we assume either
                     // valid try-else-finally or erroneous except-finally execution.
@@ -246,21 +240,21 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                     let valid_try_else_finally = try_yields + else_yields + finally_yields;
 
                     // Probe exceptions with returns for all possibilities
-                    self.would_increment_check_yield_stack_top(exception_return);
+                    self.would_increment_scope_yields(exception_return);
 
                     if try_returns {
                         let valid_try_return = try_yields + finally_yields;
-                        self.would_increment_check_yield_stack_top(valid_try_return);
+                        self.would_increment_scope_yields(valid_try_return);
                         // Propagate the non-returning exception
-                        self.apply_increment_check_yield_stack_top(exception_no_return);
+                        self.apply_increment_scope_yields(exception_no_return);
                     } else {
                         // Finally is executed even if else returns
-                        self.would_increment_check_yield_stack_top(valid_try_else_finally);
+                        self.would_increment_scope_yields(valid_try_else_finally);
                         if else_returns {
                             // Propagate the non-returning exception
-                            self.apply_increment_check_yield_stack_top(exception_no_return);
+                            self.apply_increment_scope_yields(exception_no_return);
                         } else {
-                            self.apply_increment_check_yield_stack_top(
+                            self.apply_increment_scope_yields(
                                 valid_try_else_finally.max(exception_no_return),
                             );
                         }
@@ -283,10 +277,10 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
 
                 // Yield in loop is likely to yield multiple times
                 self.has_multiple_yields |= body_yields > 0;
-                self.apply_increment_check_yield_stack_top(else_yields);
+                self.apply_increment_scope_yields(else_yields);
                 if else_returns {
                     // If else returns, don't propagate yield count
-                    self.check_then_null_yield_counts_top();
+                    self.reset_scope_yields();
                 }
             }
             _ => {}
@@ -322,7 +316,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
 
                 if self.enter_node(node).is_traverse() {
                     self.visit_body(body);
-                    self.push_tracking_frame();
+                    self.push_new_scope();
                     self.visit_body(orelse);
                     self.leave_node(node);
                 }
@@ -331,7 +325,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                 let node = ruff_python_ast::AnyNodeRef::StmtFor(loop_stmt);
                 if self.enter_node(node).is_traverse() {
                     self.visit_body(body);
-                    self.push_tracking_frame();
+                    self.push_new_scope();
                     self.visit_body(orelse);
                     self.leave_node(node);
                 }
@@ -347,7 +341,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                 if self.enter_node(node).is_traverse() {
                     self.visit_body(body);
                     for clause in elif_else_clauses {
-                        self.push_tracking_frame();
+                        self.push_new_scope();
                         self.visit_elif_else_clause(clause);
                     }
                     self.leave_node(node);
@@ -366,13 +360,13 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                 if self.enter_node(node).is_traverse() {
                     self.visit_body(body);
                     for handler in handlers {
-                        self.push_tracking_frame();
+                        self.push_new_scope();
                         self.visit_except_handler(handler);
                     }
 
-                    self.push_tracking_frame();
+                    self.push_new_scope();
                     self.visit_body(orelse);
-                    self.push_tracking_frame();
+                    self.push_new_scope();
                     self.visit_body(finalbody);
                     self.leave_node(node);
                 }
