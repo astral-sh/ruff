@@ -2087,10 +2087,23 @@ impl<'db> Type<'db> {
                     .is_disjoint_from(db, other)
             }
 
-            (Type::BoundSuper(_), Type::BoundSuper(_)) => !self.is_equivalent_to(db, other),
-            (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => KnownClass::Super
-                .to_instance(db)
-                .is_disjoint_from(db, other),
+            (Type::BoundSuper(_), Type::BoundSuper(_)) => {
+                if self.is_fully_static(db) && other.is_fully_static(db) {
+                    !self.is_equivalent_to(db, other)
+                } else {
+                    false
+                }
+            }
+            (bound_super @ Type::BoundSuper(_), other)
+            | (other, bound_super @ Type::BoundSuper(_)) => {
+                if bound_super.is_fully_static(db) {
+                    KnownClass::Super
+                        .to_instance(db)
+                        .is_disjoint_from(db, other)
+                } else {
+                    false
+                }
+            }
         }
     }
 
