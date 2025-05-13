@@ -5,10 +5,12 @@ use itertools::{Either, Itertools};
 use ruff_python_ast::name::Name;
 
 use crate::{
-    db::Db,
     semantic_index::{symbol_table, use_def_map},
     symbol::{symbol_from_bindings, symbol_from_declarations},
-    types::{ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers},
+    types::{
+        ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
+    },
+    {Db, FxOrderSet},
 };
 
 impl<'db> ClassLiteral<'db> {
@@ -70,6 +72,25 @@ pub(super) enum ProtocolInterface<'db> {
 }
 
 impl<'db> ProtocolInterface<'db> {
+    pub(super) fn with_members<'a, M>(db: &'db dyn Db, members: M) -> Self
+    where
+        M: IntoIterator<Item = (&'a str, Type<'db>)>,
+    {
+        let members: BTreeMap<_, _> = members
+            .into_iter()
+            .map(|(name, ty)| {
+                (
+                    Name::new(name),
+                    ProtocolMemberData {
+                        ty: ty.normalized(db),
+                        qualifiers: TypeQualifiers::default(),
+                    },
+                )
+            })
+            .collect();
+        Self::Members(ProtocolInterfaceMembers::new(db, members))
+    }
+
     fn empty(db: &'db dyn Db) -> Self {
         Self::Members(ProtocolInterfaceMembers::new(db, BTreeMap::default()))
     }
@@ -169,6 +190,21 @@ impl<'db> ProtocolInterface<'db> {
             Self::SelfReference => Self::SelfReference,
         }
     }
+
+    pub(super) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        match self {
+            Self::Members(members) => {
+                for data in members.inner(db).values() {
+                    data.find_legacy_typevars(db, typevars);
+                }
+            }
+            Self::SelfReference => {}
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]
@@ -190,6 +226,14 @@ impl<'db> ProtocolMemberData<'db> {
             ty: self.ty.apply_type_mapping(db, type_mapping),
             qualifiers: self.qualifiers,
         }
+    }
+
+    fn find_legacy_typevars(
+        &self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        self.ty.find_legacy_typevars(db, typevars);
     }
 }
 

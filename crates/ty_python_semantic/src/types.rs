@@ -28,7 +28,7 @@ pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_type, infer_expression_types,
     infer_scope_types,
 };
-pub(crate) use self::narrow::KnownConstraintFunction;
+pub(crate) use self::narrow::ClassInfoConstraintFunction;
 pub(crate) use self::signatures::{CallableSignature, Signature, Signatures};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
@@ -5045,7 +5045,7 @@ impl<'db> Type<'db> {
             ),
 
             Type::ProtocolInstance(instance) => {
-                Type::ProtocolInstance(instance.apply_specialization(db, type_mapping))
+                Type::ProtocolInstance(instance.apply_type_mapping(db, type_mapping))
             }
 
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
@@ -5077,11 +5077,12 @@ impl<'db> Type<'db> {
             }
 
             Type::GenericAlias(generic) => {
-                let specialization = generic
-                    .specialization(db)
-                    .apply_type_mapping(db, type_mapping);
-                Type::GenericAlias(GenericAlias::new(db, generic.origin(db), specialization))
+                Type::GenericAlias(generic.apply_type_mapping(db, type_mapping))
             }
+
+            Type::SubclassOf(subclass_of) => Type::SubclassOf(
+                subclass_of.apply_type_mapping(db, type_mapping),
+            ),
 
             Type::PropertyInstance(property) => {
                 Type::PropertyInstance(property.apply_type_mapping(db, type_mapping))
@@ -5122,9 +5123,6 @@ impl<'db> Type<'db> {
             // explicitly (via a subscript expression) or implicitly (via a call), and not because
             // some other generic context's specialization is applied to it.
             | Type::ClassLiteral(_)
-            // SubclassOf contains a ClassType, which has already been specialized if needed, like
-            // above with BoundMethod's self_instance.
-            | Type::SubclassOf(_)
             | Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::LiteralString
@@ -5199,7 +5197,19 @@ impl<'db> Type<'db> {
             }
 
             Type::GenericAlias(alias) => {
-                alias.specialization(db).find_legacy_typevars(db, typevars);
+                alias.find_legacy_typevars(db, typevars);
+            }
+
+            Type::NominalInstance(instance) => {
+                instance.find_legacy_typevars(db, typevars);
+            }
+
+            Type::ProtocolInstance(instance) => {
+                instance.find_legacy_typevars(db, typevars);
+            }
+
+            Type::SubclassOf(subclass_of) => {
+                subclass_of.find_legacy_typevars(db, typevars);
             }
 
             Type::Dynamic(_)
@@ -5212,15 +5222,12 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
-            | Type::SubclassOf(_)
             | Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::LiteralString
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
             | Type::BoundSuper(_)
-            | Type::NominalInstance(_)
-            | Type::ProtocolInstance(_)
             | Type::KnownInstance(_) => {}
         }
     }
@@ -6936,6 +6943,9 @@ pub enum KnownFunction {
     /// `builtins.issubclass`
     #[strum(serialize = "issubclass")]
     IsSubclass,
+    /// `builtins.hasattr`
+    #[strum(serialize = "hasattr")]
+    HasAttr,
     /// `builtins.reveal_type`, `typing.reveal_type` or `typing_extensions.reveal_type`
     RevealType,
     /// `builtins.len`
@@ -7002,10 +7012,10 @@ pub enum KnownFunction {
 }
 
 impl KnownFunction {
-    pub fn into_constraint_function(self) -> Option<KnownConstraintFunction> {
+    pub fn into_classinfo_constraint_function(self) -> Option<ClassInfoConstraintFunction> {
         match self {
-            Self::IsInstance => Some(KnownConstraintFunction::IsInstance),
-            Self::IsSubclass => Some(KnownConstraintFunction::IsSubclass),
+            Self::IsInstance => Some(ClassInfoConstraintFunction::IsInstance),
+            Self::IsSubclass => Some(ClassInfoConstraintFunction::IsSubclass),
             _ => None,
         }
     }
@@ -7024,7 +7034,9 @@ impl KnownFunction {
     /// Return `true` if `self` is defined in `module` at runtime.
     const fn check_module(self, module: KnownModule) -> bool {
         match self {
-            Self::IsInstance | Self::IsSubclass | Self::Len | Self::Repr => module.is_builtins(),
+            Self::IsInstance | Self::IsSubclass | Self::HasAttr | Self::Len | Self::Repr => {
+                module.is_builtins()
+            }
             Self::AssertType
             | Self::AssertNever
             | Self::Cast
@@ -8420,6 +8432,7 @@ pub(crate) mod tests {
                 KnownFunction::Len
                 | KnownFunction::Repr
                 | KnownFunction::IsInstance
+                | KnownFunction::HasAttr
                 | KnownFunction::IsSubclass => KnownModule::Builtins,
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,

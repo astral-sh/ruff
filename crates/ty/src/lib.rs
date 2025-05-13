@@ -216,7 +216,10 @@ impl MainLoop {
         self.run_with_progress::<IndicatifReporter>(db)
     }
 
-    fn run_with_progress<R: Reporter>(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
+    fn run_with_progress<R>(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus>
+    where
+        R: Reporter + Default + 'static,
+    {
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
 
         let result = self.main_loop::<R>(db);
@@ -226,7 +229,10 @@ impl MainLoop {
         result
     }
 
-    fn main_loop<R: Reporter>(&mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
+    fn main_loop<R>(&mut self, db: &mut ProjectDatabase) -> Result<ExitStatus>
+    where
+        R: Reporter + Default + 'static,
+    {
         // Schedule the first check.
         tracing::debug!("Starting main loop");
 
@@ -237,12 +243,12 @@ impl MainLoop {
                 MainLoopMessage::CheckWorkspace => {
                     let db = db.clone();
                     let sender = self.sender.clone();
-                    let reporter = R::default();
+                    let mut reporter = R::default();
 
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
-                        match db.check(&reporter) {
+                        match db.check_with_reporter(&mut reporter) {
                             Ok(result) => {
                                 // Send the result back to the main loop for printing.
                                 sender
@@ -353,11 +359,12 @@ impl MainLoop {
 }
 
 /// A progress reporter for `ty check`.
-struct IndicatifReporter(indicatif::ProgressBar);
+#[derive(Default)]
+struct IndicatifReporter(Option<indicatif::ProgressBar>);
 
-impl Default for IndicatifReporter {
-    fn default() -> IndicatifReporter {
-        let progress = indicatif::ProgressBar::new(0);
+impl ty_project::Reporter for IndicatifReporter {
+    fn set_files(&mut self, files: usize) {
+        let progress = indicatif::ProgressBar::new(files as u64);
         progress.set_style(
             indicatif::ProgressStyle::with_template(
                 "{msg:8.dim} {bar:60.green/dim} {pos}/{len} files",
@@ -366,17 +373,14 @@ impl Default for IndicatifReporter {
             .progress_chars("--"),
         );
         progress.set_message("Checking");
-        IndicatifReporter(progress)
-    }
-}
 
-impl ty_project::Reporter for IndicatifReporter {
-    fn set_files(&self, files: usize) {
-        self.0.set_length(files as u64);
+        self.0 = Some(progress);
     }
 
     fn report_file(&self, _file: &ruff_db::files::File) {
-        self.0.inc(1);
+        if let Some(ref progress_bar) = self.0 {
+            progress_bar.inc(1);
+        }
     }
 }
 

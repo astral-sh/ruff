@@ -31,7 +31,7 @@ no_sep = None
 
 " a*a a*a a ".split("*", -1)  # [" a", "a a", "a a "]
 "".split()  # []
-""" 	
+"""
 """.split()  # []
 "   	".split()  # []
 "/abc/".split() # ["/abc/"]
@@ -73,7 +73,7 @@ r"\n " "\n".split()  # [r"\n"]
 
 # negatives
 
-# invalid values should not cause panic 
+# invalid values should not cause panic
 "a,b,c,d".split(maxsplit="hello")
 "a,b,c,d".split(maxsplit=-"hello")
 
@@ -106,3 +106,7 @@ b"TesT.WwW.ExamplE.CoM".split(b".")
 '''itemC'''
 "'itemD'"
 """.split()
+
+# https://github.com/astral-sh/ruff/issues/18042
+print("a,b".rsplit(","))
+print("a,b,c".rsplit(",", 1))
