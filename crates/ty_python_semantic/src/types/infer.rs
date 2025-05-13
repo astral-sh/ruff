@@ -34,7 +34,7 @@
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
 use itertools::{Either, Itertools};
-use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, SubDiagnostic};
+use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::{walk_expr, Visitor};
@@ -4811,31 +4811,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                     let mut diagnostic =
                                                         builder.into_diagnostic(format_args!(
                                                             "Argument does not have asserted type `{}`",
-                                                            asserted_ty.display(self.db())
-                                                        ));
-
-                                                    diagnostic.set_primary_message(format_args!(
-                                                        "Expected object of type `{asserted_type}`",
-                                                        asserted_type =
                                                             asserted_ty.display(self.db()),
-                                                    ));
-
-                                                    let mut subdiagnostic =
-                                                        SubDiagnostic::new(
-                                                            Severity::Info,
-                                                            "Asserted type is not equivalent to the inferred type",
-                                                        );
-                                                    subdiagnostic.annotate(
-                                                        Annotation::primary(self.context.span(
+                                                        ));
+                                                    diagnostic.annotate(
+                                                        Annotation::secondary(self.context.span(
                                                             &call_expression.arguments.args[0],
                                                         ))
                                                         .message(format_args!(
                                                             "Inferred type of argument is `{}`",
-                                                            actual_ty.display(self.db())
+                                                            actual_ty.display(self.db()),
                                                         )),
                                                     );
-
-                                                    diagnostic.sub(subdiagnostic);
+                                                    diagnostic.info(
+                                                        format_args!(
+                                                            "`{asserted_type}` and `{inferred_type}` are not equivalent types",
+                                                            asserted_type = asserted_ty.display(self.db()),
+                                                            inferred_type = actual_ty.display(self.db()),
+                                                        )
+                                                    );
                                                 }
                                             }
                                         }
@@ -4848,16 +4841,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                     call_expression,
                                                 ) {
                                                     let mut diagnostic = builder.into_diagnostic(
-                                                        "Argument does not have expected type `Never`",
+                                                        "Argument does not have asserted type `Never`",
                                                     );
-                                                    diagnostic.set_primary_message(
-                                                        "Expected object of type `Never`",
-                                                    );
-
-                                                    let mut subdiagnostic =
-                                                        SubDiagnostic::new(Severity::Info, "Inferred type is not equivalent to `Never`");
-                                                    subdiagnostic.annotate(
-                                                        Annotation::primary(self.context.span(
+                                                    diagnostic.annotate(
+                                                        Annotation::secondary(self.context.span(
                                                             &call_expression.arguments.args[0],
                                                         ))
                                                         .message(format_args!(
@@ -4865,8 +4852,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                             actual_ty.display(self.db())
                                                         )),
                                                     );
-
-                                                    diagnostic.sub(subdiagnostic);
+                                                    diagnostic.info(
+                                                        format_args!(
+                                                            "`Never` and `{inferred_type}` are not equivalent types",
+                                                            inferred_type = actual_ty.display(self.db()),
+                                                        )
+                                                    );
                                                 }
                                             }
                                         }

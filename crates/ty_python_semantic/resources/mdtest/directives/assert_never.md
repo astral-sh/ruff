@@ -60,7 +60,7 @@ def if_else_isinstance_error(obj: A | B):
     elif isinstance(obj, C):
         pass
     else:
-        # error: [type-assertion-failure] "Argument does not have expected type `Never`"
+        # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
         assert_never(obj)
 
 def if_else_singletons_success(obj: Literal[1, "a"] | None):
@@ -81,7 +81,7 @@ def if_else_singletons_error(obj: Literal[1, "a"] | None):
     elif obj is None:
         pass
     else:
-        # error: [type-assertion-failure] "Argument does not have expected type `Never`"
+        # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
         assert_never(obj)
 
 def match_singletons_success(obj: Literal[1, "a"] | None):
@@ -94,7 +94,7 @@ def match_singletons_success(obj: Literal[1, "a"] | None):
             pass
         case _ as obj:
             # TODO: Ideally, we would not emit an error here
-            # error: [type-assertion-failure] "Argument does not have expected type `Never`"
+            # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
             assert_never(obj)
 
 def match_singletons_error(obj: Literal[1, "a"] | None):
@@ -108,6 +108,6 @@ def match_singletons_error(obj: Literal[1, "a"] | None):
         case _ as obj:
             # TODO: We should emit an error here, but the message should
             # show the type `Literal["a"]` instead of `@Todo(…)`.
-            # error: [type-assertion-failure] "Argument does not have expected type `Never`"
+            # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
             assert_never(obj)
 ```
