@@ -59,11 +59,12 @@ impl<'m, 's> MarkdownTest<'m, 's> {
     const MAX_TITLE_LENGTH: usize = 20;
     const ELLIPSIS: char = '\u{2026}';
 
+    #[inline]
     fn possibly_contracted_title(section: &Section, contracted: bool) -> String {
         let Section { title, .. } = section;
 
         if !contracted || title.len() < Self::MAX_TITLE_LENGTH {
-            title.to_string()
+            (*title).to_string()
         } else {
             format!(
                 "{}{}",
@@ -76,6 +77,7 @@ impl<'m, 's> MarkdownTest<'m, 's> {
         }
     }
 
+    #[inline]
     fn joined_name(&self, contracted: bool) -> String {
         let mut name = String::new();
         let mut parent_id = self.section.parent_id;
@@ -86,10 +88,6 @@ impl<'m, 's> MarkdownTest<'m, 's> {
                 name.insert_str(0, " - ");
             }
             name.insert_str(0, &Self::possibly_contracted_title(parent, contracted));
-
-            if name.contains("bool_conversion") || name.contains("occur") {
-                dbg!(&name);
-            }
         }
         if !name.is_empty() {
             name.push_str(" - ");
@@ -97,7 +95,7 @@ impl<'m, 's> MarkdownTest<'m, 's> {
         name.push_str(&Self::possibly_contracted_title(self.section, contracted));
 
         if contracted {
-            name.push_str(&format!(" ({})", self.section.id));
+            write!(name, " ({})", self.section.id);
         }
 
         name
