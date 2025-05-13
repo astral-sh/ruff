@@ -179,12 +179,6 @@ impl<'m, 's> Iterator for MarkdownTestIterator<'m, 's> {
 #[newtype_index]
 struct SectionId;
 
-impl Display for SectionId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
 /// A single header section of a [`MarkdownTestSuite`], or the implicit root "section".
 ///
 /// A header section is the part of a Markdown file beginning with a `#`-prefixed header line, and
