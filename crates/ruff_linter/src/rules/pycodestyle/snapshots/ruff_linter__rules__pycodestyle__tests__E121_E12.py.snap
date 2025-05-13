@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E12.py:3:3: E121 Continuation line under-indented for hanging indent
+  |
+1 | #: E121
+2 | print("E121", (
+3 |   "dent"))
+  |   ^^^^^^ E121
+4 | #: E122
+5 | print("E122", (
+  |
+
+E12.py:52:4: E121 Continuation line under-indented for hanging indent
+   |
+50 | #: E121
+51 | result = {
+52 |    'key1': 'value',
+   |    ^^^^^^ E121
+53 |    'key2': 'value',
+54 | }
+   |

@@ -3,6 +3,7 @@ use std::iter::FusedIterator;
 
 use bitflags::bitflags;
 
+pub(crate) use continued_indentation::*;
 pub(crate) use extraneous_whitespace::*;
 pub(crate) use indentation::*;
 pub(crate) use missing_whitespace::*;
@@ -21,6 +22,7 @@ pub(crate) use whitespace_before_parameters::*;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
 use crate::Locator;
 
+mod continued_indentation;
 mod extraneous_whitespace;
 mod indentation;
 mod missing_whitespace;

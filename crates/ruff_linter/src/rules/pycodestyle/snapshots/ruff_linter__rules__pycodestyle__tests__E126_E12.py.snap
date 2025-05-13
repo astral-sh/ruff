@@ -1,0 +1,151 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E12.py:29:13: E126 Continuation line over-indented for hanging indent
+   |
+27 | #: E126
+28 | print("E126", (
+29 |             "dent"))
+   |             ^^^^^^ E126
+30 | #: E126
+31 | print("E126", (
+   |
+
+E12.py:32:9: E126 Continuation line over-indented for hanging indent
+   |
+30 | #: E126
+31 | print("E126", (
+32 |         "dent"))
+   |         ^^^^^^ E126
+33 | #: E127
+34 | print("E127", ("over-",
+   |
+
+E12.py:49:6: E126 Continuation line over-indented for hanging indent
+   |
+47 |     1, 2, 3,
+48 |     4, 5, 6,
+49 |      ]
+   |      ^ E126
+50 | #: E121
+51 | result = {
+   |
+
+E12.py:59:11: E126 Continuation line over-indented for hanging indent
+   |
+57 |     'qualif_nr', 'reasonComment_en', 'reasonComment_fr',
+58 |     'reasonComment_de', 'reasonComment_it'),
+59 |           '?'),
+   |           ^^^ E126
+60 |           "foo")
+61 | #: E126
+   |
+
+E12.py:60:11: E126 Continuation line over-indented for hanging indent
+   |
+58 |     'reasonComment_de', 'reasonComment_it'),
+59 |           '?'),
+60 |           "foo")
+   |           ^^^^^ E126
+61 | #: E126
+62 | abricot = 3 + \
+   |
+
+E12.py:63:11: E126 Continuation line over-indented for hanging indent
+   |
+61 | #: E126
+62 | abricot = 3 + \
+63 |           4 + \
+   |           ^ E126
+64 |           5 + 6
+65 | #: E131
+   |
+
+E12.py:74:24: E126 Continuation line over-indented for hanging indent
+   |
+72 | part = set_mimetype((
+73 |     a.get('mime_type', 'text')),
+74 |                        'default')
+   |                        ^^^^^^^^^ E126
+75 | #:
+   |
+
+E12.py:210:9: E126 Continuation line over-indented for hanging indent
+    |
+208 |     1, 2, 3,
+209 |     4, 5, 6,
+210 |         ]
+    |         ^ E126
+211 | #: E126
+212 | abris = 3 + \
+    |
+
+E12.py:213:9: E126 Continuation line over-indented for hanging indent
+    |
+211 | #: E126
+212 | abris = 3 + \
+213 |         4 + \
+    |         ^ E126
+214 |         5 + 6
+215 | #: E126
+    |
+
+E12.py:217:9: E126 Continuation line over-indented for hanging indent
+    |
+215 | #: E126
+216 | fixed = re.sub(r'\t+', ' ', target[c::-1], 1)[::-1] + \
+217 |         target[c + 1:]
+    |         ^^^^^^ E126
+218 | #: E126 E126
+219 | rv.update(dict.fromkeys((
+    |
+
+E12.py:220:13: E126 Continuation line over-indented for hanging indent
+    |
+218 | #: E126 E126
+219 | rv.update(dict.fromkeys((
+220 |             'qualif_nr', 'reasonComment_en', 'reasonComment_fr',
+    |             ^^^^^^^^^^^ E126
+221 |             'reasonComment_de', 'reasonComment_it'),
+222 |         '?'),
+    |
+
+E12.py:222:9: E126 Continuation line over-indented for hanging indent
+    |
+220 |             'qualif_nr', 'reasonComment_en', 'reasonComment_fr',
+221 |             'reasonComment_de', 'reasonComment_it'),
+222 |         '?'),
+    |         ^^^ E126
+223 |     "foo")
+224 | #: E126
+    |
+
+E12.py:226:9: E126 Continuation line over-indented for hanging indent
+    |
+224 | #: E126
+225 | eat_a_dict_a_day({
+226 |         "foo": "bar",
+    |         ^^^^^ E126
+227 | })
+228 | #: E126 W503
+    |
+
+E12.py:231:13: E126 Continuation line over-indented for hanging indent
+    |
+229 | if (
+230 |     x == (
+231 |             3
+    |             ^ E126
+232 |     )
+233 |         or y == 4):
+    |
+
+E12.py:241:13: E126 Continuation line over-indented for hanging indent
+    |
+239 |     )
+240 |     or x == (
+241 |             3)
+    |             ^ E126
+242 |         or y == 4):
+243 |     pass
+    |

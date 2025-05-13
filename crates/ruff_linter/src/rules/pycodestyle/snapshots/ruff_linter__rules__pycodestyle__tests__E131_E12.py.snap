@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E12.py:69:6: E131 Continuation line unaligned for hanging indent
+   |
+68 |     "there",
+69 |      # "john",
+   |      ^^^^^^^^^ E131
+70 |     "dude"))
+71 | #: E126
+   |
+
+E12.py:248:9: E131 Continuation line unaligned for hanging indent
+    |
+246 |     "hash": "value",
+247 |     "long": "the quick brown fox jumps over the lazy dog before doing a "
+248 |         "somersault",
+    |         ^^^^^^^^^^^^ E131
+249 | }
+250 | #:
+    |
