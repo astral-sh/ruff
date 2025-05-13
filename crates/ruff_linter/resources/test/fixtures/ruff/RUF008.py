@@ -12,6 +12,7 @@ class A:
     without_annotation = []
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     perfectly_fine: list[int] = field(default_factory=list)
+    mutable_default_in_field: list[int] = field(default=[])
     class_variable: typing.ClassVar[list[int]] = []
 
 
@@ -22,6 +23,7 @@ class B:
     without_annotation = []
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     perfectly_fine: list[int] = field(default_factory=list)
+    mutable_default_in_field: list[int] = field(default=[])
     class_variable: ClassVar[list[int]] = []
 
 # Lint should account for deferred annotations
@@ -33,4 +35,5 @@ class AWithQuotes:
     without_annotation = []
     correct_code: 'list[int]' = KNOWINGLY_MUTABLE_DEFAULT
     perfectly_fine: 'list[int]' = field(default_factory=list)
+    mutable_default_in_field: 'list[int]' = field(default=[])
     class_variable: 'typing.ClassVar[list[int]]'= []
