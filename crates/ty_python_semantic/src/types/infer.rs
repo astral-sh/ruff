@@ -1769,9 +1769,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             let use_def = self.index.use_def_map(scope_id);
             if use_def.can_implicit_return(self.db())
-                && !KnownClass::NoneType
-                    .to_instance(self.db())
-                    .is_assignable_to(self.db(), declared_ty)
+                && !Type::none(self.db()).is_assignable_to(self.db(), declared_ty)
             {
                 report_implicit_return_type(&self.context, returns.range(), declared_ty);
             }
@@ -2549,9 +2547,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         let symbol_ty = if except_handler_definition.is_star() {
-            // TODO: we should infer `ExceptionGroup` if `node_ty` is a subtype of `tuple[type[Exception], ...]`
-            // TODO: should be generic with `symbol_ty` as the generic parameter
-            KnownClass::BaseExceptionGroup.to_instance(self.db())
+            let class = if symbol_ty
+                .is_subtype_of(self.db(), KnownClass::Exception.to_instance(self.db()))
+            {
+                KnownClass::ExceptionGroup
+            } else {
+                KnownClass::BaseExceptionGroup
+            };
+            class.to_specialized_instance(self.db(), [symbol_ty])
         } else {
             symbol_ty
         };
@@ -4025,7 +4028,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .map_or(ret.range(), |value| value.range());
             self.record_return_type(ty, range);
         } else {
-            self.record_return_type(KnownClass::NoneType.to_instance(self.db()), ret.range());
+            self.record_return_type(Type::none(self.db()), ret.range());
         }
     }
 

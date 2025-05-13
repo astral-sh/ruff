@@ -896,8 +896,8 @@ impl<'db> ClassLiteral<'db> {
         } else {
             let name = Type::string_literal(db, self.name(db));
             let bases = TupleType::from_elements(db, self.explicit_bases(db));
-            // TODO: Should be `dict[str, Any]`
-            let namespace = KnownClass::Dict.to_instance(db);
+            let namespace = KnownClass::Dict
+                .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()]);
 
             // TODO: Other keyword arguments?
             let arguments = CallArgumentTypes::positional([name, bases, namespace]);
@@ -1913,7 +1913,9 @@ pub enum KnownClass {
     Slice,
     Property,
     BaseException,
+    Exception,
     BaseExceptionGroup,
+    ExceptionGroup,
     Classmethod,
     Super,
     // enum
@@ -2002,6 +2004,8 @@ impl<'db> KnownClass {
 
             Self::Any
             | Self::BaseException
+            | Self::Exception
+            | Self::ExceptionGroup
             | Self::Object
             | Self::OrderedDict
             | Self::BaseExceptionGroup
@@ -2076,6 +2080,8 @@ impl<'db> KnownClass {
             | Self::Property
             | Self::BaseException
             | Self::BaseExceptionGroup
+            | Self::Exception
+            | Self::ExceptionGroup
             | Self::Classmethod
             | Self::GenericAlias
             | Self::GeneratorType
@@ -2133,6 +2139,8 @@ impl<'db> KnownClass {
             Self::Property => "property",
             Self::BaseException => "BaseException",
             Self::BaseExceptionGroup => "BaseExceptionGroup",
+            Self::Exception => "Exception",
+            Self::ExceptionGroup => "ExceptionGroup",
             Self::Classmethod => "classmethod",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
@@ -2229,7 +2237,9 @@ impl<'db> KnownClass {
         db: &'db dyn Db,
         specialization: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
-        let class_literal = self.to_class_literal(db).expect_class_literal();
+        let Type::ClassLiteral(class_literal) = self.to_class_literal(db) else {
+            return Type::unknown();
+        };
         let Some(generic_context) = class_literal.generic_context(db) else {
             return Type::unknown();
         };
@@ -2349,6 +2359,8 @@ impl<'db> KnownClass {
             | Self::Dict
             | Self::BaseException
             | Self::BaseExceptionGroup
+            | Self::Exception
+            | Self::ExceptionGroup
             | Self::Classmethod
             | Self::Slice
             | Self::Super
@@ -2438,6 +2450,8 @@ impl<'db> KnownClass {
             | Self::Property
             | Self::BaseException
             | Self::BaseExceptionGroup
+            | Self::Exception
+            | Self::ExceptionGroup
             | Self::Classmethod
             | Self::GenericAlias
             | Self::ModuleType
@@ -2515,6 +2529,8 @@ impl<'db> KnownClass {
             | Self::SupportsIndex
             | Self::BaseException
             | Self::BaseExceptionGroup
+            | Self::Exception
+            | Self::ExceptionGroup
             | Self::Classmethod
             | Self::TypeVar
             | Self::ParamSpec
@@ -2557,6 +2573,8 @@ impl<'db> KnownClass {
             "property" => Self::Property,
             "BaseException" => Self::BaseException,
             "BaseExceptionGroup" => Self::BaseExceptionGroup,
+            "Exception" => Self::Exception,
+            "ExceptionGroup" => Self::ExceptionGroup,
             "classmethod" => Self::Classmethod,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
@@ -2634,6 +2652,8 @@ impl<'db> KnownClass {
             | Self::ModuleType
             | Self::VersionInfo
             | Self::BaseException
+            | Self::Exception
+            | Self::ExceptionGroup
             | Self::EllipsisType
             | Self::BaseExceptionGroup
             | Self::Classmethod
@@ -2846,7 +2866,7 @@ mod tests {
         for class in KnownClass::iter() {
             let version_added = match class {
                 KnownClass::UnionType => PythonVersion::PY310,
-                KnownClass::BaseExceptionGroup => PythonVersion::PY311,
+                KnownClass::BaseExceptionGroup | KnownClass::ExceptionGroup => PythonVersion::PY311,
                 KnownClass::GenericAlias => PythonVersion::PY39,
                 _ => PythonVersion::PY37,
             };
