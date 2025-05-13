@@ -301,6 +301,62 @@ fn benchmark_many_string_assignments(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_many_tuple_assignments(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[many_tuple_assignments]", |b| {
+        b.iter_batched_ref(
+            || {
+                // This is a micro benchmark, but it is effectively identical to a code sample
+                // observed in https://github.com/astral-sh/ty/issues/362
+                setup_micro_case(
+                    r#"
+                    def flag() -> bool:
+                        return True
+
+                    t = ()
+                    if flag():
+                        t += (1,)
+                    if flag():
+                        t += (2,)
+                    if flag():
+                        t += (3,)
+                    if flag():
+                        t += (4,)
+                    if flag():
+                        t += (5,)
+                    if flag():
+                        t += (6,)
+                    if flag():
+                        t += (7,)
+                    if flag():
+                        t += (8,)
+                    if flag():
+                        t += (9,)
+                    if flag():
+                        t += (10,)
+                    if flag():
+                        t += (11,)
+
+                    # Perform some kind of operation on the union type
+                    print(1 in t)
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check().unwrap();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
-criterion_group!(micro, benchmark_many_string_assignments);
+criterion_group!(
+    micro,
+    benchmark_many_string_assignments,
+    benchmark_many_tuple_assignments
+);
 criterion_main!(check_file, micro);
