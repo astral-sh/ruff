@@ -17,7 +17,6 @@ def _(x: tuple[int, str], y: tuple[None, tuple[int]]):
 
 ```py
 def _(x: tuple[int, ...], y: tuple[str, ...]):
-    # TODO: should be `tuple[int | str, ...]`
-    reveal_type(x + y)  # revealed: tuple[int | Unknown, ...]
+    reveal_type(x + y)  # revealed: tuple[int | str, ...]
     reveal_type(x + (1, 2))  # revealed: tuple[int, ...]
 ```

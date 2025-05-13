@@ -2477,7 +2477,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
     ) {
         fn extract_tuple_specialization<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
-            let class = ty.into_nominal_instance()?.class();
+            let class = ty.into_nominal_instance()?.class;
             if !class.is_known(db, KnownClass::Tuple) {
                 return None;
             }
