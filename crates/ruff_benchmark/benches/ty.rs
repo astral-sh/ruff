@@ -16,7 +16,7 @@ use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::value::RangedValue;
 use ty_project::watch::{ChangeEvent, ChangedKind};
-use ty_project::{Db, DummyReporter, ProjectDatabase, ProjectMetadata};
+use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 
 struct Case {
     db: ProjectDatabase,
@@ -59,40 +59,7 @@ type KeyDiagnosticFields = (
     Severity,
 );
 
-// left: [
-// (Lint(LintName("invalid-argument-type")), Some("/src/tomllib/_parser.py"), Some(8224..8254), "Argument to function `skip_until` is incorrect", Error),
-// (Lint(LintName("invalid-argument-type")), Some("/src/tomllib/_parser.py"), Some(16914..16948), "Argument to function `skip_until` is incorrect", Error),
-// (Lint(LintName("invalid-argument-type")), Some("/src/tomllib/_parser.py"), Some(17319..17363), "Argument to function `skip_until` is incorrect", Error),
-// ]
-//right: [
-// (Lint(LintName("invalid-argument-type")), Some("/src/tomllib/_parser.py"), Some(8224..8254), "Argument to this function is incorrect", Error),
-// (Lint(LintName("invalid-argument-type")), Some("/src/tomllib/_parser.py"), Some(16914..16948), "Argument to this function is incorrect", Error),
-// (Lint(LintName("invalid-argument-type")), Some("/src/tomllib/_parser.py"), Some(17319..17363), "Argument to this function is incorrect", Error),
-// ]
-
-static EXPECTED_TOMLLIB_DIAGNOSTICS: &[KeyDiagnosticFields] = &[
-    (
-        DiagnosticId::lint("invalid-argument-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(8224..8254),
-        "Argument to function `skip_until` is incorrect",
-        Severity::Error,
-    ),
-    (
-        DiagnosticId::lint("invalid-argument-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(16914..16948),
-        "Argument to function `skip_until` is incorrect",
-        Severity::Error,
-    ),
-    (
-        DiagnosticId::lint("invalid-argument-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(17319..17363),
-        "Argument to function `skip_until` is incorrect",
-        Severity::Error,
-    ),
-];
+static EXPECTED_TOMLLIB_DIAGNOSTICS: &[KeyDiagnosticFields] = &[];
 
 fn tomllib_path(file: &TestFile) -> SystemPathBuf {
     SystemPathBuf::from("src").join(file.name())
@@ -164,7 +131,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
     fn setup() -> Case {
         let case = setup_tomllib_case();
 
-        let result: Vec<_> = case.db.check(&DummyReporter).unwrap();
+        let result: Vec<_> = case.db.check().unwrap();
 
         assert_diagnostics(&case.db, &result, EXPECTED_TOMLLIB_DIAGNOSTICS);
 
@@ -192,7 +159,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
             None,
         );
 
-        let result = db.check(&DummyReporter).unwrap();
+        let result = db.check().unwrap();
 
         assert_eq!(result.len(), EXPECTED_TOMLLIB_DIAGNOSTICS.len());
     }
@@ -212,7 +179,7 @@ fn benchmark_cold(criterion: &mut Criterion) {
             setup_tomllib_case,
             |case| {
                 let Case { db, .. } = case;
-                let result: Vec<_> = db.check(&DummyReporter).unwrap();
+                let result: Vec<_> = db.check().unwrap();
 
                 assert_diagnostics(db, &result, EXPECTED_TOMLLIB_DIAGNOSTICS);
             },
@@ -326,7 +293,7 @@ fn benchmark_many_string_assignments(criterion: &mut Criterion) {
             },
             |case| {
                 let Case { db, .. } = case;
-                let result = db.check(&DummyReporter).unwrap();
+                let result = db.check().unwrap();
                 assert_eq!(result.len(), 0);
             },
             BatchSize::SmallInput,

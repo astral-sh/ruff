@@ -12,6 +12,7 @@ use crate::types::generics::{GenericContext, Specialization, TypeMapping};
 use crate::types::signatures::{Parameter, Parameters};
 use crate::types::{
     CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, Signature,
+    TypeVarInstance,
 };
 use crate::{
     module_resolver::file_to_module,
@@ -31,7 +32,7 @@ use crate::{
         definition_expression_type, CallArgumentTypes, CallError, CallErrorKind, DynamicType,
         MetaclassCandidate, TupleType, UnionBuilder, UnionType,
     },
-    Db, KnownModule, Program,
+    Db, FxOrderSet, KnownModule, Program,
 };
 use indexmap::IndexSet;
 use itertools::Itertools as _;
@@ -167,12 +168,24 @@ impl<'db> GenericAlias<'db> {
         self.origin(db).definition(db)
     }
 
-    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+    pub(super) fn apply_type_mapping<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: TypeMapping<'a, 'db>,
+    ) -> Self {
         Self::new(
             db,
             self.origin(db),
             self.specialization(db).apply_type_mapping(db, type_mapping),
         )
+    }
+
+    pub(super) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        self.specialization(db).find_legacy_typevars(db, typevars);
     }
 }
 
@@ -259,6 +272,17 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => Self::Generic(generic.apply_type_mapping(db, type_mapping)),
+        }
+    }
+
+    pub(super) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        match self {
+            Self::NonGeneric(_) => {}
+            Self::Generic(generic) => generic.find_legacy_typevars(db, typevars),
         }
     }
 

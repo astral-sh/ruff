@@ -76,19 +76,19 @@ class CanIndex(Protocol[S]):
 
 class ExplicitlyImplements[T](CanIndex[T]): ...
 
-def takes_in_list[T](x: list[T]) -> T:
-    return x[0]
+def takes_in_list[T](x: list[T]) -> list[T]:
+    return x
 
 def takes_in_protocol[T](x: CanIndex[T]) -> T:
     return x[0]
 
 def deep_list(x: list[str]) -> None:
-    reveal_type(takes_in_list(x))  # revealed: str
+    reveal_type(takes_in_list(x))  # revealed: list[str]
     # TODO: revealed: str
     reveal_type(takes_in_protocol(x))  # revealed: Unknown
 
 def deeper_list(x: list[set[str]]) -> None:
-    reveal_type(takes_in_list(x))  # revealed: set[str]
+    reveal_type(takes_in_list(x))  # revealed: list[set[str]]
     # TODO: revealed: set[str]
     reveal_type(takes_in_protocol(x))  # revealed: Unknown
 
@@ -97,6 +97,11 @@ def deep_explicit(x: ExplicitlyImplements[str]) -> None:
 
 def deeper_explicit(x: ExplicitlyImplements[set[str]]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: set[str]
+
+def takes_in_type[T](x: type[T]) -> type[T]:
+    return x
+
+reveal_type(takes_in_type(int))  # revealed: @Todo(unsupported type[X] special form)
 ```
 
 This also works when passing in arguments that are subclasses of the parameter type.
@@ -105,11 +110,11 @@ This also works when passing in arguments that are subclasses of the parameter t
 class Sub(list[int]): ...
 class GenericSub[T](list[T]): ...
 
-reveal_type(takes_in_list(Sub()))  # revealed: int
+reveal_type(takes_in_list(Sub()))  # revealed: list[int]
 # TODO: revealed: int
 reveal_type(takes_in_protocol(Sub()))  # revealed: Unknown
 
-reveal_type(takes_in_list(GenericSub[str]()))  # revealed: str
+reveal_type(takes_in_list(GenericSub[str]()))  # revealed: list[str]
 # TODO: revealed: str
 reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: Unknown
 

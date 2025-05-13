@@ -6,8 +6,8 @@ use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type};
 use crate::symbol::{Symbol, SymbolAndQualifiers};
 use crate::types::generics::TypeMapping;
-use crate::types::ClassLiteral;
-use crate::Db;
+use crate::types::{ClassLiteral, TypeVarInstance};
+use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
@@ -31,6 +31,19 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance_type) => Some(instance_type),
             _ => None,
         }
+    }
+
+    pub(super) fn synthesized_protocol<'a, M>(db: &'db dyn Db, members: M) -> Self
+    where
+        M: IntoIterator<Item = (&'a str, Type<'db>)>,
+    {
+        Self::ProtocolInstance(ProtocolInstanceType {
+            inner: Protocol::Synthesized(SynthesizedProtocolType::new(
+                db,
+                ProtocolInterface::with_members(db, members),
+            )),
+            _phantom: PhantomData,
+        })
     }
 
     /// Return `true` if `self` conforms to the interface described by `protocol`.
@@ -129,6 +142,14 @@ impl<'db> NominalInstanceType<'db> {
             class: self.class.apply_type_mapping(db, type_mapping),
             _phantom: PhantomData,
         }
+    }
+
+    pub(super) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        self.class.find_legacy_typevars(db, typevars);
     }
 }
 
@@ -273,7 +294,7 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    pub(super) fn apply_specialization<'a>(
+    pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: TypeMapping<'a, 'db>,
@@ -287,6 +308,21 @@ impl<'db> ProtocolInstanceType<'db> {
                 inner: Protocol::Synthesized(synthesized.apply_type_mapping(db, type_mapping)),
                 _phantom: PhantomData,
             },
+        }
+    }
+
+    pub(super) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        match self.inner {
+            Protocol::FromClass(class) => {
+                class.find_legacy_typevars(db, typevars);
+            }
+            Protocol::Synthesized(synthesized) => {
+                synthesized.find_legacy_typevars(db, typevars);
+            }
         }
     }
 }
@@ -315,9 +351,10 @@ impl<'db> Protocol<'db> {
 }
 
 mod synthesized_protocol {
-    use crate::db::Db;
     use crate::types::generics::TypeMapping;
     use crate::types::protocol_class::ProtocolInterface;
+    use crate::types::TypeVarInstance;
+    use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
     ///
@@ -342,6 +379,14 @@ mod synthesized_protocol {
             type_mapping: TypeMapping<'a, 'db>,
         ) -> Self {
             Self(self.0.specialized_and_normalized(db, type_mapping))
+        }
+
+        pub(super) fn find_legacy_typevars(
+            self,
+            db: &'db dyn Db,
+            typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        ) {
+            self.0.find_legacy_typevars(db, typevars);
         }
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {

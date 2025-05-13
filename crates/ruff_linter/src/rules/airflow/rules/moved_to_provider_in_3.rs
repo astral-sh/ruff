@@ -1,5 +1,5 @@
 use crate::importer::ImportRequest;
-use crate::rules::airflow::helpers::ProviderReplacement;
+use crate::rules::airflow::helpers::{is_guarded_by_try_except, ProviderReplacement};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprAttribute};
@@ -937,13 +937,17 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ranged.range(),
     );
 
-    if let ProviderReplacement::AutoImport {
-        module,
-        name,
-        provider: _,
-        version: _,
-    } = replacement
-    {
+    let semantic = checker.semantic();
+    if let Some((module, name)) = match &replacement {
+        ProviderReplacement::AutoImport { module, name, .. } => Some((module, *name)),
+        ProviderReplacement::SourceModuleMovedToProvider { module, name, .. } => {
+            Some((module, name.as_str()))
+        }
+        _ => None,
+    } {
+        if is_guarded_by_try_except(expr, module, name, semantic) {
+            return;
+        }
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from(module, name),
@@ -954,6 +958,5 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             Ok(Fix::safe_edits(import_edit, [replacement_edit]))
         });
     }
-
     checker.report_diagnostic(diagnostic);
 }

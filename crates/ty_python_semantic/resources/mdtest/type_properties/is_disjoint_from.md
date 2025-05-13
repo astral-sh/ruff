@@ -91,6 +91,10 @@ static_assert(is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1]])
 static_assert(is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1], Literal[3]]))
 
 static_assert(not is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1], int]))
+static_assert(not is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[int, ...]))
+
+# TODO: should pass
+static_assert(is_disjoint_from(tuple[int, int], tuple[None, ...]))  # error: [static-assert-error]
 ```
 
 ## Unions

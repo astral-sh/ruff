@@ -1,7 +1,7 @@
-use std::panic::RefUnwindSafe;
+use std::panic::{AssertUnwindSafe, RefUnwindSafe};
 use std::sync::Arc;
 
-use crate::DEFAULT_LINT_REGISTRY;
+use crate::{DummyReporter, DEFAULT_LINT_REGISTRY};
 use crate::{Project, ProjectMetadata, Reporter};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
@@ -68,7 +68,18 @@ impl ProjectDatabase {
     }
 
     /// Checks all open files in the project and its dependencies.
-    pub fn check(&self, reporter: &impl Reporter) -> Result<Vec<Diagnostic>, Cancelled> {
+    pub fn check(&self) -> Result<Vec<Diagnostic>, Cancelled> {
+        let mut reporter = DummyReporter;
+        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn Reporter);
+        self.with_db(|db| db.project().check(db, reporter))
+    }
+
+    /// Checks all open files in the project and its dependencies, using the given reporter.
+    pub fn check_with_reporter(
+        &self,
+        reporter: &mut dyn Reporter,
+    ) -> Result<Vec<Diagnostic>, Cancelled> {
+        let reporter = AssertUnwindSafe(reporter);
         self.with_db(|db| db.project().check(db, reporter))
     }
 
