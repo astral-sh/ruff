@@ -1,0 +1,100 @@
+---
+source: crates/ruff_linter/src/rules/sqlalchemy/mod.rs
+---
+SA001.py:52:5: SA001 Missing `Mapped` or other ORM container class type annotation
+   |
+50 |     __tablename__ = "company"
+51 |
+52 |     id = mapped_column(Integer, primary_key=True)
+   |     ^^ SA001
+53 |     employees = relationship("Employee", back_populates="company")
+   |
+
+SA001.py:53:5: SA001 Missing `Mapped` or other ORM container class type annotation
+   |
+52 |     id = mapped_column(Integer, primary_key=True)
+53 |     employees = relationship("Employee", back_populates="company")
+   |     ^^^^^^^^^ SA001
+54 |
+55 |     name = mapped_column(String)
+   |
+
+SA001.py:55:5: SA001 Missing `Mapped` or other ORM container class type annotation
+   |
+53 |     employees = relationship("Employee", back_populates="company")
+54 |
+55 |     name = mapped_column(String)
+   |     ^^^^ SA001
+56 |     company_name = synonym("name")
+   |
+
+SA001.py:56:5: SA001 Missing `Mapped` or other ORM container class type annotation
+   |
+55 |     name = mapped_column(String)
+56 |     company_name = synonym("name")
+   |     ^^^^^^^^^^^^ SA001
+   |
+
+SA001.py:62:5: SA001 Missing `Mapped` or other ORM container class type annotation
+   |
+60 |     __tablename__ = "employee"
+61 |
+62 |     id = mapped_column(Integer, primary_key=True)
+   |     ^^ SA001
+63 |     company_id = mapped_column(ForeignKey("company.id"))
+64 |     company = relationship("Company", back_populates="employees")
+   |
+
+SA001.py:63:5: SA001 Missing `Mapped` or other ORM container class type annotation
+   |
+62 |     id = mapped_column(Integer, primary_key=True)
+63 |     company_id = mapped_column(ForeignKey("company.id"))
+   |     ^^^^^^^^^^ SA001
+64 |     company = relationship("Company", back_populates="employees")
+   |
+
+SA001.py:64:5: SA001 Missing `Mapped` or other ORM container class type annotation
+   |
+62 |     id = mapped_column(Integer, primary_key=True)
+63 |     company_id = mapped_column(ForeignKey("company.id"))
+64 |     company = relationship("Company", back_populates="employees")
+   |     ^^^^^^^ SA001
+65 |
+66 |     company_name = association_proxy("company", "name")
+   |
+
+SA001.py:66:5: SA001 Missing `Mapped` or other ORM container class type annotation
+   |
+64 |     company = relationship("Company", back_populates="employees")
+65 |
+66 |     company_name = association_proxy("company", "name")
+   |     ^^^^^^^^^^^^ SA001
+67 |
+68 |     first_name = mapped_column(String)
+   |
+
+SA001.py:68:5: SA001 Missing `Mapped` or other ORM container class type annotation
+   |
+66 |     company_name = association_proxy("company", "name")
+67 |
+68 |     first_name = mapped_column(String)
+   |     ^^^^^^^^^^ SA001
+69 |     last_name = mapped_column(String)
+   |
+
+SA001.py:69:5: SA001 Missing `Mapped` or other ORM container class type annotation
+   |
+68 |     first_name = mapped_column(String)
+69 |     last_name = mapped_column(String)
+   |     ^^^^^^^^^ SA001
+70 |
+71 |     name_length = column_property(func.length(first_name + last_name))
+   |
+
+SA001.py:71:5: SA001 Missing `Mapped` or other ORM container class type annotation
+   |
+69 |     last_name = mapped_column(String)
+70 |
+71 |     name_length = column_property(func.length(first_name + last_name))
+   |     ^^^^^^^^^^^ SA001
+   |
