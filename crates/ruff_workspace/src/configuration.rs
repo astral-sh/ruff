@@ -212,6 +212,10 @@ impl Configuration {
             docstring_code_line_width: format
                 .docstring_code_line_width
                 .unwrap_or(format_defaults.docstring_code_line_width),
+            pragma_tags: format.pragma_tags.unwrap_or(format_defaults.pragma_tags),
+            pragma_tags_case_insensitive: format
+                .pragma_tags_case_insensitive
+                .unwrap_or(format_defaults.pragma_tags_case_insensitive),
         };
 
         let analyze = self.analyze;
@@ -1192,6 +1196,8 @@ pub struct FormatConfiguration {
     pub line_ending: Option<LineEnding>,
     pub docstring_code_format: Option<DocstringCode>,
     pub docstring_code_line_width: Option<DocstringCodeLineWidth>,
+    pub pragma_tags: Option<Vec<String>>,
+    pub pragma_tags_case_insensitive: Option<Vec<String>>,
 }
 
 impl FormatConfiguration {
@@ -1228,6 +1234,8 @@ impl FormatConfiguration {
                 }
             }),
             docstring_code_line_width: options.docstring_code_line_length,
+            pragma_tags: options.pragma_tags,
+            pragma_tags_case_insensitive: options.pragma_tags_case_insensitive,
         })
     }
 
@@ -1245,6 +1253,10 @@ impl FormatConfiguration {
             docstring_code_line_width: self
                 .docstring_code_line_width
                 .or(config.docstring_code_line_width),
+            pragma_tags: self.pragma_tags.or(config.pragma_tags),
+            pragma_tags_case_insensitive: self
+                .pragma_tags_case_insensitive
+                .or(config.pragma_tags_case_insensitive),
         }
     }
 }

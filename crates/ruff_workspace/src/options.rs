@@ -3760,6 +3760,78 @@ pub struct FormatOptions {
         "#
     )]
     pub docstring_code_line_length: Option<DocstringCodeLineWidth>,
+
+    /// A list of pragma tags to be ignored for line-too-long by the formatter.
+    ///
+    /// By default, the formatter ignores certain pragma comments (like "noqa", "type:", "pyright:", "pylint:", "flake8:", "ruff:", "isort:", "nosec")
+    /// when computing the width of a line. This prevents the formatter from moving these pragmas around, which could change their meaning.
+    ///
+    /// This option allows you to specify the pragma tags that should be treated this way.
+    ///
+    /// For example, when this value is set to `["pragma:"]`, then this code:
+    ///
+    /// ```python
+    /// def f(x):
+    ///     x = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",) # pragma: no cover
+    ///     y = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",) # todo: nothing
+    ///     print("Hello, world!")
+    /// ```
+    ///
+    /// ... will be reformatted as:
+    ///
+    /// ```python
+    /// def f(x):
+    ///     x = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # pragma: no cover
+    ///     y = (
+    ///         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    ///     )  # todo: nothing
+    ///     print("Hello, world!")
+    /// ```
+    #[option(
+        default = r#"["type:", "pyright:", "pylint:", "flake8:", "ruff:", "isort:", "nosec"]"#,
+        value_type = "list[str]",
+        example = r#"
+            # Add "pragma:" and "spellchecker:" to the list of pragma tags
+            pragma-tags = ["type:", "pyright:", "pylint:", "flake8:", "ruff:", "isort:", "nosec", "pragma:", "spellchecker:"]
+        "#
+    )]
+    pub pragma_tags: Option<Vec<String>>,
+
+    /// A list of pragma tags to be ignored for line-too-long by the formatter, with case-insensitive matching.
+    ///
+    /// By default, the formatter ignores "noqa" comments (case-insensitive) when computing the width of a line.
+    /// This prevents the formatter from moving these pragmas around, which could change their meaning.
+    ///
+    /// This option allows you to specify additional pragma tags that should be treated the same way with case-insensitive matching.
+    ///
+    /// For example, when this value is set to `["noqa"]`, then this code:
+    ///
+    /// ```python
+    /// def f(x):
+    ///     x = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",) # NoQa
+    ///     y = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",) # ToDo
+    ///     print("Hello, world!")
+    /// ```
+    ///
+    /// ... will be reformatted as:
+    ///
+    /// ```python
+    /// def f(x):
+    ///     x = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # NoQa
+    ///     y = (
+    ///         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    ///     )  # ToDo
+    ///     print("Hello, world!")
+    /// ```
+    #[option(
+        default = r#"["noqa"]"#,
+        value_type = "list[str]",
+        example = r#"
+            # Add "todo" to the list of case-insensitive pragma tags
+            pragma-tags-case-insensitive = ["noqa", "todo"]
+        "#
+    )]
+    pub pragma_tags_case_insensitive: Option<Vec<String>>,
 }
 
 /// Configures Ruff's `analyze` command.
