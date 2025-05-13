@@ -8,7 +8,8 @@ is unbound.
 
 ```py
 reveal_type(__name__)  # revealed: str
-reveal_type(__file__)  # revealed: str | None
+# Typeshed says this is str | None, but for a pure-Python on-disk module its always str
+reveal_type(__file__)  # revealed: str
 reveal_type(__loader__)  # revealed: LoaderProtocol | None
 reveal_type(__package__)  # revealed: str | None
 reveal_type(__doc__)  # revealed: str | None
@@ -51,6 +52,10 @@ import typing
 
 reveal_type(typing.__name__)  # revealed: str
 reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = ellipsis) -> None
+
+# For a stub module, we don't know that `__file__` is a string (at runtime it may be entirely
+# unset, but we follow typeshed here):
+reveal_type(typing.__file__)  # revealed: str | None
 
 # These come from `builtins.object`, not `types.ModuleType`:
 reveal_type(typing.__eq__)  # revealed: bound method ModuleType.__eq__(value: object, /) -> bool
