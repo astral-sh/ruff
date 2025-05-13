@@ -475,6 +475,15 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
                 }
             }
         }
+
+        impl AsRule for crate::message::DiagnosticMessage {
+            fn rule(&self) -> Rule {
+                match self.name.as_str() {
+                    #from_impls_for_diagnostic_kind
+                    _ => unreachable!("invalid rule name: {}", self.name),
+                }
+            }
+        }
     }
 }
 
