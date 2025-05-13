@@ -770,16 +770,27 @@ impl SemanticSyntaxChecker {
         // We are intentionally not inspecting the async status of the scope for now to mimic F704.
         // await-outside-async is PLE1142 instead, so we'll end up emitting both syntax errors for
         // cases that trigger F704
+
+        if ctx.in_function_scope() {
+            return;
+        }
+
         if kind.is_await() {
-            if ctx.in_await_allowed_context() {
-                return;
-            }
             // `await` is allowed at the top level of a Jupyter notebook.
             // See: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html.
             if ctx.in_module_scope() && ctx.in_notebook() {
                 return;
             }
-        } else if ctx.in_function_scope() {
+            if ctx.in_await_allowed_context() {
+                return;
+            }
+        }
+
+        // Traverse scope stack to detect ancestors but prevent explicitly invalid contexts
+        if !ctx.in_sync_comprehension()
+            && !ctx.in_generator_scope()
+            && ctx.in_await_allowed_context()
+        {
             return;
         }
 
