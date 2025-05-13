@@ -543,13 +543,6 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn into_dynamic(self) -> Option<DynamicType> {
-        match self {
-            Type::Dynamic(dynamic_type) => Some(dynamic_type),
-            _ => None,
-        }
-    }
-
     pub fn object(db: &'db dyn Db) -> Self {
         KnownClass::Object.to_instance(db)
     }

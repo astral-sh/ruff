@@ -107,16 +107,20 @@ impl<'db> ClassBase<'db> {
             {
                 Self::try_from_type(db, todo_type!("GenericAlias instance"))
             }
+            Type::SubclassOf(subclass_of) => subclass_of
+                .subclass_of()
+                .into_dynamic()
+                .map(ClassBase::Dynamic),
             Type::Intersection(inter) => {
-                let dynamic_element = inter
+                let valid_element = inter
                     .positive(db)
                     .iter()
-                    .find_map(|elem| elem.into_dynamic())?;
+                    .find_map(|elem| ClassBase::try_from_type(db, *elem))?;
 
                 if ty.is_disjoint_from(db, KnownClass::Type.to_instance(db)) {
                     None
                 } else {
-                    Some(ClassBase::Dynamic(dynamic_element))
+                    Some(valid_element)
                 }
             }
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
@@ -137,7 +141,6 @@ impl<'db> ClassBase<'db> {
             | Type::LiteralString
             | Type::Tuple(_)
             | Type::ModuleLiteral(_)
-            | Type::SubclassOf(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::ProtocolInstance(_)
