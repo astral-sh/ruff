@@ -855,7 +855,7 @@ fn find_noqa_comments<'a>(
             }
             FileExemption::Codes(codes) => {
                 // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
-                if codes.contains(&&diagnostic.kind.rule().noqa_code()) {
+                if codes.contains(&&diagnostic.rule().noqa_code()) {
                     comments_by_line.push(None);
                     continue;
                 }
@@ -873,7 +873,7 @@ fn find_noqa_comments<'a>(
                         continue;
                     }
                     Directive::Codes(codes) => {
-                        if codes.includes(diagnostic.kind.rule()) {
+                        if codes.includes(diagnostic.rule()) {
                             comments_by_line.push(None);
                             continue;
                         }
@@ -884,7 +884,7 @@ fn find_noqa_comments<'a>(
 
         let noqa_offset = noqa_line_for.resolve(diagnostic.range.start());
 
-        let rule = diagnostic.kind.rule();
+        let rule = diagnostic.rule();
 
         // Or ignored by the directive itself?
         if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {

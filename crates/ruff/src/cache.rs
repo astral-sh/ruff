@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
-use ruff_diagnostics::{DiagnosticKind, Fix};
+use ruff_diagnostics::Fix;
 use ruff_linter::message::{DiagnosticMessage, Message};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{warn_user, VERSION};
@@ -348,7 +348,9 @@ impl FileCache {
                     .iter()
                     .map(|msg| {
                         Message::Diagnostic(DiagnosticMessage {
-                            kind: msg.kind.clone(),
+                            name: msg.name.clone(),
+                            body: msg.body.clone(),
+                            suggestion: msg.suggestion.clone(),
                             range: msg.range,
                             fix: msg.fix.clone(),
                             file: file.clone(),
@@ -444,7 +446,9 @@ impl LintCacheData {
                     "message uses a different source file"
                 );
                 CacheMessage {
-                    kind: msg.kind.clone(),
+                    name: msg.name.clone(),
+                    body: msg.body.clone(),
+                    suggestion: msg.suggestion.clone(),
                     range: msg.range,
                     parent: msg.parent,
                     fix: msg.fix.clone(),
@@ -464,7 +468,12 @@ impl LintCacheData {
 /// On disk representation of a diagnostic message.
 #[derive(Deserialize, Debug, Serialize, PartialEq)]
 pub(super) struct CacheMessage {
-    kind: DiagnosticKind,
+    /// The identifier of the diagnostic, used to align the diagnostic with a rule.
+    name: String,
+    /// The message body to display to the user, to explain the diagnostic.
+    body: String,
+    /// The message to display to the user, to explain the suggested fix.
+    suggestion: Option<String>,
     /// Range into the message's [`FileCache::source`].
     range: TextRange,
     parent: Option<TextSize>,

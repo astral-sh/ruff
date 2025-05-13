@@ -210,26 +210,34 @@ impl Workspace {
         let messages: Vec<ExpandedMessage> = messages
             .into_iter()
             .map(|message| match message {
-                Message::Diagnostic(DiagnosticMessage {
-                    kind, range, fix, ..
-                }) => ExpandedMessage {
-                    code: Some(kind.rule().noqa_code().to_string()),
-                    message: kind.body,
-                    start_location: source_code.line_column(range.start()).into(),
-                    end_location: source_code.line_column(range.end()).into(),
-                    fix: fix.map(|fix| ExpandedFix {
-                        message: kind.suggestion,
-                        edits: fix
-                            .edits()
-                            .iter()
-                            .map(|edit| ExpandedEdit {
-                                location: source_code.line_column(edit.start()).into(),
-                                end_location: source_code.line_column(edit.end()).into(),
-                                content: edit.content().map(ToString::to_string),
-                            })
-                            .collect(),
-                    }),
-                },
+                Message::Diagnostic(m) => {
+                    let rule = m.rule();
+                    let DiagnosticMessage {
+                        body,
+                        suggestion,
+                        range,
+                        fix,
+                        ..
+                    } = m;
+                    ExpandedMessage {
+                        code: Some(rule.noqa_code().to_string()),
+                        message: body,
+                        start_location: source_code.line_column(range.start()).into(),
+                        end_location: source_code.line_column(range.end()).into(),
+                        fix: fix.map(|fix| ExpandedFix {
+                            message: suggestion,
+                            edits: fix
+                                .edits()
+                                .iter()
+                                .map(|edit| ExpandedEdit {
+                                    location: source_code.line_column(edit.start()).into(),
+                                    end_location: source_code.line_column(edit.end()).into(),
+                                    content: edit.content().map(ToString::to_string),
+                                })
+                                .collect(),
+                        }),
+                    }
+                }
                 Message::SyntaxError(_) => ExpandedMessage {
                     code: None,
                     message: message.body().to_string(),

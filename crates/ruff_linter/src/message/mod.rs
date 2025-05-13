@@ -17,7 +17,7 @@ pub use json_lines::JsonLinesEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 pub use rdjson::RdjsonEmitter;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_notebook::NotebookIndex;
 use ruff_python_parser::{ParseError, UnsupportedSyntaxError};
 use ruff_source_file::{LineColumn, SourceFile};
@@ -53,7 +53,9 @@ pub enum Message {
 /// A diagnostic message corresponding to a rule violation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DiagnosticMessage {
-    pub kind: DiagnosticKind,
+    pub name: String,
+    pub body: String,
+    pub suggestion: Option<String>,
     pub range: TextRange,
     pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
@@ -96,7 +98,9 @@ impl Message {
     ) -> Message {
         Message::Diagnostic(DiagnosticMessage {
             range: diagnostic.range(),
-            kind: diagnostic.kind,
+            name: diagnostic.kind.name,
+            body: diagnostic.kind.body,
+            suggestion: diagnostic.kind.suggestion,
             fix: diagnostic.fix,
             parent: diagnostic.parent,
             file,
@@ -183,7 +187,7 @@ impl Message {
     /// Returns a message kind.
     pub fn kind(&self) -> MessageKind {
         match self {
-            Message::Diagnostic(m) => MessageKind::Diagnostic(m.kind.rule()),
+            Message::Diagnostic(m) => MessageKind::Diagnostic(m.rule()),
             Message::SyntaxError(_) => MessageKind::SyntaxError,
         }
     }
@@ -191,7 +195,7 @@ impl Message {
     /// Returns the name used to represent the diagnostic.
     pub fn name(&self) -> &str {
         match self {
-            Message::Diagnostic(m) => &m.kind.name,
+            Message::Diagnostic(m) => &m.name,
             Message::SyntaxError(_) => "SyntaxError",
         }
     }
@@ -199,7 +203,7 @@ impl Message {
     /// Returns the message body to display to the user.
     pub fn body(&self) -> &str {
         match self {
-            Message::Diagnostic(m) => &m.kind.body,
+            Message::Diagnostic(m) => &m.body,
             Message::SyntaxError(m) => m
                 .primary_annotation()
                 .expect("Expected a primary annotation for a ruff diagnostic")
@@ -211,7 +215,7 @@ impl Message {
     /// Returns the fix suggestion for the violation.
     pub fn suggestion(&self) -> Option<&str> {
         match self {
-            Message::Diagnostic(m) => m.kind.suggestion.as_deref(),
+            Message::Diagnostic(m) => m.suggestion.as_deref(),
             Message::SyntaxError(_) => None,
         }
     }
@@ -240,7 +244,7 @@ impl Message {
     /// Returns the [`Rule`] corresponding to the diagnostic message.
     pub fn rule(&self) -> Option<Rule> {
         match self {
-            Message::Diagnostic(m) => Some(m.kind.rule()),
+            Message::Diagnostic(m) => Some(m.rule()),
             Message::SyntaxError(_) => None,
         }
     }
