@@ -1086,9 +1086,25 @@ impl<'db> CallableBinding<'db> {
             return;
         }
 
-        let callable_description = CallableDescription::new(context.db(), self.callable_type);
-        if self.overloads.len() > 1 {
-            if let Some(builder) = context.report_lint(&NO_MATCHING_OVERLOAD, node) {
+        match self.overloads.as_slice() {
+            [] => {}
+            [overload] => {
+                let callable_description =
+                    CallableDescription::new(context.db(), self.signature_type);
+                overload.report_diagnostics(
+                    context,
+                    node,
+                    self.signature_type,
+                    callable_description.as_ref(),
+                    union_diag,
+                );
+            }
+            _overloads => {
+                let Some(builder) = context.report_lint(&NO_MATCHING_OVERLOAD, node) else {
+                    return;
+                };
+                let callable_description =
+                    CallableDescription::new(context.db(), self.callable_type);
                 let mut diag = builder.into_diagnostic(format_args!(
                     "No overload{} matches arguments",
                     if let Some(CallableDescription { kind, name }) = callable_description {
@@ -1101,18 +1117,6 @@ impl<'db> CallableBinding<'db> {
                     union_diag.add_union_context(context.db(), &mut diag);
                 }
             }
-            return;
-        }
-
-        let callable_description = CallableDescription::new(context.db(), self.signature_type);
-        for overload in &self.overloads {
-            overload.report_diagnostics(
-                context,
-                node,
-                self.signature_type,
-                callable_description.as_ref(),
-                union_diag,
-            );
         }
     }
 }
