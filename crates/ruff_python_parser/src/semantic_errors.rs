@@ -787,7 +787,7 @@ impl SemanticSyntaxChecker {
         }
 
         // Traverse scope stack to detect ancestors but prevent explicitly invalid contexts
-        if !ctx.in_sync_comprehension()
+        if !ctx.in_sync_comprehension_scope()
             && !ctx.in_generator_scope()
             && ctx.in_await_allowed_context()
         {
@@ -853,7 +853,7 @@ impl SemanticSyntaxChecker {
         if ctx.in_notebook() && ctx.in_module_scope() {
             return;
         }
-        if !ctx.in_sync_comprehension() {
+        if !ctx.in_sync_comprehension_scope() {
             return;
         }
         for generator in generators.iter().filter(|gen| gen.is_async) {
@@ -1734,7 +1734,7 @@ pub trait SemanticSyntaxContext {
     /// function to determine the (a)sync context. Instead, this method will search all enclosing
     /// scopes until it finds a sync comprehension. As a result, the two methods will typically be
     /// used together.
-    fn in_sync_comprehension(&self) -> bool;
+    fn in_sync_comprehension_scope(&self) -> bool;
 
     /// Returns `true` if the visitor is at the top-level module scope.
     fn in_module_scope(&self) -> bool;
