@@ -123,7 +123,7 @@ pub(crate) struct CallableSignature<'db> {
     ///
     /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a
     /// non-overloaded callable.
-    overloads: SmallVec<[Signature<'db>; 1]>,
+    pub(crate) overloads: SmallVec<[Signature<'db>; 1]>,
 }
 
 impl<'db> CallableSignature<'db> {
