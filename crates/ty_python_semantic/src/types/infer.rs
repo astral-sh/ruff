@@ -307,7 +307,7 @@ fn single_expression_cycle_initial<'db>(
 /// involved in an unpacking operation. It returns a result-like object that can be used to get the
 /// type of the variables involved in this unpacking along with any violations that are detected
 /// during this unpacking.
-#[salsa::tracked(returns(ref))]
+#[salsa::tracked(returns(ref), cycle_fn=unpack_cycle_recover, cycle_initial=unpack_cycle_initial)]
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
     let _span =
@@ -316,6 +316,19 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     let mut unpacker = Unpacker::new(db, unpack.target_scope(db), unpack.value_scope(db));
     unpacker.unpack(unpack.target(db), unpack.value(db));
     unpacker.finish()
+}
+
+fn unpack_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &UnpackResult<'db>,
+    _count: u32,
+    _unpack: Unpack<'db>,
+) -> salsa::CycleRecoveryAction<UnpackResult<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn unpack_cycle_initial<'db>(_db: &'db dyn Db, _unpack: Unpack<'db>) -> UnpackResult<'db> {
+    UnpackResult::cycle_fallback(Type::Never)
 }
 
 /// Returns the type of the nearest enclosing class for the given scope.
