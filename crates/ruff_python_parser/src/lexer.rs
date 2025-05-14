@@ -2646,6 +2646,190 @@ f"{(lambda x:{x})}"
     }
 
     #[test]
+    fn test_empty_tstrings() {
+        let source = r#"t"" "" t"" t'' '' t"""""" t''''''"#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_prefix() {
+        let source = r#"t"" t"" rt"" rt"" Rt"" Rt"" tr"" Tr"" tR"" TR"""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring() {
+        let source = r#"t"normal {foo} {{another}} {bar} {{{three}}}""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_parentheses() {
+        let source = r#"t"{}" t"{{}}" t" {}" t"{{{}}}" t"{{{{}}}}" t" {} {{}} {{{}}} {{{{}}}}  ""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    fn tstring_single_quote_escape_eol(eol: &str) -> LexerOutput {
+        let source = format!(r"t'text \{eol} more text'");
+        lex_source(&source)
+    }
+
+    #[test]
+    fn test_tstring_single_quote_escape_unix_eol() {
+        assert_snapshot!(tstring_single_quote_escape_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_tstring_single_quote_escape_mac_eol() {
+        assert_snapshot!(tstring_single_quote_escape_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_tstring_single_quote_escape_windows_eol() {
+        assert_snapshot!(tstring_single_quote_escape_eol(WINDOWS_EOL));
+    }
+
+    #[test]
+    fn test_tstring_escape() {
+        let source = r#"t"\{x:\"\{x}} \"\"\
+ end""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_escape_braces() {
+        let source = r"t'\{foo}' t'\\{foo}' t'\{{foo}}' t'\\{{foo}}'";
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_escape_raw() {
+        let source = r#"rt"\{x:\"\{x}} \"\"\
+ end""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_named_unicode() {
+        let source = r#"t"\N{BULLET} normal \Nope \N""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_named_unicode_raw() {
+        let source = r#"rt"\N{BULLET} normal""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_with_named_expression() {
+        let source = r#"t"{x:=10} {(x:=10)} {x,{y:=10}} {[x:=10]}""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_with_format_spec() {
+        let source = r#"t"{foo:} {x=!s:.3f} {x:.{y}f} {'':*^{1:{1}}} {x:{{1}.pop()}}""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_with_multiline_format_spec() {
+        // The last t-string is invalid syntactically but we should still lex it.
+        // Note that the `b` is a `Name` token and not a `TStringMiddle` token.
+        let source = r"t'''__{
+    x:d
+}__'''
+t'''__{
+    x:a
+        b
+          c
+}__'''
+t'__{
+    x:d
+}__'
+t'__{
+    x:a
+        b
+}__'
+";
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_conversion() {
+        let source = r#"t"{x!s} {x=!r} {x:.3f!r} {{x!r}}""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_nested() {
+        let source = r#"t"foo {t"bar {x + t"{wow}"}"} baz" t'foo {t'bar'} some {t"another"}'"#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_expression_multiline() {
+        let source = r#"t"first {
+    x
+        *
+            y
+} second""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_multiline() {
+        let source = r#"t"""
+hello
+    world
+""" t'''
+    world
+hello
+''' t"some {t"""multiline
+allowed {x}"""} string""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_comments() {
+        let source = r#"t"""
+# not a comment { # comment {
+    x
+} # not a comment
+""""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_with_ipy_escape_command() {
+        let source = r#"t"foo {!pwd} bar""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_with_lambda_expression() {
+        let source = r#"
+t"{lambda x:{x}}"
+t"{(lambda x:{x})}"
+"#
+        .trim();
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_with_nul_char() {
+        let source = r"t'\0'";
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_nested_t_and_fstring() {
+        let source = r#"t"foo {f"bar {x + t"{wow}"}"} baz" f'foo {t'bar'!r} some {f"another"}'"#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
     fn test_match_softkeyword_in_notebook() {
         let source = r"match foo:
     case bar:
@@ -2691,6 +2875,48 @@ f"{(lambda x:{x})}"
         );
         assert_eq!(
             lex_fstring_error(r#"f""""""#),
+            UnterminatedTripleQuotedString
+        );
+    }
+
+    fn lex_tstring_error(source: &str) -> TStringErrorType {
+        let output = lex(source, Mode::Module, TextSize::default());
+        match output
+            .errors
+            .into_iter()
+            .next()
+            .expect("lexer should give at least one error")
+            .into_error()
+        {
+            LexicalErrorType::TStringError(error) => error,
+            err => panic!("Expected TStringError: {err:?}"),
+        }
+    }
+
+    #[test]
+    fn test_tstring_error() {
+        use TStringErrorType::{SingleRbrace, UnterminatedString, UnterminatedTripleQuotedString};
+
+        assert_eq!(lex_tstring_error("t'}'"), SingleRbrace);
+        assert_eq!(lex_tstring_error("t'{{}'"), SingleRbrace);
+        assert_eq!(lex_tstring_error("t'{{}}}'"), SingleRbrace);
+        assert_eq!(lex_tstring_error("t'foo}'"), SingleRbrace);
+        assert_eq!(lex_tstring_error(r"t'\u007b}'"), SingleRbrace);
+        assert_eq!(lex_tstring_error("t'{a:b}}'"), SingleRbrace);
+        assert_eq!(lex_tstring_error("t'{3:}}>10}'"), SingleRbrace);
+        assert_eq!(lex_tstring_error(r"t'\{foo}\}'"), SingleRbrace);
+
+        assert_eq!(lex_tstring_error(r#"t""#), UnterminatedString);
+        assert_eq!(lex_tstring_error(r"t'"), UnterminatedString);
+
+        assert_eq!(lex_tstring_error(r#"t""""#), UnterminatedTripleQuotedString);
+        assert_eq!(lex_tstring_error(r"t'''"), UnterminatedTripleQuotedString);
+        assert_eq!(
+            lex_tstring_error(r#"t"""""#),
+            UnterminatedTripleQuotedString
+        );
+        assert_eq!(
+            lex_tstring_error(r#"t""""""#),
             UnterminatedTripleQuotedString
         );
     }
