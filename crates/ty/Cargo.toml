@@ -35,7 +35,6 @@ salsa = { workspace = true }
 tracing = { workspace = true, features = ["release_max_level_debug"] }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
 tracing-flame = { workspace = true }
-tracing-tree = { workspace = true }
 wild = { workspace = true }
 
 [dev-dependencies]

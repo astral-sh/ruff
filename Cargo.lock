@@ -4011,7 +4011,6 @@ dependencies = [
  "tracing",
  "tracing-flame",
  "tracing-subscriber",
- "tracing-tree",
  "ty_project",
  "ty_python_semantic",
  "ty_server",
