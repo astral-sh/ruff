@@ -19,28 +19,39 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ## Example
 /// Given:
 /// ```python
-/// if x > 0:
-///     return True
-/// else:
+/// def foo(x: int) -> bool:
+///     if x > 0:
+///         return True
+///     else:
+///         return False
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(x: int) -> bool:
+///     return x > 0
+/// ```
+///
+/// Or, given:
+/// ```python
+/// def foo(x: int) -> bool:
+///     if x > 0:
+///         return True
 ///     return False
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// return x > 0
+/// def foo(x: int) -> bool:
+///     return x > 0
 /// ```
 ///
-/// Or, given:
-/// ```python
-/// if x > 0:
-///     return True
-/// return False
-/// ```
+/// ## Fix safety
 ///
-/// Use instead:
-/// ```python
-/// return x > 0
-/// ```
+/// This fix is marked as unsafe because it may change the program’s behavior if the condition does not
+/// return a proper Boolean. While the fix will try to wrap non-boolean values in a call to bool,
+/// custom implementations of comparison functions like `__eq__` can avoid the bool call and still
+/// lead to altered behavior.
 ///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
