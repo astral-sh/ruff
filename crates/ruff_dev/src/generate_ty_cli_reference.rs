@@ -179,7 +179,7 @@ fn generate_command<'a>(output: &mut String, command: &'a Command, parents: &mut
                 let id = format!("{name_key}--{}", arg.get_id());
                 output.push_str(&format!("<dt id=\"{id}\">"));
                 output.push_str(&format!(
-                    "<a href=\"#{id}\"<code>{}</code></a>",
+                    "<a href=\"#{id}\"><code>{}</code></a>",
                     arg.get_id().to_string().to_uppercase(),
                 ));
                 output.push_str("</dt>");
