@@ -83,7 +83,7 @@ pub(crate) fn split_static_string(
     let sep_arg = arguments.find_argument_value("sep", 0);
     let split_replacement = if let Some(sep) = sep_arg {
         match sep {
-            Expr::NoneLiteral(_) => split_default(str_value, maxsplit_value),
+            Expr::NoneLiteral(_) => split_default(str_value, maxsplit_value, direction),
             Expr::StringLiteral(sep_value) => {
                 let sep_value_str = sep_value.value.to_str();
                 Some(split_sep(
@@ -99,7 +99,7 @@ pub(crate) fn split_static_string(
             }
         }
     } else {
-        split_default(str_value, maxsplit_value)
+        split_default(str_value, maxsplit_value, direction)
     };
 
     let mut diagnostic = Diagnostic::new(SplitStaticString, call.range());
@@ -144,7 +144,11 @@ fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
     })
 }
 
-fn split_default(str_value: &StringLiteralValue, max_split: i32) -> Option<Expr> {
+fn split_default(
+    str_value: &StringLiteralValue,
+    max_split: i32,
+    direction: Direction,
+) -> Option<Expr> {
     // From the Python documentation:
     // > If sep is not specified or is None, a different splitting algorithm is applied: runs of
     // > consecutive whitespace are regarded as a single separator, and the result will contain
@@ -152,6 +156,7 @@ fn split_default(str_value: &StringLiteralValue, max_split: i32) -> Option<Expr>
     // > Consequently, splitting an empty string or a string consisting of just whitespace with
     // > a None separator returns [].
     // https://docs.python.org/3/library/stdtypes.html#str.split
+    let string_val = str_value.to_str();
     match max_split.cmp(&0) {
         Ordering::Greater => {
             // Autofix for `maxsplit` without separator not yet implemented, as
@@ -160,14 +165,30 @@ fn split_default(str_value: &StringLiteralValue, max_split: i32) -> Option<Expr>
             None
         }
         Ordering::Equal => {
-            let list_items: Vec<&str> = vec![str_value.to_str()];
+            // Behavior for maxsplit = 0 when sep is None:
+            // - If the string is empty or all whitespace, result is [].
+            // - Otherwise:
+            //   - " x ".split(maxsplit=0)  -> ['x ']
+            //   - " x ".rsplit(maxsplit=0) -> [' x']
+            //   - "".split(maxsplit=0) -> []
+            //   - " ".split(maxsplit=0) -> []
+            let processed_str = if direction == Direction::Left {
+                string_val.trim_start()
+            } else {
+                string_val.trim_end()
+            };
+            let list_items: &[_] = if processed_str.is_empty() {
+                &[]
+            } else {
+                &[processed_str]
+            };
             Some(construct_replacement(
-                &list_items,
+                list_items,
                 str_value.first_literal_flags(),
             ))
         }
         Ordering::Less => {
-            let list_items: Vec<&str> = str_value.to_str().split_whitespace().collect();
+            let list_items: Vec<&str> = string_val.split_whitespace().collect();
             Some(construct_replacement(
                 &list_items,
                 str_value.first_literal_flags(),

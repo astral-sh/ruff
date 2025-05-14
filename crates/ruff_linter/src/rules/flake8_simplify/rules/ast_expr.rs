@@ -32,6 +32,12 @@ use crate::checkers::ast::Checker;
 /// os.environ["FOO"]
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because automatically capitalizing environment variable names
+/// can change program behavior in environments where the variable names are case-sensitive, such as most
+/// Unix-like systems.
+///
 /// ## References
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 #[derive(ViolationMetadata)]
