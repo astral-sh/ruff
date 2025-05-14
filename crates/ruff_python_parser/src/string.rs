@@ -12,6 +12,7 @@ pub(crate) enum StringType {
     Str(ast::StringLiteral),
     Bytes(ast::BytesLiteral),
     FString(ast::FString),
+    TString(ast::TString),
 }
 
 impl Ranged for StringType {
@@ -20,6 +21,7 @@ impl Ranged for StringType {
             Self::Str(node) => node.range(),
             Self::Bytes(node) => node.range(),
             Self::FString(node) => node.range(),
+            Self::TString(node) => node.range(),
         }
     }
 }
@@ -30,6 +32,7 @@ impl From<StringType> for Expr {
             StringType::Str(node) => Expr::from(node),
             StringType::Bytes(node) => Expr::from(node),
             StringType::FString(node) => Expr::from(node),
+            StringType::TString(node) => Expr::from(node),
         }
     }
 }
@@ -317,6 +320,92 @@ impl StringParser {
         })
     }
 
+    fn parse_tstring_middle(mut self) -> Result<ast::TStringLiteralElement, LexicalError> {
+        // Fast-path: if the t-string doesn't contain any escape sequences, return the literal.
+        let Some(mut index) = memchr::memchr3(b'{', b'}', b'\\', self.source.as_bytes()) else {
+            return Ok(ast::TStringLiteralElement {
+                value: self.source,
+                range: self.range,
+            });
+        };
+
+        let mut value = String::with_capacity(self.source.len());
+        loop {
+            // Add the characters before the escape sequence (or curly brace) to the string.
+            let before_with_slash_or_brace = self.skip_bytes(index + 1);
+            let before = &before_with_slash_or_brace[..before_with_slash_or_brace.len() - 1];
+            value.push_str(before);
+
+            // Add the escaped character to the string.
+            match &self.source.as_bytes()[self.cursor - 1] {
+                // If there are any curly braces inside a `FStringMiddle` token,
+                // then they were escaped (i.e. `{{` or `}}`). This means that
+                // we need increase the location by 2 instead of 1.
+                b'{' => {
+                    self.offset += TextSize::from(1);
+                    value.push('{');
+                }
+                b'}' => {
+                    self.offset += TextSize::from(1);
+                    value.push('}');
+                }
+                // We can encounter a `\` as the last character in a `TStringMiddle`
+                // token which is valid in this context. For example,
+                //
+                // ```python
+                // t"\{foo} \{bar:\}"
+                // # ^     ^^     ^
+                // ```
+                //
+                // Here, the `TStringMiddle` token content will be "\" and " \"
+                // which is invalid if we look at the content in isolation:
+                //
+                // ```python
+                // "\"
+                // ```
+                //
+                // However, the content is syntactically valid in the context of
+                // the t-string because it's a substring of the entire t-string.
+                // This is still an invalid escape sequence, but we don't want to
+                // raise a syntax error as is done by the CPython parser. It might
+                // be supported in the future, refer to point 3: https://peps.python.org/pep-0701/#rejected-ideas
+                b'\\' => {
+                    if !self.flags.is_raw_string() && self.peek_byte().is_some() {
+                        match self.parse_escaped_char()? {
+                            None => {}
+                            Some(EscapedChar::Literal(c)) => value.push(c),
+                            Some(EscapedChar::Escape(c)) => {
+                                value.push('\\');
+                                value.push(c);
+                            }
+                        }
+                    } else {
+                        value.push('\\');
+                    }
+                }
+                ch => {
+                    unreachable!("Expected '{{', '}}', or '\\' but got {:?}", ch);
+                }
+            }
+
+            let Some(next_index) =
+                memchr::memchr3(b'{', b'}', b'\\', self.source[self.cursor..].as_bytes())
+            else {
+                // Add the rest of the string to the value.
+                let rest = &self.source[self.cursor..];
+                value.push_str(rest);
+                break;
+            };
+
+            index = next_index;
+        }
+
+        Ok(ast::TStringLiteralElement {
+            value: value.into_boxed_str(),
+            range: self.range,
+        })
+    }
+
     fn parse_bytes(mut self) -> Result<StringType, LexicalError> {
         if let Some(index) = self.source.as_bytes().find_non_ascii_byte() {
             let ch = self.source.chars().nth(index).unwrap();
@@ -464,6 +553,15 @@ pub(crate) fn parse_fstring_literal_element(
     range: TextRange,
 ) -> Result<ast::FStringLiteralElement, LexicalError> {
     StringParser::new(source, flags, range.start(), range).parse_fstring_middle()
+}
+
+// TODO(dhruvmanila): Move this to the new parser
+pub(crate) fn parse_tstring_literal_element(
+    source: Box<str>,
+    flags: AnyStringFlags,
+    range: TextRange,
+) -> Result<ast::TStringLiteralElement, LexicalError> {
+    StringParser::new(source, flags, range.start(), range).parse_tstring_middle()
 }
 
 #[cfg(test)]
