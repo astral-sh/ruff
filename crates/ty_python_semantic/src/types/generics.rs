@@ -536,7 +536,11 @@ impl<'db> Specialization<'db> {
                     .iter()
                     .zip(other.types(db))
                     .map(|(self_type, other_type)| {
-                        union_or_intersection_elements_ordering(db, self_type, other_type)
+                        union_or_intersection_elements_ordering(
+                            db,
+                            &self_type.normalized(db),
+                            &other_type.normalized(db),
+                        )
                     })
                     .fold(Ordering::Equal, Ordering::then)
             })
