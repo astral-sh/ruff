@@ -1,13 +1,13 @@
-use crate::importer::ImportRequest;
-use crate::rules::airflow::helpers::{is_guarded_by_try_except, ProviderReplacement};
+use crate::checkers::ast::Checker;
+use crate::fix::edits::remove_unused_imports;
+use crate::rules::airflow::helpers::{is_guarded_by_try_except, match_head, ProviderReplacement};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
+use ruff_python_semantic::{MemberNameImport, NameImport};
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for uses of Airflow functions and values that have been moved to it providers.
@@ -975,14 +975,36 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         if is_guarded_by_try_except(expr, module, name, semantic) {
             return;
         }
+
         diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(module, name),
+            let head = match_head(expr);
+            let binding = checker
+                .semantic()
+                .resolve_name(head.expect(""))
+                .or_else(|| checker.semantic().lookup_symbol(&head.unwrap().id))
+                .map(|id| checker.semantic().binding(id));
+            let stmt = binding.expect("").statement(semantic);
+            let remove_import_edit = remove_unused_imports(
+                std::iter::once(name),
+                stmt.expect(""),
+                None,
+                checker.locator(),
+                checker.stylist(),
+                checker.indexer(),
+            );
+            let import_edit = checker.importer().add_import(
+                &NameImport::ImportFrom(MemberNameImport::member(
+                    (*module).to_string(),
+                    name.to_string(),
+                )),
                 expr.start(),
-                checker.semantic(),
-            )?;
-            let replacement_edit = Edit::range_replacement(binding, ranged.range());
-            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
+            );
+
+            let replacement_edit = Edit::range_replacement(name.to_string(), ranged.range());
+            Ok(Fix::unsafe_edits(
+                remove_import_edit.expect(""),
+                [import_edit, replacement_edit], // add_import_edit.into_edits(), //, replacement_edit],
+            ))
         });
     }
     checker.report_diagnostic(diagnostic);
