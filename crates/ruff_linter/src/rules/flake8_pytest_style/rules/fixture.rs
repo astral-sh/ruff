@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -11,6 +12,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
+use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
@@ -807,10 +809,51 @@ fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: 
 }
 
 /// PT019
-fn check_test_function_args(checker: &Checker, parameters: &Parameters) {
+fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorators: &[Decorator]) {
+    let mut named_parametrize = FxHashSet::default();
+    for decorator in decorators.iter().filter(|decorator| {
+        UnqualifiedName::from_expr(map_callable(&decorator.expression))
+            .is_some_and(|name| matches!(name.segments(), ["pytest", "mark", "parametrize"]))
+    }) {
+        let Some(call_expr) = decorator.expression.as_call_expr() else {
+            continue;
+        };
+        let Some(first_arg) = call_expr.arguments.find_argument_value("argnames", 0) else {
+            continue;
+        };
+
+        match first_arg {
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+                named_parametrize.extend(
+                    value
+                        .to_str()
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|param| !param.is_empty() && param.starts_with('_')),
+                );
+            }
+
+            Expr::Name(_) => return,
+            Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })
+                if elts.iter().any(Expr::is_name_expr) =>
+            {
+                return
+            }
+            Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                named_parametrize.extend(
+                    elts.iter()
+                        .filter_map(Expr::as_string_literal_expr)
+                        .map(|param| param.value.to_str().trim())
+                        .filter(|param| !param.is_empty() && param.starts_with('_')),
+                );
+            }
+            _ => {}
+        }
+    }
+
     for parameter in parameters.iter_non_variadic_params() {
         let name = parameter.name();
-        if name.starts_with('_') {
+        if name.starts_with('_') && !named_parametrize.contains(name.as_str()) {
             checker.report_diagnostic(Diagnostic::new(
                 PytestFixtureParamWithoutValue {
                     name: name.to_string(),
@@ -915,6 +958,6 @@ pub(crate) fn fixture(
     }
 
     if checker.enabled(Rule::PytestFixtureParamWithoutValue) && name.starts_with("test_") {
-        check_test_function_args(checker, parameters);
+        check_test_function_args(checker, parameters, decorators);
     }
 }
