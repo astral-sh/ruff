@@ -1,0 +1,134 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC102_numpy.py:6:5: DOC102 Documented parameter `a` is not in the function's signature
+  |
+4 |     Adds two numbers and returns the result.
+5 |
+6 |     Parameters
+  |     ^^^^^^^^^^ DOC102
+7 |     ----------
+8 |     a : int
+  |
+  = help: Remove the extraneous parameter from the docstring
+
+DOC102_numpy.py:26:5: DOC102 Documented parameter `multiplier` is not in the function's signature
+   |
+24 |     Multiplies each element in a list by a given multiplier.
+25 |
+26 |     Parameters
+   |     ^^^^^^^^^^ DOC102
+27 |     ----------
+28 |     lst : list of int
+   |
+   = help: Remove the extraneous parameter from the docstring
+
+DOC102_numpy.py:46:5: DOC102 Documented parameter `numbers` is not in the function's signature
+   |
+44 |     Finds the maximum value in a list of numbers.
+45 |
+46 |     Parameters
+   |     ^^^^^^^^^^ DOC102
+47 |     ----------
+48 |     numbers : list of int
+   |
+   = help: Remove the extraneous parameter from the docstring
+
+DOC102_numpy.py:64:5: DOC102 These documented parameters are not in the function's signature: `name`, `age`, `email`
+   |
+62 |     Creates a user profile with basic information.
+63 |
+64 |     Parameters
+   |     ^^^^^^^^^^ DOC102
+65 |     ----------
+66 |     name : str
+   |
+   = help: Remove the extraneous parameters from the docstring
+
+DOC102_numpy.py:93:5: DOC102 Documented parameter `tax_rate` is not in the function's signature
+   |
+91 |     Calculates the total price after applying tax and a discount.
+92 |
+93 |     Parameters
+   |     ^^^^^^^^^^ DOC102
+94 |     ----------
+95 |     item_prices : list of float
+   |
+   = help: Remove the extraneous parameter from the docstring
+
+DOC102_numpy.py:118:5: DOC102 These documented parameters are not in the function's signature: `to_address`, `cc_address`
+    |
+116 |     Sends an email to the specified recipients.
+117 |
+118 |     Parameters
+    |     ^^^^^^^^^^ DOC102
+119 |     ----------
+120 |     subject : str
+    |
+    = help: Remove the extraneous parameters from the docstring
+
+DOC102_numpy.py:144:5: DOC102 Documented parameter `separator` is not in the function's signature
+    |
+142 |     Concatenates multiple strings with a specified separator.
+143 |
+144 |     Parameters
+    |     ^^^^^^^^^^ DOC102
+145 |     ----------
+146 |     separator : str
+    |
+    = help: Remove the extraneous parameter from the docstring
+
+DOC102_numpy.py:164:5: DOC102 These documented parameters are not in the function's signature: `items`, `details`
+    |
+162 |     Processes an order with a list of items and optional order details.
+163 |
+164 |     Parameters
+    |     ^^^^^^^^^^ DOC102
+165 |     ----------
+166 |     order_id : int
+    |
+    = help: Remove the extraneous parameters from the docstring
+
+DOC102_numpy.py:195:9: DOC102 Documented parameter `value` is not in the function's signature
+    |
+193 |         Initializes the calculator with an initial value.
+194 |
+195 |         Parameters
+    |         ^^^^^^^^^^ DOC102
+196 |         ----------
+197 |         value : int, optional
+    |
+    = help: Remove the extraneous parameter from the docstring
+
+DOC102_numpy.py:207:9: DOC102 Documented parameter `number` is not in the function's signature
+    |
+205 |         Adds two numbers to the current value.
+206 |
+207 |         Parameters
+    |         ^^^^^^^^^^ DOC102
+208 |         ----------
+209 |         number : int or float
+    |
+    = help: Remove the extraneous parameter from the docstring
+
+DOC102_numpy.py:228:9: DOC102 Documented parameter `value_str` is not in the function's signature
+    |
+226 |         Creates a Calculator instance from a string representation of a number.
+227 |
+228 |         Parameters
+    |         ^^^^^^^^^^ DOC102
+229 |         ----------
+230 |         value_str : str
+    |
+    = help: Remove the extraneous parameter from the docstring
+
+DOC102_numpy.py:247:9: DOC102 Documented parameter `number` is not in the function's signature
+    |
+245 |         Checks if a given number is valid (int or float).
+246 |
+247 |         Parameters
+    |         ^^^^^^^^^^ DOC102
+248 |         ----------
+249 |         number : any
+    |
+    = help: Remove the extraneous parameter from the docstring
