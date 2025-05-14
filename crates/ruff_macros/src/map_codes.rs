@@ -404,7 +404,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_fixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
 
-    let mut from_impls_for_diagnostic_kind = quote!();
+    let mut from_impls_for_diagnostic = quote!();
 
     for Rule {
         name, attrs, path, ..
@@ -422,8 +422,8 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
         );
         rule_explanation_match_arms.extend(quote! {#(#attrs)* Self::#name => #path::explain(),});
 
-        // Enable conversion from `DiagnosticKind` to `Rule`.
-        from_impls_for_diagnostic_kind
+        // Enable conversion from `Diagnostic` and `DiagnosticMessage` to `Rule`.
+        from_impls_for_diagnostic
             .extend(quote! {#(#attrs)* ::ruff_macros::kebab_case!(#name) => Rule::#name,});
     }
 
@@ -471,7 +471,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
         impl AsRule for ruff_diagnostics::Diagnostic {
             fn rule(&self) -> Rule {
                 match self.name {
-                    #from_impls_for_diagnostic_kind
+                    #from_impls_for_diagnostic
                     _ => unreachable!("invalid rule name: {}", self.name),
                 }
             }
@@ -480,7 +480,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
         impl AsRule for crate::message::DiagnosticMessage {
             fn rule(&self) -> Rule {
                 match self.name {
-                    #from_impls_for_diagnostic_kind
+                    #from_impls_for_diagnostic
                     _ => unreachable!("invalid rule name: {}", self.name),
                 }
             }
