@@ -1252,11 +1252,13 @@ impl<'src> Parser<'src> {
     ) -> Expr {
         assert!(strings.len() > 1);
 
+        let mut has_tstring = false;
         let mut has_fstring = false;
         let mut byte_literal_count = 0;
         for string in &strings {
             match string {
                 StringType::FString(_) => has_fstring = true,
+                StringType::TString(_) => has_tstring = true,
                 StringType::Bytes(_) => byte_literal_count += 1,
                 StringType::Str(_) => {}
             }
@@ -1285,7 +1287,7 @@ impl<'src> Parser<'src> {
                     );
                 }
                 // Only construct a byte expression if all the literals are bytes
-                // otherwise, we'll try either string or f-string. This is to retain
+                // otherwise, we'll try either string, t-string, or f-string. This is to retain
                 // as much information as possible.
                 Ordering::Equal => {
                     let mut values = Vec::with_capacity(strings.len());
@@ -1326,7 +1328,7 @@ impl<'src> Parser<'src> {
         // )
         // 2 + 2
 
-        if !has_fstring {
+        if !has_fstring && !has_tstring {
             let mut values = Vec::with_capacity(strings.len());
             for string in strings {
                 values.push(match string {
@@ -1340,10 +1342,34 @@ impl<'src> Parser<'src> {
             });
         }
 
+        if has_tstring {
+            let mut parts = Vec::with_capacity(strings.len());
+            for string in strings {
+                match string {
+                    StringType::TString(tstring) => parts.push(ast::TStringPart::TString(tstring)),
+                    StringType::FString(fstring) => {
+                        parts.push(ruff_python_ast::TStringPart::FString(fstring));
+                    }
+                    StringType::Str(string) => parts.push(ast::TStringPart::Literal(string)),
+                    StringType::Bytes(bytes) => parts.push(ast::TStringPart::Literal(
+                        ast::StringLiteral::invalid(bytes.range()),
+                    )),
+                }
+            }
+
+            return Expr::from(ast::ExprTString {
+                value: ast::TStringValue::concatenated(parts),
+                range,
+            });
+        }
+
         let mut parts = Vec::with_capacity(strings.len());
         for string in strings {
             match string {
                 StringType::FString(fstring) => parts.push(ast::FStringPart::FString(fstring)),
+                StringType::TString(_) => {
+                    unreachable!("expected no tstring parts by this point")
+                }
                 StringType::Str(string) => parts.push(ast::FStringPart::Literal(string)),
                 StringType::Bytes(bytes) => parts.push(ast::FStringPart::Literal(
                     ast::StringLiteral::invalid(bytes.range()),
