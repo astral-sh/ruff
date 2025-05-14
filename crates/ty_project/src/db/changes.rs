@@ -182,7 +182,7 @@ impl ProjectDatabase {
                         );
                     }
 
-                    let program_settings = metadata.to_program_settings(self.system());
+                    let program_settings = metadata.to_program_settings(self);
 
                     let program = Program::get(self);
                     if let Err(error) = program.update_from_settings(self, program_settings) {
@@ -209,7 +209,7 @@ impl ProjectDatabase {
         } else if custom_stdlib_change {
             let search_paths = project
                 .metadata(self)
-                .to_program_settings(self.system())
+                .to_program_settings(self)
                 .search_paths;
 
             if let Err(error) = program.update_search_paths(self, &search_paths) {

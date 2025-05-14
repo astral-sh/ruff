@@ -45,6 +45,7 @@ impl ModuleDb {
             &db,
             ProgramSettings {
                 python_version,
+                python_version_source: ty_python_semantic::ValueSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths,
             },

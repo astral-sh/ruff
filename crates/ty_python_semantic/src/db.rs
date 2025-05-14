@@ -180,6 +180,7 @@ pub(crate) mod tests {
                 &db,
                 ProgramSettings {
                     python_version: self.python_version,
+                    python_version_source: crate::ValueSource::default(),
                     python_platform: self.python_platform,
                     search_paths: SearchPathSettings::new(vec![src_root]),
                 },

@@ -1490,6 +1490,7 @@ mod tests {
             &db,
             ProgramSettings {
                 python_version: PythonVersion::PY38,
+                python_version_source: crate::ValueSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -1996,6 +1997,7 @@ not_a_directory
             &db,
             ProgramSettings {
                 python_version: PythonVersion::default(),
+                python_version_source: crate::ValueSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -2069,6 +2071,7 @@ not_a_directory
             &db,
             ProgramSettings {
                 python_version: PythonVersion::default(),
+                python_version_source: crate::ValueSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -2109,6 +2112,7 @@ not_a_directory
             &db,
             ProgramSettings {
                 python_version: PythonVersion::default(),
+                python_version_source: crate::ValueSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],

@@ -89,7 +89,7 @@ impl Workspace {
         )
         .map_err(into_error)?;
 
-        let program_settings = project.to_program_settings(&self.system);
+        let program_settings = project.to_program_settings(&self.db);
         Program::get(&self.db)
             .update_from_settings(&mut self.db, program_settings)
             .map_err(into_error)?;

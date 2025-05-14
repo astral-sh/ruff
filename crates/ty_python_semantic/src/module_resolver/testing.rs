@@ -236,6 +236,7 @@ impl TestCaseBuilder<MockedTypeshed> {
             &db,
             ProgramSettings {
                 python_version,
+                python_version_source: crate::ValueSource::default(),
                 python_platform,
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -294,6 +295,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
             &db,
             ProgramSettings {
                 python_version,
+                python_version_source: crate::ValueSource::default(),
                 python_platform,
                 search_paths: SearchPathSettings {
                     python_path: PythonPath::KnownSitePackages(vec![site_packages.clone()]),

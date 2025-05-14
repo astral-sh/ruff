@@ -17,7 +17,7 @@ pub mod pyproject;
 pub mod settings;
 pub mod value;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub struct ProjectMetadata {
     pub(super) name: Name,
@@ -239,8 +239,8 @@ impl ProjectMetadata {
         &self.extra_configuration_paths
     }
 
-    pub fn to_program_settings(&self, system: &dyn System) -> ProgramSettings {
-        self.options.to_program_settings(self.root(), system)
+    pub fn to_program_settings(&self, db: &dyn crate::Db) -> ProgramSettings {
+        self.options.to_program_settings(db, self.root())
     }
 
     /// Combine the project options with the CLI options where the CLI options take precedence.

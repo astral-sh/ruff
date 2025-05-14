@@ -86,14 +86,29 @@ impl Options {
 
     pub(crate) fn to_program_settings(
         &self,
+        db: &dyn crate::Db,
         project_root: &SystemPath,
-        system: &dyn System,
     ) -> ProgramSettings {
-        let python_version = self
+        let (python_version, python_version_source) = self
             .environment
             .as_ref()
-            .and_then(|env| env.python_version.as_deref().copied())
-            .unwrap_or(PythonVersion::latest_ty());
+            .and_then(|env| env.python_version.as_ref())
+            .map(|ranged_version| {
+                (
+                    ranged_version.inner_copied(),
+                    match ranged_version.source() {
+                        ValueSource::Cli => ty_python_semantic::ValueSource::Cli,
+                        ValueSource::File(path) => ty_python_semantic::ValueSource::File(
+                            system_path_to_file(db.upcast(), &**path).ok(),
+                            ranged_version.range(),
+                        ),
+                    },
+                )
+            })
+            .unwrap_or((
+                PythonVersion::latest_ty(),
+                ty_python_semantic::ValueSource::default(),
+            ));
         let python_platform = self
             .environment
             .as_ref()
@@ -105,8 +120,9 @@ impl Options {
             });
         ProgramSettings {
             python_version,
+            python_version_source,
             python_platform,
-            search_paths: self.to_search_path_settings(project_root, system),
+            search_paths: self.to_search_path_settings(project_root, db.system()),
         }
     }
 

@@ -11,7 +11,7 @@ use crate::types::string_annotation::{
 };
 use crate::types::{protocol_class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
 use crate::{declare_lint, Program};
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
@@ -1653,21 +1653,46 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
     let ast::ExprName { id, .. } = expr_name_node;
     let mut diagnostic = builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
     if let Some(version_added_to_builtins) = version_builtin_was_added(id) {
-        diagnostic.info(format_args!(
-            "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
-        ));
+        let program = Program::get(context.db());
+        let python_version = program.python_version(context.db());
 
-        // TODO: can we tell the user *why* we're inferring this target version?
-        // CLI flag? pyproject.toml? Python environment?
-        diagnostic.info(format_args!(
-            "The inferred target version of your project is Python {}",
-            Program::get(context.db()).python_version(context.db())
-        ));
-
-        diagnostic.info(
-            "If using a pyproject.toml file, \
-            consider adjusting the `project.requires-python` or `tool.ty.environment.python-version` field"
+        let mut sub_diagnostic = SubDiagnostic::new(
+            Severity::Info,
+            format_args!(
+                "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}, \
+                but Python {python_version} was assumed when resolving types",
+            ),
         );
+
+        let python_version_source = program.python_version_source(context.db());
+
+        match python_version_source {
+            crate::ValueSource::Cli => {
+                diagnostic.sub(sub_diagnostic);
+                diagnostic.info(format_args!(
+                    "This is because Python {python_version} was specified on the command line",
+                ));
+            }
+            crate::ValueSource::File(file, range) => {
+                if let Some(file) = file {
+                    sub_diagnostic.annotate(
+                        Annotation::primary(Span::from(*file).with_optional_range(*range)).message(
+                            format_args!(
+                                "Python {python_version} assumed due to this configuration setting"
+                            ),
+                        ),
+                    );
+                }
+                diagnostic.sub(sub_diagnostic);
+            }
+            crate::ValueSource::Default => {
+                diagnostic.sub(sub_diagnostic);
+                diagnostic.info(format_args!(
+                    "This is because it is the newest Python version supported by ty, \
+                    and neither a command-line argument nor a configuration setting was provided",
+                ));
+            }
+        }
     }
 }
 
