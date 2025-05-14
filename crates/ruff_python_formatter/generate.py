@@ -41,6 +41,9 @@ for node_line in node_lines:
         "FStringLiteralElement",
         "FStringExpressionElement",
         "FStringFormatSpec",
+        "TStringLiteralElement",
+        "TStringInterpolationElement",
+        "TStringFormatSpec",
         "Identifier",
     ):
         continue
