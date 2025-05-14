@@ -690,7 +690,7 @@ impl SemanticSyntaxContext for Checker<'_> {
         false
     }
 
-    fn in_sync_comprehension_scope(&self) -> bool {
+    fn in_sync_comprehension(&self) -> bool {
         for scope in self.semantic.current_scopes() {
             if let ScopeKind::Generator {
                 kind:

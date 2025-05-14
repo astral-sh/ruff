@@ -528,7 +528,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         true
     }
 
-    fn in_sync_comprehension_scope(&self) -> bool {
+    fn in_sync_comprehension(&self) -> bool {
         for scope in &self.scopes {
             if let Scope::Comprehension { is_async: false } = scope {
                 return true;

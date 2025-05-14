@@ -2480,7 +2480,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
         false
     }
 
-    fn in_sync_comprehension_scope(&self) -> bool {
+    fn in_sync_comprehension(&self) -> bool {
         for scope_info in self.scope_stack.iter().rev() {
             let scope = &self.scopes[scope_info.file_scope_id];
             let generators = match scope.node() {
