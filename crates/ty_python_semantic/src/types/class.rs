@@ -527,7 +527,7 @@ impl<'db> ClassLiteral<'db> {
     pub fn ordering(self, db: &'db dyn Db, other: Self) -> Ordering {
         self.name(db)
             .cmp(other.name(db))
-            .then_with(|| self.body_scope(db).cmp(&other.body_scope(db)))
+            .then_with(|| self.body_scope(db).ordering(db, other.body_scope(db)))
     }
 }
 

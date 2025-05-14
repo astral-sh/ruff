@@ -149,6 +149,14 @@ impl<'db> ScopeId<'db> {
             NodeWithScopeKind::GeneratorExpression(_) => "<generator>",
         }
     }
+
+    pub(crate) fn ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        self.file(db)
+            .path(db)
+            .as_str()
+            .cmp(other.file(db).path(db).as_str())
+            .then_with(|| self.file_scope_id(db).0.cmp(&other.file_scope_id(db).0))
+    }
 }
 
 /// ID that uniquely identifies a scope inside of a module.

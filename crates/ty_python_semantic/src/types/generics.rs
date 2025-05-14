@@ -532,17 +532,22 @@ impl<'db> Specialization<'db> {
         self.generic_context(db)
             .ordering(db, other.generic_context(db))
             .then_with(|| {
-                self.types(db)
-                    .iter()
-                    .zip(other.types(db))
-                    .map(|(self_type, other_type)| {
-                        union_or_intersection_elements_ordering(
-                            db,
-                            &self_type.normalized(db),
-                            &other_type.normalized(db),
-                        )
-                    })
-                    .fold(Ordering::Equal, Ordering::then)
+                let self_types = self.types(db);
+                let other_types = other.types(db);
+
+                self_types.len().cmp(&other_types.len()).then_with(|| {
+                    self.types(db)
+                        .iter()
+                        .zip(other.types(db))
+                        .map(|(self_type, other_type)| {
+                            union_or_intersection_elements_ordering(
+                                db,
+                                &self_type.normalized(db),
+                                &other_type.normalized(db),
+                            )
+                        })
+                        .fold(Ordering::Equal, Ordering::then)
+                })
             })
     }
 }
