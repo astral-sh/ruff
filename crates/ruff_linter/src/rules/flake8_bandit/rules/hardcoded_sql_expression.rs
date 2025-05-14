@@ -175,6 +175,7 @@ fn is_explicit_concatenation(expr: &Expr) -> Option<bool> {
         Expr::DictComp(_) => Some(false),
         Expr::Compare(_) => Some(false),
         Expr::FString(_) => Some(true),
+        Expr::TString(_) => Some(false),
         Expr::StringLiteral(_) => Some(true),
         Expr::BytesLiteral(_) => Some(false),
         Expr::NoneLiteral(_) => Some(false),

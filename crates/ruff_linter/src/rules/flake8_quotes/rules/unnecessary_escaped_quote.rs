@@ -78,6 +78,11 @@ pub(crate) fn unnecessary_escaped_quote(checker: &Checker, string_like: StringLi
                     checker.report_diagnostic(diagnostic);
                 }
             }
+            ast::StringLikePart::TString(t_string) => {
+                if let Some(diagnostic) = check_t_string(locator, t_string) {
+                    checker.report_diagnostic(diagnostic);
+                }
+            }
         }
     }
 }
@@ -127,6 +132,35 @@ fn check_f_string(locator: &Locator, f_string: &ast::FString) -> Option<Diagnost
 
     let mut edits = vec![];
     for literal in f_string.elements.literals() {
+        let content = locator.slice(literal);
+        if !contains_escaped_quote(content, opposite_quote_char) {
+            continue;
+        }
+        edits.push(Edit::range_replacement(
+            unescape_string(content, opposite_quote_char),
+            literal.range(),
+        ));
+    }
+
+    let mut edits_iter = edits.into_iter();
+    let first = edits_iter.next()?;
+
+    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, *range);
+    diagnostic.set_fix(Fix::safe_edits(first, edits_iter));
+    Some(diagnostic)
+}
+
+/// Checks for unnecessary escaped quotes in a t-string.
+fn check_t_string(locator: &Locator, t_string: &ast::TString) -> Option<Diagnostic> {
+    let ast::TString { flags, range, .. } = t_string;
+    if flags.is_triple_quoted() || flags.prefix().is_raw() {
+        return None;
+    }
+
+    let opposite_quote_char = flags.quote_style().opposite().as_char();
+
+    let mut edits = vec![];
+    for literal in t_string.elements.literals() {
         let content = locator.slice(literal);
         if !contains_escaped_quote(content, opposite_quote_char) {
             continue;

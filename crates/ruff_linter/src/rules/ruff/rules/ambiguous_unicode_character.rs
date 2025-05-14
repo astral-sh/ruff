@@ -232,6 +232,20 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like:
                     }
                 }
             }
+            ast::StringLikePart::TString(t_string) => {
+                for literal in t_string.elements.literals() {
+                    let text = checker.locator().slice(literal);
+                    let mut diagnostics = Vec::new();
+                    ambiguous_unicode_character(
+                        &mut diagnostics,
+                        text,
+                        literal.range(),
+                        context,
+                        checker.settings,
+                    );
+                    checker.report_diagnostics(diagnostics);
+                }
+            }
         }
     }
 }
