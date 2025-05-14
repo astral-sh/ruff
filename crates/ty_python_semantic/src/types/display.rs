@@ -170,31 +170,15 @@ impl Display for DisplayRepresentation<'_> {
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 write!(
                     f,
-                    "<method-wrapper `__get__` of `{function}{specialization}`>",
+                    "<method-wrapper `__get__` of `{function}`>",
                     function = function.name(self.db),
-                    specialization = if let Some(specialization) = function.specialization(self.db)
-                    {
-                        specialization
-                            .display_short(self.db, TupleSpecialization::No)
-                            .to_string()
-                    } else {
-                        String::new()
-                    },
                 )
             }
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)) => {
                 write!(
                     f,
-                    "<method-wrapper `__call__` of `{function}{specialization}`>",
+                    "<method-wrapper `__call__` of `{function}`>",
                     function = function.name(self.db),
-                    specialization = if let Some(specialization) = function.specialization(self.db)
-                    {
-                        specialization
-                            .display_short(self.db, TupleSpecialization::No)
-                            .to_string()
-                    } else {
-                        String::new()
-                    },
                 )
             }
             Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(_)) => {

@@ -5,8 +5,7 @@ use std::marker::PhantomData;
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type};
 use crate::symbol::{Symbol, SymbolAndQualifiers};
-use crate::types::generics::TypeMapping;
-use crate::types::{ClassLiteral, TypeVarInstance};
+use crate::types::{ClassLiteral, TypeMapping, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -356,9 +355,8 @@ impl<'db> Protocol<'db> {
 }
 
 mod synthesized_protocol {
-    use crate::types::generics::TypeMapping;
     use crate::types::protocol_class::ProtocolInterface;
-    use crate::types::TypeVarInstance;
+    use crate::types::{TypeMapping, TypeVarInstance};
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.

@@ -17,8 +17,8 @@ use smallvec::{smallvec, SmallVec};
 
 use super::{definition_expression_type, DynamicType, Type};
 use crate::semantic_index::definition::Definition;
-use crate::types::generics::{GenericContext, Specialization, TypeMapping};
-use crate::types::{todo_type, ClassLiteral, TypeVarInstance};
+use crate::types::generics::GenericContext;
+use crate::types::{todo_type, ClassLiteral, TypeMapping, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
@@ -310,18 +310,6 @@ impl<'db> Signature<'db> {
                 .map(|param| param.normalized(db))
                 .collect(),
             return_ty: self.return_ty.map(|return_ty| return_ty.normalized(db)),
-        }
-    }
-
-    pub(crate) fn apply_optional_specialization(
-        self,
-        db: &'db dyn Db,
-        specialization: Option<Specialization<'db>>,
-    ) -> Self {
-        if let Some(specialization) = specialization {
-            self.apply_type_mapping(db, &TypeMapping::Specialization(specialization))
-        } else {
-            self
         }
     }
 

@@ -1,6 +1,7 @@
-use crate::types::generics::{GenericContext, Specialization, TypeMapping};
+use crate::types::generics::{GenericContext, Specialization};
 use crate::types::{
     todo_type, ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, Type,
+    TypeMapping,
 };
 use crate::Db;
 

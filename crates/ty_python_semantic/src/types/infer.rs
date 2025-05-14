@@ -2001,7 +2001,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .to_scope_id(self.db(), self.file());
 
         let inherited_generic_context = None;
-        let specialization = None;
+        let type_mappings = Box::from([]);
 
         let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
             self.db(),
@@ -2011,7 +2011,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             function_decorators,
             dataclass_transformer_params,
             inherited_generic_context,
-            specialization,
+            type_mappings,
         ));
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {

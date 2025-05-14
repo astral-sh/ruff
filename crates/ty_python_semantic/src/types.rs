@@ -45,7 +45,7 @@ use crate::types::call::{Bindings, CallArgumentTypes, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
-use crate::types::generics::{GenericContext, Specialization, TypeMapping};
+use crate::types::generics::{GenericContext, PartialSpecialization, Specialization};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
@@ -5036,15 +5036,22 @@ impl<'db> Type<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Type<'db> {
         match self {
-            Type::TypeVar(typevar) => type_mapping.get(db, typevar).unwrap_or(self),
+            Type::TypeVar(typevar) => match type_mapping {
+                TypeMapping::Specialization(specialization) => {
+                    specialization.get(db, typevar).unwrap_or(self)
+                }
+                TypeMapping::PartialSpecialization(partial) => {
+                    partial.get(db, typevar).unwrap_or(self)
+                }
+            }
 
             Type::FunctionLiteral(function) => {
-                Type::FunctionLiteral(function.apply_type_mapping(db, type_mapping))
+                Type::FunctionLiteral(function.with_type_mapping(db, type_mapping))
             }
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
-                method.function(db).apply_type_mapping(db, type_mapping),
+                method.function(db).with_type_mapping(db, type_mapping),
                 method.self_instance(db).apply_type_mapping(db, type_mapping),
             )),
 
@@ -5058,13 +5065,13 @@ impl<'db> Type<'db> {
 
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(
-                    function.apply_type_mapping(db, type_mapping),
+                    function.with_type_mapping(db, type_mapping),
                 ))
             }
 
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)) => {
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(
-                    function.apply_type_mapping(db, type_mapping),
+                    function.with_type_mapping(db, type_mapping),
                 ))
             }
 
@@ -5416,6 +5423,30 @@ impl<'db> Type<'db> {
 impl<'db> From<&Type<'db>> for Type<'db> {
     fn from(value: &Type<'db>) -> Self {
         *value
+    }
+}
+
+/// A mapping that can be applied to a type, producing another type.
+///
+/// This is represented as an enum (with some variants using `Cow`), and not an `FnMut` trait,
+/// since we sometimes have to apply type mappings lazily (e.g., to the signature of a function
+/// literal).
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum TypeMapping<'a, 'db> {
+    Specialization(Specialization<'db>),
+    PartialSpecialization(PartialSpecialization<'a, 'db>),
+}
+
+impl<'db> TypeMapping<'_, 'db> {
+    fn to_owned(&self) -> TypeMapping<'db, 'db> {
+        match self {
+            TypeMapping::Specialization(specialization) => {
+                TypeMapping::Specialization(*specialization)
+            }
+            TypeMapping::PartialSpecialization(partial) => {
+                TypeMapping::PartialSpecialization(partial.to_owned())
+            }
+        }
     }
 }
 
@@ -6592,10 +6623,8 @@ pub struct FunctionType<'db> {
     /// to its own generic context.
     inherited_generic_context: Option<GenericContext<'db>>,
 
-    /// A specialization that should be applied to the function's parameter and return types,
-    /// either because the function is itself generic, or because it appears in the body of a
-    /// generic class.
-    specialization: Option<Specialization<'db>>,
+    /// Type mappings that should be applied to the function's parameter and return types.
+    type_mappings: Box<[TypeMapping<'db, 'db>]>,
 }
 
 #[salsa::tracked]
@@ -6683,29 +6712,36 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
-        let specialization = self.specialization(db);
+        let type_mappings = self.type_mappings(db);
         if let Some(overloaded) = self.to_overloaded(db) {
             FunctionSignature {
                 overloads: CallableSignature::from_overloads(
                     Type::FunctionLiteral(self),
                     overloaded.overloads.iter().copied().map(|overload| {
-                        overload
-                            .internal_signature(db)
-                            .apply_optional_specialization(db, specialization)
+                        type_mappings
+                            .iter()
+                            .fold(overload.internal_signature(db), |ty, mapping| {
+                                ty.apply_type_mapping(db, mapping)
+                            })
                     }),
                 ),
                 implementation: overloaded.implementation.map(|implementation| {
-                    implementation
-                        .internal_signature(db)
-                        .apply_optional_specialization(db, specialization)
+                    type_mappings
+                        .iter()
+                        .fold(implementation.internal_signature(db), |ty, mapping| {
+                            ty.apply_type_mapping(db, mapping)
+                        })
                 }),
             }
         } else {
             FunctionSignature {
                 overloads: CallableSignature::single(
                     Type::FunctionLiteral(self),
-                    self.internal_signature(db)
-                        .apply_optional_specialization(db, specialization),
+                    type_mappings
+                        .iter()
+                        .fold(self.internal_signature(db), |ty, mapping| {
+                            ty.apply_type_mapping(db, mapping)
+                        }),
                 ),
                 implementation: None,
             }
@@ -6756,7 +6792,7 @@ impl<'db> FunctionType<'db> {
             self.decorators(db),
             Some(params),
             self.inherited_generic_context(db),
-            self.specialization(db),
+            self.type_mappings(db),
         )
     }
 
@@ -6775,15 +6811,13 @@ impl<'db> FunctionType<'db> {
             self.decorators(db),
             self.dataclass_transformer_params(db),
             Some(inherited_generic_context),
-            self.specialization(db),
+            self.type_mappings(db),
         )
     }
 
-    fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        let specialization = match self.specialization(db) {
-            Some(existing) => existing.apply_specialization(db, specialization),
-            None => specialization,
-        };
+    fn with_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+        let mut type_mappings = self.type_mappings(db).to_vec();
+        type_mappings.push(type_mapping.to_owned());
         Self::new(
             db,
             self.name(db).clone(),
@@ -6792,12 +6826,8 @@ impl<'db> FunctionType<'db> {
             self.decorators(db),
             self.dataclass_transformer_params(db),
             self.inherited_generic_context(db),
-            Some(specialization),
+            type_mappings.into_boxed_slice(),
         )
-    }
-
-    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
-        self.apply_specialization(db, type_mapping.to_specialization(db))
     }
 
     fn find_legacy_typevars(

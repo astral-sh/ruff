@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
@@ -7,7 +9,7 @@ use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    declaration_type, todo_type, KnownInstanceType, Type, TypeVarBoundOrConstraints,
+    declaration_type, todo_type, KnownInstanceType, Type, TypeMapping, TypeVarBoundOrConstraints,
     TypeVarInstance, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxOrderSet};
@@ -219,11 +221,12 @@ impl<'db> GenericContext<'db> {
             // Typevars are only allowed to refer to _earlier_ typevars in their defaults. (This is
             // statically enforced for PEP-695 contexts, and is explicitly called out as a
             // requirement for legacy contexts.)
-            let type_mapping = TypeMapping::Partial {
+            let partial = PartialSpecialization {
                 generic_context: self,
-                types: &expanded[0..idx],
+                types: Cow::Borrowed(&expanded[0..idx]),
             };
-            let default = default.apply_type_mapping(db, &type_mapping);
+            let default =
+                default.apply_type_mapping(db, &TypeMapping::PartialSpecialization(partial));
             expanded[idx] = default;
         }
 
@@ -295,6 +298,16 @@ pub struct Specialization<'db> {
 }
 
 impl<'db> Specialization<'db> {
+    /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
+    /// mapping.
+    pub(crate) fn get(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
+        let index = self
+            .generic_context(db)
+            .variables(db)
+            .get_index_of(&typevar)?;
+        self.types(db).get(index).copied()
+    }
+
     /// Applies a specialization to this specialization. This is used, for instance, when a generic
     /// class inherits from a generic alias:
     ///
@@ -520,49 +533,24 @@ impl<'db> Specialization<'db> {
 ///
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
-#[derive(Debug)]
-pub(crate) enum TypeMapping<'a, 'db> {
-    Specialization(Specialization<'db>),
-    Partial {
-        generic_context: GenericContext<'db>,
-        types: &'a [Type<'db>],
-    },
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct PartialSpecialization<'a, 'db> {
+    generic_context: GenericContext<'db>,
+    types: Cow<'a, [Type<'db>]>,
 }
 
-impl<'db> TypeMapping<'_, 'db> {
-    fn generic_context(&self, db: &'db dyn Db) -> GenericContext<'db> {
-        match self {
-            Self::Specialization(specialization) => specialization.generic_context(db),
-            Self::Partial {
-                generic_context, ..
-            } => *generic_context,
-        }
-    }
-
+impl<'db> PartialSpecialization<'_, 'db> {
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
     pub(crate) fn get(&self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
-        let index = self
-            .generic_context(db)
-            .variables(db)
-            .get_index_of(&typevar)?;
-        match self {
-            Self::Specialization(specialization) => specialization.types(db).get(index).copied(),
-            Self::Partial { types, .. } => types.get(index).copied(),
-        }
+        let index = self.generic_context.variables(db).get_index_of(&typevar)?;
+        self.types.get(index).copied()
     }
 
-    pub(crate) fn to_specialization(&self, db: &'db dyn Db) -> Specialization<'db> {
-        match self {
-            Self::Specialization(specialization) => *specialization,
-            Self::Partial {
-                generic_context,
-                types,
-            } => {
-                let mut types = types.to_vec();
-                types.resize(generic_context.variables(db).len(), Type::unknown());
-                Specialization::new(db, generic_context, types.into_boxed_slice())
-            }
+    pub(crate) fn to_owned(&self) -> PartialSpecialization<'db, 'db> {
+        PartialSpecialization {
+            generic_context: self.generic_context,
+            types: Cow::from(self.types.clone().into_owned()),
         }
     }
 }
