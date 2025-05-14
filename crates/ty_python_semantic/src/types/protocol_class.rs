@@ -171,7 +171,7 @@ impl<'db> ProtocolInterface<'db> {
     pub(super) fn specialized_and_normalized<'a>(
         self,
         db: &'db dyn Db,
-        type_mapping: TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
         match self {
             Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
@@ -221,7 +221,7 @@ impl<'db> ProtocolMemberData<'db> {
         }
     }
 
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         Self {
             ty: self.ty.apply_type_mapping(db, type_mapping),
             qualifiers: self.qualifiers,

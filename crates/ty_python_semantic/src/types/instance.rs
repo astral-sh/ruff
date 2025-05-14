@@ -135,7 +135,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
-        type_mapping: TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
         Self::from_class(self.class.apply_type_mapping(db, type_mapping))
     }
@@ -304,7 +304,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
-        type_mapping: TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
         match self.inner {
             Protocol::FromClass(class) => {
@@ -381,7 +381,7 @@ mod synthesized_protocol {
         pub(super) fn apply_type_mapping<'a>(
             self,
             db: &'db dyn Db,
-            type_mapping: TypeMapping<'a, 'db>,
+            type_mapping: &TypeMapping<'a, 'db>,
         ) -> Self {
             Self(self.0.specialized_and_normalized(db, type_mapping))
         }

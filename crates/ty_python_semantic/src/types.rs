@@ -342,7 +342,7 @@ pub struct PropertyInstanceType<'db> {
 }
 
 impl<'db> PropertyInstanceType<'db> {
-    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         let getter = self
             .getter(db)
             .map(|ty| ty.apply_type_mapping(db, type_mapping));
@@ -5027,13 +5027,13 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         specialization: Specialization<'db>,
     ) -> Type<'db> {
-        self.apply_type_mapping(db, specialization.type_mapping())
+        self.apply_type_mapping(db, &TypeMapping::Specialization(specialization))
     }
 
     fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
-        type_mapping: TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
     ) -> Type<'db> {
         match self {
             Type::TypeVar(typevar) => type_mapping.get(db, typevar).unwrap_or(self),
@@ -6796,8 +6796,8 @@ impl<'db> FunctionType<'db> {
         )
     }
 
-    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
-        self.apply_specialization(db, type_mapping.into_specialization(db))
+    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+        self.apply_specialization(db, type_mapping.to_specialization(db))
     }
 
     fn find_legacy_typevars(
@@ -7237,7 +7237,7 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         CallableType::from_overloads(
             db,
             self.signatures(db)

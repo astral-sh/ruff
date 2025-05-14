@@ -223,7 +223,7 @@ impl<'db> GenericContext<'db> {
                 generic_context: self,
                 types: &expanded[0..idx],
             };
-            let default = default.apply_type_mapping(db, type_mapping);
+            let default = default.apply_type_mapping(db, &type_mapping);
             expanded[idx] = default;
         }
 
@@ -295,10 +295,6 @@ pub struct Specialization<'db> {
 }
 
 impl<'db> Specialization<'db> {
-    pub(crate) fn type_mapping(self) -> TypeMapping<'db, 'db> {
-        TypeMapping::Specialization(self)
-    }
-
     /// Applies a specialization to this specialization. This is used, for instance, when a generic
     /// class inherits from a generic alias:
     ///
@@ -313,13 +309,13 @@ impl<'db> Specialization<'db> {
     /// That lets us produce the generic alias `A[int]`, which is the corresponding entry in the
     /// MRO of `B[int]`.
     pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
-        self.apply_type_mapping(db, other.type_mapping())
+        self.apply_type_mapping(db, &TypeMapping::Specialization(other))
     }
 
     pub(crate) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
-        type_mapping: TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
         let types: Box<[_]> = self
             .types(db)
@@ -524,7 +520,7 @@ impl<'db> Specialization<'db> {
 ///
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Debug)]
 pub(crate) enum TypeMapping<'a, 'db> {
     Specialization(Specialization<'db>),
     Partial {
@@ -534,18 +530,18 @@ pub(crate) enum TypeMapping<'a, 'db> {
 }
 
 impl<'db> TypeMapping<'_, 'db> {
-    fn generic_context(self, db: &'db dyn Db) -> GenericContext<'db> {
+    fn generic_context(&self, db: &'db dyn Db) -> GenericContext<'db> {
         match self {
             Self::Specialization(specialization) => specialization.generic_context(db),
             Self::Partial {
                 generic_context, ..
-            } => generic_context,
+            } => *generic_context,
         }
     }
 
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
-    pub(crate) fn get(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
+    pub(crate) fn get(&self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
         let index = self
             .generic_context(db)
             .variables(db)
@@ -556,9 +552,9 @@ impl<'db> TypeMapping<'_, 'db> {
         }
     }
 
-    pub(crate) fn into_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+    pub(crate) fn to_specialization(&self, db: &'db dyn Db) -> Specialization<'db> {
         match self {
-            Self::Specialization(specialization) => specialization,
+            Self::Specialization(specialization) => *specialization,
             Self::Partial {
                 generic_context,
                 types,

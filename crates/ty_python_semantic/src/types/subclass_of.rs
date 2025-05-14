@@ -71,7 +71,7 @@ impl<'db> SubclassOfType<'db> {
     pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
-        type_mapping: TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Self {

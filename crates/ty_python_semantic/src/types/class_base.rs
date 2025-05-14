@@ -229,7 +229,7 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.apply_type_mapping(db, type_mapping)),
             Self::Dynamic(_) | Self::Generic(_) | Self::Protocol(_) => self,
@@ -242,7 +242,7 @@ impl<'db> ClassBase<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         if let Some(specialization) = specialization {
-            self.apply_type_mapping(db, specialization.type_mapping())
+            self.apply_type_mapping(db, &TypeMapping::Specialization(specialization))
         } else {
             self
         }
