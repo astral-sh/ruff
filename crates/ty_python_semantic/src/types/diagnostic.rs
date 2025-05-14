@@ -9,6 +9,7 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
+use crate::types::LintDiagnosticGuard;
 use crate::types::{protocol_class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
 use crate::{declare_lint, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
@@ -788,7 +789,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for expressions that are used as type expressions
+    /// Checks for expressions that are used as [type expressions]
     /// but cannot validly be interpreted as such.
     ///
     /// ## Why is this bad?
@@ -802,6 +803,7 @@ declare_lint! {
     /// a: type[1]  # `1` is not a type
     /// b: Annotated[int]  # `Annotated` expects at least two arguments
     /// ```
+    /// [type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
     pub(crate) static INVALID_TYPE_FORM = {
         summary: "detects invalid type forms",
         status: LintStatus::preview("1.0.0"),
@@ -1772,6 +1774,13 @@ pub(crate) fn report_invalid_arguments_to_callable(
         "Special form `{}` expected exactly two arguments (parameter types and return type)",
         KnownInstanceType::Callable.repr(db)
     ));
+}
+
+pub(crate) fn add_type_expression_reference_link(mut diag: LintDiagnosticGuard) {
+    diag.info("See the following page for a reference on valid type expressions:");
+    diag.info(
+        "https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
+    );
 }
 
 pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
