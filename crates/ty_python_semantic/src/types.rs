@@ -949,6 +949,10 @@ impl<'db> Type<'db> {
     /// Returns the fallback instance type that a literal is an instance of, or `None` if the type
     /// is not a literal.
     pub fn literal_fallback_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        // There are other literal types that could conceivable be included here: class literals
+        // falling back to `type[X]`, for instance. For now, there is not much rigorous thought put
+        // into what's included vs not; this is just an empirical choice that makes our ecosystem
+        // report look better until we have proper bidirectional type inference.
         match self {
             Type::StringLiteral(_) | Type::LiteralString => Some(KnownClass::Str.to_instance(db)),
             Type::BooleanLiteral(_) => Some(KnownClass::Bool.to_instance(db)),
