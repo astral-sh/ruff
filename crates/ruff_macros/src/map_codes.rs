@@ -468,21 +468,33 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             }
         }
 
+        // adapted from the strum `EnumString` example code until #18079 is merged
+        impl std::str::FromStr for Rule {
+            type Err = ::strum::ParseError;
+
+            fn from_str(s: &str) -> ::core::result::Result<Rule, Self::Err> {
+                let res = match s {
+                    #from_impls_for_diagnostic
+                    _ => return ::core::result::Result::Err(::strum::ParseError::VariantNotFound),
+                };
+
+                ::core::result::Result::Ok(res)
+            }
+        }
+
         impl AsRule for ruff_diagnostics::Diagnostic {
             fn rule(&self) -> Rule {
-                match self.name {
-                    #from_impls_for_diagnostic
-                    _ => unreachable!("invalid rule name: {}", self.name),
-                }
+                self.name
+                    .parse()
+                    .unwrap_or_else(|_| unreachable!("invalid rule name: {}", self.name))
             }
         }
 
         impl AsRule for crate::message::DiagnosticMessage {
             fn rule(&self) -> Rule {
-                match self.name {
-                    #from_impls_for_diagnostic
-                    _ => unreachable!("invalid rule name: {}", self.name),
-                }
+                self.name
+                    .parse()
+                    .unwrap_or_else(|_| unreachable!("invalid rule name: {}", self.name))
             }
         }
     }
