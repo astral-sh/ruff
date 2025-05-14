@@ -1,0 +1,359 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/t_string_unclosed_lbrace.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..84,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 46..50,
+                    value: TString(
+                        ExprTString {
+                            range: 46..50,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 46..50,
+                                            elements: [
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 48..49,
+                                                        interpolation: Name(
+                                                            ExprName {
+                                                                range: 49..49,
+                                                                id: Name(""),
+                                                                ctx: Invalid,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 51..60,
+                    value: TString(
+                        ExprTString {
+                            range: 51..60,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 51..60,
+                                            elements: [
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 53..60,
+                                                        interpolation: Name(
+                                                            ExprName {
+                                                                range: 54..57,
+                                                                id: Name("foo"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 61..69,
+                    value: TString(
+                        ExprTString {
+                            range: 61..69,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 61..69,
+                                            elements: [
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 63..68,
+                                                        interpolation: Name(
+                                                            ExprName {
+                                                                range: 64..67,
+                                                                id: Name("foo"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: Some(
+                                                            DebugText {
+                                                                leading: "",
+                                                                trailing: "=",
+                                                            },
+                                                        ),
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 70..83,
+                    value: TString(
+                        ExprTString {
+                            range: 70..83,
+                            value: TStringValue {
+                                inner: Concatenated(
+                                    [
+                                        TString(
+                                            TString {
+                                                range: 70..74,
+                                                elements: [
+                                                    Interpolation(
+                                                        TStringInterpolationElement {
+                                                            range: 72..73,
+                                                            interpolation: Name(
+                                                                ExprName {
+                                                                    range: 73..73,
+                                                                    id: Name(""),
+                                                                    ctx: Invalid,
+                                                                },
+                                                            ),
+                                                            debug_text: None,
+                                                            conversion: None,
+                                                            format_spec: None,
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: TStringFlags {
+                                                    quote_style: Double,
+                                                    prefix: Regular,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                        TString(
+                                            TString {
+                                                range: 75..83,
+                                                elements: [
+                                                    Interpolation(
+                                                        TStringInterpolationElement {
+                                                            range: 79..80,
+                                                            interpolation: Name(
+                                                                ExprName {
+                                                                    range: 80..80,
+                                                                    id: Name(""),
+                                                                    ctx: Invalid,
+                                                                },
+                                                            ),
+                                                            debug_text: None,
+                                                            conversion: None,
+                                                            format_spec: None,
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: TStringFlags {
+                                                    quote_style: Double,
+                                                    prefix: Regular,
+                                                    triple_quoted: true,
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | t"{"
+  |    ^ Syntax Error: missing closing quote in string literal
+3 | t"{foo!r"
+4 | t"{foo="
+  |
+
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | t"{"
+  |     ^ Syntax Error: t-string: unterminated string
+3 | t"{foo!r"
+4 | t"{foo="
+  |
+
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | t"{"
+  |     ^ Syntax Error: t-string: unterminated string
+3 | t"{foo!r"
+4 | t"{foo="
+  |
+
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | t"{"
+3 | t"{foo!r"
+  |        ^^ Syntax Error: missing closing quote in string literal
+4 | t"{foo="
+5 | t"{"
+  |
+
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | t"{"
+3 | t"{foo!r"
+  |          ^ Syntax Error: t-string: unterminated string
+4 | t"{foo="
+5 | t"{"
+  |
+
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | t"{"
+3 | t"{foo!r"
+  |          ^ Syntax Error: t-string: unterminated string
+4 | t"{foo="
+5 | t"{"
+  |
+
+
+  |
+2 | t"{"
+3 | t"{foo!r"
+4 | t"{foo="
+  | ^^ Syntax Error: t-string: expecting '}'
+5 | t"{"
+6 | t"""{"""
+  |
+
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | t"{"
+3 | t"{foo!r"
+  |          ^ Syntax Error: Expected TStringEnd, found Unknown
+4 | t"{foo="
+5 | t"{"
+  |
+
+
+  |
+2 | t"{"
+3 | t"{foo!r"
+4 | t"{foo="
+  |        ^ Syntax Error: missing closing quote in string literal
+5 | t"{"
+6 | t"""{"""
+  |
+
+
+  |
+2 | t"{"
+3 | t"{foo!r"
+4 | t"{foo="
+  |         ^ Syntax Error: t-string: unterminated string
+5 | t"{"
+6 | t"""{"""
+  |
+
+
+  |
+2 | t"{"
+3 | t"{foo!r"
+4 | t"{foo="
+  |         ^ Syntax Error: t-string: unterminated string
+5 | t"{"
+6 | t"""{"""
+  |
+
+
+  |
+3 | t"{foo!r"
+4 | t"{foo="
+5 | t"{"
+  |    ^ Syntax Error: missing closing quote in string literal
+6 | t"""{"""
+  |
+
+
+  |
+4 | t"{foo="
+5 | t"{"
+6 | t"""{"""
+  | ^^^^ Syntax Error: Expected TStringEnd, found TStringStart
+  |
+
+
+  |
+4 | t"{foo="
+5 | t"{"
+6 | t"""{"""
+  |      ^^^ Syntax Error: Expected an expression
+  |
+
+
+  |
+5 | t"{"
+6 | t"""{"""
+  |         ^ Syntax Error: unexpected EOF while parsing
+  |
+
+
+  |
+5 | t"{"
+6 | t"""{"""
+  |         ^ Syntax Error: t-string: unterminated string
+  |

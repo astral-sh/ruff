@@ -1,0 +1,95 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/invalid_tstring_literal_element.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..104,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 46..72,
+                    value: TString(
+                        ExprTString {
+                            range: 46..72,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 46..72,
+                                            elements: [
+                                                Literal(
+                                                    TStringLiteralElement {
+                                                        range: 48..71,
+                                                        value: "",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 73..103,
+                    value: TString(
+                        ExprTString {
+                            range: 73..103,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 73..103,
+                                            elements: [
+                                                Literal(
+                                                    TStringLiteralElement {
+                                                        range: 77..100,
+                                                        value: "",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: true,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | t'hello \N{INVALID} world'
+  |            ^^^^^^^ Syntax Error: Got unexpected unicode
+3 | t"""hello \N{INVALID} world"""
+  |
+
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | t'hello \N{INVALID} world'
+3 | t"""hello \N{INVALID} world"""
+  |              ^^^^^^^ Syntax Error: Got unexpected unicode
+  |

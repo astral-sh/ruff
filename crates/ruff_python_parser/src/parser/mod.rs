@@ -852,6 +852,7 @@ impl TStringElementsKind {
         match self {
             TStringElementsKind::Regular => TokenKind::TStringEnd,
             // test_ok tstring_format_spec_terminator
+            // # parse_options: {"target-version": "3.14"}
             // t"hello {x:} world"
             // t"hello {x:.3f} world"
             TStringElementsKind::FormatSpec => TokenKind::Rbrace,

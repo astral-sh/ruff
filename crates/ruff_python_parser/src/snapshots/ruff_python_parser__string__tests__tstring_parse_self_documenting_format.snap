@@ -1,0 +1,64 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..14,
+            value: TString(
+                ExprTString {
+                    range: 0..14,
+                    value: TStringValue {
+                        inner: Single(
+                            TString(
+                                TString {
+                                    range: 0..14,
+                                    elements: [
+                                        Interpolation(
+                                            TStringInterpolationElement {
+                                                range: 2..13,
+                                                interpolation: Name(
+                                                    ExprName {
+                                                        range: 3..7,
+                                                        id: Name("user"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: Some(
+                                                    DebugText {
+                                                        leading: "",
+                                                        trailing: "=",
+                                                    },
+                                                ),
+                                                conversion: None,
+                                                format_spec: Some(
+                                                    TStringFormatSpec {
+                                                        range: 9..12,
+                                                        elements: [
+                                                            Literal(
+                                                                TStringLiteralElement {
+                                                                    range: 9..12,
+                                                                    value: ">10",
+                                                                },
+                                                            ),
+                                                        ],
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    flags: TStringFlags {
+                                        quote_style: Double,
+                                        prefix: Regular,
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]
