@@ -387,7 +387,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = 3.8
 source_type                = Python
 ```
 
@@ -771,110 +771,39 @@ if True:
 
 # Regression test for https://github.com/astral-sh/ruff/issues/14001
 with (
-    (
-        open(
-            "some/path.txt",
-            "rb",
-        )
-        if True
-        else open("other/path.txt")
+    open(
+        "some/path.txt",
+        "rb",
     )
+    if True
+    else open("other/path.txt")
     # Bar
 ):
     pass
 
 
 with (  # trailing comment
-    (
-        open(
-            "some/path.txt",
-            "rb",
-        )
-        if True
-        else open("other/path.txt")
+    open(
+        "some/path.txt",
+        "rb",
     )
+    if True
+    else open("other/path.txt")
     # Bar
 ):
     pass
 
 
 with (
-    (
-        open(
-            "some/path.txt",
-            "rb",
-        )
-        if True
-        else open("other/path.txt")
+    open(
+        "some/path.txt",
+        "rb",
     )
+    if True
+    else open("other/path.txt")
     # Bar
 ):
     pass
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -377,42 +377,36 @@
- 
- # Regression test for https://github.com/astral-sh/ruff/issues/14001
- with (
--    (
--        open(
--            "some/path.txt",
--            "rb",
--        )
--        if True
--        else open("other/path.txt")
-+    open(
-+        "some/path.txt",
-+        "rb",
-     )
-+    if True
-+    else open("other/path.txt")
-     # Bar
- ):
-     pass
- 
- 
- with (  # trailing comment
--    (
--        open(
--            "some/path.txt",
--            "rb",
--        )
--        if True
--        else open("other/path.txt")
-+    open(
-+        "some/path.txt",
-+        "rb",
-     )
-+    if True
-+    else open("other/path.txt")
-     # Bar
- ):
-     pass
- 
- 
- with (
--    (
--        open(
--            "some/path.txt",
--            "rb",
--        )
--        if True
--        else open("other/path.txt")
-+    open(
-+        "some/path.txt",
-+        "rb",
-     )
-+    if True
-+    else open("other/path.txt")
-     # Bar
- ):
-     pass
 ```
 
 
@@ -889,7 +818,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Enabled
-target_version             = Py39
+target_version             = 3.9
 source_type                = Python
 ```
 

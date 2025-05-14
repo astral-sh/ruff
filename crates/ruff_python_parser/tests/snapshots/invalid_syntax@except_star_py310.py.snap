@@ -1,0 +1,145 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/except_star_py310.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..126,
+        body: [
+            Try(
+                StmtTry {
+                    range: 44..125,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 49..52,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 49..52,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 53..76,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 61..71,
+                                            id: Name("ValueError"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 73..76,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 73..76,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 77..98,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 85..93,
+                                            id: Name("KeyError"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 95..98,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 95..98,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 99..125,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 115..120,
+                                            id: Name("Error"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 122..125,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 122..125,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: true,
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.10"}
+2 | try: ...
+3 | except* ValueError: ...
+  |       ^ Syntax Error: Cannot use `except*` on Python 3.10 (syntax was added in Python 3.11)
+4 | except* KeyError: ...
+5 | except    *     Error: ...
+  |
+
+
+  |
+2 | try: ...
+3 | except* ValueError: ...
+4 | except* KeyError: ...
+  |       ^ Syntax Error: Cannot use `except*` on Python 3.10 (syntax was added in Python 3.11)
+5 | except    *     Error: ...
+  |
+
+
+  |
+3 | except* ValueError: ...
+4 | except* KeyError: ...
+5 | except    *     Error: ...
+  |           ^ Syntax Error: Cannot use `except*` on Python 3.10 (syntax was added in Python 3.11)
+  |

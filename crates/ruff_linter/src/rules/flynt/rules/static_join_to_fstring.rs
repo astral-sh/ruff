@@ -28,6 +28,14 @@ use crate::rules::flynt::helpers;
 /// f"{foo} {bar}"
 /// ```
 ///
+/// # Fix safety
+/// The fix is always marked unsafe because the evaluation of the f-string
+/// expressions will default to calling the `__format__` method of each
+/// object, whereas `str.join` expects each object to be an instance of
+/// `str` and uses the corresponding string. Therefore it is possible for
+/// the values of the resulting strings to differ, or for one expression
+/// to raise an exception while the other does not.
+///
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
@@ -72,7 +80,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
                     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                         if flags.is_none() {
                             // take the flags from the first Expr
-                            flags = Some(value.flags());
+                            flags = Some(value.first_literal_flags());
                         }
                         Some(value.to_str())
                     } else {

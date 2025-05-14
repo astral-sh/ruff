@@ -38,7 +38,7 @@ use crate::Locator;
 /// keyword to a positional argument will change the behavior of the code, even
 /// if the keyword argument was used erroneously.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// defaultdict(default_factory=int)
 /// defaultdict(default_factory=list)

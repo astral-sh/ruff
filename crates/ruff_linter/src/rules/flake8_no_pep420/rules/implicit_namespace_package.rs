@@ -10,7 +10,6 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::comments::shebang::ShebangDirective;
 use crate::fs;
 use crate::package::PackageRoot;
-use crate::settings::types::PreviewMode;
 use crate::Locator;
 
 /// ## What it does
@@ -60,23 +59,23 @@ pub(crate) fn implicit_namespace_package(
     comment_ranges: &CommentRanges,
     project_root: &Path,
     src: &[PathBuf],
-    preview: PreviewMode,
+    allow_nested_roots: bool,
 ) -> Option<Diagnostic> {
     if package.is_none()
         // Ignore non-`.py` files, which don't require an `__init__.py`.
         && PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file)
         // Ignore any files that are direct children of the project root.
-        && !path
+        && path
             .parent()
-            .is_some_and( |parent| parent == project_root)
+            .is_none_or( |parent| parent != project_root)
         // Ignore any files that are direct children of a source directory (e.g., `src/manage.py`).
         && !path
             .parent()
             .is_some_and( |parent| src.iter().any(|src| src == parent))
         // Ignore files that contain a shebang.
-        && !comment_ranges
+        && comment_ranges
             .first().filter(|range| range.start() == TextSize::from(0))
-            .is_some_and(|range| ShebangDirective::try_extract(locator.slice(*range)).is_some())
+            .is_none_or(|range| ShebangDirective::try_extract(locator.slice(*range)).is_none())
         // Ignore PEP 723 scripts.
         && ScriptTag::parse(locator.contents().as_bytes()).is_none()
     {
@@ -93,7 +92,7 @@ pub(crate) fn implicit_namespace_package(
         ));
     }
 
-    if preview.is_enabled() {
+    if allow_nested_roots {
         if let Some(PackageRoot::Nested { path: root }) = package.as_ref() {
             if path.ends_with("__init__.py") {
                 // Identify the intermediary package that's missing the `__init__.py` file.

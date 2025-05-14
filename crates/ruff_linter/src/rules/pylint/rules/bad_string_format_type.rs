@@ -230,7 +230,7 @@ pub(crate) fn bad_string_format_type(
         // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
         if let Ok(format_string) = CFormatString::from_str(string) {
             format_strings.push(format_string);
-        };
+        }
     }
 
     // Parse the parameters.

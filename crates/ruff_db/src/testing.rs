@@ -18,7 +18,7 @@ pub fn assert_function_query_was_not_run<Db, Q, QDb, I, R>(
 
     db.attach(|_| {
         if let Some(will_execute_event) = will_execute_event {
-            panic!("Expected query {query_name}({id}) not to have run but it did: {will_execute_event:?}");
+            panic!("Expected query {query_name}({id}) not to have run but it did: {will_execute_event:?}\n\n{events:#?}");
         }
     });
 }
@@ -46,7 +46,7 @@ pub fn assert_const_function_query_was_not_run<Db, Q, QDb, R>(
     db.attach(|_| {
         if let Some(will_execute_event) = event {
             panic!(
-                "Expected query {query_name}() not to have run but it did: {will_execute_event:?}"
+                "Expected query {query_name}() not to have run but it did: {will_execute_event:?}\n\n{events:#?}"
             );
         }
     });
@@ -107,7 +107,7 @@ fn query_name<Q>(_query: &Q) -> &'static str {
         .unwrap_or(full_qualified_query_name)
 }
 
-/// Sets up logging for the current thread. It captures all `red_knot` and `ruff` events.
+/// Sets up logging for the current thread. It captures all `ty` and `ruff` events.
 ///
 /// Useful for capturing the tracing output in a failing test.
 ///
@@ -128,7 +128,7 @@ pub fn setup_logging() -> LoggingGuard {
 /// # Examples
 /// ```
 /// use ruff_db::testing::setup_logging_with_filter;
-/// let _logging = setup_logging_with_filter("red_knot_module_resolver::resolver");
+/// let _logging = setup_logging_with_filter("ty_module_resolver::resolver");
 /// ```
 ///
 /// # Filter
@@ -148,11 +148,7 @@ impl LoggingBuilder {
     pub fn new() -> Self {
         Self {
             filter: EnvFilter::default()
-                .add_directive(
-                    "red_knot=trace"
-                        .parse()
-                        .expect("Hardcoded directive to be valid"),
-                )
+                .add_directive("ty=trace".parse().expect("Hardcoded directive to be valid"))
                 .add_directive(
                     "ruff=trace"
                         .parse()
@@ -223,7 +219,7 @@ fn query_was_not_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;
 
-    #[salsa::input]
+    #[salsa::input(debug)]
     struct Input {
         text: String,
     }
@@ -258,7 +254,7 @@ fn query_was_not_run_fails_if_query_was_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;
 
-    #[salsa::input]
+    #[salsa::input(debug)]
     struct Input {
         text: String,
     }
@@ -321,7 +317,7 @@ fn query_was_run_fails_if_query_was_not_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;
 
-    #[salsa::input]
+    #[salsa::input(debug)]
     struct Input {
         text: String,
     }

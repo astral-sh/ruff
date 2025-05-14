@@ -32,3 +32,6 @@ s = set( # outer set comment
 [ # comprehension comment
  x for x in range(3)]
  ))))
+
+# Test trailing comma case
+s = set([x for x in range(3)],)

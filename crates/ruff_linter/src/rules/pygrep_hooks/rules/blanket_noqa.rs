@@ -3,8 +3,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::noqa::{Directive, FileNoqaDirectives, NoqaDirectives, ParsedFileExemption};
-use crate::settings::types::PreviewMode;
+use crate::noqa::{self, Directive, FileNoqaDirectives, NoqaDirectives};
 use crate::Locator;
 
 /// ## What it does
@@ -17,9 +16,6 @@ use crate::Locator;
 /// Blanket `noqa` annotations are also more difficult to interpret and
 /// maintain, as the annotation does not clarify which diagnostics are intended
 /// to be suppressed.
-///
-/// In [preview], this rule also checks for blanket file-level annotations (e.g.,
-/// `# ruff: noqa`, as opposed to `# ruff: noqa: F401`).
 ///
 /// ## Example
 /// ```python
@@ -41,12 +37,9 @@ use crate::Locator;
 ///
 /// ## References
 /// - [Ruff documentation](https://docs.astral.sh/ruff/configuration/#error-suppression)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct BlanketNOQA {
     missing_colon: bool,
-    space_before_colon: bool,
     file_exemption: bool,
 }
 
@@ -57,27 +50,22 @@ impl Violation for BlanketNOQA {
     fn message(&self) -> String {
         let BlanketNOQA {
             missing_colon,
-            space_before_colon,
             file_exemption,
         } = self;
         // This awkward branching is necessary to ensure that the generic message is picked up by
         // `derive_message_formats`.
-        if !missing_colon && !space_before_colon && !file_exemption {
+        if !missing_colon && !file_exemption {
             "Use specific rule codes when using `noqa`".to_string()
         } else if *file_exemption {
             "Use specific rule codes when using `ruff: noqa`".to_string()
-        } else if *missing_colon {
-            "Use a colon when specifying `noqa` rule codes".to_string()
         } else {
-            "Do not add spaces between `noqa` and its colon".to_string()
+            "Use a colon when specifying `noqa` rule codes".to_string()
         }
     }
 
     fn fix_title(&self) -> Option<String> {
         if self.missing_colon {
             Some("Add missing colon".to_string())
-        } else if self.space_before_colon {
-            Some("Remove space(s) before colon".to_string())
         } else {
             None
         }
@@ -90,20 +78,16 @@ pub(crate) fn blanket_noqa(
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
     file_noqa_directives: &FileNoqaDirectives,
-    preview: PreviewMode,
 ) {
-    if preview.is_enabled() {
-        for line in file_noqa_directives.lines() {
-            if let ParsedFileExemption::All = line.parsed_file_exemption {
-                diagnostics.push(Diagnostic::new(
-                    BlanketNOQA {
-                        missing_colon: false,
-                        space_before_colon: false,
-                        file_exemption: true,
-                    },
-                    line.range(),
-                ));
-            }
+    for line in file_noqa_directives.lines() {
+        if let Directive::All(_) = line.parsed_file_exemption {
+            diagnostics.push(Diagnostic::new(
+                BlanketNOQA {
+                    missing_colon: false,
+                    file_exemption: true,
+                },
+                line.range(),
+            ));
         }
     }
 
@@ -116,22 +100,7 @@ pub(crate) fn blanket_noqa(
             let mut cursor = Cursor::new(&line[noqa_end.to_usize()..]);
             cursor.eat_while(char::is_whitespace);
 
-            // Check for extraneous spaces before the colon.
-            // Ex) `# noqa : F401`
-            if cursor.first() == ':' {
-                let start = all.end();
-                let end = start + cursor.token_len();
-                let mut diagnostic = Diagnostic::new(
-                    BlanketNOQA {
-                        missing_colon: false,
-                        space_before_colon: true,
-                        file_exemption: false,
-                    },
-                    TextRange::new(all.start(), end),
-                );
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(start, end)));
-                diagnostics.push(diagnostic);
-            } else if Directive::lex_code(cursor.chars().as_str()).is_some() {
+            if noqa::lex_codes(cursor.chars().as_str()).is_ok_and(|codes| !codes.is_empty()) {
                 // Check for a missing colon.
                 // Ex) `# noqa F401`
                 let start = all.end();
@@ -139,7 +108,6 @@ pub(crate) fn blanket_noqa(
                 let mut diagnostic = Diagnostic::new(
                     BlanketNOQA {
                         missing_colon: true,
-                        space_before_colon: false,
                         file_exemption: false,
                     },
                     TextRange::new(all.start(), end),
@@ -151,7 +119,6 @@ pub(crate) fn blanket_noqa(
                 diagnostics.push(Diagnostic::new(
                     BlanketNOQA {
                         missing_colon: false,
-                        space_before_colon: false,
                         file_exemption: false,
                     },
                     all.range(),

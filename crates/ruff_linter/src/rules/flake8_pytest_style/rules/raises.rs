@@ -13,16 +13,16 @@ use super::helpers::is_empty_or_null_string;
 /// ## What it does
 /// Checks for `pytest.raises` context managers with multiple statements.
 ///
+/// This rule allows `pytest.raises` bodies to contain `for`
+/// loops with empty bodies (e.g., `pass` or `...` statements), to test
+/// iterator behavior.
+///
 /// ## Why is this bad?
 /// When a `pytest.raises` is used as a context manager and contains multiple
 /// statements, it can lead to the test passing when it actually should fail.
 ///
 /// A `pytest.raises` context manager should only contain a single simple
 /// statement that raises the expected exception.
-///
-/// In [preview], this rule allows `pytest.raises` bodies to contain `for`
-/// loops with empty bodies (e.g., `pass` or `...` statements), to test
-/// iterator behavior.
 ///
 /// ## Example
 /// ```python
@@ -50,8 +50,6 @@ use super::helpers::is_empty_or_null_string;
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct PytestRaisesWithMultipleStatements;
 
@@ -175,7 +173,11 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_raises(&call.func, checker.semantic()) {
         if checker.enabled(Rule::PytestRaisesWithoutException) {
-            if call.arguments.is_empty() {
+            if call
+                .arguments
+                .find_argument("expected_exception", 0)
+                .is_none()
+            {
                 checker.report_diagnostic(Diagnostic::new(
                     PytestRaisesWithoutException,
                     call.func.range(),
@@ -184,13 +186,22 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
         }
 
         if checker.enabled(Rule::PytestRaisesTooBroad) {
-            if let Some(exception) = call.arguments.find_argument_value("expected_exception", 0) {
-                if call
-                    .arguments
-                    .find_keyword("match")
-                    .map_or(true, |k| is_empty_or_null_string(&k.value))
+            // Pytest.raises has two overloads
+            // ```py
+            // with raises(expected_exception: type[E] | tuple[type[E], ...], *, match: str | Pattern[str] | None = ...) → RaisesContext[E] as excinfo
+            // with raises(expected_exception: type[E] | tuple[type[E], ...], func: Callable[[...], Any], *args: Any, **kwargs: Any) → ExceptionInfo[E] as excinfo
+            // ```
+            // Don't raise this diagnostic if the call matches the second overload (has a second positional argument or an argument named `func`)
+            if call.arguments.find_argument("func", 1).is_none() {
+                if let Some(exception) = call.arguments.find_argument_value("expected_exception", 0)
                 {
-                    exception_needs_match(checker, exception);
+                    if call
+                        .arguments
+                        .find_keyword("match")
+                        .is_none_or(|k| is_empty_or_null_string(&k.value))
+                    {
+                        exception_needs_match(checker, exception);
+                    }
                 }
             }
         }
@@ -206,14 +217,12 @@ pub(crate) fn complex_raises(checker: &Checker, stmt: &Stmt, items: &[WithItem],
     // Check body for `pytest.raises` context manager
     if raises_called {
         let is_too_complex = if let [stmt] = body {
-            let in_preview = checker.settings.preview.is_enabled();
-
             match stmt {
                 Stmt::With(ast::StmtWith { body, .. }) => is_non_trivial_with_body(body),
                 // Allow function and class definitions to test decorators.
                 Stmt::ClassDef(_) | Stmt::FunctionDef(_) => false,
                 // Allow empty `for` loops to test iterators.
-                Stmt::For(ast::StmtFor { body, .. }) if in_preview => match &body[..] {
+                Stmt::For(ast::StmtFor { body, .. }) => match &body[..] {
                     [Stmt::Pass(_)] => false,
                     [Stmt::Expr(ast::StmtExpr { value, .. })] => !value.is_ellipsis_literal_expr(),
                     _ => true,

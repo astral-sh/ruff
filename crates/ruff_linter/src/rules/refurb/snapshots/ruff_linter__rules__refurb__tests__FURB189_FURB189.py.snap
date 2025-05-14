@@ -74,4 +74,52 @@ FURB189.py:23:9: FURB189 [*] Subclassing `str` can be error prone, use `collecti
    23 |+class S(UserString):
 24 24 |     pass
 25 25 | 
-26 26 | # currently not detected
+26 26 | class SubscriptDict(dict[str, str]):
+
+FURB189.py:26:21: FURB189 [*] Subclassing `dict` can be error prone, use `collections.UserDict` instead
+   |
+24 |     pass
+25 |
+26 | class SubscriptDict(dict[str, str]):
+   |                     ^^^^ FURB189
+27 |     pass
+   |
+   = help: Replace with `collections.UserDict`
+
+ℹ Unsafe fix
+1  1  | # setup
+2  2  | from enum import Enum, EnumMeta
+3     |-from collections import UserList as UL
+   3  |+from collections import UserList as UL, UserDict
+4  4  | 
+5  5  | class SetOnceMappingMixin:
+6  6  |     __slots__ = ()
+--------------------------------------------------------------------------------
+23 23 | class S(str):
+24 24 |     pass
+25 25 | 
+26    |-class SubscriptDict(dict[str, str]):
+   26 |+class SubscriptDict(UserDict[str, str]):
+27 27 |     pass
+28 28 | 
+29 29 | class SubscriptList(list[str]):
+
+FURB189.py:29:21: FURB189 [*] Subclassing `list` can be error prone, use `collections.UserList` instead
+   |
+27 |     pass
+28 |
+29 | class SubscriptList(list[str]):
+   |                     ^^^^ FURB189
+30 |     pass
+   |
+   = help: Replace with `collections.UserList`
+
+ℹ Unsafe fix
+26 26 | class SubscriptDict(dict[str, str]):
+27 27 |     pass
+28 28 | 
+29    |-class SubscriptList(list[str]):
+   29 |+class SubscriptList(UL[str]):
+30 30 |     pass
+31 31 | 
+32 32 | # currently not detected

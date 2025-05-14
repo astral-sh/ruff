@@ -1,0 +1,40 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF059_3.py:13:5: RUF059 [*] Unpacked variable `b` is never used
+   |
+11 | def bar():
+12 |     a = foo()
+13 |     b, c = foo()
+   |     ^ RUF059
+   |
+   = help: Prefix it with an underscore or any other dummy variable pattern
+
+ℹ Unsafe fix
+10 10 | 
+11 11 | def bar():
+12 12 |     a = foo()
+13    |-    b, c = foo()
+   13 |+    _b, c = foo()
+14 14 | 
+15 15 | 
+16 16 | def baz():
+
+RUF059_3.py:13:8: RUF059 [*] Unpacked variable `c` is never used
+   |
+11 | def bar():
+12 |     a = foo()
+13 |     b, c = foo()
+   |        ^ RUF059
+   |
+   = help: Prefix it with an underscore or any other dummy variable pattern
+
+ℹ Unsafe fix
+10 10 | 
+11 11 | def bar():
+12 12 |     a = foo()
+13    |-    b, c = foo()
+   13 |+    b, _c = foo()
+14 14 | 
+15 15 | 
+16 16 | def baz():

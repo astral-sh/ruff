@@ -17,7 +17,7 @@ use crate::rules::flake8_comprehensions::settings::Settings;
 /// literal (`{}`). The former is slower because the name `dict` must be
 /// looked up in the global scope in case it has been rebound.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict()
 /// dict(a=1, b=2)

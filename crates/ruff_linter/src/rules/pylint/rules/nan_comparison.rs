@@ -48,7 +48,21 @@ impl Violation for NanComparison {
 
 /// PLW0177
 pub(crate) fn nan_comparison(checker: &Checker, left: &Expr, comparators: &[Expr]) {
-    for expr in std::iter::once(left).chain(comparators) {
+    nan_comparison_impl(checker, std::iter::once(left).chain(comparators));
+}
+
+/// PLW0177
+pub(crate) fn nan_comparison_match(checker: &Checker, cases: &[ast::MatchCase]) {
+    nan_comparison_impl(
+        checker,
+        cases
+            .iter()
+            .filter_map(|case| case.pattern.as_match_value().map(|pattern| &*pattern.value)),
+    );
+}
+
+fn nan_comparison_impl<'a>(checker: &Checker, comparators: impl Iterator<Item = &'a Expr>) {
+    for expr in comparators {
         if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {
             match qualified_name.segments() {
                 ["numpy", "nan" | "NAN" | "NaN"] => {

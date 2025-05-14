@@ -1,10 +1,10 @@
 //! Analysis rules for the `typing` module.
 
-use ruff_python_ast::helpers::{any_over_expr, is_const_false, map_subscript};
+use ruff_python_ast::helpers::{any_over_expr, map_subscript};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{
-    self as ast, Expr, ExprCall, ExprName, Int, Operator, ParameterWithDefault, Parameters, Stmt,
+    self as ast, Expr, ExprCall, ExprName, Operator, ParameterWithDefault, Parameters, Stmt,
     StmtAssign,
 };
 use ruff_python_stdlib::typing::{
@@ -391,44 +391,19 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
 pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
     let ast::StmtIf { test, .. } = stmt;
 
-    if semantic.use_new_type_checking_block_detection_semantics() {
-        return match test.as_ref() {
-            // As long as the symbol's name is "TYPE_CHECKING" we will treat it like `typing.TYPE_CHECKING`
-            // for this specific check even if it's defined somewhere else, like the current module.
-            // Ex) `if TYPE_CHECKING:`
-            Expr::Name(ast::ExprName { id, .. }) => {
-                id == "TYPE_CHECKING"
+    match test.as_ref() {
+        // As long as the symbol's name is "TYPE_CHECKING" we will treat it like `typing.TYPE_CHECKING`
+        // for this specific check even if it's defined somewhere else, like the current module.
+        // Ex) `if TYPE_CHECKING:`
+        Expr::Name(ast::ExprName { id, .. }) => {
+            id == "TYPE_CHECKING"
                 // Ex) `if TC:` with `from typing import TYPE_CHECKING as TC`
                 || semantic.match_typing_expr(test, "TYPE_CHECKING")
-            }
-            // Ex) `if typing.TYPE_CHECKING:`
-            Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr == "TYPE_CHECKING",
-            _ => false,
-        };
+        }
+        // Ex) `if typing.TYPE_CHECKING:`
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr == "TYPE_CHECKING",
+        _ => false,
     }
-
-    // Ex) `if False:`
-    if is_const_false(test) {
-        return true;
-    }
-
-    // Ex) `if 0:`
-    if matches!(
-        test.as_ref(),
-        Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: ast::Number::Int(Int::ZERO),
-            ..
-        })
-    ) {
-        return true;
-    }
-
-    // Ex) `if typing.TYPE_CHECKING:`
-    if semantic.match_typing_expr(test, "TYPE_CHECKING") {
-        return true;
-    }
-
-    false
 }
 
 /// Returns `true` if the [`ast::StmtIf`] is a version-checking block (e.g., `if sys.version_info >= ...:`).
@@ -572,7 +547,7 @@ pub trait TypeChecker {
 /// NOTE: this function doesn't perform more serious type inference, so it won't be able
 ///       to understand if the value gets initialized from a call to a function always returning
 ///       lists. This also implies no interfile analysis.
-fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bool {
+pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bool {
     match binding.kind {
         BindingKind::Assignment => match binding.statement(semantic) {
             // Given:
@@ -664,6 +639,18 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
             _ => false,
         },
 
+        BindingKind::FunctionDefinition(_) => match binding.statement(semantic) {
+            // ```python
+            // def foo() -> int:
+            //   ...
+            // ```
+            Some(Stmt::FunctionDef(ast::StmtFunctionDef { returns, .. })) => returns
+                .as_ref()
+                .is_some_and(|return_ann| T::match_annotation(return_ann, semantic)),
+
+            _ => false,
+        },
+
         _ => false,
     }
 }
@@ -739,6 +726,22 @@ impl BuiltinTypeChecker for SetChecker {
     const BUILTIN_TYPE_NAME: &'static str = "set";
     const TYPING_NAME: Option<&'static str> = Some("Set");
     const EXPR_TYPE: PythonType = PythonType::Set;
+}
+
+struct StringChecker;
+
+impl BuiltinTypeChecker for StringChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "str";
+    const TYPING_NAME: Option<&'static str> = None;
+    const EXPR_TYPE: PythonType = PythonType::String;
+}
+
+struct BytesChecker;
+
+impl BuiltinTypeChecker for BytesChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "bytes";
+    const TYPING_NAME: Option<&'static str> = None;
+    const EXPR_TYPE: PythonType = PythonType::Bytes;
 }
 
 struct TupleChecker;
@@ -984,6 +987,16 @@ pub fn is_float(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<FloatChecker>(binding, semantic)
 }
 
+/// Test whether the given binding can be considered an instance of `str`.
+pub fn is_string(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<StringChecker>(binding, semantic)
+}
+
+/// Test whether the given binding can be considered an instance of `bytes`.
+pub fn is_bytes(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<BytesChecker>(binding, semantic)
+}
+
 /// Test whether the given binding can be considered a set.
 ///
 /// For this, we check what value might be associated with it through it's initialization and
@@ -1134,7 +1147,7 @@ pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) ->
 ///
 /// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
 /// `StringLiteral` with value `"str"` when called with `bla`.
-#[allow(clippy::single_match)]
+#[expect(clippy::single_match)]
 pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) -> Option<&'a Expr> {
     match binding.kind {
         // Ex) `x := 1`
@@ -1230,7 +1243,7 @@ fn match_target<'a>(binding: &Binding, targets: &[Expr], values: &'a [Expr]) -> 
                         }
                     }
                     _ => (),
-                };
+                }
             }
             Expr::Name(name) => {
                 if name.range() == binding.range() {

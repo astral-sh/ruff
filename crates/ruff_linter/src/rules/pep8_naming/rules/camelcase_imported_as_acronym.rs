@@ -37,6 +37,8 @@ use crate::rules::pep8_naming::helpers;
 ///
 /// ## Options
 /// - `lint.flake8-import-conventions.aliases`
+/// - `lint.pep8-naming.ignore-names`
+/// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]

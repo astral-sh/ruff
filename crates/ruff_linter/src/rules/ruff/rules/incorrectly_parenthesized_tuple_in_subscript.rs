@@ -1,9 +1,9 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Expr, ExprSubscript};
+use ruff_python_ast::{Expr, ExprSubscript, PythonVersion};
 use ruff_text_size::Ranged;
 
-use crate::{checkers::ast::Checker, settings::types::PythonVersion};
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for consistent style regarding whether nonempty tuples in subscripts
@@ -73,6 +73,12 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &Checker, subscript: &
         return;
     }
 
+    // We should not handle single starred expressions
+    // (regardless of `prefer_parentheses`)
+    if matches!(&tuple_subscript.elts[..], &[Expr::Starred(_)]) {
+        return;
+    }
+
     // Adding parentheses in the presence of a slice leads to a syntax error.
     if prefer_parentheses && tuple_subscript.iter().any(Expr::is_slice_expr) {
         return;
@@ -82,7 +88,7 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &Checker, subscript: &
     // to a syntax error in Python 3.10.
     // This is no longer a syntax error starting in Python 3.11
     // see https://peps.python.org/pep-0646/#change-1-star-expressions-in-indexes
-    if checker.settings.target_version <= PythonVersion::Py310
+    if checker.target_version() <= PythonVersion::PY310
         && !prefer_parentheses
         && tuple_subscript.iter().any(Expr::is_starred_expr)
     {

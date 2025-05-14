@@ -246,15 +246,16 @@ impl<'src> Lexer<'src> {
                     self.cursor.bump();
                     if self.cursor.eat_char('\r') {
                         self.cursor.eat_char('\n');
-                    } else if self.cursor.is_eof() {
-                        return Some(self.push_error(LexicalError::new(
-                            LexicalErrorType::Eof,
-                            self.token_range(),
-                        )));
                     } else if !self.cursor.eat_char('\n') {
                         return Some(self.push_error(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
                             TextRange::at(self.offset() - '\\'.text_len(), '\\'.text_len()),
+                        )));
+                    }
+                    if self.cursor.is_eof() {
+                        return Some(self.push_error(LexicalError::new(
+                            LexicalErrorType::Eof,
+                            self.token_range(),
                         )));
                     }
                     indentation = Indentation::root();
@@ -290,7 +291,7 @@ impl<'src> Lexer<'src> {
                         LexicalErrorType::IndentationError,
                         self.token_range(),
                     )));
-                };
+                }
 
                 // The lexer might've eaten some whitespaces to calculate the `indentation`. For
                 // example:
@@ -341,13 +342,14 @@ impl<'src> Lexer<'src> {
                     self.cursor.bump();
                     if self.cursor.eat_char('\r') {
                         self.cursor.eat_char('\n');
-                    } else if self.cursor.is_eof() {
-                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
                     } else if !self.cursor.eat_char('\n') {
                         return Err(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
                             TextRange::at(self.offset() - '\\'.text_len(), '\\'.text_len()),
                         ));
+                    }
+                    if self.cursor.is_eof() {
+                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
                     }
                 }
                 // Form feed
@@ -1071,7 +1073,7 @@ impl<'src> Lexer<'src> {
         if first_digit_or_dot != '.' {
             number.push(first_digit_or_dot);
             self.radix_run(&mut number, Radix::Decimal);
-        };
+        }
 
         let is_float = if first_digit_or_dot == '.' || self.cursor.eat_char('.') {
             number.push('.');
@@ -1256,7 +1258,7 @@ impl<'src> Lexer<'src> {
                     // `IpyEscapeKind::Magic` and `IpyEscapeKind::Help` because of the initial `%` and `??`
                     // tokens.
                     if question_count > 2
-                        || value.chars().last().map_or(true, is_python_whitespace)
+                        || value.chars().last().is_none_or(is_python_whitespace)
                         || !matches!(self.cursor.first(), '\n' | '\r' | EOF_CHAR)
                     {
                         // Not a help end escape command, so continue with the lexing.
@@ -1457,7 +1459,7 @@ impl<'src> Lexer<'src> {
 
     /// Retrieves the current offset of the cursor within the source code.
     // SAFETY: Lexer doesn't allow files larger than 4GB
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     #[inline]
     fn offset(&self) -> TextSize {
         TextSize::new(self.source.len() as u32) - self.cursor.text_len()
@@ -2210,6 +2212,46 @@ if first:
     #[test]
     fn test_triple_quoted_windows_eol() {
         assert_snapshot!(triple_quoted_eol(WINDOWS_EOL));
+    }
+
+    fn line_continuation_at_eof_after_newline(eol: &str) -> LexerOutput {
+        let source = format!(r"\{eol}");
+        lex_invalid(&source, Mode::Module)
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_after_newline_unix_eol() {
+        assert_snapshot!(line_continuation_at_eof_after_newline(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_after_newline_mac_eol() {
+        assert_snapshot!(line_continuation_at_eof_after_newline(MAC_EOL));
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_after_newline_windows_eol() {
+        assert_snapshot!(line_continuation_at_eof_after_newline(WINDOWS_EOL));
+    }
+
+    fn line_continuation_at_eof(eol: &str) -> LexerOutput {
+        let source = format!(r"1, \{eol}");
+        lex_invalid(&source, Mode::Module)
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_unix_eol() {
+        assert_snapshot!(line_continuation_at_eof(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_mac_eol() {
+        assert_snapshot!(line_continuation_at_eof(MAC_EOL));
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_windows_eol() {
+        assert_snapshot!(line_continuation_at_eof(WINDOWS_EOL));
     }
 
     // This test case is to just make sure that the lexer doesn't go into

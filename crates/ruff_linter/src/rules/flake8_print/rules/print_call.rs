@@ -109,8 +109,7 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
             // or `"sys.stderr"`), don't trigger T201.
             if let Some(keyword) = call.arguments.find_keyword("file") {
                 if !keyword.value.is_none_literal_expr() {
-                    if semantic.resolve_qualified_name(&keyword.value).map_or(
-                        true,
+                    if semantic.resolve_qualified_name(&keyword.value).is_none_or(
                         |qualified_name| {
                             !matches!(qualified_name.segments(), ["sys", "stdout" | "stderr"])
                         },

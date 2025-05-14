@@ -1,12 +1,29 @@
+use std::backtrace::BacktraceStatus;
 use std::cell::Cell;
 use std::panic::Location;
 use std::sync::OnceLock;
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct PanicError {
     pub location: Option<String>,
-    pub payload: Option<String>,
+    pub payload: Payload,
     pub backtrace: Option<std::backtrace::Backtrace>,
+    pub salsa_backtrace: Option<salsa::Backtrace>,
+}
+
+#[derive(Debug)]
+pub struct Payload(Box<dyn std::any::Any + Send>);
+
+impl Payload {
+    pub fn as_str(&self) -> Option<&str> {
+        if let Some(s) = self.0.downcast_ref::<String>() {
+            Some(s)
+        } else if let Some(s) = self.0.downcast_ref::<&str>() {
+            Some(s)
+        } else {
+            None
+        }
+    }
 }
 
 impl std::fmt::Display for PanicError {
@@ -15,20 +32,39 @@ impl std::fmt::Display for PanicError {
         if let Some(location) = &self.location {
             write!(f, " {location}")?;
         }
-        if let Some(payload) = &self.payload {
+        if let Some(payload) = self.payload.as_str() {
             write!(f, ":\n{payload}")?;
         }
         if let Some(backtrace) = &self.backtrace {
-            writeln!(f, "\nBacktrace: {backtrace}")?;
+            match backtrace.status() {
+                BacktraceStatus::Disabled => {
+                    writeln!(
+                        f,
+                        "\nrun with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+                    )?;
+                }
+                BacktraceStatus::Captured => {
+                    writeln!(f, "\nBacktrace: {backtrace}")?;
+                }
+                _ => {}
+            }
         }
         Ok(())
     }
 }
 
+#[derive(Default)]
+struct CapturedPanicInfo {
+    backtrace: Option<std::backtrace::Backtrace>,
+    location: Option<String>,
+    salsa_backtrace: Option<salsa::Backtrace>,
+}
+
 thread_local! {
     static CAPTURE_PANIC_INFO: Cell<bool> = const { Cell::new(false) };
-    static OUR_HOOK_RAN: Cell<bool> = const { Cell::new(false) };
-    static LAST_PANIC: Cell<Option<PanicError>> = const { Cell::new(None) };
+    static LAST_BACKTRACE: Cell<CapturedPanicInfo> = const {
+        Cell::new(CapturedPanicInfo { backtrace: None, location: None, salsa_backtrace: None })
+    };
 }
 
 fn install_hook() {
@@ -36,24 +72,18 @@ fn install_hook() {
     ONCE.get_or_init(|| {
         let prev = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
-            OUR_HOOK_RAN.with(|cell| cell.set(true));
             let should_capture = CAPTURE_PANIC_INFO.with(Cell::get);
             if !should_capture {
                 return (*prev)(info);
             }
-            let payload = if let Some(s) = info.payload().downcast_ref::<&str>() {
-                Some(s.to_string())
-            } else {
-                info.payload().downcast_ref::<String>().cloned()
-            };
+
             let location = info.location().map(Location::to_string);
-            let backtrace = std::backtrace::Backtrace::force_capture();
-            LAST_PANIC.with(|cell| {
-                cell.set(Some(PanicError {
-                    payload,
-                    location,
-                    backtrace: Some(backtrace),
-                }));
+            let backtrace = Some(std::backtrace::Backtrace::capture());
+
+            LAST_BACKTRACE.set(CapturedPanicInfo {
+                backtrace,
+                location,
+                salsa_backtrace: salsa::Backtrace::capture(),
             });
         }));
     });
@@ -70,7 +100,7 @@ fn install_hook() {
 /// stderr).
 ///
 /// We assume that there is nothing else running in this process that needs to install a competing
-/// panic hook.  We are careful to install our custom hook only once, and we do not ever restore
+/// panic hook. We are careful to install our custom hook only once, and we do not ever restore
 /// the previous hook (since you can always retain the previous hook's behavior by not calling this
 /// wrapper).
 pub fn catch_unwind<F, R>(f: F) -> Result<R, PanicError>
@@ -78,15 +108,83 @@ where
     F: FnOnce() -> R + std::panic::UnwindSafe,
 {
     install_hook();
-    OUR_HOOK_RAN.with(|cell| cell.set(false));
-    let prev_should_capture = CAPTURE_PANIC_INFO.with(|cell| cell.replace(true));
-    let result = std::panic::catch_unwind(f).map_err(|_| {
-        let our_hook_ran = OUR_HOOK_RAN.with(Cell::get);
-        if !our_hook_ran {
-            panic!("detected a competing panic hook");
+    let prev_should_capture = CAPTURE_PANIC_INFO.replace(true);
+    let result = std::panic::catch_unwind(f).map_err(|payload| {
+        // Try to get the backtrace and location from our custom panic hook.
+        // The custom panic hook only runs once when `panic!` is called (or similar). It doesn't
+        // run when the panic is propagated with `std::panic::resume_unwind`. The panic hook
+        // is also not called when the panic is raised with `std::panic::resum_unwind` as is the
+        // case for salsa unwinds (see the ignored test below).
+        // Because of that, always take the payload from `catch_unwind` because it may have been transformed
+        // by an inner `std::panic::catch_unwind` handlers and only use the information
+        // from the custom handler to enrich the error with the backtrace and location.
+        let CapturedPanicInfo {
+            location,
+            backtrace,
+            salsa_backtrace,
+        } = LAST_BACKTRACE.with(Cell::take);
+
+        PanicError {
+            location,
+            payload: Payload(payload),
+            backtrace,
+            salsa_backtrace,
         }
-        LAST_PANIC.with(Cell::take).unwrap_or_default()
     });
-    CAPTURE_PANIC_INFO.with(|cell| cell.set(prev_should_capture));
+    CAPTURE_PANIC_INFO.set(prev_should_capture);
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use salsa::{Database, Durability};
+
+    #[test]
+    #[ignore = "super::catch_unwind installs a custom panic handler, which could effect test isolation"]
+    fn no_backtrace_for_salsa_cancelled() {
+        #[salsa::input]
+        struct Input {
+            value: u32,
+        }
+
+        #[salsa::tracked]
+        fn test_query(db: &dyn Database, input: Input) -> u32 {
+            loop {
+                // This should throw a cancelled error
+                let _ = input.value(db);
+            }
+        }
+
+        let db = salsa::DatabaseImpl::new();
+
+        let input = Input::new(&db, 42);
+
+        let result = std::thread::scope(move |scope| {
+            {
+                let mut db = db.clone();
+                scope.spawn(move || {
+                    // This will cancel the other thread by throwing a `salsa::Cancelled` error.
+                    db.synthetic_write(Durability::MEDIUM);
+                });
+            }
+
+            {
+                scope.spawn(move || {
+                    super::catch_unwind(|| {
+                        test_query(&db, input);
+                    })
+                })
+            }
+            .join()
+            .unwrap()
+        });
+
+        match result {
+            Ok(_) => panic!("Expected query to panic"),
+            Err(err) => {
+                // Panics triggered with `resume_unwind` have no backtrace.
+                assert!(err.backtrace.is_none());
+            }
+        }
+    }
 }

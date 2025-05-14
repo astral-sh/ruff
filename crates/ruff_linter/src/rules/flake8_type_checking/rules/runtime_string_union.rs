@@ -1,15 +1,13 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, ExprContext, Operator};
+use ruff_python_ast::{Expr, ExprContext, Operator, PythonVersion};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_type_checking::helpers::quote_annotation;
-use crate::settings::types::PythonVersion;
-use crate::settings::LinterSettings;
 use crate::Locator;
 
 /// ## What it does
@@ -98,7 +96,7 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
         checker.locator(),
         expr,
         &mut string_results,
-        checker.settings,
+        checker.target_version(),
     );
 
     if string_results.is_empty() {
@@ -181,7 +179,7 @@ fn traverse_op<'a>(
     locator: &'_ Locator,
     expr: &'a Expr,
     strings: &mut Vec<StringResult<'a>>,
-    settings: &'_ LinterSettings,
+    target_version: PythonVersion,
 ) -> bool {
     match expr {
         Expr::StringLiteral(literal) => {
@@ -191,7 +189,7 @@ fn traverse_op<'a>(
                     quotes_are_removable: quotes_are_removable(
                         semantic,
                         result.expression(),
-                        settings,
+                        target_version,
                     ),
                 });
                 // the only time quotes can be extended is if all quoted expression
@@ -220,8 +218,8 @@ fn traverse_op<'a>(
         }) => {
             // we don't want short-circuiting here, since we need to collect
             // string results from both branches
-            traverse_op(semantic, locator, left, strings, settings)
-                & traverse_op(semantic, locator, right, strings, settings)
+            traverse_op(semantic, locator, left, strings, target_version)
+                & traverse_op(semantic, locator, right, strings, target_version)
         }
         _ => true,
     }
@@ -229,18 +227,22 @@ fn traverse_op<'a>(
 
 /// Traverses the type expression and checks if the expression can safely
 /// be unquoted
-fn quotes_are_removable(semantic: &SemanticModel, expr: &Expr, settings: &LinterSettings) -> bool {
+fn quotes_are_removable(
+    semantic: &SemanticModel,
+    expr: &Expr,
+    target_version: PythonVersion,
+) -> bool {
     match expr {
         Expr::BinOp(ast::ExprBinOp {
             left, right, op, ..
         }) => {
             match op {
                 Operator::BitOr => {
-                    if settings.target_version < PythonVersion::Py310 {
+                    if target_version < PythonVersion::PY310 {
                         return false;
                     }
-                    quotes_are_removable(semantic, left, settings)
-                        && quotes_are_removable(semantic, right, settings)
+                    quotes_are_removable(semantic, left, target_version)
+                        && quotes_are_removable(semantic, right, target_version)
                 }
                 // for now we'll treat uses of other operators as unremovable quotes
                 // since that would make it an invalid type expression anyways. We skip
@@ -252,13 +254,13 @@ fn quotes_are_removable(semantic: &SemanticModel, expr: &Expr, settings: &Linter
             value,
             ctx: ExprContext::Load,
             ..
-        }) => quotes_are_removable(semantic, value, settings),
+        }) => quotes_are_removable(semantic, value, target_version),
         // Subscript or attribute accesses that are valid type expressions may fail
         // at runtime, so we have to assume that they do, to keep code working.
         Expr::Subscript(_) | Expr::Attribute(_) => false,
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             for elt in elts {
-                if !quotes_are_removable(semantic, elt, settings) {
+                if !quotes_are_removable(semantic, elt, target_version) {
                     return false;
                 }
             }

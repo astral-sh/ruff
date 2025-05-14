@@ -13,9 +13,6 @@ use crate::rules::refurb::helpers::replace_with_identity_check;
 /// There is only ever one instance of `None`, so it is more efficient and
 /// readable to use the `is` operator to check if an object is `None`.
 ///
-/// Only name expressions (e.g., `type(foo) == type(None)`) are reported.
-/// In [preview], the rule will also report other kinds of expressions.
-///
 /// ## Example
 /// ```python
 /// type(obj) is type(None)
@@ -34,8 +31,6 @@ use crate::rules::refurb::helpers::replace_with_identity_check;
 /// - [Python documentation: `None`](https://docs.python.org/3/library/constants.html#None)
 /// - [Python documentation: `type`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct TypeNoneComparison {
     replacement: IdentityCheck,
@@ -79,12 +74,6 @@ pub(crate) fn type_none_comparison(checker: &Checker, compare: &ast::ExprCompare
         (_, Expr::NoneLiteral(_)) => left_arg,
         _ => return,
     };
-
-    if checker.settings.preview.is_disabled()
-        && !matches!(other_arg, Expr::Name(_) | Expr::NoneLiteral(_))
-    {
-        return;
-    }
 
     let diagnostic = Diagnostic::new(TypeNoneComparison { replacement }, compare.range);
 

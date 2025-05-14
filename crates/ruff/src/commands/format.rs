@@ -11,6 +11,7 @@ use itertools::Itertools;
 use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use ruff_python_parser::ParseError;
 use rustc_hash::FxHashSet;
 use thiserror::Error;
 use tracing::debug;
@@ -159,7 +160,7 @@ pub(crate) fn format(
                             }),
                             Err(error) => Err(FormatCommandError::Panic(
                                 Some(resolved_file.path().to_path_buf()),
-                                error,
+                                Box::new(error),
                             )),
                         },
                     )
@@ -213,7 +214,11 @@ pub(crate) fn format(
     match mode {
         FormatMode::Write => {
             if errors.is_empty() {
-                Ok(ExitStatus::Success)
+                if cli.exit_non_zero_on_format && results.any_formatted() {
+                    Ok(ExitStatus::Failure)
+                } else {
+                    Ok(ExitStatus::Success)
+                }
             } else {
                 Ok(ExitStatus::Error)
             }
@@ -341,7 +346,7 @@ pub(crate) fn format_source(
 ) -> Result<FormattedSource, FormatCommandError> {
     match &source_kind {
         SourceKind::Python(unformatted) => {
-            let options = settings.to_format_options(source_type, unformatted);
+            let options = settings.to_format_options(source_type, unformatted, path);
 
             let formatted = if let Some(range) = range {
                 let line_index = LineIndex::from_source_text(unformatted);
@@ -357,7 +362,7 @@ pub(crate) fn format_source(
                 })
             } else {
                 // Using `Printed::into_code` requires adding `ruff_formatter` as a direct dependency, and I suspect that Rust can optimize the closure away regardless.
-                #[allow(clippy::redundant_closure_for_method_calls)]
+                #[expect(clippy::redundant_closure_for_method_calls)]
                 format_module_source(unformatted, options).map(|formatted| formatted.into_code())
             };
 
@@ -391,7 +396,7 @@ pub(crate) fn format_source(
                 ));
             }
 
-            let options = settings.to_format_options(source_type, notebook.source_code());
+            let options = settings.to_format_options(source_type, notebook.source_code(), path);
 
             let mut output: Option<String> = None;
             let mut last: Option<TextSize> = None;
@@ -406,8 +411,12 @@ pub(crate) fn format_source(
                 let formatted =
                     format_module_source(unformatted, options.clone()).map_err(|err| {
                         if let FormatModuleError::ParseError(err) = err {
+                            // Offset the error by the start of the cell
                             DisplayParseError::from_source_kind(
-                                err,
+                                ParseError {
+                                    error: err.error,
+                                    location: err.location.checked_add(*start).unwrap(),
+                                },
                                 path.map(Path::to_path_buf),
                                 source_kind,
                             )
@@ -626,7 +635,7 @@ impl<'a> FormatResults<'a> {
 pub(crate) enum FormatCommandError {
     Ignore(#[from] ignore::Error),
     Parse(#[from] DisplayParseError),
-    Panic(Option<PathBuf>, PanicError),
+    Panic(Option<PathBuf>, Box<PanicError>),
     Read(Option<PathBuf>, SourceError),
     Format(Option<PathBuf>, FormatModuleError),
     Write(Option<PathBuf>, SourceError),

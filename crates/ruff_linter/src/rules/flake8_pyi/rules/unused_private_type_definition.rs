@@ -26,9 +26,8 @@ use crate::fix;
 /// _Ts = typing_extensions.TypeVarTuple("_Ts")
 /// ```
 ///
-/// ## Fix safety and availability
-/// This rule's fix is available when [`preview`] mode is enabled.
-/// It is always marked as unsafe, as it would break your code if the type
+/// ## Fix safety
+/// The fix is always marked as unsafe, as it would break your code if the type
 /// variable is imported by another module.
 #[derive(ViolationMetadata)]
 pub(crate) struct UnusedPrivateTypeVar {
@@ -225,18 +224,19 @@ pub(crate) fn unused_private_type_var(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let diagnostic = Diagnostic::new(
             UnusedPrivateTypeVar {
                 type_var_like_name: id.to_string(),
                 type_var_like_kind: type_var_like_kind.to_string(),
             },
             binding.range(),
-        );
-
-        if checker.settings.preview.is_enabled() {
-            let edit = fix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
-            diagnostic.set_fix(Fix::unsafe_edit(edit));
-        }
+        )
+        .with_fix(Fix::unsafe_edit(fix::edits::delete_stmt(
+            stmt,
+            None,
+            checker.locator(),
+            checker.indexer(),
+        )));
 
         checker.report_diagnostic(diagnostic);
     }

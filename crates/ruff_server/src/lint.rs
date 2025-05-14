@@ -9,12 +9,13 @@ use crate::{
     session::DocumentQuery,
     PositionEncoding, DIAGNOSTIC_NAME,
 };
-use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
-use ruff_linter::package::PackageRoot;
+use ruff_diagnostics::{Applicability, DiagnosticKind, Edit, Fix};
 use ruff_linter::{
     directives::{extract_directives, Flags},
     generate_noqa_edits,
     linter::check_path,
+    message::{DiagnosticMessage, Message},
+    package::PackageRoot,
     packaging::detect_package_root,
     registry::AsRule,
     settings::flags,
@@ -24,7 +25,7 @@ use ruff_linter::{
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::ParseError;
+use ruff_python_parser::ParseOptions;
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -67,16 +68,15 @@ pub(crate) fn check(
     show_syntax_errors: bool,
 ) -> DiagnosticsMap {
     let source_kind = query.make_source_kind();
-    let file_resolver_settings = query.settings().file_resolver();
-    let linter_settings = query.settings().linter();
+    let settings = query.settings();
     let document_path = query.file_path();
 
     // If the document is excluded, return an empty list of diagnostics.
     let package = if let Some(document_path) = document_path.as_ref() {
         if is_document_excluded_for_linting(
             document_path,
-            file_resolver_settings,
-            linter_settings,
+            &settings.file_resolver,
+            &settings.linter,
             query.text_document_language_id(),
         ) {
             return DiagnosticsMap::default();
@@ -86,7 +86,7 @@ pub(crate) fn check(
             document_path
                 .parent()
                 .expect("a path to a document should have a parent path"),
-            &linter_settings.namespace_packages,
+            &settings.linter.namespace_packages,
         )
         .map(PackageRoot::root)
     } else {
@@ -95,8 +95,19 @@ pub(crate) fn check(
 
     let source_type = query.source_type();
 
+    let target_version = if let Some(path) = &document_path {
+        settings.linter.resolve_target_version(path)
+    } else {
+        settings.linter.unresolved_target_version
+    };
+
+    let parse_options =
+        ParseOptions::from(source_type).with_target_version(target_version.parser_version());
+
     // Parse once.
-    let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
+    let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), parse_options)
+        .try_into_module()
+        .expect("PySourceType always parses to a ModModule");
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -111,26 +122,27 @@ pub(crate) fn check(
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
     // Generate checks.
-    let diagnostics = check_path(
+    let messages = check_path(
         &query.virtual_file_path(),
         package,
         &locator,
         &stylist,
         &indexer,
         &directives,
-        linter_settings,
+        &settings.linter,
         flags::Noqa::Enabled,
         &source_kind,
         source_type,
         &parsed,
+        target_version,
     );
 
     let noqa_edits = generate_noqa_edits(
         &query.virtual_file_path(),
-        &diagnostics,
+        &messages,
         &locator,
         indexer.comment_ranges(),
-        &linter_settings.external,
+        &settings.linter.external,
         &directives.noqa_line_for,
         stylist.line_ending(),
     );
@@ -149,34 +161,31 @@ pub(crate) fn check(
             .or_default();
     }
 
-    let lsp_diagnostics = diagnostics
-        .into_iter()
-        .zip(noqa_edits)
-        .map(|(diagnostic, noqa_edit)| {
-            to_lsp_diagnostic(
-                diagnostic,
-                noqa_edit,
-                &source_kind,
-                locator.to_index(),
-                encoding,
-            )
-        });
-
-    let lsp_diagnostics = lsp_diagnostics.chain(
-        show_syntax_errors
-            .then(|| {
-                parsed.errors().iter().map(|parse_error| {
-                    parse_error_to_lsp_diagnostic(
-                        parse_error,
-                        &source_kind,
-                        locator.to_index(),
-                        encoding,
-                    )
-                })
-            })
+    let lsp_diagnostics =
+        messages
             .into_iter()
-            .flatten(),
-    );
+            .zip(noqa_edits)
+            .filter_map(|(message, noqa_edit)| match message {
+                Message::Diagnostic(diagnostic_message) => Some(to_lsp_diagnostic(
+                    diagnostic_message,
+                    noqa_edit,
+                    &source_kind,
+                    locator.to_index(),
+                    encoding,
+                )),
+                Message::SyntaxError(_) => {
+                    if show_syntax_errors {
+                        Some(syntax_error_to_lsp_diagnostic(
+                            &message,
+                            &source_kind,
+                            locator.to_index(),
+                            encoding,
+                        ))
+                    } else {
+                        None
+                    }
+                }
+            });
 
     if let Some(notebook) = query.as_notebook() {
         for (index, diagnostic) in lsp_diagnostics {
@@ -233,13 +242,13 @@ pub(crate) fn fixes_for_diagnostics(
 /// Generates an LSP diagnostic with an associated cell index for the diagnostic to go in.
 /// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
-    diagnostic: Diagnostic,
+    diagnostic: DiagnosticMessage,
     noqa_edit: Option<Edit>,
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
 ) -> (usize, lsp_types::Diagnostic) {
-    let Diagnostic {
+    let DiagnosticMessage {
         kind,
         range: diagnostic_range,
         fix,
@@ -312,8 +321,8 @@ fn to_lsp_diagnostic(
     )
 }
 
-fn parse_error_to_lsp_diagnostic(
-    parse_error: &ParseError,
+fn syntax_error_to_lsp_diagnostic(
+    syntax_error: &Message,
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
@@ -322,7 +331,7 @@ fn parse_error_to_lsp_diagnostic(
     let cell: usize;
 
     if let Some(notebook_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
-        NotebookRange { cell, range } = parse_error.location.to_notebook_range(
+        NotebookRange { cell, range } = syntax_error.range().to_notebook_range(
             source_kind.source_code(),
             index,
             notebook_index,
@@ -330,8 +339,8 @@ fn parse_error_to_lsp_diagnostic(
         );
     } else {
         cell = usize::default();
-        range = parse_error
-            .location
+        range = syntax_error
+            .range()
             .to_range(source_kind.source_code(), index, encoding);
     }
 
@@ -344,7 +353,7 @@ fn parse_error_to_lsp_diagnostic(
             code: None,
             code_description: None,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: format!("SyntaxError: {}", &parse_error.error),
+            message: syntax_error.body().to_string(),
             related_information: None,
             data: None,
         },
@@ -379,7 +388,8 @@ fn tags(code: &str) -> Option<Vec<lsp_types::DiagnosticTag>> {
     match code {
         // F401: <module> imported but unused
         // F841: local variable <name> is assigned to but never used
-        "F401" | "F841" => Some(vec![lsp_types::DiagnosticTag::UNNECESSARY]),
+        // RUF059: Unused unpacked variable
+        "F401" | "F841" | "RUF059" => Some(vec![lsp_types::DiagnosticTag::UNNECESSARY]),
         _ => None,
     }
 }

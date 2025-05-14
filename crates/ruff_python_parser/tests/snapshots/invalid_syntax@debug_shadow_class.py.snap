@@ -1,0 +1,94 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_class.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..82,
+        body: [
+            ClassDef(
+                StmtClassDef {
+                    range: 0..20,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("__debug__"),
+                        range: 6..15,
+                    },
+                    type_params: None,
+                    arguments: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 17..20,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 17..20,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    range: 35..58,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("C"),
+                        range: 41..42,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 42..53,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 43..52,
+                                        name: Identifier {
+                                            id: Name("__debug__"),
+                                            range: 43..52,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    arguments: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 55..58,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 55..58,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | class __debug__: ...  # class name
+  |       ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+2 | class C[__debug__]: ...  # type parameter name
+  |
+
+
+  |
+1 | class __debug__: ...  # class name
+2 | class C[__debug__]: ...  # type parameter name
+  |         ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+  |

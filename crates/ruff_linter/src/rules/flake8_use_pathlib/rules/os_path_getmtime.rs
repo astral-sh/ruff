@@ -12,7 +12,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 /// improve readability over the `os.path` module's counterparts (e.g.,
 /// `os.path.getmtime()`).
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// import os
 ///

@@ -299,7 +299,7 @@ pub(crate) fn todos(
                 has_issue_link = true;
             }
 
-            // If the next_comment isn't a tag or an issue, it's worthles in the context of this
+            // If the next_comment isn't a tag or an issue, it's worthless in the context of this
             // linter. We can increment here instead of waiting for the next iteration of the outer
             // loop.
             curr_range = next_range;

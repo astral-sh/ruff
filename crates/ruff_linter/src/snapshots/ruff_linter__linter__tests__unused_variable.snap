@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/linter.rs
-snapshot_kind: text
 ---
 unused_variable.ipynb:cell 1:2:5: F841 [*] Local variable `foo1` is assigned to but never used
   |

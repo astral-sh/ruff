@@ -27,7 +27,7 @@ use super::helpers;
 /// 6. `def get_absolute_url()`
 /// 7. Any custom methods
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// from django.db import models
 ///

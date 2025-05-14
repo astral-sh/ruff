@@ -273,7 +273,7 @@ fn handle_enclosed_comment<'a>(
                     .any(|token| token.kind() == SimpleTokenKind::LBracket)
                 {
                     return CommentPlacement::Default(comment);
-                };
+                }
 
                 // If there are no additional tokens between the open parenthesis and the comment, then
                 // it should be attached as a dangling comment on the brackets, rather than a leading
@@ -1391,11 +1391,9 @@ fn handle_attribute_comment<'a>(
         .take_while(|token| token.kind == SimpleTokenKind::RParen)
         .last()
     {
-        return if comment.start() < right_paren.start() {
-            CommentPlacement::trailing(attribute.value.as_ref(), comment)
-        } else {
-            CommentPlacement::dangling(comment.enclosing_node(), comment)
-        };
+        if comment.start() < right_paren.start() {
+            return CommentPlacement::trailing(attribute.value.as_ref(), comment);
+        }
     }
 
     // If the comment precedes the `.`, treat it as trailing _if_ it's on the same line as the
@@ -1650,7 +1648,7 @@ fn handle_pattern_match_mapping_comment<'a>(
     // like `rest` above, isn't a node.)
     if comment.following_node().is_some() {
         return CommentPlacement::Default(comment);
-    };
+    }
 
     // If there's no rest pattern, no need to do anything special.
     let Some(rest) = pattern.rest.as_ref() else {

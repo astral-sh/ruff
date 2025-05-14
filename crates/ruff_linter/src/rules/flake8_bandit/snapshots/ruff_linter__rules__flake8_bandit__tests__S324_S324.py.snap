@@ -195,3 +195,13 @@ S324.py:29:14: S324 Probable use of insecure hash functions in `crypt`: `crypt.M
 30 |
 31 | # OK
    |
+
+S324.py:51:13: S324 Probable use of insecure hash functions in `hashlib`: `Md5`
+   |
+49 | # From issue: https://github.com/astral-sh/ruff/issues/16525#issuecomment-2706188584
+50 | # Errors
+51 | hashlib.new("Md5")
+   |             ^^^^^ S324
+52 |
+53 | # OK
+   |

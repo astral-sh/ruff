@@ -18,7 +18,7 @@ use crate::rules::fastapi::rules::is_fastapi_route;
 /// contexts where that function may be called. In some cases, labeling a function `async` is
 /// semantically meaningful (e.g. with the trio library).
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// async def foo():
 ///     bar()

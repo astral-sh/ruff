@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
-snapshot_kind: text
 ---
 ARG.py:51:11: ARG004 Unused static method argument: `cls`
    |
@@ -25,3 +24,12 @@ ARG.py:55:11: ARG004 Unused static method argument: `x`
    |           ^ ARG004
 56 |         print("Hello, world!")
    |
+
+ARG.py:213:22: ARG004 Unused static method argument: `x`
+    |
+211 | ###
+212 | class C:
+213 |     def __new__(cls, x):
+    |                      ^ ARG004
+214 |         print("Hello, world!")
+    |

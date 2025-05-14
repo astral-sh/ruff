@@ -53,10 +53,10 @@ pub(crate) fn tarfile_unsafe_members(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    if !call
+    if call
         .func
         .as_attribute_expr()
-        .is_some_and(|attr| attr.attr.as_str() == "extractall")
+        .is_none_or(|attr| attr.attr.as_str() != "extractall")
     {
         return;
     }

@@ -30,7 +30,6 @@ use crate::cache::{Cache, PackageCacheMap, PackageCaches};
 use crate::diagnostics::Diagnostics;
 
 /// Run the linter over a collection of files.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn check(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
@@ -174,14 +173,13 @@ pub(crate) fn check(
     caches.persist()?;
 
     let duration = start.elapsed();
-    debug!("Checked {:?} files in: {:?}", checked_files, duration);
+    debug!("Checked {checked_files:?} files in: {duration:?}");
 
     Ok(all_diagnostics)
 }
 
 /// Wraps [`lint_path`](crate::diagnostics::lint_path) in a [`catch_unwind`](std::panic::catch_unwind) and emits
 /// a diagnostic if the linting the file panics.
-#[allow(clippy::too_many_arguments)]
 fn lint_path(
     path: &Path,
     package: Option<PackageRoot<'_>>,

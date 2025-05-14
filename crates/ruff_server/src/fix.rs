@@ -10,7 +10,7 @@ use crate::{
 };
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{
-    linter::{FixerResult, LinterResult},
+    linter::FixerResult,
     packaging::detect_package_root,
     settings::{flags, LinterSettings},
 };
@@ -27,15 +27,14 @@ pub(crate) fn fix_all(
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
     let source_kind = query.make_source_kind();
-
-    let file_resolver_settings = query.settings().file_resolver();
+    let settings = query.settings();
     let document_path = query.file_path();
 
     // If the document is excluded, return an empty list of fixes.
     let package = if let Some(document_path) = document_path.as_ref() {
         if is_document_excluded_for_linting(
             document_path,
-            file_resolver_settings,
+            &settings.file_resolver,
             linter_settings,
             query.text_document_language_id(),
         ) {
@@ -63,21 +62,19 @@ pub(crate) fn fix_all(
     // which is inconsistent with how `ruff check --fix` works.
     let FixerResult {
         transformed,
-        result: LinterResult {
-            has_syntax_error, ..
-        },
+        result,
         ..
     } = ruff_linter::linter::lint_fix(
         &query.virtual_file_path(),
         package,
         flags::Noqa::Enabled,
-        query.settings().unsafe_fixes(),
+        settings.unsafe_fixes,
         linter_settings,
         &source_kind,
         source_type,
     )?;
 
-    if has_syntax_error {
+    if result.has_invalid_syntax() {
         // If there's a syntax error, then there won't be any fixes to apply.
         return Ok(Fixes::default());
     }

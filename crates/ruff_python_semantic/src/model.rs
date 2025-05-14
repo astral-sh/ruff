@@ -344,14 +344,14 @@ impl<'a> SemanticModel<'a> {
     pub fn is_available_in_scope(&self, member: &str, scope_id: ScopeId) -> bool {
         self.lookup_symbol_in_scope(member, scope_id, false)
             .map(|binding_id| &self.bindings[binding_id])
-            .map_or(true, |binding| binding.kind.is_builtin())
+            .is_none_or(|binding| binding.kind.is_builtin())
     }
 
     /// Resolve a `del` reference to `symbol` at `range`.
     pub fn resolve_del(&mut self, symbol: &str, range: TextRange) {
         let is_unbound = self.scopes[self.scope_id]
             .get(symbol)
-            .map_or(true, |binding_id| {
+            .is_none_or(|binding_id| {
                 // Treat the deletion of a name as a reference to that name.
                 self.add_local_reference(binding_id, ExprContext::Del, range);
                 self.bindings[binding_id].is_unbound()
@@ -1517,24 +1517,48 @@ impl<'a> SemanticModel<'a> {
 
     /// Set the [`Globals`] for the current [`Scope`].
     pub fn set_globals(&mut self, globals: Globals<'a>) {
-        // If any global bindings don't already exist in the global scope, add them.
-        for (name, range) in globals.iter() {
-            if self
-                .global_scope()
-                .get(name)
-                .map_or(true, |binding_id| self.bindings[binding_id].is_unbound())
-            {
-                let id = self.bindings.push(Binding {
-                    kind: BindingKind::Assignment,
-                    range: *range,
-                    references: Vec::new(),
-                    scope: ScopeId::global(),
-                    source: self.node_id,
-                    context: self.execution_context(),
-                    exceptions: self.exceptions(),
-                    flags: BindingFlags::empty(),
-                });
-                self.global_scope_mut().add(name, id);
+        // If any global bindings don't already exist in the global scope, add them, unless we are
+        // also in the global scope, where we don't want these to count as definitions for rules
+        // like `undefined-name` (F821). For example, adding bindings in the top-level scope causes
+        // a false negative in cases like this:
+        //
+        // ```python
+        // global x
+        //
+        // def f():
+        //     print(x)  # F821 false negative
+        // ```
+        //
+        // On the other hand, failing to add bindings in non-top-level scopes causes false
+        // positives:
+        //
+        // ```python
+        // def f():
+        //     global foo
+        //     import foo
+        //
+        // def g():
+        //     foo.is_used()  # F821 false positive
+        // ```
+        if !self.at_top_level() {
+            for (name, range) in globals.iter() {
+                if self
+                    .global_scope()
+                    .get(name)
+                    .is_none_or(|binding_id| self.bindings[binding_id].is_unbound())
+                {
+                    let id = self.bindings.push(Binding {
+                        kind: BindingKind::Assignment,
+                        range: *range,
+                        references: Vec::new(),
+                        scope: ScopeId::global(),
+                        source: self.node_id,
+                        context: self.execution_context(),
+                        exceptions: self.exceptions(),
+                        flags: BindingFlags::empty(),
+                    });
+                    self.global_scope_mut().add(name, id);
+                }
             }
         }
 
@@ -1979,11 +2003,6 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::IMPORT_BOUNDARY)
     }
 
-    /// Return `true` if the model has traverse past the `__future__` import boundary.
-    pub const fn seen_futures_boundary(&self) -> bool {
-        self.flags.intersects(SemanticModelFlags::FUTURES_BOUNDARY)
-    }
-
     /// Return `true` if the model has traversed past the module docstring boundary.
     pub const fn seen_module_docstring_boundary(&self) -> bool {
         self.flags
@@ -2026,18 +2045,6 @@ impl<'a> SemanticModel<'a> {
     pub const fn in_deferred_class_base(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::DEFERRED_CLASS_BASE)
-    }
-
-    /// Return `true` if we should use the new semantics to recognize
-    /// type checking blocks. Previously we only recognized type checking
-    /// blocks if `TYPE_CHECKING` was imported from a typing module.
-    ///
-    /// With this feature flag enabled we recognize any symbol named
-    /// `TYPE_CHECKING`, regardless of where it comes from to mirror
-    /// what mypy and pyright do.
-    pub const fn use_new_type_checking_block_detection_semantics(&self) -> bool {
-        self.flags
-            .intersects(SemanticModelFlags::NEW_TYPE_CHECKING_BLOCK_DETECTION)
     }
 
     /// Return an iterator over all bindings shadowed by the given [`BindingId`], within the
@@ -2364,21 +2371,6 @@ bitflags! {
         /// ```
         const IMPORT_BOUNDARY = 1 << 13;
 
-        /// The model has traversed past the `__future__` import boundary.
-        ///
-        /// For example, the model could be visiting `x` in:
-        /// ```python
-        /// from __future__ import annotations
-        ///
-        /// import os
-        ///
-        /// x: int = 1
-        /// ```
-        ///
-        /// Python considers it a syntax error to import from `__future__` after
-        /// any other non-`__future__`-importing statements.
-        const FUTURES_BOUNDARY = 1 << 14;
-
         /// The model is in a file that has `from __future__ import annotations`
         /// at the top of the module.
         ///
@@ -2390,10 +2382,10 @@ bitflags! {
         /// def f(x: int) -> int:
         ///   ...
         /// ```
-        const FUTURE_ANNOTATIONS = 1 << 15;
+        const FUTURE_ANNOTATIONS = 1 << 14;
 
         /// The model is in a Python stub file (i.e., a `.pyi` file).
-        const STUB_FILE = 1 << 16;
+        const STUB_FILE = 1 << 15;
 
         /// `__future__`-style type annotations are enabled in this model.
         /// That could be because it's a stub file,
@@ -2409,7 +2401,7 @@ bitflags! {
         ///
         /// x: int = 1
         /// ```
-        const MODULE_DOCSTRING_BOUNDARY = 1 << 17;
+        const MODULE_DOCSTRING_BOUNDARY = 1 << 16;
 
         /// The model is in a (deferred) [type parameter definition].
         ///
@@ -2433,7 +2425,7 @@ bitflags! {
         /// not when we "pass by" it when initially traversing the source tree.
         ///
         /// [type parameter definition]: https://docs.python.org/3/reference/executionmodel.html#annotation-scopes
-        const TYPE_PARAM_DEFINITION = 1 << 18;
+        const TYPE_PARAM_DEFINITION = 1 << 17;
 
         /// The model is in a named expression assignment.
         ///
@@ -2441,7 +2433,7 @@ bitflags! {
         /// ```python
         /// if (x := 1): ...
         /// ```
-        const NAMED_EXPRESSION_ASSIGNMENT = 1 << 19;
+        const NAMED_EXPRESSION_ASSIGNMENT = 1 << 18;
 
         /// The model is in a docstring as described in [PEP 257].
         ///
@@ -2462,7 +2454,7 @@ bitflags! {
         /// ```
         ///
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
-        const PEP_257_DOCSTRING = 1 << 20;
+        const PEP_257_DOCSTRING = 1 << 19;
 
         /// The model is visiting the r.h.s. of a module-level `__all__` definition.
         ///
@@ -2474,7 +2466,7 @@ bitflags! {
         /// __all__ = ("bar",)
         /// __all__ += ("baz,")
         /// ```
-        const DUNDER_ALL_DEFINITION = 1 << 21;
+        const DUNDER_ALL_DEFINITION = 1 << 20;
 
         /// The model is in an f-string replacement field.
         ///
@@ -2483,7 +2475,7 @@ bitflags! {
         /// ```python
         /// f"first {x} second {y}"
         /// ```
-        const F_STRING_REPLACEMENT_FIELD = 1 << 22;
+        const F_STRING_REPLACEMENT_FIELD = 1 << 21;
 
         /// The model is visiting the bases tuple of a class.
         ///
@@ -2493,11 +2485,11 @@ bitflags! {
         /// class Baz(Foo, Bar):
         ///     pass
         /// ```
-        const CLASS_BASE = 1 << 23;
+        const CLASS_BASE = 1 << 22;
 
         /// The model is visiting a class base that was initially deferred
         /// while traversing the AST. (This only happens in stub files.)
-        const DEFERRED_CLASS_BASE = 1 << 24;
+        const DEFERRED_CLASS_BASE = 1 << 23;
 
         /// The model is in an attribute docstring.
         ///
@@ -2522,7 +2514,7 @@ bitflags! {
         /// static-analysis tools.
         ///
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
-        const ATTRIBUTE_DOCSTRING = 1 << 25;
+        const ATTRIBUTE_DOCSTRING = 1 << 24;
 
         /// The model is in the value expression of a [PEP 613] explicit type alias.
         ///
@@ -2534,7 +2526,7 @@ bitflags! {
         /// ```
         ///
         /// [PEP 613]: https://peps.python.org/pep-0613/
-        const ANNOTATED_TYPE_ALIAS = 1 << 27;
+        const ANNOTATED_TYPE_ALIAS = 1 << 25;
 
         /// The model is in the value expression of a [PEP 695] type statement.
         ///
@@ -2544,7 +2536,7 @@ bitflags! {
         /// ```
         ///
         /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
-        const DEFERRED_TYPE_ALIAS = 1 << 28;
+        const DEFERRED_TYPE_ALIAS = 1 << 26;
 
         /// The model is visiting an `assert` statement.
         ///
@@ -2552,7 +2544,7 @@ bitflags! {
         /// ```python
         /// assert (y := x**2) > 42, y
         /// ```
-        const ASSERT_STATEMENT = 1 << 29;
+        const ASSERT_STATEMENT = 1 << 27;
 
         /// The model is in a [`@no_type_check`] context.
         ///
@@ -2569,15 +2561,7 @@ bitflags! {
         ///
         /// [no_type_check]: https://docs.python.org/3/library/typing.html#typing.no_type_check
         /// [#13824]: https://github.com/astral-sh/ruff/issues/13824
-        const NO_TYPE_CHECK = 1 << 30;
-
-        /// The model special-cases any symbol named `TYPE_CHECKING`.
-        ///
-        /// Previously we only recognized `TYPE_CHECKING` if it was part of
-        /// one of the configured `typing` modules. This flag exists to
-        /// test out the semantic change only in preview. This flag will go
-        /// away once this change has been stabilized.
-        const NEW_TYPE_CHECKING_BLOCK_DETECTION = 1 << 31;
+        const NO_TYPE_CHECK = 1 << 28;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

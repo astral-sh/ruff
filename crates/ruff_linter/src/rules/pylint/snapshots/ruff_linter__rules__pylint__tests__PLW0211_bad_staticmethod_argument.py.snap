@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 bad_staticmethod_argument.py:3:13: PLW0211 First argument of a static method should not be named `self`
   |
@@ -26,4 +25,13 @@ bad_staticmethod_argument.py:19:15: PLW0211 First argument of a static method sh
 19 |     def sleep(self, x, y, z):  # [bad-staticmethod-argument]
    |               ^^^^ PLW0211
 20 |         pass
+   |
+
+bad_staticmethod_argument.py:55:17: PLW0211 First argument of a static method should not be named `self`
+   |
+53 | # `self` but not with `cls` as first argument - see above).
+54 | class Foo:
+55 |     def __new__(self, x, y, z):  # [bad-staticmethod-argument]
+   |                 ^^^^ PLW0211
+56 |         pass
    |

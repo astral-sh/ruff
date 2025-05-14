@@ -241,7 +241,6 @@ impl Printer {
         }
 
         if !self.flags.intersects(Flags::SHOW_VIOLATIONS) {
-            #[allow(deprecated)]
             if matches!(
                 self.format,
                 OutputFormat::Full | OutputFormat::Concise | OutputFormat::Grouped
@@ -353,7 +352,11 @@ impl Printer {
                 code: message.rule().map(std::convert::Into::into),
                 name: message.kind().into(),
                 count,
-                fixable: message.fixable(),
+                fixable: if let Some(fix) = message.fix() {
+                    fix.applies(self.unsafe_fixes.required_applicability())
+                } else {
+                    false
+                },
             })
             .sorted_by_key(|statistic| Reverse(statistic.count))
             .collect();
@@ -412,9 +415,7 @@ impl Printer {
                     )?;
                 }
 
-                if any_fixable {
-                    writeln!(writer, "[*] fixable with `ruff check --fix`",)?;
-                }
+                self.write_summary_text(writer, diagnostics)?;
                 return Ok(());
             }
             OutputFormat::Json => {

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF052.py:92:9: RUF052 Local dummy variable `_var` is accessed
    |
@@ -184,3 +183,24 @@ RUF052.py:160:5: RUF052 Local dummy variable `_NotADynamicClass` is accessed
 162 |     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
     |
     = help: Remove leading underscores
+
+RUF052.py:182:5: RUF052 Local dummy variable `_dummy_var` is accessed
+    |
+181 | def foo():
+182 |     _dummy_var = 42
+    |     ^^^^^^^^^^ RUF052
+183 |
+184 |     def bar():
+    |
+    = help: Prefer using trailing underscores to avoid shadowing a variable
+
+RUF052.py:192:5: RUF052 Local dummy variable `_dummy_var` is accessed
+    |
+190 |     # Unfixable because both possible candidates for the new name are shadowed
+191 |     # in the scope of one of the references to the variable
+192 |     _dummy_var = 42
+    |     ^^^^^^^^^^ RUF052
+193 |
+194 |     def bar():
+    |
+    = help: Prefer using trailing underscores to avoid shadowing a variable

@@ -46,3 +46,9 @@ MyType = TypedDict("MyType", dict())
 X = TypedDict("X", {
     "some_config": int,  # important
 })
+
+# Private names should not be reported (OK)
+WithPrivate = TypedDict("WithPrivate", {"__x": int})
+
+# Dunder names should not be reported (OK)
+WithDunder = TypedDict("WithDunder", {"__x__": int})

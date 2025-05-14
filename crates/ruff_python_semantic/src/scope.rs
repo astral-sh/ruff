@@ -170,7 +170,10 @@ bitflags! {
 pub enum ScopeKind<'a> {
     Class(&'a ast::StmtClassDef),
     Function(&'a ast::StmtFunctionDef),
-    Generator(GeneratorKind),
+    Generator {
+        kind: GeneratorKind,
+        is_async: bool,
+    },
     Module,
     /// A Python 3.12+ [annotation scope](https://docs.python.org/3/reference/executionmodel.html#annotation-scopes)
     Type,

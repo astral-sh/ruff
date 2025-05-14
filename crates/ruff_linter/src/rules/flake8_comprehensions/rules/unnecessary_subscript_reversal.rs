@@ -13,7 +13,7 @@ use crate::checkers::ast::Checker;
 /// into `reversed()`, `set()` or `sorted()` functions as they will change
 /// the order of the elements again.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// sorted(iterable[::-1])
 /// set(iterable[::-1])
@@ -79,7 +79,7 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: &ast::Expr
     };
     if *val != 1 {
         return;
-    };
+    }
     let Some(function_name) = checker.semantic().resolve_builtin_symbol(&call.func) else {
         return;
     };

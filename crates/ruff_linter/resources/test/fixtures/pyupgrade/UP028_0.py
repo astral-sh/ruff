@@ -163,3 +163,26 @@ def f():
         pass
     except Exception as x:
         pass
+
+
+# https://github.com/astral-sh/ruff/issues/15540
+def f():
+    for a in 1,:
+        yield a
+
+
+SOME_GLOBAL = None
+
+def f(iterable):
+    global SOME_GLOBAL
+
+    for SOME_GLOBAL in iterable:
+        yield SOME_GLOBAL
+
+    some_non_local = None
+
+    def g():
+        nonlocal some_non_local
+
+        for some_non_local in iterable:
+            yield some_non_local

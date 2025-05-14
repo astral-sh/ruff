@@ -426,7 +426,7 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
             tree = Expression::Call(Box::new((*inner_call).clone()));
             if inner_needs_parens {
                 tree = tree.with_parens(LeftParen::default(), RightParen::default());
-            };
+            }
         } else {
             // If the `reverse` argument is used...
             let args = if inner_call.args.iter().any(|arg| {

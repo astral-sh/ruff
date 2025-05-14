@@ -6,7 +6,6 @@ use crate::expression::parentheses::{
     is_expression_parenthesized, parenthesized, Parentheses, Parenthesize,
 };
 use crate::prelude::*;
-use crate::preview::is_with_single_target_parentheses_enabled;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum WithItemLayout {
@@ -118,11 +117,7 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
                 // ...except if the with item is parenthesized and it's not the only with item or it has a target.
                 // Then use the context expression as a preferred breaking point.
                 let prefer_breaking_context_expression =
-                    if is_with_single_target_parentheses_enabled(f.context()) {
-                        (optional_vars.is_some() || !single) && is_parenthesized
-                    } else {
-                        is_parenthesized
-                    };
+                    (optional_vars.is_some() || !single) && is_parenthesized;
 
                 if prefer_breaking_context_expression {
                     maybe_parenthesize_expression(

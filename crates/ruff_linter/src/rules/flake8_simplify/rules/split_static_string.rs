@@ -39,6 +39,8 @@ use crate::checkers::ast::Checker;
 /// ).split(",")
 /// ```
 ///
+/// as this is converted to `["a", "b"]` without any of the comments.
+///
 /// ## References
 /// - [Python documentation: `str.split`](https://docs.python.org/3/library/stdtypes.html#str.split)
 #[derive(ViolationMetadata)]
@@ -159,11 +161,17 @@ fn split_default(str_value: &StringLiteralValue, max_split: i32) -> Option<Expr>
         }
         Ordering::Equal => {
             let list_items: Vec<&str> = vec![str_value.to_str()];
-            Some(construct_replacement(&list_items, str_value.flags()))
+            Some(construct_replacement(
+                &list_items,
+                str_value.first_literal_flags(),
+            ))
         }
         Ordering::Less => {
             let list_items: Vec<&str> = str_value.to_str().split_whitespace().collect();
-            Some(construct_replacement(&list_items, str_value.flags()))
+            Some(construct_replacement(
+                &list_items,
+                str_value.first_literal_flags(),
+            ))
         }
     }
 }
@@ -178,16 +186,24 @@ fn split_sep(
     let list_items: Vec<&str> = if let Ok(split_n) = usize::try_from(max_split) {
         match direction {
             Direction::Left => value.splitn(split_n + 1, sep_value).collect(),
-            Direction::Right => value.rsplitn(split_n + 1, sep_value).collect(),
+            Direction::Right => {
+                let mut items: Vec<&str> = value.rsplitn(split_n + 1, sep_value).collect();
+                items.reverse();
+                items
+            }
         }
     } else {
         match direction {
             Direction::Left => value.split(sep_value).collect(),
-            Direction::Right => value.rsplit(sep_value).collect(),
+            Direction::Right => {
+                let mut items: Vec<&str> = value.rsplit(sep_value).collect();
+                items.reverse();
+                items
+            }
         }
     };
 
-    construct_replacement(&list_items, str_value.flags())
+    construct_replacement(&list_items, str_value.first_literal_flags())
 }
 
 /// Returns the value of the `maxsplit` argument as an `i32`, if it is a numeric value.

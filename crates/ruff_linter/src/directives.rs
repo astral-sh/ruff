@@ -320,7 +320,7 @@ impl<'a> TodoDirective<'a> {
                 subset = &comment[relative_offset.to_usize()..];
             } else {
                 break;
-            };
+            }
         }
 
         None

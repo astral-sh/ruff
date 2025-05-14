@@ -50,3 +50,13 @@ invalid_envvar_default.py:14:17: PLW1508 Invalid type for environment variable d
 15 | os.environ.get("TEST", 12)  # [invalid-envvar-default]
 16 | os.environ.get("TEST", "AA" * 12)
    |
+
+invalid_envvar_default.py:15:24: PLW1508 Invalid type for environment variable default; expected `str` or `None`
+   |
+13 | os.getenv("AA", "GOOD" if Z else "BAR")
+14 | os.getenv("AA", 1 if Z else "BAR")  # [invalid-envvar-default]
+15 | os.environ.get("TEST", 12)  # [invalid-envvar-default]
+   |                        ^^ PLW1508
+16 | os.environ.get("TEST", "AA" * 12)
+17 | os.environ.get("TEST", 13 * "AA")
+   |

@@ -31,7 +31,7 @@ use crate::registry::Rule;
 /// ```
 ///
 /// ## References
-/// - [Typing documentation: Version and Platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
+/// - [Typing documentation: Version and Platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
 pub(crate) struct UnrecognizedVersionInfoCheck;
 
@@ -70,7 +70,7 @@ impl Violation for UnrecognizedVersionInfoCheck {
 /// ```
 ///
 /// ## References
-/// - [Typing documentation: Version and Platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
+/// - [Typing documentation: Version and Platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
 pub(crate) struct PatchVersionComparison;
 
@@ -106,7 +106,7 @@ impl Violation for PatchVersionComparison {
 /// ```
 ///
 /// ## References
-/// - [Typing documentation: Version and Platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
+/// - [Typing documentation: Version and Platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
 pub(crate) struct WrongTupleLengthVersionComparison {
     expected_length: usize,
