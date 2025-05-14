@@ -68,7 +68,7 @@ use crate::symbol::{
 use crate::types::call::{Argument, Bindings, CallArgumentTypes, CallArguments, CallError};
 use crate::types::class::{MetaclassErrorKind, SliceLiteral};
 use crate::types::diagnostic::{
-    report_implicit_return_type, report_invalid_arguments_to_annotated,
+    self, report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
     report_invalid_return_type, report_possibly_unbound_attribute, TypeCheckDiagnostics,
@@ -1843,9 +1843,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             let use_def = self.index.use_def_map(scope_id);
             if use_def.can_implicit_return(self.db())
-                && !KnownClass::NoneType
-                    .to_instance(self.db())
-                    .is_assignable_to(self.db(), declared_ty)
+                && !Type::none(self.db()).is_assignable_to(self.db(), declared_ty)
             {
                 report_implicit_return_type(&self.context, returns.range(), declared_ty);
             }
@@ -2623,9 +2621,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         let symbol_ty = if except_handler_definition.is_star() {
-            // TODO: we should infer `ExceptionGroup` if `node_ty` is a subtype of `tuple[type[Exception], ...]`
-            // TODO: should be generic with `symbol_ty` as the generic parameter
-            KnownClass::BaseExceptionGroup.to_instance(self.db())
+            let class = if symbol_ty
+                .is_subtype_of(self.db(), KnownClass::Exception.to_instance(self.db()))
+            {
+                KnownClass::ExceptionGroup
+            } else {
+                KnownClass::BaseExceptionGroup
+            };
+            class.to_specialized_instance(self.db(), [symbol_ty])
         } else {
             symbol_ty
         };
@@ -4104,7 +4107,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .map_or(ret.range(), |value| value.range());
             self.record_return_type(ty, range);
         } else {
-            self.record_return_type(KnownClass::NoneType.to_instance(self.db()), ret.range());
+            self.record_return_type(Type::none(self.db()), ret.range());
         }
     }
 
@@ -7740,7 +7743,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         message: std::fmt::Arguments,
     ) -> Type<'db> {
         if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, expression) {
-            builder.into_diagnostic(message);
+            let diag = builder.into_diagnostic(message);
+            diagnostic::add_type_expression_reference_link(diag);
         }
         Type::unknown()
     }
@@ -8568,11 +8572,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::ClassVar | KnownInstanceType::Final => {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                    builder.into_diagnostic(format_args!(
+                    let diag = builder.into_diagnostic(format_args!(
                         "Type qualifier `{}` is not allowed in type expressions \
                          (only in annotation expressions)",
                         known_instance.repr(self.db())
                     ));
+                    diagnostic::add_type_expression_reference_link(diag);
                 }
                 self.infer_type_expression(arguments_slice)
             }
@@ -8796,11 +8801,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             _ => {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, parameters) {
-                    builder.into_diagnostic(format_args!(
+                    let diag = builder.into_diagnostic(format_args!(
                         "The first argument to `Callable` \
                          must be either a list of types, \
                          ParamSpec, Concatenate, or `...`",
                     ));
+                    diagnostic::add_type_expression_reference_link(diag);
                 }
                 return None;
             }
