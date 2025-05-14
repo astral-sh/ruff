@@ -4,29 +4,38 @@ use super::TokenFlags;
 
 /// The context representing the current f-string that the lexer is in.
 #[derive(Clone, Debug)]
-pub(crate) struct FStringContext {
+pub(crate) struct FTStringContext {
+    kind: FTStringKind,
     flags: TokenFlags,
 
-    /// The level of nesting for the lexer when it entered the current f-string.
+    /// The level of nesting for the lexer when it entered the current f/t-string.
     /// The nesting level includes all kinds of parentheses i.e., round, square,
     /// and curly.
     nesting: u32,
 
-    /// The current depth of format spec for the current f-string. This is because
+    /// The current depth of format spec for the current f/t-string. This is because
     /// there can be multiple format specs nested for the same f-string.
     /// For example, `{a:{b:{c}}}` has 3 format specs.
     format_spec_depth: u32,
 }
 
-impl FStringContext {
-    pub(crate) const fn new(flags: TokenFlags, nesting: u32) -> Self {
-        assert!(flags.is_f_string());
+impl FTStringContext {
+    pub(crate) const fn new(kind: FTStringKind, flags: TokenFlags, nesting: u32) -> Self {
+        match kind {
+            FTStringKind::FString => assert!(flags.is_f_string()),
+            FTStringKind::TString => assert!(flags.is_t_string()),
+        }
 
         Self {
+            kind,
             flags,
             nesting,
             format_spec_depth: 0,
         }
+    }
+
+    pub(crate) const fn kind(&self) -> FTStringKind {
+        self.kind
     }
 
     pub(crate) const fn flags(&self) -> TokenFlags {
@@ -106,38 +115,44 @@ impl FStringContext {
     }
 }
 
-/// The f-strings stack is used to keep track of all the f-strings that the
-/// lexer encounters. This is necessary because f-strings can be nested.
+/// The "ft-strings" stack is used to keep track of all the f-strings and t-strings that the
+/// lexer encounters. This is necessary because f-strings and t-strings can be nested.
 #[derive(Debug, Default)]
-pub(crate) struct FStrings {
-    stack: Vec<FStringContext>,
+pub(crate) struct FTStrings {
+    stack: Vec<FTStringContext>,
 }
 
-impl FStrings {
-    pub(crate) fn push(&mut self, context: FStringContext) {
+impl FTStrings {
+    pub(crate) fn push(&mut self, context: FTStringContext) {
         self.stack.push(context);
     }
 
-    pub(crate) fn pop(&mut self) -> Option<FStringContext> {
+    pub(crate) fn pop(&mut self) -> Option<FTStringContext> {
         self.stack.pop()
     }
 
-    pub(crate) fn current(&self) -> Option<&FStringContext> {
+    pub(crate) fn current(&self) -> Option<&FTStringContext> {
         self.stack.last()
     }
 
-    pub(crate) fn current_mut(&mut self) -> Option<&mut FStringContext> {
+    pub(crate) fn current_mut(&mut self) -> Option<&mut FTStringContext> {
         self.stack.last_mut()
     }
 
-    pub(crate) fn checkpoint(&self) -> FStringsCheckpoint {
-        FStringsCheckpoint(self.stack.clone())
+    pub(crate) fn checkpoint(&self) -> FTStringsCheckpoint {
+        FTStringsCheckpoint(self.stack.clone())
     }
 
-    pub(crate) fn rewind(&mut self, checkpoint: FStringsCheckpoint) {
+    pub(crate) fn rewind(&mut self, checkpoint: FTStringsCheckpoint) {
         self.stack = checkpoint.0;
     }
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct FStringsCheckpoint(Vec<FStringContext>);
+pub(crate) struct FTStringsCheckpoint(Vec<FTStringContext>);
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum FTStringKind {
+    FString,
+    TString,
+}
