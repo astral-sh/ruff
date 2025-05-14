@@ -1,0 +1,251 @@
+---
+source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+---
+C417_1.py:7:10: C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
+  |
+5 | def overshadowed_list():
+6 |     list = ...
+7 |     list(map(lambda x: x, []))
+  |          ^^^^^^^^^^^^^^^^^^^^ C417
+  |
+  = help: Replace `map()` with a generator expression
+
+ℹ Unsafe fix
+4 4 | 
+5 5 | def overshadowed_list():
+6 6 |     list = ...
+7   |-    list(map(lambda x: x, []))
+  7 |+    list((x for x in []))
+8 8 | 
+9 9 | 
+10 10 | set(map(lambda x, y: x, nums, nums))
+
+C417_1.py:10:1: C417 [*] Unnecessary `map()` usage (rewrite using a set comprehension)
+   |
+10 | set(map(lambda x, y: x, nums, nums))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+11 |
+12 | list(map(lambda x: (a := x), foo))
+   |
+   = help: Replace `map()` with a set comprehension
+
+ℹ Unsafe fix
+7  7  |     list(map(lambda x: x, []))
+8  8  | 
+9  9  | 
+10    |-set(map(lambda x, y: x, nums, nums))
+   10 |+{x for x, y in zip(nums, nums)}
+11 11 | 
+12 12 | list(map(lambda x: (a := x), foo))
+13 13 | 
+
+C417_1.py:12:1: C417 [*] Unnecessary `map()` usage (rewrite using a list comprehension)
+   |
+10 | set(map(lambda x, y: x, nums, nums))
+11 |
+12 | list(map(lambda x: (a := x), foo))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+13 |
+14 | list(map(lambda x: (a for a in \
+   |
+   = help: Replace `map()` with a list comprehension
+
+ℹ Unsafe fix
+9  9  | 
+10 10 | set(map(lambda x, y: x, nums, nums))
+11 11 | 
+12    |-list(map(lambda x: (a := x), foo))
+   12 |+[(a := x) for x in foo]
+13 13 | 
+14 14 | list(map(lambda x: (a for a in \
+15 15 |                     range(x)), foo))
+
+C417_1.py:14:1: C417 [*] Unnecessary `map()` usage (rewrite using a list comprehension)
+   |
+12 |   list(map(lambda x: (a := x), foo))
+13 |
+14 | / list(map(lambda x: (a for a in \
+15 | |                     range(x)), foo))
+   | |____________________________________^ C417
+16 |
+17 |   dict(map(lambda k, v: (k, v), keys, values))
+   |
+   = help: Replace `map()` with a list comprehension
+
+ℹ Unsafe fix
+11 11 | 
+12 12 | list(map(lambda x: (a := x), foo))
+13 13 | 
+14    |-list(map(lambda x: (a for a in \
+15    |-                    range(x)), foo))
+   14 |+[(a for a in \
+   15 |+                    range(x)) for x in foo]
+16 16 | 
+17 17 | dict(map(lambda k, v: (k, v), keys, values))
+18 18 | 
+
+C417_1.py:17:1: C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
+   |
+15 |                     range(x)), foo))
+16 |
+17 | dict(map(lambda k, v: (k, v), keys, values))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+18 |
+19 | dict(
+   |
+   = help: Replace `map()` with a dict comprehension
+
+ℹ Unsafe fix
+14 14 | list(map(lambda x: (a for a in \
+15 15 |                     range(x)), foo))
+16 16 | 
+17    |-dict(map(lambda k, v: (k, v), keys, values))
+   17 |+{k: v for k, v in zip(keys, values)}
+18 18 | 
+19 19 | dict(
+20 20 |     map(
+
+C417_1.py:19:1: C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
+   |
+17 |   dict(map(lambda k, v: (k, v), keys, values))
+18 |
+19 | / dict(
+20 | |     map(
+21 | |         lambda k, v: (
+22 | |             (  # Foo
+23 | |                 k
+24 | |             ),
+25 | |             v **2
+26 | |         ),
+27 | |         keys, values
+28 | |     )
+29 | | )
+   | |_^ C417
+30 |
+31 |   list(map(lambda x: list[...], foo))
+   |
+   = help: Replace `map()` with a dict comprehension
+
+ℹ Unsafe fix
+16 16 | 
+17 17 | dict(map(lambda k, v: (k, v), keys, values))
+18 18 | 
+19    |-dict(
+20    |-    map(
+21    |-        lambda k, v: (
+22    |-            (  # Foo
+   19 |+{(  # Foo
+23 20 |                 k
+24    |-            ),
+25    |-            v **2
+26    |-        ),
+27    |-        keys, values
+28    |-    )
+29    |-)
+   21 |+            ): v **2 for k, v in zip(keys, values)}
+30 22 | 
+31 23 | list(map(lambda x: list[...], foo))
+32 24 | 
+
+C417_1.py:31:1: C417 [*] Unnecessary `map()` usage (rewrite using a list comprehension)
+   |
+29 | )
+30 |
+31 | list(map(lambda x: list[...], foo))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+   |
+   = help: Replace `map()` with a list comprehension
+
+ℹ Unsafe fix
+28 28 |     )
+29 29 | )
+30 30 | 
+31    |-list(map(lambda x: list[...], foo))
+   31 |+[list[...] for x in foo]
+32 32 | 
+33 33 | 
+34 34 | def unfixable():
+
+C417_1.py:36:5: C417 Unnecessary `map()` usage (rewrite using a generator expression)
+   |
+34 | def unfixable():
+35 |     zip = []
+36 |     map(lambda x, y: x + y + 1, a, b)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+   |
+   = help: Replace `map()` with a generator expression
+
+C417_1.py:39:1: C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
+   |
+39 | / dict(
+40 | |     map(
+41 | |         lambda x, y: (
+42 | |             a := 0,
+43 | |             b := 1
+44 | |         ),
+45 | |         foo, bar
+46 | |     )
+47 | | )
+   | |_^ C417
+   |
+   = help: Replace `map()` with a dict comprehension
+
+ℹ Unsafe fix
+36 36 |     map(lambda x, y: x + y + 1, a, b)
+37 37 | 
+38 38 | 
+39    |-dict(
+40    |-    map(
+41    |-        lambda x, y: (
+42    |-            a := 0,
+43    |-            b := 1
+44    |-        ),
+45    |-        foo, bar
+46    |-    )
+47    |-)
+   39 |+{(a := 0): (b := 1) for x, y in zip(foo, bar)}
+48 40 | 
+49 41 | 
+50 42 | dict(
+
+C417_1.py:50:1: C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
+   |
+50 | / dict(
+51 | |     map(
+52 | |         lambda x, y: (
+53 | |             list[...],
+54 | |         # Comment
+55 | |             (  # Comment
+56 | |                 a for a \
+57 | |                 in b
+58 | |             )
+59 | |         ),
+60 | |         foo, bar
+61 | |     )
+62 | | )
+   | |_^ C417
+   |
+   = help: Replace `map()` with a dict comprehension
+
+ℹ Unsafe fix
+47 47 | )
+48 48 | 
+49 49 | 
+50    |-dict(
+51    |-    map(
+52    |-        lambda x, y: (
+53    |-            list[...],
+54    |-        # Comment
+55    |-            (  # Comment
+   50 |+{list[...]: (  # Comment
+56 51 |                 a for a \
+57 52 |                 in b
+58    |-            )
+59    |-        ),
+60    |-        foo, bar
+61    |-    )
+62    |-)
+   53 |+            ) for x, y in zip(foo, bar)}
+63 54 | 
+64 55 | 
+65 56 | ### No errors
