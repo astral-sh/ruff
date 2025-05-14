@@ -404,8 +404,6 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_fixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
 
-    let mut from_impls_for_diagnostic = quote!();
-
     for Rule {
         name, attrs, path, ..
     } in input
@@ -421,10 +419,6 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::FIX_AVAILABILITY,},
         );
         rule_explanation_match_arms.extend(quote! {#(#attrs)* Self::#name => #path::explain(),});
-
-        // Enable conversion from `Diagnostic` and `DiagnosticMessage` to `Rule`.
-        from_impls_for_diagnostic
-            .extend(quote! {#(#attrs)* ::ruff_macros::kebab_case!(#name) => Rule::#name,});
     }
 
     quote! {
@@ -443,6 +437,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             ::ruff_macros::CacheKey,
             AsRefStr,
             ::strum_macros::IntoStaticStr,
+            ::strum_macros::EnumString,
             ::serde::Serialize,
             ::serde::Deserialize,
         )]
@@ -465,20 +460,6 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             /// Returns the fix status of this rule.
             pub const fn fixable(&self) -> ruff_diagnostics::FixAvailability {
                 match self { #rule_fixable_match_arms }
-            }
-        }
-
-        // adapted from the strum `EnumString` example code until #18079 is merged
-        impl std::str::FromStr for Rule {
-            type Err = ::strum::ParseError;
-
-            fn from_str(s: &str) -> ::core::result::Result<Rule, Self::Err> {
-                let res = match s {
-                    #from_impls_for_diagnostic
-                    _ => return ::core::result::Result::Err(::strum::ParseError::VariantNotFound),
-                };
-
-                ::core::result::Result::Ok(res)
             }
         }
 
