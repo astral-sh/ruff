@@ -19,15 +19,17 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ## Example
 /// Given:
 /// ```python
-/// if x > 0:
-///     return True
-/// else:
-///     return False
+/// def foo(x: int) -> bool:
+///     if x > 0:
+///         return True
+///     else:
+///         return False
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// return x > 0
+/// def foo(x: int) -> bool:
+///     return x > 0
 /// ```
 ///
 /// Or, given:
@@ -46,7 +48,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// ## Fix safety
 ///
-/// The fix is marked as unsafe because it could remove comments.
+/// This fix is marked as unsafe because it may change the program’s behavior if the condition does not
+/// return a proper Boolean. Additionally, the fix could remove comments.
 ///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
