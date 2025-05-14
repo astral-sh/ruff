@@ -31,7 +31,7 @@ pub struct Options {
 
     /// Configures the enabled rules and their severity.
     ///
-    /// See [the rules documentation](https://github.com/astral-sh/ty/blob/main/docs/rules.md) for a list of all available rules.
+    /// See [the rules documentation](https://ty.dev/rules) for a list of all available rules.
     ///
     /// Valid severities are:
     ///

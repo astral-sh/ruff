@@ -93,12 +93,10 @@ def deeper_list(x: list[set[str]]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: Unknown
 
 def deep_explicit(x: ExplicitlyImplements[str]) -> None:
-    # TODO: revealed: str
-    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+    reveal_type(takes_in_protocol(x))  # revealed: str
 
 def deeper_explicit(x: ExplicitlyImplements[set[str]]) -> None:
-    # TODO: revealed: set[str]
-    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
 
 def takes_in_type[T](x: type[T]) -> type[T]:
     return x
@@ -123,10 +121,8 @@ reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: Unknown
 class ExplicitSub(ExplicitlyImplements[int]): ...
 class ExplicitGenericSub[T](ExplicitlyImplements[T]): ...
 
-# TODO: revealed: int
-reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: Unknown
-# TODO: revealed: str
-reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: Unknown
+reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: int
+reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 ```
 
 ## Inferring a bound typevar

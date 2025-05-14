@@ -14,7 +14,9 @@ use crate::types::{
 };
 use crate::{resolve_module, Db, KnownModule, Program};
 
-pub(crate) use implicit_globals::module_type_implicit_global_symbol;
+pub(crate) use implicit_globals::{
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol,
+};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub(crate) enum Boundness {
@@ -275,7 +277,6 @@ pub(crate) fn explicit_global_symbol<'db>(
 /// rather than being looked up as symbols explicitly defined/declared in the global scope.
 ///
 /// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
-#[cfg(test)]
 pub(crate) fn global_symbol<'db>(
     db: &'db dyn Db,
     file: File,
@@ -958,11 +959,36 @@ mod implicit_globals {
     use ruff_python_ast as ast;
 
     use crate::db::Db;
-    use crate::semantic_index::{self, symbol_table};
+    use crate::semantic_index::{self, symbol_table, use_def_map};
     use crate::symbol::SymbolAndQualifiers;
-    use crate::types::KnownClass;
+    use crate::types::{KnownClass, Type};
 
-    use super::Symbol;
+    use super::{symbol_from_declarations, Symbol, SymbolFromDeclarationsResult};
+
+    pub(crate) fn module_type_implicit_global_declaration<'db>(
+        db: &'db dyn Db,
+        name: &str,
+    ) -> SymbolFromDeclarationsResult<'db> {
+        if !module_type_symbols(db)
+            .iter()
+            .any(|module_type_member| &**module_type_member == name)
+        {
+            return Ok(Symbol::Unbound.into());
+        }
+        let Type::ClassLiteral(module_type_class) = KnownClass::ModuleType.to_class_literal(db)
+        else {
+            return Ok(Symbol::Unbound.into());
+        };
+        let module_type_scope = module_type_class.body_scope(db);
+        let symbol_table = symbol_table(db, module_type_scope);
+        let Some(symbol_id) = symbol_table.symbol_id_by_name(name) else {
+            return Ok(Symbol::Unbound.into());
+        };
+        symbol_from_declarations(
+            db,
+            use_def_map(db, module_type_scope).public_declarations(symbol_id),
+        )
+    }
 
     /// Looks up the type of an "implicit global symbol". Returns [`Symbol::Unbound`] if
     /// `name` is not present as an implicit symbol in module-global namespaces.
