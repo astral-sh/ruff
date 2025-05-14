@@ -53,7 +53,7 @@ pub enum Message {
 /// A diagnostic message corresponding to a rule violation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DiagnosticMessage {
-    pub name: String,
+    pub name: &'static str,
     pub body: String,
     pub suggestion: Option<String>,
     pub range: TextRange,
@@ -195,7 +195,7 @@ impl Message {
     /// Returns the name used to represent the diagnostic.
     pub fn name(&self) -> &str {
         match self {
-            Message::Diagnostic(m) => &m.name,
+            Message::Diagnostic(m) => m.name,
             Message::SyntaxError(_) => "SyntaxError",
         }
     }
@@ -429,7 +429,7 @@ def fibonacci(n):
 
         let unused_import_start = TextSize::from(7);
         let unused_import = DiagnosticMessage {
-            name: "UnusedImport".to_string(),
+            name: "unused-import",
             body: "`os` imported but unused".to_string(),
             suggestion: Some("Remove unused import: `os`".to_string()),
             range: TextRange::new(unused_import_start, TextSize::from(9)),
@@ -444,7 +444,7 @@ def fibonacci(n):
 
         let unused_variable_start = TextSize::from(94);
         let unused_variable = DiagnosticMessage {
-            name: "UnusedVariable".to_string(),
+            name: "unused-variable",
             body: "Local variable `x` is assigned to but never used".to_string(),
             suggestion: Some("Remove assignment to unused variable `x`".to_string()),
             range: TextRange::new(unused_variable_start, TextSize::from(95)),
@@ -461,7 +461,7 @@ def fibonacci(n):
 
         let undefined_name_start = TextSize::from(3);
         let undefined_name = DiagnosticMessage {
-            name: "UndefinedName".to_string(),
+            name: "undefined-name",
             body: "Undefined name `a`".to_string(),
             suggestion: None,
             range: TextRange::new(undefined_name_start, TextSize::from(4)),
@@ -495,7 +495,7 @@ def foo():
 
         let unused_import_os_start = TextSize::from(16);
         let unused_import_os = DiagnosticMessage {
-            name: "UnusedImport".to_string(),
+            name: "unused-import",
             body: "`os` imported but unused".to_string(),
             suggestion: Some("Remove unused import: `os`".to_string()),
             range: TextRange::new(unused_import_os_start, TextSize::from(18)),
@@ -510,7 +510,7 @@ def foo():
 
         let unused_import_math_start = TextSize::from(35);
         let unused_import_math = DiagnosticMessage {
-            name: "UnusedImport".to_string(),
+            name: "unused-import",
             body: "`math` imported but unused".to_string(),
             suggestion: Some("Remove unused import: `math`".to_string()),
             range: TextRange::new(unused_import_math_start, TextSize::from(39)),
@@ -525,7 +525,7 @@ def foo():
 
         let unused_variable_start = TextSize::from(98);
         let unused_variable = DiagnosticMessage {
-            name: "UnusedVariable".to_string(),
+            name: "unused-variable",
             body: "Local variable `x` is assigned to but never used".to_string(),
             suggestion: Some("Remove assignment to unused variable `x`".to_string()),
             range: TextRange::new(unused_variable_start, TextSize::from(99)),

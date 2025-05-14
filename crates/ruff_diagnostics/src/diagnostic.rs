@@ -8,7 +8,7 @@ use crate::{Fix, Violation};
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Diagnostic {
     /// The identifier of the diagnostic, used to align the diagnostic with a rule.
-    pub name: String,
+    pub name: &'static str,
     /// The message body to display to the user, to explain the diagnostic.
     pub body: String,
     /// The message to display to the user, to explain the suggested fix.
@@ -21,7 +21,7 @@ pub struct Diagnostic {
 impl Diagnostic {
     pub fn new<T: Violation>(kind: T, range: TextRange) -> Self {
         Self {
-            name: T::rule_name().to_string(),
+            name: T::rule_name(),
             body: Violation::message(&kind),
             suggestion: Violation::fix_title(&kind),
             range,

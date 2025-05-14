@@ -424,7 +424,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
         // Enable conversion from `DiagnosticKind` to `Rule`.
         from_impls_for_diagnostic_kind
-            .extend(quote! {#(#attrs)* stringify!(#name) => Rule::#name,});
+            .extend(quote! {#(#attrs)* ::ruff_macros::kebab_case!(#name) => Rule::#name,});
     }
 
     quote! {
@@ -443,6 +443,8 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             ::ruff_macros::CacheKey,
             AsRefStr,
             ::strum_macros::IntoStaticStr,
+            ::serde::Serialize,
+            ::serde::Deserialize,
         )]
         #[repr(u16)]
         #[strum(serialize_all = "kebab-case")]
@@ -468,7 +470,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
         impl AsRule for ruff_diagnostics::Diagnostic {
             fn rule(&self) -> Rule {
-                match self.name.as_str() {
+                match self.name {
                     #from_impls_for_diagnostic_kind
                     _ => unreachable!("invalid rule name: {}", self.name),
                 }
@@ -477,7 +479,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
         impl AsRule for crate::message::DiagnosticMessage {
             fn rule(&self) -> Rule {
-                match self.name.as_str() {
+                match self.name {
                     #from_impls_for_diagnostic_kind
                     _ => unreachable!("invalid rule name: {}", self.name),
                 }
