@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{ops::Deref, path::PathBuf};
 
 use lsp_types::Url;
 use rustc_hash::FxHashMap;
@@ -36,6 +36,7 @@ impl Experimental {
 #[serde(rename_all = "camelCase")]
 pub struct ClientSettings {
     pub(crate) experimental: Option<Experimental>,
+    pub(crate) disable_language_services: Option<bool>,
     // These settings are only needed for tracing, and are only read from the global configuration.
     // These will not be in the resolved settings.
     #[serde(flatten)]
@@ -131,5 +132,61 @@ impl Default for InitializationOptions {
         Self::GlobalOnly {
             settings: ClientSettings::default(),
         }
+    }
+}
+
+/// Resolved client settings for a specific document. These settings are meant to be
+/// used directly by the server, and are *not* a 1:1 representation with how the client
+/// sends them.
+#[derive(Clone, Debug)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+pub(crate) struct ResolvedClientSettings {
+    disable_language_services: bool,
+}
+
+impl ResolvedClientSettings {
+    pub(crate) fn is_language_services_disabled(&self) -> bool {
+        self.disable_language_services
+    }
+
+    /// Resolves global settings only.
+    pub(super) fn global(global_settings: &ClientSettings) -> Self {
+        Self::new_impl(&[global_settings])
+    }
+
+    fn new_impl(all_settings: &[&ClientSettings]) -> Self {
+        Self {
+            disable_language_services: Self::resolve_or(
+                all_settings,
+                |settings| settings.disable_language_services,
+                false,
+            ),
+        }
+    }
+
+    /// Attempts to resolve a setting using a list of available client settings as sources.
+    /// Client settings that come earlier in the list take priority. `default` will be returned
+    /// if none of the settings specify the requested setting.
+    ///
+    /// Use [`ResolvedClientSettings::resolve_optional`] if the setting should be optional instead
+    /// of having a default value.
+    fn resolve_or<T>(
+        all_settings: &[&ClientSettings],
+        get: impl Fn(&ClientSettings) -> Option<T>,
+        default: T,
+    ) -> T {
+        Self::resolve_optional(all_settings, get).unwrap_or(default)
+    }
+
+    /// Attempts to resolve a setting using a list of available client settings as sources.
+    /// Client settings that come earlier in the list take priority. This function is for fields
+    /// that do not have a default value and should be left unset.
+    ///
+    /// Use [`ResolvedClientSettings::resolve_or`] for settings that should have default values.
+    fn resolve_optional<T>(
+        all_settings: &[&ClientSettings],
+        get: impl FnMut(&ClientSettings) -> Option<T>,
+    ) -> Option<T> {
+        all_settings.iter().map(Deref::deref).find_map(get)
     }
 }
