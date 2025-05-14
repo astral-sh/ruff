@@ -136,6 +136,52 @@ impl StringLikeExtensions for ast::StringLike<'_> {
                     f_string.flags.triple_quotes(),
                 )
             }
+            StringLikePart::TString(t_string) => {
+                fn contains_line_break_or_comments(
+                    elements: &ast::TStringElements,
+                    context: &PyFormatContext,
+                    triple_quotes: TripleQuotes,
+                ) -> bool {
+                    elements.iter().any(|element| match element {
+                        ast::TStringElement::Literal(literal) => {
+                            triple_quotes.is_yes()
+                                && context.source().contains_line_break(literal.range())
+                        }
+                        ast::TStringElement::Interpolation(interpolation) => {
+                            // Interpolations containing comments can't be joined.
+                            //
+                            // Format specifiers needs to be checked as well. For example, the
+                            // following should be considered multiline because the literal
+                            // part of the format specifier contains a newline at the end
+                            // (`.3f\n`):
+                            //
+                            // ```py
+                            // x = t"hello {a + b + c + d:.3f
+                            // } world"
+                            // ```
+                            context.comments().contains_comments(interpolation.into())
+                                || interpolation.format_spec.as_deref().is_some_and(|spec| {
+                                    contains_line_break_or_comments(
+                                        &spec.elements,
+                                        context,
+                                        triple_quotes,
+                                    )
+                                })
+                                || interpolation.debug_text.as_ref().is_some_and(|debug_text| {
+                                    memchr2(b'\n', b'\r', debug_text.leading.as_bytes()).is_some()
+                                        || memchr2(b'\n', b'\r', debug_text.trailing.as_bytes())
+                                            .is_some()
+                                })
+                        }
+                    })
+                }
+
+                contains_line_break_or_comments(
+                    &t_string.elements,
+                    context,
+                    t_string.flags.triple_quotes(),
+                )
+            }
         })
     }
 }

@@ -314,13 +314,11 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
         AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
         AnyNodeRef::ExprCall(_) => handle_call_comment(comment),
-        AnyNodeRef::ExprStringLiteral(_) => {
-            if let Some(AnyNodeRef::FString(fstring)) = comment.enclosing_parent() {
-                CommentPlacement::dangling(fstring, comment)
-            } else {
-                CommentPlacement::Default(comment)
-            }
-        }
+        AnyNodeRef::ExprStringLiteral(_) => match comment.enclosing_parent() {
+            Some(AnyNodeRef::FString(fstring)) => CommentPlacement::dangling(fstring, comment),
+            Some(AnyNodeRef::TString(tstring)) => CommentPlacement::dangling(tstring, comment),
+            _ => CommentPlacement::Default(comment),
+        },
         AnyNodeRef::FString(fstring) => CommentPlacement::dangling(fstring, comment),
         AnyNodeRef::FStringExpressionElement(_) => {
             // Handle comments after the format specifier (should be rare):
@@ -337,6 +335,30 @@ fn handle_enclosed_comment<'a>(
                 comment.preceding_node(),
                 Some(
                     AnyNodeRef::FStringExpressionElement(_) | AnyNodeRef::FStringLiteralElement(_)
+                )
+            ) {
+                CommentPlacement::trailing(comment.enclosing_node(), comment)
+            } else {
+                handle_bracketed_end_of_line_comment(comment, source)
+            }
+        }
+        AnyNodeRef::TString(tstring) => CommentPlacement::dangling(tstring, comment),
+        AnyNodeRef::TStringInterpolationElement(_) => {
+            // Handle comments after the format specifier (should be rare):
+            //
+            // ```python
+            // t"literal {
+            //     expr:.3f
+            //     # comment
+            // }"
+            // ```
+            //
+            // This is a valid comment placement.
+            if matches!(
+                comment.preceding_node(),
+                Some(
+                    AnyNodeRef::TStringInterpolationElement(_)
+                        | AnyNodeRef::TStringLiteralElement(_)
                 )
             ) {
                 CommentPlacement::trailing(comment.enclosing_node(), comment)
