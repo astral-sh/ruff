@@ -5053,6 +5053,7 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(partial) => {
                     partial.get(db, typevar).unwrap_or(self)
                 }
+                TypeMapping::PromoteLiterals => self,
             }
 
             Type::FunctionLiteral(function) => {
@@ -5135,6 +5136,18 @@ impl<'db> Type<'db> {
                     .map(|ty| ty.apply_type_mapping(db, type_mapping)),
             ),
 
+            Type::ModuleLiteral(_)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::LiteralString
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_) => match type_mapping {
+                TypeMapping::Specialization(_) |
+                TypeMapping::PartialSpecialization(_) => self,
+                TypeMapping::PromoteLiterals => self.literal_fallback_instance(db)
+                    .expect("literal type should have fallback instance type"),
+            }
+
             Type::Dynamic(_)
             | Type::Never
             | Type::AlwaysTruthy
@@ -5143,16 +5156,10 @@ impl<'db> Type<'db> {
             | Type::MethodWrapper(MethodWrapperKind::StrStartswith(_))
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
-            | Type::ModuleLiteral(_)
             // A non-generic class never needs to be specialized. A generic class is specialized
             // explicitly (via a subscript expression) or implicitly (via a call), and not because
             // some other generic context's specialization is applied to it.
             | Type::ClassLiteral(_)
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::LiteralString
-            | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
             | Type::BoundSuper(_)
             | Type::KnownInstance(_) => self,
         }
@@ -5436,15 +5443,21 @@ impl<'db> From<&Type<'db>> for Type<'db> {
     }
 }
 
-/// A mapping that can be applied to a type, producing another type.
+/// A mapping that can be applied to a type, producing another type. This is applied inductively to
+/// the components of complex types.
 ///
 /// This is represented as an enum (with some variants using `Cow`), and not an `FnMut` trait,
 /// since we sometimes have to apply type mappings lazily (e.g., to the signature of a function
 /// literal).
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TypeMapping<'a, 'db> {
+    /// Applies a specialization to the type
     Specialization(Specialization<'db>),
+    /// Applies a partial specialization to the type
     PartialSpecialization(PartialSpecialization<'a, 'db>),
+    /// Promotes any literal types to their corresponding instance types (e.g. `Literal["string"]`
+    /// to `str`)
+    PromoteLiterals,
 }
 
 impl<'db> TypeMapping<'_, 'db> {
@@ -5456,6 +5469,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::PartialSpecialization(partial) => {
                 TypeMapping::PartialSpecialization(partial.to_owned())
             }
+            TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
         }
     }
 }

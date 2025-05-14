@@ -90,7 +90,7 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTyp
 The type parameter can be specified explicitly:
 
 ```py
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
 T = TypeVar("T")
 
@@ -98,6 +98,7 @@ class C(Generic[T]):
     x: T
 
 reveal_type(C[int]())  # revealed: C[int]
+reveal_type(C[Literal[5]]())  # revealed: C[Literal[5]]
 ```
 
 The specialization must match the generic types:
@@ -229,9 +230,9 @@ class C(Generic[T]):
     def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
-reveal_type(C(1))  # revealed: C[Literal[1]]
+reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -245,9 +246,9 @@ T = TypeVar("T")
 class C(Generic[T]):
     def __init__(self, x: T) -> None: ...
 
-reveal_type(C(1))  # revealed: C[Literal[1]]
+reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -264,9 +265,9 @@ class C(Generic[T]):
 
     def __init__(self, x: T) -> None: ...
 
-reveal_type(C(1))  # revealed: C[Literal[1]]
+reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -283,9 +284,9 @@ class C(Generic[T]):
 
     def __init__(self, x: T) -> None: ...
 
-reveal_type(C(1))  # revealed: C[Literal[1]]
+reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 
 class D(Generic[T]):
@@ -294,9 +295,9 @@ class D(Generic[T]):
 
     def __init__(self, *args, **kwargs) -> None: ...
 
-reveal_type(D(1))  # revealed: D[Literal[1]]
+reveal_type(D(1))  # revealed: D[int]
 
-# error: [invalid-assignment] "Object of type `D[Literal["five"]]` is not assignable to `D[int]`"
+# error: [invalid-assignment] "Object of type `D[str]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
 ```
 
@@ -319,7 +320,7 @@ class C(Generic[T, U]):
 class D(C[V, int]):
     def __init__(self, x: V) -> None: ...
 
-reveal_type(D(1))  # revealed: D[Literal[1]]
+reveal_type(D(1))  # revealed: D[int]
 ```
 
 ### `__init__` is itself generic
@@ -333,11 +334,11 @@ T = TypeVar("T")
 class C(Generic[T]):
     def __init__(self, x: T, y: S) -> None: ...
 
-reveal_type(C(1, 1))  # revealed: C[Literal[1]]
-reveal_type(C(1, "string"))  # revealed: C[Literal[1]]
-reveal_type(C(1, True))  # revealed: C[Literal[1]]
+reveal_type(C(1, 1))  # revealed: C[int]
+reveal_type(C(1, "string"))  # revealed: C[int]
+reveal_type(C(1, True))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
 ```
 
