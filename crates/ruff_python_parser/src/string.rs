@@ -569,7 +569,9 @@ mod tests {
     use ruff_python_ast::Suite;
 
     use crate::error::LexicalErrorType;
-    use crate::{FStringErrorType, ParseError, ParseErrorType, Parsed, parse_module};
+    use crate::{
+        FStringErrorType, ParseError, ParseErrorType, Parsed, TStringErrorType, parse_module,
+    };
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
@@ -715,6 +717,118 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_tstring() {
+        let source = r#"t"{a}{ b }{{foo}}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_nested_spec() {
+        let source = r#"t"{foo:{spec}}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_not_nested_spec() {
+        let source = r#"t"{foo:spec}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_empty_tstring() {
+        let source = r#"t"""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_parse_self_documenting_base() {
+        let source = r#"t"{user=}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_parse_self_documenting_base_more() {
+        let source = r#"t"mix {user=} with text and {second=}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_parse_self_documenting_format() {
+        let source = r#"t"{user=:>10}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    fn parse_tstring_error(source: &str) -> TStringErrorType {
+        parse_suite(source)
+            .map_err(|e| match e.error {
+                ParseErrorType::Lexical(LexicalErrorType::TStringError(e)) => e,
+                ParseErrorType::TStringError(e) => e,
+                e => unreachable!("Expected TStringError: {:?}", e),
+            })
+            .expect_err("Expected error")
+    }
+
+    #[test]
+    fn test_parse_invalid_tstring() {
+        use TStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
+
+        assert_eq!(parse_tstring_error(r#"t"{5!x}""#), InvalidConversionFlag);
+        assert_eq!(
+            parse_tstring_error("t'{lambda x:{x}}'"),
+            LambdaWithoutParentheses
+        );
+        // NOTE: The parser produces the `LambdaWithoutParentheses` for this case, but
+        // since the parser only return the first error to maintain compatibility with
+        // the rest of the codebase, this test case fails. The `LambdaWithoutParentheses`
+        // error appears after the unexpected `tStringMiddle` token, which is between the
+        // `:` and the `{`.
+        // assert_eq!(parse_tstring_error("f'{lambda x: {x}}'"), LambdaWithoutParentheses);
+        assert!(parse_suite(r#"t"{class}""#).is_err());
+    }
+
+    #[test]
+    fn test_parse_tstring_not_equals() {
+        let source = r#"t"{1 != 2}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_equals() {
+        let source = r#"t"{42 == 42}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_self_doc_prec_space() {
+        let source = r#"t"{x   =}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_self_doc_trailing_space() {
+        let source = r#"t"{x=   }""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_yield_expr() {
+        let source = r#"t"{yield}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
     fn test_parse_string_concat() {
         let source = "'Hello ' 'world'";
         let suite = parse_suite(source).unwrap();
@@ -773,6 +887,62 @@ mod tests {
     #[test]
     fn test_parse_u_f_string_concat_2() {
         let source = "u'Hello ' f'world' '!'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_t_string_concat_1() {
+        let source = "'Hello ' t'world'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_t_string_concat_2() {
+        let source = "'Hello ' t'world'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_t_string_concat_3() {
+        let source = "'Hello ' t'world{\"!\"}'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_t_string_concat_4() {
+        let source = "'Hello ' t'world{\"!\"}' 'again!'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_u_t_string_concat_1() {
+        let source = "u'Hello ' t'world'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_u_t_string_concat_2() {
+        let source = "u'Hello ' t'world' '!'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_f_t_string_concat_1() {
+        let source = "f'Hello ' t'world'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_f_t_string_concat_2() {
+        let source = "f'Hello ' t'world' '!'";
         let suite = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
@@ -890,6 +1060,71 @@ mod tests {
     #[test]
     fn test_parse_fstring_nested_concatenation_string_spec() {
         let source = r#"f"{foo:{'' ''}}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_escaped_newline() {
+        let source = r#"t"\n{x}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_constant_range() {
+        let source = r#"t"aaa{bbb}ccc{ddd}eee""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_unescaped_newline() {
+        let source = r#"t"""
+{x}""""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_escaped_character() {
+        let source = r#"t"\\{x}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_raw_tstring() {
+        let source = r#"rt"{x}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_triple_quoted_raw_tstring() {
+        let source = r#"rt"""{x}""""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_line_continuation() {
+        let source = r#"rt"\
+{x}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_nested_string_spec() {
+        let source = r#"t"{foo:{''}}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_nested_concatenation_string_spec() {
+        let source = r#"t"{foo:{'' ''}}""#;
         let suite = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(suite);
     }

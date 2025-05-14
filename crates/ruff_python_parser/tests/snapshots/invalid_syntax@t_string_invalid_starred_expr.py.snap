@@ -1,0 +1,205 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/t_string_invalid_starred_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..158,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 123..129,
+                    value: TString(
+                        ExprTString {
+                            range: 123..129,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 123..129,
+                                            elements: [
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 125..128,
+                                                        interpolation: Starred(
+                                                            ExprStarred {
+                                                                range: 126..127,
+                                                                value: Name(
+                                                                    ExprName {
+                                                                        range: 127..127,
+                                                                        id: Name(""),
+                                                                        ctx: Invalid,
+                                                                    },
+                                                                ),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 130..143,
+                    value: TString(
+                        ExprTString {
+                            range: 130..143,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 130..143,
+                                            elements: [
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 132..142,
+                                                        interpolation: Starred(
+                                                            ExprStarred {
+                                                                range: 133..141,
+                                                                value: BoolOp(
+                                                                    ExprBoolOp {
+                                                                        range: 134..141,
+                                                                        op: And,
+                                                                        values: [
+                                                                            Name(
+                                                                                ExprName {
+                                                                                    range: 134..135,
+                                                                                    id: Name("x"),
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            ),
+                                                                            Name(
+                                                                                ExprName {
+                                                                                    range: 140..141,
+                                                                                    id: Name("y"),
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            ),
+                                                                        ],
+                                                                    },
+                                                                ),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 144..157,
+                    value: TString(
+                        ExprTString {
+                            range: 144..157,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 144..157,
+                                            elements: [
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 146..156,
+                                                        interpolation: Starred(
+                                                            ExprStarred {
+                                                                range: 147..155,
+                                                                value: Yield(
+                                                                    ExprYield {
+                                                                        range: 148..155,
+                                                                        value: Some(
+                                                                            Name(
+                                                                                ExprName {
+                                                                                    range: 154..155,
+                                                                                    id: Name("x"),
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            ),
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | # Starred expression inside t-string has a minimum precedence of bitwise or.
+3 | t"{*}"
+  |     ^ Syntax Error: Expected an expression
+4 | t"{*x and y}"
+5 | t"{*yield x}"
+  |
+
+
+  |
+2 | # Starred expression inside t-string has a minimum precedence of bitwise or.
+3 | t"{*}"
+4 | t"{*x and y}"
+  |     ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+5 | t"{*yield x}"
+  |
+
+
+  |
+3 | t"{*}"
+4 | t"{*x and y}"
+5 | t"{*yield x}"
+  |     ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |

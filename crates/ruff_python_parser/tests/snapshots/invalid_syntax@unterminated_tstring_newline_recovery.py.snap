@@ -1,0 +1,362 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/unterminated_tstring_newline_recovery.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..111,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 44..51,
+                    value: TString(
+                        ExprTString {
+                            range: 44..51,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 44..51,
+                                            elements: [],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 52..57,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 52..57,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 52..53,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 56..57,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 58..68,
+                    value: TString(
+                        ExprTString {
+                            range: 58..68,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 58..68,
+                                            elements: [
+                                                Literal(
+                                                    TStringLiteralElement {
+                                                        range: 60..66,
+                                                        value: "hello ",
+                                                    },
+                                                ),
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 66..68,
+                                                        interpolation: Name(
+                                                            ExprName {
+                                                                range: 67..68,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 69..74,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 69..74,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 69..70,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 73..74,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 75..86,
+                    value: TString(
+                        ExprTString {
+                            range: 75..86,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 75..86,
+                                            elements: [
+                                                Literal(
+                                                    TStringLiteralElement {
+                                                        range: 77..83,
+                                                        value: "hello ",
+                                                    },
+                                                ),
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 83..86,
+                                                        interpolation: Name(
+                                                            ExprName {
+                                                                range: 84..85,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            TStringFormatSpec {
+                                                                range: 86..86,
+                                                                elements: [],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 87..92,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 87..92,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 87..88,
+                                    value: Int(
+                                        3,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 91..92,
+                                    value: Int(
+                                        3,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 93..104,
+                    value: TString(
+                        ExprTString {
+                            range: 93..104,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 93..104,
+                                            elements: [
+                                                Literal(
+                                                    TStringLiteralElement {
+                                                        range: 95..101,
+                                                        value: "hello ",
+                                                    },
+                                                ),
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 101..104,
+                                                        interpolation: Name(
+                                                            ExprName {
+                                                                range: 102..103,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 105..110,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 105..110,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 105..106,
+                                    value: Int(
+                                        4,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 109..110,
+                                    value: Int(
+                                        4,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | t"hello
+  |   ^^^^^ Syntax Error: t-string: unterminated string
+3 | 1 + 1
+4 | t"hello {x
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | t"hello
+  |        ^ Syntax Error: Expected TStringEnd, found newline
+3 | 1 + 1
+4 | t"hello {x
+5 | 2 + 2
+  |
+
+
+  |
+2 | t"hello
+3 | 1 + 1
+4 | t"hello {x
+  |           ^ Syntax Error: t-string: unterminated string
+5 | 2 + 2
+6 | t"hello {x:
+  |
+
+
+  |
+3 | 1 + 1
+4 | t"hello {x
+5 | 2 + 2
+  | ^ Syntax Error: t-string: expecting '}'
+6 | t"hello {x:
+7 | 3 + 3
+  |
+
+
+  |
+2 | t"hello
+3 | 1 + 1
+4 | t"hello {x
+  |           ^ Syntax Error: Expected TStringEnd, found Unknown
+5 | 2 + 2
+6 | t"hello {x:
+  |
+
+
+  |
+4 | t"hello {x
+5 | 2 + 2
+6 | t"hello {x:
+  |            ^ Syntax Error: t-string: unterminated string
+7 | 3 + 3
+8 | t"hello {x}
+  |
+
+
+  |
+6 | t"hello {x:
+7 | 3 + 3
+8 | t"hello {x}
+  |            ^ Syntax Error: t-string: unterminated string
+9 | 4 + 4
+  |
