@@ -7,6 +7,7 @@ pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
+use ruff_text_size::{Ranged, TextRange};
 use salsa::plumbing::AsId;
 use salsa::{Durability, Setter};
 
@@ -93,7 +94,9 @@ impl Files {
                     .root(db, path)
                     .map_or(Durability::default(), |root| root.durability(db));
 
-                let builder = File::builder(FilePath::System(absolute)).durability(durability);
+                let builder = File::builder(FilePath::System(absolute))
+                    .durability(durability)
+                    .path_durability(Durability::HIGH);
 
                 let builder = match metadata {
                     Ok(metadata) if metadata.file_type().is_file() => builder
@@ -158,9 +161,11 @@ impl Files {
         tracing::trace!("Adding virtual file {}", path);
         let virtual_file = VirtualFile(
             File::builder(FilePath::SystemVirtual(path.to_path_buf()))
+                .path_durability(Durability::HIGH)
                 .status(FileStatus::Exists)
                 .revision(FileRevision::zero())
                 .permissions(None)
+                .permissions_durability(Durability::HIGH)
                 .new(db),
         );
         self.inner
@@ -271,8 +276,8 @@ impl std::panic::RefUnwindSafe for Files {}
 /// A file that's either stored on the host system's file system or in the vendored file system.
 #[salsa::input]
 pub struct File {
-    /// The path of the file.
-    #[return_ref]
+    /// The path of the file (immutable).
+    #[returns(ref)]
     pub path: FilePath,
 
     /// The unix permissions of the file. Only supported on unix systems. Always `None` on Windows
@@ -423,9 +428,19 @@ impl File {
 
     /// Returns `true` if the file should be analyzed as a type stub.
     pub fn is_stub(self, db: &dyn Db) -> bool {
-        self.path(db)
-            .extension()
-            .is_some_and(|extension| PySourceType::from_extension(extension).is_stub())
+        self.source_type(db).is_stub()
+    }
+
+    pub fn source_type(self, db: &dyn Db) -> PySourceType {
+        match self.path(db) {
+            FilePath::System(path) => path
+                .extension()
+                .map_or(PySourceType::Python, PySourceType::from_extension),
+            FilePath::Vendored(_) => PySourceType::Stub,
+            FilePath::SystemVirtual(path) => path
+                .extension()
+                .map_or(PySourceType::Python, PySourceType::from_extension),
+        }
     }
 }
 
@@ -509,6 +524,30 @@ impl fmt::Display for FileError {
 }
 
 impl std::error::Error for FileError {}
+
+/// Range with its corresponding file.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct FileRange {
+    file: File,
+    range: TextRange,
+}
+
+impl FileRange {
+    pub const fn new(file: File, range: TextRange) -> Self {
+        Self { file, range }
+    }
+
+    pub const fn file(&self) -> File {
+        self.file
+    }
+}
+
+impl Ranged for FileRange {
+    #[inline]
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
 
 #[cfg(test)]
 mod tests {

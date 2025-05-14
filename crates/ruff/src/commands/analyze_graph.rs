@@ -75,6 +75,8 @@ pub(crate) fn analyze_graph(
             .target_version
             .as_tuple()
             .into(),
+        args.python
+            .and_then(|python| SystemPathBuf::from_path_buf(python).ok()),
     )?;
 
     let imports = {

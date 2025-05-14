@@ -1,0 +1,8 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+<filename>:2:22: SyntaxError: named expression cannot be used within a generic definition
+  |
+2 | def f[T](x: int) -> (y := 3): return x
+  |                      ^^^^^^
+  |

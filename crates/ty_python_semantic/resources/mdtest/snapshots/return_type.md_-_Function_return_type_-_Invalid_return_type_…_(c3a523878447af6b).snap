@@ -1,0 +1,74 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: return_type.md - Function return type - Invalid return type in stub file
+mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.pyi
+
+```
+ 1 | def f() -> int:
+ 2 |     # error: [invalid-return-type]
+ 3 |     return ...
+ 4 | 
+ 5 | # error: [invalid-return-type]
+ 6 | def foo() -> int:
+ 7 |     print("...")
+ 8 |     ...
+ 9 | 
+10 | # error: [invalid-return-type]
+11 | def foo() -> int:
+12 |     f"""{foo} is a function that ..."""
+13 |     ...
+```
+
+# Diagnostics
+
+```
+error[invalid-return-type]: Return type does not match returned value
+ --> src/mdtest_snippet.pyi:1:12
+  |
+1 | def f() -> int:
+  |            --- Expected `int` because of return type
+2 |     # error: [invalid-return-type]
+3 |     return ...
+  |            ^^^ expected `int`, found `ellipsis`
+4 |
+5 | # error: [invalid-return-type]
+  |
+info: rule `invalid-return-type` is enabled by default
+
+```
+
+```
+error[invalid-return-type]: Function can implicitly return `None`, which is not assignable to return type `int`
+ --> src/mdtest_snippet.pyi:6:14
+  |
+5 | # error: [invalid-return-type]
+6 | def foo() -> int:
+  |              ^^^
+7 |     print("...")
+8 |     ...
+  |
+info: rule `invalid-return-type` is enabled by default
+
+```
+
+```
+error[invalid-return-type]: Function can implicitly return `None`, which is not assignable to return type `int`
+  --> src/mdtest_snippet.pyi:11:14
+   |
+10 | # error: [invalid-return-type]
+11 | def foo() -> int:
+   |              ^^^
+12 |     f"""{foo} is a function that ..."""
+13 |     ...
+   |
+info: rule `invalid-return-type` is enabled by default
+
+```

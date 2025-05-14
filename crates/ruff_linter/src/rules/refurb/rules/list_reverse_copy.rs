@@ -182,7 +182,7 @@ fn extract_name_from_sliced_reversed(expr: &Expr) -> Option<&ExprName> {
         .is_none_or(|value| value != 1)
     {
         return None;
-    };
+    }
     value.as_name_expr()
 }
 

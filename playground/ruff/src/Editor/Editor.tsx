@@ -242,7 +242,7 @@ export default function Editor({
         <PrimarySideBar onSelectTool={(tool) => setTab(tool)} selected={tab} />
 
         <Panel id="main" order={0} minSize={10}>
-          <PanelGroup id="main" direction="vertical">
+          <PanelGroup id="vertical" direction="vertical">
             <Panel minSize={10} className="my-2" order={0}>
               <SourceEditor
                 visible={tab === "Source"}

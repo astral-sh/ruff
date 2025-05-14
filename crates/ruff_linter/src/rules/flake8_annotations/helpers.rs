@@ -14,7 +14,7 @@ use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::importer::{ImportRequest, Importer};
+use crate::checkers::ast::Checker;
 use ruff_python_ast::PythonVersion;
 
 /// Return the name of the function, if it's overloaded.
@@ -119,26 +119,20 @@ impl AutoPythonType {
     /// additional edits.
     pub(crate) fn into_expression(
         self,
-        importer: &Importer,
+        checker: &Checker,
         at: TextSize,
-        semantic: &SemanticModel,
-        target_version: PythonVersion,
     ) -> Option<(Expr, Vec<Edit>)> {
+        let target_version = checker.target_version();
         match self {
             AutoPythonType::Never => {
-                let (no_return_edit, binding) = importer
-                    .get_or_import_symbol(
-                        &ImportRequest::import_from(
-                            "typing",
-                            if target_version >= PythonVersion::PY311 {
-                                "Never"
-                            } else {
-                                "NoReturn"
-                            },
-                        ),
-                        at,
-                        semantic,
-                    )
+                let member = if target_version >= PythonVersion::PY311 {
+                    "Never"
+                } else {
+                    "NoReturn"
+                };
+                let (no_return_edit, binding) = checker
+                    .typing_importer(member, PythonVersion::lowest())?
+                    .import(at)
                     .ok()?;
                 let expr = Expr::Name(ast::ExprName {
                     id: Name::from(binding),
@@ -175,12 +169,9 @@ impl AutoPythonType {
                             let element = type_expr(*python_type)?;
 
                             // Ex) `Optional[int]`
-                            let (optional_edit, binding) = importer
-                                .get_or_import_symbol(
-                                    &ImportRequest::import_from("typing", "Optional"),
-                                    at,
-                                    semantic,
-                                )
+                            let (optional_edit, binding) = checker
+                                .typing_importer("Optional", PythonVersion::lowest())?
+                                .import(at)
                                 .ok()?;
                             let expr = typing_optional(element, Name::from(binding));
                             Some((expr, vec![optional_edit]))
@@ -192,12 +183,9 @@ impl AutoPythonType {
                                 .collect::<Option<Vec<_>>>()?;
 
                             // Ex) `Union[int, str]`
-                            let (union_edit, binding) = importer
-                                .get_or_import_symbol(
-                                    &ImportRequest::import_from("typing", "Union"),
-                                    at,
-                                    semantic,
-                                )
+                            let (union_edit, binding) = checker
+                                .typing_importer("Union", PythonVersion::lowest())?
+                                .import(at)
                                 .ok()?;
                             let expr = typing_union(&elements, Name::from(binding));
                             Some((expr, vec![union_edit]))

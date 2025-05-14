@@ -1,0 +1,402 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: mro.md - Method Resolution Order tests - `__bases__` lists with duplicate bases
+mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import reveal_type
+ 2 | 
+ 3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
+ 4 | 
+ 5 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+ 6 | 
+ 7 | class Spam: ...
+ 8 | class Eggs: ...
+ 9 | class Bar: ...
+10 | class Baz: ...
+11 | 
+12 | # fmt: off
+13 | 
+14 | # error: [duplicate-base] "Duplicate base class `Spam`"
+15 | # error: [duplicate-base] "Duplicate base class `Eggs`"
+16 | class Ham(
+17 |     Spam,
+18 |     Eggs,
+19 |     Bar,
+20 |     Baz,
+21 |     Spam,
+22 |     Eggs,
+23 | ): ...
+24 | 
+25 | # fmt: on
+26 | 
+27 | reveal_type(Ham.__mro__)  # revealed: tuple[<class 'Ham'>, Unknown, <class 'object'>]
+28 | 
+29 | class Mushrooms: ...
+30 | class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
+31 | 
+32 | reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
+33 | 
+34 | # fmt: off
+35 | 
+36 | # error: [duplicate-base] "Duplicate base class `Eggs`"
+37 | class VeryEggyOmelette(
+38 |     Eggs,
+39 |     Ham,
+40 |     Spam,
+41 |     Eggs,
+42 |     Mushrooms,
+43 |     Bar,
+44 |     Eggs,
+45 |     Baz,
+46 |     Eggs,
+47 | ): ...
+48 | 
+49 | # fmt: off
+50 | # fmt: off
+51 | 
+52 | class A: ...
+53 | 
+54 | class B(  # type: ignore[duplicate-base]
+55 |     A,
+56 |     A,
+57 | ): ...
+58 | 
+59 | class C(
+60 |     A,
+61 |     A
+62 | ):  # type: ignore[duplicate-base]
+63 |     x: int
+64 | 
+65 | # fmt: on
+66 | # fmt: off
+67 | 
+68 | # error: [duplicate-base]
+69 | class D(
+70 |     A,
+71 |     # error: [unused-ignore-comment]
+72 |     A,  # type: ignore[duplicate-base]
+73 | ): ...
+74 | 
+75 | # error: [duplicate-base]
+76 | class E(
+77 |     A,
+78 |     A
+79 | ):
+80 |     # error: [unused-ignore-comment]
+81 |     x: int  # type: ignore[duplicate-base]
+82 | 
+83 | # fmt: on
+```
+
+# Diagnostics
+
+```
+error[duplicate-base]: Duplicate base class `str`
+ --> src/mdtest_snippet.py:3:7
+  |
+1 | from typing_extensions import reveal_type
+2 |
+3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
+  |       ^^^^^^^^^^^^^
+4 |
+5 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+  |
+info: The definition of class `Foo` will raise `TypeError` at runtime
+ --> src/mdtest_snippet.py:3:11
+  |
+1 | from typing_extensions import reveal_type
+2 |
+3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
+  |           ---  ^^^ Class `str` later repeated here
+  |           |
+  |           Class `str` first included in bases list here
+4 |
+5 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+  |
+info: rule `duplicate-base` is enabled by default
+
+```
+
+```
+info[revealed-type]: Revealed type
+ --> src/mdtest_snippet.py:5:13
+  |
+3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
+4 |
+5 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+  |             ^^^^^^^^^^^ `tuple[<class 'Foo'>, Unknown, <class 'object'>]`
+6 |
+7 | class Spam: ...
+  |
+
+```
+
+```
+error[duplicate-base]: Duplicate base class `Eggs`
+  --> src/mdtest_snippet.py:16:7
+   |
+14 |   # error: [duplicate-base] "Duplicate base class `Spam`"
+15 |   # error: [duplicate-base] "Duplicate base class `Eggs`"
+16 |   class Ham(
+   |  _______^
+17 | |     Spam,
+18 | |     Eggs,
+19 | |     Bar,
+20 | |     Baz,
+21 | |     Spam,
+22 | |     Eggs,
+23 | | ): ...
+   | |_^
+24 |
+25 |   # fmt: on
+   |
+info: The definition of class `Ham` will raise `TypeError` at runtime
+  --> src/mdtest_snippet.py:18:5
+   |
+16 | class Ham(
+17 |     Spam,
+18 |     Eggs,
+   |     ---- Class `Eggs` first included in bases list here
+19 |     Bar,
+20 |     Baz,
+21 |     Spam,
+22 |     Eggs,
+   |     ^^^^ Class `Eggs` later repeated here
+23 | ): ...
+   |
+info: rule `duplicate-base` is enabled by default
+
+```
+
+```
+error[duplicate-base]: Duplicate base class `Spam`
+  --> src/mdtest_snippet.py:16:7
+   |
+14 |   # error: [duplicate-base] "Duplicate base class `Spam`"
+15 |   # error: [duplicate-base] "Duplicate base class `Eggs`"
+16 |   class Ham(
+   |  _______^
+17 | |     Spam,
+18 | |     Eggs,
+19 | |     Bar,
+20 | |     Baz,
+21 | |     Spam,
+22 | |     Eggs,
+23 | | ): ...
+   | |_^
+24 |
+25 |   # fmt: on
+   |
+info: The definition of class `Ham` will raise `TypeError` at runtime
+  --> src/mdtest_snippet.py:17:5
+   |
+15 | # error: [duplicate-base] "Duplicate base class `Eggs`"
+16 | class Ham(
+17 |     Spam,
+   |     ---- Class `Spam` first included in bases list here
+18 |     Eggs,
+19 |     Bar,
+20 |     Baz,
+21 |     Spam,
+   |     ^^^^ Class `Spam` later repeated here
+22 |     Eggs,
+23 | ): ...
+   |
+info: rule `duplicate-base` is enabled by default
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:27:13
+   |
+25 | # fmt: on
+26 |
+27 | reveal_type(Ham.__mro__)  # revealed: tuple[<class 'Ham'>, Unknown, <class 'object'>]
+   |             ^^^^^^^^^^^ `tuple[<class 'Ham'>, Unknown, <class 'object'>]`
+28 |
+29 | class Mushrooms: ...
+   |
+
+```
+
+```
+error[duplicate-base]: Duplicate base class `Mushrooms`
+  --> src/mdtest_snippet.py:30:7
+   |
+29 | class Mushrooms: ...
+30 | class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+31 |
+32 | reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
+   |
+info: The definition of class `Omelette` will raise `TypeError` at runtime
+  --> src/mdtest_snippet.py:30:28
+   |
+29 | class Mushrooms: ...
+30 | class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
+   |                            ---------  ^^^^^^^^^ Class `Mushrooms` later repeated here
+   |                            |
+   |                            Class `Mushrooms` first included in bases list here
+31 |
+32 | reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
+   |
+info: rule `duplicate-base` is enabled by default
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:32:13
+   |
+30 | class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
+31 |
+32 | reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
+   |             ^^^^^^^^^^^^^^^^ `tuple[<class 'Omelette'>, Unknown, <class 'object'>]`
+33 |
+34 | # fmt: off
+   |
+
+```
+
+```
+error[duplicate-base]: Duplicate base class `Eggs`
+  --> src/mdtest_snippet.py:37:7
+   |
+36 |   # error: [duplicate-base] "Duplicate base class `Eggs`"
+37 |   class VeryEggyOmelette(
+   |  _______^
+38 | |     Eggs,
+39 | |     Ham,
+40 | |     Spam,
+41 | |     Eggs,
+42 | |     Mushrooms,
+43 | |     Bar,
+44 | |     Eggs,
+45 | |     Baz,
+46 | |     Eggs,
+47 | | ): ...
+   | |_^
+48 |
+49 |   # fmt: off
+   |
+info: The definition of class `VeryEggyOmelette` will raise `TypeError` at runtime
+  --> src/mdtest_snippet.py:38:5
+   |
+36 | # error: [duplicate-base] "Duplicate base class `Eggs`"
+37 | class VeryEggyOmelette(
+38 |     Eggs,
+   |     ---- Class `Eggs` first included in bases list here
+39 |     Ham,
+40 |     Spam,
+41 |     Eggs,
+   |     ^^^^ Class `Eggs` later repeated here
+42 |     Mushrooms,
+43 |     Bar,
+44 |     Eggs,
+   |     ^^^^ Class `Eggs` later repeated here
+45 |     Baz,
+46 |     Eggs,
+   |     ^^^^ Class `Eggs` later repeated here
+47 | ): ...
+   |
+info: rule `duplicate-base` is enabled by default
+
+```
+
+```
+error[duplicate-base]: Duplicate base class `A`
+  --> src/mdtest_snippet.py:69:7
+   |
+68 |   # error: [duplicate-base]
+69 |   class D(
+   |  _______^
+70 | |     A,
+71 | |     # error: [unused-ignore-comment]
+72 | |     A,  # type: ignore[duplicate-base]
+73 | | ): ...
+   | |_^
+74 |
+75 |   # error: [duplicate-base]
+   |
+info: The definition of class `D` will raise `TypeError` at runtime
+  --> src/mdtest_snippet.py:70:5
+   |
+68 | # error: [duplicate-base]
+69 | class D(
+70 |     A,
+   |     - Class `A` first included in bases list here
+71 |     # error: [unused-ignore-comment]
+72 |     A,  # type: ignore[duplicate-base]
+   |     ^ Class `A` later repeated here
+73 | ): ...
+   |
+info: rule `duplicate-base` is enabled by default
+
+```
+
+```
+info[unused-ignore-comment]
+  --> src/mdtest_snippet.py:72:9
+   |
+70 |     A,
+71 |     # error: [unused-ignore-comment]
+72 |     A,  # type: ignore[duplicate-base]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Unused blanket `type: ignore` directive
+73 | ): ...
+   |
+
+```
+
+```
+error[duplicate-base]: Duplicate base class `A`
+  --> src/mdtest_snippet.py:76:7
+   |
+75 |   # error: [duplicate-base]
+76 |   class E(
+   |  _______^
+77 | |     A,
+78 | |     A
+79 | | ):
+   | |_^
+80 |       # error: [unused-ignore-comment]
+81 |       x: int  # type: ignore[duplicate-base]
+   |
+info: The definition of class `E` will raise `TypeError` at runtime
+  --> src/mdtest_snippet.py:77:5
+   |
+75 | # error: [duplicate-base]
+76 | class E(
+77 |     A,
+   |     - Class `A` first included in bases list here
+78 |     A
+   |     ^ Class `A` later repeated here
+79 | ):
+80 |     # error: [unused-ignore-comment]
+   |
+info: rule `duplicate-base` is enabled by default
+
+```
+
+```
+info[unused-ignore-comment]
+  --> src/mdtest_snippet.py:81:13
+   |
+79 | ):
+80 |     # error: [unused-ignore-comment]
+81 |     x: int  # type: ignore[duplicate-base]
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Unused blanket `type: ignore` directive
+82 |
+83 | # fmt: on
+   |
+
+```

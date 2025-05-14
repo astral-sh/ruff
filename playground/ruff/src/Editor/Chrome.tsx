@@ -1,3 +1,4 @@
+import ruffSchema from "../../../../ruff.schema.json";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Header, useTheme, setupMonaco } from "shared";
 import { persist, persistLocal, restore, stringify } from "./settings";
@@ -21,6 +22,7 @@ export default function Chrome() {
     }
 
     persist(settings, pythonSource).catch((error) =>
+      // eslint-disable-next-line no-console
       console.error(`Failed to share playground: ${error}`),
     );
   }, [pythonSource, settings]);
@@ -34,6 +36,7 @@ export default function Chrome() {
         setRevision(1);
       })
       .catch((error) => {
+        // eslint-disable-next-line no-console
         console.error("Failed to initialize playground.", error);
       });
   }
@@ -62,6 +65,15 @@ export default function Chrome() {
     [pythonSource],
   );
 
+  const handleResetClicked = useCallback(() => {
+    const pythonSource = DEFAULT_PYTHON_SOURCE;
+    const settings = stringify(Workspace.defaultSettings());
+
+    persistLocal({ pythonSource, settingsSource: settings });
+    setPythonSource(pythonSource);
+    setSettings(settings);
+  }, []);
+
   const source: Source | null = useMemo(() => {
     if (pythonSource == null || settings == null) {
       return null;
@@ -75,9 +87,11 @@ export default function Chrome() {
       <Header
         edit={revision}
         theme={theme}
+        logo="ruff"
         version={ruffVersion}
         onChangeTheme={setTheme}
         onShare={handleShare}
+        onReset={handleResetClicked}
       />
 
       <div className="flex grow">
@@ -103,7 +117,11 @@ async function startPlayground(): Promise<{
   await initRuff();
   const monaco = await loader.init();
 
-  setupMonaco(monaco);
+  setupMonaco(monaco, {
+    uri: "https://raw.githubusercontent.com/astral-sh/ruff/main/ruff.schema.json",
+    fileMatch: ["ruff.json"],
+    schema: ruffSchema,
+  });
 
   const response = await restore();
   const [settingsSource, pythonSource] = response ?? [

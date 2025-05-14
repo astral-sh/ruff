@@ -1,0 +1,39 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: tuples.md - Comparison: Tuples - Equality with elements that incorrectly implement `__bool__`
+mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/tuples.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class NotBoolable:
+2 |     __bool__: None = None
+3 | 
+4 | class A:
+5 |     def __eq__(self, other) -> NotBoolable:
+6 |         return NotBoolable()
+7 | 
+8 | # error: [unsupported-bool-conversion]
+9 | (A(),) == (A(),)
+```
+
+# Diagnostics
+
+```
+error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable`
+ --> src/mdtest_snippet.py:9:1
+  |
+8 | # error: [unsupported-bool-conversion]
+9 | (A(),) == (A(),)
+  | ^^^^^^^^^^^^^^^^
+  |
+info: `__bool__` on `NotBoolable` must be callable
+info: rule `unsupported-bool-conversion` is enabled by default
+
+```

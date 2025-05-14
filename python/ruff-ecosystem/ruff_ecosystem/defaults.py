@@ -4,6 +4,7 @@ Default projects for ecosystem checks
 
 from ruff_ecosystem.projects import (
     CheckOptions,
+    FormatOptions,
     Project,
     Repository,
 )
@@ -134,7 +135,12 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="wntrblm", name="nox", ref="main")),
     Project(repo=Repository(owner="pytest-dev", name="pytest", ref="main")),
     Project(repo=Repository(owner="encode", name="httpx", ref="master")),
-    Project(repo=Repository(owner="mesonbuild", name="meson-python", ref="main")),
+    Project(
+        repo=Repository(owner="mesonbuild", name="meson-python", ref="main"),
+        format_options=FormatOptions(
+            exclude="tests/packages/symlinks/baz.py,tests/packages/symlinks/qux.py"
+        ),
+    ),
     Project(repo=Repository(owner="pdm-project", name="pdm", ref="main")),
     Project(repo=Repository(owner="astropy", name="astropy", ref="main")),
 ]

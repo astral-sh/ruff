@@ -1,19 +1,19 @@
-use filetime::FileTime;
-use ruff_notebook::{Notebook, NotebookError};
-use rustc_hash::FxHashSet;
-use std::panic::RefUnwindSafe;
-use std::sync::Arc;
-use std::{any::Any, path::PathBuf};
-
-use crate::system::{
-    CaseSensitivity, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
-};
-
 use super::walk_directory::{
     self, DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration,
     WalkDirectoryVisitorBuilder, WalkState,
 };
+use crate::max_parallelism;
+use crate::system::{
+    CaseSensitivity, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System,
+    SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
+};
+use filetime::FileTime;
+use ruff_notebook::{Notebook, NotebookError};
+use rustc_hash::FxHashSet;
+use std::num::NonZeroUsize;
+use std::panic::RefUnwindSafe;
+use std::sync::Arc;
+use std::{any::Any, path::PathBuf};
 
 /// A system implementation that uses the OS file system.
 #[derive(Debug, Clone)]
@@ -50,7 +50,6 @@ impl OsSystem {
 
         Self {
             // Spreading `..Default` because it isn't possible to feature gate the initializer of a single field.
-            #[allow(clippy::needless_update)]
             inner: Arc::new(OsSystemInner {
                 cwd: cwd.to_path_buf(),
                 case_sensitivity,
@@ -427,11 +426,7 @@ impl DirectoryWalker for OsDirectoryWalker {
             builder.add(additional_path.as_std_path());
         }
 
-        builder.threads(
-            std::thread::available_parallelism()
-                .map_or(1, std::num::NonZeroUsize::get)
-                .min(12),
-        );
+        builder.threads(max_parallelism().min(NonZeroUsize::new(12).unwrap()).get());
 
         builder.build_parallel().run(|| {
             let mut visitor = visitor_builder.build();

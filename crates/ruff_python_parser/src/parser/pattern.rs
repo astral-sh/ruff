@@ -488,13 +488,16 @@ impl Parser<'_> {
                         // test_ok match_as_pattern_soft_keyword
                         // match foo:
                         //     case case: ...
+                        // match foo:
                         //     case match: ...
+                        // match foo:
                         //     case type: ...
                         let ident = self.parse_identifier();
 
                         // test_ok match_as_pattern
                         // match foo:
                         //     case foo_bar: ...
+                        // match foo:
                         //     case _: ...
                         Pattern::MatchAs(ast::PatternMatchAs {
                             range: ident.range,

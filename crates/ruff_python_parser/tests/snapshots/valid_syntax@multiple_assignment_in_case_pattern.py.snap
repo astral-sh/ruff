@@ -1,0 +1,115 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/multiple_assignment_in_case_pattern.py
+snapshot_kind: text
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..42,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..41,
+                    subject: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 6..7,
+                            value: Int(
+                                2,
+                            ),
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 13..41,
+                            pattern: MatchOr(
+                                PatternMatchOr {
+                                    range: 18..36,
+                                    patterns: [
+                                        MatchClass(
+                                            PatternMatchClass {
+                                                range: 18..26,
+                                                cls: Name(
+                                                    ExprName {
+                                                        range: 18..23,
+                                                        id: Name("Class"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                arguments: PatternArguments {
+                                                    range: 23..26,
+                                                    patterns: [
+                                                        MatchAs(
+                                                            PatternMatchAs {
+                                                                range: 24..25,
+                                                                pattern: None,
+                                                                name: Some(
+                                                                    Identifier {
+                                                                        id: Name("x"),
+                                                                        range: 24..25,
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ],
+                                                    keywords: [],
+                                                },
+                                            },
+                                        ),
+                                        MatchSequence(
+                                            PatternMatchSequence {
+                                                range: 29..32,
+                                                patterns: [
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 30..31,
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("x"),
+                                                                    range: 30..31,
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                        MatchAs(
+                                            PatternMatchAs {
+                                                range: 35..36,
+                                                pattern: None,
+                                                name: Some(
+                                                    Identifier {
+                                                        id: Name("x"),
+                                                        range: 35..36,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 38..41,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 38..41,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

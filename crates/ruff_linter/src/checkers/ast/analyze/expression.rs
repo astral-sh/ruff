@@ -229,8 +229,14 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.enabled(Rule::Airflow3Removal) {
                         airflow::rules::airflow_3_removal_expr(checker, expr);
                     }
+                    if checker.enabled(Rule::Airflow3SuggestedUpdate) {
+                        airflow::rules::airflow_3_0_suggested_update_expr(checker, expr);
+                    }
                     if checker.enabled(Rule::Airflow3MovedToProvider) {
                         airflow::rules::moved_to_provider_in_3(checker, expr);
+                    }
+                    if checker.enabled(Rule::Airflow3SuggestedToMoveToProvider) {
+                        airflow::rules::suggested_to_move_to_provider_in_3(checker, expr);
                     }
                     if checker.any_enabled(&[
                         Rule::SuspiciousPickleUsage,
@@ -336,9 +342,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.enabled(Rule::UndocumentedWarn) {
                 flake8_logging::rules::undocumented_warn(checker, expr);
-            }
-            if checker.enabled(Rule::LoadBeforeGlobalDeclaration) {
-                pylint::rules::load_before_global_declaration(checker, id, expr);
             }
         }
         Expr::Attribute(attribute) => {
@@ -450,6 +453,15 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);
+            }
+            if checker.enabled(Rule::Airflow3SuggestedUpdate) {
+                airflow::rules::airflow_3_0_suggested_update_expr(checker, expr);
+            }
+            if checker.enabled(Rule::Airflow3MovedToProvider) {
+                airflow::rules::moved_to_provider_in_3(checker, expr);
+            }
+            if checker.enabled(Rule::Airflow3SuggestedToMoveToProvider) {
+                airflow::rules::suggested_to_move_to_provider_in_3(checker, expr);
             }
         }
         Expr::Call(
@@ -1146,6 +1158,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);
             }
+            if checker.enabled(Rule::Airflow3SuggestedUpdate) {
+                airflow::rules::airflow_3_0_suggested_update_expr(checker, expr);
+            }
             if checker.enabled(Rule::UnnecessaryCastToInt) {
                 ruff::rules::unnecessary_cast_to_int(checker, call);
             }
@@ -1197,30 +1212,16 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
         }
         Expr::Yield(_) => {
-            if checker.enabled(Rule::YieldOutsideFunction) {
-                pyflakes::rules::yield_outside_function(checker, expr);
-            }
             if checker.enabled(Rule::YieldInInit) {
                 pylint::rules::yield_in_init(checker, expr);
             }
         }
         Expr::YieldFrom(yield_from) => {
-            if checker.enabled(Rule::YieldOutsideFunction) {
-                pyflakes::rules::yield_outside_function(checker, expr);
-            }
             if checker.enabled(Rule::YieldInInit) {
                 pylint::rules::yield_in_init(checker, expr);
             }
             if checker.enabled(Rule::YieldFromInAsyncFunction) {
                 pylint::rules::yield_from_in_async_function(checker, yield_from);
-            }
-        }
-        Expr::Await(_) => {
-            if checker.enabled(Rule::YieldOutsideFunction) {
-                pyflakes::rules::yield_outside_function(checker, expr);
-            }
-            if checker.enabled(Rule::AwaitOutsideAsync) {
-                pylint::rules::await_outside_async(checker, expr);
             }
         }
         Expr::FString(f_string_expr @ ast::ExprFString { value, .. }) => {
@@ -1503,6 +1504,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::NanComparison) {
                 pylint::rules::nan_comparison(checker, left, comparators);
             }
+            if checker.enabled(Rule::InEmptyCollection) {
+                ruff::rules::in_empty_collection(checker, compare);
+            }
             if checker.enabled(Rule::InDictKeys) {
                 flake8_simplify::rules::key_in_dict_compare(checker, compare);
             }
@@ -1752,5 +1756,5 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
         }
         _ => {}
-    };
+    }
 }

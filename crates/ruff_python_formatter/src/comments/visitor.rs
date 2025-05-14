@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::iter::Peekable;
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{AnyNodeRef, Identifier};
 use ruff_python_ast::{Mod, Stmt};
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
@@ -53,7 +53,7 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
 
     pub(super) fn visit(mut self, root: AnyNodeRef<'a>) {
         if self.enter_node(root).is_traverse() {
-            root.visit_preorder(&mut self);
+            root.visit_source_order(&mut self);
         }
 
         self.leave_node(root);
@@ -165,6 +165,10 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 }
             }
         }
+    }
+
+    fn visit_identifier(&mut self, _identifier: &'ast Identifier) {
+        // TODO: Visit and associate comments with identifiers
     }
 }
 
@@ -359,7 +363,7 @@ pub(super) enum CommentPlacement<'a> {
     /// Makes the comment a...
     ///
     /// * [trailing comment] of the [`preceding_node`] if both the [`following_node`] and [`preceding_node`] are not [None]
-    ///     and the comment and [`preceding_node`] are only separated by a space (there's no token between the comment and [`preceding_node`]).
+    ///   and the comment and [`preceding_node`] are only separated by a space (there's no token between the comment and [`preceding_node`]).
     /// * [leading comment] of the [`following_node`] if the [`following_node`] is not [None]
     /// * [trailing comment] of the [`preceding_node`] if the [`preceding_node`] is not [None]
     /// * [dangling comment] of the [`enclosing_node`].

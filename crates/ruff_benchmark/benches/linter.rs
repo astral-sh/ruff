@@ -45,9 +45,9 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
         target_arch = "powerpc64"
     )
 ))]
-#[allow(non_upper_case_globals)]
+#[expect(non_upper_case_globals)]
 #[export_name = "_rjem_malloc_conf"]
-#[allow(unsafe_code)]
+#[expect(unsafe_code)]
 pub static _rjem_malloc_conf: &[u8] = b"dirty_decay_ms:-1,muzzy_decay_ms:-1\0";
 
 fn create_test_cases() -> Vec<TestCase> {
@@ -89,7 +89,7 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                         );
 
                         // Assert that file contains no parse errors
-                        assert!(!result.has_syntax_error);
+                        assert!(!result.has_syntax_errors());
                     },
                     criterion::BatchSize::SmallInput,
                 );

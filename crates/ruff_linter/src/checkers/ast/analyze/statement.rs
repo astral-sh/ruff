@@ -349,7 +349,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             #[cfg(any(feature = "test-rules", test))]
             if checker.enabled(Rule::UnreachableCode) {
-                checker.report_diagnostics(pylint::rules::in_function(name, body));
+                pylint::rules::in_function(checker, name, body);
             }
             if checker.enabled(Rule::ReimplementedOperator) {
                 refurb::rules::reimplemented_operator(checker, &function_def.into());
@@ -380,9 +380,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Return(_) => {
-            if checker.enabled(Rule::ReturnOutsideFunction) {
-                pyflakes::rules::return_outside_function(checker, stmt);
-            }
             if checker.enabled(Rule::ReturnInInit) {
                 pylint::rules::return_in_init(checker, stmt);
             }
@@ -645,7 +642,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
                 if let Some(asname) = &alias.asname {
-                    let name = alias.name.split('.').last().unwrap();
+                    let name = alias.name.split('.').next_back().unwrap();
                     if checker.enabled(Rule::ConstantImportedAsNonConstant) {
                         if let Some(diagnostic) =
                             pep8_naming::rules::constant_imported_as_non_constant(
@@ -852,14 +849,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if let Some("__future__") = module {
                     if checker.enabled(Rule::FutureFeatureNotDefined) {
                         pyflakes::rules::future_feature_not_defined(checker, alias);
-                    }
-                    if checker.enabled(Rule::LateFutureImport) {
-                        if checker.semantic.seen_futures_boundary() {
-                            checker.report_diagnostic(Diagnostic::new(
-                                pyflakes::rules::LateFutureImport,
-                                stmt.range(),
-                            ));
-                        }
                     }
                 } else if &alias.name == "*" {
                     if checker.enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
@@ -1253,14 +1242,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ruff::rules::invalid_assert_message_literal_argument(checker, assert_stmt);
             }
         }
-        Stmt::With(
-            with_stmt @ ast::StmtWith {
-                items,
-                body,
-                is_async,
-                ..
-            },
-        ) => {
+        Stmt::With(with_stmt @ ast::StmtWith { items, body, .. }) => {
             if checker.enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
@@ -1294,11 +1276,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::CancelScopeNoCheckpoint) {
                 flake8_async::rules::cancel_scope_no_checkpoint(checker, with_stmt, items);
-            }
-            if *is_async {
-                if checker.enabled(Rule::AwaitOutsideAsync) {
-                    pylint::rules::await_outside_async(checker, stmt);
-                }
             }
         }
         Stmt::While(while_stmt @ ast::StmtWhile { body, orelse, .. }) => {
@@ -1342,6 +1319,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::UnnecessaryEnumerate,
                 Rule::UnusedLoopControlVariable,
                 Rule::YieldInForLoop,
+                Rule::ManualDictComprehension,
                 Rule::ManualListComprehension,
             ]) {
                 checker.analyze.for_loops.push(checker.semantic.snapshot());
@@ -1370,9 +1348,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ManualListCopy) {
                 perflint::rules::manual_list_copy(checker, for_stmt);
             }
-            if checker.enabled(Rule::ManualDictComprehension) {
-                perflint::rules::manual_dict_comprehension(checker, target, body);
-            }
+
             if checker.enabled(Rule::ModifiedIteratingSet) {
                 pylint::rules::modified_iterating_set(checker, for_stmt);
             }
@@ -1388,11 +1364,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ReadlinesInFor) {
                 refurb::rules::readlines_in_for(checker, for_stmt);
             }
-            if *is_async {
-                if checker.enabled(Rule::AwaitOutsideAsync) {
-                    pylint::rules::await_outside_async(checker, stmt);
-                }
-            } else {
+            if !*is_async {
                 if checker.enabled(Rule::ReimplementedBuiltin) {
                     flake8_simplify::rules::convert_for_loop_to_any_all(checker, stmt);
                 }

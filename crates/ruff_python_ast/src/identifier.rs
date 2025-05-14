@@ -207,7 +207,7 @@ impl<'a> IdentifierTokenizer<'a> {
                 _ => {
                     // Nothing to do.
                 }
-            };
+            }
         }
 
         None

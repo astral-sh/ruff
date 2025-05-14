@@ -112,7 +112,7 @@ fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
     file == Path::new("-")
 }
 
-/// Returns the default set of files if none are provided, otherwise returns `None`.
+/// Returns the default set of files if none are provided, otherwise returns provided files.
 fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
     if files.is_empty() {
         if is_stdin {
@@ -134,7 +134,7 @@ pub fn run(
     {
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
-            #[allow(clippy::print_stderr)]
+            #[expect(clippy::print_stderr)]
             {
                 eprintln!(
                     r#"
@@ -228,7 +228,7 @@ fn server(args: ServerCommand) -> Result<ExitStatus> {
     // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
     let worker_threads = std::thread::available_parallelism()
         .unwrap_or(four)
-        .max(four);
+        .min(four);
     commands::server::run_server(worker_threads, args.resolve_preview())
 }
 
@@ -290,8 +290,8 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     // - If `--fix` or `--fix-only` is set, apply applicable fixes to the filesystem (or
     //   print them to stdout, if we're reading from stdin).
     // - If `--diff` or `--fix-only` are set, don't print any violations (only applicable fixes)
-    // - By default, applicable fixes only include [`Applicablility::Automatic`], but if
-    //   `--unsafe-fixes` is set, then [`Applicablility::Suggested`] fixes are included.
+    // - By default, applicable fixes only include [`Applicability::Automatic`], but if
+    //   `--unsafe-fixes` is set, then [`Applicability::Suggested`] fixes are included.
 
     let fix_mode = if cli.diff {
         FixMode::Diff
@@ -326,7 +326,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             commands::add_noqa::add_noqa(&files, &pyproject_config, &config_arguments)?;
         if modifications > 0 && config_arguments.log_level >= LogLevel::Default {
             let s = if modifications == 1 { "" } else { "s" };
-            #[allow(clippy::print_stderr)]
+            #[expect(clippy::print_stderr)]
             {
                 eprintln!("Added {modifications} noqa directive{s}.");
             }

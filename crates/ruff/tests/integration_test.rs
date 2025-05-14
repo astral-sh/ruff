@@ -1055,6 +1055,52 @@ def mvce(keys, values):
 }
 
 #[test]
+fn show_statistics_syntax_errors() {
+    let mut cmd = RuffCheck::default()
+        .args(["--statistics", "--target-version=py39", "--preview"])
+        .build();
+
+    // ParseError
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("x ="),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1		syntax-error
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+
+    // match before 3.10, UnsupportedSyntaxError
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("match 2:\n  case 1: ..."),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1		syntax-error
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+
+    // rebound comprehension variable, SemanticSyntaxError
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[x := 1 for x in range(0)]"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1		syntax-error
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+}
+
+#[test]
 fn preview_enabled_prefix() {
     // All the RUF9XX test rules should be triggered
     let mut cmd = RuffCheck::default()
@@ -2186,4 +2232,196 @@ unfixable = ["RUF"]
     ");
 
     Ok(())
+}
+
+#[test]
+fn pyproject_toml_stdin_syntax_error() {
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "pyproject.toml", "--select", "RUF200"])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    pyproject.toml:1:9: RUF200 Failed to parse pyproject.toml: invalid table header
+    expected `.`, `]`
+      |
+    1 | [project
+      |         ^ RUF200
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn pyproject_toml_stdin_schema_error() {
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "pyproject.toml", "--select", "RUF200"])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project]\nname = 1"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    pyproject.toml:2:8: RUF200 Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
+      |
+    1 | [project]
+    2 | name = 1
+      |        ^ RUF200
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn pyproject_toml_stdin_no_applicable_rules_selected() {
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "pyproject.toml"])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn pyproject_toml_stdin_no_applicable_rules_selected_2() {
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "pyproject.toml", "--select", "F401"])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn pyproject_toml_stdin_no_errors() {
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "pyproject.toml"])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin(r#"[project]\nname = "ruff"\nversion = "0.0.0""#),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn pyproject_toml_stdin_schema_error_fix() {
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--stdin-filename",
+            "pyproject.toml",
+            "--select",
+            "RUF200",
+            "--fix",
+        ])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project]\nname = 1"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    [project]
+    name = 1
+    ----- stderr -----
+    pyproject.toml:2:8: RUF200 Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
+      |
+    1 | [project]
+    2 | name = 1
+      |        ^ RUF200
+      |
+
+    Found 1 error.
+    "
+    );
+}
+
+#[test]
+fn pyproject_toml_stdin_schema_error_fix_only() {
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--stdin-filename",
+            "pyproject.toml",
+            "--select",
+            "RUF200",
+            "--fix-only",
+        ])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project]\nname = 1"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    [project]
+    name = 1
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn pyproject_toml_stdin_schema_error_fix_diff() {
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--stdin-filename",
+            "pyproject.toml",
+            "--select",
+            "RUF200",
+            "--fix",
+            "--diff",
+        ])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project]\nname = 1"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "
+    );
 }

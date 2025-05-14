@@ -1,0 +1,133 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_import.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..100,
+        body: [
+            Import(
+                StmtImport {
+                    range: 0..16,
+                    names: [
+                        Alias {
+                            range: 7..16,
+                            name: Identifier {
+                                id: Name("__debug__"),
+                                range: 7..16,
+                            },
+                            asname: None,
+                        },
+                    ],
+                },
+            ),
+            Import(
+                StmtImport {
+                    range: 17..42,
+                    names: [
+                        Alias {
+                            range: 24..42,
+                            name: Identifier {
+                                id: Name("debug"),
+                                range: 24..29,
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("__debug__"),
+                                    range: 33..42,
+                                },
+                            ),
+                        },
+                    ],
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 43..66,
+                    module: Some(
+                        Identifier {
+                            id: Name("x"),
+                            range: 48..49,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 57..66,
+                            name: Identifier {
+                                id: Name("__debug__"),
+                                range: 57..66,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 67..99,
+                    module: Some(
+                        Identifier {
+                            id: Name("x"),
+                            range: 72..73,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 81..99,
+                            name: Identifier {
+                                id: Name("debug"),
+                                range: 81..86,
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("__debug__"),
+                                    range: 90..99,
+                                },
+                            ),
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | import __debug__
+  |        ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+2 | import debug as __debug__
+3 | from x import __debug__
+  |
+
+
+  |
+1 | import __debug__
+2 | import debug as __debug__
+  |                 ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+3 | from x import __debug__
+4 | from x import debug as __debug__
+  |
+
+
+  |
+1 | import __debug__
+2 | import debug as __debug__
+3 | from x import __debug__
+  |               ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+4 | from x import debug as __debug__
+  |
+
+
+  |
+2 | import debug as __debug__
+3 | from x import __debug__
+4 | from x import debug as __debug__
+  |                        ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+  |

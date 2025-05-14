@@ -1,5 +1,4 @@
-import SideBar, { SideBarEntry } from "./SideBar";
-import { Icons } from "shared";
+import { Icons, SideBar, SideBarEntry } from "shared";
 import { SecondaryTool } from "./SecondaryPanel";
 
 interface RightSideBarProps {

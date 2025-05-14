@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::{Formatter, Write};
 use std::fs;
@@ -5,7 +6,11 @@ use std::path::Path;
 
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_python_ast::visitor::source_order::{walk_module, SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::{AnyNodeRef, Mod, PythonVersion};
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, AnyNodeRef, Mod, PythonVersion};
+use ruff_python_parser::semantic_errors::{
+    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
+};
 use ruff_python_parser::{parse_unchecked, Mode, ParseErrorType, ParseOptions, Token};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -37,7 +42,7 @@ fn test_valid_syntax(input_path: &Path) {
     let options = extract_options(&source).unwrap_or_else(|| {
         ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest())
     });
-    let parsed = parse_unchecked(&source, options);
+    let parsed = parse_unchecked(&source, options.clone());
 
     if parsed.has_syntax_errors() {
         let line_index = LineIndex::from_source_text(&source);
@@ -81,6 +86,39 @@ fn test_valid_syntax(input_path: &Path) {
     writeln!(&mut output, "## AST").unwrap();
     writeln!(&mut output, "\n```\n{:#?}\n```", parsed.syntax()).unwrap();
 
+    let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
+
+    let mut visitor =
+        SemanticSyntaxCheckerVisitor::new(&source).with_python_version(options.target_version());
+
+    for stmt in parsed.suite() {
+        visitor.visit_stmt(stmt);
+    }
+
+    let semantic_syntax_errors = visitor.into_diagnostics();
+
+    if !semantic_syntax_errors.is_empty() {
+        let mut message = "Expected no semantic syntax errors for a valid program:\n".to_string();
+
+        let line_index = LineIndex::from_source_text(&source);
+        let source_code = SourceCode::new(&source, &line_index);
+
+        for error in semantic_syntax_errors {
+            writeln!(
+                &mut message,
+                "{}\n",
+                CodeFrame {
+                    range: error.range,
+                    error: &ParseErrorType::OtherError(error.to_string()),
+                    source_code: &source_code,
+                }
+            )
+            .unwrap();
+        }
+
+        panic!("{input_path:?}: {message}");
+    }
+
     insta::with_settings!({
         omit_expression => true,
         input_file => input_path,
@@ -97,12 +135,7 @@ fn test_invalid_syntax(input_path: &Path) {
     let options = extract_options(&source).unwrap_or_else(|| {
         ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest())
     });
-    let parsed = parse_unchecked(&source, options);
-
-    assert!(
-        parsed.has_syntax_errors(),
-        "{input_path:?}: Expected parser to generate at least one syntax error for a program containing syntax errors."
-    );
+    let parsed = parse_unchecked(&source, options.clone());
 
     validate_tokens(parsed.tokens(), source.text_len(), input_path);
     validate_ast(parsed.syntax(), source.text_len(), input_path);
@@ -136,6 +169,39 @@ fn test_invalid_syntax(input_path: &Path) {
     }
 
     for error in parsed.unsupported_syntax_errors() {
+        writeln!(
+            &mut output,
+            "{}\n",
+            CodeFrame {
+                range: error.range,
+                error: &ParseErrorType::OtherError(error.to_string()),
+                source_code: &source_code,
+            }
+        )
+        .unwrap();
+    }
+
+    let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
+
+    let mut visitor =
+        SemanticSyntaxCheckerVisitor::new(&source).with_python_version(options.target_version());
+
+    for stmt in parsed.suite() {
+        visitor.visit_stmt(stmt);
+    }
+
+    let semantic_syntax_errors = visitor.into_diagnostics();
+
+    assert!(
+        parsed.has_syntax_errors() || !semantic_syntax_errors.is_empty(),
+        "{input_path:?}: Expected parser to generate at least one syntax error for a program containing syntax errors."
+    );
+
+    if !semantic_syntax_errors.is_empty() {
+        writeln!(&mut output, "## Semantic Syntax Errors\n").unwrap();
+    }
+
+    for error in semantic_syntax_errors {
         writeln!(
             &mut output,
             "{}\n",
@@ -208,7 +274,7 @@ fn extract_options(source: &str) -> Option<ParseOptions> {
 // Use it for quickly debugging a parser issue.
 #[test]
 #[ignore]
-#[allow(clippy::print_stdout)]
+#[expect(clippy::print_stdout)]
 fn parser_quick_test() {
     let source = "\
 f'{'
@@ -391,5 +457,187 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
         self.parents.pop().expect("Expected tree to be balanced");
 
         self.previous = Some(node);
+    }
+}
+
+enum Scope {
+    Module,
+    Function,
+    Comprehension { is_async: bool },
+    Class,
+}
+
+struct SemanticSyntaxCheckerVisitor<'a> {
+    checker: SemanticSyntaxChecker,
+    diagnostics: RefCell<Vec<SemanticSyntaxError>>,
+    python_version: PythonVersion,
+    source: &'a str,
+    scopes: Vec<Scope>,
+}
+
+impl<'a> SemanticSyntaxCheckerVisitor<'a> {
+    fn new(source: &'a str) -> Self {
+        Self {
+            checker: SemanticSyntaxChecker::new(),
+            diagnostics: RefCell::default(),
+            python_version: PythonVersion::default(),
+            source,
+            scopes: vec![Scope::Module],
+        }
+    }
+
+    #[must_use]
+    fn with_python_version(mut self, python_version: PythonVersion) -> Self {
+        self.python_version = python_version;
+        self
+    }
+
+    fn into_diagnostics(self) -> Vec<SemanticSyntaxError> {
+        self.diagnostics.into_inner()
+    }
+
+    fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
+        let mut checker = std::mem::take(&mut self.checker);
+        f(&mut checker, self);
+        self.checker = checker;
+    }
+}
+
+impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
+    fn future_annotations_or_stub(&self) -> bool {
+        false
+    }
+
+    fn python_version(&self) -> PythonVersion {
+        self.python_version
+    }
+
+    fn report_semantic_error(&self, error: SemanticSyntaxError) {
+        self.diagnostics.borrow_mut().push(error);
+    }
+
+    fn source(&self) -> &str {
+        self.source
+    }
+
+    fn global(&self, _name: &str) -> Option<TextRange> {
+        None
+    }
+
+    fn in_async_context(&self) -> bool {
+        true
+    }
+
+    fn in_sync_comprehension(&self) -> bool {
+        for scope in &self.scopes {
+            if let Scope::Comprehension { is_async: false } = scope {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn in_module_scope(&self) -> bool {
+        self.scopes.len() == 1
+    }
+
+    fn in_function_scope(&self) -> bool {
+        true
+    }
+
+    fn in_notebook(&self) -> bool {
+        false
+    }
+
+    fn in_await_allowed_context(&self) -> bool {
+        true
+    }
+
+    fn in_generator_scope(&self) -> bool {
+        true
+    }
+}
+
+impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
+    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+        self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+        match stmt {
+            ast::Stmt::ClassDef(ast::StmtClassDef {
+                arguments,
+                body,
+                decorator_list,
+                type_params,
+                ..
+            }) => {
+                for decorator in decorator_list {
+                    self.visit_decorator(decorator);
+                }
+                if let Some(type_params) = type_params {
+                    self.visit_type_params(type_params);
+                }
+                if let Some(arguments) = arguments {
+                    self.visit_arguments(arguments);
+                }
+                self.scopes.push(Scope::Class);
+                self.visit_body(body);
+                self.scopes.pop().unwrap();
+            }
+            ast::Stmt::FunctionDef(ast::StmtFunctionDef { .. }) => {
+                self.scopes.push(Scope::Function);
+                ast::visitor::walk_stmt(self, stmt);
+                self.scopes.pop().unwrap();
+            }
+            _ => {
+                ast::visitor::walk_stmt(self, stmt);
+            }
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &ast::Expr) {
+        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
+        match expr {
+            ast::Expr::Lambda(_) => {
+                self.scopes.push(Scope::Function);
+                ast::visitor::walk_expr(self, expr);
+                self.scopes.pop().unwrap();
+            }
+            ast::Expr::ListComp(ast::ExprListComp {
+                elt, generators, ..
+            })
+            | ast::Expr::SetComp(ast::ExprSetComp {
+                elt, generators, ..
+            })
+            | ast::Expr::Generator(ast::ExprGenerator {
+                elt, generators, ..
+            }) => {
+                for comprehension in generators {
+                    self.visit_comprehension(comprehension);
+                }
+                self.scopes.push(Scope::Comprehension {
+                    is_async: generators.iter().any(|gen| gen.is_async),
+                });
+                self.visit_expr(elt);
+                self.scopes.pop().unwrap();
+            }
+            ast::Expr::DictComp(ast::ExprDictComp {
+                key,
+                value,
+                generators,
+                ..
+            }) => {
+                for comprehension in generators {
+                    self.visit_comprehension(comprehension);
+                }
+                self.scopes.push(Scope::Comprehension {
+                    is_async: generators.iter().any(|gen| gen.is_async),
+                });
+                self.visit_expr(key);
+                self.visit_expr(value);
+                self.scopes.pop().unwrap();
+            }
+            _ => {
+                ast::visitor::walk_expr(self, expr);
+            }
+        }
     }
 }

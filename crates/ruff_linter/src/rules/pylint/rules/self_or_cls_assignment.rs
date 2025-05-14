@@ -103,8 +103,8 @@ pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
     );
 
     let method_type = match (function_type, self_or_cls.name().as_str()) {
-        (FunctionType::Method { .. }, "self") => MethodType::Instance,
-        (FunctionType::ClassMethod { .. }, "cls") => MethodType::Class,
+        (FunctionType::Method, "self") => MethodType::Instance,
+        (FunctionType::ClassMethod, "cls") => MethodType::Class,
         (FunctionType::NewMethod, "cls") => MethodType::New,
         _ => return,
     };

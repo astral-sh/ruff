@@ -7,7 +7,7 @@ use crate::TokenKind;
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ParseError {
     pub error: ParseErrorType,
     pub location: TextRange,
@@ -49,7 +49,7 @@ impl ParseError {
 }
 
 /// Represents the different types of errors that can occur during parsing of an f-string.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FStringErrorType {
     /// Expected a right brace after an opened left brace.
     UnclosedLbrace,
@@ -85,7 +85,7 @@ impl std::fmt::Display for FStringErrorType {
 }
 
 /// Represents the different types of errors that can occur during parsing.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ParseErrorType {
     /// An unexpected error occurred.
     OtherError(String),
@@ -126,8 +126,6 @@ pub enum ParseErrorType {
     /// A default value was found for a `*` or `**` parameter.
     VarParameterWithDefault,
 
-    /// A duplicate parameter was found in a function definition or lambda expression.
-    DuplicateParameter(String),
     /// A keyword argument was repeated.
     DuplicateKeywordArgumentError(String),
 
@@ -285,9 +283,6 @@ impl std::fmt::Display for ParseErrorType {
                 f.write_str("Invalid augmented assignment target")
             }
             ParseErrorType::InvalidDeleteTarget => f.write_str("Invalid delete target"),
-            ParseErrorType::DuplicateParameter(arg_name) => {
-                write!(f, "Duplicate parameter {arg_name:?}")
-            }
             ParseErrorType::DuplicateKeywordArgumentError(arg_name) => {
                 write!(f, "Duplicate keyword argument {arg_name:?}")
             }
@@ -362,7 +357,7 @@ impl std::fmt::Display for LexicalError {
 }
 
 /// Represents the different types of errors that can occur during lexing.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LexicalErrorType {
     // TODO: Can probably be removed, the places it is used seem to be able
     // to use the `UnicodeError` variant instead.
@@ -450,6 +445,14 @@ impl Ranged for UnsupportedSyntaxError {
 pub enum StarTupleKind {
     Return,
     Yield,
+}
+
+/// The type of PEP 701 f-string error for [`UnsupportedSyntaxErrorKind::Pep701FString`].
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum FStringKind {
+    Backslash,
+    Comment,
+    NestedQuote,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -661,6 +664,34 @@ pub enum UnsupportedSyntaxErrorKind {
     TypeAliasStatement,
     TypeParamDefault,
 
+    /// Represents the use of a [PEP 701] f-string before Python 3.12.
+    ///
+    /// ## Examples
+    ///
+    /// As described in the PEP, each of these cases were invalid before Python 3.12:
+    ///
+    /// ```python
+    /// # nested quotes
+    /// f'Magic wand: { bag['wand'] }'
+    ///
+    /// # escape characters
+    /// f"{'\n'.join(a)}"
+    ///
+    /// # comments
+    /// f'''A complex trick: {
+    ///     bag['bag']  # recursive bags!
+    /// }'''
+    ///
+    /// # arbitrary nesting
+    /// f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"
+    /// ```
+    ///
+    /// These restrictions were lifted in Python 3.12, meaning that all of these examples are now
+    /// valid.
+    ///
+    /// [PEP 701]: https://peps.python.org/pep-0701/
+    Pep701FString(FStringKind),
+
     /// Represents the use of a parenthesized `with` item before Python 3.9.
     ///
     /// ## Examples
@@ -782,6 +813,41 @@ pub enum UnsupportedSyntaxErrorKind {
     /// [PEG parser rewrite]: https://peps.python.org/pep-0617/
     /// [Python 3.11 release]: https://docs.python.org/3/whatsnew/3.11.html#other-language-changes
     UnparenthesizedUnpackInFor,
+    /// Represents the use of multiple exception names in an except clause without an `as` binding, before Python 3.14.
+    ///
+    /// ## Examples
+    /// Before Python 3.14, catching multiple exceptions required
+    /// parentheses like so:
+    ///
+    /// ```python
+    /// try:
+    ///     ...
+    /// except (ExceptionA, ExceptionB, ExceptionC):
+    ///     ...
+    /// ```
+    ///
+    /// Starting with Python 3.14, thanks to [PEP 758], it was permitted
+    /// to omit the parentheses:
+    ///
+    /// ```python
+    /// try:
+    ///     ...
+    /// except ExceptionA, ExceptionB, ExceptionC:
+    ///     ...
+    /// ```
+    ///
+    /// However, parentheses are still required in the presence of an `as`:
+    ///
+    /// ```python
+    /// try:
+    ///     ...
+    /// except (ExceptionA, ExceptionB, ExceptionC) as e:
+    ///     ...
+    /// ```
+    ///
+    ///
+    /// [PEP 758]: https://peps.python.org/pep-0758/
+    UnparenthesizedExceptionTypes,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -838,6 +904,15 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
             }
+            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash) => {
+                "Cannot use an escape sequence (backslash) in f-strings"
+            }
+            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment) => {
+                "Cannot use comments in f-strings"
+            }
+            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote) => {
+                "Cannot reuse outer quote character in f-strings"
+            }
             UnsupportedSyntaxErrorKind::ParenthesizedContextManager => {
                 "Cannot use parentheses within a `with` statement"
             }
@@ -847,6 +922,9 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::StarAnnotation => "Cannot use star annotation",
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 "Cannot use iterable unpacking in `for` statements"
+            }
+            UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes => {
+                "Multiple exception types must be parenthesized"
             }
         };
 
@@ -904,6 +982,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
+            UnsupportedSyntaxErrorKind::Pep701FString(_) => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::ParenthesizedContextManager => {
                 Change::Added(PythonVersion::PY39)
             }
@@ -913,6 +992,9 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::StarAnnotation => Change::Added(PythonVersion::PY311),
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 Change::Added(PythonVersion::PY39)
+            }
+            UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes => {
+                Change::Added(PythonVersion::PY314)
             }
         }
     }

@@ -5,7 +5,7 @@ permissions: {}
 on:
   pull_request:
     paths:
-      - "crates/red_knot*/**"
+      - "crates/ty*/**"
       - "crates/ruff_db"
       - "crates/ruff_python_ast"
       - "crates/ruff_python_parser"
@@ -21,36 +21,40 @@ env:
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: 1
 
 jobs:
   mypy_primer:
     name: Run mypy_primer
-    runs-on: ubuntu-24.04
+    runs-on: depot-ubuntu-22.04-32
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           path: ruff
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@f94ec6bedd8674c4426838e6b50417d36b6ab231 # v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
 
-      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
         with:
           workspaces: "ruff"
+
       - name: Install Rust toolchain
         run: rustup show
-
-      - name: Install mypy_primer
-        run: |
-          uv tool install "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support"
 
       - name: Run mypy_primer
         shell: bash
         run: |
           cd ruff
+
+          echo "Enabling mypy primer specific configuration overloads (see .github/mypy-primer-ty.toml)"
+          mkdir -p ~/.config/ty
+          cp .github/mypy-primer-ty.toml ~/.config/ty/ty.toml
+
+          PRIMER_SELECTOR="$(paste -s -d'|' crates/ty_python_semantic/resources/primer/good.txt)"
 
           echo "new commit"
           git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
@@ -62,13 +66,16 @@ jobs:
 
           cd ..
 
+          echo "Project selector: $PRIMER_SELECTOR"
           # Allow the exit code to be 0 or 1, only fail for actual mypy_primer crashes/bugs
-          uvx mypy_primer \
+          uvx \
+            --from="git+https://github.com/hauntsaninja/mypy_primer@4b15cf3b07db69db67bbfaebfffb2a8a28040933" \
+            mypy_primer \
             --repo ruff \
-            --type-checker knot \
+            --type-checker ty \
             --old base_commit \
             --new "$GITHUB_SHA" \
-            --project-selector '/(mypy_primer|black|pyp|git-revise|zipp|arrow|isort|itsdangerous|rich|packaging|pybind11|pyinstrument)$' \
+            --project-selector "/($PRIMER_SELECTOR)\$" \
             --output concise \
             --debug > mypy_primer.diff || [ $? -eq 1 ]
 
@@ -81,13 +88,13 @@ jobs:
           echo ${{ github.event.number }} > pr-number
 
       - name: Upload diff
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mypy_primer_diff
           path: mypy_primer.diff
 
       - name: Upload pr-number
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: pr-number
           path: pr-number

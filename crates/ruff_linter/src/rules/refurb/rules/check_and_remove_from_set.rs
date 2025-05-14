@@ -102,7 +102,7 @@ pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf
         .is_some_and(|binding| is_set(binding, checker.semantic()))
     {
         return;
-    };
+    }
 
     let mut diagnostic = Diagnostic::new(
         CheckAndRemoveFromSet {

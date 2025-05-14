@@ -1,0 +1,85 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/non_rebound_comprehension_variable.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..27,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..26,
+                    value: ListComp(
+                        ExprListComp {
+                            range: 0..26,
+                            elt: Named(
+                                ExprNamed {
+                                    range: 1..7,
+                                    target: Name(
+                                        ExprName {
+                                            range: 1..2,
+                                            id: Name("a"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 6..7,
+                                            value: Int(
+                                                0,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 8..25,
+                                    target: Name(
+                                        ExprName {
+                                            range: 12..13,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Call(
+                                        ExprCall {
+                                            range: 17..25,
+                                            func: Name(
+                                                ExprName {
+                                                    range: 17..22,
+                                                    id: Name("range"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 22..25,
+                                                args: [
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 23..24,
+                                                            value: Int(
+                                                                0,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

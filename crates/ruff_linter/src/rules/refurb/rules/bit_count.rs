@@ -1,7 +1,8 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -26,6 +27,11 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// x = (123).bit_count()
 /// y = 0b1111011.bit_count()
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe unless the argument to `bin` can be inferred as
+/// an instance of a type that implements the `__index__` and `bit_count` methods because this can
+/// change the exception raised at runtime for an invalid argument.
 ///
 /// ## Options
 /// - `target-version`
@@ -74,7 +80,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
 
     if !call.arguments.keywords.is_empty() {
         return;
-    };
+    }
     let [arg] = &*call.arguments.args else {
         return;
     };
@@ -100,7 +106,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
 
     if !arguments.keywords.is_empty() {
         return;
-    };
+    }
     let [arg] = &*arguments.args else {
         return;
     };
@@ -110,6 +116,10 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         return;
     }
 
+    // If is a starred expression, it returns.
+    if arg.is_starred_expr() {
+        return;
+    }
     // Extract, e.g., `x` in `bin(x)`.
     let literal_text = checker.locator().slice(arg);
 
@@ -159,6 +169,14 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         | Expr::Subscript(_) => false,
     };
 
+    // check if the fix is safe or not
+    let applicability: Applicability = match ResolvedPythonType::from(arg) {
+        ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer | NumberLike::Bool)) => {
+            Applicability::Safe
+        }
+        _ => Applicability::Unsafe,
+    };
+
     let replacement = if parenthesize {
         format!("({literal_text}).bit_count()")
     } else {
@@ -172,11 +190,10 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         },
         call.range(),
     );
-
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        replacement,
-        call.range(),
-    )));
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(replacement, call.range()),
+        applicability,
+    ));
 
     checker.report_diagnostic(diagnostic);
 }

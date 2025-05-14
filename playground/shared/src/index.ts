@@ -7,3 +7,8 @@ export { default as ShareButton } from "./ShareButton";
 export { type Theme, useTheme } from "./theme";
 export { HorizontalResizeHandle, VerticalResizeHandle } from "./ResizeHandle";
 export { setupMonaco } from "./setupMonaco";
+export {
+  default as SideBar,
+  SideBarEntry,
+  type SideBarEntryProps,
+} from "./SideBar";

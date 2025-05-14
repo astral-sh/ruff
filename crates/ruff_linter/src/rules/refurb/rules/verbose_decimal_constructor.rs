@@ -96,7 +96,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
 
             // Early return if we now have an empty string
             // or a very long string:
-            if (rest.len() > PYTHONINTMAXSTRDIGITS) || (rest.len() == 0) {
+            if (rest.len() > PYTHONINTMAXSTRDIGITS) || (rest.is_empty()) {
                 return;
             }
 
@@ -106,7 +106,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
             // Verify that the rest of the string is a valid integer.
             if !rest.bytes().all(|c| c.is_ascii_digit()) {
                 return;
-            };
+            }
 
             // If all the characters are zeros, then the value is zero.
             let rest = match (unary, rest.is_empty()) {
@@ -140,12 +140,12 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
             // Must be a call to the `float` builtin.
             if !checker.semantic().match_builtin_expr(func, "float") {
                 return;
-            };
+            }
 
             // Must have exactly one argument, which is a string literal.
-            if arguments.keywords.len() != 0 {
+            if !arguments.keywords.is_empty() {
                 return;
-            };
+            }
             let [float] = arguments.args.as_ref() else {
                 return;
             };

@@ -22,6 +22,7 @@ mod tests {
     use ruff_text_size::Ranged;
 
     use crate::linter::check_path;
+    use crate::message::Message;
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::isort;
     use crate::rules::pyflakes;
@@ -218,7 +219,7 @@ mod tests {
         let diagnostics = test_snippet(
             "PythonFinalizationError",
             &LinterSettings {
-                unresolved_target_version: ruff_python_ast::PythonVersion::PY312,
+                unresolved_target_version: ruff_python_ast::PythonVersion::PY312.into(),
                 ..LinterSettings::for_rule(Rule::UndefinedName)
             },
         );
@@ -743,8 +744,9 @@ mod tests {
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python(contents.to_string());
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
+        let target_version = settings.unresolved_target_version;
         let options =
-            ParseOptions::from(source_type).with_target_version(settings.unresolved_target_version);
+            ParseOptions::from(source_type).with_target_version(target_version.parser_version());
         let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
             .try_into_module()
             .expect("PySourceType always parses into a module");
@@ -757,7 +759,7 @@ mod tests {
             &locator,
             &indexer,
         );
-        let mut diagnostics = check_path(
+        let mut messages = check_path(
             Path::new("<filename>"),
             None,
             &locator,
@@ -769,11 +771,12 @@ mod tests {
             &source_kind,
             source_type,
             &parsed,
-            settings.unresolved_target_version,
+            target_version,
         );
-        diagnostics.sort_by_key(Ranged::start);
-        let actual = diagnostics
+        messages.sort_by_key(Ranged::start);
+        let actual = messages
             .iter()
+            .filter_map(Message::as_diagnostic_message)
             .map(|diagnostic| diagnostic.kind.rule())
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
@@ -3122,7 +3125,7 @@ lambda: fu
 
     #[test]
     fn redefined_by_gen_exp() {
-        // Re-using a global name as the loop variable for a generator
+        // Reusing a global name as the loop variable for a generator
         // expression results in a redefinition warning.
         flakes(
             "import fu; (1 for fu in range(1))",
@@ -4257,6 +4260,24 @@ lambda: fu
 
             class Y(NamedTuple):
                 y: NamedTuple("v", [("vv", int)])
+        "#,
+            &[],
+        );
+    }
+
+    #[test]
+    fn gh_issue_17196_regression_test() {
+        flakes(
+            r#"
+            from typing import Annotated
+
+            def type_annotations_from_tuple():
+                annos = (str, "foo", "bar")
+                return Annotated[annos]
+
+            def type_annotations_from_filtered_tuple():
+                annos = (str, None, "foo", None, "bar")
+                return Annotated[tuple([a for a in annos if a is not None])]
         "#,
             &[],
         );

@@ -91,6 +91,7 @@ export default function SettingsEditor({
               model.setValue(JSON.stringify(cleansed, null, 4));
             } catch (e) {
               // Turned out to not be TOML after all.
+              // eslint-disable-next-line no-console
               console.warn("Failed to parse settings as TOML", e);
             }
           });
@@ -114,6 +115,7 @@ export default function SettingsEditor({
       onMount={handleMount}
       wrapperProps={visible ? {} : { style: { display: "none" } }}
       language="json"
+      path="ruff.json"
       value={source}
       theme={theme === "light" ? "Ayu-Light" : "Ayu-Dark"}
       onChange={handleChange}
