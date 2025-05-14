@@ -1086,7 +1086,7 @@ bitflags! {
 }
 
 // TODO(dylan): Implement the functionality suggested
-// in this doc-comment for `Generator` and `Checker`.
+// in this doc-comment for `Checker`.
 // Note we will have to handle interwoven nested t and
 // f strings.
 /// Flags that can be queried to obtain information

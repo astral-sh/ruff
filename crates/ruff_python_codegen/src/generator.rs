@@ -7,7 +7,7 @@ use ruff_python_ast::{
     self as ast, Alias, AnyStringFlags, ArgOrKeyword, BoolOp, BytesLiteralFlags, CmpOp,
     Comprehension, ConversionFlag, DebugText, ExceptHandler, Expr, FStringFlags, Identifier,
     MatchCase, Operator, Parameter, Parameters, Pattern, Singleton, Stmt, StringFlags, Suite,
-    TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    TStringFlags, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
@@ -1112,6 +1112,9 @@ impl<'a> Generator<'a> {
             Expr::FString(ast::ExprFString { value, .. }) => {
                 self.unparse_f_string_value(value);
             }
+            Expr::TString(ast::ExprTString { value, .. }) => {
+                self.unparse_t_string_value(value);
+            }
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                 self.unparse_string_literal_value(value);
             }
@@ -1413,6 +1416,109 @@ impl<'a> Generator<'a> {
     fn unparse_f_string(&mut self, values: &[ast::FStringElement], flags: FStringFlags) {
         let mut generator = Generator::new(self.indent, self.line_ending);
         generator.unparse_f_string_body(values);
+        let body = &generator.buffer;
+        self.p_str_repr(body, flags);
+    }
+
+    fn unparse_t_string_value(&mut self, value: &ast::TStringValue) {
+        let mut first = true;
+        for t_string_part in value {
+            self.p_delim(&mut first, " ");
+            match t_string_part {
+                ast::TStringPart::Literal(string_literal) => {
+                    self.unparse_string_literal(string_literal);
+                }
+                ast::TStringPart::FString(f_string) => {
+                    self.unparse_f_string(&f_string.elements, f_string.flags);
+                }
+                ast::TStringPart::TString(t_string) => {
+                    self.unparse_t_string(&t_string.elements, t_string.flags);
+                }
+            }
+        }
+    }
+
+    fn unparse_t_string_body(&mut self, values: &[ast::TStringElement]) {
+        for value in values {
+            self.unparse_t_string_element(value);
+        }
+    }
+
+    fn unparse_t_string_interpolation_element(
+        &mut self,
+        val: &Expr,
+        debug_text: Option<&DebugText>,
+        conversion: ConversionFlag,
+        spec: Option<&ast::TStringFormatSpec>,
+    ) {
+        let mut generator = Generator::new(self.indent, self.line_ending);
+        generator.unparse_expr(val, precedence::FORMATTED_VALUE);
+        let brace = if generator.buffer.starts_with('{') {
+            // put a space to avoid escaping the bracket
+            "{ "
+        } else {
+            "{"
+        };
+        self.p(brace);
+
+        if let Some(debug_text) = debug_text {
+            self.buffer += debug_text.leading.as_str();
+        }
+
+        self.buffer += &generator.buffer;
+
+        if let Some(debug_text) = debug_text {
+            self.buffer += debug_text.trailing.as_str();
+        }
+
+        if !conversion.is_none() {
+            self.p("!");
+            #[allow(clippy::cast_possible_truncation)]
+            self.p(&format!("{}", conversion as u8 as char));
+        }
+
+        if let Some(spec) = spec {
+            self.p(":");
+            self.unparse_t_string_specifier(&spec.elements);
+        }
+
+        self.p("}");
+    }
+
+    fn unparse_t_string_element(&mut self, element: &ast::TStringElement) {
+        match element {
+            ast::TStringElement::Literal(ast::TStringLiteralElement { value, .. }) => {
+                self.unparse_t_string_literal_element(value);
+            }
+            ast::TStringElement::Interpolation(ast::TStringInterpolationElement {
+                interpolation,
+                debug_text,
+                conversion,
+                format_spec,
+                range: _,
+            }) => self.unparse_t_string_interpolation_element(
+                interpolation,
+                debug_text.as_ref(),
+                *conversion,
+                format_spec.as_deref(),
+            ),
+        }
+    }
+
+    fn unparse_t_string_literal_element(&mut self, s: &str) {
+        let s = s.replace('{', "{{").replace('}', "}}");
+        self.p(&s);
+    }
+
+    fn unparse_t_string_specifier(&mut self, values: &[ast::TStringElement]) {
+        self.unparse_t_string_body(values);
+    }
+
+    /// Unparse `values` with [`Generator::unparse_t_string_body`], using `quote` as the preferred
+    /// surrounding quote style.
+    fn unparse_t_string(&mut self, values: &[ast::TStringElement], flags: TStringFlags) {
+        let mut generator = Generator::new(self.indent, self.line_ending);
+        generator.unparse_t_string_body(values);
         let body = &generator.buffer;
         self.p_str_repr(body, flags);
     }
