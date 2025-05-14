@@ -6840,8 +6840,12 @@ impl<'db> FunctionType<'db> {
     }
 
     fn with_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
-        let mut type_mappings = self.type_mappings(db).to_vec();
-        type_mappings.push(type_mapping.to_owned());
+        let type_mappings: Box<[_]> = self
+            .type_mappings(db)
+            .iter()
+            .cloned()
+            .chain(std::iter::once(type_mapping.to_owned()))
+            .collect();
         Self::new(
             db,
             self.name(db).clone(),
@@ -6850,7 +6854,7 @@ impl<'db> FunctionType<'db> {
             self.decorators(db),
             self.dataclass_transformer_params(db),
             self.inherited_generic_context(db),
-            type_mappings.into_boxed_slice(),
+            type_mappings,
         )
     }
 
