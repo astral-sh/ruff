@@ -194,7 +194,7 @@ def good_return(x: T) -> T:
     return x
 
 def bad_return(x: T) -> T:
-    # error: [invalid-return-type] "Return type does not match returned value: Expected `T`, found `int`"
+    # error: [invalid-return-type] "Return type does not match returned value: expected `T`, found `int`"
     return x + 1
 ```
 
@@ -212,7 +212,7 @@ def different_types(cond: bool, t: T, s: S) -> T:
     if cond:
         return t
     else:
-        # error: [invalid-return-type] "Return type does not match returned value: Expected `T`, found `S`"
+        # error: [invalid-return-type] "Return type does not match returned value: expected `T`, found `S`"
         return s
 
 def same_types(cond: bool, t1: T, t2: T) -> T:

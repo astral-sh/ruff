@@ -48,7 +48,7 @@ error[invalid-return-type]: Return type does not match returned value
 2 |     if False:
 3 |         # error: [invalid-return-type]
 4 |         return 1
-  |                ^ Expected `None`, found `Literal[1]`
+  |                ^ expected `None`, found `Literal[1]`
 5 |
 6 | # error: [invalid-return-type]
   |
