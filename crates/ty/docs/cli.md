@@ -30,7 +30,7 @@ ty check [OPTIONS] [PATH]...
 
 <h3 class="cli-reference">Arguments</h3>
 
-<dl class="cli-reference"><dt id="ty-check--paths"><a href="#ty-check--paths"<code>PATHS</code></a></dt><dd><p>List of files or directories to check [default: the project root]</p>
+<dl class="cli-reference"><dt id="ty-check--paths"><a href="#ty-check--paths"><code>PATHS</code></a></dt><dd><p>List of files or directories to check [default: the project root]</p>
 </dd></dl>
 
 <h3 class="cli-reference">Options</h3>
@@ -125,7 +125,7 @@ ty generate-shell-completion <SHELL>
 
 <h3 class="cli-reference">Arguments</h3>
 
-<dl class="cli-reference"><dt id="ty-generate-shell-completion--shell"><a href="#ty-generate-shell-completion--shell"<code>SHELL</code></a></dt></dl>
+<dl class="cli-reference"><dt id="ty-generate-shell-completion--shell"><a href="#ty-generate-shell-completion--shell"><code>SHELL</code></a></dt></dl>
 
 <h3 class="cli-reference">Options</h3>
 
