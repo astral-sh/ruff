@@ -2,8 +2,9 @@ use crate::normalizer::Normalizer;
 use itertools::Itertools;
 use ruff_formatter::FormatOptions;
 use ruff_python_ast::comparable::ComparableMod;
+use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_formatter::{PreviewMode, PyFormatOptions, format_module_source, format_range};
-use ruff_python_parser::{ParseOptions, UnsupportedSyntaxError, parse};
+use ruff_python_parser::{ParseError, ParseOptions, TokenKind, UnsupportedSyntaxError, parse};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
@@ -277,6 +278,110 @@ fn format() {
     );
 }
 
+/// Tests that the following operations on a file give the same answer:
+/// - First change all f-strings to t-strings and vice-versa, then format.
+/// - First format, then change all f-strings to t-strings and vice-versa
+///
+/// (In other words: formatting is _equivariant_ with respect to interchanging
+/// f and t-strings).
+#[test]
+fn f_and_t_strings_format_the_same() {
+    let test_black_file = |input_path: &Path| {
+        let options_path = input_path.with_extension("options.json");
+        let options = if let Ok(options_file) = fs::File::open(&options_path) {
+            let reader = BufReader::new(options_file);
+            serde_json::from_reader::<BufReader<_>, PyFormatOptions>(reader)
+                .unwrap_or_else(|_| {
+                    panic!("Expected option file {options_path:?} to be a valid Json file")
+                })
+                .with_target_version(PythonVersion::PY314)
+        } else {
+            PyFormatOptions::from_extension(input_path).with_target_version(PythonVersion::PY314)
+        };
+
+        f_and_t_strings_format_the_same_with_options(input_path, &options);
+    };
+
+    let test_ruff_file = |input_path: &Path| {
+        let options_path = input_path.with_extension("options.json");
+        if let Ok(options_file) = fs::File::open(&options_path) {
+            let reader = BufReader::new(options_file);
+            let options_vec = serde_json::from_reader::<BufReader<_>, Vec<PyFormatOptions>>(reader)
+                .unwrap_or_else(|_| {
+                    panic!("Expected option file {options_path:?} to be a valid Json file")
+                });
+
+            for options in options_vec {
+                f_and_t_strings_format_the_same_with_options(
+                    input_path,
+                    &options.with_target_version(PythonVersion::PY314),
+                );
+            }
+        } else {
+            let options = PyFormatOptions::from_extension(input_path)
+                .with_target_version(PythonVersion::PY314);
+            f_and_t_strings_format_the_same_with_options(input_path, &options);
+        }
+    };
+    insta::glob!(
+        "../resources",
+        "test/fixtures/black/**/*.{py,pyi}",
+        test_black_file
+    );
+    insta::glob!(
+        "../resources",
+        "test/fixtures/ruff/**/*.{py,pyi}",
+        test_ruff_file
+    );
+}
+
+fn f_and_t_strings_format_the_same_with_options(input_path: &Path, options: &PyFormatOptions) {
+    let content = fs::read_to_string(input_path).unwrap();
+
+    // To avoid some complexity around parsing snippets with
+    // possible indentation, we skip the range formatting fixtures.
+    if content.contains("<RANGE_START>") {
+        return;
+    }
+
+    let swapped_content = swap_f_and_t_strings(&content, options.source_type())
+        .expect("Swapping f-strings and t-strings to succeed");
+
+    let printed = format_module_source(&content, options.clone()).expect("Formatting to succeed");
+    let swapped_printed =
+        format_module_source(&swapped_content, options.clone()).unwrap_or_else(|err| {
+            panic!(
+                "Formatting swapped content at {} to succeed but got {err}\n{swapped_content}",
+                input_path.display(),
+            )
+        });
+
+    let formatted_code = printed.into_code();
+    let formatted_swapped_code = swapped_printed.into_code();
+
+    let swapped_formatted_code = swap_f_and_t_strings(&formatted_code, options.source_type())
+        .expect("Swapping f and t-strings in formatted code to succeed");
+
+    if swapped_formatted_code != formatted_swapped_code {
+        let diff = TextDiff::from_lines(&swapped_formatted_code, &formatted_swapped_code)
+            .unified_diff()
+            .header("Swap after format", "Format after swap")
+            .to_string();
+        panic!(
+            r#"Formatting differs for f and t-strings at {input_path}.
+
+Options:
+{options}
+---
+{diff}---
+
+"#,
+            input_path = input_path.display(),
+            options = &DisplayPyOptions(options),
+        );
+    }
+}
+
 fn format_file(source: &str, options: &PyFormatOptions, input_path: &Path) -> String {
     let (unformatted, formatted_code) = if source.contains("<RANGE_START>") {
         let mut content = source.to_string();
@@ -461,6 +566,44 @@ fn ensure_unchanged_ast(
             input_path.display(),
         );
     }
+}
+
+/// Returns a string where all instances of f-strings in the source
+/// are replaced by t-strings, and vice-versa.
+fn swap_f_and_t_strings(source: &str, source_type: PySourceType) -> Result<String, ParseError> {
+    let mut buf = source.to_string();
+
+    // Since f and t-strings can be nested, we cannot use something like
+    // regexes or Aho-Corasick for this swap. The necessary work to handle
+    // this tiny context-free grammar is already done during lexing,
+    // so we lex the code and then rewrite it, replacing f-string prefixes
+    // with t-string prefixes and vice-versa.
+    //
+    // Since lexing is not publicly exposed we somewhat wastefully parse.
+    let parsed = parse(source, ParseOptions::from(source_type))?;
+    let tokens = parsed.tokens();
+    for token in tokens {
+        match token.kind() {
+            TokenKind::FStringStart => {
+                let snippet = &source[token.range()];
+
+                buf.replace_range(
+                    Range::<usize>::from(token.range()),
+                    &snippet.replace('f', "t").replace('F', "T"),
+                );
+            }
+            TokenKind::TStringStart => {
+                let snippet = &source[token.range()];
+
+                buf.replace_range(
+                    Range::<usize>::from(token.range()),
+                    &snippet.replace('t', "f").replace('T', "F"),
+                );
+            }
+            _ => {}
+        }
+    }
+    Ok(buf)
 }
 
 struct Header<'a> {
