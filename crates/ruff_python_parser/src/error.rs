@@ -892,6 +892,12 @@ pub enum UnsupportedSyntaxErrorKind {
     ///
     /// [PEP 758]: https://peps.python.org/pep-0758/
     UnparenthesizedExceptionTypes,
+    /// Represents the use of a template string (t-string)
+    /// literal prior to the implementation of [PEP 750]
+    /// in Python 3.14.
+    ///
+    /// [PEP 750]: https://peps.python.org/pep-0750/
+    TemplateStrings,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -972,6 +978,9 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes => {
                 "Multiple exception types must be parenthesized"
             }
+            UnsupportedSyntaxErrorKind::TemplateStrings => {
+                "Cannot use t-strings"
+            }
         };
 
         write!(
@@ -1042,6 +1051,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes => {
                 Change::Added(PythonVersion::PY314)
             }
+            UnsupportedSyntaxErrorKind::TemplateStrings => Change::Added(PythonVersion::PY314),
         }
     }
 
