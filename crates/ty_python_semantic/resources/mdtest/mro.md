@@ -256,6 +256,25 @@ class Foo(x): ...
 reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
 ```
 
+## `__bases__` is a union of a dynamic type and valid bases
+
+If a dynamic type such as `Any` or `Unknown` is one of the elements in the union, and all other
+types *would be* valid class bases, we do not emit an `invalid-base` diagnostic and use the dynamic
+type as a base to prevent further downstream errors.
+
+```py
+from typing import Any
+
+def _(flag: bool, any: Any):
+    if flag:
+        Base = any
+    else:
+        class Base: ...
+
+    class Foo(Base): ...
+    reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Any, <class 'object'>]
+```
+
 ## `__bases__` includes multiple `Union`s
 
 ```py
