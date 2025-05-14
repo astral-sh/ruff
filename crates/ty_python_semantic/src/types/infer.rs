@@ -72,13 +72,12 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_callable, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
     report_invalid_return_type, report_possibly_unbound_attribute, TypeCheckDiagnostics,
-    CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS,
-    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, INCONSISTENT_MRO,
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
-    UNSUPPORTED_OPERATOR,
+    CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
+    DIVISION_BY_ZERO, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
+    INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS,
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
@@ -7276,7 +7275,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
                         if let Some(builder) = self
                             .context
-                            .report_lint(&CALL_POSSIBLY_UNBOUND_METHOD, value_node)
+                            .report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, value_node)
                         {
                             builder.into_diagnostic(format_args!(
                                 "Method `__getitem__` of type `{}` is possibly unbound",
@@ -7324,7 +7323,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             if boundness == Boundness::PossiblyUnbound {
                                 if let Some(builder) = self
                                     .context
-                                    .report_lint(&CALL_POSSIBLY_UNBOUND_METHOD, value_node)
+                                    .report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, value_node)
                                 {
                                     builder.into_diagnostic(format_args!(
                                         "Method `__class_getitem__` of type `{}` \
