@@ -2,7 +2,7 @@ use memchr::memchr_iter;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{AnyStringFlags, FStringElement, StringLike, StringLikePart};
+use ruff_python_ast::{AnyStringFlags, FStringElement, StringLike, StringLikePart, TStringElement};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -89,6 +89,39 @@ pub(crate) fn invalid_escape_sequence(checker: &Checker, string_like: StringLike
                         }
                         FStringElement::Expression(expression) => {
                             let Some(format_spec) = expression.format_spec.as_ref() else {
+                                continue;
+                            };
+                            for literal in format_spec.elements.literals() {
+                                escape_chars_state.update(analyze_escape_chars(
+                                    locator,
+                                    literal.range(),
+                                    flags,
+                                ));
+                            }
+                        }
+                    }
+                }
+                escape_chars_state
+            }
+            StringLikePart::TString(t_string) => {
+                let flags = AnyStringFlags::from(t_string.flags);
+                let mut escape_chars_state = EscapeCharsState::default();
+                // Whether we suggest converting to a raw string or
+                // adding backslashes depends on the presence of valid
+                // escape characters in the entire t-string. Therefore,
+                // we must analyze escape characters in each t-string
+                // element before pushing a diagnostic and fix.
+                for element in &t_string.elements {
+                    match element {
+                        TStringElement::Literal(literal) => {
+                            escape_chars_state.update(analyze_escape_chars(
+                                locator,
+                                literal.range(),
+                                flags,
+                            ));
+                        }
+                        TStringElement::Interpolation(interpolation) => {
+                            let Some(format_spec) = interpolation.format_spec.as_ref() else {
                                 continue;
                             };
                             for literal in format_spec.elements.literals() {

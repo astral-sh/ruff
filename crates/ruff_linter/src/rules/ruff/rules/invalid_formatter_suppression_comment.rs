@@ -308,6 +308,10 @@ const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
         | AnyNodeRef::FStringLiteralElement(_)
         | AnyNodeRef::FStringFormatSpec(_)
         | AnyNodeRef::ExprFString(_)
+        | AnyNodeRef::TStringInterpolationElement(_)
+        | AnyNodeRef::TStringLiteralElement(_)
+        | AnyNodeRef::TStringFormatSpec(_)
+        | AnyNodeRef::ExprTString(_)
         | AnyNodeRef::ExprStringLiteral(_)
         | AnyNodeRef::ExprBytesLiteral(_)
         | AnyNodeRef::ExprNumberLiteral(_)
@@ -345,6 +349,7 @@ const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
         | AnyNodeRef::TypeParamTypeVarTuple(_)
         | AnyNodeRef::TypeParamParamSpec(_)
         | AnyNodeRef::FString(_)
+        | AnyNodeRef::TString(_)
         | AnyNodeRef::StringLiteral(_)
         | AnyNodeRef::BytesLiteral(_)
         | AnyNodeRef::Identifier(_) => false,
