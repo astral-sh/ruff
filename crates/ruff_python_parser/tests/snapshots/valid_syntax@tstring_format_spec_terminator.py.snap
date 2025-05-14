@@ -7,32 +7,32 @@ input_file: crates/ruff_python_parser/resources/inline/ok/tstring_format_spec_te
 ```
 Module(
     ModModule {
-        range: 0..43,
+        range: 0..87,
         body: [
             Expr(
                 StmtExpr {
-                    range: 0..19,
+                    range: 44..63,
                     value: TString(
                         ExprTString {
-                            range: 0..19,
+                            range: 44..63,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 0..19,
+                                            range: 44..63,
                                             elements: [
                                                 Literal(
                                                     TStringLiteralElement {
-                                                        range: 2..8,
+                                                        range: 46..52,
                                                         value: "hello ",
                                                     },
                                                 ),
                                                 Interpolation(
                                                     TStringInterpolationElement {
-                                                        range: 8..12,
+                                                        range: 52..56,
                                                         interpolation: Name(
                                                             ExprName {
-                                                                range: 9..10,
+                                                                range: 53..54,
                                                                 id: Name("x"),
                                                                 ctx: Load,
                                                             },
@@ -41,7 +41,7 @@ Module(
                                                         conversion: None,
                                                         format_spec: Some(
                                                             TStringFormatSpec {
-                                                                range: 11..11,
+                                                                range: 55..55,
                                                                 elements: [],
                                                             },
                                                         ),
@@ -49,7 +49,7 @@ Module(
                                                 ),
                                                 Literal(
                                                     TStringLiteralElement {
-                                                        range: 12..18,
+                                                        range: 56..62,
                                                         value: " world",
                                                     },
                                                 ),
@@ -69,28 +69,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 20..42,
+                    range: 64..86,
                     value: TString(
                         ExprTString {
-                            range: 20..42,
+                            range: 64..86,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 20..42,
+                                            range: 64..86,
                                             elements: [
                                                 Literal(
                                                     TStringLiteralElement {
-                                                        range: 22..28,
+                                                        range: 66..72,
                                                         value: "hello ",
                                                     },
                                                 ),
                                                 Interpolation(
                                                     TStringInterpolationElement {
-                                                        range: 28..35,
+                                                        range: 72..79,
                                                         interpolation: Name(
                                                             ExprName {
-                                                                range: 29..30,
+                                                                range: 73..74,
                                                                 id: Name("x"),
                                                                 ctx: Load,
                                                             },
@@ -99,11 +99,11 @@ Module(
                                                         conversion: None,
                                                         format_spec: Some(
                                                             TStringFormatSpec {
-                                                                range: 31..34,
+                                                                range: 75..78,
                                                                 elements: [
                                                                     Literal(
                                                                         TStringLiteralElement {
-                                                                            range: 31..34,
+                                                                            range: 75..78,
                                                                             value: ".3f",
                                                                         },
                                                                     ),
@@ -114,7 +114,7 @@ Module(
                                                 ),
                                                 Literal(
                                                     TStringLiteralElement {
-                                                        range: 35..41,
+                                                        range: 79..85,
                                                         value: " world",
                                                     },
                                                 ),
