@@ -15,4 +15,6 @@ pub(crate) mod parameter;
 pub(crate) mod parameter_with_default;
 pub(crate) mod parameters;
 pub(crate) mod string_literal;
+pub(crate) mod t_string;
+pub(crate) mod t_string_element;
 pub(crate) mod with_item;

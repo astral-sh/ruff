@@ -2,9 +2,11 @@ use itertools::Itertools;
 use ruff_formatter::{FormatContext, format_args, write};
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::str_prefix::{
-    AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
+    AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
 };
-use ruff_python_ast::{AnyStringFlags, FStringElement, StringFlags, StringLike, StringLikePart};
+use ruff_python_ast::{
+    AnyStringFlags, FStringElement, StringFlags, StringLike, StringLikePart, TStringElement,
+};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 use std::borrow::Cow;
@@ -13,17 +15,20 @@ use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
 use crate::other::f_string::{FStringContext, FStringLayout};
 use crate::other::f_string_element::FormatFStringExpressionElement;
+use crate::other::t_string::{TStringContext, TStringLayout};
+use crate::other::t_string_element::FormatTStringInterpolationElement;
 use crate::prelude::*;
 use crate::string::docstring::needs_chaperone_space;
 use crate::string::normalize::{
     QuoteMetadata, is_fstring_with_quoted_debug_expression,
     is_fstring_with_quoted_format_spec_and_debug,
     is_fstring_with_triple_quoted_literal_expression_containing_quotes,
+    is_tstring_with_quoted_format_spec_and_debug,
 };
 use crate::string::{StringLikeExtensions, StringNormalizer, StringQuotes, normalize_string};
 
 /// Formats any implicitly concatenated string. This could be any valid combination
-/// of string, bytes or f-string literals.
+/// of string, bytes, f-string, or t-string literals.
 pub(crate) struct FormatImplicitConcatenatedString<'a> {
     string: StringLike<'a>,
 }
@@ -98,6 +103,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
                 StringLikePart::String(part) => part.format().fmt(f),
                 StringLikePart::Bytes(bytes_literal) => bytes_literal.format().fmt(f),
                 StringLikePart::FString(part) => part.format().fmt(f),
+                StringLikePart::TString(part) => part.format().fmt(f),
             });
 
             let part_comments = comments.leading_dangling_trailing(part);
@@ -138,11 +144,15 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
 
             let first_part = string.parts().next()?;
 
-            // The string is either a regular string, f-string, or bytes string.
+            // The string is either a regular string, f-string, t-string, or bytes string.
             let normalizer = StringNormalizer::from_context(context);
 
             // Some if a part requires preserving its quotes.
             let mut preserve_quotes_requirement: Option<Quote> = None;
+
+            // Whether one of the parts of a t-string is an
+            // f-string, e.g. t"{this}"f"{that}"
+            let mut seen_fstring_part_in_tstring = false;
 
             // Early exit if it's known that this string can't be joined
             for part in string.parts() {
@@ -164,9 +174,29 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                     return None;
                 }
 
-                if let StringLikePart::FString(fstring) = part {
-                    if context.options().target_version().supports_pep_701() {
-                        if is_fstring_with_quoted_format_spec_and_debug(fstring, context) {
+                match part {
+                    StringLikePart::FString(fstring) => {
+                        if matches!(string, StringLike::TString(_)) {
+                            seen_fstring_part_in_tstring = true;
+                        }
+                        if context.options().target_version().supports_pep_701() {
+                            if is_fstring_with_quoted_format_spec_and_debug(fstring, context) {
+                                if preserve_quotes_requirement
+                                    .is_some_and(|quote| quote != part.flags().quote_style())
+                                {
+                                    return None;
+                                }
+                                preserve_quotes_requirement = Some(part.flags().quote_style());
+                            }
+                        }
+                        // Avoid invalid syntax for pre Python 312:
+                        // * When joining parts that have debug expressions with quotes: `f"{10 + len('bar')=}" f'{10 + len("bar")=}'
+                        // * When joining parts that contain triple quoted strings with quotes: `f"{'''test ' '''}" f'{"""other " """}'`
+                        else if is_fstring_with_quoted_debug_expression(fstring, context)
+                            || is_fstring_with_triple_quoted_literal_expression_containing_quotes(
+                                fstring, context,
+                            )
+                        {
                             if preserve_quotes_requirement
                                 .is_some_and(|quote| quote != part.flags().quote_style())
                             {
@@ -175,21 +205,22 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                             preserve_quotes_requirement = Some(part.flags().quote_style());
                         }
                     }
-                    // Avoid invalid syntax for pre Python 312:
-                    // * When joining parts that have debug expressions with quotes: `f"{10 + len('bar')=}" f'{10 + len("bar")=}'
-                    // * When joining parts that contain triple quoted strings with quotes: `f"{'''test ' '''}" f'{"""other " """}'`
-                    else if is_fstring_with_quoted_debug_expression(fstring, context)
-                        || is_fstring_with_triple_quoted_literal_expression_containing_quotes(
-                            fstring, context,
-                        )
-                    {
-                        if preserve_quotes_requirement
-                            .is_some_and(|quote| quote != part.flags().quote_style())
-                        {
-                            return None;
+                    StringLikePart::TString(tstring) => {
+                        if is_tstring_with_quoted_format_spec_and_debug(tstring, context) {
+                            if preserve_quotes_requirement
+                                .is_some_and(|quote| quote != part.flags().quote_style())
+                            {
+                                return None;
+                            }
+                            preserve_quotes_requirement = Some(part.flags().quote_style());
                         }
-                        preserve_quotes_requirement = Some(part.flags().quote_style());
                     }
+                    StringLikePart::Bytes(_) | StringLikePart::String(_) => {}
+                }
+
+                // Don't concatenate t-strings and f-strings
+                if seen_fstring_part_in_tstring {
+                    return None;
                 }
             }
 
@@ -203,6 +234,7 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 StringLike::String(_) => AnyStringPrefix::Regular(StringLiteralPrefix::Empty),
                 StringLike::Bytes(_) => AnyStringPrefix::Bytes(ByteStringPrefix::Regular),
                 StringLike::FString(_) => AnyStringPrefix::Format(FStringPrefix::Regular),
+                StringLike::TString(_) => AnyStringPrefix::Template(TStringPrefix::Regular),
             };
 
             let quote = if let Some(quote) = preserve_quotes_requirement {
@@ -287,7 +319,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                     FormatLiteralContent {
                         range: part.content_range(),
                         flags: self.flags,
-                        is_fstring: false,
+                        is_ftstring: false,
                         trim_start: first_non_empty && self.docstring,
                         trim_end: self.docstring && parts.peek().is_none(),
                     }
@@ -307,7 +339,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                                 FormatLiteralContent {
                                     range: literal.range(),
                                     flags: self.flags,
-                                    is_fstring: true,
+                                    is_ftstring: true,
                                     trim_end: false,
                                     trim_start: false,
                                 }
@@ -326,6 +358,33 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                         }
                     }
                 }
+                StringLikePart::TString(f_string) => {
+                    for element in &f_string.elements {
+                        match element {
+                            TStringElement::Literal(literal) => {
+                                FormatLiteralContent {
+                                    range: literal.range(),
+                                    flags: self.flags,
+                                    is_ftstring: true,
+                                    trim_end: false,
+                                    trim_start: false,
+                                }
+                                .fmt(f)?;
+                            }
+                            // Formatting the expression here and in the expanded version is safe **only**
+                            // because we assert that the t-string never contains any comments.
+                            TStringElement::Interpolation(expression) => {
+                                let context = TStringContext::new(
+                                    self.flags,
+                                    TStringLayout::from_t_string(f_string, f.context().source()),
+                                );
+
+                                FormatTStringInterpolationElement::new(expression, context)
+                                    .fmt(f)?;
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -336,7 +395,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
 struct FormatLiteralContent {
     range: TextRange,
     flags: AnyStringFlags,
-    is_fstring: bool,
+    is_ftstring: bool,
     trim_start: bool,
     trim_end: bool,
 }
@@ -348,7 +407,7 @@ impl Format<PyFormatContext<'_>> for FormatLiteralContent {
             content,
             0,
             self.flags,
-            self.flags.is_f_string() && !self.is_fstring,
+            (self.flags.is_f_string() || self.flags.is_t_string()) && !self.is_ftstring,
         );
 
         // Trim the start and end of the string if it's the first or last part of a docstring.

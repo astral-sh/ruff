@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
-use ruff_formatter::{Buffer, RemoveSoftLinesBuffer, format_args, write};
+use ruff_formatter::{format_args, write, Buffer, RemoveSoftLinesBuffer};
 use ruff_python_ast::{
-    AnyStringFlags, ConversionFlag, Expr, FStringElement, FStringExpressionElement,
-    FStringLiteralElement, StringFlags,
+    AnyStringFlags, ConversionFlag, Expr, StringFlags, TStringElement, TStringInterpolationElement,
+    TStringLiteralElement,
 };
 use ruff_text_size::{Ranged, TextSlice};
 
@@ -14,44 +14,45 @@ use crate::prelude::*;
 use crate::string::normalize_string;
 use crate::verbatim::verbatim_text;
 
-use super::f_string::FStringContext;
+use super::t_string::TStringContext;
 
-/// Formats an f-string element which is either a literal or a formatted expression.
+/// Formats a t-string element which is either a literal or interpolation
+/// element.
 ///
 /// This delegates the actual formatting to the appropriate formatter.
-pub(crate) struct FormatFStringElement<'a> {
-    element: &'a FStringElement,
-    context: FStringContext,
+pub(crate) struct FormatTStringElement<'a> {
+    element: &'a TStringElement,
+    context: TStringContext,
 }
 
-impl<'a> FormatFStringElement<'a> {
-    pub(crate) fn new(element: &'a FStringElement, context: FStringContext) -> Self {
+impl<'a> FormatTStringElement<'a> {
+    pub(crate) fn new(element: &'a TStringElement, context: TStringContext) -> Self {
         Self { element, context }
     }
 }
 
-impl Format<PyFormatContext<'_>> for FormatFStringElement<'_> {
+impl Format<PyFormatContext<'_>> for FormatTStringElement<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         match self.element {
-            FStringElement::Literal(string_literal) => {
-                FormatFStringLiteralElement::new(string_literal, self.context.flags()).fmt(f)
+            TStringElement::Literal(string_literal) => {
+                FormatTStringLiteralElement::new(string_literal, self.context.flags()).fmt(f)
             }
-            FStringElement::Expression(expression) => {
-                FormatFStringExpressionElement::new(expression, self.context).fmt(f)
+            TStringElement::Interpolation(interpolation) => {
+                FormatTStringInterpolationElement::new(interpolation, self.context).fmt(f)
             }
         }
     }
 }
 
-/// Formats an f-string literal element.
-pub(crate) struct FormatFStringLiteralElement<'a> {
-    element: &'a FStringLiteralElement,
-    /// Flags of the enclosing F-string part
+/// Formats a t-string literal element.
+pub(crate) struct FormatTStringLiteralElement<'a> {
+    element: &'a TStringLiteralElement,
+    /// Flags of the enclosing t-string part
     fstring_flags: AnyStringFlags,
 }
 
-impl<'a> FormatFStringLiteralElement<'a> {
-    pub(crate) fn new(element: &'a FStringLiteralElement, fstring_flags: AnyStringFlags) -> Self {
+impl<'a> FormatTStringLiteralElement<'a> {
+    pub(crate) fn new(element: &'a TStringLiteralElement, fstring_flags: AnyStringFlags) -> Self {
         Self {
             element,
             fstring_flags,
@@ -59,7 +60,7 @@ impl<'a> FormatFStringLiteralElement<'a> {
     }
 }
 
-impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
+impl Format<PyFormatContext<'_>> for FormatTStringLiteralElement<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let literal_content = f.context().source().slice(self.element);
         let normalized = normalize_string(literal_content, 0, self.fstring_flags, false);
@@ -70,36 +71,36 @@ impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
     }
 }
 
-/// Context representing an f-string expression element.
+/// Context representing an t-string interpolation element.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct FStringExpressionElementContext {
-    /// The context of the parent f-string containing this expression element.
-    parent_context: FStringContext,
-    /// Indicates whether this expression element has format specifier or not.
+pub(crate) struct TStringInterpolationElementContext {
+    /// The context of the parent t-string containing this interpolation element.
+    parent_context: TStringContext,
+    /// Indicates whether this interpolation element has format specifier or not.
     has_format_spec: bool,
 }
 
-impl FStringExpressionElementContext {
-    /// Returns the [`FStringContext`] containing this expression element.
-    pub(crate) fn f_string(self) -> FStringContext {
+impl TStringInterpolationElementContext {
+    /// Returns the [`TStringContext`] containing this interpolation element.
+    pub(crate) fn t_string(self) -> TStringContext {
         self.parent_context
     }
 
-    /// Returns `true` if the expression element can contain line breaks.
+    /// Returns `true` if the interpolation element can contain line breaks.
     pub(crate) fn can_contain_line_breaks(self) -> bool {
         self.parent_context.layout().is_multiline()
-            // For a triple-quoted f-string, the element can't be formatted into multiline if it
+            // For a triple-quoted t-string, the element can't be formatted into multiline if it
             // has a format specifier because otherwise the newline would be treated as part of the
             // format specifier.
             //
-            // Given the following f-string:
+            // Given the following t-string:
             // ```python
-            // f"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable:.3f} ddddddddddddddd eeeeeeee"""
+            // t"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable:.3f} ddddddddddddddd eeeeeeee"""
             // ```
             //
             // We can't format it as:
             // ```python
-            // f"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
+            // t"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
             //     variable:.3f
             // } ddddddddddddddd eeeeeeee"""
             // ```
@@ -112,17 +113,17 @@ impl FStringExpressionElementContext {
     }
 }
 
-/// Formats an f-string expression element.
-pub(crate) struct FormatFStringExpressionElement<'a> {
-    element: &'a FStringExpressionElement,
-    context: FStringExpressionElementContext,
+/// Formats an t-string expression element.
+pub(crate) struct FormatTStringInterpolationElement<'a> {
+    element: &'a TStringInterpolationElement,
+    context: TStringInterpolationElementContext,
 }
 
-impl<'a> FormatFStringExpressionElement<'a> {
-    pub(crate) fn new(element: &'a FStringExpressionElement, context: FStringContext) -> Self {
+impl<'a> FormatTStringInterpolationElement<'a> {
+    pub(crate) fn new(element: &'a TStringInterpolationElement, context: TStringContext) -> Self {
         Self {
             element,
-            context: FStringExpressionElementContext {
+            context: TStringInterpolationElementContext {
                 parent_context: context,
                 has_format_spec: element.format_spec.is_some(),
             },
@@ -130,10 +131,10 @@ impl<'a> FormatFStringExpressionElement<'a> {
     }
 }
 
-impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
+impl Format<PyFormatContext<'_>> for FormatTStringInterpolationElement<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let FStringExpressionElement {
-            expression,
+        let TStringInterpolationElement {
+            interpolation,
             debug_text,
             conversion,
             format_spec,
@@ -155,7 +156,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
             // can be trailing comments. For example,
             //
             // ```python
-            // f"""foo {
+            // t"""foo {
             //     x:.3f
             //     # trailing comment
             // }"""
@@ -168,7 +169,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                 f,
                 [
                     text(&debug_text.leading),
-                    verbatim_text(&**expression),
+                    verbatim_text(&**interpolation),
                     text(&debug_text.trailing),
                 ]
             )?;
@@ -191,12 +192,12 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
             let comments = f.context().comments().clone();
             let dangling_item_comments = comments.dangling(self.element);
 
-            // If an expression starts with a `{`, we need to add a space before the
+            // If an interpolation starts with a `{`, we need to add a space before the
             // curly brace to avoid turning it into a literal curly with `{{`.
             //
             // For example,
             // ```python
-            // f"{ {'x': 1, 'y': 2} }"
+            // t"{ {'x': 1, 'y': 2} }"
             // #  ^                ^
             // ```
             //
@@ -204,7 +205,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
             // before the closing curly brace is not strictly necessary, but it's
             // added to maintain consistency.
             let bracket_spacing =
-                needs_bracket_spacing(expression, f.context()).then_some(format_with(|f| {
+                needs_bracket_spacing(interpolation, f.context()).then_some(format_with(|f| {
                     if self.context.can_contain_line_breaks() {
                         soft_line_break_or_space().fmt(f)
                     } else {
@@ -213,13 +214,13 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                 }));
 
             let item = format_with(|f: &mut PyFormatter| {
-                // Update the context to be inside the f-string expression element.
+                // Update the context to be inside the t-string interpolation element.
                 let f = &mut WithFTStringState::new(
-                    FTStringState::InsideExpressionElement(self.context),
+                    FTStringState::InsideInterpolationElement(self.context),
                     f,
                 );
 
-                write!(f, [bracket_spacing, expression.format()])?;
+                write!(f, [bracket_spacing, interpolation.format()])?;
 
                 // Conversion comes first, then the format spec.
                 match conversion {
@@ -233,14 +234,14 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                     token(":").fmt(f)?;
 
                     for element in &format_spec.elements {
-                        FormatFStringElement::new(element, self.context.f_string()).fmt(f)?;
+                        FormatTStringElement::new(element, self.context.t_string()).fmt(f)?;
                     }
 
                     // These trailing comments can only occur if the format specifier is
                     // present. For example,
                     //
                     // ```python
-                    // f"{
+                    // t"{
                     //    x:.3f
                     //    # comment
                     // }"

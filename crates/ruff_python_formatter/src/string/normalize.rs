@@ -6,13 +6,13 @@ use ruff_formatter::FormatContext;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{
     AnyStringFlags, BytesLiteral, FString, FStringElement, FStringElements, FStringFlags,
-    StringFlags, StringLikePart, StringLiteral,
-    str::{Quote, TripleQuotes},
+    StringFlags, StringLikePart, StringLiteral, TString, TStringElement, TStringElements,
+    TStringFlags,
 };
 use ruff_text_size::{Ranged, TextRange, TextSlice};
 
 use crate::QuoteStyle;
-use crate::context::FStringState;
+use crate::context::FTStringState;
 use crate::prelude::*;
 use crate::string::StringQuotes;
 
@@ -47,11 +47,16 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
             .unwrap_or(self.context.options().quote_style());
         let supports_pep_701 = self.context.options().target_version().supports_pep_701();
 
-        // For f-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
-        if let FStringState::InsideExpressionElement(parent_context) = self.context.f_string_state()
-        {
-            let parent_flags = parent_context.f_string().flags();
-
+        // For f-strings and t-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
+        if let Some(parent_flags) = match self.context.ft_string_state() {
+            FTStringState::InsideExpressionElement(parent_context) => {
+                Some(parent_context.f_string().flags())
+            }
+            FTStringState::InsideInterpolationElement(parent_context) => {
+                Some(parent_context.t_string().flags())
+            }
+            FTStringState::Outside => None,
+        } {
             if !parent_flags.is_triple_quoted() || string.flags().is_triple_quoted() {
                 // This logic is even necessary when using preserve and the target python version doesn't support PEP701 because
                 // we might end up joining two f-strings that have different quote styles, in which case we need to alternate the quotes
@@ -67,33 +72,41 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
             return QuoteStyle::Preserve;
         }
 
-        // There are cases where it is necessary to preserve the quotes to prevent an invalid f-string.
-        if let StringLikePart::FString(fstring) = string {
-            // There are two cases where it's necessary to preserve the quotes if the
-            // target version is pre 3.12 and the part is an f-string.
-            if !supports_pep_701 {
-                // An f-string expression contains a debug text with a quote character
-                // because the formatter will emit the debug expression **exactly** the
-                // same as in the source text.
-                if is_fstring_with_quoted_debug_expression(fstring, self.context) {
-                    return QuoteStyle::Preserve;
+        // There are cases where it is necessary to preserve the quotes to prevent an invalid f-string or t-string.
+        match string {
+            StringLikePart::FString(fstring) => {
+                // There are two cases where it's necessary to preserve the quotes if the
+                // target version is pre 3.12 and the part is an f-string.
+                if !supports_pep_701 {
+                    // An f-string expression contains a debug text with a quote character
+                    // because the formatter will emit the debug expression **exactly** the
+                    // same as in the source text.
+                    if is_fstring_with_quoted_debug_expression(fstring, self.context) {
+                        return QuoteStyle::Preserve;
+                    }
+
+                    // An f-string expression that contains a triple quoted string literal
+                    // expression that contains a quote.
+                    if is_fstring_with_triple_quoted_literal_expression_containing_quotes(
+                        fstring,
+                        self.context,
+                    ) {
+                        return QuoteStyle::Preserve;
+                    }
                 }
 
-                // An f-string expression that contains a triple quoted string literal
-                // expression that contains a quote.
-                if is_fstring_with_triple_quoted_literal_expression_containing_quotes(
-                    fstring,
-                    self.context,
-                ) {
+                // An f-string expression element contains a debug text and the corresponding
+                // format specifier has a literal element with a quote character.
+                if is_fstring_with_quoted_format_spec_and_debug(fstring, self.context) {
                     return QuoteStyle::Preserve;
                 }
             }
-
-            // An f-string expression element contains a debug text and the corresponding
-            // format specifier has a literal element with a quote character.
-            if is_fstring_with_quoted_format_spec_and_debug(fstring, self.context) {
-                return QuoteStyle::Preserve;
+            StringLikePart::TString(tstring) => {
+                if is_tstring_with_quoted_format_spec_and_debug(tstring, self.context) {
+                    return QuoteStyle::Preserve;
+                }
             }
+            _ => {}
         }
 
         // Per PEP 8, always prefer double quotes for triple-quoted strings.
@@ -172,7 +185,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
             // The preferred quote style is single or double quotes, and the string contains a quote or
             // another character that may require escaping
             (Ok(preferred_quote), Some(first_quote_or_normalized_char_offset)) => {
-                let metadata = if string.is_fstring() {
+                let metadata = if string.is_ftstring() {
                     QuoteMetadata::from_part(string, self.context, preferred_quote)
                 } else {
                     QuoteMetadata::from_str(
@@ -265,6 +278,16 @@ impl QuoteMetadata {
                 metadata.merge_fstring_elements(
                     &fstring.elements,
                     fstring.flags,
+                    context,
+                    preferred_quote,
+                )
+            }
+            StringLikePart::TString(tstring) => {
+                let metadata = QuoteMetadata::from_str("", part.flags(), preferred_quote);
+
+                metadata.merge_tstring_elements(
+                    &tstring.elements,
+                    tstring.flags,
                     context,
                     preferred_quote,
                 )
@@ -401,6 +424,51 @@ impl QuoteMetadata {
                     if let Some(spec) = expression.format_spec.as_deref() {
                         if expression.debug_text.is_none() {
                             merged = merged.merge_fstring_elements(
+                                &spec.elements,
+                                flags,
+                                context,
+                                preferred_quote,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        merged
+    }
+    /// For t-strings, only consider the quotes inside string-literals but ignore
+    /// quotes inside interpolations (except inside the format spec). This allows both the outer and the nested literals
+    /// to make the optimal local-choice to reduce the total number of quotes necessary.
+    /// This doesn't require any pre 312 special handling because an interpolation
+    /// can never contain the outer quote character, not even escaped:
+    /// ```python
+    /// t"{'escaping a quote like this \" is a syntax error pre 312'}"
+    /// ```
+    fn merge_tstring_elements(
+        self,
+        elements: &TStringElements,
+        flags: TStringFlags,
+        context: &PyFormatContext,
+        preferred_quote: Quote,
+    ) -> Self {
+        let mut merged = self;
+
+        for element in elements {
+            match element {
+                TStringElement::Literal(literal) => {
+                    merged = merged
+                        .merge(&QuoteMetadata::from_str(
+                            context.source().slice(literal),
+                            flags.into(),
+                            preferred_quote,
+                        ))
+                        .expect("Merge to succeed because all parts have the same flags");
+                }
+                TStringElement::Interpolation(interpolation) => {
+                    if let Some(spec) = interpolation.format_spec.as_deref() {
+                        if interpolation.debug_text.is_none() {
+                            merged = merged.merge_tstring_elements(
                                 &spec.elements,
                                 flags,
                                 context,
@@ -982,6 +1050,17 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
 
                     contains_quotes
                 }
+                StringLikePart::TString(tstring) => {
+                    let mut contains_quotes = false;
+                    for literal in tstring.elements.literals() {
+                        if self.contains_quote(literal.range(), tstring.flags.into()) {
+                            contains_quotes = true;
+                            break;
+                        }
+                    }
+
+                    contains_quotes
+                }
             };
 
             if contains_quotes {
@@ -1016,6 +1095,58 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
     ruff_python_ast::visitor::source_order::walk_f_string(&mut visitor, fstring);
 
     visitor.found
+}
+
+/// Returns `true` if `string` has any t-string interpolation element (direct or nested) with a debug expression and a format spec
+/// that contains the opposite quote. It's important to preserve the quote style for those t-strings
+/// because changing the quote style would result in invalid syntax.
+///
+/// ```python
+/// t'{1=: "abcd \'\'}'
+/// t'{x=:a{y:"abcd"}}'
+/// t'{x=:a{y:{z:"abcd"}}}'
+/// ```
+pub(super) fn is_tstring_with_quoted_format_spec_and_debug(
+    tstring: &TString,
+    context: &PyFormatContext,
+) -> bool {
+    fn has_format_spec_with_opposite_quote(
+        elements: &TStringElements,
+        flags: TStringFlags,
+        context: &PyFormatContext,
+        in_debug: bool,
+    ) -> bool {
+        elements.iter().any(|element| match element {
+            TStringElement::Literal(literal) => {
+                let content = context.source().slice(literal);
+
+                in_debug && contains_opposite_quote(content, flags.into())
+            }
+            TStringElement::Interpolation(expression) => {
+                expression.format_spec.as_deref().is_some_and(|spec| {
+                    has_format_spec_with_opposite_quote(
+                        &spec.elements,
+                        flags,
+                        context,
+                        in_debug || expression.debug_text.is_some(),
+                    )
+                })
+            }
+        })
+    }
+
+    tstring.elements.interpolations().any(|expression| {
+        if let Some(spec) = expression.format_spec.as_deref() {
+            return has_format_spec_with_opposite_quote(
+                &spec.elements,
+                tstring.flags,
+                context,
+                expression.debug_text.is_some(),
+            );
+        }
+
+        false
+    })
 }
 
 fn contains_opposite_quote(content: &str, flags: AnyStringFlags) -> bool {
