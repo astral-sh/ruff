@@ -36,36 +36,43 @@ Ruff Language Server in Neovim. To set it up, install
 [configuration](https://github.com/neovim/nvim-lspconfig#configuration) documentation, and add the
 following to your `init.lua`:
 
-- Nvim 0.11+ (see [vim.lsp.config](<https://neovim.io/doc/user/lsp.html#vim.lsp.config()>))
+=== "Neovim 0.10 (with [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig))"
 
-  ```lua
-  vim.lsp.enable('ruff')
-  vim.lsp.config('ruff', {
-    init_options = {
-      settings = {
-        -- Ruff language server settings go here
+    ```lua
+    require('lspconfig').ruff.setup({
+      init_options = {
+        settings = {
+          -- Ruff language server settings go here
+        }
       }
-    }
-  })
-  ```
+    })
+    ```
 
-- Nvim 0.10 (legacy)
+    !!! note
 
-  ```lua
-  require('lspconfig').ruff.setup({
-    init_options = {
-      settings = {
-        -- Ruff language server settings go here
+        If the installed version of `nvim-lspconfig` includes the changes from
+        [neovim/nvim-lspconfig@`70d1c2c`](https://github.com/neovim/nvim-lspconfig/commit/70d1c2c31a88af4b36019dc1551be16bffb8f9db),
+        you will need to use Ruff version `0.5.3` or later.
+
+=== "Neovim 0.11+ (with [`vim.lsp.config`](https://neovim.io/doc/user/lsp.html#vim.lsp.config()))"
+
+    ```lua
+    vim.lsp.config('ruff', {
+      init_options = {
+        settings = {
+          -- Ruff language server settings go here
+        }
       }
-    }
-  })
-  ```
+    })
 
-!!! note
+    vim.lsp.enable('ruff')
+    ```
 
-    If the installed version of `nvim-lspconfig` includes the changes from
-    [neovim/nvim-lspconfig@`70d1c2c`](https://github.com/neovim/nvim-lspconfig/commit/70d1c2c31a88af4b36019dc1551be16bffb8f9db),
-    you will need to use Ruff version `0.5.3` or later.
+    !!! note
+
+        The [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) plugin should contain the changes
+        from [neovim/nvim-lspconfig@`bc1981a`](https://github.com/neovim/nvim-lspconfig/commit/bc1981a0d38faa7df0ffc7cb45203d2ce86267d0).
+
 
 If you're using Ruff alongside another language server (like Pyright), you may want to defer to that
 language server for certain capabilities, like [`textDocument/hover`](./features.md#hover):
