@@ -3703,6 +3703,7 @@ impl<'src> Parser<'src> {
             | TokenKind::Complex
             | TokenKind::String
             | TokenKind::FStringStart
+            | TokenKind::TStringStart
             | TokenKind::Lbrace
             | TokenKind::Tilde
             | TokenKind::Ellipsis
