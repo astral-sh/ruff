@@ -5,6 +5,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::preview::is_support_slices_in_literal_concatenation_enabled;
 
 /// ## What it does
 /// Checks for uses of the `+` operator to concatenate collections.
@@ -32,6 +33,12 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// foo = [2, 3, 4]
 /// bar = [1, *foo, 5, 6]
 /// ```
+///
+/// ## Fix safety
+///
+/// The fix is always marked as unsafe because the `+` operator uses the `__add__` magic method and
+/// `*`-unpacking uses the `__iter__` magic method. Both of these could have custom
+/// implementations, causing the fix to change program behaviour.
 ///
 /// ## References
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
@@ -89,7 +96,7 @@ enum Type {
 }
 
 /// Recursively merge all the tuples and lists in the expression.
-fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
+fn concatenate_expressions(expr: &Expr, should_support_slices: bool) -> Option<(Expr, Type)> {
     let Expr::BinOp(ast::ExprBinOp {
         left,
         op: Operator::Add,
@@ -101,18 +108,22 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
     };
 
     let new_left = match left.as_ref() {
-        Expr::BinOp(ast::ExprBinOp { .. }) => match concatenate_expressions(left) {
-            Some((new_left, _)) => new_left,
-            None => *left.clone(),
-        },
+        Expr::BinOp(ast::ExprBinOp { .. }) => {
+            match concatenate_expressions(left, should_support_slices) {
+                Some((new_left, _)) => new_left,
+                None => *left.clone(),
+            }
+        }
         _ => *left.clone(),
     };
 
     let new_right = match right.as_ref() {
-        Expr::BinOp(ast::ExprBinOp { .. }) => match concatenate_expressions(right) {
-            Some((new_right, _)) => new_right,
-            None => *right.clone(),
-        },
+        Expr::BinOp(ast::ExprBinOp { .. }) => {
+            match concatenate_expressions(right, should_support_slices) {
+                Some((new_right, _)) => new_right,
+                None => *right.clone(),
+            }
+        }
         _ => *right.clone(),
     };
 
@@ -137,6 +148,12 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
         // We'll be a bit conservative here; only calls, names and attribute accesses
         // will be considered as splat elements.
         Expr::Call(_) | Expr::Attribute(_) | Expr::Name(_) => {
+            make_splat_elts(splat_element, other_elements, splat_at_left)
+        }
+        // Subscripts are also considered safe-ish to splat if the indexer is a slice.
+        Expr::Subscript(ast::ExprSubscript { slice, .. })
+            if should_support_slices && matches!(&**slice, Expr::Slice(_)) =>
+        {
             make_splat_elts(splat_element, other_elements, splat_at_left)
         }
         // If the splat element is itself a list/tuple, insert them in the other list/tuple.
@@ -181,7 +198,10 @@ pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let Some((new_expr, type_)) = concatenate_expressions(expr) else {
+    let should_support_slices =
+        is_support_slices_in_literal_concatenation_enabled(checker.settings);
+
+    let Some((new_expr, type_)) = concatenate_expressions(expr, should_support_slices) else {
         return;
     };
 

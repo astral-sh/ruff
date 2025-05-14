@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.83"
+rust-version = "1.84"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -23,6 +23,7 @@ ruff_index = { path = "crates/ruff_index" }
 ruff_linter = { path = "crates/ruff_linter" }
 ruff_macros = { path = "crates/ruff_macros" }
 ruff_notebook = { path = "crates/ruff_notebook" }
+ruff_options_metadata = { path = "crates/ruff_options_metadata" }
 ruff_python_ast = { path = "crates/ruff_python_ast" }
 ruff_python_codegen = { path = "crates/ruff_python_codegen" }
 ruff_python_formatter = { path = "crates/ruff_python_formatter" }
@@ -35,13 +36,15 @@ ruff_python_trivia = { path = "crates/ruff_python_trivia" }
 ruff_server = { path = "crates/ruff_server" }
 ruff_source_file = { path = "crates/ruff_source_file" }
 ruff_text_size = { path = "crates/ruff_text_size" }
-red_knot_vendored = { path = "crates/red_knot_vendored" }
 ruff_workspace = { path = "crates/ruff_workspace" }
 
-red_knot_python_semantic = { path = "crates/red_knot_python_semantic" }
-red_knot_server = { path = "crates/red_knot_server" }
-red_knot_test = { path = "crates/red_knot_test" }
-red_knot_project = { path = "crates/red_knot_project", default-features = false }
+ty = { path = "crates/ty" }
+ty_ide = { path = "crates/ty_ide" }
+ty_project = { path = "crates/ty_project", default-features = false }
+ty_python_semantic = { path = "crates/ty_python_semantic" }
+ty_server = { path = "crates/ty_server" }
+ty_test = { path = "crates/ty_test" }
+ty_vendored = { path = "crates/ty_vendored" }
 
 aho-corasick = { version = "1.1.3" }
 anstream = { version = "0.6.18" }
@@ -54,7 +57,6 @@ bitflags = { version = "2.5.0" }
 bstr = { version = "1.9.1" }
 cachedir = { version = "0.3.1" }
 camino = { version = "1.1.7" }
-chrono = { version = "0.4.35", default-features = false, features = ["clock"] }
 clap = { version = "4.5.3", features = ["derive"] }
 clap_complete_command = { version = "0.6.0" }
 clearscreen = { version = "4.0.0" }
@@ -94,6 +96,7 @@ insta-cmd = { version = "0.6.0" }
 is-macro = { version = "0.3.5" }
 is-wsl = { version = "0.4.0" }
 itertools = { version = "0.14.0" }
+jiff = { version = "0.2.0" }
 js-sys = { version = "0.3.69" }
 jod-thread = { version = "0.1.2" }
 libc = { version = "0.2.153" }
@@ -122,8 +125,9 @@ rand = { version = "0.9.0" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
+rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "d758691ba17ee1a60c5356ea90888d529e1782ad" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "7edce6e248f35c8114b4b021cdb474a3fb2813b3" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
@@ -181,7 +185,7 @@ wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false }
 
 [workspace.metadata.cargo-shear]
-ignored = ["getrandom"]
+ignored = ["getrandom", "ruff_options_metadata"]
 
 
 [workspace.lints.rust]
@@ -208,6 +212,7 @@ must_use_candidate = "allow"
 similar_names = "allow"
 single_match_else = "allow"
 too_many_lines = "allow"
+needless_continue = "allow"       # An explicit continue can be more readable, especially if the alternative is an empty block.
 # Without the hashes we run into a `rustfmt` bug in some snapshot tests, see #13250
 needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
@@ -266,70 +271,3 @@ debug = 1
 # The profile that 'cargo dist' will build with.
 [profile.dist]
 inherits = "release"
-
-# Config for 'dist'
-[workspace.metadata.dist]
-# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.25.2-prerelease.3"
-# CI backends to support
-ci = "github"
-# The installers to generate for each app
-installers = ["shell", "powershell"]
-# The archive format to use for windows builds (defaults .zip)
-windows-archive = ".zip"
-# The archive format to use for non-windows builds (defaults .tar.xz)
-unix-archive = ".tar.gz"
-# Target platforms to build apps for (Rust target-triple syntax)
-targets = [
-    "aarch64-apple-darwin",
-    "aarch64-pc-windows-msvc",
-    "aarch64-unknown-linux-gnu",
-    "aarch64-unknown-linux-musl",
-    "arm-unknown-linux-musleabihf",
-    "armv7-unknown-linux-gnueabihf",
-    "armv7-unknown-linux-musleabihf",
-    "i686-pc-windows-msvc",
-    "i686-unknown-linux-gnu",
-    "i686-unknown-linux-musl",
-    "powerpc64-unknown-linux-gnu",
-    "powerpc64le-unknown-linux-gnu",
-    "s390x-unknown-linux-gnu",
-    "x86_64-apple-darwin",
-    "x86_64-pc-windows-msvc",
-    "x86_64-unknown-linux-gnu",
-    "x86_64-unknown-linux-musl",
-]
-# Whether to auto-include files like READMEs, LICENSEs, and CHANGELOGs (default true)
-auto-includes = false
-# Whether dist should create a Github Release or use an existing draft
-create-release = true
-# Which actions to run on pull requests
-pr-run-mode = "skip"
-# Whether CI should trigger releases with dispatches instead of tag pushes
-dispatch-releases = true
-# Which phase dist should use to create the GitHub release
-github-release = "announce"
-# Whether CI should include auto-generated code to build local artifacts
-build-local-artifacts = false
-# Local artifacts jobs to run in CI
-local-artifacts-jobs = ["./build-binaries", "./build-docker"]
-# Publish jobs to run in CI
-publish-jobs = ["./publish-pypi", "./publish-wasm"]
-# Post-announce jobs to run in CI
-post-announce-jobs = [
-    "./notify-dependents",
-    "./publish-docs",
-    "./publish-playground",
-]
-# Custom permissions for GitHub Jobs
-github-custom-job-permissions = { "build-docker" = { packages = "write", contents = "read" }, "publish-wasm" = { contents = "read", id-token = "write", packages = "write" } }
-# Whether to install an updater program
-install-updater = false
-# Path that installers should place binaries in
-install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
-# Temporarily allow changes to the `release` workflow, in which we pin actions
-# to a SHA instead of a tag (https://github.com/astral-sh/uv/issues/12253)
-allow-dirty = ["ci"]
-
-[workspace.metadata.dist.github-custom-runners]
-global = "depot-ubuntu-latest-4"

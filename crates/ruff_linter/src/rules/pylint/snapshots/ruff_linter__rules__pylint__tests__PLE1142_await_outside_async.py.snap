@@ -63,3 +63,24 @@ await_outside_async.py:74:17: PLE1142 `await` should be used within an async fun
 74 |     [x for x in await foo()]
    |                 ^^^^^^^^^^^ PLE1142
    |
+
+await_outside_async.py:78:6: PLE1142 `await` should be used within an async function
+   |
+77 | def async_for_dictionary_comprehension_key():
+78 |     {await x: y for x, y in foo()}
+   |      ^^^^^^^ PLE1142
+   |
+
+await_outside_async.py:82:9: PLE1142 `await` should be used within an async function
+   |
+81 | def async_for_dictionary_comprehension_value():
+82 |     {y: await x for x, y in foo()}
+   |         ^^^^^^^ PLE1142
+   |
+
+await_outside_async.py:86:11: PLE1142 `await` should be used within an async function
+   |
+85 | def async_for_dict_comprehension():
+86 |     {x: y async for x, y in foo()}
+   |           ^^^^^^^^^^^^^^^^^^^^^^^ PLE1142
+   |

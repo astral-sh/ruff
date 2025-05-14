@@ -1503,24 +1503,48 @@ impl<'a> SemanticModel<'a> {
 
     /// Set the [`Globals`] for the current [`Scope`].
     pub fn set_globals(&mut self, globals: Globals<'a>) {
-        // If any global bindings don't already exist in the global scope, add them.
-        for (name, range) in globals.iter() {
-            if self
-                .global_scope()
-                .get(name)
-                .is_none_or(|binding_id| self.bindings[binding_id].is_unbound())
-            {
-                let id = self.bindings.push(Binding {
-                    kind: BindingKind::Assignment,
-                    range: *range,
-                    references: Vec::new(),
-                    scope: ScopeId::global(),
-                    source: self.node_id,
-                    context: self.execution_context(),
-                    exceptions: self.exceptions(),
-                    flags: BindingFlags::empty(),
-                });
-                self.global_scope_mut().add(name, id);
+        // If any global bindings don't already exist in the global scope, add them, unless we are
+        // also in the global scope, where we don't want these to count as definitions for rules
+        // like `undefined-name` (F821). For example, adding bindings in the top-level scope causes
+        // a false negative in cases like this:
+        //
+        // ```python
+        // global x
+        //
+        // def f():
+        //     print(x)  # F821 false negative
+        // ```
+        //
+        // On the other hand, failing to add bindings in non-top-level scopes causes false
+        // positives:
+        //
+        // ```python
+        // def f():
+        //     global foo
+        //     import foo
+        //
+        // def g():
+        //     foo.is_used()  # F821 false positive
+        // ```
+        if !self.at_top_level() {
+            for (name, range) in globals.iter() {
+                if self
+                    .global_scope()
+                    .get(name)
+                    .is_none_or(|binding_id| self.bindings[binding_id].is_unbound())
+                {
+                    let id = self.bindings.push(Binding {
+                        kind: BindingKind::Assignment,
+                        range: *range,
+                        references: Vec::new(),
+                        scope: ScopeId::global(),
+                        source: self.node_id,
+                        context: self.execution_context(),
+                        exceptions: self.exceptions(),
+                        flags: BindingFlags::empty(),
+                    });
+                    self.global_scope_mut().add(name, id);
+                }
             }
         }
 

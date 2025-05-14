@@ -114,6 +114,6 @@ pub(crate) fn ends_with_punctuation(checker: &Checker, docstring: &Docstring) {
                 )));
             }
             checker.report_diagnostic(diagnostic);
-        };
+        }
     }
 }

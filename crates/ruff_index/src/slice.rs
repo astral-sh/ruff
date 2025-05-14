@@ -22,7 +22,7 @@ impl<I: Idx, T> IndexSlice<I, T> {
     pub const fn from_raw(raw: &[T]) -> &Self {
         let ptr: *const [T] = raw;
 
-        #[allow(unsafe_code)]
+        #[expect(unsafe_code)]
         // SAFETY: `IndexSlice` is `repr(transparent)` over a normal slice
         unsafe {
             &*(ptr as *const Self)
@@ -33,7 +33,7 @@ impl<I: Idx, T> IndexSlice<I, T> {
     pub fn from_raw_mut(raw: &mut [T]) -> &mut Self {
         let ptr: *mut [T] = raw;
 
-        #[allow(unsafe_code)]
+        #[expect(unsafe_code)]
         // SAFETY: `IndexSlice` is `repr(transparent)` over a normal slice
         unsafe {
             &mut *(ptr as *mut Self)
@@ -209,5 +209,5 @@ impl<I: Idx, T> Default for &mut IndexSlice<I, T> {
 
 // Whether `IndexSlice` is `Send` depends only on the data,
 // not the phantom data.
-#[allow(unsafe_code)]
+#[expect(unsafe_code)]
 unsafe impl<I: Idx, T> Send for IndexSlice<I, T> where T: Send {}

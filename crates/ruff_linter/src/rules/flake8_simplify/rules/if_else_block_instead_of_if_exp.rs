@@ -8,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
+use crate::preview::is_simplify_ternary_to_binary_enabled;
 
 /// ## What it does
 /// Check for `if`-`else`-blocks that can be replaced with a ternary operator.
@@ -180,39 +181,40 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
     //     - If `test == not body_value` and preview enabled, replace with `target_var = body_value and else_value`
     //     - If `not test == body_value` and preview enabled, replace with `target_var = body_value and else_value`
     //     - Otherwise, replace with `target_var = body_value if test else else_value`
-    let (contents, assignment_kind) =
-        match (checker.settings.preview.is_enabled(), test, body_value) {
-            (true, test_node, body_node)
-                if ComparableExpr::from(test_node) == ComparableExpr::from(body_node)
-                    && !contains_effect(test_node, |id| {
-                        checker.semantic().has_builtin_binding(id)
-                    }) =>
-            {
-                let target_var = &body_target;
-                let binary = assignment_binary_or(target_var, body_value, else_value);
-                (checker.generator().stmt(&binary), AssignmentKind::Binary)
-            }
-            (true, test_node, body_node)
-                if (test_node.as_unary_op_expr().is_some_and(|op_expr| {
-                    op_expr.op.is_not()
-                        && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(body_node)
-                }) || body_node.as_unary_op_expr().is_some_and(|op_expr| {
-                    op_expr.op.is_not()
-                        && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(test_node)
-                })) && !contains_effect(test_node, |id| {
-                    checker.semantic().has_builtin_binding(id)
-                }) =>
-            {
-                let target_var = &body_target;
-                let binary = assignment_binary_and(target_var, body_value, else_value);
-                (checker.generator().stmt(&binary), AssignmentKind::Binary)
-            }
-            _ => {
-                let target_var = &body_target;
-                let ternary = assignment_ternary(target_var, body_value, test, else_value);
-                (checker.generator().stmt(&ternary), AssignmentKind::Ternary)
-            }
-        };
+    let (contents, assignment_kind) = match (
+        is_simplify_ternary_to_binary_enabled(checker.settings),
+        test,
+        body_value,
+    ) {
+        (true, test_node, body_node)
+            if ComparableExpr::from(test_node) == ComparableExpr::from(body_node)
+                && !contains_effect(test_node, |id| checker.semantic().has_builtin_binding(id)) =>
+        {
+            let target_var = &body_target;
+            let binary = assignment_binary_or(target_var, body_value, else_value);
+            (checker.generator().stmt(&binary), AssignmentKind::Binary)
+        }
+        (true, test_node, body_node)
+            if (test_node.as_unary_op_expr().is_some_and(|op_expr| {
+                op_expr.op.is_not()
+                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(body_node)
+            }) || body_node.as_unary_op_expr().is_some_and(|op_expr| {
+                op_expr.op.is_not()
+                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(test_node)
+            })) && !contains_effect(test_node, |id| {
+                checker.semantic().has_builtin_binding(id)
+            }) =>
+        {
+            let target_var = &body_target;
+            let binary = assignment_binary_and(target_var, body_value, else_value);
+            (checker.generator().stmt(&binary), AssignmentKind::Binary)
+        }
+        _ => {
+            let target_var = &body_target;
+            let ternary = assignment_ternary(target_var, body_value, test, else_value);
+            (checker.generator().stmt(&ternary), AssignmentKind::Ternary)
+        }
+    };
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     if !fits(

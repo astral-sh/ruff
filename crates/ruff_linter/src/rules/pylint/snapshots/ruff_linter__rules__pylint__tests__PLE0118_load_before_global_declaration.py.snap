@@ -123,3 +123,11 @@ load_before_global_declaration.py:113:14: PLE0118 Name `x` is used prior to glob
     |              ^ PLE0118
 114 |     global x
     |
+
+load_before_global_declaration.py:162:1: PLE0118 Name `x` is used prior to global declaration on line 163
+    |
+161 | # surprisingly still an error, global in module scope
+162 | x = None
+    | ^ PLE0118
+163 | global x
+    |

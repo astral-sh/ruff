@@ -1,6 +1,7 @@
+use crate::rules::numpy::helpers::{AttributeSearcher, ImportSearcher};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
+use ruff_python_ast::name::QualifiedNameBuilder;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr};
@@ -705,7 +706,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
             Edit::range_replacement(python_expr.to_string(), expr.range()),
         )),
         Details::Manual { guideline: _ } => {}
-    };
+    }
     checker.report_diagnostic(diagnostic);
 }
 
@@ -822,57 +823,6 @@ fn try_block_contains_undeprecated_attribute(
     attribute_searcher.found_attribute
 }
 
-/// AST visitor that searches an AST tree for [`ast::ExprAttribute`] nodes
-/// that match a certain [`QualifiedName`].
-struct AttributeSearcher<'a> {
-    attribute_to_find: QualifiedName<'a>,
-    semantic: &'a SemanticModel<'a>,
-    found_attribute: bool,
-}
-
-impl<'a> AttributeSearcher<'a> {
-    fn new(attribute_to_find: QualifiedName<'a>, semantic: &'a SemanticModel<'a>) -> Self {
-        Self {
-            attribute_to_find,
-            semantic,
-            found_attribute: false,
-        }
-    }
-}
-
-impl Visitor<'_> for AttributeSearcher<'_> {
-    fn visit_expr(&mut self, expr: &'_ Expr) {
-        if self.found_attribute {
-            return;
-        }
-        if expr.is_attribute_expr()
-            && self
-                .semantic
-                .resolve_qualified_name(expr)
-                .is_some_and(|qualified_name| qualified_name == self.attribute_to_find)
-        {
-            self.found_attribute = true;
-            return;
-        }
-        ast::visitor::walk_expr(self, expr);
-    }
-
-    fn visit_stmt(&mut self, stmt: &ruff_python_ast::Stmt) {
-        if !self.found_attribute {
-            ast::visitor::walk_stmt(self, stmt);
-        }
-    }
-
-    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
-        for stmt in body {
-            self.visit_stmt(stmt);
-            if self.found_attribute {
-                return;
-            }
-        }
-    }
-}
-
 /// Given an [`ast::StmtTry`] node, does the `try` branch of that node
 /// contain any [`ast::StmtImportFrom`] nodes that indicate the numpy
 /// member is being imported from the non-deprecated location?
@@ -891,50 +841,4 @@ fn try_block_contains_undeprecated_import(
     let mut import_searcher = ImportSearcher::new(path, name);
     import_searcher.visit_body(&try_node.body);
     import_searcher.found_import
-}
-
-/// AST visitor that searches an AST tree for [`ast::StmtImportFrom`] nodes
-/// that match a certain [`QualifiedName`].
-struct ImportSearcher<'a> {
-    module: &'a str,
-    name: &'a str,
-    found_import: bool,
-}
-
-impl<'a> ImportSearcher<'a> {
-    fn new(module: &'a str, name: &'a str) -> Self {
-        Self {
-            module,
-            name,
-            found_import: false,
-        }
-    }
-}
-
-impl StatementVisitor<'_> for ImportSearcher<'_> {
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-        if self.found_import {
-            return;
-        }
-        if let ast::Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) = stmt {
-            if module.as_ref().is_some_and(|module| module == self.module)
-                && names
-                    .iter()
-                    .any(|ast::Alias { name, .. }| name == self.name)
-            {
-                self.found_import = true;
-                return;
-            }
-        }
-        ast::statement_visitor::walk_stmt(self, stmt);
-    }
-
-    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
-        for stmt in body {
-            self.visit_stmt(stmt);
-            if self.found_import {
-                return;
-            }
-        }
-    }
 }

@@ -36,7 +36,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("fastapi").join(path).as_path(),
             &settings::LinterSettings {
-                unresolved_target_version: ruff_python_ast::PythonVersion::PY38,
+                unresolved_target_version: ruff_python_ast::PythonVersion::PY38.into(),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

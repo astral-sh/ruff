@@ -1,0 +1,157 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302_standard.py:25:1: AIR302 `airflow.operators.bash_operator.BashOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+23 | )
+24 |
+25 | BashOperator()
+   | ^^^^^^^^^^^^ AIR302
+26 |
+27 | TriggerDagRunLink()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.1` and use `airflow.providers.standard.operators.bash.BashOperator` instead.
+
+AIR302_standard.py:27:1: AIR302 `airflow.operators.dagrun_operator.TriggerDagRunLink` is moved into `standard` provider in Airflow 3.0;
+   |
+25 | BashOperator()
+26 |
+27 | TriggerDagRunLink()
+   | ^^^^^^^^^^^^^^^^^ AIR302
+28 | TriggerDagRunOperator()
+29 | DummyOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.2` and use `airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunLink` instead.
+
+AIR302_standard.py:28:1: AIR302 `airflow.operators.dagrun_operator.TriggerDagRunOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+27 | TriggerDagRunLink()
+28 | TriggerDagRunOperator()
+   | ^^^^^^^^^^^^^^^^^^^^^ AIR302
+29 | DummyOperator()
+30 | EmptyOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.2` and use `airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunOperator` instead.
+
+AIR302_standard.py:29:1: AIR302 `airflow.operators.dummy.DummyOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+27 | TriggerDagRunLink()
+28 | TriggerDagRunOperator()
+29 | DummyOperator()
+   | ^^^^^^^^^^^^^ AIR302
+30 | EmptyOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.2` and use `airflow.providers.standard.operators.empty.EmptyOperator` instead.
+
+AIR302_standard.py:30:1: AIR302 `airflow.operators.dummy.EmptyOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+28 | TriggerDagRunOperator()
+29 | DummyOperator()
+30 | EmptyOperator()
+   | ^^^^^^^^^^^^^ AIR302
+31 |
+32 | LatestOnlyOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.2` and use `airflow.providers.standard.operators.empty.EmptyOperator` instead.
+
+AIR302_standard.py:32:1: AIR302 `airflow.operators.latest_only_operator.LatestOnlyOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+30 | EmptyOperator()
+31 |
+32 | LatestOnlyOperator()
+   | ^^^^^^^^^^^^^^^^^^ AIR302
+33 |
+34 | BranchPythonOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `airflow.providers.standard.operators.latest_only.LatestOnlyOperator` instead.
+
+AIR302_standard.py:34:1: AIR302 `airflow.operators.python_operator.BranchPythonOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+32 | LatestOnlyOperator()
+33 |
+34 | BranchPythonOperator()
+   | ^^^^^^^^^^^^^^^^^^^^ AIR302
+35 | PythonOperator()
+36 | PythonVirtualenvOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.1` and use `airflow.providers.standard.operators.python.BranchPythonOperator` instead.
+
+AIR302_standard.py:35:1: AIR302 `airflow.operators.python_operator.PythonOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+34 | BranchPythonOperator()
+35 | PythonOperator()
+   | ^^^^^^^^^^^^^^ AIR302
+36 | PythonVirtualenvOperator()
+37 | ShortCircuitOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.1` and use `airflow.providers.standard.operators.python.PythonOperator` instead.
+
+AIR302_standard.py:36:1: AIR302 `airflow.operators.python_operator.PythonVirtualenvOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+34 | BranchPythonOperator()
+35 | PythonOperator()
+36 | PythonVirtualenvOperator()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+37 | ShortCircuitOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.1` and use `airflow.providers.standard.operators.python.PythonVirtualenvOperator` instead.
+
+AIR302_standard.py:37:1: AIR302 `airflow.operators.python_operator.ShortCircuitOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+35 | PythonOperator()
+36 | PythonVirtualenvOperator()
+37 | ShortCircuitOperator()
+   | ^^^^^^^^^^^^^^^^^^^^ AIR302
+38 |
+39 | ExternalTaskMarker()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.1` and use `airflow.providers.standard.operators.python.ShortCircuitOperator` instead.
+
+AIR302_standard.py:39:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskMarker` is moved into `standard` provider in Airflow 3.0;
+   |
+37 | ShortCircuitOperator()
+38 |
+39 | ExternalTaskMarker()
+   | ^^^^^^^^^^^^^^^^^^ AIR302
+40 | ExternalTaskSensor()
+41 | ExternalTaskSensorLink()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `airflow.providers.standard.sensors.external_task.ExternalTaskMarker` instead.
+
+AIR302_standard.py:40:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensor` is moved into `standard` provider in Airflow 3.0;
+   |
+39 | ExternalTaskMarker()
+40 | ExternalTaskSensor()
+   | ^^^^^^^^^^^^^^^^^^ AIR302
+41 | ExternalTaskSensorLink()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `airflow.providers.standard.sensors.external_task.ExternalTaskSensor` instead.
+
+AIR302_standard.py:41:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensorLink` is moved into `standard` provider in Airflow 3.0;
+   |
+39 | ExternalTaskMarker()
+40 | ExternalTaskSensor()
+41 | ExternalTaskSensorLink()
+   | ^^^^^^^^^^^^^^^^^^^^^^ AIR302
+42 |
+43 | from airflow.operators.dummy_operator import (
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `airflow.providers.standard.sensors.external_task.ExternalTaskSensorLink` instead.
+
+AIR302_standard.py:48:1: AIR302 `airflow.operators.dummy_operator.DummyOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+46 | )
+47 |
+48 | DummyOperator()
+   | ^^^^^^^^^^^^^ AIR302
+49 | EmptyOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.2` and use `airflow.providers.standard.operators.empty.EmptyOperator` instead.
+
+AIR302_standard.py:49:1: AIR302 `airflow.operators.dummy_operator.EmptyOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+48 | DummyOperator()
+49 | EmptyOperator()
+   | ^^^^^^^^^^^^^ AIR302
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.2` and use `airflow.providers.standard.operators.empty.EmptyOperator` instead.

@@ -209,7 +209,7 @@ fn get_fallback_target_version(dir: &Path) -> Option<PythonVersion> {
     let pyproject = match parsed_pyproject {
         Ok(pyproject) => pyproject,
         Err(err) => {
-            debug!("Failed to find fallback `target-version` due to: {}", err);
+            debug!("Failed to find fallback `target-version` due to: {err}");
             return None;
         }
     };
@@ -399,7 +399,7 @@ strict-checking = false
 "#,
         )?;
 
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let expected = Flake8BuiltinsOptions {
             builtins_allowed_modules: Some(vec!["asyncio".to_string()]),
             allowed_modules: Some(vec!["sys".to_string()]),

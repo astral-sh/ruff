@@ -26,20 +26,6 @@ use crate::{
     TypeParam,
 };
 
-/// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ModModule {
-    pub range: TextRange,
-    pub body: Vec<Stmt>,
-}
-
-/// See also [Expression](https://docs.python.org/3/library/ast.html#ast.Expression)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ModExpression {
-    pub range: TextRange,
-    pub body: Box<Expr>,
-}
-
 impl StmtClassDef {
     /// Return an iterator over the bases of the class.
     pub fn bases(&self) -> &[Expr] {
@@ -102,6 +88,19 @@ impl Expr {
 }
 
 impl ExprRef<'_> {
+    /// See [`Expr::is_literal_expr`].
+    pub fn is_literal_expr(&self) -> bool {
+        matches!(
+            self,
+            ExprRef::StringLiteral(_)
+                | ExprRef::BytesLiteral(_)
+                | ExprRef::NumberLiteral(_)
+                | ExprRef::BooleanLiteral(_)
+                | ExprRef::NoneLiteral(_)
+                | ExprRef::EllipsisLiteral(_)
+        )
+    }
+
     pub fn precedence(&self) -> OperatorPrecedence {
         OperatorPrecedence::from(self)
     }
@@ -353,7 +352,7 @@ impl Deref for FStringLiteralElement {
 /// Transforms a value prior to formatting it.
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, is_macro::Is)]
 #[repr(i8)]
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 pub enum ConversionFlag {
     /// No conversion
     None = -1, // CPython uses -1
@@ -1522,7 +1521,7 @@ impl BytesLiteralFlags {
                 self.0
                     .set(BytesLiteralFlagsInner::R_PREFIX_LOWER, !uppercase_r);
             }
-        };
+        }
         self
     }
 
@@ -1749,7 +1748,7 @@ impl AnyStringFlags {
         match quotes {
             Quote::Double => self.0 |= AnyStringFlagsInner::DOUBLE,
             Quote::Single => self.0 -= AnyStringFlagsInner::DOUBLE,
-        };
+        }
         self
     }
 
@@ -2244,12 +2243,33 @@ impl Pattern {
     ///
     /// [irrefutable pattern]: https://peps.python.org/pep-0634/#irrefutable-case-blocks
     pub fn is_irrefutable(&self) -> bool {
+        self.irrefutable_pattern().is_some()
+    }
+
+    /// Return `Some(IrrefutablePattern)` if `self` is irrefutable or `None` otherwise.
+    pub fn irrefutable_pattern(&self) -> Option<IrrefutablePattern> {
         match self {
-            Pattern::MatchAs(PatternMatchAs { pattern: None, .. }) => true,
+            Pattern::MatchAs(PatternMatchAs {
+                pattern,
+                name,
+                range,
+            }) => match pattern {
+                Some(pattern) => pattern.irrefutable_pattern(),
+                None => match name {
+                    Some(name) => Some(IrrefutablePattern {
+                        kind: IrrefutablePatternKind::Name(name.id.clone()),
+                        range: *range,
+                    }),
+                    None => Some(IrrefutablePattern {
+                        kind: IrrefutablePatternKind::Wildcard,
+                        range: *range,
+                    }),
+                },
+            },
             Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
-                patterns.iter().any(Pattern::is_irrefutable)
+                patterns.iter().find_map(Pattern::irrefutable_pattern)
             }
-            _ => false,
+            _ => None,
         }
     }
 
@@ -2275,6 +2295,17 @@ impl Pattern {
             _ => false,
         }
     }
+}
+
+pub struct IrrefutablePattern {
+    pub kind: IrrefutablePatternKind,
+    pub range: TextRange,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum IrrefutablePatternKind {
+    Name(Name),
+    Wildcard,
 }
 
 /// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)
@@ -2813,7 +2844,7 @@ impl Arguments {
         self.find_argument(name, position).map(ArgOrKeyword::value)
     }
 
-    /// Return the the argument with the given name or at the given position, or `None` if no such
+    /// Return the argument with the given name or at the given position, or `None` if no such
     /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
     /// positional arguments.
     pub fn find_argument(&self, name: &str, position: usize) -> Option<ArgOrKeyword> {

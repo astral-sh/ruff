@@ -4,6 +4,7 @@ use std::str::FromStr;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, OperatorPrecedence, UnaryOp};
+use ruff_source_file::find_newline;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -160,13 +161,14 @@ pub(crate) fn native_literals(
                 keywords,
                 range: _,
             },
-        range: _,
+        range: call_range,
     } = call;
 
     if !keywords.is_empty() || args.len() > 1 {
         return;
     }
 
+    let tokens = checker.tokens();
     let semantic = checker.semantic();
 
     let Some(builtin) = semantic.resolve_builtin_symbol(func) else {
@@ -243,7 +245,23 @@ pub(crate) fn native_literals(
 
             let arg_code = checker.locator().slice(arg);
 
-            let content = match (parent_expr, literal_type, has_unary_op) {
+            let mut needs_space = false;
+            // Look for the `Rpar` token of the call expression and check if there is a keyword token right
+            // next to it without any space separating them. Without this check, the fix for this
+            // rule would create a syntax error.
+            // Ex) `bool(True)and None` no space between `)` and the keyword `and`.
+            //
+            // Subtract 1 from the end of the range to include `Rpar` token in the slice.
+            if let [paren_token, next_token, ..] = tokens.after(call_range.sub_end(1.into()).end())
+            {
+                needs_space = next_token.kind().is_keyword()
+                    && paren_token.range().end() == next_token.range().start();
+            }
+
+            let mut content = match (parent_expr, literal_type, has_unary_op) {
+                // Expressions including newlines must be parenthesised to be valid syntax
+                (_, _, true) if find_newline(arg_code).is_some() => format!("({arg_code})"),
+
                 // Attribute access on an integer requires the integer to be parenthesized to disambiguate from a float
                 // Ex) `(7).denominator` is valid but `7.denominator` is not
                 // Note that floats do not have this problem
@@ -260,6 +278,10 @@ pub(crate) fn native_literals(
 
                 _ => arg_code.to_string(),
             };
+
+            if needs_space {
+                content.push(' ');
+            }
 
             let applicability = if checker.comment_ranges().intersects(call.range) {
                 Applicability::Unsafe

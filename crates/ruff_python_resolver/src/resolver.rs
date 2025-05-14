@@ -12,7 +12,7 @@ use crate::import_result::{ImportResult, ImportType};
 use crate::module_descriptor::ImportModuleDescriptor;
 use crate::{host, native_module, py_typed, search};
 
-#[allow(clippy::fn_params_excessive_bools)]
+#[expect(clippy::fn_params_excessive_bools)]
 fn resolve_module_descriptor(
     root: &Path,
     module_descriptor: &ImportModuleDescriptor,
@@ -206,7 +206,7 @@ fn resolve_module_descriptor(
 /// defined in [PEP 420].
 ///
 /// [PEP 420]: https://peps.python.org/pep-0420/
-#[allow(clippy::fn_params_excessive_bools)]
+#[expect(clippy::fn_params_excessive_bools)]
 fn resolve_absolute_import(
     root: &Path,
     module_descriptor: &ImportModuleDescriptor,
@@ -392,7 +392,7 @@ fn resolve_best_absolute_import<Host: host::Host>(
 
     if allow_pyi && !module_descriptor.name_parts.is_empty() {
         // Check for a stdlib typeshed file.
-        debug!("Looking for typeshed stdlib path: {}", import_name);
+        debug!("Looking for typeshed stdlib path: {import_name}");
         if let Some(mut typeshed_stdilib_import) =
             find_typeshed_path(module_descriptor, true, config, host)
         {
@@ -401,7 +401,7 @@ fn resolve_best_absolute_import<Host: host::Host>(
         }
 
         // Check for a third-party typeshed file.
-        debug!("Looking for typeshed third-party path: {}", import_name);
+        debug!("Looking for typeshed third-party path: {import_name}");
         if let Some(mut typeshed_third_party_import) =
             find_typeshed_path(module_descriptor, false, config, host)
         {

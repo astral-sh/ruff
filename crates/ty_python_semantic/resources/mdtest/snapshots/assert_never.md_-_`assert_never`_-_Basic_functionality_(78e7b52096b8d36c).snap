@@ -1,0 +1,189 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: assert_never.md - `assert_never` - Basic functionality
+mdtest path: crates/ty_python_semantic/resources/mdtest/directives/assert_never.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import assert_never, Never, Any
+ 2 | from ty_extensions import Unknown
+ 3 | 
+ 4 | def _(never: Never, any_: Any, unknown: Unknown, flag: bool):
+ 5 |     assert_never(never)  # fine
+ 6 | 
+ 7 |     assert_never(0)  # error: [type-assertion-failure]
+ 8 |     assert_never("")  # error: [type-assertion-failure]
+ 9 |     assert_never(None)  # error: [type-assertion-failure]
+10 |     assert_never([])  # error: [type-assertion-failure]
+11 |     assert_never({})  # error: [type-assertion-failure]
+12 |     assert_never(())  # error: [type-assertion-failure]
+13 |     assert_never(1 if flag else never)  # error: [type-assertion-failure]
+14 | 
+15 |     assert_never(any_)  # error: [type-assertion-failure]
+16 |     assert_never(unknown)  # error: [type-assertion-failure]
+```
+
+# Diagnostics
+
+```
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+ --> src/mdtest_snippet.py:7:5
+  |
+5 |     assert_never(never)  # fine
+6 |
+7 |     assert_never(0)  # error: [type-assertion-failure]
+  |     ^^^^^^^^^^^^^-^
+  |                  |
+  |                  Inferred type of argument is `Literal[0]`
+8 |     assert_never("")  # error: [type-assertion-failure]
+9 |     assert_never(None)  # error: [type-assertion-failure]
+  |
+info: `Never` and `Literal[0]` are not equivalent types
+info: rule `type-assertion-failure` is enabled by default
+
+```
+
+```
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+  --> src/mdtest_snippet.py:8:5
+   |
+ 7 |     assert_never(0)  # error: [type-assertion-failure]
+ 8 |     assert_never("")  # error: [type-assertion-failure]
+   |     ^^^^^^^^^^^^^--^
+   |                  |
+   |                  Inferred type of argument is `Literal[""]`
+ 9 |     assert_never(None)  # error: [type-assertion-failure]
+10 |     assert_never([])  # error: [type-assertion-failure]
+   |
+info: `Never` and `Literal[""]` are not equivalent types
+info: rule `type-assertion-failure` is enabled by default
+
+```
+
+```
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+  --> src/mdtest_snippet.py:9:5
+   |
+ 7 |     assert_never(0)  # error: [type-assertion-failure]
+ 8 |     assert_never("")  # error: [type-assertion-failure]
+ 9 |     assert_never(None)  # error: [type-assertion-failure]
+   |     ^^^^^^^^^^^^^----^
+   |                  |
+   |                  Inferred type of argument is `None`
+10 |     assert_never([])  # error: [type-assertion-failure]
+11 |     assert_never({})  # error: [type-assertion-failure]
+   |
+info: `Never` and `None` are not equivalent types
+info: rule `type-assertion-failure` is enabled by default
+
+```
+
+```
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+  --> src/mdtest_snippet.py:10:5
+   |
+ 8 |     assert_never("")  # error: [type-assertion-failure]
+ 9 |     assert_never(None)  # error: [type-assertion-failure]
+10 |     assert_never([])  # error: [type-assertion-failure]
+   |     ^^^^^^^^^^^^^--^
+   |                  |
+   |                  Inferred type of argument is `list[Unknown]`
+11 |     assert_never({})  # error: [type-assertion-failure]
+12 |     assert_never(())  # error: [type-assertion-failure]
+   |
+info: `Never` and `list[Unknown]` are not equivalent types
+info: rule `type-assertion-failure` is enabled by default
+
+```
+
+```
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+  --> src/mdtest_snippet.py:11:5
+   |
+ 9 |     assert_never(None)  # error: [type-assertion-failure]
+10 |     assert_never([])  # error: [type-assertion-failure]
+11 |     assert_never({})  # error: [type-assertion-failure]
+   |     ^^^^^^^^^^^^^--^
+   |                  |
+   |                  Inferred type of argument is `dict[Unknown, Unknown]`
+12 |     assert_never(())  # error: [type-assertion-failure]
+13 |     assert_never(1 if flag else never)  # error: [type-assertion-failure]
+   |
+info: `Never` and `dict[Unknown, Unknown]` are not equivalent types
+info: rule `type-assertion-failure` is enabled by default
+
+```
+
+```
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+  --> src/mdtest_snippet.py:12:5
+   |
+10 |     assert_never([])  # error: [type-assertion-failure]
+11 |     assert_never({})  # error: [type-assertion-failure]
+12 |     assert_never(())  # error: [type-assertion-failure]
+   |     ^^^^^^^^^^^^^--^
+   |                  |
+   |                  Inferred type of argument is `tuple[()]`
+13 |     assert_never(1 if flag else never)  # error: [type-assertion-failure]
+   |
+info: `Never` and `tuple[()]` are not equivalent types
+info: rule `type-assertion-failure` is enabled by default
+
+```
+
+```
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+  --> src/mdtest_snippet.py:13:5
+   |
+11 |     assert_never({})  # error: [type-assertion-failure]
+12 |     assert_never(())  # error: [type-assertion-failure]
+13 |     assert_never(1 if flag else never)  # error: [type-assertion-failure]
+   |     ^^^^^^^^^^^^^--------------------^
+   |                  |
+   |                  Inferred type of argument is `Literal[1]`
+14 |
+15 |     assert_never(any_)  # error: [type-assertion-failure]
+   |
+info: `Never` and `Literal[1]` are not equivalent types
+info: rule `type-assertion-failure` is enabled by default
+
+```
+
+```
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+  --> src/mdtest_snippet.py:15:5
+   |
+13 |     assert_never(1 if flag else never)  # error: [type-assertion-failure]
+14 |
+15 |     assert_never(any_)  # error: [type-assertion-failure]
+   |     ^^^^^^^^^^^^^----^
+   |                  |
+   |                  Inferred type of argument is `Any`
+16 |     assert_never(unknown)  # error: [type-assertion-failure]
+   |
+info: `Never` and `Any` are not equivalent types
+info: rule `type-assertion-failure` is enabled by default
+
+```
+
+```
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+  --> src/mdtest_snippet.py:16:5
+   |
+15 |     assert_never(any_)  # error: [type-assertion-failure]
+16 |     assert_never(unknown)  # error: [type-assertion-failure]
+   |     ^^^^^^^^^^^^^-------^
+   |                  |
+   |                  Inferred type of argument is `Unknown`
+   |
+info: `Never` and `Unknown` are not equivalent types
+info: rule `type-assertion-failure` is enabled by default
+
+```

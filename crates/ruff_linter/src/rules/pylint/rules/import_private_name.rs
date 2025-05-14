@@ -151,7 +151,7 @@ fn is_typing(reference: &ResolvedReference) -> bool {
         || reference.in_runtime_evaluated_annotation()
 }
 
-#[allow(clippy::struct_field_names)]
+#[expect(clippy::struct_field_names)]
 struct ImportInfo<'a> {
     module_name: &'a [&'a str],
     member_name: Cow<'a, str>,

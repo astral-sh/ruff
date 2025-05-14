@@ -216,8 +216,7 @@ impl RuleSelector {
                 }
                 // Deprecated rules are excluded in preview mode and with 'All' option unless explicitly selected
                 RuleGroup::Deprecated => {
-                    (!preview_enabled || self.is_exact())
-                        && !matches!(self, RuleSelector::All { .. })
+                    (!preview_enabled || self.is_exact()) && !matches!(self, RuleSelector::All)
                 }
                 // Removed rules are included if explicitly selected but will error downstream
                 RuleGroup::Removed => self.is_exact(),
@@ -315,7 +314,7 @@ mod schema {
                     .filter(|_rule| {
                         // Filter out all test-only rules
                         #[cfg(any(feature = "test-rules", test))]
-                        #[allow(clippy::used_underscore_binding)]
+                        #[expect(clippy::used_underscore_binding)]
                         if _rule.starts_with("RUF9") || _rule == "PLW0101" {
                             return false;
                         }

@@ -30,7 +30,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Typing documentation: Version and platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
+/// - [Typing documentation: Version and platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
 pub(crate) struct ComplexIfStatementInStub;
 

@@ -34,6 +34,7 @@ pub enum PythonVersion {
     Py311,
     Py312,
     Py313,
+    Py314,
 }
 
 impl Default for PythonVersion {
@@ -55,6 +56,7 @@ impl TryFrom<ast::PythonVersion> for PythonVersion {
             ast::PythonVersion::PY311 => Ok(Self::Py311),
             ast::PythonVersion::PY312 => Ok(Self::Py312),
             ast::PythonVersion::PY313 => Ok(Self::Py313),
+            ast::PythonVersion::PY314 => Ok(Self::Py314),
             _ => Err(format!("unrecognized python version {value}")),
         }
     }
@@ -84,6 +86,7 @@ impl PythonVersion {
             Self::Py311 => (3, 11),
             Self::Py312 => (3, 12),
             Self::Py313 => (3, 13),
+            Self::Py314 => (3, 14),
         }
     }
 }
@@ -246,12 +249,12 @@ pub struct FilePatternSet {
     cache_key: u64,
     // This field is only for displaying the internals
     // of `set`.
-    #[allow(clippy::used_underscore_binding)]
+    #[expect(clippy::used_underscore_binding)]
     _set_internals: Vec<FilePattern>,
 }
 
 impl FilePatternSet {
-    #[allow(clippy::used_underscore_binding)]
+    #[expect(clippy::used_underscore_binding)]
     pub fn try_from_iter<I>(patterns: I) -> Result<Self, anyhow::Error>
     where
         I: IntoIterator<Item = FilePattern>,

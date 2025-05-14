@@ -1,7 +1,5 @@
 use compact_str::CompactString;
-use std::fmt::Display;
-
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use std::fmt::{Display, Write};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
@@ -899,12 +897,14 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Nonlocal);
 
         // test_err nonlocal_stmt_trailing_comma
-        // nonlocal ,
-        // nonlocal x,
-        // nonlocal x, y,
+        // def _():
+        //     nonlocal ,
+        //     nonlocal x,
+        //     nonlocal x, y,
 
         // test_err nonlocal_stmt_expression
-        // nonlocal x + 1
+        // def _():
+        //     nonlocal x + 1
         let names = self.parse_comma_separated_list_into_vec(
             RecoveryContextKind::Identifiers,
             Parser::parse_identifier,
@@ -912,7 +912,8 @@ impl<'src> Parser<'src> {
 
         if names.is_empty() {
             // test_err nonlocal_stmt_empty
-            // nonlocal
+            // def _():
+            //     nonlocal
             self.add_error(
                 ParseErrorType::EmptyNonlocalNames,
                 self.current_token_range(),
@@ -920,8 +921,9 @@ impl<'src> Parser<'src> {
         }
 
         // test_ok nonlocal_stmt
-        // nonlocal x
-        // nonlocal x, y, z
+        // def _():
+        //     nonlocal x
+        //     nonlocal x, y, z
         ast::StmtNonlocal {
             range: self.node_range(start),
             names,
@@ -1028,7 +1030,7 @@ impl<'src> Parser<'src> {
                         ..
                     }) = &**slice
                     {
-                        buffer.push_str(&format!("{integer}"));
+                        let _ = write!(buffer, "{integer}");
                     } else {
                         parser.add_error(
                             ParseErrorType::OtherError(
@@ -1125,10 +1127,10 @@ impl<'src> Parser<'src> {
         // a + b
 
         // test_err assign_stmt_invalid_value_expr
-        // x = *a and b
-        // x = *yield x
-        // x = *yield from x
-        // x = *lambda x: x
+        // x = (*a and b,)
+        // x = (42, *yield x)
+        // x = (42, *yield from x)
+        // x = (*lambda x: x,)
         // x = x := 1
 
         let mut value =
@@ -1579,25 +1581,50 @@ impl<'src> Parser<'src> {
                     ..
                 })
             ) {
-                // test_err except_stmt_unparenthesized_tuple
-                // try:
-                //     pass
-                // except x, y:
-                //     pass
-                // except x, y as exc:
-                //     pass
-                // try:
-                //     pass
-                // except* x, y:
-                //     pass
-                // except* x, y as eg:
-                //     pass
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "Multiple exception types must be parenthesized".to_string(),
-                    ),
-                    &parsed_expr,
-                );
+                if self.at(TokenKind::As) {
+                    // test_err except_stmt_unparenthesized_tuple_as
+                    // try:
+                    //     pass
+                    // except x, y as exc:
+                    //     pass
+                    // try:
+                    //     pass
+                    // except* x, y as eg:
+                    //     pass
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "Multiple exception types must be parenthesized when using `as`"
+                                .to_string(),
+                        ),
+                        &parsed_expr,
+                    );
+                } else {
+                    // test_err except_stmt_unparenthesized_tuple_no_as_py313
+                    // # parse_options: {"target-version": "3.13"}
+                    // try:
+                    //     pass
+                    // except x, y:
+                    //     pass
+                    // try:
+                    //     pass
+                    // except* x, y:
+                    //     pass
+
+                    // test_ok except_stmt_unparenthesized_tuple_no_as_py314
+                    // # parse_options: {"target-version": "3.14"}
+                    // try:
+                    //     pass
+                    // except x, y:
+                    //     pass
+                    // try:
+                    //     pass
+                    // except* x, y:
+                    //     pass
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes,
+                        parsed_expr.range(),
+                    );
+                }
             }
             Some(Box::new(parsed_expr.expr))
         } else {
@@ -1891,7 +1918,6 @@ impl<'src> Parser<'src> {
                 // test_ok function_def_valid_return_expr
                 // def foo() -> int | str: ...
                 // def foo() -> lambda x: x: ...
-                // def foo() -> (yield x): ...
                 // def foo() -> int if True else str: ...
 
                 // test_err function_def_invalid_return_expr
@@ -2986,7 +3012,6 @@ impl<'src> Parser<'src> {
                             // test_ok param_with_annotation
                             // def foo(arg: int): ...
                             // def foo(arg: lambda x: x): ...
-                            // def foo(arg: (yield x)): ...
                             // def foo(arg: (x := int)): ...
 
                             // test_err param_with_invalid_annotation
@@ -3341,10 +3366,6 @@ impl<'src> Parser<'src> {
 
         parameters.range = self.node_range(start);
 
-        // test_err params_duplicate_names
-        // def foo(a, a=10, *a, a, a: str, **a): ...
-        self.validate_parameters(&parameters);
-
         parameters
     }
 
@@ -3629,25 +3650,6 @@ impl<'src> Parser<'src> {
             }
             Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => {}
             _ => self.add_error(ParseErrorType::InvalidDeleteTarget, expr),
-        }
-    }
-
-    /// Validate that the given parameters doesn't have any duplicate names.
-    ///
-    /// Report errors for all the duplicate names found.
-    fn validate_parameters(&mut self, parameters: &ast::Parameters) {
-        let mut all_arg_names =
-            FxHashSet::with_capacity_and_hasher(parameters.len(), FxBuildHasher);
-
-        for parameter in parameters {
-            let range = parameter.name().range();
-            let param_name = parameter.name().as_str();
-            if !all_arg_names.insert(param_name) {
-                self.add_error(
-                    ParseErrorType::DuplicateParameter(param_name.to_string()),
-                    range,
-                );
-            }
         }
     }
 

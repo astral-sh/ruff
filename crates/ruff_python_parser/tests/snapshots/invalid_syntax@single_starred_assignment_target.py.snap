@@ -1,0 +1,58 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/single_starred_assignment_target.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..10,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 0..9,
+                    targets: [
+                        Starred(
+                            ExprStarred {
+                                range: 0..2,
+                                value: Name(
+                                    ExprName {
+                                        range: 1..2,
+                                        id: Name("a"),
+                                        ctx: Store,
+                                    },
+                                ),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Tuple(
+                        ExprTuple {
+                            range: 5..9,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 6..7,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | *a = (1,)
+  | ^^ Syntax Error: starred assignment target must be in a list or tuple
+  |

@@ -1170,7 +1170,7 @@ impl<'a> Generator<'a> {
                 } else {
                     self.unparse_expr(value, precedence::MAX);
                     self.p(".");
-                };
+                }
                 self.p_id(attr);
             }
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
@@ -1365,7 +1365,7 @@ impl<'a> Generator<'a> {
 
         if !conversion.is_none() {
             self.p("!");
-            #[allow(clippy::cast_possible_truncation)]
+
             self.p(&format!("{}", conversion as u8 as char));
         }
 

@@ -262,7 +262,7 @@ pub(crate) fn is_singledispatch_implementation(
 
         if attribute.attr.as_str() != "register" {
             return false;
-        };
+        }
 
         let Some(id) = semantic.lookup_attribute(attribute.value.as_ref()) else {
             return false;

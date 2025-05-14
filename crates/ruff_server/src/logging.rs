@@ -34,7 +34,7 @@ pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Pat
                 .append(true)
                 .open(&path)
                 .map_err(|err| {
-                    #[allow(clippy::print_stderr)]
+                    #[expect(clippy::print_stderr)]
                     {
                         eprintln!(
                             "Failed to open file at {} for logging: {err}",

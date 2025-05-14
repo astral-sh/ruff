@@ -3,7 +3,7 @@ use ruff_python_ast::StmtImportFrom;
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 
-use crate::{checkers::ast::Checker, fix};
+use crate::{checkers::ast::Checker, fix, preview::is_fix_future_annotations_in_stub_enabled};
 
 /// ## What it does
 /// Checks for the presence of the `from __future__ import annotations` import
@@ -16,7 +16,7 @@ use crate::{checkers::ast::Checker, fix};
 /// statement has no effect and should be omitted.
 ///
 /// ## References
-/// - [Static Typing with Python: Type Stubs](https://typing.readthedocs.io/en/latest/source/stubs.html)
+/// - [Static Typing with Python: Type Stubs](https://typing.python.org/en/latest/source/stubs.html)
 #[derive(ViolationMetadata)]
 pub(crate) struct FutureAnnotationsInStub;
 
@@ -47,7 +47,7 @@ pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
 
     if module_name != "__future__" {
         return;
-    };
+    }
 
     if names.iter().all(|alias| &*alias.name != "annotations") {
         return;
@@ -55,7 +55,7 @@ pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
 
     let mut diagnostic = Diagnostic::new(FutureAnnotationsInStub, *range);
 
-    if checker.settings.preview.is_enabled() {
+    if is_fix_future_annotations_in_stub_enabled(checker.settings) {
         let stmt = checker.semantic().current_statement();
 
         diagnostic.try_set_fix(|| {

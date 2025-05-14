@@ -18,7 +18,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
-  PYTHON_VERSION: "3.12"
+  PYTHON_VERSION: "3.13"
 
 jobs:
   determine_changes:
@@ -36,11 +36,13 @@ jobs:
       code: ${{ steps.check_code.outputs.changed }}
       # Flag that is raised when any code that affects the fuzzer is changed
       fuzz: ${{ steps.check_fuzzer.outputs.changed }}
+      # Flag that is set to "true" when code related to ty changes.
+      ty: ${{ steps.check_ty.outputs.changed }}
 
       # Flag that is set to "true" when code related to the playground changes.
       playground: ${{ steps.check_playground.outputs.changed }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -82,7 +84,7 @@ jobs:
           if git diff --quiet "${MERGE_BASE}...HEAD" -- ':Cargo.toml' \
             ':Cargo.lock' \
             ':crates/**' \
-            ':!crates/red_knot*/**' \
+            ':!crates/ty*/**' \
             ':!crates/ruff_python_formatter/**' \
             ':!crates/ruff_formatter/**' \
             ':!crates/ruff_dev/**' \
@@ -141,9 +143,9 @@ jobs:
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
         run: |
-          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':**/*' \
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':**' \
             ':!**/*.md' \
-            ':crates/red_knot_python_semantic/resources/mdtest/**/*.md' \
+            ':crates/ty_python_semantic/resources/mdtest/**/*.md' \
             ':!docs/**' \
             ':!assets/**' \
             ':.github/workflows/ci.yaml' \
@@ -166,12 +168,35 @@ jobs:
               echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Check if the ty code changed
+        id: check_ty
+        env:
+          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+        run: |
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- \
+            ':Cargo.toml' \
+            ':Cargo.lock' \
+            ':crates/ty*/**' \
+            ':crates/ruff_db/**' \
+            ':crates/ruff_annotate_snippets/**' \
+            ':crates/ruff_python_ast/**' \
+            ':crates/ruff_python_parser/**' \
+            ':crates/ruff_python_trivia/**' \
+            ':crates/ruff_source_file/**' \
+            ':crates/ruff_text_size/**' \
+            ':.github/workflows/ci.yaml' \
+          ; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
   cargo-fmt:
     name: "cargo fmt"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
       - name: "Install Rust toolchain"
@@ -185,10 +210,10 @@ jobs:
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - name: "Install Rust toolchain"
         run: |
           rustup component add clippy
@@ -196,7 +221,7 @@ jobs:
       - name: "Clippy"
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: "Clippy (wasm)"
-        run: cargo clippy -p ruff_wasm -p red_knot_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
+        run: cargo clippy -p ruff_wasm -p ty_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
 
   cargo-test-linux:
     name: "cargo test (linux)"
@@ -205,22 +230,30 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@v1
+        uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@914ac1e29db2d22aef69891f032778d9adc3990d # v2
+        uses: taiki-e/install-action@83254c543806f3224380bf1001d6fac8feaf2d0b # v2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@914ac1e29db2d22aef69891f032778d9adc3990d # v2
+        uses: taiki-e/install-action@83254c543806f3224380bf1001d6fac8feaf2d0b # v2
         with:
           tool: cargo-insta
+      - name: ty mdtests (GitHub annotations)
+        if: ${{ needs.determine_changes.outputs.ty == 'true' }}
+        env:
+          NO_COLOR: 1
+          MDTEST_GITHUB_ANNOTATIONS_FORMAT: 1
+        # Ignore errors if this step fails; we want to continue to later steps in the workflow anyway.
+        # This step is just to get nice GitHub annotations on the PR diff in the files-changed tab.
+        run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
         shell: bash
         env:
@@ -235,14 +268,18 @@ jobs:
       # sync, not just public items. Eventually we should do this for all
       # crates; for now add crates here as they are warning-clean to prevent
       # regression.
-      - run: cargo doc --no-deps -p red_knot_python_semantic -p red_knot -p red_knot_test -p ruff_db --document-private-items
+      - run: cargo doc --no-deps -p ty_python_semantic -p ty -p ty_test -p ruff_db --document-private-items
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ruff
           path: target/debug/ruff
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ty
+          path: target/debug/ty
 
   cargo-test-linux-release:
     name: "cargo test (linux, release)"
@@ -251,20 +288,20 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@v1
+        uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@914ac1e29db2d22aef69891f032778d9adc3990d # v2
+        uses: taiki-e/install-action@83254c543806f3224380bf1001d6fac8feaf2d0b # v2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@914ac1e29db2d22aef69891f032778d9adc3990d # v2
+        uses: taiki-e/install-action@83254c543806f3224380bf1001d6fac8feaf2d0b # v2
         with:
           tool: cargo-insta
       - name: "Run tests"
@@ -280,14 +317,14 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@914ac1e29db2d22aef69891f032778d9adc3990d # v2
+        uses: taiki-e/install-action@83254c543806f3224380bf1001d6fac8feaf2d0b # v2
         with:
           tool: cargo-nextest
       - name: "Run tests"
@@ -307,13 +344,13 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
-      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
           cache: "npm"
@@ -325,9 +362,9 @@ jobs:
         run: |
           cd crates/ruff_wasm
           wasm-pack test --node
-      - name: "Test red_knot_wasm"
+      - name: "Test ty_wasm"
         run: |
-          cd crates/red_knot_wasm
+          cd crates/ty_wasm
           wasm-pack test --node
 
   cargo-build-release:
@@ -336,14 +373,14 @@ jobs:
     if: ${{ github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@v1
+        uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
       - name: "Build"
         run: cargo build --release --locked
 
@@ -354,7 +391,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
       - uses: SebRollen/toml-action@b1b3628f55fc3a28208d4203ada8b737e9687876 # v1.2.0
@@ -362,19 +399,19 @@ jobs:
         with:
           file: "Cargo.toml"
           field: "workspace.package.rust-version"
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - name: "Install Rust toolchain"
         env:
           MSRV: ${{ steps.msrv.outputs.value }}
         run: rustup default "${MSRV}"
       - name: "Install mold"
-        uses: rui314/setup-mold@v1
+        uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@914ac1e29db2d22aef69891f032778d9adc3990d # v2
+        uses: taiki-e/install-action@83254c543806f3224380bf1001d6fac8feaf2d0b # v2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@914ac1e29db2d22aef69891f032778d9adc3990d # v2
+        uses: taiki-e/install-action@83254c543806f3224380bf1001d6fac8feaf2d0b # v2
         with:
           tool: cargo-insta
       - name: "Run tests"
@@ -391,16 +428,16 @@ jobs:
     if: ${{ github.ref == 'refs/heads/main' || needs.determine_changes.outputs.fuzz == 'true' || needs.determine_changes.outputs.code == 'true' }}
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
         with:
           workspaces: "fuzz -> target"
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo-binstall"
-        uses: cargo-bins/cargo-binstall@main
+        uses: cargo-bins/cargo-binstall@13f9d60d5358393bf14644dba56d9f123bc5d595 # v1.12.4
         with:
           tool: cargo-fuzz@0.11.2
       - name: "Install cargo-fuzz"
@@ -419,11 +456,11 @@ jobs:
     env:
       FORCE_COLOR: 1
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@22695119d769bdb6f7032ad67b9bca0ef8c4a174 # v5
-      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         name: Download Ruff binary to test
         id: download-cached-binary
         with:
@@ -453,10 +490,10 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       # Run all code generation scripts, and verify that the current output is
@@ -485,14 +522,14 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && needs.determine_changes.outputs.code == 'true' }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         name: Download comparison Ruff binary
         id: ruff-target
         with:
@@ -587,17 +624,64 @@ jobs:
         run: |
           echo ${{ github.event.number }} > pr-number
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         name: Upload PR Number
         with:
           name: pr-number
           path: pr-number
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         name: Upload Results
         with:
           name: ecosystem-result
           path: ecosystem-result
+
+  fuzz-ty:
+    name: "Fuzz for new ty panics"
+    runs-on: depot-ubuntu-22.04-16
+    needs:
+      - cargo-test-linux
+      - determine_changes
+    # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && needs.determine_changes.outputs.ty == 'true' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        name: Download new ty binary
+        id: ty-new
+        with:
+          name: ty
+          path: target/debug
+      - uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
+        name: Download baseline ty binary
+        with:
+          name: ty
+          branch: ${{ github.event.pull_request.base.ref }}
+          workflow: "ci.yaml"
+          check_artifacts: true
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+      - name: Fuzz
+        env:
+          FORCE_COLOR: 1
+          NEW_TY: ${{ steps.ty-new.outputs.download-path }}
+        run: |
+          # Make executable, since artifact download doesn't preserve this
+          chmod +x "${PWD}/ty" "${NEW_TY}/ty"
+
+          (
+            uvx \
+            --python="${PYTHON_VERSION}" \
+            --from=./python/py-fuzzer \
+            fuzz \
+            --test-executable="${NEW_TY}/ty" \
+            --baseline-executable="${PWD}/ty" \
+            --only-new-bugs \
+            --bin=ty \
+            0-500
+          )
 
   cargo-shear:
     name: "cargo shear"
@@ -605,10 +689,10 @@ jobs:
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: cargo-bins/cargo-binstall@main
+      - uses: cargo-bins/cargo-binstall@13f9d60d5358393bf14644dba56d9f123bc5d595 # v1.12.4
       - run: cargo binstall --no-confirm cargo-shear
       - run: cargo shear
 
@@ -618,18 +702,18 @@ jobs:
     timeout-minutes: 20
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
+        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1.49.1
         with:
           args: --out dist
       - name: "Test wheel"
@@ -642,22 +726,15 @@ jobs:
 
   pre-commit:
     name: "pre-commit"
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-22.04-16
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
-      - name: "Install Rust toolchain"
-        run: rustup show
-      - name: "Install pre-commit"
-        run: pip install pre-commit
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
       - name: "Cache pre-commit"
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
@@ -666,7 +743,7 @@ jobs:
           echo '```console' > "$GITHUB_STEP_SUMMARY"
           # Enable color output for pre-commit and remove it for the summary
           # Use --hook-stage=manual to enable slower pre-commit hooks that are skipped by default
-          SKIP=cargo-fmt,clippy,dev-generate-all pre-commit run --all-files --show-diff-on-failure --color=always --hook-stage=manual | \
+          SKIP=cargo-fmt,clippy,dev-generate-all uvx --python="${PYTHON_VERSION}" pre-commit run --all-files --show-diff-on-failure --color=always --hook-stage=manual | \
             tee >(sed -E 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[mGK]//g' >> "$GITHUB_STEP_SUMMARY") >&1
           exit_code="${PIPESTATUS[0]}"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -679,22 +756,22 @@ jobs:
     env:
       MKDOCS_INSIDERS_SSH_KEY_EXISTS: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY != '' }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.13"
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - name: "Add SSH key"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
-        uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
+        uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
         with:
           ssh-private-key: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY }}
       - name: "Install Rust toolchain"
         run: rustup show
       - name: Install uv
-        uses: astral-sh/setup-uv@22695119d769bdb6f7032ad67b9bca0ef8c4a174 # v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
       - name: "Install Insiders dependencies"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
         run: uv pip install -r docs/requirements-insiders.txt --system
@@ -721,10 +798,10 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.formatter == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Run checks"
@@ -747,17 +824,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         name: "Download ruff-lsp source"
         with:
           persist-credentials: false
           repository: "astral-sh/ruff-lsp"
 
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          # installation fails on 3.13 and newer
+          python-version: "3.12"
 
-      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         name: Download development ruff binary
         id: ruff-target
         with:
@@ -788,13 +866,13 @@ jobs:
       - determine_changes
     if: ${{ (needs.determine_changes.outputs.playground == 'true') }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
-      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: "npm"
@@ -820,17 +898,17 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
 
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
 
       - name: "Install Rust toolchain"
         run: rustup show
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@914ac1e29db2d22aef69891f032778d9adc3990d # v2
+        uses: taiki-e/install-action@83254c543806f3224380bf1001d6fac8feaf2d0b # v2
         with:
           tool: cargo-codspeed
 
@@ -838,7 +916,7 @@ jobs:
         run: cargo codspeed build --features codspeed -p ruff_benchmark
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@0010eb0ca6e89b80c88e8edaaa07cfe5f3e6664d # v3
+        uses: CodSpeedHQ/action@0010eb0ca6e89b80c88e8edaaa07cfe5f3e6664d # v3.5.0
         with:
           run: cargo codspeed run
           token: ${{ secrets.CODSPEED_TOKEN }}

@@ -195,6 +195,10 @@ where
             }
         }
     }
+
+    fn visit_identifier(&mut self, _identifier: &'ast ruff_python_ast::Identifier) {
+        // Skip identifiers, matching the formatter comment extraction
+    }
 }
 
 #[derive(Clone, Debug)]

@@ -1,5 +1,5 @@
-use red_knot_python_semantic::resolve_module;
 use ruff_db::files::FilePath;
+use ty_python_semantic::resolve_module;
 
 use crate::collector::CollectedImport;
 use crate::ModuleDb;

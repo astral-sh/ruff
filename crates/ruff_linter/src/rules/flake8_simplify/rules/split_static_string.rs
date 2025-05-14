@@ -186,12 +186,20 @@ fn split_sep(
     let list_items: Vec<&str> = if let Ok(split_n) = usize::try_from(max_split) {
         match direction {
             Direction::Left => value.splitn(split_n + 1, sep_value).collect(),
-            Direction::Right => value.rsplitn(split_n + 1, sep_value).collect(),
+            Direction::Right => {
+                let mut items: Vec<&str> = value.rsplitn(split_n + 1, sep_value).collect();
+                items.reverse();
+                items
+            }
         }
     } else {
         match direction {
             Direction::Left => value.split(sep_value).collect(),
-            Direction::Right => value.rsplit(sep_value).collect(),
+            Direction::Right => {
+                let mut items: Vec<&str> = value.rsplit(sep_value).collect();
+                items.reverse();
+                items
+            }
         }
     };
 

@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+<filename>:3:10: SyntaxError: name capture `irrefutable` makes remaining patterns unreachable
+  |
+2 | match value:
+3 |     case irrefutable:
+  |          ^^^^^^^^^^^
+4 |         pass
+5 |     case 1:
+  |

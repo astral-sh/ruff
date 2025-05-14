@@ -14,8 +14,6 @@ x[y] = (1, 2, 3)
 # This last group of tests checks that assignments we expect to be parsed
 # (including some interesting ones) continue to be parsed successfully.
 
-*foo = 42
-
 [x, y, z] = [1, 2, 3]
 
 (x, y, z) = (1, 2, 3)
@@ -39,7 +37,7 @@ foo.bar = 42
 
 foo = 42
 
-[] = *data
-() = *data
+[] = (*data,)
+() = (*data,)
 a, b = ab
 a = b = c

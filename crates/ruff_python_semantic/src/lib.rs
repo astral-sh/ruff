@@ -1,6 +1,7 @@
 pub mod analyze;
 mod binding;
 mod branches;
+pub mod cfg;
 mod context;
 mod definition;
 mod globals;

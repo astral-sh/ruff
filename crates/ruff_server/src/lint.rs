@@ -14,7 +14,7 @@ use ruff_linter::{
     directives::{extract_directives, Flags},
     generate_noqa_edits,
     linter::check_path,
-    message::{DiagnosticMessage, Message, SyntaxErrorMessage},
+    message::{DiagnosticMessage, Message},
     package::PackageRoot,
     packaging::detect_package_root,
     registry::AsRule,
@@ -101,7 +101,8 @@ pub(crate) fn check(
         settings.linter.unresolved_target_version
     };
 
-    let parse_options = ParseOptions::from(source_type).with_target_version(target_version);
+    let parse_options =
+        ParseOptions::from(source_type).with_target_version(target_version.parser_version());
 
     // Parse once.
     let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), parse_options)
@@ -172,10 +173,10 @@ pub(crate) fn check(
                     locator.to_index(),
                     encoding,
                 )),
-                Message::SyntaxError(syntax_error_message) => {
+                Message::SyntaxError(_) => {
                     if show_syntax_errors {
                         Some(syntax_error_to_lsp_diagnostic(
-                            syntax_error_message,
+                            &message,
                             &source_kind,
                             locator.to_index(),
                             encoding,
@@ -321,7 +322,7 @@ fn to_lsp_diagnostic(
 }
 
 fn syntax_error_to_lsp_diagnostic(
-    syntax_error: SyntaxErrorMessage,
+    syntax_error: &Message,
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
@@ -330,7 +331,7 @@ fn syntax_error_to_lsp_diagnostic(
     let cell: usize;
 
     if let Some(notebook_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
-        NotebookRange { cell, range } = syntax_error.range.to_notebook_range(
+        NotebookRange { cell, range } = syntax_error.range().to_notebook_range(
             source_kind.source_code(),
             index,
             notebook_index,
@@ -339,7 +340,7 @@ fn syntax_error_to_lsp_diagnostic(
     } else {
         cell = usize::default();
         range = syntax_error
-            .range
+            .range()
             .to_range(source_kind.source_code(), index, encoding);
     }
 
@@ -352,7 +353,7 @@ fn syntax_error_to_lsp_diagnostic(
             code: None,
             code_description: None,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: syntax_error.message,
+            message: syntax_error.body().to_string(),
             related_information: None,
             data: None,
         },

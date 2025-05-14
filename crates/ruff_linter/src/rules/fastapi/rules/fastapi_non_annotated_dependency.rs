@@ -6,7 +6,6 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
 use crate::rules::fastapi::rules::is_fastapi_route;
 use ruff_python_ast::PythonVersion;
 
@@ -59,6 +58,16 @@ use ruff_python_ast::PythonVersion;
 /// async def read_items(commons: Annotated[dict, Depends(common_parameters)]):
 ///     return commons
 /// ```
+///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for Python versions
+/// before 3.9, its diagnostic will not be emitted, and no fix will be offered, if
+/// `typing_extensions` imports have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
 ///
 /// [FastAPI documentation]: https://fastapi.tiangolo.com/tutorial/query-params-str-validations/?h=annotated#advantages-of-annotated
 /// [typing-annotated]: https://docs.python.org/3/library/typing.html#typing.Annotated
@@ -224,6 +233,10 @@ fn create_diagnostic(
     dependency_call: Option<DependencyCall>,
     mut seen_default: bool,
 ) -> bool {
+    let Some(importer) = checker.typing_importer("Annotated", PythonVersion::PY39) else {
+        return seen_default;
+    };
+
     let mut diagnostic = Diagnostic::new(
         FastApiNonAnnotatedDependency {
             py_version: checker.target_version(),
@@ -232,16 +245,7 @@ fn create_diagnostic(
     );
 
     let try_generate_fix = || {
-        let module = if checker.target_version() >= PythonVersion::PY39 {
-            "typing"
-        } else {
-            "typing_extensions"
-        };
-        let (import_edit, binding) = checker.importer().get_or_import_symbol(
-            &ImportRequest::import_from(module, "Annotated"),
-            parameter.range.start(),
-            checker.semantic(),
-        )?;
+        let (import_edit, binding) = importer.import(parameter.range.start())?;
 
         // Each of these classes takes a single, optional default
         // argument, followed by kw-only arguments

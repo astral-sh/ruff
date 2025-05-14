@@ -129,7 +129,7 @@ fn is_number_literal(expr: &Expr, value: i8) -> bool {
         if let Number::Int(number) = &number_literal.value {
             return number.as_i8().is_some_and(|number| number == value);
         } else if let Number::Float(number) = number_literal.value {
-            #[allow(clippy::float_cmp)]
+            #[expect(clippy::float_cmp)]
             return number == f64::from(value);
         }
     }

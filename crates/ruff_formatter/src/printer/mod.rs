@@ -331,7 +331,7 @@ impl<'a> Printer<'a> {
             FormatElement::Tag(StartVerbatim(kind)) => {
                 if let VerbatimKind::Verbatim { length } = kind {
                     // SAFETY: Ruff only supports formatting files <= 4GB
-                    #[allow(clippy::cast_possible_truncation)]
+                    #[expect(clippy::cast_possible_truncation)]
                     self.state.verbatim_markers.push(TextRange::at(
                         TextSize::from(self.state.buffer.len() as u32),
                         *length,
@@ -362,9 +362,7 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::FitsExpanded, args);
             }
 
-            FormatElement::Tag(
-                tag @ (StartLabelled(_) | StartEntry | StartBestFittingEntry { .. }),
-            ) => {
+            FormatElement::Tag(tag @ (StartLabelled(_) | StartEntry | StartBestFittingEntry)) => {
                 stack.push(tag.kind(), args);
             }
 
@@ -386,7 +384,7 @@ impl<'a> Printer<'a> {
             ) => {
                 stack.pop(tag.kind())?;
             }
-        };
+        }
 
         Ok(())
     }
@@ -466,7 +464,7 @@ impl<'a> Printer<'a> {
         self.push_marker();
 
         match text {
-            #[allow(clippy::cast_possible_truncation)]
+            #[expect(clippy::cast_possible_truncation)]
             Text::Token(token) => {
                 self.state.buffer.push_str(token);
                 self.state.line_width += token.len() as u32;
@@ -833,7 +831,7 @@ impl<'a> Printer<'a> {
         } else {
             self.state.buffer.push(char);
 
-            #[allow(clippy::cast_possible_truncation)]
+            #[expect(clippy::cast_possible_truncation)]
             let char_width = if char == '\t' {
                 self.options.indent_width.value()
             } else {
@@ -1416,7 +1414,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 | StartVerbatim(_)
                 | StartLabelled(_)
                 | StartEntry
-                | StartBestFittingEntry { .. }),
+                | StartBestFittingEntry),
             ) => {
                 self.stack.push(tag.kind(), args);
             }
@@ -1482,7 +1480,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             u32::from(indent.level()) * self.options().indent_width() + u32::from(indent.align());
 
         match text {
-            #[allow(clippy::cast_possible_truncation)]
+            #[expect(clippy::cast_possible_truncation)]
             Text::Token(token) => {
                 self.state.line_width += token.len() as u32;
             }
@@ -1513,7 +1511,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                                 }
                             }
                             // SAFETY: A u32 is sufficient to format files <= 4GB
-                            #[allow(clippy::cast_possible_truncation)]
+                            #[expect(clippy::cast_possible_truncation)]
                             c => c.width().unwrap_or(0) as u32,
                         };
                         self.state.line_width += char_width;
