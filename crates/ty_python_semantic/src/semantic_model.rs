@@ -89,6 +89,7 @@ impl_expression_has_type!(ast::ExprYieldFrom);
 impl_expression_has_type!(ast::ExprCompare);
 impl_expression_has_type!(ast::ExprCall);
 impl_expression_has_type!(ast::ExprFString);
+impl_expression_has_type!(ast::ExprTString);
 impl_expression_has_type!(ast::ExprStringLiteral);
 impl_expression_has_type!(ast::ExprBytesLiteral);
 impl_expression_has_type!(ast::ExprNumberLiteral);
@@ -125,6 +126,7 @@ impl HasType for ast::Expr {
             Expr::Compare(inner) => inner.inferred_type(model),
             Expr::Call(inner) => inner.inferred_type(model),
             Expr::FString(inner) => inner.inferred_type(model),
+            Expr::TString(inner) => inner.inferred_type(model),
             Expr::StringLiteral(inner) => inner.inferred_type(model),
             Expr::BytesLiteral(inner) => inner.inferred_type(model),
             Expr::NumberLiteral(inner) => inner.inferred_type(model),
