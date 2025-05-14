@@ -107,6 +107,12 @@ pub(crate) struct CheckCommand {
     #[clap(flatten)]
     pub(crate) config: ConfigsArg,
 
+    /// The path to a `ty.toml` file to use for configuration.
+    ///
+    /// While ty configuration can be included in a `pyproject.toml` file, it is not allowed in this context.
+    #[arg(long, env = "TY_CONFIG_FILE", value_name = "PATH")]
+    pub(crate) config_file: Option<SystemPathBuf>,
+
     /// The format to use for printing diagnostic messages.
     #[arg(long)]
     pub(crate) output_format: Option<OutputFormat>,

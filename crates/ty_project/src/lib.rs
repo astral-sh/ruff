@@ -5,7 +5,7 @@ use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 pub use db::{Db, ProjectDatabase};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
-pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
+pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, create_parse_diagnostic,
     create_unsupported_syntax_diagnostic,
