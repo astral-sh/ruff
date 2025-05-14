@@ -64,7 +64,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
                 [
                     "" | "builtins",
                     "EnvironmentError" | "IOError" | "WindowsError"
-                ] | ["mmap" | "select" | "socket" | "os", "error"]
+                ] | ["mmap" | "resource" | "select" | "socket" | "os", "error"]
             )
         })
 }

@@ -1548,7 +1548,7 @@ pub(super) fn report_invalid_return_type(
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     diag.set_primary_message(format_args!(
-        "Expected `{expected_ty}`, found `{actual_ty}`",
+        "expected `{expected_ty}`, found `{actual_ty}`",
         expected_ty = expected_ty.display(context.db()),
         actual_ty = actual_ty.display(context.db()),
     ));
@@ -1573,7 +1573,7 @@ pub(super) fn report_invalid_generator_function_return_type(
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     let inferred_ty = inferred_return.display(context.db());
     diag.set_primary_message(format_args!(
-        "Expected `{expected_ty}`, found `{inferred_ty}`",
+        "expected `{expected_ty}`, found `{inferred_ty}`",
         expected_ty = expected_ty.display(context.db()),
     ));
 

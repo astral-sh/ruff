@@ -149,3 +149,20 @@ Person = namedtuple("Person", ["id", "name", "age"], defaults=[None])
 alice = Person(1, "Alice", 42)
 bob = Person(2, "Bob")
 ```
+
+## NamedTuple with custom `__getattr__`
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/322>. Make sure that the
+`__getattr__` method does not interfere with the `NamedTuple` behavior.
+
+```py
+from typing import NamedTuple
+
+class Vec2(NamedTuple):
+    x: float = 0.0
+    y: float = 0.0
+
+    def __getattr__(self, attrs: str): ...
+
+Vec2(0.0, 0.0)
+```

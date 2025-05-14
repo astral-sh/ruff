@@ -60,7 +60,7 @@ error[invalid-return-type]: Return type does not match returned value
 17 |     yield from i()
 18 |
 19 | def j() -> str:  # error: [invalid-return-type]
-   |            ^^^ Expected `str`, found `types.GeneratorType`
+   |            ^^^ expected `str`, found `types.GeneratorType`
 20 |     yield 42
 21 | import types
    |
@@ -77,7 +77,7 @@ error[invalid-return-type]: Return type does not match returned value
 34 |     yield 42
 35 |
 36 | async def j() -> str:  # error: [invalid-return-type]
-   |                  ^^^ Expected `str`, found `types.AsyncGeneratorType`
+   |                  ^^^ expected `str`, found `types.AsyncGeneratorType`
 37 |     yield 42
    |
 info: Function is inferred as returning `types.AsyncGeneratorType` because it is an async generator function
