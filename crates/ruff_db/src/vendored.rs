@@ -172,7 +172,7 @@ impl Default for VendoredFileSystem {
 /// that users of the `VendoredFileSystem` could realistically need.
 /// For debugging purposes, however, we want to have all information
 /// available.
-#[allow(unused)]
+#[expect(unused)]
 #[derive(Debug)]
 struct ZipFileDebugInfo {
     crc32_hash: u32,

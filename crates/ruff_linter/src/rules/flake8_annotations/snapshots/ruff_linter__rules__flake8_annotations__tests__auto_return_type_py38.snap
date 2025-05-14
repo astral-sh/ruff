@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
-snapshot_kind: text
 ---
 auto_return_type.py:1:5: ANN201 [*] Missing return type annotation for public function `func`
   |
@@ -97,7 +96,7 @@ auto_return_type.py:27:5: ANN201 [*] Missing return type annotation for public f
    |     ^^^^ ANN201
 28 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
    |
-   = help: Add return type annotation: `Union[str | float]`
+   = help: Add return type annotation: `Union[str, float]`
 
 ℹ Unsafe fix
    1  |+from typing import Union
@@ -109,7 +108,7 @@ auto_return_type.py:27:5: ANN201 [*] Missing return type annotation for public f
 25 26 | 
 26 27 | 
 27    |-def func(x: int):
-   28 |+def func(x: int) -> Union[str | float]:
+   28 |+def func(x: int) -> Union[str, float]:
 28 29 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
 29 30 | 
 30 31 | 
@@ -120,7 +119,7 @@ auto_return_type.py:31:5: ANN201 [*] Missing return type annotation for public f
    |     ^^^^ ANN201
 32 |     return 1 + 2.5 if x > 0 else 1.5 or "str"
    |
-   = help: Add return type annotation: `Union[str | float]`
+   = help: Add return type annotation: `Union[str, float]`
 
 ℹ Unsafe fix
    1  |+from typing import Union
@@ -132,7 +131,7 @@ auto_return_type.py:31:5: ANN201 [*] Missing return type annotation for public f
 29 30 | 
 30 31 | 
 31    |-def func(x: int):
-   32 |+def func(x: int) -> Union[str | float]:
+   32 |+def func(x: int) -> Union[str, float]:
 32 33 |     return 1 + 2.5 if x > 0 else 1.5 or "str"
 33 34 | 
 34 35 | 
@@ -204,7 +203,7 @@ auto_return_type.py:59:5: ANN201 [*] Missing return type annotation for public f
 60 |     if not x:
 61 |         return 1
    |
-   = help: Add return type annotation: `Union[str | int | None]`
+   = help: Add return type annotation: `Union[str, int, None]`
 
 ℹ Unsafe fix
    1  |+from typing import Union
@@ -216,7 +215,7 @@ auto_return_type.py:59:5: ANN201 [*] Missing return type annotation for public f
 57 58 | 
 58 59 | 
 59    |-def func(x: int):
-   60 |+def func(x: int) -> Union[str | int | None]:
+   60 |+def func(x: int) -> Union[str, int, None]:
 60 61 |     if not x:
 61 62 |         return 1
 62 63 |     elif x > 5:
@@ -294,7 +293,7 @@ auto_return_type.py:82:5: ANN201 [*] Missing return type annotation for public f
 83 |     match x:
 84 |         case [1, 2, 3]:
    |
-   = help: Add return type annotation: `Union[str | int | None]`
+   = help: Add return type annotation: `Union[str, int, None]`
 
 ℹ Unsafe fix
    1  |+from typing import Union
@@ -306,7 +305,7 @@ auto_return_type.py:82:5: ANN201 [*] Missing return type annotation for public f
 80 81 | 
 81 82 | 
 82    |-def func(x: int):
-   83 |+def func(x: int) -> Union[str | int | None]:
+   83 |+def func(x: int) -> Union[str, int, None]:
 83 84 |     match x:
 84 85 |         case [1, 2, 3]:
 85 86 |             return 1
@@ -853,7 +852,7 @@ auto_return_type.py:299:5: ANN201 [*] Missing return type annotation for public 
 300 |     match x:
 301 |         case [1, 2, 3]:
     |
-    = help: Add return type annotation: `Union[str | int]`
+    = help: Add return type annotation: `Union[str, int]`
 
 ℹ Unsafe fix
 214 214 |         return 1
@@ -869,7 +868,7 @@ auto_return_type.py:299:5: ANN201 [*] Missing return type annotation for public 
 297 297 | 
 298 298 | 
 299     |-def func(x: int):
-    299 |+def func(x: int) -> Union[str | int]:
+    299 |+def func(x: int) -> Union[str, int]:
 300 300 |     match x:
 301 301 |         case [1, 2, 3]:
 302 302 |             return 1

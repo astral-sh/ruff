@@ -10,6 +10,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
@@ -108,7 +109,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
-                target_version: settings::types::PythonVersion::Py39,
+                unresolved_target_version: PythonVersion::PY39.into(),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -567,6 +568,21 @@ mod tests {
         def foo(tb: TracebackType) -> pathlib.Path: ...
     ",
         "github_issue_15681_fix_test"
+    )]
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        TYPE_CHECKING = False
+        if TYPE_CHECKING:
+            from typing import Any, Literal, Never, Self
+        else:
+            def __getattr__(name: str):
+                pass
+
+        __all__ = ['TYPE_CHECKING', 'Any', 'Literal', 'Never', 'Self']
+    ",
+        "github_issue_16045"
     )]
     fn contents_preview(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(

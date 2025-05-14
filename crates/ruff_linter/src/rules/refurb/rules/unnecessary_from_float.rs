@@ -15,7 +15,7 @@ use crate::checkers::ast::Checker;
 /// the use of `from_float` and `from_decimal` methods is unnecessary, and
 /// should be avoided in favor of the more concise constructor syntax.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// Decimal.from_float(4.2)
 /// Decimal.from_float(float("inf"))
@@ -109,10 +109,10 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
     'short_circuit: {
         if !matches!(constructor, Constructor::Decimal) {
             break 'short_circuit;
-        };
+        }
         if !(method_name == MethodName::FromFloat) {
             break 'short_circuit;
-        };
+        }
 
         let Some(value) = (match method_name {
             MethodName::FromFloat => call.arguments.find_argument_value("f", 0),
@@ -131,9 +131,9 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
         };
 
         // Must have exactly one argument, which is a string literal.
-        if arguments.keywords.len() != 0 {
+        if !arguments.keywords.is_empty() {
             break 'short_circuit;
-        };
+        }
         let [float] = arguments.args.as_ref() else {
             break 'short_circuit;
         };
@@ -150,7 +150,7 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
         // Must be a call to the `float` builtin.
         if !semantic.match_builtin_expr(func, "float") {
             break 'short_circuit;
-        };
+        }
 
         let replacement = checker.locator().slice(float).to_string();
         diagnostic.set_fix(Fix::safe_edits(

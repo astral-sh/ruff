@@ -6,7 +6,7 @@ use ruff_formatter::{
 };
 use ruff_python_ast::visitor::source_order::{walk_body, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch, StmtTry};
-use ruff_python_parser::{parse, AsMode};
+use ruff_python_parser::{parse, ParseOptions};
 use ruff_python_trivia::{
     indentation_at_offset, BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind,
 };
@@ -73,7 +73,7 @@ pub fn format_range(
 
     assert_valid_char_boundaries(range, source);
 
-    let parsed = parse(source, options.source_type().as_mode())?;
+    let parsed = parse(source, ParseOptions::from(options.source_type()))?;
     let source_code = SourceCode::new(source);
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let comments = Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
@@ -154,7 +154,7 @@ fn find_enclosing_node<'ast>(
     let mut visitor = FindEnclosingNode::new(range, context);
 
     if visitor.enter_node(root).is_traverse() {
-        root.visit_preorder(&mut visitor);
+        root.visit_source_order(&mut visitor);
     }
     visitor.leave_node(root);
 
@@ -314,7 +314,7 @@ fn narrow_range(
     };
 
     if visitor.enter_node(enclosing_node).is_traverse() {
-        enclosing_node.visit_preorder(&mut visitor);
+        enclosing_node.visit_source_order(&mut visitor);
     }
 
     visitor.leave_node(enclosing_node);
@@ -546,7 +546,7 @@ impl NarrowRange<'_> {
         Some(SavedLevel { level: saved_level })
     }
 
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     fn leave_level(&mut self, saved_state: SavedLevel) {
         self.level = saved_state.level;
     }

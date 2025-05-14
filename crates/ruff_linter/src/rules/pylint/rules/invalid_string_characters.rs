@@ -1,9 +1,7 @@
-use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_diagnostics::Edit;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_parser::TokenKind;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_python_parser::{Token, TokenKind};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 
@@ -29,14 +27,16 @@ use crate::Locator;
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidCharacterBackspace;
 
-impl AlwaysFixableViolation for InvalidCharacterBackspace {
+impl Violation for InvalidCharacterBackspace {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Invalid unescaped character backspace, use \"\\b\" instead".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Replace with escape sequence".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with escape sequence".to_string())
     }
 }
 
@@ -62,14 +62,16 @@ impl AlwaysFixableViolation for InvalidCharacterBackspace {
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidCharacterSub;
 
-impl AlwaysFixableViolation for InvalidCharacterSub {
+impl Violation for InvalidCharacterSub {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Invalid unescaped character SUB, use \"\\x1A\" instead".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Replace with escape sequence".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with escape sequence".to_string())
     }
 }
 
@@ -95,14 +97,16 @@ impl AlwaysFixableViolation for InvalidCharacterSub {
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidCharacterEsc;
 
-impl AlwaysFixableViolation for InvalidCharacterEsc {
+impl Violation for InvalidCharacterEsc {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Invalid unescaped character ESC, use \"\\x1B\" instead".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Replace with escape sequence".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with escape sequence".to_string())
     }
 }
 
@@ -128,14 +132,16 @@ impl AlwaysFixableViolation for InvalidCharacterEsc {
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidCharacterNul;
 
-impl AlwaysFixableViolation for InvalidCharacterNul {
+impl Violation for InvalidCharacterNul {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Invalid unescaped character NUL, use \"\\0\" instead".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Replace with escape sequence".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with escape sequence".to_string())
     }
 }
 
@@ -160,28 +166,29 @@ impl AlwaysFixableViolation for InvalidCharacterNul {
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidCharacterZeroWidthSpace;
 
-impl AlwaysFixableViolation for InvalidCharacterZeroWidthSpace {
+impl Violation for InvalidCharacterZeroWidthSpace {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Invalid unescaped character zero-width-space, use \"\\u200B\" instead".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Replace with escape sequence".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with escape sequence".to_string())
     }
 }
 
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
 pub(crate) fn invalid_string_characters(
     diagnostics: &mut Vec<Diagnostic>,
-    token: TokenKind,
-    range: TextRange,
+    token: &Token,
     locator: &Locator,
 ) {
-    let text = match token {
+    let text = match token.kind() {
         // We can't use the `value` field since it's decoded and e.g. for f-strings removed a curly
         // brace that escaped another curly brace, which would gives us wrong column information.
-        TokenKind::String | TokenKind::FStringMiddle => locator.slice(range),
+        TokenKind::String | TokenKind::FStringMiddle => locator.slice(token),
         _ => return,
     };
 
@@ -198,11 +205,16 @@ pub(crate) fn invalid_string_characters(
             }
         };
 
-        let location = range.start() + TextSize::try_from(column).unwrap();
+        let location = token.start() + TextSize::try_from(column).unwrap();
         let range = TextRange::at(location, c.text_len());
 
-        diagnostics.push(Diagnostic::new(rule, range).with_fix(Fix::safe_edit(
-            Edit::range_replacement(replacement.to_string(), range),
-        )));
+        let mut diagnostic = Diagnostic::new(rule, range);
+
+        if !token.unwrap_string_flags().is_raw_string() {
+            let edit = Edit::range_replacement(replacement.to_string(), range);
+            diagnostic.set_fix(Fix::safe_edit(edit));
+        }
+
+        diagnostics.push(diagnostic);
     }
 }

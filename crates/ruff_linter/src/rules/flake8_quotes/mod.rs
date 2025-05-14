@@ -12,9 +12,9 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
+    use ruff_python_ast::PythonVersion;
 
     use super::settings::Quote;
 
@@ -62,7 +62,7 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..LinterSettings::for_rule(Rule::AvoidableEscapedQuote)
-                    .with_target_version(PythonVersion::Py311)
+                    .with_target_version(PythonVersion::PY311)
             },
         )?;
         assert_messages!(diagnostics);
@@ -81,7 +81,7 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..LinterSettings::for_rule(Rule::AvoidableEscapedQuote)
-                    .with_target_version(PythonVersion::Py311)
+                    .with_target_version(PythonVersion::PY311)
             },
         )?;
         assert_messages!(diagnostics);

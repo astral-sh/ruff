@@ -195,7 +195,7 @@ pub(crate) fn if_expr_with_true_false(
             ),
             expr.range(),
         )));
-    };
+    }
     checker.report_diagnostic(diagnostic);
 }
 

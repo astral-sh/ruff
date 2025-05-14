@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/return_stmt_invalid_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -180,4 +179,22 @@ Module(
 4 | return x := 1
 5 | return *x and y
   |         ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |
+
+
+## Semantic Syntax Errors
+
+  |
+1 | return *
+  |        ^ Syntax Error: Starred expression cannot be used here
+2 | return yield x
+3 | return yield from x
+  |
+
+
+  |
+3 | return yield from x
+4 | return x := 1
+5 | return *x and y
+  |        ^^^^^^^^ Syntax Error: Starred expression cannot be used here
   |

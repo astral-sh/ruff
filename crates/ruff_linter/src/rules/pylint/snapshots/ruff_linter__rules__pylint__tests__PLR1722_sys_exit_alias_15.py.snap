@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+sys_exit_alias_15.py:6:1: PLR1722 [*] Use `sys.exit()` instead of `exit`
+  |
+4 | else:
+5 |     code = 1
+6 | exit(code)
+  | ^^^^ PLR1722
+  |
+  = help: Replace `exit` with `sys.exit()`
+
+ℹ Unsafe fix
+  1 |+import sys
+1 2 | success = True
+2 3 | if success:
+3 4 |     code = 0
+4 5 | else:
+5 6 |     code = 1
+6   |-exit(code)
+  7 |+sys.exit(code)

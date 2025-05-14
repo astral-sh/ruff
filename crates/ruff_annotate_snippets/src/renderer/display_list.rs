@@ -315,7 +315,7 @@ impl DisplaySet<'_> {
                         None => {
                             buffer.putc(line_offset, lineno_width + 1, '|', *lineno_color);
                         }
-                    };
+                    }
                 }
                 if let DisplaySourceLine::Content { text, .. } = line {
                     // The width of the line number, a space, pipe, and a space
@@ -474,7 +474,7 @@ impl DisplaySet<'_> {
                             // 3 │       X0 Y0 Z0
                             //   │ ┏━━━━━┛  │  │     < We are writing these lines
                             //   │ ┃┌───────┘  │     < by reverting the "depth" of
-                            //   │ ┃│┌─────────┘     < their multilne spans.
+                            //   │ ┃│┌─────────┘     < their multiline spans.
                             // 4 │ ┃││   X1 Y1 Z1
                             // 5 │ ┃││   X2 Y2 Z2
                             //   │ ┃│└────╿──│──┘ `Z` label
@@ -937,7 +937,7 @@ impl From<snippet::Level> for DisplayAnnotationType {
     }
 }
 
-/// Information whether the header is the initial one or a consequitive one
+/// Information whether the header is the initial one or a consecutive one
 /// for multi-slice cases.
 // TODO: private
 #[derive(Debug, Clone, PartialEq)]
@@ -1251,25 +1251,25 @@ fn fold_body(body: Vec<DisplayLine<'_>>) -> Vec<DisplayLine<'_>> {
     const INNER_UNFOLD_SIZE: usize = INNER_CONTEXT * 2 + 1;
 
     let mut lines = vec![];
-    let mut unhighlighed_lines = vec![];
+    let mut unhighlighted_lines = vec![];
     for line in body {
         match &line {
             DisplayLine::Source { annotations, .. } => {
                 if annotations.is_empty() {
-                    unhighlighed_lines.push(line);
+                    unhighlighted_lines.push(line);
                 } else {
                     if lines.is_empty() {
-                        // Ignore leading unhighlighed lines
-                        unhighlighed_lines.clear();
+                        // Ignore leading unhighlighted lines
+                        unhighlighted_lines.clear();
                     }
-                    match unhighlighed_lines.len() {
+                    match unhighlighted_lines.len() {
                         0 => {}
                         n if n <= INNER_UNFOLD_SIZE => {
                             // Rather than render our cut indicator, don't fold
-                            lines.append(&mut unhighlighed_lines);
+                            lines.append(&mut unhighlighted_lines);
                         }
                         _ => {
-                            lines.extend(unhighlighed_lines.drain(..INNER_CONTEXT));
+                            lines.extend(unhighlighted_lines.drain(..INNER_CONTEXT));
                             let inline_marks = lines
                                 .last()
                                 .and_then(|line| {
@@ -1287,16 +1287,16 @@ fn fold_body(body: Vec<DisplayLine<'_>>) -> Vec<DisplayLine<'_>> {
                             lines.push(DisplayLine::Fold {
                                 inline_marks: inline_marks.clone(),
                             });
-                            unhighlighed_lines
-                                .drain(..unhighlighed_lines.len().saturating_sub(INNER_CONTEXT));
-                            lines.append(&mut unhighlighed_lines);
+                            unhighlighted_lines
+                                .drain(..unhighlighted_lines.len().saturating_sub(INNER_CONTEXT));
+                            lines.append(&mut unhighlighted_lines);
                         }
                     }
                     lines.push(line);
                 }
             }
             _ => {
-                unhighlighed_lines.push(line);
+                unhighlighted_lines.push(line);
             }
         }
     }
@@ -1753,7 +1753,7 @@ fn format_inline_marks(
             DisplayMarkType::AnnotationThrough(depth) => {
                 buf.putc(line, 3 + lineno_width + depth, '|', *annotation_style);
             }
-        };
+        }
     }
     Ok(())
 }

@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -6,32 +7,42 @@ use std::sync::Arc;
 use anyhow::Context;
 use ignore::{WalkBuilder, WalkState};
 
-use ruff_linter::settings::types::UnsafeFixes;
-use ruff_linter::{
-    display_settings, fs::normalize_path_to, settings::types::FilePattern,
-    settings::types::PreviewMode,
-};
+use ruff_linter::settings::types::GlobPath;
+use ruff_linter::{settings::types::FilePattern, settings::types::PreviewMode};
+use ruff_workspace::pyproject::find_fallback_target_version;
 use ruff_workspace::resolver::match_exclusion;
+use ruff_workspace::Settings;
 use ruff_workspace::{
     configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
     pyproject::{find_user_settings_toml, settings_toml},
-    resolver::{ConfigurationTransformer, Relativity},
+    resolver::ConfigurationTransformer,
 };
 
-use crate::session::settings::{ConfigurationPreference, ResolvedEditorSettings};
+use crate::session::settings::{
+    ConfigurationPreference, ResolvedConfiguration, ResolvedEditorSettings,
+};
 
+#[derive(Debug)]
 pub struct RuffSettings {
     /// The path to this configuration file, used for debugging.
     /// The default fallback configuration does not have a file path.
     path: Option<PathBuf>,
-    /// Toggle for unsafe fixes.
-    unsafe_fixes: UnsafeFixes,
-    /// Settings used to manage file inclusion and exclusion.
-    file_resolver: ruff_workspace::FileResolverSettings,
-    /// Settings to pass into the Ruff linter.
-    linter: ruff_linter::settings::LinterSettings,
-    /// Settings to pass into the Ruff formatter.
-    formatter: ruff_workspace::FormatterSettings,
+    /// The resolved settings.
+    settings: Settings,
+}
+
+impl RuffSettings {
+    pub(crate) fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
+    }
+}
+
+impl Deref for RuffSettings {
+    type Target = Settings;
+
+    fn deref(&self) -> &Settings {
+        &self.settings
+    }
 }
 
 pub(super) struct RuffSettingsIndex {
@@ -42,69 +53,94 @@ pub(super) struct RuffSettingsIndex {
 
 impl std::fmt::Display for RuffSettings {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        display_settings! {
-            formatter = f,
-            fields = [
-                self.file_resolver,
-                self.linter,
-                self.formatter
-            ]
-        }
-        Ok(())
+        std::fmt::Display::fmt(&self.settings, f)
     }
 }
 
 impl RuffSettings {
+    /// Constructs [`RuffSettings`] by attempting to resolve settings from a user-provided
+    /// configuration file, such as `pyproject.toml` or `ruff.toml`, within the
+    /// user's workspace.
+    ///
+    /// In the absence of a valid configuration file, it gracefully falls back to
+    /// editor-only settings.
     pub(crate) fn fallback(editor_settings: &ResolvedEditorSettings, root: &Path) -> RuffSettings {
-        let mut path = None;
-        let fallback = find_user_settings_toml()
+        struct FallbackTransformer<'a> {
+            inner: EditorConfigurationTransformer<'a>,
+        }
+
+        impl ConfigurationTransformer for FallbackTransformer<'_> {
+            fn transform(&self, mut configuration: Configuration) -> Configuration {
+                let fallback = find_fallback_target_version(self.inner.1);
+                if let Some(fallback) = fallback {
+                    tracing::debug!(
+                        "Derived `target-version` from found `requires-python`: {fallback:?}"
+                    );
+                    configuration.target_version = Some(fallback.into());
+                }
+
+                self.inner.transform(configuration)
+            }
+        }
+
+        find_user_settings_toml()
             .and_then(|user_settings| {
-                let settings = ruff_workspace::resolver::resolve_root_settings(
+                tracing::debug!(
+                    "Loading settings from user configuration file: `{}`",
+                    user_settings.display()
+                );
+                ruff_workspace::resolver::resolve_root_settings(
                     &user_settings,
-                    Relativity::Cwd,
-                    &EditorConfigurationTransformer(editor_settings, root),
+                    &FallbackTransformer {
+                        inner: EditorConfigurationTransformer(editor_settings, root),
+                    },
+                    ruff_workspace::resolver::ConfigurationOrigin::UserSettings,
                 )
-                .ok();
-                path = Some(user_settings);
-                settings
+                .ok()
+                .map(|settings| RuffSettings {
+                    path: Some(user_settings),
+                    settings,
+                })
             })
             .unwrap_or_else(|| {
-                let default_configuration = Configuration::default();
-                EditorConfigurationTransformer(editor_settings, root)
-                    .transform(default_configuration)
-                    .into_settings(root)
-                    .expect(
-                        "editor configuration should merge successfully with default configuration",
-                    )
-            });
+                let fallback = find_fallback_target_version(root);
+                if let Some(fallback) = fallback {
+                    tracing::debug!(
+                        "Derived `target-version` from found `requires-python` for fallback configuration: {fallback:?}"
+                    );
+                }
 
-        RuffSettings {
-            path,
-            unsafe_fixes: fallback.unsafe_fixes,
-            file_resolver: fallback.file_resolver,
-            formatter: fallback.formatter,
-            linter: fallback.linter,
-        }
+                let configuration = Configuration {
+                    target_version: fallback.map(Into::into),
+                    ..Configuration::default()
+                };
+                Self::with_editor_settings(editor_settings, root, configuration).expect(
+                    "editor configuration should merge successfully with default configuration",
+                )
+            })
     }
 
-    /// Return the [`ruff_workspace::FileResolverSettings`] for this [`RuffSettings`].
-    pub(crate) fn file_resolver(&self) -> &ruff_workspace::FileResolverSettings {
-        &self.file_resolver
+    /// Constructs [`RuffSettings`] by merging the editor-defined settings with the
+    /// default configuration.
+    fn editor_only(editor_settings: &ResolvedEditorSettings, root: &Path) -> RuffSettings {
+        Self::with_editor_settings(editor_settings, root, Configuration::default())
+            .expect("editor configuration should merge successfully with default configuration")
     }
 
-    /// Return the [`ruff_linter::settings::LinterSettings`] for this [`RuffSettings`].
-    pub(crate) fn linter(&self) -> &ruff_linter::settings::LinterSettings {
-        &self.linter
-    }
+    /// Merges the `configuration` with the editor defined settings.
+    fn with_editor_settings(
+        editor_settings: &ResolvedEditorSettings,
+        root: &Path,
+        configuration: Configuration,
+    ) -> anyhow::Result<RuffSettings> {
+        let settings = EditorConfigurationTransformer(editor_settings, root)
+            .transform(configuration)
+            .into_settings(root)?;
 
-    /// Return the [`ruff_workspace::FormatterSettings`] for this [`RuffSettings`].
-    pub(crate) fn formatter(&self) -> &ruff_workspace::FormatterSettings {
-        &self.formatter
-    }
-
-    /// Return the [`UnsafeFixes`] for this [`RuffSettings`].
-    pub(crate) fn unsafe_fixes(&self) -> UnsafeFixes {
-        self.unsafe_fixes
+        Ok(RuffSettings {
+            path: None,
+            settings,
+        })
     }
 }
 
@@ -124,11 +160,22 @@ impl RuffSettingsIndex {
         editor_settings: &ResolvedEditorSettings,
         is_default_workspace: bool,
     ) -> Self {
+        if editor_settings.configuration_preference == ConfigurationPreference::EditorOnly {
+            tracing::debug!(
+                "Using editor-only settings for workspace: {} (skipped indexing)",
+                root.display()
+            );
+            return RuffSettingsIndex {
+                index: BTreeMap::default(),
+                fallback: Arc::new(RuffSettings::editor_only(editor_settings, root)),
+            };
+        }
+
         tracing::debug!("Indexing settings for workspace: {}", root.display());
 
         let mut has_error = false;
-        let mut index = BTreeMap::default();
         let mut respect_gitignore = None;
+        let mut index = BTreeMap::default();
 
         // If this is *not* the default workspace, then we should skip the workspace root itself
         // because it will be resolved when walking the workspace directory tree. This is done by
@@ -142,20 +189,18 @@ impl RuffSettingsIndex {
                 Ok(Some(pyproject)) => {
                     match ruff_workspace::resolver::resolve_root_settings(
                         &pyproject,
-                        Relativity::Parent,
                         &EditorConfigurationTransformer(editor_settings, root),
+                        ruff_workspace::resolver::ConfigurationOrigin::Ancestor,
                     ) {
                         Ok(settings) => {
+                            tracing::debug!("Loaded settings from: `{}`", pyproject.display());
                             respect_gitignore = Some(settings.file_resolver.respect_gitignore);
 
                             index.insert(
                                 directory.to_path_buf(),
                                 Arc::new(RuffSettings {
                                     path: Some(pyproject),
-                                    unsafe_fixes: settings.unsafe_fixes,
-                                    file_resolver: settings.file_resolver,
-                                    linter: settings.linter,
-                                    formatter: settings.formatter,
+                                    settings,
                                 }),
                             );
                             break;
@@ -210,7 +255,7 @@ impl RuffSettingsIndex {
         // Add any settings within the workspace itself
         let mut builder = WalkBuilder::new(root);
         builder.standard_filters(
-            respect_gitignore.unwrap_or_else(|| fallback.file_resolver().respect_gitignore),
+            respect_gitignore.unwrap_or_else(|| fallback.file_resolver.respect_gitignore),
         );
         builder.hidden(false);
         builder.threads(
@@ -269,18 +314,20 @@ impl RuffSettingsIndex {
                     Ok(Some(pyproject)) => {
                         match ruff_workspace::resolver::resolve_root_settings(
                             &pyproject,
-                            Relativity::Parent,
                             &EditorConfigurationTransformer(editor_settings, root),
+                            ruff_workspace::resolver::ConfigurationOrigin::Ancestor,
                         ) {
                             Ok(settings) => {
+                                tracing::debug!(
+                                    "Loaded settings from: `{}` for `{}`",
+                                    pyproject.display(),
+                                    directory.display()
+                                );
                                 index.write().unwrap().insert(
                                     directory,
                                     Arc::new(RuffSettings {
                                         path: Some(pyproject),
-                                        unsafe_fixes: settings.unsafe_fixes,
-                                        file_resolver: settings.file_resolver,
-                                        linter: settings.linter,
-                                        formatter: settings.formatter,
+                                        settings,
                                     }),
                                 );
                             }
@@ -333,14 +380,15 @@ impl RuffSettingsIndex {
             .clone()
     }
 
-    pub(crate) fn list_files(&self) -> impl Iterator<Item = &Path> {
+    pub(super) fn fallback(&self) -> Arc<RuffSettings> {
+        self.fallback.clone()
+    }
+
+    /// Returns an iterator over the paths to the configuration files in the index.
+    pub(crate) fn config_file_paths(&self) -> impl Iterator<Item = &Path> {
         self.index
             .values()
             .filter_map(|settings| settings.path.as_deref())
-    }
-
-    pub(super) fn fallback(&self) -> Arc<RuffSettings> {
-        self.fallback.clone()
     }
 }
 
@@ -381,7 +429,7 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
                 exclude
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = normalize_path_to(&pattern, project_root);
+                        let absolute = GlobPath::normalize(&pattern, project_root);
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
@@ -390,21 +438,39 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
             ..Configuration::default()
         };
 
-        // Merge in the editor-specified configuration file, if it exists.
-        let editor_configuration = if let Some(config_file_path) = configuration {
-            tracing::debug!(
-                "Combining settings from editor-specified configuration file at: {}",
-                config_file_path.display()
-            );
-            match open_configuration_file(&config_file_path) {
-                Ok(config_from_file) => editor_configuration.combine(config_from_file),
-                err => {
-                    tracing::error!(
-                        "{:?}",
-                        err.context("Unable to load editor-specified configuration file")
-                            .unwrap_err()
+        // Merge in the editor-specified configuration.
+        let editor_configuration = if let Some(configuration) = configuration {
+            match configuration {
+                ResolvedConfiguration::FilePath(path) => {
+                    tracing::debug!(
+                        "Combining settings from editor-specified configuration file at: {}",
+                        path.display()
                     );
-                    editor_configuration
+                    match open_configuration_file(&path) {
+                        Ok(config_from_file) => editor_configuration.combine(config_from_file),
+                        err => {
+                            tracing::error!(
+                                "{:?}",
+                                err.context("Unable to load editor-specified configuration file")
+                                    .unwrap_err()
+                            );
+                            editor_configuration
+                        }
+                    }
+                }
+                ResolvedConfiguration::Inline(options) => {
+                    tracing::debug!(
+                        "Combining settings from editor-specified inline configuration"
+                    );
+                    match Configuration::from_options(options, None, project_root) {
+                        Ok(configuration) => editor_configuration.combine(configuration),
+                        Err(err) => {
+                            tracing::error!(
+                                "Unable to load editor-specified inline configuration: {err:?}",
+                            );
+                            editor_configuration
+                        }
+                    }
                 }
             }
         } else {
@@ -426,8 +492,8 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
 fn open_configuration_file(config_path: &Path) -> crate::Result<Configuration> {
     ruff_workspace::resolver::resolve_configuration(
         config_path,
-        Relativity::Cwd,
         &IdentityTransformer,
+        ruff_workspace::resolver::ConfigurationOrigin::UserSpecified,
     )
 }
 
@@ -436,5 +502,49 @@ struct IdentityTransformer;
 impl ConfigurationTransformer for IdentityTransformer {
     fn transform(&self, config: Configuration) -> Configuration {
         config
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_linter::line_width::LineLength;
+    use ruff_workspace::options::Options;
+
+    use super::*;
+
+    /// This test ensures that the inline configuration is correctly applied to the configuration.
+    #[test]
+    fn inline_settings() {
+        let editor_settings = ResolvedEditorSettings {
+            configuration: Some(ResolvedConfiguration::Inline(Options {
+                line_length: Some(LineLength::try_from(120).unwrap()),
+                ..Default::default()
+            })),
+            ..Default::default()
+        };
+
+        let config = EditorConfigurationTransformer(&editor_settings, Path::new("/src/project"))
+            .transform(Configuration::default());
+
+        assert_eq!(config.line_length.unwrap().value(), 120);
+    }
+
+    /// This test ensures that between the inline configuration and specific settings, the specific
+    /// settings is prioritized.
+    #[test]
+    fn inline_and_specific_settings_resolution_order() {
+        let editor_settings = ResolvedEditorSettings {
+            configuration: Some(ResolvedConfiguration::Inline(Options {
+                line_length: Some(LineLength::try_from(120).unwrap()),
+                ..Default::default()
+            })),
+            line_length: Some(LineLength::try_from(100).unwrap()),
+            ..Default::default()
+        };
+
+        let config = EditorConfigurationTransformer(&editor_settings, Path::new("/src/project"))
+            .transform(Configuration::default());
+
+        assert_eq!(config.line_length.unwrap().value(), 100);
     }
 }

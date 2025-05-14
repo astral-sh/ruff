@@ -150,7 +150,7 @@ impl Violation for MissingTypeKwargs {
 #[deprecated(note = "ANN101 has been removed")]
 pub(crate) struct MissingTypeSelf;
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl Violation for MissingTypeSelf {
     fn message(&self) -> String {
         unreachable!("ANN101 has been removed");
@@ -194,7 +194,7 @@ impl Violation for MissingTypeSelf {
 #[deprecated(note = "ANN102 has been removed")]
 pub(crate) struct MissingTypeCls;
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl Violation for MissingTypeCls {
     fn message(&self) -> String {
         unreachable!("ANN102 has been removed")
@@ -224,6 +224,16 @@ impl Violation for MissingTypeCls {
 /// def add(a: int, b: int) -> int:
 ///     return a + b
 /// ```
+///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for some Python versions,
+/// its diagnostic will not be emitted, and no fix will be offered, if `typing_extensions` imports
+/// have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingReturnTypeUndocumentedPublicFunction {
     name: String,
@@ -267,6 +277,16 @@ impl Violation for MissingReturnTypeUndocumentedPublicFunction {
 /// def _add(a: int, b: int) -> int:
 ///     return a + b
 /// ```
+///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for some Python versions,
+/// its diagnostic will not be emitted, and no fix will be offered, if `typing_extensions` imports
+/// have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingReturnTypePrivateFunction {
     name: String,
@@ -480,7 +500,7 @@ impl Violation for MissingReturnTypeClassMethod {
 /// ```
 ///
 /// ## References
-/// - [Typing spec: `Any`](https://typing.readthedocs.io/en/latest/spec/special-types.html#any)
+/// - [Typing spec: `Any`](https://typing.python.org/en/latest/spec/special-types.html#any)
 /// - [Python documentation: `typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
 /// - [Mypy documentation: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
 #[derive(ViolationMetadata)]
@@ -523,7 +543,7 @@ fn check_dynamically_typed<F>(
             if type_hint_resolves_to_any(
                 parsed_annotation.expression(),
                 checker,
-                checker.settings.target_version.minor(),
+                checker.target_version(),
             ) {
                 diagnostics.push(Diagnostic::new(
                     AnyType { name: func() },
@@ -532,7 +552,7 @@ fn check_dynamically_typed<F>(
             }
         }
     } else {
-        if type_hint_resolves_to_any(annotation, checker, checker.settings.target_version.minor()) {
+        if type_hint_resolves_to_any(annotation, checker, checker.target_version()) {
             diagnostics.push(Diagnostic::new(
                 AnyType { name: func() },
                 annotation.range(),
@@ -721,12 +741,7 @@ pub(crate) fn definition(
                 } else {
                     auto_return_type(function)
                         .and_then(|return_type| {
-                            return_type.into_expression(
-                                checker.importer(),
-                                function.parameters.start(),
-                                checker.semantic(),
-                                checker.settings.target_version,
-                            )
+                            return_type.into_expression(checker, function.parameters.start())
                         })
                         .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits))
                 };
@@ -752,12 +767,7 @@ pub(crate) fn definition(
                 } else {
                     auto_return_type(function)
                         .and_then(|return_type| {
-                            return_type.into_expression(
-                                checker.importer(),
-                                function.parameters.start(),
-                                checker.semantic(),
-                                checker.settings.target_version,
-                            )
+                            return_type.into_expression(checker, function.parameters.start())
                         })
                         .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits))
                 };
@@ -822,12 +832,8 @@ pub(crate) fn definition(
                         } else {
                             auto_return_type(function)
                                 .and_then(|return_type| {
-                                    return_type.into_expression(
-                                        checker.importer(),
-                                        function.parameters.start(),
-                                        checker.semantic(),
-                                        checker.settings.target_version,
-                                    )
+                                    return_type
+                                        .into_expression(checker, function.parameters.start())
                                 })
                                 .map(|(return_type, edits)| {
                                     (checker.generator().expr(&return_type), edits)
@@ -861,12 +867,8 @@ pub(crate) fn definition(
                         } else {
                             auto_return_type(function)
                                 .and_then(|return_type| {
-                                    return_type.into_expression(
-                                        checker.importer(),
-                                        function.parameters.start(),
-                                        checker.semantic(),
-                                        checker.settings.target_version,
-                                    )
+                                    return_type
+                                        .into_expression(checker, function.parameters.start())
                                 })
                                 .map(|(return_type, edits)| {
                                     (checker.generator().expr(&return_type), edits)

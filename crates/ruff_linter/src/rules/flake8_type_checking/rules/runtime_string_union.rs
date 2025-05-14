@@ -146,7 +146,7 @@ pub(crate) fn runtime_string_union_preview(
         return;
     };
 
-    if quotes_are_unremovable(checker.semantic(), expr, checker.settings) {
+    if quotes_are_unremovable(checker.semantic(), expr, checker.target_version()) {
         // extend the expression to the smallest possible expression that
         // can still be quoted safely
         let mut extended_expr = None;
@@ -230,8 +230,6 @@ pub(crate) fn runtime_string_union_preview(
     }
     checker.report_diagnostic(diagnostic);
 }
-
-/// Get the parent expression
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Strategy {

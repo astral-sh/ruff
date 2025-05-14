@@ -11,7 +11,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::{IdentifierPattern, PreviewMode};
+    use crate::settings::types::IdentifierPattern;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -350,36 +350,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_pytest_style").join(path).as_path(),
             &settings::LinterSettings {
-                flake8_pytest_style: plugin_settings,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(name, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(
-        Rule::PytestRaisesWithMultipleStatements,
-        Path::new("PT012.py"),
-        Settings::default(),
-        "PT012_preview"
-    )]
-    #[test_case(
-        Rule::PytestWarnsWithMultipleStatements,
-        Path::new("PT031.py"),
-        Settings::default(),
-        "PT031_preview"
-    )]
-    fn test_pytest_style_preview(
-        rule_code: Rule,
-        path: &Path,
-        plugin_settings: Settings,
-        name: &str,
-    ) -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("flake8_pytest_style").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
                 flake8_pytest_style: plugin_settings,
                 ..settings::LinterSettings::for_rule(rule_code)
             },

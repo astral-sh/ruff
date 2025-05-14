@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/for_stmt_invalid_iter_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -181,4 +180,14 @@ Module(
 2 | for x in yield a: ...
 3 | for target in x := 1: ...
   |                    ^ Syntax Error: Invalid annotated assignment target
+  |
+
+
+## Semantic Syntax Errors
+
+  |
+1 | for x in *a and b: ...
+  |          ^^^^^^^^ Syntax Error: Starred expression cannot be used here
+2 | for x in yield a: ...
+3 | for target in x := 1: ...
   |

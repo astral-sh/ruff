@@ -17,7 +17,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// the listed functions within an additional `list()`, `set()`, `sorted()`, or
 /// `tuple()` call. Doing so is redundant and can be confusing for readers.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// list(tuple(iterable))
 /// ```

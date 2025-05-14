@@ -18,7 +18,9 @@ def foo():
     result = {}
     for idx, name in enumerate(fruit):
         if idx % 2:
-            result[idx] = name  # Ok (false negative: edge case where `else` is same as `if`)
+            result[idx] = (
+                name  # Ok (false negative: edge case where `else` is same as `if`)
+            )
         else:
             result[idx] = name
 
@@ -85,7 +87,67 @@ def foo():
 
 def foo():
     from builtins import dict as SneakyDict
+
     fruit = ["apple", "pear", "orange"]
     result = SneakyDict()
     for idx, name in enumerate(fruit):
+        result[name] = idx  # PERF403
+
+
+def foo():
+    fruit = ["apple", "pear", "orange"]
+    result: dict[str, int] = {
+        # comment 1
+    }
+    for idx, name in enumerate(
+        fruit  # comment 2
+    ):
+        # comment 3
+        result[
+            name  # comment 4
+        ] = idx  # PERF403
+
+
+def foo():
+    fruit = ["apple", "pear", "orange"]
+    a = 1; result = {}; b = 2
+    for idx, name in enumerate(fruit):
+        result[name] = idx  # PERF403
+
+
+def foo():
+    fruit = ["apple", "pear", "orange"]
+    result = {"kiwi": 3}
+    for idx, name in enumerate(fruit):
+        result[name] = idx  # PERF403
+
+
+def foo():
+    fruit = ["apple", "pear", "orange"]
+    (_, result) = (None, {"kiwi": 3})
+    for idx, name in enumerate(fruit):
+        result[name] = idx  # PERF403
+
+
+def foo():
+    fruit = ["apple", "pear", "orange"]
+    result = {}
+    print(len(result))
+    for idx, name in enumerate(fruit):
+        result[name] = idx  # PERF403
+
+
+def foo():
+    fruit = ["apple", "pear", "orange"]
+    result = {}
+    for idx, name in enumerate(fruit):
+        if last_idx := idx % 3:
+            result[name] = idx  # PERF403
+
+
+def foo():
+    fruit = ["apple", "pear", "orange"]
+    indices = [0, 1, 2]
+    result = {}
+    for idx, name in indices, fruit:
         result[name] = idx  # PERF403

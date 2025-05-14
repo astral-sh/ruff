@@ -26,7 +26,7 @@ use super::suppression_comment_visitor::{
 /// Suppression comments that do not actually prevent formatting could cause unintended changes
 /// when the formatter is run.
 ///
-/// ## Examples
+/// ## Example
 /// In the following example, all suppression comments would cause
 /// a rule violation.
 ///
@@ -49,6 +49,12 @@ use super::suppression_comment_visitor::{
 ///     # fmt: on
 ///     # yapf: enable
 /// ```
+///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because it deletes the invalid suppression comment,
+/// rather than trying to move it to a valid position, which the user more likely intended.
+///
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidFormatterSuppressionComment {
     reason: IgnoredReason,

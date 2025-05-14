@@ -66,3 +66,94 @@ UP036_5.py:18:4: UP036 [*] Version block is outdated for minimum Python version
    23 |+    else:
    24 |+        print(3)
    25 |+    return None
+31 26 | 
+32 27 | 
+33 28 | # https://github.com/astral-sh/ruff/issues/16082
+
+UP036_5.py:36:4: UP036 [*] Version block is outdated for minimum Python version
+   |
+35 | ## Errors
+36 | if sys.version_info < (3, 12, 0):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+37 |     print()
+   |
+   = help: Remove outdated version block
+
+ℹ Unsafe fix
+33 33 | # https://github.com/astral-sh/ruff/issues/16082
+34 34 | 
+35 35 | ## Errors
+36    |-if sys.version_info < (3, 12, 0):
+37    |-    print()
+38 36 | 
+39 37 | if sys.version_info <= (3, 12, 0):
+40 38 |     print()
+
+UP036_5.py:39:4: UP036 [*] Version block is outdated for minimum Python version
+   |
+37 |     print()
+38 |
+39 | if sys.version_info <= (3, 12, 0):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+40 |     print()
+   |
+   = help: Remove outdated version block
+
+ℹ Unsafe fix
+36 36 | if sys.version_info < (3, 12, 0):
+37 37 |     print()
+38 38 | 
+39    |-if sys.version_info <= (3, 12, 0):
+40    |-    print()
+41 39 | 
+42 40 | if sys.version_info < (3, 12, 11):
+43 41 |     print()
+
+UP036_5.py:42:4: UP036 [*] Version block is outdated for minimum Python version
+   |
+40 |     print()
+41 |
+42 | if sys.version_info < (3, 12, 11):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+43 |     print()
+   |
+   = help: Remove outdated version block
+
+ℹ Unsafe fix
+39 39 | if sys.version_info <= (3, 12, 0):
+40 40 |     print()
+41 41 | 
+42    |-if sys.version_info < (3, 12, 11):
+43    |-    print()
+44 42 | 
+45 43 | if sys.version_info < (3, 13, 0):
+46 44 |     print()
+
+UP036_5.py:45:4: UP036 [*] Version block is outdated for minimum Python version
+   |
+43 |     print()
+44 |
+45 | if sys.version_info < (3, 13, 0):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+46 |     print()
+   |
+   = help: Remove outdated version block
+
+ℹ Unsafe fix
+42 42 | if sys.version_info < (3, 12, 11):
+43 43 |     print()
+44 44 | 
+45    |-if sys.version_info < (3, 13, 0):
+46    |-    print()
+47 45 | 
+48 46 | if sys.version_info <= (3, 13, 100000):
+49 47 |     print()
+
+UP036_5.py:48:24: UP036 Version specifier is invalid
+   |
+46 |     print()
+47 |
+48 | if sys.version_info <= (3, 13, 100000):
+   |                        ^^^^^^^^^^^^^^^ UP036
+49 |     print()
+   |

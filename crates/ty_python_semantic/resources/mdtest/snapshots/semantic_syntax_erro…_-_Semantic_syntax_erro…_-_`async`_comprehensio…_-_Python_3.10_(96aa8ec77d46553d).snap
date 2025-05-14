@@ -1,0 +1,46 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: semantic_syntax_errors.md - Semantic syntax error diagnostics - `async` comprehensions in synchronous comprehensions - Python 3.10
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/semantic_syntax_errors.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | async def elements(n):
+ 2 |     yield n
+ 3 | 
+ 4 | async def f():
+ 5 |     # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)"
+ 6 |     return {n: [x async for x in elements(n)] for n in range(3)}
+ 7 | async def test():
+ 8 |     return [[x async for x in elements(n)] async for n in range(3)]
+ 9 | async def f():
+10 |     [x for x in [1]] and [x async for x in elements(1)]
+11 | 
+12 | async def f():
+13 |     def g():
+14 |         pass
+15 |     [x async for x in elements(1)]
+```
+
+# Diagnostics
+
+```
+error[invalid-syntax]
+ --> src/mdtest_snippet.py:6:19
+  |
+4 | async def f():
+5 |     # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (synt...
+6 |     return {n: [x async for x in elements(n)] for n in range(3)}
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
+7 | async def test():
+8 |     return [[x async for x in elements(n)] async for n in range(3)]
+  |
+
+```

@@ -174,3 +174,10 @@ class NamesShadowingTypeVarAreNotTouched:
         type S = int
         print(S)  # not a reference to the type variable, so not touched by the autofix
         return 42
+
+
+MetaType = TypeVar("MetaType")
+
+class MetaTestClass(type):
+    def m(cls: MetaType) -> MetaType:
+        return cls

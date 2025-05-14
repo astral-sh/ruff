@@ -82,7 +82,7 @@ pub(crate) fn call_datetime_now_without_tzinfo(checker: &Checker, call: &ast::Ex
         return;
     }
 
-    if helpers::parent_expr_is_astimezone(checker) {
+    if helpers::followed_by_astimezone(checker) {
         return;
     }
 

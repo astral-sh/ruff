@@ -1,3 +1,6 @@
+use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
+use ruff_db::source::source_text;
 use thiserror::Error;
 use tracing::Level;
 
@@ -5,7 +8,7 @@ pub use range::format_range;
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, write, FormatError, Formatted, PrintError, Printed, SourceCode};
 use ruff_python_ast::{AnyNodeRef, Mod};
-use ruff_python_parser::{parse, AsMode, ParseError, Parsed};
+use ruff_python_parser::{parse, ParseError, ParseOptions, Parsed};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
@@ -13,9 +16,10 @@ use crate::comments::{
     has_skip_comment, leading_comments, trailing_comments, Comments, SourceComment,
 };
 pub use crate::context::PyFormatContext;
+pub use crate::db::Db;
 pub use crate::options::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
-    PythonVersion, QuoteStyle,
+    QuoteStyle,
 };
 use crate::range::is_logical_line;
 pub use crate::shared_traits::{AsFormat, FormattedIter, FormattedIterExt, IntoFormat};
@@ -25,6 +29,7 @@ pub(crate) mod builders;
 pub mod cli;
 mod comments;
 pub(crate) mod context;
+mod db;
 pub(crate) mod expression;
 mod generated;
 pub(crate) mod module;
@@ -96,7 +101,7 @@ where
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, salsa::Update, PartialEq, Eq)]
 pub enum FormatModuleError {
     #[error(transparent)]
     ParseError(#[from] ParseError),
@@ -112,7 +117,7 @@ pub fn format_module_source(
     options: PyFormatOptions,
 ) -> Result<Printed, FormatModuleError> {
     let source_type = options.source_type();
-    let parsed = parse(source, source_type.as_mode())?;
+    let parsed = parse(source, ParseOptions::from(source_type))?;
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let formatted = format_module_ast(&parsed, &comment_ranges, source, options)?;
     Ok(formatted.print()?)
@@ -124,6 +129,19 @@ pub fn format_module_ast<'a>(
     source: &'a str,
     options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>> {
+    format_node(parsed, comment_ranges, source, options)
+}
+
+fn format_node<'a, N>(
+    parsed: &'a Parsed<N>,
+    comment_ranges: &'a CommentRanges,
+    source: &'a str,
+    options: PyFormatOptions,
+) -> FormatResult<Formatted<PyFormatContext<'a>>>
+where
+    N: AsFormat<PyFormatContext<'a>>,
+    &'a N: Into<AnyNodeRef<'a>>,
+{
     let source_code = SourceCode::new(source);
     let comments = Comments::from_ast(parsed.syntax(), source_code, comment_ranges);
 
@@ -136,6 +154,28 @@ pub fn format_module_ast<'a>(
         .comments()
         .assert_all_formatted(source_code);
     Ok(formatted)
+}
+
+pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatModuleError> {
+    let options = db.format_options(file);
+
+    let parsed = parsed_module(db.upcast(), file);
+
+    if let Some(first) = parsed.errors().first() {
+        return Err(FormatModuleError::ParseError(first.clone()));
+    }
+
+    let comment_ranges = CommentRanges::from(parsed.tokens());
+    let source = source_text(db.upcast(), file);
+
+    let formatted = format_node(parsed, &comment_ranges, &source, options)?;
+    let printed = formatted.print()?;
+
+    if printed.as_code() == &*source {
+        Ok(None)
+    } else {
+        Ok(Some(printed.into_code()))
+    }
 }
 
 /// Public function for generating a printable string of the debug comments.
@@ -154,7 +194,7 @@ mod tests {
     use insta::assert_snapshot;
 
     use ruff_python_ast::PySourceType;
-    use ruff_python_parser::{parse, AsMode};
+    use ruff_python_parser::{parse, ParseOptions};
     use ruff_python_trivia::CommentRanges;
     use ruff_text_size::{TextRange, TextSize};
 
@@ -199,7 +239,7 @@ def main() -> None:
 
         // Parse the AST.
         let source_path = "code_inline.py";
-        let parsed = parse(source, source_type.as_mode()).unwrap();
+        let parsed = parse(source, ParseOptions::from(source_type)).unwrap();
         let comment_ranges = CommentRanges::from(parsed.tokens());
         let options = PyFormatOptions::from_extension(Path::new(source_path));
         let formatted = format_module_ast(&parsed, &comment_ranges, source, options).unwrap();

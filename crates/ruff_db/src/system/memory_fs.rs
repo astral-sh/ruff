@@ -6,11 +6,9 @@ use camino::{Utf8Path, Utf8PathBuf};
 use filetime::FileTime;
 use rustc_hash::FxHashMap;
 
-use ruff_notebook::{Notebook, NotebookError};
-
 use crate::system::{
-    walk_directory, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result,
-    SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
+    file_time_now, walk_directory, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata,
+    Result, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
 };
 
 use super::walk_directory::{
@@ -131,14 +129,6 @@ impl MemoryFileSystem {
         read_to_string(self, path.as_ref())
     }
 
-    pub(crate) fn read_to_notebook(
-        &self,
-        path: impl AsRef<SystemPath>,
-    ) -> std::result::Result<ruff_notebook::Notebook, ruff_notebook::NotebookError> {
-        let content = self.read_to_string(path)?;
-        ruff_notebook::Notebook::from_source_code(&content)
-    }
-
     pub(crate) fn read_virtual_path_to_string(
         &self,
         path: impl AsRef<SystemVirtualPath>,
@@ -149,14 +139,6 @@ impl MemoryFileSystem {
             .ok_or_else(not_found)?;
 
         Ok(file.content.clone())
-    }
-
-    pub(crate) fn read_virtual_path_to_notebook(
-        &self,
-        path: &SystemVirtualPath,
-    ) -> std::result::Result<Notebook, NotebookError> {
-        let content = self.read_virtual_path_to_string(path)?;
-        ruff_notebook::Notebook::from_source_code(&content)
     }
 
     pub fn exists(&self, path: &SystemPath) -> bool {
@@ -171,18 +153,33 @@ impl MemoryFileSystem {
         virtual_files.contains_key(&path.to_path_buf())
     }
 
+    /// Stores a new file in the file system.
+    ///
+    /// The operation overrides the content for an existing file with the same normalized `path`.
+    pub fn write_file(&self, path: impl AsRef<SystemPath>, content: impl ToString) -> Result<()> {
+        let mut by_path = self.inner.by_path.write().unwrap();
+
+        let normalized = self.normalize_path(path.as_ref());
+
+        let file = get_or_create_file(&mut by_path, &normalized)?;
+        file.content = content.to_string();
+        file.last_modified = file_time_now();
+
+        Ok(())
+    }
+
     /// Writes the files to the file system.
     ///
     /// The operation overrides existing files with the same normalized path.
     ///
     /// Enclosing directories are automatically created if they don't exist.
-    pub fn write_files<P, C>(&self, files: impl IntoIterator<Item = (P, C)>) -> Result<()>
+    pub fn write_files_all<P, C>(&self, files: impl IntoIterator<Item = (P, C)>) -> Result<()>
     where
         P: AsRef<SystemPath>,
         C: ToString,
     {
         for (path, content) in files {
-            self.write_file(path.as_ref(), content.to_string())?;
+            self.write_file_all(path.as_ref(), content.to_string())?;
         }
 
         Ok(())
@@ -193,16 +190,18 @@ impl MemoryFileSystem {
     /// The operation overrides the content for an existing file with the same normalized `path`.
     ///
     /// Enclosing directories are automatically created if they don't exist.
-    pub fn write_file(&self, path: impl AsRef<SystemPath>, content: impl ToString) -> Result<()> {
-        let mut by_path = self.inner.by_path.write().unwrap();
+    pub fn write_file_all(
+        &self,
+        path: impl AsRef<SystemPath>,
+        content: impl ToString,
+    ) -> Result<()> {
+        let path = path.as_ref();
 
-        let normalized = self.normalize_path(path.as_ref());
+        if let Some(parent) = path.parent() {
+            self.create_directory_all(parent)?;
+        }
 
-        let file = get_or_create_file(&mut by_path, &normalized)?;
-        file.content = content.to_string();
-        file.last_modified = now();
-
-        Ok(())
+        self.write_file(path, content)
     }
 
     /// Stores a new virtual file in the file system.
@@ -216,7 +215,7 @@ impl MemoryFileSystem {
             std::collections::hash_map::Entry::Vacant(entry) => {
                 entry.insert(File {
                     content: content.to_string(),
-                    last_modified: now(),
+                    last_modified: file_time_now(),
                 });
             }
             std::collections::hash_map::Entry::Occupied(mut entry) => {
@@ -311,7 +310,7 @@ impl MemoryFileSystem {
         let mut by_path = self.inner.by_path.write().unwrap();
         let normalized = self.normalize_path(path.as_ref());
 
-        get_or_create_file(&mut by_path, &normalized)?.last_modified = now();
+        get_or_create_file(&mut by_path, &normalized)?.last_modified = file_time_now();
 
         Ok(())
     }
@@ -487,7 +486,7 @@ fn create_dir_all(
         path.push(component);
         let entry = paths.entry(path.clone()).or_insert_with(|| {
             Entry::Directory(Directory {
-                last_modified: now(),
+                last_modified: file_time_now(),
             })
         });
 
@@ -504,13 +503,17 @@ fn get_or_create_file<'a>(
     normalized: &Utf8Path,
 ) -> Result<&'a mut File> {
     if let Some(parent) = normalized.parent() {
-        create_dir_all(paths, parent)?;
+        let parent_entry = paths.get(parent).ok_or_else(not_found)?;
+
+        if parent_entry.is_file() {
+            return Err(not_a_directory());
+        }
     }
 
     let entry = paths.entry(normalized.to_path_buf()).or_insert_with(|| {
         Entry::File(File {
             content: String::new(),
-            last_modified: now(),
+            last_modified: file_time_now(),
         })
     });
 
@@ -692,30 +695,6 @@ enum WalkerState {
     Nested { path: SystemPathBuf, depth: usize },
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-fn now() -> FileTime {
-    FileTime::now()
-}
-
-#[cfg(target_arch = "wasm32")]
-fn now() -> FileTime {
-    // Copied from FileTime::from_system_time()
-    let time = web_time::SystemTime::now();
-
-    time.duration_since(web_time::UNIX_EPOCH)
-        .map(|d| FileTime::from_unix_time(d.as_secs() as i64, d.subsec_nanos()))
-        .unwrap_or_else(|e| {
-            let until_epoch = e.duration();
-            let (sec_offset, nanos) = if until_epoch.subsec_nanos() == 0 {
-                (0, 0)
-            } else {
-                (-1, 1_000_000_000 - until_epoch.subsec_nanos())
-            };
-
-            FileTime::from_unix_time(-(until_epoch.as_secs() as i64) + sec_offset, nanos)
-        })
-}
-
 #[cfg(test)]
 mod tests {
     use std::io::ErrorKind;
@@ -737,7 +716,7 @@ mod tests {
         P: AsRef<SystemPath>,
     {
         let fs = MemoryFileSystem::new();
-        fs.write_files(files.into_iter().map(|path| (path, "")))
+        fs.write_files_all(files.into_iter().map(|path| (path, "")))
             .unwrap();
 
         fs
@@ -840,29 +819,25 @@ mod tests {
     }
 
     #[test]
-    fn write_file_fails_if_a_component_is_a_file() {
-        let fs = with_files(["a/b.py"]);
+    fn write_file_fails_if_a_parent_directory_is_missing() {
+        let fs = with_files(["c.py"]);
 
         let error = fs
-            .write_file(SystemPath::new("a/b.py/c"), "content".to_string())
+            .write_file(SystemPath::new("a/b.py"), "content".to_string())
             .unwrap_err();
 
-        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(error.kind(), ErrorKind::NotFound);
     }
 
     #[test]
-    fn write_file_fails_if_path_points_to_a_directory() -> Result<()> {
-        let fs = MemoryFileSystem::new();
-
-        fs.create_directory_all("a")?;
+    fn write_file_all_fails_if_a_component_is_a_file() {
+        let fs = with_files(["a/b.py"]);
 
         let error = fs
-            .write_file(SystemPath::new("a"), "content".to_string())
+            .write_file_all(SystemPath::new("a/b.py/c"), "content".to_string())
             .unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::Other);
-
-        Ok(())
     }
 
     #[test]
@@ -882,7 +857,7 @@ mod tests {
         let fs = MemoryFileSystem::new();
         let path = SystemPath::new("a.py");
 
-        fs.write_file(path, "Test content".to_string())?;
+        fs.write_file_all(path, "Test content".to_string())?;
 
         assert_eq!(fs.read_to_string(path)?, "Test content");
 
@@ -909,6 +884,21 @@ mod tests {
         let error = fs.read_to_string(SystemPath::new("a")).unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::NotFound);
+
+        Ok(())
+    }
+
+    #[test]
+    fn write_file_fails_if_path_points_to_a_directory() -> Result<()> {
+        let fs = MemoryFileSystem::new();
+
+        fs.create_directory_all("a")?;
+
+        let error = fs
+            .write_file(SystemPath::new("a"), "content".to_string())
+            .unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::Other);
 
         Ok(())
     }
@@ -1064,7 +1054,7 @@ mod tests {
         let root = SystemPath::new("/src");
         let system = MemoryFileSystem::with_current_directory(root);
 
-        system.write_files([
+        system.write_files_all([
             (root.join("foo.py"), "print('foo')"),
             (root.join("a/bar.py"), "print('bar')"),
             (root.join("a/baz.py"), "print('baz')"),
@@ -1123,7 +1113,7 @@ mod tests {
         let root = SystemPath::new("/src");
         let system = MemoryFileSystem::with_current_directory(root);
 
-        system.write_files([
+        system.write_files_all([
             (root.join("foo.py"), "print('foo')"),
             (root.join("a/bar.py"), "print('bar')"),
             (root.join("a/.baz.py"), "print('baz')"),
@@ -1169,7 +1159,7 @@ mod tests {
         let root = SystemPath::new("/src");
         let system = MemoryFileSystem::with_current_directory(root);
 
-        system.write_file(root.join("foo.py"), "print('foo')")?;
+        system.write_file_all(root.join("foo.py"), "print('foo')")?;
 
         let writer = DirectoryEntryToString::new(root.to_path_buf());
 
@@ -1199,7 +1189,7 @@ mod tests {
         let root = SystemPath::new("/src");
         let fs = MemoryFileSystem::with_current_directory(root);
 
-        fs.write_files([
+        fs.write_files_all([
             (root.join("foo.py"), "print('foo')"),
             (root.join("a/bar.py"), "print('bar')"),
             (root.join("a/.baz.py"), "print('baz')"),

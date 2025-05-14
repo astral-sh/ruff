@@ -16,7 +16,11 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::preview::{
+    is_dunder_init_fix_unused_import_enabled, is_full_path_match_source_strategy_enabled,
+};
 use crate::registry::Rule;
+use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::{isort, isort::ImportSection, isort::ImportType};
 
 /// ## What it does
@@ -87,6 +91,11 @@ use crate::rules::{isort, isort::ImportSection, isort::ImportType};
 ///     print("numpy is not installed")
 /// ```
 ///
+/// ## Preview
+/// When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
+/// the criterion for determining whether an import is first-party
+/// is stricter, which could affect the suggested fix. See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
+///
 /// ## Options
 /// - `lint.ignore-init-module-imports`
 /// - `lint.pyflakes.allowed-unused-imports`
@@ -94,7 +103,7 @@ use crate::rules::{isort, isort::ImportSection, isort::ImportType};
 /// ## References
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 /// - [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
-/// - [Typing documentation: interface conventions](https://typing.readthedocs.io/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
+/// - [Typing documentation: interface conventions](https://typing.python.org/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
 #[derive(ViolationMetadata)]
 pub(crate) struct UnusedImport {
     /// Qualified name of the import
@@ -221,18 +230,24 @@ enum UnusedImportContext {
 }
 
 fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
-    let qualified_name = import.qualified_name();
+    let source_name = import.source_name().join(".");
+    let match_source_strategy = if is_full_path_match_source_strategy_enabled(checker.settings) {
+        MatchSourceStrategy::FullPath
+    } else {
+        MatchSourceStrategy::Root
+    };
     let category = isort::categorize(
-        &qualified_name.to_string(),
-        qualified_name.is_unresolved_import(),
+        &source_name,
+        import.qualified_name().is_unresolved_import(),
         &checker.settings.src,
         checker.package(),
         checker.settings.isort.detect_same_package,
         &checker.settings.isort.known_modules,
-        checker.settings.target_version,
+        checker.target_version(),
         checker.settings.isort.no_sections,
         &checker.settings.isort.section_order,
         &checker.settings.isort.default_section,
+        match_source_strategy,
     );
     matches! {
         category,
@@ -352,7 +367,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
 
     let in_init = checker.path().ends_with("__init__.py");
     let fix_init = !checker.settings.ignore_init_module_imports;
-    let preview_mode = checker.settings.preview.is_enabled();
+    let preview_mode = is_dunder_init_fix_unused_import_enabled(checker.settings);
     let dunder_all_exprs = find_dunder_all_exprs(checker.semantic());
 
     // Generate a diagnostic for every import, but share fixes across all imports within the same

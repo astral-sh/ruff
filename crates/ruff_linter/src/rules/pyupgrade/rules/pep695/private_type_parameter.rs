@@ -1,7 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
 use ruff_python_semantic::Binding;
+use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_text_size::Ranged;
 
 use crate::{
     checkers::ast::Checker,
@@ -53,15 +55,16 @@ use crate::{
 /// ## See also
 ///
 /// This rule renames private [PEP 695] type parameters but doesn't convert pre-[PEP 695] generics
-/// to the new format. See [`non-pep695-generic-function`] and [`non-pep695-generic-class`] for
-/// rules that will make this transformation. Those rules do not remove unused type variables after
-/// their changes, so you may also want to consider enabling [`unused-private-type-var`] to complete
+/// to the new format. See [`non-pep695-generic-function`][UP047] and
+/// [`non-pep695-generic-class`][UP046] for rules that will make this transformation.
+/// Those rules do not remove unused type variables after their changes,
+/// so you may also want to consider enabling [`unused-private-type-var`][PYI018] to complete
 /// the transition to [PEP 695] generics.
 ///
 /// [PEP 695]: https://peps.python.org/pep-0695/
-/// [non-pep695-generic-function]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function
-/// [non-pep695-generic-class]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class
-/// [unused-private-type-var]: https://docs.astral.sh/ruff/rules/unused-private-type-var
+/// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function
+/// [UP046]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class
+/// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var
 #[derive(ViolationMetadata)]
 pub(crate) struct PrivateTypeParameter {
     kind: ParamKind,
@@ -93,7 +96,7 @@ impl Violation for PrivateTypeParameter {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Remove the leading underscores".to_string())
+        Some("Rename type parameter to remove leading underscores".to_string())
     }
 }
 
@@ -129,20 +132,36 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
 
     // if the new name would shadow another variable, keyword, or builtin, emit a diagnostic without
     // a suggested fix
-    if ShadowedKind::new(new_name, checker, binding.scope).shadows_any() {
+    if ShadowedKind::new(binding, new_name, checker).shadows_any() {
         return Some(diagnostic);
     }
+
+    if !is_identifier(new_name) {
+        return Some(diagnostic);
+    }
+
+    let source = checker.source();
 
     diagnostic.try_set_fix(|| {
         let (first, rest) = Renamer::rename(
             old_name,
             new_name,
             &semantic.scopes[binding.scope],
-            checker.semantic(),
+            semantic,
             checker.stylist(),
         )?;
 
-        Ok(Fix::safe_edits(first, rest))
+        let applicability = if binding
+            .references()
+            .any(|id| &source[semantic.reference(id).range()] != old_name)
+        {
+            Applicability::DisplayOnly
+        } else {
+            Applicability::Safe
+        };
+
+        let fix_isolation = Checker::isolation(binding.source);
+        Ok(Fix::applicable_edits(first, rest, applicability).isolate(fix_isolation))
     });
 
     Some(diagnostic)

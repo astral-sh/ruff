@@ -13,7 +13,7 @@ use crate::checkers::ast::Checker;
 /// If a class definition doesn't have any bases, the parentheses are
 /// unnecessary.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// class Foo():
 ///     ...

@@ -165,7 +165,7 @@ pub(super) fn dataclass_kind<'a>(
 
 /// Returns `true` if the given class has "default copy" semantics.
 ///
-/// For example, Pydantic `BaseModel` and `BaseSettings` subclassses copy attribute defaults on
+/// For example, Pydantic `BaseModel` and `BaseSettings` subclasses copy attribute defaults on
 /// instance creation. As such, the use of mutable default values is safe for such classes.
 pub(super) fn has_default_copy_semantics(
     class_def: &ast::StmtClassDef,
@@ -174,7 +174,16 @@ pub(super) fn has_default_copy_semantics(
     analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
         matches!(
             qualified_name.segments(),
-            ["pydantic", "BaseModel" | "BaseSettings" | "BaseConfig"]
+            [
+                "pydantic",
+                "BaseModel" | "RootModel" | "BaseSettings" | "BaseConfig"
+            ] | ["pydantic", "generics", "GenericModel"]
+                | [
+                    "pydantic",
+                    "v1",
+                    "BaseModel" | "BaseSettings" | "BaseConfig"
+                ]
+                | ["pydantic", "v1", "generics", "GenericModel"]
                 | ["pydantic_settings", "BaseSettings"]
                 | ["msgspec", "Struct"]
                 | ["sqlmodel", "SQLModel"]

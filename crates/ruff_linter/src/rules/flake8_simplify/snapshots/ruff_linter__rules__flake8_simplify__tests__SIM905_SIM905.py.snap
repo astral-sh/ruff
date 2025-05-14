@@ -352,7 +352,7 @@ SIM905.py:32:1: SIM905 [*] Consider using a list literal instead of `str.split`
 32 | " a*a a*a a ".split("*", -1)  # [" a", "a a", "a a "]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 33 | "".split()  # []
-34 | """     
+34 | """
    |
    = help: Replace with list literal
 
@@ -363,7 +363,7 @@ SIM905.py:32:1: SIM905 [*] Consider using a list literal instead of `str.split`
 32    |-" a*a a*a a ".split("*", -1)  # [" a", "a a", "a a "]
    32 |+[" a", "a a", "a a "]  # [" a", "a a", "a a "]
 33 33 | "".split()  # []
-34 34 | """ 	
+34 34 | """
 35 35 | """.split()  # []
 
 SIM905.py:33:1: SIM905 [*] Consider using a list literal instead of `str.split`
@@ -371,7 +371,7 @@ SIM905.py:33:1: SIM905 [*] Consider using a list literal instead of `str.split`
 32 | " a*a a*a a ".split("*", -1)  # [" a", "a a", "a a "]
 33 | "".split()  # []
    | ^^^^^^^^^^ SIM905
-34 | """     
+34 | """
 35 | """.split()  # []
    |
    = help: Replace with list literal
@@ -382,7 +382,7 @@ SIM905.py:33:1: SIM905 [*] Consider using a list literal instead of `str.split`
 32 32 | " a*a a*a a ".split("*", -1)  # [" a", "a a", "a a "]
 33    |-"".split()  # []
    33 |+[]  # []
-34 34 | """ 	
+34 34 | """
 35 35 | """.split()  # []
 36 36 | "   	".split()  # []
 
@@ -390,7 +390,7 @@ SIM905.py:34:1: SIM905 [*] Consider using a list literal instead of `str.split`
    |
 32 |   " a*a a*a a ".split("*", -1)  # [" a", "a a", "a a "]
 33 |   "".split()  # []
-34 | / """     
+34 | / """
 35 | | """.split()  # []
    | |___________^ SIM905
 36 |   "       ".split()  # []
@@ -402,7 +402,7 @@ SIM905.py:34:1: SIM905 [*] Consider using a list literal instead of `str.split`
 31 31 | 
 32 32 | " a*a a*a a ".split("*", -1)  # [" a", "a a", "a a "]
 33 33 | "".split()  # []
-34    |-""" 	
+34    |-"""
 35    |-""".split()  # []
    34 |+[]  # []
 36 35 | "   	".split()  # []
@@ -411,7 +411,7 @@ SIM905.py:34:1: SIM905 [*] Consider using a list literal instead of `str.split`
 
 SIM905.py:36:1: SIM905 [*] Consider using a list literal instead of `str.split`
    |
-34 | """     
+34 | """
 35 | """.split()  # []
 36 | "       ".split()  # []
    | ^^^^^^^^^^^^^^^^^ SIM905
@@ -422,7 +422,7 @@ SIM905.py:36:1: SIM905 [*] Consider using a list literal instead of `str.split`
 
 ℹ Safe fix
 33 33 | "".split()  # []
-34 34 | """ 	
+34 34 | """
 35 35 | """.split()  # []
 36    |-"   	".split()  # []
    36 |+[]  # []
@@ -442,7 +442,7 @@ SIM905.py:37:1: SIM905 [*] Consider using a list literal instead of `str.split`
    = help: Replace with list literal
 
 ℹ Safe fix
-34 34 | """ 	
+34 34 | """
 35 35 | """.split()  # []
 36 36 | "   	".split()  # []
 37    |-"/abc/".split() # ["/abc/"]
@@ -854,6 +854,8 @@ SIM905.py:103:1: SIM905 [*] Consider using a list literal instead of `str.split`
 107 | | "'itemD'"
 108 | | """.split()
     | |___________^ SIM905
+109 |
+110 |   # https://github.com/astral-sh/ruff/issues/18042
     |
     = help: Replace with list literal
 
@@ -868,3 +870,39 @@ SIM905.py:103:1: SIM905 [*] Consider using a list literal instead of `str.split`
 107     |-"'itemD'"
 108     |-""".split()
     103 |+['"itemA"', "'itemB'", "'''itemC'''", "\"'itemD'\""]
+109 104 | 
+110 105 | # https://github.com/astral-sh/ruff/issues/18042
+111 106 | print("a,b".rsplit(","))
+
+SIM905.py:111:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+110 | # https://github.com/astral-sh/ruff/issues/18042
+111 | print("a,b".rsplit(","))
+    |       ^^^^^^^^^^^^^^^^^ SIM905
+112 | print("a,b,c".rsplit(",", 1))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+108 108 | """.split()
+109 109 | 
+110 110 | # https://github.com/astral-sh/ruff/issues/18042
+111     |-print("a,b".rsplit(","))
+    111 |+print(["a", "b"])
+112 112 | print("a,b,c".rsplit(",", 1))
+
+SIM905.py:112:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+110 | # https://github.com/astral-sh/ruff/issues/18042
+111 | print("a,b".rsplit(","))
+112 | print("a,b,c".rsplit(",", 1))
+    |       ^^^^^^^^^^^^^^^^^^^^^^ SIM905
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+109 109 | 
+110 110 | # https://github.com/astral-sh/ruff/issues/18042
+111 111 | print("a,b".rsplit(","))
+112     |-print("a,b,c".rsplit(",", 1))
+    112 |+print(["a,b", "c"])

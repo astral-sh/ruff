@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Arguments, StmtClassDef};
+use ruff_python_ast::{helpers::map_subscript, Arguments, StmtClassDef};
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, importer::ImportRequest};
@@ -9,21 +9,37 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// Checks for subclasses of `dict`, `list` or `str`.
 ///
 /// ## Why is this bad?
-/// Subclassing `dict`, `list`, or `str` objects can be error prone, use the
-/// `UserDict`, `UserList`, and `UserString` objects from the `collections` module
+/// Built-in types don't consistently use their own dunder methods. For example,
+/// `dict.__init__` and `dict.update()` bypass `__setitem__`, making inheritance unreliable.
+///
+/// Use the `UserDict`, `UserList`, and `UserString` objects from the `collections` module
 /// instead.
 ///
 /// ## Example
+///
 /// ```python
-/// class CaseInsensitiveDict(dict): ...
+/// class UppercaseDict(dict):
+///     def __setitem__(self, key, value):
+///         super().__setitem__(key.upper(), value)
+///
+///
+/// d = UppercaseDict({"a": 1, "b": 2})  # Bypasses __setitem__
+/// print(d)  # {'a': 1, 'b': 2}
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from collections import UserDict
 ///
 ///
-/// class CaseInsensitiveDict(UserDict): ...
+/// class UppercaseDict(UserDict):
+///     def __setitem__(self, key, value):
+///         super().__setitem__(key.upper(), value)
+///
+///
+/// d = UppercaseDict({"a": 1, "b": 2})  # Uses __setitem__
+/// print(d)  # {'A': 1, 'B': 2}
 /// ```
 ///
 /// ## Fix safety
@@ -70,11 +86,16 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
         return;
     };
 
+    // Expect only one base class else return
     let [base] = &**bases else {
         return;
     };
 
-    let Some(symbol) = checker.semantic().resolve_builtin_symbol(base) else {
+    // Check if the base class is a subscript expression so that only the name expr
+    // is checked and modified.
+    let base_expr = map_subscript(base);
+
+    let Some(symbol) = checker.semantic().resolve_builtin_symbol(base_expr) else {
         return;
     };
 
@@ -89,7 +110,7 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
             subclass: symbol.to_string(),
             replacement: user_symbol.to_string(),
         },
-        base.range(),
+        base_expr.range(),
     );
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -97,7 +118,7 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
             base.start(),
             checker.semantic(),
         )?;
-        let other_edit = Edit::range_replacement(binding, base.range());
+        let other_edit = Edit::range_replacement(binding, base_expr.range());
         Ok(Fix::unsafe_edits(import_edit, [other_edit]))
     });
     checker.report_diagnostic(diagnostic);

@@ -5,7 +5,9 @@ use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::transformer::{walk_expr, Transformer};
-use ruff_python_ast::{self as ast, Decorator, Expr, ExprContext, Operator, StringLiteralFlags};
+use ruff_python_ast::{
+    self as ast, Decorator, Expr, ExprContext, Operator, PythonVersion, StringLiteralFlags,
+};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
@@ -14,8 +16,6 @@ use ruff_python_semantic::{
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::rules::flake8_type_checking::settings::Settings;
-use crate::settings::types::PythonVersion;
-use crate::settings::LinterSettings;
 use crate::Locator;
 
 /// Returns `true` if the [`ResolvedReference`] is in a typing-only context _or_ a runtime-evaluated
@@ -218,7 +218,7 @@ pub(crate) fn is_singledispatch_implementation(
 
         if attribute.attr.as_str() != "register" {
             return false;
-        };
+        }
 
         let Some(id) = semantic.lookup_attribute(attribute.value.as_ref()) else {
             return false;
@@ -459,7 +459,7 @@ impl Transformer for QuoteRewriter {
 pub(crate) fn quotes_are_unremovable(
     semantic: &SemanticModel,
     expr: &Expr,
-    settings: &LinterSettings,
+    target_version: PythonVersion,
 ) -> bool {
     match expr {
         Expr::BinOp(ast::ExprBinOp {
@@ -467,11 +467,11 @@ pub(crate) fn quotes_are_unremovable(
         }) => {
             match op {
                 Operator::BitOr => {
-                    if settings.target_version < PythonVersion::Py310 {
+                    if target_version < PythonVersion::PY310 {
                         return true;
                     }
-                    quotes_are_unremovable(semantic, left, settings)
-                        || quotes_are_unremovable(semantic, right, settings)
+                    quotes_are_unremovable(semantic, left, target_version)
+                        || quotes_are_unremovable(semantic, right, target_version)
                 }
                 // for now we'll treat uses of other operators as unremovable quotes
                 // since that would make it an invalid type expression anyways. We skip
@@ -484,7 +484,7 @@ pub(crate) fn quotes_are_unremovable(
             value,
             ctx: ExprContext::Load,
             ..
-        }) => quotes_are_unremovable(semantic, value, settings),
+        }) => quotes_are_unremovable(semantic, value, target_version),
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
             // for subscripts we don't know whether it's safe to do at runtime
             // since the operation may only be available at type checking time.
@@ -492,7 +492,7 @@ pub(crate) fn quotes_are_unremovable(
             if !semantic.in_type_checking_block() {
                 return true;
             }
-            if quotes_are_unremovable(semantic, value, settings) {
+            if quotes_are_unremovable(semantic, value, target_version) {
                 return true;
             }
             // for `typing.Annotated`, only analyze the first argument, since the rest may
@@ -501,23 +501,23 @@ pub(crate) fn quotes_are_unremovable(
                 if semantic.match_typing_qualified_name(&qualified_name, "Annotated") {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                         return !elts.is_empty()
-                            && quotes_are_unremovable(semantic, &elts[0], settings);
+                            && quotes_are_unremovable(semantic, &elts[0], target_version);
                     }
                     return false;
                 }
             }
-            quotes_are_unremovable(semantic, slice, settings)
+            quotes_are_unremovable(semantic, slice, target_version)
         }
         Expr::Attribute(ast::ExprAttribute { value, .. }) => {
             // for attributes we also don't know whether it's safe
             if !semantic.in_type_checking_block() {
                 return true;
             }
-            quotes_are_unremovable(semantic, value, settings)
+            quotes_are_unremovable(semantic, value, target_version)
         }
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             for elt in elts {
-                if quotes_are_unremovable(semantic, elt, settings) {
+                if quotes_are_unremovable(semantic, elt, target_version) {
                     return true;
                 }
             }

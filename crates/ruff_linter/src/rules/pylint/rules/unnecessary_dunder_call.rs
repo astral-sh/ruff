@@ -1,12 +1,12 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, BoolOp, Expr, Operator, Stmt, UnaryOp};
+use ruff_python_ast::{self as ast, Expr, OperatorPrecedence, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::is_known_dunder_method;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for explicit use of dunder methods, like `__str__` and `__add__`.
@@ -14,6 +14,34 @@ use crate::settings::types::PythonVersion;
 /// ## Why is this bad?
 /// Dunder names are not meant to be called explicitly and, in most cases, can
 /// be replaced with builtins or operators.
+///
+/// ## Fix safety
+/// This fix is always unsafe. When replacing dunder method calls with operators
+/// or builtins, the behavior can change in the following ways:
+///
+/// 1. Types may implement only a subset of related dunder methods. Calling a
+///    missing dunder method directly returns `NotImplemented`, but using the
+///    equivalent operator raises a `TypeError`.
+///    ```python
+///    class C: pass
+///    c = C()
+///    c.__gt__(1)  # before fix: NotImplemented
+///    c > 1        # after fix: raises TypeError
+///    ```
+/// 2. Instance-assigned dunder methods are ignored by operators and builtins.
+///    ```python
+///    class C: pass
+///    c = C()
+///    c.__bool__ = lambda: False
+///    c.__bool__() # before fix: False
+///    bool(c)      # after fix: True
+///    ```
+///
+/// 3. Even with built-in types, behavior can differ.
+///    ```python
+///    (1).__gt__(1.0)  # before fix: NotImplemented
+///    1 > 1.0          # after fix: False
+///    ```
 ///
 /// ## Example
 /// ```python
@@ -76,7 +104,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // If this is an allowed dunder method, abort.
-    if allowed_dunder_constants(attr, checker.settings.target_version) {
+    if allowed_dunder_constants(attr, checker.target_version()) {
         return;
     }
 
@@ -208,7 +236,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
             fixed,
             call.range(),
         )));
-    };
+    }
 
     checker.report_diagnostic(diagnostic);
 }
@@ -248,7 +276,7 @@ fn allowed_dunder_constants(dunder_method: &str, target_version: PythonVersion) 
         return true;
     }
 
-    if target_version < PythonVersion::Py310 && matches!(dunder_method, "__aiter__" | "__anext__") {
+    if target_version < PythonVersion::PY310 && matches!(dunder_method, "__aiter__" | "__anext__") {
         return true;
     }
 
@@ -398,7 +426,7 @@ impl DunderReplacement {
             "__or__" => Some(Self::Operator(
                 "|",
                 "Use `|` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitOr,
             )),
             "__rshift__" => Some(Self::Operator(
                 ">>",
@@ -418,7 +446,7 @@ impl DunderReplacement {
             "__xor__" => Some(Self::Operator(
                 "^",
                 "Use `^` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitXor,
             )),
 
             "__radd__" => Some(Self::ROperator(
@@ -454,7 +482,7 @@ impl DunderReplacement {
             "__ror__" => Some(Self::ROperator(
                 "|",
                 "Use `|` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitOr,
             )),
             "__rrshift__" => Some(Self::ROperator(
                 ">>",
@@ -474,7 +502,7 @@ impl DunderReplacement {
             "__rxor__" => Some(Self::ROperator(
                 "^",
                 "Use `^` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitXor,
             )),
 
             "__aiter__" => Some(Self::Builtin("aiter", "Use `aiter()` builtin")),
@@ -571,168 +599,4 @@ fn in_dunder_method_definition(semantic: &SemanticModel) -> bool {
         };
         func_def.name.starts_with("__") && func_def.name.ends_with("__")
     })
-}
-
-/// Represents the precedence levels for Python expressions.
-/// Variants at the top have lower precedence and variants at the bottom have
-/// higher precedence.
-///
-/// See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-enum OperatorPrecedence {
-    /// The lowest (virtual) precedence level
-    None,
-    /// Precedence of `yield` and `yield from` expressions.
-    Yield,
-    /// Precedence of assignment expressions (`name := expr`).
-    Assign,
-    /// Precedence of starred expressions (`*expr`).
-    Starred,
-    /// Precedence of lambda expressions (`lambda args: expr`).
-    Lambda,
-    /// Precedence of if/else expressions (`expr if cond else expr`).
-    IfElse,
-    /// Precedence of boolean `or` expressions.
-    Or,
-    /// Precedence of boolean `and` expressions.
-    And,
-    /// Precedence of boolean `not` expressions.
-    Not,
-    /// Precedence of comparisons (`<`, `<=`, `>`, `>=`, `!=`, `==`),
-    /// memberships (`in`, `not in`) and identity tests (`is`, `is not`).
-    ComparisonsMembershipIdentity,
-    /// Precedence of bitwise `|` and `^` operators.
-    BitXorOr,
-    /// Precedence of bitwise `&` operator.
-    BitAnd,
-    /// Precedence of left and right shift expressions (`<<`, `>>`).
-    LeftRightShift,
-    /// Precedence of addition and subtraction expressions (`+`, `-`).
-    AddSub,
-    /// Precedence of multiplication (`*`), matrix multiplication (`@`), division (`/`),
-    /// floor division (`//`) and remainder (`%`) expressions.
-    MulDivRemain,
-    /// Precedence of unary positive (`+`), negative (`-`), and bitwise NOT (`~`) expressions.
-    PosNegBitNot,
-    /// Precedence of exponentiation expressions (`**`).
-    Exponent,
-    /// Precedence of `await` expressions.
-    Await,
-    /// Precedence of call expressions (`()`), attribute access (`.`), and subscript (`[]`) expressions.
-    CallAttribute,
-    /// Precedence of atomic expressions (literals, names, containers).
-    Atomic,
-}
-
-impl OperatorPrecedence {
-    fn from_expr(expr: &Expr) -> Self {
-        match expr {
-            // Binding or parenthesized expression, list display, dictionary display, set display
-            Expr::Tuple(_)
-            | Expr::Dict(_)
-            | Expr::Set(_)
-            | Expr::ListComp(_)
-            | Expr::List(_)
-            | Expr::SetComp(_)
-            | Expr::DictComp(_)
-            | Expr::Generator(_)
-            | Expr::Name(_)
-            | Expr::StringLiteral(_)
-            | Expr::BytesLiteral(_)
-            | Expr::NumberLiteral(_)
-            | Expr::BooleanLiteral(_)
-            | Expr::NoneLiteral(_)
-            | Expr::EllipsisLiteral(_)
-            | Expr::FString(_) => Self::Atomic,
-            // Subscription, slicing, call, attribute reference
-            Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) | Expr::Slice(_) => {
-                Self::CallAttribute
-            }
-
-            // Await expression
-            Expr::Await(_) => Self::Await,
-
-            // Exponentiation **
-            // Handled below along with other binary operators
-
-            // Unary operators: +x, -x, ~x (except boolean not)
-            Expr::UnaryOp(operator) => match operator.op {
-                UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert => Self::PosNegBitNot,
-                UnaryOp::Not => Self::Not,
-            },
-
-            // Math binary ops
-            Expr::BinOp(binary_operation) => Self::from(binary_operation.op),
-
-            // Comparisons: <, <=, >, >=, ==, !=, in, not in, is, is not
-            Expr::Compare(_) => Self::ComparisonsMembershipIdentity,
-
-            // Boolean not
-            // Handled above in unary operators
-
-            // Boolean operations: and, or
-            Expr::BoolOp(bool_op) => Self::from(bool_op.op),
-
-            // Conditional expressions: x if y else z
-            Expr::If(_) => Self::IfElse,
-
-            // Lambda expressions
-            Expr::Lambda(_) => Self::Lambda,
-
-            // Unpacking also omitted in the docs, but has almost the lowest precedence,
-            // except for assignment & yield expressions. E.g. `[*(v := [1,2])]` is valid
-            // but `[*v := [1,2]] would fail on incorrect syntax because * will associate
-            // `v` before the assignment.
-            Expr::Starred(_) => Self::Starred,
-
-            // Assignment expressions (aka named)
-            Expr::Named(_) => Self::Assign,
-
-            // Although omitted in docs, yield expressions may be used inside an expression
-            // but must be parenthesized. So for our purposes we assume they just have
-            // the lowest "real" precedence.
-            Expr::Yield(_) | Expr::YieldFrom(_) => Self::Yield,
-
-            // Not a real python expression, so treat as lowest as well
-            Expr::IpyEscapeCommand(_) => Self::None,
-        }
-    }
-}
-
-impl From<&Expr> for OperatorPrecedence {
-    fn from(expr: &Expr) -> Self {
-        Self::from_expr(expr)
-    }
-}
-
-impl From<Operator> for OperatorPrecedence {
-    fn from(operator: Operator) -> Self {
-        match operator {
-            // Multiplication, matrix multiplication, division, floor division, remainder:
-            // *, @, /, //, %
-            Operator::Mult
-            | Operator::MatMult
-            | Operator::Div
-            | Operator::Mod
-            | Operator::FloorDiv => Self::MulDivRemain,
-            // Addition, subtraction
-            Operator::Add | Operator::Sub => Self::AddSub,
-            // Bitwise shifts: <<, >>
-            Operator::LShift | Operator::RShift => Self::LeftRightShift,
-            // Bitwise operations: &, ^, |
-            Operator::BitAnd => Self::BitAnd,
-            Operator::BitXor | Operator::BitOr => Self::BitXorOr,
-            // Exponentiation **
-            Operator::Pow => Self::Exponent,
-        }
-    }
-}
-
-impl From<BoolOp> for OperatorPrecedence {
-    fn from(operator: BoolOp) -> Self {
-        match operator {
-            BoolOp::And => Self::And,
-            BoolOp::Or => Self::Or,
-        }
-    }
 }

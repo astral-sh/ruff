@@ -27,6 +27,12 @@ use ruff_text_size::Ranged;
 /// ```python
 /// a = 1
 /// ```
+///
+/// ## Fix safety
+///
+/// The fix is marked unsafe if it is not possible to guarantee that the first argument of
+/// `round()` is of type `int`, or if the fix deletes comments.
+///
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryRound;
 
@@ -89,7 +95,7 @@ pub(crate) fn unnecessary_round(checker: &Checker, call: &ExprCall) {
 
     if checker.comment_ranges().intersects(call.range()) {
         applicability = Applicability::Unsafe;
-    };
+    }
 
     let edit = unwrap_round_call(call, rounded, checker.semantic(), checker.locator());
     let fix = Fix::applicable_edit(edit, applicability);

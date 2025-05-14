@@ -1,0 +1,91 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/unparenthesized_named_expr_set_comp_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..73,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 43..72,
+                    value: SetComp(
+                        ExprSetComp {
+                            range: 43..72,
+                            elt: Named(
+                                ExprNamed {
+                                    range: 44..53,
+                                    target: Name(
+                                        ExprName {
+                                            range: 44..48,
+                                            id: Name("last"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 52..53,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 54..71,
+                                    target: Name(
+                                        ExprName {
+                                            range: 58..59,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Call(
+                                        ExprCall {
+                                            range: 63..71,
+                                            func: Name(
+                                                ExprName {
+                                                    range: 63..68,
+                                                    id: Name("range"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 68..71,
+                                                args: [
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 69..70,
+                                                            value: Int(
+                                                                3,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.8"}
+2 | {last := x for x in range(3)}
+  |  ^^^^^^^^^ Syntax Error: Cannot use unparenthesized assignment expression as an element in a set comprehension on Python 3.8 (syntax was added in Python 3.9)
+  |

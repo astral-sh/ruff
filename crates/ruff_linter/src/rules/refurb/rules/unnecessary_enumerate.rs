@@ -179,7 +179,7 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) 
                 // If the `start` argument is set to something other than the `range` default,
                 // there's no clear fix.
                 let start = arguments.find_argument_value("start", 1);
-                if start.map_or(true, |start| {
+                if start.is_none_or(|start| {
                     matches!(
                         start,
                         Expr::NumberLiteral(ast::ExprNumberLiteral {

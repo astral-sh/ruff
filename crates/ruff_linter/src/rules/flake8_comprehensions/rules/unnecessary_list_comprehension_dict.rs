@@ -16,7 +16,7 @@ use super::helpers;
 /// It's unnecessary to use a list comprehension inside a call to `dict()`,
 /// since there is an equivalent comprehension for this type.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict([(x, f(x)) for x in foo])
 /// ```

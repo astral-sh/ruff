@@ -154,7 +154,7 @@ fn enumerate_items<'a>(
     // If the `enumerate` call has a non-zero `start`, don't omit.
     if !arguments
         .find_argument_value("start", 1)
-        .map_or(true, |expr| {
+        .is_none_or(|expr| {
             matches!(
                 expr,
                 Expr::NumberLiteral(ast::ExprNumberLiteral {

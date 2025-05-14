@@ -1,5 +1,6 @@
 //! Checks relating to shell injection.
 
+use crate::preview::is_shell_injection_only_trusted_input_enabled;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::Truthiness;
@@ -194,10 +195,10 @@ impl Violation for StartProcessWithAShell {
 /// This rule specifically flags functions in the `os` module that spawn
 /// subprocesses *without* the use of a shell. Note that these typically pose a
 /// much smaller security risk than subprocesses that are started *with* a
-/// shell, which are flagged by [`start-process-with-a-shell`] (`S605`). This
-/// gives you the option of enabling one rule while disabling the other if you
-/// decide that the security risk from these functions is acceptable for your
-/// use case.
+/// shell, which are flagged by [`start-process-with-a-shell`][S605] (`S605`).
+/// This gives you the option of enabling one rule while disabling the other
+/// if you decide that the security risk from these functions is acceptable
+/// for your use case.
 ///
 /// ## Example
 /// ```python
@@ -208,7 +209,7 @@ impl Violation for StartProcessWithAShell {
 ///     os.spawnlp(os.P_NOWAIT, "/bin/mycmd", "mycmd", arbitrary_user_input)
 /// ```
 ///
-/// [start-process-with-a-shell]: https://docs.astral.sh/ruff/rules/start-process-with-a-shell/#start-process-with-a-shell-s605
+/// [S605]: https://docs.astral.sh/ruff/rules/start-process-with-a-shell
 #[derive(ViolationMetadata)]
 pub(crate) struct StartProcessWithNoShell;
 
@@ -287,6 +288,19 @@ impl Violation for UnixCommandWildcardInjection {
     }
 }
 
+/// Check if an expression is a trusted input for subprocess.run.
+/// We assume that any str, list[str] or tuple[str] literal can be trusted.
+fn is_trusted_input(arg: &Expr) -> bool {
+    match arg {
+        Expr::StringLiteral(_) => true,
+        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.iter().all(|elt| matches!(elt, Expr::StringLiteral(_)))
+        }
+        Expr::Named(named) => is_trusted_input(&named.value),
+        _ => false,
+    }
+}
+
 /// S602, S603, S604, S605, S606, S607, S609
 pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     let call_kind = get_call_kind(&call.func, checker.semantic());
@@ -310,24 +324,16 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                     }
                 }
                 // S603
-                Some(ShellKeyword {
-                    truthiness:
-                        Truthiness::False | Truthiness::Falsey | Truthiness::None | Truthiness::Unknown,
-                }) => {
-                    if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                        checker.report_diagnostic(Diagnostic::new(
-                            SubprocessWithoutShellEqualsTrue,
-                            call.func.range(),
-                        ));
-                    }
-                }
-                // S603
-                None => {
-                    if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                        checker.report_diagnostic(Diagnostic::new(
-                            SubprocessWithoutShellEqualsTrue,
-                            call.func.range(),
-                        ));
+                _ => {
+                    if !is_trusted_input(arg)
+                        || !is_shell_injection_only_trusted_input_enabled(checker.settings)
+                    {
+                        if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
+                            checker.report_diagnostic(Diagnostic::new(
+                                SubprocessWithoutShellEqualsTrue,
+                                call.func.range(),
+                            ));
+                        }
                     }
                 }
             }

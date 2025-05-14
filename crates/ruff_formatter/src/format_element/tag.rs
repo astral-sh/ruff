@@ -144,7 +144,7 @@ impl Tag {
             StartVerbatim(_) | EndVerbatim => TagKind::Verbatim,
             StartLabelled(_) | EndLabelled => TagKind::Labelled,
             StartFitsExpanded { .. } | EndFitsExpanded => TagKind::FitsExpanded,
-            StartBestFittingEntry { .. } | EndBestFittingEntry => TagKind::BestFittingEntry,
+            StartBestFittingEntry | EndBestFittingEntry => TagKind::BestFittingEntry,
             StartBestFitParenthesize { .. } | EndBestFitParenthesize => {
                 TagKind::BestFitParenthesize
             }
@@ -379,7 +379,7 @@ impl PartialEq for LabelId {
 }
 
 impl LabelId {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     pub fn of<T: LabelDefinition>(label: T) -> Self {
         Self {
             value: label.value(),

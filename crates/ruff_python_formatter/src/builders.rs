@@ -42,7 +42,7 @@ impl<'ast> Format<PyFormatContext<'ast>> for ParenthesizeIfExpands<'_, 'ast> {
                         soft_block_indent(&Arguments::from(&self.inner)).fmt(f)?;
                     } else {
                         Arguments::from(&self.inner).fmt(f)?;
-                    };
+                    }
 
                     if_group_breaks(&token(")")).fmt(f)
                 }))]
@@ -178,7 +178,6 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
         self
     }
 
-    #[allow(unused)]
     pub(crate) fn entries<T, I, F>(&mut self, entries: I) -> &mut Self
     where
         T: Ranged,

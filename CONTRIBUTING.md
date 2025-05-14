@@ -2,6 +2,11 @@
 
 Welcome! We're happy to have you here. Thank you in advance for your contribution to Ruff.
 
+> [!NOTE]
+>
+> This guide is for Ruff. If you're looking to contribute to ty, please see [the ty contributing
+> guide](https://github.com/astral-sh/ruff/blob/main/crates/ty/CONTRIBUTING.md).
+
 ## The Basics
 
 Ruff welcomes contributions in the form of pull requests.
@@ -366,6 +371,15 @@ uvx --from ./python/ruff-ecosystem ruff-ecosystem format ruff "./target/debug/ru
 
 See the [ruff-ecosystem package](https://github.com/astral-sh/ruff/tree/main/python/ruff-ecosystem) for more details.
 
+## Upgrading Rust
+
+1. Change the `channel` in `./rust-toolchain.toml` to the new Rust version (`<latest>`)
+1. Change the `rust-version` in the `./Cargo.toml` to `<latest> - 2` (e.g. 1.84 if the latest is 1.86)
+1. Run `cargo clippy --fix --allow-dirty --allow-staged` to fix new clippy warnings
+1. Create and merge the PR
+1. Bump the Rust version in Ruff's conda forge recipe. See [this PR](https://github.com/conda-forge/ruff-feedstock/pull/266) for an example.
+1. Enjoy the new Rust version!
+
 ## Benchmarking and Profiling
 
 We have several ways of benchmarking and profiling Ruff:
@@ -526,7 +540,7 @@ cargo benchmark
 #### Benchmark-driven Development
 
 Ruff uses [Criterion.rs](https://bheisler.github.io/criterion.rs/book/) for benchmarks. You can use
-`--save-baseline=<name>` to store an initial baseline benchmark (e.g. on `main`) and then use
+`--save-baseline=<name>` to store an initial baseline benchmark (e.g., on `main`) and then use
 `--benchmark=<name>` to compare against that benchmark. Criterion will print a message telling you
 if the benchmark improved/regressed compared to that baseline.
 
@@ -678,9 +692,9 @@ utils with it:
 23 Newline 24
 ```
 
-- `cargo dev print-cst <file>`: Print the CST of a python file using
+- `cargo dev print-cst <file>`: Print the CST of a Python file using
     [LibCST](https://github.com/Instagram/LibCST), which is used in addition to the RustPython parser
-    in Ruff. E.g. for `if True: pass # comment` everything including the whitespace is represented:
+    in Ruff. For example, for `if True: pass # comment`, everything, including the whitespace, is represented:
 
 ```text
 Module {

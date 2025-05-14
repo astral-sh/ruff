@@ -2,7 +2,8 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_text_size::{Ranged, TextSize};
+use ruff_python_parser::TokenKind;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
@@ -16,7 +17,7 @@ use super::helpers;
 /// It's unnecessary to use a list comprehension inside a call to `set()`,
 /// since there is an equivalent comprehension for this type.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// set([f(x) for x in foo])
 /// ```
@@ -70,9 +71,18 @@ pub(crate) fn unnecessary_list_comprehension_set(checker: &Checker, call: &ast::
     );
 
     // Replace `)` with `}`.
+    // Place `}` at argument's end or at trailing comma if present
+    let after_arg_tokens = checker
+        .tokens()
+        .in_range(TextRange::new(argument.end(), call.end()));
+    let right_brace_loc = after_arg_tokens
+        .iter()
+        .find(|token| token.kind() == TokenKind::Comma)
+        .map_or(call.arguments.end() - one, |comma| comma.end() - one);
+
     let call_end = Edit::replacement(
         pad_end("}", call.range(), checker.locator(), checker.semantic()),
-        call.arguments.end() - one,
+        right_brace_loc,
         call.end(),
     );
 

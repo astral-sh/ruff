@@ -34,6 +34,10 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 /// async def func():
 ///     await trio.sleep_forever()
 /// ```
+///
+/// ## Fix safety
+///
+/// This fix is marked as unsafe as it changes program behavior.
 #[derive(ViolationMetadata)]
 pub(crate) struct LongSleepNotForever {
     module: AsyncModule,
@@ -88,7 +92,7 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
         }
         Number::Float(float_value) =>
         {
-            #[allow(clippy::cast_precision_loss)]
+            #[expect(clippy::cast_precision_loss)]
             if *float_value <= one_day_in_secs as f64 {
                 return;
             }

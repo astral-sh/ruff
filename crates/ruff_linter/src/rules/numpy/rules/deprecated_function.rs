@@ -17,7 +17,7 @@ use crate::importer::ImportRequest;
 ///
 /// Prefer newer APIs over deprecated ones.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// import numpy as np
 ///

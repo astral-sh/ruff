@@ -59,7 +59,7 @@ where
     fn can_skip(&mut self, node_end: TextSize) -> bool {
         self.comments
             .peek()
-            .map_or(true, |next| next.range.start() >= node_end)
+            .is_none_or(|next| next.range.start() >= node_end)
     }
 }
 
@@ -194,6 +194,10 @@ where
                 }
             }
         }
+    }
+
+    fn visit_identifier(&mut self, _identifier: &'ast ruff_python_ast::Identifier) {
+        // Skip identifiers, matching the formatter comment extraction
     }
 }
 

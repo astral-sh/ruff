@@ -1,0 +1,97 @@
+name: PR comment (mypy_primer)
+
+on: # zizmor: ignore[dangerous-triggers]
+  workflow_run:
+    workflows: [Run mypy_primer]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      workflow_run_id:
+        description: The mypy_primer workflow that triggers the workflow run
+        required: true
+
+jobs:
+  comment:
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
+        name: Download PR number
+        with:
+          name: pr-number
+          run_id: ${{ github.event.workflow_run.id ||  github.event.inputs.workflow_run_id }}
+          if_no_artifact_found: ignore
+          allow_forks: true
+
+      - name: Parse pull request number
+        id: pr-number
+        run: |
+          if [[ -f pr-number ]]
+          then
+            echo "pr-number=$(<pr-number)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
+        name: "Download mypy_primer results"
+        id: download-mypy_primer_diff
+        if: steps.pr-number.outputs.pr-number
+        with:
+          name: mypy_primer_diff
+          workflow: mypy_primer.yaml
+          pr: ${{ steps.pr-number.outputs.pr-number }}
+          path: pr/mypy_primer_diff
+          workflow_conclusion: completed
+          if_no_artifact_found: ignore
+          allow_forks: true
+
+      - name: Generate comment content
+        id: generate-comment
+        if: steps.download-mypy_primer_diff.outputs.found_artifact == 'true'
+        run: |
+          # Guard against malicious mypy_primer results that symlink to a secret
+          # file on this runner
+          if [[ -L pr/mypy_primer_diff/mypy_primer.diff ]]
+          then
+              echo "Error: mypy_primer.diff cannot be a symlink"
+              exit 1
+          fi
+
+          # Note this identifier is used to find the comment to update on
+          # subsequent runs
+          echo '<!-- generated-comment mypy_primer -->' >> comment.txt
+
+          echo '## `mypy_primer` results' >> comment.txt
+          if [ -s "pr/mypy_primer_diff/mypy_primer.diff" ]; then
+            echo '<details>' >> comment.txt
+            echo '<summary>Changes were detected when running on open source projects</summary>' >> comment.txt
+            echo '' >> comment.txt
+            echo '```diff' >> comment.txt
+            cat pr/mypy_primer_diff/mypy_primer.diff >> comment.txt
+            echo '```' >> comment.txt
+            echo '</details>' >> comment.txt
+          else
+            echo 'No ecosystem changes detected ✅' >> comment.txt
+          fi
+
+          echo 'comment<<EOF' >> "$GITHUB_OUTPUT"
+          cat comment.txt >> "$GITHUB_OUTPUT"
+          echo 'EOF' >> "$GITHUB_OUTPUT"
+
+      - name: Find existing comment
+        uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e # v3
+        if: steps.generate-comment.outcome == 'success'
+        id: find-comment
+        with:
+          issue-number: ${{ steps.pr-number.outputs.pr-number }}
+          comment-author: "github-actions[bot]"
+          body-includes: "<!-- generated-comment mypy_primer -->"
+
+      - name: Create or update comment
+        if: steps.find-comment.outcome == 'success'
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ steps.pr-number.outputs.pr-number }}
+          body-path: comment.txt
+          edit-mode: replace

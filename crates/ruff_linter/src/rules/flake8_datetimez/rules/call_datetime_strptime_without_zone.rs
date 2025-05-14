@@ -132,7 +132,7 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &Checker, call: &ast:
             }
             _ => {}
         }
-    };
+    }
 
     let semantic = checker.semantic();
     if let Some(antipattern) = find_antipattern(

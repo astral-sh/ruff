@@ -63,7 +63,7 @@ pub(crate) fn fail_call(checker: &Checker, call: &ast::ExprCall) {
             .arguments
             .find_argument_value("reason", 0)
             .or_else(|| call.arguments.find_argument_value("msg", 0))
-            .map_or(true, is_empty_or_null_string)
+            .is_none_or(is_empty_or_null_string)
         {
             checker.report_diagnostic(Diagnostic::new(PytestFailWithoutMessage, call.func.range()));
         }

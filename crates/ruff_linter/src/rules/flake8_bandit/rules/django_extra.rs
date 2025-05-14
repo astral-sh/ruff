@@ -22,7 +22,7 @@ use crate::checkers::ast::Checker;
 /// User.objects.all().extra(select={"test": "%secure" % "nos"})
 /// ```
 ///
-/// ## Use instead:
+/// Use instead:
 /// ```python
 /// from django.contrib.auth.models import User
 ///

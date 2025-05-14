@@ -121,7 +121,7 @@ impl SarifResult {
     fn from_message(message: &Message) -> Result<Self> {
         let start_location = message.compute_start_location();
         let end_location = message.compute_end_location();
-        let path = normalize_path(message.filename());
+        let path = normalize_path(&*message.filename());
         Ok(Self {
             rule: message.rule(),
             level: "error".to_string(),
@@ -129,27 +129,27 @@ impl SarifResult {
             uri: url::Url::from_file_path(&path)
                 .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))?
                 .to_string(),
-            start_line: start_location.row,
+            start_line: start_location.line,
             start_column: start_location.column,
-            end_line: end_location.row,
+            end_line: end_location.line,
             end_column: end_location.column,
         })
     }
 
     #[cfg(target_arch = "wasm32")]
-    #[allow(clippy::unnecessary_wraps)]
+    #[expect(clippy::unnecessary_wraps)]
     fn from_message(message: &Message) -> Result<Self> {
         let start_location = message.compute_start_location();
         let end_location = message.compute_end_location();
-        let path = normalize_path(message.filename());
+        let path = normalize_path(&*message.filename());
         Ok(Self {
             rule: message.rule(),
             level: "error".to_string(),
             message: message.body().to_string(),
             uri: path.display().to_string(),
-            start_line: start_location.row,
+            start_line: start_location.line,
             start_column: start_location.column,
-            end_line: end_location.row,
+            end_line: end_location.line,
             end_column: end_location.column,
         })
     }

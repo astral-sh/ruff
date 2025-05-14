@@ -16,102 +16,64 @@ TC005.py:4:5: TC005 [*] Found empty type-checking block
 4   |-    pass  # TC005
 5 3 | 
 6 4 | 
-7 5 | if False:
+7 5 | def example():
 
-TC005.py:8:5: TC005 [*] Found empty type-checking block
+TC005.py:9:9: TC005 [*] Found empty type-checking block
    |
- 7 | if False:
- 8 |     pass  # TC005
-   |     ^^^^ TC005
- 9 |
-10 | if 0:
-   |
-   = help: Delete empty type-checking block
-
-ℹ Safe fix
-4 4 |     pass  # TC005
-5 5 | 
-6 6 | 
-7   |-if False:
-8   |-    pass  # TC005
-9 7 | 
-10 8 | if 0:
-11 9 |     pass  # TC005
-
-TC005.py:11:5: TC005 [*] Found empty type-checking block
-   |
-10 | if 0:
-11 |     pass  # TC005
-   |     ^^^^ TC005
+ 7 | def example():
+ 8 |     if TYPE_CHECKING:
+ 9 |         pass  # TC005
+   |         ^^^^ TC005
+10 |     return
    |
    = help: Delete empty type-checking block
 
 ℹ Safe fix
-7  7  | if False:
-8  8  |     pass  # TC005
-9  9  | 
-10    |-if 0:
-11    |-    pass  # TC005
+5  5  | 
+6  6  | 
+7  7  | def example():
+8     |-    if TYPE_CHECKING:
+9     |-        pass  # TC005
+10 8  |     return
+11 9  | 
 12 10 | 
-13 11 | 
-14 12 | def example():
 
-TC005.py:16:9: TC005 [*] Found empty type-checking block
+TC005.py:15:9: TC005 [*] Found empty type-checking block
    |
-14 | def example():
-15 |     if TYPE_CHECKING:
-16 |         pass  # TC005
+13 | class Test:
+14 |     if TYPE_CHECKING:
+15 |         pass  # TC005
    |         ^^^^ TC005
-17 |     return
+16 |     x = 2
    |
    = help: Delete empty type-checking block
 
 ℹ Safe fix
+11 11 | 
 12 12 | 
-13 13 | 
-14 14 | def example():
-15    |-    if TYPE_CHECKING:
-16    |-        pass  # TC005
-17 15 |     return
+13 13 | class Test:
+14    |-    if TYPE_CHECKING:
+15    |-        pass  # TC005
+16 14 |     x = 2
+17 15 | 
 18 16 | 
-19 17 | 
 
-TC005.py:22:9: TC005 [*] Found empty type-checking block
+TC005.py:31:5: TC005 [*] Found empty type-checking block
    |
-20 | class Test:
-21 |     if TYPE_CHECKING:
-22 |         pass  # TC005
-   |         ^^^^ TC005
-23 |     x = 2
-   |
-   = help: Delete empty type-checking block
-
-ℹ Safe fix
-18 18 | 
-19 19 | 
-20 20 | class Test:
-21    |-    if TYPE_CHECKING:
-22    |-        pass  # TC005
-23 21 |     x = 2
-24 22 | 
-25 23 | 
-
-TC005.py:45:5: TC005 [*] Found empty type-checking block
-   |
-44 | if TYPE_CHECKING:
-45 |     pass  # TC005
+30 | if TYPE_CHECKING:
+31 |     pass  # TC005
    |     ^^^^ TC005
-46 |
-47 | # https://github.com/astral-sh/ruff/issues/11368
+32 |
+33 | # https://github.com/astral-sh/ruff/issues/11368
    |
    = help: Delete empty type-checking block
 
 ℹ Safe fix
-41 41 | 
-42 42 | from typing_extensions import TYPE_CHECKING
-43 43 | 
-44    |-if TYPE_CHECKING:
-45    |-    pass  # TC005
-46 44 | 
-47 45 | # https://github.com/astral-sh/ruff/issues/11368
-48 46 | if TYPE_CHECKING:
+27 27 | 
+28 28 | from typing_extensions import TYPE_CHECKING
+29 29 | 
+30    |-if TYPE_CHECKING:
+31    |-    pass  # TC005
+32 30 | 
+33 31 | # https://github.com/astral-sh/ruff/issues/11368
+34 32 | if TYPE_CHECKING:

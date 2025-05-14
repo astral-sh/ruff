@@ -29,10 +29,13 @@ unicode-normalization = { workspace = true }
 
 [dev-dependencies]
 ruff_annotate_snippets = { workspace = true }
+ruff_python_ast = { workspace = true, features = ["serde"] }
 ruff_source_file = { workspace = true }
 
 anyhow = { workspace = true }
 insta = { workspace = true, features = ["glob"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
 walkdir = { workspace = true }
 
 [lints]

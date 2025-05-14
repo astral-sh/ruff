@@ -950,15 +950,40 @@ fn rule_invalid_rule_name() {
 #[test]
 fn show_statistics() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "F401", "--statistics"])
+        .args(["--select", "C416", "--statistics"])
         .build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("import sys\nimport os\n\nprint(os.getuid())\n"), @r"
+                         .pass_stdin(r#"
+def mvce(keys, values):
+    return {key: value for key, value in zip(keys, values)}
+"#), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    1	F401	[*] unused-import
-    [*] fixable with `ruff check --fix`
+    1	C416	unnecessary-comprehension
+    Found 1 error.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    ");
+}
+
+#[test]
+fn show_statistics_unsafe_fixes() {
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "C416", "--statistics", "--unsafe-fixes"])
+        .build();
+    assert_cmd_snapshot!(cmd
+                         .pass_stdin(r#"
+def mvce(keys, values):
+    return {key: value for key, value in zip(keys, values)}
+"#), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1	C416	[*] unnecessary-comprehension
+    Found 1 error.
+    [*] 1 fixable with the --fix option.
 
     ----- stderr -----
     ");
@@ -969,21 +994,57 @@ fn show_statistics_json() {
     let mut cmd = RuffCheck::default()
         .args([
             "--select",
-            "F401",
+            "C416",
             "--statistics",
             "--output-format",
             "json",
         ])
         .build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("import sys\nimport os\n\nprint(os.getuid())\n"), @r#"
+        .pass_stdin(r#"
+def mvce(keys, values):
+    return {key: value for key, value in zip(keys, values)}
+"#), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
     [
       {
-        "code": "F401",
-        "name": "unused-import",
+        "code": "C416",
+        "name": "unnecessary-comprehension",
+        "count": 1,
+        "fixable": false
+      }
+    ]
+
+    ----- stderr -----
+    "#);
+}
+
+#[test]
+fn show_statistics_json_unsafe_fixes() {
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--select",
+            "C416",
+            "--statistics",
+            "--unsafe-fixes",
+            "--output-format",
+            "json",
+        ])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r#"
+def mvce(keys, values):
+    return {key: value for key, value in zip(keys, values)}
+"#), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    [
+      {
+        "code": "C416",
+        "name": "unnecessary-comprehension",
         "count": 1,
         "fixable": true
       }
@@ -991,6 +1052,52 @@ fn show_statistics_json() {
 
     ----- stderr -----
     "#);
+}
+
+#[test]
+fn show_statistics_syntax_errors() {
+    let mut cmd = RuffCheck::default()
+        .args(["--statistics", "--target-version=py39", "--preview"])
+        .build();
+
+    // ParseError
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("x ="),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1		syntax-error
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+
+    // match before 3.10, UnsupportedSyntaxError
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("match 2:\n  case 1: ..."),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1		syntax-error
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+
+    // rebound comprehension variable, SemanticSyntaxError
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[x := 1 for x in range(0)]"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1		syntax-error
+    Found 1 error.
+
+    ----- stderr -----
+    ");
 }
 
 #[test]
@@ -2125,4 +2232,196 @@ unfixable = ["RUF"]
     ");
 
     Ok(())
+}
+
+#[test]
+fn pyproject_toml_stdin_syntax_error() {
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "pyproject.toml", "--select", "RUF200"])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    pyproject.toml:1:9: RUF200 Failed to parse pyproject.toml: invalid table header
+    expected `.`, `]`
+      |
+    1 | [project
+      |         ^ RUF200
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn pyproject_toml_stdin_schema_error() {
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "pyproject.toml", "--select", "RUF200"])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project]\nname = 1"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    pyproject.toml:2:8: RUF200 Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
+      |
+    1 | [project]
+    2 | name = 1
+      |        ^ RUF200
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn pyproject_toml_stdin_no_applicable_rules_selected() {
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "pyproject.toml"])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn pyproject_toml_stdin_no_applicable_rules_selected_2() {
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "pyproject.toml", "--select", "F401"])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn pyproject_toml_stdin_no_errors() {
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "pyproject.toml"])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin(r#"[project]\nname = "ruff"\nversion = "0.0.0""#),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn pyproject_toml_stdin_schema_error_fix() {
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--stdin-filename",
+            "pyproject.toml",
+            "--select",
+            "RUF200",
+            "--fix",
+        ])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project]\nname = 1"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    [project]
+    name = 1
+    ----- stderr -----
+    pyproject.toml:2:8: RUF200 Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
+      |
+    1 | [project]
+    2 | name = 1
+      |        ^ RUF200
+      |
+
+    Found 1 error.
+    "
+    );
+}
+
+#[test]
+fn pyproject_toml_stdin_schema_error_fix_only() {
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--stdin-filename",
+            "pyproject.toml",
+            "--select",
+            "RUF200",
+            "--fix-only",
+        ])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project]\nname = 1"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    [project]
+    name = 1
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn pyproject_toml_stdin_schema_error_fix_diff() {
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--stdin-filename",
+            "pyproject.toml",
+            "--select",
+            "RUF200",
+            "--fix",
+            "--diff",
+        ])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project]\nname = 1"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "
+    );
 }

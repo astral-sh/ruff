@@ -29,18 +29,14 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
     let id = req.id.clone();
 
     match req.method.as_str() {
-        request::CodeActions::METHOD => background_request_task::<request::CodeActions>(
-            req,
-            BackgroundSchedule::LatencySensitive,
-        ),
+        request::CodeActions::METHOD => {
+            background_request_task::<request::CodeActions>(req, BackgroundSchedule::Worker)
+        }
         request::CodeActionResolve::METHOD => {
             background_request_task::<request::CodeActionResolve>(req, BackgroundSchedule::Worker)
         }
         request::DocumentDiagnostic::METHOD => {
-            background_request_task::<request::DocumentDiagnostic>(
-                req,
-                BackgroundSchedule::LatencySensitive,
-            )
+            background_request_task::<request::DocumentDiagnostic>(req, BackgroundSchedule::Worker)
         }
         request::ExecuteCommand::METHOD => local_request_task::<request::ExecuteCommand>(req),
         request::Format::METHOD => {
@@ -147,7 +143,7 @@ fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
     }))
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationHandler>(
     req: server::Notification,
     schedule: BackgroundSchedule,

@@ -1,2 +1,5 @@
 **.md
-pkg
+ruff/dist
+ruff/ruff_wasm
+ty/dist
+ty/ty_wasm

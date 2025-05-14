@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-repeated_equality_comparison.py:2:1: PLR1714 [*] Consider merging multiple comparisons: `foo in ("a", "b")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:2:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b"}`.
   |
 1 | # Errors.
 2 | foo == "a" or foo == "b"
@@ -14,12 +14,12 @@ repeated_equality_comparison.py:2:1: PLR1714 [*] Consider merging multiple compa
 ℹ Unsafe fix
 1 1 | # Errors.
 2   |-foo == "a" or foo == "b"
-  2 |+foo in ("a", "b")
+  2 |+foo in {"a", "b"}
 3 3 | 
 4 4 | foo != "a" and foo != "b"
 5 5 | 
 
-repeated_equality_comparison.py:4:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in ("a", "b")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:4:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b"}`.
   |
 2 | foo == "a" or foo == "b"
 3 |
@@ -35,12 +35,12 @@ repeated_equality_comparison.py:4:1: PLR1714 [*] Consider merging multiple compa
 2 2 | foo == "a" or foo == "b"
 3 3 | 
 4   |-foo != "a" and foo != "b"
-  4 |+foo not in ("a", "b")
+  4 |+foo not in {"a", "b"}
 5 5 | 
 6 6 | foo == "a" or foo == "b" or foo == "c"
 7 7 | 
 
-repeated_equality_comparison.py:6:1: PLR1714 [*] Consider merging multiple comparisons: `foo in ("a", "b", "c")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:6:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
   |
 4 | foo != "a" and foo != "b"
 5 |
@@ -56,12 +56,12 @@ repeated_equality_comparison.py:6:1: PLR1714 [*] Consider merging multiple compa
 4 4 | foo != "a" and foo != "b"
 5 5 | 
 6   |-foo == "a" or foo == "b" or foo == "c"
-  6 |+foo in ("a", "b", "c")
+  6 |+foo in {"a", "b", "c"}
 7 7 | 
 8 8 | foo != "a" and foo != "b" and foo != "c"
 9 9 | 
 
-repeated_equality_comparison.py:8:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in ("a", "b", "c")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:8:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b", "c"}`.
    |
  6 | foo == "a" or foo == "b" or foo == "c"
  7 |
@@ -77,7 +77,7 @@ repeated_equality_comparison.py:8:1: PLR1714 [*] Consider merging multiple compa
 6 6 | foo == "a" or foo == "b" or foo == "c"
 7 7 | 
 8   |-foo != "a" and foo != "b" and foo != "c"
-  8 |+foo not in ("a", "b", "c")
+  8 |+foo not in {"a", "b", "c"}
 9 9 | 
 10 10 | foo == a or foo == "b" or foo == 3  # Mixed types.
 11 11 | 
@@ -103,7 +103,7 @@ repeated_equality_comparison.py:10:1: PLR1714 [*] Consider merging multiple comp
 12 12 | "a" == foo or "b" == foo or "c" == foo
 13 13 | 
 
-repeated_equality_comparison.py:12:1: PLR1714 [*] Consider merging multiple comparisons: `foo in ("a", "b", "c")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:12:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
    |
 10 | foo == a or foo == "b" or foo == 3  # Mixed types.
 11 |
@@ -119,12 +119,12 @@ repeated_equality_comparison.py:12:1: PLR1714 [*] Consider merging multiple comp
 10 10 | foo == a or foo == "b" or foo == 3  # Mixed types.
 11 11 | 
 12    |-"a" == foo or "b" == foo or "c" == foo
-   12 |+foo in ("a", "b", "c")
+   12 |+foo in {"a", "b", "c"}
 13 13 | 
 14 14 | "a" != foo and "b" != foo and "c" != foo
 15 15 | 
 
-repeated_equality_comparison.py:14:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in ("a", "b", "c")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:14:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b", "c"}`.
    |
 12 | "a" == foo or "b" == foo or "c" == foo
 13 |
@@ -140,12 +140,12 @@ repeated_equality_comparison.py:14:1: PLR1714 [*] Consider merging multiple comp
 12 12 | "a" == foo or "b" == foo or "c" == foo
 13 13 | 
 14    |-"a" != foo and "b" != foo and "c" != foo
-   14 |+foo not in ("a", "b", "c")
+   14 |+foo not in {"a", "b", "c"}
 15 15 | 
 16 16 | "a" == foo or foo == "b" or "c" == foo
 17 17 | 
 
-repeated_equality_comparison.py:16:1: PLR1714 [*] Consider merging multiple comparisons: `foo in ("a", "b", "c")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:16:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
    |
 14 | "a" != foo and "b" != foo and "c" != foo
 15 |
@@ -161,7 +161,7 @@ repeated_equality_comparison.py:16:1: PLR1714 [*] Consider merging multiple comp
 14 14 | "a" != foo and "b" != foo and "c" != foo
 15 15 | 
 16    |-"a" == foo or foo == "b" or "c" == foo
-   16 |+foo in ("a", "b", "c")
+   16 |+foo in {"a", "b", "c"}
 17 17 | 
 18 18 | foo == bar or baz == foo or qux == foo
 19 19 | 
@@ -187,7 +187,7 @@ repeated_equality_comparison.py:18:1: PLR1714 [*] Consider merging multiple comp
 20 20 | foo == "a" or "b" == foo or foo == "c"
 21 21 | 
 
-repeated_equality_comparison.py:20:1: PLR1714 [*] Consider merging multiple comparisons: `foo in ("a", "b", "c")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:20:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
    |
 18 | foo == bar or baz == foo or qux == foo
 19 |
@@ -203,12 +203,12 @@ repeated_equality_comparison.py:20:1: PLR1714 [*] Consider merging multiple comp
 18 18 | foo == bar or baz == foo or qux == foo
 19 19 | 
 20    |-foo == "a" or "b" == foo or foo == "c"
-   20 |+foo in ("a", "b", "c")
+   20 |+foo in {"a", "b", "c"}
 21 21 | 
 22 22 | foo != "a" and "b" != foo and foo != "c"
 23 23 | 
 
-repeated_equality_comparison.py:22:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in ("a", "b", "c")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:22:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b", "c"}`.
    |
 20 | foo == "a" or "b" == foo or foo == "c"
 21 |
@@ -224,12 +224,12 @@ repeated_equality_comparison.py:22:1: PLR1714 [*] Consider merging multiple comp
 20 20 | foo == "a" or "b" == foo or foo == "c"
 21 21 | 
 22    |-foo != "a" and "b" != foo and foo != "c"
-   22 |+foo not in ("a", "b", "c")
+   22 |+foo not in {"a", "b", "c"}
 23 23 | 
 24 24 | foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
 25 25 | 
 
-repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comparisons: `foo in ("a", "b")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b"}`.
    |
 22 | foo != "a" and "b" != foo and foo != "c"
 23 |
@@ -245,12 +245,12 @@ repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comp
 22 22 | foo != "a" and "b" != foo and foo != "c"
 23 23 | 
 24    |-foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
-   24 |+foo in ("a", "b") or "c" == bar or "d" == bar  # Multiple targets
+   24 |+foo in {"a", "b"} or "c" == bar or "d" == bar  # Multiple targets
 25 25 | 
 26 26 | foo.bar == "a" or foo.bar == "b"  # Attributes.
 27 27 | 
 
-repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comparisons: `bar in ("c", "d")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comparisons: `bar in {"c", "d"}`.
    |
 22 | foo != "a" and "b" != foo and foo != "c"
 23 |
@@ -266,12 +266,12 @@ repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comp
 22 22 | foo != "a" and "b" != foo and foo != "c"
 23 23 | 
 24    |-foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
-   24 |+foo == "a" or foo == "b" or bar in ("c", "d")  # Multiple targets
+   24 |+foo == "a" or foo == "b" or bar in {"c", "d"}  # Multiple targets
 25 25 | 
 26 26 | foo.bar == "a" or foo.bar == "b"  # Attributes.
 27 27 | 
 
-repeated_equality_comparison.py:26:1: PLR1714 [*] Consider merging multiple comparisons: `foo.bar in ("a", "b")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:26:1: PLR1714 [*] Consider merging multiple comparisons: `foo.bar in {"a", "b"}`.
    |
 24 | foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
 25 |
@@ -287,12 +287,12 @@ repeated_equality_comparison.py:26:1: PLR1714 [*] Consider merging multiple comp
 24 24 | foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
 25 25 | 
 26    |-foo.bar == "a" or foo.bar == "b"  # Attributes.
-   26 |+foo.bar in ("a", "b")  # Attributes.
+   26 |+foo.bar in {"a", "b"}  # Attributes.
 27 27 | 
 28 28 | # OK
 29 29 | foo == "a" and foo == "b" and foo == "c"  # `and` mixed with `==`.
 
-repeated_equality_comparison.py:61:16: PLR1714 [*] Consider merging multiple comparisons: `bar in ("c", "d")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:61:16: PLR1714 [*] Consider merging multiple comparisons: `bar in {"c", "d"}`.
    |
 59 | foo == "a" or "c" == bar or foo == "b" or "d" == bar  # Multiple targets
 60 |
@@ -308,12 +308,12 @@ repeated_equality_comparison.py:61:16: PLR1714 [*] Consider merging multiple com
 59 59 | foo == "a" or "c" == bar or foo == "b" or "d" == bar  # Multiple targets
 60 60 | 
 61    |-foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
-   61 |+foo == "a" or (bar in ("c", "d")) or foo == "b"  # Multiple targets
+   61 |+foo == "a" or (bar in {"c", "d"}) or foo == "b"  # Multiple targets
 62 62 | 
 63 63 | foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
 64 64 | 
 
-repeated_equality_comparison.py:63:1: PLR1714 [*] Consider merging multiple comparisons: `foo in ("a", "b")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:63:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b"}`.
    |
 61 | foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
 62 |
@@ -329,12 +329,12 @@ repeated_equality_comparison.py:63:1: PLR1714 [*] Consider merging multiple comp
 61 61 | foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
 62 62 | 
 63    |-foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
-   63 |+foo in ("a", "b") or "c" != bar and "d" != bar  # Multiple targets
+   63 |+foo in {"a", "b"} or "c" != bar and "d" != bar  # Multiple targets
 64 64 | 
 65 65 | foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
 66 66 | 
 
-repeated_equality_comparison.py:63:29: PLR1714 [*] Consider merging multiple comparisons: `bar not in ("c", "d")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:63:29: PLR1714 [*] Consider merging multiple comparisons: `bar not in {"c", "d"}`.
    |
 61 | foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
 62 |
@@ -350,12 +350,12 @@ repeated_equality_comparison.py:63:29: PLR1714 [*] Consider merging multiple com
 61 61 | foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
 62 62 | 
 63    |-foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
-   63 |+foo == "a" or foo == "b" or bar not in ("c", "d")  # Multiple targets
+   63 |+foo == "a" or foo == "b" or bar not in {"c", "d"}  # Multiple targets
 64 64 | 
 65 65 | foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
 66 66 | 
 
-repeated_equality_comparison.py:65:16: PLR1714 [*] Consider merging multiple comparisons: `bar not in ("c", "d")`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:65:16: PLR1714 [*] Consider merging multiple comparisons: `bar not in {"c", "d"}`.
    |
 63 | foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
 64 |
@@ -371,12 +371,12 @@ repeated_equality_comparison.py:65:16: PLR1714 [*] Consider merging multiple com
 63 63 | foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
 64 64 | 
 65    |-foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
-   65 |+foo == "a" or (bar not in ("c", "d")) or foo == "b"  # Multiple targets
+   65 |+foo == "a" or (bar not in {"c", "d"}) or foo == "b"  # Multiple targets
 66 66 | 
 67 67 | foo == "a" and "c" != bar or foo == "b" and "d" != bar  # Multiple targets
 68 68 | 
 
-repeated_equality_comparison.py:69:1: PLR1714 [*] Consider merging multiple comparisons: `foo in (1, True)`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:69:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {1, True}`.
    |
 67 | foo == "a" and "c" != bar or foo == "b" and "d" != bar  # Multiple targets
 68 |
@@ -392,12 +392,12 @@ repeated_equality_comparison.py:69:1: PLR1714 [*] Consider merging multiple comp
 67 67 | foo == "a" and "c" != bar or foo == "b" and "d" != bar  # Multiple targets
 68 68 | 
 69    |-foo == 1 or foo == True # Different types, same hashed value
-   69 |+foo in (1, True) # Different types, same hashed value
+   69 |+foo in {1, True} # Different types, same hashed value
 70 70 | 
 71 71 | foo == 1 or foo == 1.0 # Different types, same hashed value
 72 72 | 
 
-repeated_equality_comparison.py:71:1: PLR1714 [*] Consider merging multiple comparisons: `foo in (1, 1.0)`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:71:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {1, 1.0}`.
    |
 69 | foo == 1 or foo == True # Different types, same hashed value
 70 |
@@ -413,12 +413,12 @@ repeated_equality_comparison.py:71:1: PLR1714 [*] Consider merging multiple comp
 69 69 | foo == 1 or foo == True # Different types, same hashed value
 70 70 | 
 71    |-foo == 1 or foo == 1.0 # Different types, same hashed value
-   71 |+foo in (1, 1.0) # Different types, same hashed value
+   71 |+foo in {1, 1.0} # Different types, same hashed value
 72 72 | 
 73 73 | foo == False or foo == 0 # Different types, same hashed value
 74 74 | 
 
-repeated_equality_comparison.py:73:1: PLR1714 [*] Consider merging multiple comparisons: `foo in (False, 0)`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:73:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {False, 0}`.
    |
 71 | foo == 1 or foo == 1.0 # Different types, same hashed value
 72 |
@@ -434,11 +434,11 @@ repeated_equality_comparison.py:73:1: PLR1714 [*] Consider merging multiple comp
 71 71 | foo == 1 or foo == 1.0 # Different types, same hashed value
 72 72 | 
 73    |-foo == False or foo == 0 # Different types, same hashed value
-   73 |+foo in (False, 0) # Different types, same hashed value
+   73 |+foo in {False, 0} # Different types, same hashed value
 74 74 | 
 75 75 | foo == 0.0 or foo == 0j # Different types, same hashed value
 
-repeated_equality_comparison.py:75:1: PLR1714 [*] Consider merging multiple comparisons: `foo in (0.0, 0j)`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:75:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {0.0, 0j}`.
    |
 73 | foo == False or foo == 0 # Different types, same hashed value
 74 |
@@ -452,4 +452,4 @@ repeated_equality_comparison.py:75:1: PLR1714 [*] Consider merging multiple comp
 73 73 | foo == False or foo == 0 # Different types, same hashed value
 74 74 | 
 75    |-foo == 0.0 or foo == 0j # Different types, same hashed value
-   75 |+foo in (0.0, 0j) # Different types, same hashed value
+   75 |+foo in {0.0, 0j} # Different types, same hashed value

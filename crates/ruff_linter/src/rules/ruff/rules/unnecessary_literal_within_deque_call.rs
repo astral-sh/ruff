@@ -10,7 +10,7 @@ use ruff_text_size::Ranged;
 /// ## Why is this bad?
 /// It's unnecessary to use an empty literal as a deque's iterable, since this is already the default behavior.
 ///
-/// ## Examples
+/// ## Example
 ///
 /// ```python
 /// from collections import deque

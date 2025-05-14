@@ -1,0 +1,36 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: line_continuation_at_eof(WINDOWS_EOL)
+---
+## Tokens
+```
+[
+    (
+        Int(
+            1,
+        ),
+        0..1,
+    ),
+    (
+        Comma,
+        1..2,
+    ),
+    (
+        Unknown,
+        2..6,
+    ),
+    (
+        Newline,
+        6..6,
+    ),
+]
+```
+## Errors
+```
+[
+    LexicalError {
+        error: Eof,
+        location: 2..6,
+    },
+]
+```

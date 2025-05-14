@@ -16,7 +16,7 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - uses: dawidd6/action-download-artifact@v8
+      - uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
         name: Download pull request number
         with:
           name: pr-number
@@ -32,7 +32,7 @@ jobs:
             echo "pr-number=$(<pr-number)" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: dawidd6/action-download-artifact@v8
+      - uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
         name: "Download ecosystem results"
         id: download-ecosystem-result
         if: steps.pr-number.outputs.pr-number
@@ -70,7 +70,7 @@ jobs:
           echo 'EOF' >> "$GITHUB_OUTPUT"
 
       - name: Find existing comment
-        uses: peter-evans/find-comment@v3
+        uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e # v3
         if: steps.generate-comment.outcome == 'success'
         id: find-comment
         with:
@@ -80,7 +80,7 @@ jobs:
 
       - name: Create or update comment
         if: steps.find-comment.outcome == 'success'
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
         with:
           comment-id: ${{ steps.find-comment.outputs.comment-id }}
           issue-number: ${{ steps.pr-number.outputs.pr-number }}
