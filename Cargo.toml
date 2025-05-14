@@ -185,6 +185,9 @@ zip = { version = "0.6.6", default-features = false }
 ignored = ["getrandom"]
 
 
+[patch."https://github.com/salsa-rs/salsa.git"]
+salsa = { path = "../salsa" }
+
 [workspace.lints.rust]
 unsafe_code = "warn"
 unreachable_pub = "warn"

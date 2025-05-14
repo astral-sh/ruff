@@ -1,0 +1,4 @@
+import asyncio
+
+
+asyncio.shield()
