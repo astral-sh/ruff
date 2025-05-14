@@ -172,32 +172,20 @@ fn split_default(
             //   - " x ".rsplit(maxsplit=0) -> [' x']
             //   - "".split(maxsplit=0) -> []
             //   - " ".split(maxsplit=0) -> []
-            if string_val
-                .trim_matches(|c: char| c.is_whitespace())
-                .is_empty()
-            {
-                Some(construct_replacement(&[], str_value.first_literal_flags()))
+            let processed_str = if direction == Direction::Left {
+                string_val.trim_start()
             } else {
-                let processed_str = if direction == Direction::Left {
-                    // Retain string from the first non-whitespace char to the end.
-                    // e.g., "  foo bar  " -> "foo bar  "
-                    let start_index = string_val.find(|c: char| !c.is_whitespace()).unwrap_or(0);
-                    &string_val[start_index..]
-                } else {
-                    // Direction::Right
-                    // Find the byte index *after* the last non-whitespace character.
-                    let end_index = string_val
-                        .rfind(|c: char| !c.is_whitespace())
-                        .map_or(string_val.len(), |i| {
-                            i + string_val[i..].chars().next().unwrap().len_utf8()
-                        });
-                    &string_val[..end_index]
-                };
-                Some(construct_replacement(
-                    &[processed_str],
-                    str_value.first_literal_flags(),
-                ))
-            }
+                string_val.trim_end()
+            };
+            let list_items: &[_] = if processed_str.is_empty() {
+                &[]
+            } else {
+                &[processed_str]
+            };
+            Some(construct_replacement(
+                list_items,
+                str_value.first_literal_flags(),
+            ))
         }
         Ordering::Less => {
             let list_items: Vec<&str> = string_val.split_whitespace().collect();
