@@ -56,23 +56,32 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::IntLiteral(_), _) => Ordering::Less,
         (_, Type::IntLiteral(_)) => Ordering::Greater,
 
-        (Type::StringLiteral(left), Type::StringLiteral(right)) => left.cmp(right),
+        (Type::StringLiteral(left), Type::StringLiteral(right)) => left.ordering(db, *right),
         (Type::StringLiteral(_), _) => Ordering::Less,
         (_, Type::StringLiteral(_)) => Ordering::Greater,
 
-        (Type::BytesLiteral(left), Type::BytesLiteral(right)) => left.cmp(right),
+        (Type::BytesLiteral(left), Type::BytesLiteral(right)) => left.ordering(db, *right),
         (Type::BytesLiteral(_), _) => Ordering::Less,
         (_, Type::BytesLiteral(_)) => Ordering::Greater,
 
-        (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => left.cmp(right),
+        (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
+            // TODO: This compares by salsa ID, which can lead to non-deterministic ordering
+            left.cmp(right)
+        }
         (Type::FunctionLiteral(_), _) => Ordering::Less,
         (_, Type::FunctionLiteral(_)) => Ordering::Greater,
 
-        (Type::BoundMethod(left), Type::BoundMethod(right)) => left.cmp(right),
+        (Type::BoundMethod(left), Type::BoundMethod(right)) => {
+            // TODO: This compares by salsa ID, which can lead to non-deterministic ordering
+            left.cmp(right)
+        }
         (Type::BoundMethod(_), _) => Ordering::Less,
         (_, Type::BoundMethod(_)) => Ordering::Greater,
 
-        (Type::MethodWrapper(left), Type::MethodWrapper(right)) => left.cmp(right),
+        (Type::MethodWrapper(left), Type::MethodWrapper(right)) => {
+            // TODO: This compares by salsa ID, which can lead to non-deterministic ordering
+            left.cmp(right)
+        }
         (Type::MethodWrapper(_), _) => Ordering::Less,
         (_, Type::MethodWrapper(_)) => Ordering::Greater,
 
@@ -92,29 +101,40 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::DataclassTransformer(_), _) => Ordering::Less,
         (_, Type::DataclassTransformer(_)) => Ordering::Greater,
 
-        (Type::Callable(left), Type::Callable(right)) => left.cmp(right),
+        (Type::Callable(left), Type::Callable(right)) => {
+            // TODO: This compares by salsa ID, which can lead to non-deterministic ordering
+            left.cmp(right)
+        }
         (Type::Callable(_), _) => Ordering::Less,
         (_, Type::Callable(_)) => Ordering::Greater,
 
-        (Type::Tuple(left), Type::Tuple(right)) => left.cmp(right),
+        (Type::Tuple(left), Type::Tuple(right)) => {
+            // TODO: This compares by salsa ID, which can lead to non-deterministic ordering
+            left.cmp(right)
+        }
         (Type::Tuple(_), _) => Ordering::Less,
         (_, Type::Tuple(_)) => Ordering::Greater,
 
-        (Type::ModuleLiteral(left), Type::ModuleLiteral(right)) => left.cmp(right),
+        (Type::ModuleLiteral(left), Type::ModuleLiteral(right)) => {
+            // TODO: This compares by salsa ID, which can lead to non-deterministic ordering
+            left.cmp(right)
+        }
         (Type::ModuleLiteral(_), _) => Ordering::Less,
         (_, Type::ModuleLiteral(_)) => Ordering::Greater,
 
-        (Type::ClassLiteral(left), Type::ClassLiteral(right)) => left.cmp(right),
+        (Type::ClassLiteral(left), Type::ClassLiteral(right)) => left.ordering(db, *right),
         (Type::ClassLiteral(_), _) => Ordering::Less,
         (_, Type::ClassLiteral(_)) => Ordering::Greater,
 
-        (Type::GenericAlias(left), Type::GenericAlias(right)) => left.cmp(right),
+        (Type::GenericAlias(left), Type::GenericAlias(right)) => left.ordering(db, *right),
         (Type::GenericAlias(_), _) => Ordering::Less,
         (_, Type::GenericAlias(_)) => Ordering::Greater,
 
         (Type::SubclassOf(left), Type::SubclassOf(right)) => {
             match (left.subclass_of(), right.subclass_of()) {
-                (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => left.cmp(&right),
+                (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => {
+                    left.ordering(db, right)
+                }
                 (SubclassOfInner::Class(_), _) => Ordering::Less,
                 (_, SubclassOfInner::Class(_)) => Ordering::Greater,
                 (SubclassOfInner::Dynamic(left), SubclassOfInner::Dynamic(right)) => {
@@ -126,17 +146,22 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::SubclassOf(_), _) => Ordering::Less,
         (_, Type::SubclassOf(_)) => Ordering::Greater,
 
-        (Type::NominalInstance(left), Type::NominalInstance(right)) => left.class.cmp(&right.class),
+        (Type::NominalInstance(left), Type::NominalInstance(right)) => {
+            left.class.ordering(db, right.class)
+        }
         (Type::NominalInstance(_), _) => Ordering::Less,
         (_, Type::NominalInstance(_)) => Ordering::Greater,
 
         (Type::ProtocolInstance(left_proto), Type::ProtocolInstance(right_proto)) => {
-            left_proto.cmp(right_proto)
+            left_proto.ordering(db, *right_proto)
         }
         (Type::ProtocolInstance(_), _) => Ordering::Less,
         (_, Type::ProtocolInstance(_)) => Ordering::Greater,
 
-        (Type::TypeVar(left), Type::TypeVar(right)) => left.cmp(right),
+        (Type::TypeVar(left), Type::TypeVar(right)) => {
+            // TODO: This compares by salsa ID, which can lead to non-deterministic ordering
+            left.cmp(right)
+        }
         (Type::TypeVar(_), _) => Ordering::Less,
         (_, Type::TypeVar(_)) => Ordering::Greater,
 
@@ -148,15 +173,21 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
         (Type::BoundSuper(left), Type::BoundSuper(right)) => {
             (match (left.pivot_class(db), right.pivot_class(db)) {
-                (ClassBase::Class(left), ClassBase::Class(right)) => left.cmp(&right),
+                (ClassBase::Class(left), ClassBase::Class(right)) => left.ordering(db, right),
                 (ClassBase::Class(_), _) => Ordering::Less,
                 (_, ClassBase::Class(_)) => Ordering::Greater,
 
-                (ClassBase::Protocol(left), ClassBase::Protocol(right)) => left.cmp(&right),
+                (ClassBase::Protocol(left), ClassBase::Protocol(right)) => {
+                    // TODO: This compares by salsa ID, which can lead to non-deterministic ordering
+                    left.cmp(&right)
+                }
                 (ClassBase::Protocol(_), _) => Ordering::Less,
                 (_, ClassBase::Protocol(_)) => Ordering::Greater,
 
-                (ClassBase::Generic(left), ClassBase::Generic(right)) => left.cmp(&right),
+                (ClassBase::Generic(left), ClassBase::Generic(right)) => {
+                    // TODO: This compares by salsa ID, which can lead to non-deterministic ordering
+                    left.cmp(&right)
+                }
                 (ClassBase::Generic(_), _) => Ordering::Less,
                 (_, ClassBase::Generic(_)) => Ordering::Greater,
 
@@ -165,11 +196,13 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 }
             })
             .then_with(|| match (left.owner(db), right.owner(db)) {
-                (SuperOwnerKind::Class(left), SuperOwnerKind::Class(right)) => left.cmp(&right),
+                (SuperOwnerKind::Class(left), SuperOwnerKind::Class(right)) => {
+                    left.ordering(db, right)
+                }
                 (SuperOwnerKind::Class(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Class(_)) => Ordering::Greater,
                 (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => {
-                    left.class.cmp(&right.class)
+                    left.class.ordering(db, right.class)
                 }
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
@@ -247,12 +280,14 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (_, KnownInstanceType::OrderedDict) => Ordering::Greater,
 
                 (KnownInstanceType::Generic(left), KnownInstanceType::Generic(right)) => {
+                    // TODO: This compares by salsa ID, which can lead to non-deterministic ordering
                     left.cmp(right)
                 }
                 (KnownInstanceType::Generic(_), _) => Ordering::Less,
                 (_, KnownInstanceType::Generic(_)) => Ordering::Greater,
 
                 (KnownInstanceType::Protocol(left), KnownInstanceType::Protocol(right)) => {
+                    // TODO: This compares by salsa ID, which can lead to non-deterministic ordering
                     left.cmp(right)
                 }
                 (KnownInstanceType::Protocol(_), _) => Ordering::Less,
@@ -312,11 +347,15 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (
                     KnownInstanceType::TypeAliasType(left),
                     KnownInstanceType::TypeAliasType(right),
-                ) => left.cmp(right),
+                ) => {
+                    // TODO: This compares by salsa ID, which can lead to non-deterministic ordering
+                    left.cmp(right)
+                }
                 (KnownInstanceType::TypeAliasType(_), _) => Ordering::Less,
                 (_, KnownInstanceType::TypeAliasType(_)) => Ordering::Greater,
 
                 (KnownInstanceType::TypeVar(left), KnownInstanceType::TypeVar(right)) => {
+                    // TODO: This compares by salsa ID, which can lead to non-deterministic ordering
                     left.cmp(right)
                 }
             }
@@ -325,7 +364,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::KnownInstance(_), _) => Ordering::Less,
         (_, Type::KnownInstance(_)) => Ordering::Greater,
 
-        (Type::PropertyInstance(left), Type::PropertyInstance(right)) => left.cmp(right),
+        (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {
+            // TODO: This compares by salsa ID, which can lead to non-deterministic ordering
+            left.cmp(right)
+        }
         (Type::PropertyInstance(_), _) => Ordering::Less,
         (_, Type::PropertyInstance(_)) => Ordering::Greater,
 

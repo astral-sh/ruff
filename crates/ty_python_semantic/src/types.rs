@@ -1,6 +1,7 @@
 use infer::enclosing_class_symbol;
 use itertools::Either;
 
+use std::cmp::Ordering;
 use std::slice::Iter;
 use std::str::FromStr;
 
@@ -7973,6 +7974,10 @@ impl<'db> StringLiteralType<'db> {
             .chars()
             .map(|c| StringLiteralType::new(db, c.to_string().as_str()))
     }
+
+    pub(crate) fn ordering(self, db: &'db dyn Db, other: Self) -> Ordering {
+        self.value(db).cmp(other.value(db))
+    }
 }
 
 #[salsa::interned(debug)]
@@ -7984,6 +7989,10 @@ pub struct BytesLiteralType<'db> {
 impl<'db> BytesLiteralType<'db> {
     pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
         self.value(db).len()
+    }
+
+    pub(crate) fn ordering(self, db: &'db dyn Db, other: Self) -> Ordering {
+        self.value(db).cmp(other.value(db))
     }
 }
 

@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, ops::Deref};
+use std::{cmp::Ordering, collections::BTreeMap, ops::Deref};
 
 use itertools::{Either, Itertools};
 
@@ -65,7 +65,7 @@ pub(super) struct ProtocolInterfaceMembers<'db> {
 }
 
 /// The interface of a protocol: the members of that protocol, and the types of those members.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update)]
 pub(super) enum ProtocolInterface<'db> {
     Members(ProtocolInterfaceMembers<'db>),
     SelfReference,
@@ -203,6 +203,17 @@ impl<'db> ProtocolInterface<'db> {
                 }
             }
             Self::SelfReference => {}
+        }
+    }
+
+    pub(super) fn ordering(self, db: &'db dyn Db, other: Self) -> Ordering {
+        match (self, other) {
+            (Self::Members(this), Self::Members(other)) => {
+                this.inner(db).keys().cmp(other.inner(db).keys())
+            }
+            (Self::SelfReference, Self::Members(_)) => Ordering::Less,
+            (Self::Members(_), Self::SelfReference) => Ordering::Greater,
+            (Self::SelfReference, Self::SelfReference) => Ordering::Equal,
         }
     }
 }

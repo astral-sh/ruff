@@ -1,5 +1,6 @@
 //! Instance types: both nominal and structural.
 
+use std::cmp::Ordering;
 use std::marker::PhantomData;
 
 use super::protocol_class::ProtocolInterface;
@@ -157,7 +158,7 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
 
 /// A `ProtocolInstanceType` represents the set of all possible runtime objects
 /// that conform to the interface described by a certain protocol.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord, salsa::Update)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update)]
 pub struct ProtocolInstanceType<'db> {
     pub(super) inner: Protocol<'db>,
 
@@ -330,11 +331,15 @@ impl<'db> ProtocolInstanceType<'db> {
             }
         }
     }
+
+    pub(super) fn ordering(self, db: &'db dyn Db, other: Self) -> Ordering {
+        self.inner.ordering(db, other.inner)
+    }
 }
 
 /// An enumeration of the two kinds of protocol types: those that originate from a class
 /// definition in source code, and those that are synthesized from a set of members.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update)]
 pub(super) enum Protocol<'db> {
     FromClass(ClassType<'db>),
     Synthesized(SynthesizedProtocolType<'db>),
@@ -353,9 +358,20 @@ impl<'db> Protocol<'db> {
             Self::Synthesized(synthesized) => synthesized.interface(),
         }
     }
+
+    pub(super) fn ordering(self, db: &'db dyn Db, other: Self) -> Ordering {
+        match (self, other) {
+            (Self::FromClass(_), Self::Synthesized(_)) => Ordering::Greater,
+            (Self::Synthesized(_), Self::FromClass(_)) => Ordering::Less,
+            (Self::FromClass(this), Self::FromClass(other)) => this.ordering(db, other),
+            (Self::Synthesized(this), Self::Synthesized(other)) => this.ordering(db, other),
+        }
+    }
 }
 
 mod synthesized_protocol {
+    use std::cmp::Ordering;
+
     use crate::types::generics::TypeMapping;
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::TypeVarInstance;
@@ -370,7 +386,7 @@ mod synthesized_protocol {
     ///
     /// The constructor method of this type maintains the invariant that a synthesized protocol type
     /// is always constructed from a *normalized* protocol interface.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update)]
     pub(in crate::types) struct SynthesizedProtocolType<'db>(ProtocolInterface<'db>);
 
     impl<'db> SynthesizedProtocolType<'db> {
@@ -396,6 +412,10 @@ mod synthesized_protocol {
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {
             self.0
+        }
+
+        pub(super) fn ordering(self, db: &'db dyn Db, other: Self) -> Ordering {
+            self.0.ordering(db, other.0)
         }
     }
 }

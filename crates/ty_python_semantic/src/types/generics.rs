@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
@@ -7,8 +9,9 @@ use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    declaration_type, todo_type, KnownInstanceType, Type, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarVariance, UnionType,
+    declaration_type, todo_type, type_ordering::union_or_intersection_elements_ordering,
+    KnownInstanceType, Type, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance,
+    UnionType,
 };
 use crate::{Db, FxOrderSet};
 
@@ -229,9 +232,15 @@ impl<'db> GenericContext<'db> {
 
         Specialization::new(db, self, expanded.into_boxed_slice())
     }
+
+    pub(crate) fn ordering(self, db: &'db dyn Db, other: Self) -> Ordering {
+        self.variables(db)
+            .cmp(other.variables(db))
+            .then_with(|| self.origin(db).cmp(&other.origin(db)))
+    }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub enum GenericContextOrigin {
     LegacyBase(LegacyGenericBase),
     Inherited,
@@ -256,7 +265,7 @@ impl std::fmt::Display for GenericContextOrigin {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub enum LegacyGenericBase {
     Generic,
     Protocol,
@@ -517,6 +526,20 @@ impl<'db> Specialization<'db> {
         for ty in self.types(db) {
             ty.find_legacy_typevars(db, typevars);
         }
+    }
+
+    pub(crate) fn ordering(self, db: &'db dyn Db, other: Self) -> Ordering {
+        self.generic_context(db)
+            .ordering(db, other.generic_context(db))
+            .then_with(|| {
+                self.types(db)
+                    .iter()
+                    .zip(other.types(db))
+                    .map(|(self_type, other_type)| {
+                        union_or_intersection_elements_ordering(db, self_type, other_type)
+                    })
+                    .fold(Ordering::Equal, Ordering::then)
+            })
     }
 }
 

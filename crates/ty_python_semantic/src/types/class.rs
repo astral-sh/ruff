@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::hash::BuildHasherDefault;
 use std::sync::{LazyLock, Mutex};
 
@@ -187,6 +188,15 @@ impl<'db> GenericAlias<'db> {
     ) {
         self.specialization(db).find_legacy_typevars(db, typevars);
     }
+
+    pub(super) fn ordering(self, db: &'db dyn Db, other: Self) -> Ordering {
+        self.origin(db)
+            .ordering(db, other.origin(db))
+            .then_with(|| {
+                self.specialization(db)
+                    .ordering(db, other.specialization(db))
+            })
+    }
 }
 
 impl<'db> From<GenericAlias<'db>> for Type<'db> {
@@ -197,9 +207,7 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
 
 /// Represents a class type, which might be a non-generic class, or a specialization of a generic
 /// class.
-#[derive(
-    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Supertype, salsa::Update,
-)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update)]
 pub enum ClassType<'db> {
     NonGeneric(ClassLiteral<'db>),
     Generic(GenericAlias<'db>),
@@ -470,6 +478,15 @@ impl<'db> ClassType<'db> {
             .own_instance_member(db, name)
             .map_type(|ty| ty.apply_optional_specialization(db, specialization))
     }
+
+    pub fn ordering(self, db: &'db dyn Db, other: Self) -> Ordering {
+        match (self, other) {
+            (ClassType::NonGeneric(_), ClassType::Generic(_)) => Ordering::Less,
+            (ClassType::Generic(_), ClassType::NonGeneric(_)) => Ordering::Greater,
+            (ClassType::NonGeneric(this), ClassType::NonGeneric(other)) => this.ordering(db, other),
+            (ClassType::Generic(this), ClassType::Generic(other)) => this.ordering(db, other),
+        }
+    }
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
@@ -504,6 +521,14 @@ pub struct ClassLiteral<'db> {
 
     pub(crate) dataclass_params: Option<DataclassParams>,
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
+}
+
+impl<'db> ClassLiteral<'db> {
+    pub fn ordering(self, db: &'db dyn Db, other: Self) -> Ordering {
+        self.name(db)
+            .cmp(other.name(db))
+            .then_with(|| self.body_scope(db).cmp(&other.body_scope(db)))
+    }
 }
 
 #[expect(clippy::trivially_copy_pass_by_ref, clippy::ref_option)]
