@@ -84,6 +84,42 @@ impl std::fmt::Display for FStringErrorType {
     }
 }
 
+/// Represents the different types of errors that can occur during parsing of a t-string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TStringErrorType {
+    /// Expected a right brace after an opened left brace.
+    UnclosedLbrace,
+    /// An invalid conversion flag was encountered.
+    InvalidConversionFlag,
+    /// A single right brace was encountered.
+    SingleRbrace,
+    /// Unterminated string.
+    UnterminatedString,
+    /// Unterminated triple-quoted string.
+    UnterminatedTripleQuotedString,
+    /// A lambda expression without parentheses was encountered.
+    LambdaWithoutParentheses,
+}
+
+impl std::fmt::Display for TStringErrorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use TStringErrorType::{
+            InvalidConversionFlag, LambdaWithoutParentheses, SingleRbrace, UnclosedLbrace,
+            UnterminatedString, UnterminatedTripleQuotedString,
+        };
+        match self {
+            UnclosedLbrace => write!(f, "expecting '}}'"),
+            InvalidConversionFlag => write!(f, "invalid conversion character"),
+            SingleRbrace => write!(f, "single '}}' is not allowed"),
+            UnterminatedString => write!(f, "unterminated string"),
+            UnterminatedTripleQuotedString => write!(f, "unterminated triple-quoted string"),
+            LambdaWithoutParentheses => {
+                write!(f, "lambda expressions are not allowed without parentheses")
+            }
+        }
+    }
+}
+
 /// Represents the different types of errors that can occur during parsing.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ParseErrorType {
@@ -179,6 +215,8 @@ pub enum ParseErrorType {
 
     /// An f-string error containing the [`FStringErrorType`].
     FStringError(FStringErrorType),
+    /// A t-string error containing the [`TStringErrorType`].
+    TStringError(TStringErrorType),
     /// Parser encountered an error during lexing.
     Lexical(LexicalErrorType),
 }
@@ -292,6 +330,9 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::FStringError(fstring_error) => {
                 write!(f, "f-string: {fstring_error}")
             }
+            ParseErrorType::TStringError(ref tstring_error) => {
+                write!(f, "t-string: {tstring_error}")
+            }
             ParseErrorType::UnexpectedExpressionToken => {
                 write!(f, "Unexpected token at the end of an expression")
             }
@@ -377,6 +418,8 @@ pub enum LexicalErrorType {
     UnrecognizedToken { tok: char },
     /// An f-string error containing the [`FStringErrorType`].
     FStringError(FStringErrorType),
+    /// A t-string error containing the [`TStringErrorType`].
+    TStringError(TStringErrorType),
     /// Invalid character encountered in a byte literal.
     InvalidByteLiteral,
     /// An unexpected character was encountered after a line continuation.
@@ -394,6 +437,7 @@ impl std::fmt::Display for LexicalErrorType {
         match self {
             LexicalErrorType::StringError => write!(f, "Got unexpected string"),
             LexicalErrorType::FStringError(error) => write!(f, "f-string: {error}"),
+            LexicalErrorType::TStringError(error) => write!(f, "t-string: {error}"),
             LexicalErrorType::InvalidByteLiteral => {
                 write!(f, "bytes can only contain ASCII literal characters")
             }
