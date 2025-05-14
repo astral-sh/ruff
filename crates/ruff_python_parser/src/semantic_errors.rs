@@ -784,13 +784,7 @@ impl SemanticSyntaxChecker {
             if ctx.in_await_allowed_context() {
                 return;
             }
-        }
-
-        // Traverse scope stack to detect ancestors but prevent explicitly invalid contexts
-        if !ctx.in_sync_comprehension()
-            && !ctx.in_generator_scope()
-            && ctx.in_await_allowed_context()
-        {
+        } else if ctx.in_yield_allowed_context() {
             return;
         }
 
@@ -1727,6 +1721,35 @@ pub trait SemanticSyntaxContext {
     ///
     /// See the trait-level documentation for more details.
     fn in_await_allowed_context(&self) -> bool;
+
+    /// Returns `true` if the visitor is currently in a context where `yield` and `yield from`
+    /// expressions are allowed.
+    ///
+    /// Yield expressions are allowed only in:
+    /// 1. Function definitions
+    /// 2. Lambda expressions
+    ///
+    /// Unlike `await`, yield is not allowed in:
+    /// - Comprehensions (list, set, dict)
+    /// - Generator expressions
+    /// - Class definitions
+    ///
+    /// This method should traverse parent scopes to check if the closest relevant scope
+    /// is a function or lambda, and that no disallowed context (class, comprehension, generator)
+    /// intervenes. For example:
+    ///
+    /// ```python
+    /// def f():
+    ///     yield 1  # okay, in a function
+    ///     lambda: (yield 1)  # okay, in a lambda
+    ///
+    ///     [(yield 1) for x in range(3)]  # error, in a comprehension
+    ///     ((yield 1) for x in range(3))  # error, in a generator expression
+    ///     class C:
+    ///         yield 1  # error, in a class within a function
+    /// ```
+    ///
+    fn in_yield_allowed_context(&self) -> bool;
 
     /// Returns `true` if the visitor is currently inside of a synchronous comprehension.
     ///

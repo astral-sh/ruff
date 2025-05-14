@@ -2480,6 +2480,18 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
         false
     }
 
+    fn in_yield_allowed_context(&self) -> bool {
+        for scope_info in self.scope_stack.iter().rev() {
+            let scope = &self.scopes[scope_info.file_scope_id];
+            match scope.kind() {
+                ScopeKind::Class | ScopeKind::Comprehension => return false,
+                ScopeKind::Function | ScopeKind::Lambda => return true,
+                ScopeKind::Module | ScopeKind::TypeAlias | ScopeKind::Annotation => {}
+            }
+        }
+        false
+    }
+
     fn in_sync_comprehension(&self) -> bool {
         for scope_info in self.scope_stack.iter().rev() {
             let scope = &self.scopes[scope_info.file_scope_id];
