@@ -32,15 +32,21 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// Or, given:
 /// ```python
-/// if x > 0:
-///     return True
-/// return False
+/// def foo(x: int) -> bool:
+///     if x > 0:
+///         return True
+///     return False
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// return x > 0
+/// def foo(x: int) -> bool:
+///     return x > 0
 /// ```
+///
+/// ## Fix safety
+///
+/// The fix is marked as unsafe because it could remove comments.
 ///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
