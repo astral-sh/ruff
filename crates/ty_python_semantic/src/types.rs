@@ -4516,7 +4516,8 @@ impl<'db> Type<'db> {
                 .member_lookup_with_policy(
                     db,
                     "__init__".into(),
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                        | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 )
                 .symbol
                 .is_unbound()
