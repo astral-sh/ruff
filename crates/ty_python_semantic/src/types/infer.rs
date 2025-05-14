@@ -68,7 +68,7 @@ use crate::symbol::{
 use crate::types::call::{Argument, Bindings, CallArgumentTypes, CallArguments, CallError};
 use crate::types::class::{MetaclassErrorKind, SliceLiteral};
 use crate::types::diagnostic::{
-    report_implicit_return_type, report_invalid_arguments_to_annotated,
+    self, report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
     report_invalid_return_type, report_possibly_unbound_attribute, TypeCheckDiagnostics,
@@ -7743,7 +7743,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         message: std::fmt::Arguments,
     ) -> Type<'db> {
         if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, expression) {
-            builder.into_diagnostic(message);
+            let diag = builder.into_diagnostic(message);
+            diagnostic::add_type_expression_reference_link(diag);
         }
         Type::unknown()
     }
@@ -8571,11 +8572,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::ClassVar | KnownInstanceType::Final => {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                    builder.into_diagnostic(format_args!(
+                    let diag = builder.into_diagnostic(format_args!(
                         "Type qualifier `{}` is not allowed in type expressions \
                          (only in annotation expressions)",
                         known_instance.repr(self.db())
                     ));
+                    diagnostic::add_type_expression_reference_link(diag);
                 }
                 self.infer_type_expression(arguments_slice)
             }
@@ -8799,11 +8801,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             _ => {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, parameters) {
-                    builder.into_diagnostic(format_args!(
+                    let diag = builder.into_diagnostic(format_args!(
                         "The first argument to `Callable` \
                          must be either a list of types, \
                          ParamSpec, Concatenate, or `...`",
                     ));
+                    diagnostic::add_type_expression_reference_link(diag);
                 }
                 return None;
             }

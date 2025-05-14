@@ -562,7 +562,7 @@
         },
         "invalid-type-form": {
           "title": "detects invalid type forms",
-          "description": "## What it does\nChecks for expressions that are used as type expressions\nbut cannot validly be interpreted as such.\n\n## Why is this bad?\nSuch expressions cannot be understood by ty.\nIn some cases, they might raise errors at runtime.\n\n## Examples\n```python\nfrom typing import Annotated\n\na: type[1]  # `1` is not a type\nb: Annotated[int]  # `Annotated` expects at least two arguments\n```",
+          "description": "## What it does\nChecks for expressions that are used as [type expressions]\nbut cannot validly be interpreted as such.\n\n## Why is this bad?\nSuch expressions cannot be understood by ty.\nIn some cases, they might raise errors at runtime.\n\n## Examples\n```python\nfrom typing import Annotated\n\na: type[1]  # `1` is not a type\nb: Annotated[int]  # `Annotated` expects at least two arguments\n```\n[type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
           "default": "error",
           "oneOf": [
             {
