@@ -585,10 +585,10 @@ impl<'db> ConstraintsIterator<'_, 'db> {
         self,
         db: &'db dyn crate::Db,
         base_ty: Type<'db>,
-        symbol: ScopedTargetId,
+        target: ScopedTargetId,
     ) -> Type<'db> {
         let constraint_tys: Vec<_> = self
-            .filter_map(|constraint| infer_narrowing_constraint(db, constraint, symbol))
+            .filter_map(|constraint| infer_narrowing_constraint(db, constraint, target))
             .collect();
 
         if constraint_tys.is_empty() {

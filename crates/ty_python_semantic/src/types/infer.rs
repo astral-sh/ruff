@@ -60,8 +60,8 @@ use crate::semantic_index::target::{
 };
 use crate::semantic_index::{semantic_index, EagerSnapshotResult, SemanticIndex};
 use crate::target::{
-    builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, symbol,
+    builtins_module_scope, builtins_symbol, explicit_global_target, global_target,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol,
     target_from_bindings, target_from_declarations, typing_extensions_symbol, Boundness,
     LookupError,
 };
@@ -5420,7 +5420,25 @@ impl<'db> TypeInferenceBuilder<'db> {
         todo_type!("generic `typing.Awaitable` type")
     }
 
-    /// Infer the type of a [`ast::ExprName`] expression, assuming a load context.
+    // Perform narrowing with applicable constraints between the current scope and the enclosing scope.
+    fn narrow_with_applicable_constraints(
+        &self,
+        target: &Target,
+        mut ty: Type<'db>,
+        constraint_keys: &[(FileScopeId, ConstraintKey)],
+    ) -> Type<'db> {
+        let db = self.db();
+        for (enclosing_scope_file_id, constraint_key) in constraint_keys {
+            let use_def = self.index.use_def_map(*enclosing_scope_file_id);
+            let constraints = use_def.narrowing_constraints_at_use(*constraint_key);
+            let target_table = self.index.target_table(*enclosing_scope_file_id);
+            let target = target_table.target_id_by_target(target).unwrap();
+
+            ty = constraints.narrow(db, ty, target);
+        }
+        ty
+    }
+
     fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
         let ast::ExprName {
             range: _,
@@ -5428,7 +5446,66 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = name_node;
         let Ok(target) = Target::try_from(symbol_name);
+        let db = self.db();
 
+        let (resolved, constraint_keys) =
+            self.infer_target_load(&target, ast::ExprRef::Name(name_node));
+        resolved
+            // Not found in the module's explicitly declared global symbols?
+            // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
+            // These are looked up as attributes on `types.ModuleType`.
+            .or_fall_back_to(db, || {
+                module_type_implicit_global_symbol(db, symbol_name).map_type(|ty| {
+                    self.narrow_with_applicable_constraints(&target, ty, &constraint_keys)
+                })
+            })
+            // Not found in globals? Fallback to builtins
+            // (without infinite recursion if we're already in builtins.)
+            .or_fall_back_to(db, || {
+                if Some(self.scope()) == builtins_module_scope(db) {
+                    ResolvedTarget::Unbound.into()
+                } else {
+                    builtins_symbol(db, symbol_name)
+                }
+            })
+            // Still not found? It might be `reveal_type`...
+            .or_fall_back_to(db, || {
+                if symbol_name == "reveal_type" {
+                    if let Some(builder) = self.context.report_lint(&UNDEFINED_REVEAL, name_node) {
+                        let mut diag =
+                            builder.into_diagnostic("`reveal_type` used without importing it");
+                        diag.info(
+                            "This is allowed for debugging convenience but will fail at runtime",
+                        );
+                    }
+                    typing_extensions_symbol(db, symbol_name)
+                } else {
+                    ResolvedTarget::Unbound.into()
+                }
+            })
+            .unwrap_with_diagnostic(|lookup_error| match lookup_error {
+                LookupError::Unbound(qualifiers) => {
+                    if self.is_reachable(name_node) {
+                        report_unresolved_reference(&self.context, name_node);
+                    }
+                    TypeAndQualifiers::new(Type::unknown(), qualifiers)
+                }
+                LookupError::PossiblyUnbound(type_when_bound) => {
+                    if self.is_reachable(name_node) {
+                        report_possibly_unresolved_reference(&self.context, name_node);
+                    }
+                    type_when_bound
+                }
+            })
+            .inner_type()
+    }
+
+    /// Infer the type of a target expression, assuming a load context.
+    fn infer_target_load(
+        &mut self,
+        target: &Target,
+        expr: ast::ExprRef,
+    ) -> (TargetAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
         let db = self.db();
         let scope = self.scope();
         let file_scope_id = scope.file_scope_id(db);
@@ -5436,22 +5513,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(file_scope_id);
 
         let mut constraint_keys = vec![];
-        // Perform narrowing with applicable constraints between the current scope and the enclosing scope.
-        let narrow_with_applicable_constraints = |mut ty, constraint_keys: &[_]| {
-            for (enclosing_scope_file_id, constraint_key) in constraint_keys {
-                let use_def = self.index.use_def_map(*enclosing_scope_file_id);
-                let constraints = use_def.narrowing_constraints_at_use(*constraint_key);
-                let symbol_table = self.index.target_table(*enclosing_scope_file_id);
-                let symbol = symbol_table.target_id_by_target(&target).unwrap();
-
-                ty = constraints.narrow(db, ty, symbol);
-            }
-            ty
-        };
-
         // If we're inferring types of deferred expressions, always treat them as public symbols
         let (local_scope_symbol, use_id) = if self.is_deferred() {
-            let symbol = if let Some(target_id) = symbol_table.target_id_by_target(&target) {
+            let symbol = if let Some(target_id) = symbol_table.target_id_by_target(target) {
                 target_from_bindings(db, use_def.public_bindings(target_id))
             } else {
                 assert!(
@@ -5462,14 +5526,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             };
             (symbol, None)
         } else {
-            let use_id = name_node.scoped_use_id(db, scope);
-            let symbol = target_from_bindings(db, use_def.bindings_at_use(use_id));
-            (symbol, Some(use_id))
+            let use_id = expr.scoped_use_id(db, scope);
+            let target = target_from_bindings(db, use_def.bindings_at_use(use_id));
+            (target, Some(use_id))
         };
 
-        let symbol = TargetAndQualifiers::from(local_scope_symbol).or_fall_back_to(db, || {
-            let has_bindings_in_this_scope = match symbol_table.target_by_name(symbol_name) {
-                Some(symbol) => symbol.is_bound(),
+        let target = TargetAndQualifiers::from(local_scope_symbol).or_fall_back_to(db, || {
+            let has_bindings_in_this_scope = match symbol_table.marked_target(target) {
+                Some(target) => target.is_bound(),
                 None => {
                     assert!(
                         self.deferred_state.in_string_annotation(),
@@ -5482,11 +5546,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             let current_file = self.file();
 
             let skip_non_global_scopes = symbol_table
-                .target_id_by_name(symbol_name)
+                .target_id_by_target(target)
                 .is_some_and(|target_id| self.skip_non_global_scopes(file_scope_id, target_id));
 
             if skip_non_global_scopes {
-                return global_symbol(self.db(), self.file(), symbol_name);
+                return global_target(self.db(), self.file(), target);
             }
 
             // If it's a function-like scope and there is one or more binding in this scope (but
@@ -5533,7 +5597,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if !self.is_deferred() {
                     match self
                         .index
-                        .eager_snapshot(enclosing_scope_file_id, &target, file_scope_id)
+                        .eager_snapshot(enclosing_scope_file_id, target, file_scope_id)
                     {
                         EagerSnapshotResult::FoundConstraint(constraint) => {
                             constraint_keys.push((
@@ -5549,7 +5613,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
                             return target_from_bindings(db, bindings)
                                 .map_type(|ty| {
-                                    narrow_with_applicable_constraints(ty, &constraint_keys)
+                                    self.narrow_with_applicable_constraints(
+                                        target,
+                                        ty,
+                                        &constraint_keys,
+                                    )
                                 })
                                 .into();
                         }
@@ -5567,18 +5635,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let enclosing_symbol_table = self.index.target_table(enclosing_scope_file_id);
-                let Some(enclosing_symbol) = enclosing_symbol_table.target_by_name(symbol_name)
-                else {
+                let Some(enclosing_target) = enclosing_symbol_table.marked_target(target) else {
                     continue;
                 };
-                if enclosing_symbol.is_bound() {
+                if enclosing_target.is_bound() {
                     // We can return early here, because the nearest function-like scope that
                     // defines a name must be the only source for the nonlocal reference (at
                     // runtime, it is the scope that creates the cell for our closure.) If the name
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
-                    return symbol(db, enclosing_scope_id, symbol_name)
-                        .map_type(|ty| narrow_with_applicable_constraints(ty, &constraint_keys));
+                    return crate::target::target(db, enclosing_scope_id, target).map_type(|ty| {
+                        self.narrow_with_applicable_constraints(target, ty, &constraint_keys)
+                    });
                 }
             }
 
@@ -5593,7 +5661,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if !self.is_deferred() {
                         match self.index.eager_snapshot(
                             FileScopeId::global(),
-                            &target,
+                            target,
                             file_scope_id,
                         ) {
                             EagerSnapshotResult::FoundConstraint(constraint) => {
@@ -5605,7 +5673,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                             EagerSnapshotResult::FoundBindings(bindings) => {
                                 return target_from_bindings(db, bindings)
                                     .map_type(|ty| {
-                                        narrow_with_applicable_constraints(ty, &constraint_keys)
+                                        self.narrow_with_applicable_constraints(
+                                            target,
+                                            ty,
+                                            &constraint_keys,
+                                        )
                                     })
                                     .into();
                             }
@@ -5617,60 +5689,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
 
-                    explicit_global_symbol(db, self.file(), symbol_name)
-                        .map_type(|ty| narrow_with_applicable_constraints(ty, &constraint_keys))
-                })
-                // Not found in the module's explicitly declared global symbols?
-                // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
-                // These are looked up as attributes on `types.ModuleType`.
-                .or_fall_back_to(db, || {
-                    module_type_implicit_global_symbol(db, symbol_name)
-                        .map_type(|ty| narrow_with_applicable_constraints(ty, &constraint_keys))
-                })
-                // Not found in globals? Fallback to builtins
-                // (without infinite recursion if we're already in builtins.)
-                .or_fall_back_to(db, || {
-                    if Some(self.scope()) == builtins_module_scope(db) {
-                        ResolvedTarget::Unbound.into()
-                    } else {
-                        builtins_symbol(db, symbol_name)
-                    }
-                })
-                // Still not found? It might be `reveal_type`...
-                .or_fall_back_to(db, || {
-                    if symbol_name == "reveal_type" {
-                        if let Some(builder) =
-                            self.context.report_lint(&UNDEFINED_REVEAL, name_node)
-                        {
-                            let mut diag =
-                                builder.into_diagnostic("`reveal_type` used without importing it");
-                            diag.info(
-                                "This is allowed for debugging convenience but will fail at runtime"
-                            );
-                        }
-                        typing_extensions_symbol(db, symbol_name)
-                    } else {
-                        ResolvedTarget::Unbound.into()
-                    }
+                    explicit_global_target(db, self.file(), target).map_type(|ty| {
+                        self.narrow_with_applicable_constraints(target, ty, &constraint_keys)
+                    })
                 })
         });
 
-        symbol
-            .unwrap_with_diagnostic(|lookup_error| match lookup_error {
-                LookupError::Unbound(qualifiers) => {
-                    if self.is_reachable(name_node) {
-                        report_unresolved_reference(&self.context, name_node);
-                    }
-                    TypeAndQualifiers::new(Type::unknown(), qualifiers)
-                }
-                LookupError::PossiblyUnbound(type_when_bound) => {
-                    if self.is_reachable(name_node) {
-                        report_possibly_unresolved_reference(&self.context, name_node);
-                    }
-                    type_when_bound
-                }
-            })
-            .inner_type()
+        (target, constraint_keys)
     }
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
@@ -5719,19 +5744,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             // If the value class defines `__get__/__set__`, the value most recently assigned
             // to the attribute may not necessarily be obtained here.
             if !member_is_property && !kind.is_data() {
-                let scope = self.scope().file_scope_id(db);
-                let table = self.index.target_table(scope);
-                let use_def = self.index.use_def_map(scope);
-                if let Some(target_id) = table.target_id_by_target(&target) {
-                    let symbol = if self.is_deferred() {
-                        target_from_bindings(db, use_def.public_bindings(target_id))
-                    } else {
-                        let use_id = attribute.scoped_use_id(db, self.scope());
-                        target_from_bindings(db, use_def.bindings_at_use(use_id))
-                    };
-                    if let ResolvedTarget::Type(ty, Boundness::Bound) = symbol {
-                        return ty;
-                    }
+                let (resolved, _) =
+                    self.infer_target_load(&target, ast::ExprRef::Attribute(attribute));
+                if let ResolvedTarget::Type(ty, Boundness::Bound) = resolved.target {
+                    return ty;
                 }
             }
         }
@@ -7104,22 +7120,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = subscript;
 
         if let Ok(target) = Target::try_from(subscript) {
-            let db = self.db();
-            let scope = self.scope().file_scope_id(db);
-            let table = self.index.target_table(scope);
-            let use_def = self.index.use_def_map(scope);
-            if let Some(target_id) = table.target_id_by_target(&target) {
-                let symbol = if self.is_deferred() {
-                    target_from_bindings(db, use_def.public_bindings(target_id))
-                } else {
-                    let use_id = subscript.scoped_use_id(db, self.scope());
-                    target_from_bindings(db, use_def.bindings_at_use(use_id))
-                };
-                if let ResolvedTarget::Type(ty, Boundness::Bound) = symbol {
-                    self.infer_expression(value);
-                    self.infer_expression(slice);
-                    return ty;
-                }
+            let (resolved, _) = self.infer_target_load(&target, ast::ExprRef::Subscript(subscript));
+            if let ResolvedTarget::Type(ty, Boundness::Bound) = resolved.target {
+                self.infer_expression(value);
+                self.infer_expression(slice);
+                return ty;
             }
         }
 
@@ -9130,7 +9135,7 @@ mod tests {
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::target::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, target_table, use_def_map};
-    use crate::target::global_symbol;
+    use crate::target::{global_symbol, symbol};
     use crate::types::check_types;
     use ruff_db::diagnostic::Diagnostic;
     use ruff_db::files::{system_path_to_file, File};

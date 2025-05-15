@@ -204,6 +204,7 @@ pub(crate) type LookupResult<'db> = Result<TypeAndQualifiers<'db>, LookupError<'
 
 /// Infer the public type of a symbol (its type as seen from outside its scope) in the given
 /// `scope`.
+#[allow(unused)]
 pub(crate) fn symbol<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -272,6 +273,48 @@ pub(crate) fn class_symbol<'db>(
 /// those additional symbols.
 ///
 /// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
+pub(crate) fn explicit_global_target<'db>(
+    db: &'db dyn Db,
+    file: File,
+    target: &Target,
+) -> TargetAndQualifiers<'db> {
+    target_impl(
+        db,
+        global_scope(db, file),
+        target,
+        RequiresExplicitReExport::No,
+    )
+}
+
+/// Infers the public type of an explicit module-global symbol as seen from within the same file.
+///
+/// Unlike [`explicit_global_symbol`], this function also considers various "implicit globals"
+/// such as `__name__`, `__doc__` and `__file__`. These are looked up as attributes on `types.ModuleType`
+/// rather than being looked up as symbols explicitly defined/declared in the global scope.
+///
+/// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
+pub(crate) fn global_target<'db>(
+    db: &'db dyn Db,
+    file: File,
+    target: &Target,
+) -> TargetAndQualifiers<'db> {
+    explicit_global_target(db, file, target).or_fall_back_to(db, || {
+        if let Some(name) = target.as_name() {
+            module_type_implicit_global_symbol(db, name)
+        } else {
+            ResolvedTarget::Unbound.into()
+        }
+    })
+}
+
+/// Infers the public type of an explicit module-global symbol as seen from within the same file.
+///
+/// Note that all global scopes also include various "implicit globals" such as `__name__`,
+/// `__doc__` and `__file__`. This function **does not** consider those symbols; it will return
+/// `ResolvedTarget::Unbound` for them. Use the (currently test-only) `global_symbol` query to also include
+/// those additional symbols.
+///
+/// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
 pub(crate) fn explicit_global_symbol<'db>(
     db: &'db dyn Db,
     file: File,
@@ -292,6 +335,7 @@ pub(crate) fn explicit_global_symbol<'db>(
 /// rather than being looked up as symbols explicitly defined/declared in the global scope.
 ///
 /// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
+#[allow(unused)]
 pub(crate) fn global_symbol<'db>(
     db: &'db dyn Db,
     file: File,

@@ -512,8 +512,14 @@ impl TargetTable {
     }
 
     /// Returns the symbol named `name`.
+    #[allow(unused)]
     pub(crate) fn target_by_name(&self, name: &str) -> Option<&Target> {
         let id = self.target_id_by_name(name)?;
+        Some(self.target(id))
+    }
+
+    pub(crate) fn marked_target(&self, target: &Target) -> Option<&Target> {
+        let id = self.target_id_by_target(target)?;
         Some(self.target(id))
     }
 
