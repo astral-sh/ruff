@@ -7,6 +7,7 @@ use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{Itertools, iterate};
+use ruff_linter::codes::NoqaCode;
 use serde::Serialize;
 
 use ruff_linter::fs::relativize_path;
@@ -17,7 +18,6 @@ use ruff_linter::message::{
     SarifEmitter, TextEmitter,
 };
 use ruff_linter::notify_user;
-use ruff_linter::registry::Rule;
 use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{OutputFormat, UnsafeFixes};
 
@@ -44,25 +44,25 @@ struct ExpandedStatistics {
 }
 
 #[derive(Copy, Clone)]
-struct SerializeRuleAsCode(Rule);
+struct SerializeRuleAsCode(NoqaCode);
 
 impl Serialize for SerializeRuleAsCode {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&self.0.noqa_code().to_string())
+        serializer.serialize_str(&self.0.to_string())
     }
 }
 
 impl Display for SerializeRuleAsCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.noqa_code())
+        write!(f, "{}", self.0)
     }
 }
 
-impl From<Rule> for SerializeRuleAsCode {
-    fn from(rule: Rule) -> Self {
+impl From<NoqaCode> for SerializeRuleAsCode {
+    fn from(rule: NoqaCode) -> Self {
         Self(rule)
     }
 }
@@ -327,20 +327,24 @@ impl Printer {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
             .iter()
-            .sorted_by_key(|message| (message.rule(), message.fixable()))
-            .fold(vec![], |mut acc: Vec<(&Message, usize)>, message| {
-                if let Some((prev_message, count)) = acc.last_mut() {
-                    if prev_message.rule() == message.rule() {
-                        *count += 1;
-                        return acc;
+            .map(|message| (message.noqa_code(), message))
+            .sorted_by_key(|(code, message)| (*code, message.fixable()))
+            .fold(
+                vec![],
+                |mut acc: Vec<((Option<NoqaCode>, &Message), usize)>, (code, message)| {
+                    if let Some(((prev_code, _prev_message), count)) = acc.last_mut() {
+                        if *prev_code == code {
+                            *count += 1;
+                            return acc;
+                        }
                     }
-                }
-                acc.push((message, 1));
-                acc
-            })
+                    acc.push(((code, message), 1));
+                    acc
+                },
+            )
             .iter()
-            .map(|&(message, count)| ExpandedStatistics {
-                code: message.rule().map(std::convert::Into::into),
+            .map(|&((code, message), count)| ExpandedStatistics {
+                code: code.map(std::convert::Into::into),
                 name: message.name(),
                 count,
                 fixable: if let Some(fix) = message.fix() {
