@@ -5051,7 +5051,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             if (source_type.is_equivalent_to(db, *casted_type)
                                                 || source_type.normalized(db)
                                                     == casted_type.normalized(db))
-                                                && !source_type.contains_todo(db)
+                                                && !source_type.any_over_type(db, &|ty| {
+                                                    matches!(
+                                                        ty,
+                                                        Type::Dynamic(dynamic)
+                                                            if dynamic != DynamicType::Any
+                                                    )
+                                                })
                                             {
                                                 if let Some(builder) = self
                                                     .context
