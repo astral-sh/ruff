@@ -1143,7 +1143,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "015") => (RuleGroup::Stable, rules::flake8_logging::rules::RootLoggerCall),
 
         // SQLAlchemy
-        (SQLAlchemy, "001") => (RuleGroup::Preview, rules::sqlalchemy::rules::SQLAlchemyMissingMappedTypeAnnotation),
+        (SQLAlchemy, "201") => (RuleGroup::Preview, rules::sqlalchemy::rules::SQLAlchemyMissingMappedTypeAnnotation),
 
         _ => return None,
     })

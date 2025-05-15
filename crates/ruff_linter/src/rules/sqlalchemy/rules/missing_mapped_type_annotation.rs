@@ -70,7 +70,7 @@ impl Violation for SQLAlchemyMissingMappedTypeAnnotation {
     }
 }
 
-/// SA001
+/// SA201
 pub(crate) fn missing_mapped_type_annotation(checker: &mut Checker, body: &[Stmt]) {
     if !checker.semantic().seen_module(Modules::SQLALCHEMY) {
         return;
