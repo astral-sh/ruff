@@ -222,4 +222,34 @@ reveal_type(D().instance_method)
 reveal_type(D.class_method)
 ```
 
+## Constructor `__new__` return type handling
+
+When a class's `__new__` method returns a different type than the class itself,
+the type checker should respect that return type annotation.
+
+```py
+class A:
+    def __new__(cls) -> "int | A":
+        if True:  # simplified condition
+            return object.__new__(cls)
+        else:
+            return 42
+
+reveal_type(A())  # revealed: int | A
+
+def expects_a(x: A) -> None:
+    assert isinstance(x, A)
+
+a = A()
+# error: [invalid-argument-type] "Argument to function `expects_a` is incorrect: Expected `A`, found `int | A`"
+expects_a(a)
+
+# Class that only returns a different type
+class B:
+    def __new__(cls) -> int:
+        return 42
+
+reveal_type(B())  # revealed: int
+```
+
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations

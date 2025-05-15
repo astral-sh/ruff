@@ -5333,9 +5333,10 @@ impl<'db> Type<'db> {
         //    fallback to `object.__init__`, since it will indeed check that no arguments are
         //    passed.
         //
-        // Note that we currently ignore `__new__` return type, since we do not yet support `Self`
-        // and most builtin classes use it as return type annotation. We always return the instance
-        // type.
+        // Note that we currently ignore `__new__` return type in most cases, since we do not yet
+        // support `Self` and most builtin classes use it as return type annotation.
+        // However, we do respect explicit return types when they indicate the constructor
+        // can return a different type (e.g., int | MyClass).
 
         // Lookup `__new__` method in the MRO up to, but not including, `object`. Also, we must
         // avoid `__new__` on `type` since per descriptor protocol, if `__new__` is not defined on
@@ -5389,6 +5390,36 @@ impl<'db> Type<'db> {
             .to_instance(db)
             .expect("type should be convertible to instance type");
 
+        // Check if __new__ explicitly returns a different type than the instance
+        let new_return_type = new_call_outcome
+            .as_ref()
+            .and_then(|outcome| outcome.as_ref().ok())
+            .and_then(|bindings| {
+                let ret_type = bindings.return_type(db);
+
+                // Skip if return type is unknown/dynamic or None - likely unresolved annotations
+                if ret_type.is_unknown()
+                    || matches!(ret_type, Type::Dynamic(_))
+                    || ret_type.is_none(db)
+                {
+                    return None;
+                }
+
+                // Skip special classes like NamedTuple that have unique constructor behavior
+                // These often return None or other builtin types that should be ignored
+                if matches!(ret_type, Type::KnownInstance(_)) {
+                    return None;
+                }
+
+                // If the return type is different from the instance type, use it
+                // This handles our various cases: int | A, parent class returns, or int
+                if ret_type == instance_ty {
+                    None
+                } else {
+                    Some(ret_type)
+                }
+            });
+
         match (generic_origin, new_call_outcome, init_call_outcome) {
             // All calls are successful or not called at all
             (
@@ -5440,14 +5471,19 @@ impl<'db> Type<'db> {
                         )
                     })
                     .unwrap_or(instance_ty);
-                Ok(specialized)
+
+                // Return the __new__ type if available, otherwise return instance_ty
+                Ok(new_return_type.unwrap_or(specialized))
             }
 
-            (None, None | Some(Ok(_)), None | Some(Ok(_))) => Ok(instance_ty),
+            (None, None | Some(Ok(_)), None | Some(Ok(_))) => {
+                Ok(new_return_type.unwrap_or(instance_ty))
+            }
 
             (_, None | Some(Ok(_)), Some(Err(error))) => {
                 // no custom `__new__` or it was called and succeeded, but `__init__` failed.
-                Err(ConstructorCallError::Init(instance_ty, error))
+                let result_type = new_return_type.unwrap_or(instance_ty);
+                Err(ConstructorCallError::Init(result_type, error))
             }
             (_, Some(Err(error)), None | Some(Ok(_))) => {
                 // custom `__new__` was called and failed, but init is ok
