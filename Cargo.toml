@@ -162,6 +162,8 @@ tracing-log = { version = "0.2.0" }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = [
     "env-filter",
     "fmt",
+    "ansi",
+    "smallvec"
 ] }
 tryfn = { version = "0.2.1" }
 typed-arena = { version = "2.0.2" }
