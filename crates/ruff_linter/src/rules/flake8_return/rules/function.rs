@@ -3,7 +3,7 @@ use std::ops::Add;
 use anyhow::Result;
 
 use ruff_diagnostics::{AlwaysFixableViolation, FixAvailability, Violation};
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;

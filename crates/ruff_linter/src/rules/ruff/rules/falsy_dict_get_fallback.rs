@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{helpers::Truthiness, Expr, ExprAttribute};
 use ruff_python_semantic::analyze::typing;

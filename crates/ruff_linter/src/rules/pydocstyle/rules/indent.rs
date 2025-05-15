@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_source_file::{Line, NewlineWithTrailingNewline};

@@ -4,7 +4,7 @@ use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_python_semantic::analyze::typing::is_dict;
 
 /// ## What it does

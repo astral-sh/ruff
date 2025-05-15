@@ -3,7 +3,7 @@ use std::fmt::Display;
 use smallvec::SmallVec;
 
 use ast::{StmtClassDef, StmtFunctionDef};
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, helpers::comment_indentation_after, AnyNodeRef};
 use ruff_python_trivia::{indentation_at_offset, SuppressionKind};

@@ -2,7 +2,7 @@ use std::sync::LazyLock;
 
 use regex::RegexSet;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{TextLen, TextRange, TextSize};

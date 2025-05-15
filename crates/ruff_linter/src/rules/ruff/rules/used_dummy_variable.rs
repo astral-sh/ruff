@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_semantic::{Binding, BindingId};

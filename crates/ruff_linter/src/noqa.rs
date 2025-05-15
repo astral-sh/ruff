@@ -1213,7 +1213,7 @@ mod tests {
 
     use insta::assert_debug_snapshot;
 
-    use ruff_diagnostics::{Diagnostic, Edit};
+    use ruff_diagnostics::Edit;
     use ruff_python_trivia::CommentRanges;
     use ruff_source_file::{LineEnding, SourceFileBuilder};
     use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};

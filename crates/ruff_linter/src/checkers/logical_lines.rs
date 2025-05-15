@@ -1,4 +1,3 @@
-use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};

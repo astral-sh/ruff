@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;

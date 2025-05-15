@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use ruff_diagnostics::{Diagnostic, Fix, Violation};
+use ruff_diagnostics::{Fix, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;

@@ -595,7 +595,7 @@ mod tests {
     use ruff_source_file::SourceFileBuilder;
     use test_case::test_case;
 
-    use ruff_diagnostics::{Diagnostic, Edit, Fix};
+    use ruff_diagnostics::{Edit, Fix};
     use ruff_python_ast::Stmt;
     use ruff_python_codegen::Stylist;
     use ruff_python_parser::{parse_expression, parse_module};

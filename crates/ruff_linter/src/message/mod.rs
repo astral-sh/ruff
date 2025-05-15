@@ -16,7 +16,7 @@ pub use json_lines::JsonLinesEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 pub use rdjson::RdjsonEmitter;
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::Fix;
 use ruff_notebook::NotebookIndex;
 use ruff_python_parser::{ParseError, UnsupportedSyntaxError};
 use ruff_source_file::{LineColumn, SourceFile};

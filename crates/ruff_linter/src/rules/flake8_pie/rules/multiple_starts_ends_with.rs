@@ -9,7 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier};
 
 use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;

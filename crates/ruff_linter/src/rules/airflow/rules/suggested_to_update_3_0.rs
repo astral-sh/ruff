@@ -3,7 +3,7 @@ use crate::importer::ImportRequest;
 use crate::rules::airflow::helpers::{
     is_airflow_builtin_or_provider, is_guarded_by_try_except, Replacement,
 };
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall, ExprName};
 use ruff_python_semantic::Modules;

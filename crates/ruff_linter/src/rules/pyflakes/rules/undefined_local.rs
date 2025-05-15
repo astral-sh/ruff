@@ -1,6 +1,6 @@
 use std::string::ToString;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::{Scope, ScopeId};
 use ruff_text_size::Ranged;

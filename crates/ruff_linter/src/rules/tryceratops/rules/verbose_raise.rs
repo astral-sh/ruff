@@ -1,6 +1,6 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, Stmt};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_text_size::Ranged;

@@ -4,7 +4,7 @@ use std::iter;
 use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeMap;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Stmt};

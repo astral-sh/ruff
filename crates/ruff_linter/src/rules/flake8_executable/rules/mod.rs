@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use ruff_diagnostics::Diagnostic;
 use ruff_python_trivia::CommentRanges;
 pub(crate) use shebang_leading_whitespace::*;
 pub(crate) use shebang_missing_executable_file::*;

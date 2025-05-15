@@ -5,7 +5,7 @@ use crate::{
     rules::perflint::helpers::statement_deletion_range,
 };
 use anyhow::{anyhow, Result};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::perflint::helpers::comment_strings_in_range;
 use ruff_macros::{derive_message_formats, ViolationMetadata};

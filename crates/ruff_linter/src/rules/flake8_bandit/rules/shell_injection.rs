@@ -1,7 +1,7 @@
 //! Checks relating to shell injection.
 
 use crate::preview::is_shell_injection_only_trusted_input_enabled;
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::{self as ast, Arguments, Expr};

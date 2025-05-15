@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scope};

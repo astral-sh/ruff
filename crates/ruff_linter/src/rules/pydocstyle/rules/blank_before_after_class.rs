@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::{indentation_at_offset, PythonWhitespace};
 use ruff_source_file::{Line, LineRanges, UniversalNewlineIterator};

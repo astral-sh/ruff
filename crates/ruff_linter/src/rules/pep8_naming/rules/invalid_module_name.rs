@@ -3,7 +3,7 @@ use std::path::Path;
 
 use crate::package::PackageRoot;
 use crate::rules::pep8_naming::settings::IgnoreNames;
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::PySourceType;
 use ruff_python_stdlib::identifiers::{is_migration_name, is_module_name};

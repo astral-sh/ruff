@@ -1,5 +1,5 @@
 use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_diagnostics::Diagnostic;
+
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
 use ruff_macros::{derive_message_formats, ViolationMetadata};

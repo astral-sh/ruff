@@ -2,7 +2,6 @@
 
 use std::path::Path;
 
-use ruff_diagnostics::Diagnostic;
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;

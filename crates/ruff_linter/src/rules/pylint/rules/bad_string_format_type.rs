@@ -5,7 +5,7 @@ use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, 
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 

@@ -1,7 +1,7 @@
 use anyhow::bail;
 use ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::Fix;
 use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Stmt, WithItem};

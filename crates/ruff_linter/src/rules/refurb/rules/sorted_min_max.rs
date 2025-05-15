@@ -1,4 +1,3 @@
-use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
 use ruff_diagnostics::FixAvailability;

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Decorator, Expr, ExprCall, Keyword, StmtFunctionDef};
 use ruff_python_semantic::{Modules, SemanticModel};

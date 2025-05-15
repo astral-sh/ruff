@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{AnyNodeRef, Expr, ExprContext, ExprSubscript, ExprTuple};
 use ruff_python_semantic::analyze::typing::traverse_literal;

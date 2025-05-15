@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::Fix;
 use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;

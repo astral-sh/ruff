@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, FixAvailability};
+use ruff_diagnostics::FixAvailability;
 use ruff_diagnostics::{Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;

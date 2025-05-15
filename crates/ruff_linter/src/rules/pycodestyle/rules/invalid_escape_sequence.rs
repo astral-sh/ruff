@@ -1,6 +1,6 @@
 use memchr::memchr_iter;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{AnyStringFlags, FStringElement, StringLike, StringLikePart};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};

@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 

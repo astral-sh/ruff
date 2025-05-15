@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use memchr::memchr_iter;
 use regex::Regex;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::TextSize;
