@@ -1,5 +1,6 @@
 //! Sets up logging for ty
 
+use crate::args::TerminalColor;
 use anyhow::Context;
 use colored::Colorize;
 use std::fmt;
@@ -76,7 +77,10 @@ impl VerbosityLevel {
     }
 }
 
-pub(crate) fn setup_tracing(level: VerbosityLevel) -> anyhow::Result<TracingGuard> {
+pub(crate) fn setup_tracing(
+    level: VerbosityLevel,
+    color: TerminalColor,
+) -> anyhow::Result<TracingGuard> {
     use tracing_subscriber::prelude::*;
 
     // The `TY_LOG` environment variable overrides the default log level.
@@ -115,8 +119,13 @@ pub(crate) fn setup_tracing(level: VerbosityLevel) -> anyhow::Result<TracingGuar
         .with(filter)
         .with(profiling_layer);
 
-    let ansi =
-        colored::control::SHOULD_COLORIZE.should_colorize() && std::io::stderr().is_terminal();
+    let ansi = match color {
+        TerminalColor::Auto => {
+            colored::control::SHOULD_COLORIZE.should_colorize() && std::io::stderr().is_terminal()
+        }
+        TerminalColor::Always => true,
+        TerminalColor::Never => false,
+    };
 
     if level.is_trace() {
         let subscriber = registry.with(
