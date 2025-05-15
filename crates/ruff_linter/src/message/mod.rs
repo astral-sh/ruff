@@ -60,21 +60,6 @@ pub struct Message {
     pub(crate) noqa_offset: Option<TextSize>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum MessageKind {
-    Diagnostic(Rule),
-    SyntaxError,
-}
-
-impl MessageKind {
-    pub fn as_str(&self) -> &str {
-        match self {
-            MessageKind::Diagnostic(rule) => rule.as_ref(),
-            MessageKind::SyntaxError => "syntax-error",
-        }
-    }
-}
-
 impl Message {
     pub fn syntax_error(
         message: impl std::fmt::Display,
@@ -208,19 +193,10 @@ impl Message {
         self.diagnostic.id().is_invalid_syntax()
     }
 
-    /// Returns a message kind.
-    pub fn kind(&self) -> MessageKind {
-        if self.is_syntax_error() {
-            MessageKind::SyntaxError
-        } else {
-            MessageKind::Diagnostic(self.rule().expect("Expected a rule for non-syntax errors"))
-        }
-    }
-
     /// Returns the name used to represent the diagnostic.
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> &'static str {
         if self.is_syntax_error() {
-            "SyntaxError"
+            "syntax-error"
         } else {
             self.diagnostic.id().as_str()
         }

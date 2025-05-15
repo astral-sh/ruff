@@ -13,8 +13,8 @@ use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JsonLinesEmitter, JunitEmitter, Message, MessageKind, PylintEmitter,
-    RdjsonEmitter, SarifEmitter, TextEmitter,
+    JsonEmitter, JsonLinesEmitter, JunitEmitter, Message, PylintEmitter, RdjsonEmitter,
+    SarifEmitter, TextEmitter,
 };
 use ruff_linter::notify_user;
 use ruff_linter::registry::Rule;
@@ -38,7 +38,7 @@ bitflags! {
 #[derive(Serialize)]
 struct ExpandedStatistics {
     code: Option<SerializeRuleAsCode>,
-    name: SerializeMessageKindAsTitle,
+    name: &'static str,
     count: usize,
     fixable: bool,
 }
@@ -64,29 +64,6 @@ impl Display for SerializeRuleAsCode {
 impl From<Rule> for SerializeRuleAsCode {
     fn from(rule: Rule) -> Self {
         Self(rule)
-    }
-}
-
-struct SerializeMessageKindAsTitle(MessageKind);
-
-impl Serialize for SerializeMessageKindAsTitle {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(self.0.as_str())
-    }
-}
-
-impl Display for SerializeMessageKindAsTitle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.0.as_str())
-    }
-}
-
-impl From<MessageKind> for SerializeMessageKindAsTitle {
-    fn from(kind: MessageKind) -> Self {
-        Self(kind)
     }
 }
 
@@ -364,7 +341,7 @@ impl Printer {
             .iter()
             .map(|&(message, count)| ExpandedStatistics {
                 code: message.rule().map(std::convert::Into::into),
-                name: message.kind().into(),
+                name: message.name(),
                 count,
                 fixable: if let Some(fix) = message.fix() {
                     fix.applies(self.unsafe_fixes.required_applicability())
