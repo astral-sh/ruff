@@ -7,7 +7,7 @@ use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    declaration_type, todo_type, KnownInstanceType, Type, TypeVarBoundOrConstraints,
+    declaration_type, todo_type, KnownInstanceType, TupleType, Type, TypeVarBoundOrConstraints,
     TypeVarInstance, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxOrderSet};
@@ -167,6 +167,16 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         let types = vec![Type::unknown(); self.variables(db).len()];
         self.specialize(db, types.into())
+    }
+
+    /// Returns a tuple type of the typevars introduced by this generic context.
+    pub(crate) fn as_tuple(self, db: &'db dyn Db) -> Type<'db> {
+        TupleType::from_elements(
+            db,
+            self.variables(db)
+                .iter()
+                .map(|typevar| Type::TypeVar(*typevar)),
+        )
     }
 
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
