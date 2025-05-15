@@ -110,7 +110,7 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
     }
 
     let mut target_instance = value;
-    // a subscripted value could technically be subscripted further ad-infinitum, so we
+    // a subscripted value could technically be subscripted further ad infinitum, so we
     // recurse into the subscript expressions until we find the value being subscripted
     while let Expr::Subscript(ExprSubscript { value, .. }) = target_instance.as_ref() {
         target_instance = value;
