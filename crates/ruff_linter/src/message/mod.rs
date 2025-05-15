@@ -82,7 +82,7 @@ impl Diagnostic {
     }
 
     #[expect(clippy::too_many_arguments)]
-    pub fn diagnostic(
+    pub fn from_parts(
         name: &'static str,
         body: String,
         suggestion: Option<String>,
@@ -114,7 +114,7 @@ impl Diagnostic {
 
     #[expect(clippy::needless_pass_by_value)]
     pub fn new<T: Violation>(kind: T, range: TextRange) -> Self {
-        Self::diagnostic(
+        Self::from_parts(
             T::rule_name(),
             Violation::message(&kind),
             Violation::fix_title(&kind),
@@ -128,7 +128,7 @@ impl Diagnostic {
 
     #[expect(clippy::needless_pass_by_value)]
     pub fn new2<T: Violation>(kind: T, range: TextRange, file: SourceFile) -> Self {
-        Self::diagnostic(
+        Self::from_parts(
             T::rule_name(),
             Violation::message(&kind),
             Violation::fix_title(&kind),
@@ -479,7 +479,7 @@ def fibonacci(n):
         let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
 
         let unused_import_start = TextSize::from(7);
-        let unused_import = Diagnostic::diagnostic(
+        let unused_import = Diagnostic::from_parts(
             "unused-import",
             "`os` imported but unused".to_string(),
             Some("Remove unused import: `os`".to_string()),
@@ -494,7 +494,7 @@ def fibonacci(n):
         );
 
         let unused_variable_start = TextSize::from(94);
-        let unused_variable = Diagnostic::diagnostic(
+        let unused_variable = Diagnostic::from_parts(
             "unused-variable",
             "Local variable `x` is assigned to but never used".to_string(),
             Some("Remove assignment to unused variable `x`".to_string()),
@@ -511,7 +511,7 @@ def fibonacci(n):
         let file_2 = r"if a == 1: pass";
 
         let undefined_name_start = TextSize::from(3);
-        let undefined_name = Diagnostic::diagnostic(
+        let undefined_name = Diagnostic::from_parts(
             "undefined-name",
             "Undefined name `a`".to_string(),
             None,
@@ -544,7 +544,7 @@ def foo():
         let notebook_source = SourceFileBuilder::new("notebook.ipynb", notebook).finish();
 
         let unused_import_os_start = TextSize::from(16);
-        let unused_import_os = Diagnostic::diagnostic(
+        let unused_import_os = Diagnostic::from_parts(
             "unused-import",
             "`os` imported but unused".to_string(),
             Some("Remove unused import: `os`".to_string()),
@@ -559,7 +559,7 @@ def foo():
         );
 
         let unused_import_math_start = TextSize::from(35);
-        let unused_import_math = Diagnostic::diagnostic(
+        let unused_import_math = Diagnostic::from_parts(
             "unused-import",
             "`math` imported but unused".to_string(),
             Some("Remove unused import: `math`".to_string()),
@@ -574,7 +574,7 @@ def foo():
         );
 
         let unused_variable_start = TextSize::from(98);
-        let unused_variable = Diagnostic::diagnostic(
+        let unused_variable = Diagnostic::from_parts(
             "unused-variable",
             "Local variable `x` is assigned to but never used".to_string(),
             Some("Remove assignment to unused variable `x`".to_string()),

@@ -348,7 +348,7 @@ impl FileCache {
                 lint.messages
                     .iter()
                     .map(|msg| {
-                        Diagnostic::diagnostic(
+                        Diagnostic::from_parts(
                             msg.rule.into(),
                             msg.body.clone(),
                             msg.suggestion.clone(),
