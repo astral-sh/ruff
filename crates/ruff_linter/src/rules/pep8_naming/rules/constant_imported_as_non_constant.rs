@@ -68,7 +68,7 @@ pub(crate) fn constant_imported_as_non_constant(
     alias: &Alias,
     stmt: &Stmt,
     ignore_names: &IgnoreNames,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     if str::is_cased_uppercase(name)
         && !(str::is_cased_uppercase(asname)
             // Single-character names are ambiguous.
@@ -80,7 +80,7 @@ pub(crate) fn constant_imported_as_non_constant(
         if ignore_names.matches(name) || ignore_names.matches(asname) {
             return None;
         }
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             ConstantImportedAsNonConstant {
                 name: name.to_string(),
                 asname: asname.to_string(),

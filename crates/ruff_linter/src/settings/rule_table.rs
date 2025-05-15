@@ -24,8 +24,8 @@ impl RuleTable {
 
     /// Returns whether the given rule should be checked.
     #[inline]
-    pub const fn enabled(&self, rule: Rule) -> bool {
-        self.enabled.contains(rule)
+    pub fn enabled(&self, rule: Option<Rule>) -> bool {
+        rule.is_some_and(|rule| self.enabled.contains(rule))
     }
 
     /// Returns whether any of the given rules should be checked.
@@ -36,8 +36,8 @@ impl RuleTable {
 
     /// Returns whether violations of the given rule should be fixed.
     #[inline]
-    pub const fn should_fix(&self, rule: Rule) -> bool {
-        self.should_fix.contains(rule)
+    pub fn should_fix(&self, rule: Option<Rule>) -> bool {
+        rule.is_some_and(|rule| self.should_fix.contains(rule))
     }
 
     /// Returns an iterator over all enabled rules.

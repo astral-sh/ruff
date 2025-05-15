@@ -63,7 +63,7 @@ fn check_expr(checker: &Checker, expr: &Expr, names: &mut Vec<Name>) {
                 return;
             }
             if names.contains(id) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(crate::message::Diagnostic::new(
                     RedeclaredAssignedName {
                         name: id.to_string(),
                     },

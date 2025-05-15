@@ -119,7 +119,8 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(LongSleepNotForever { module }, call.range());
+    let mut diagnostic =
+        crate::message::Diagnostic::new(LongSleepNotForever { module }, call.range());
     let replacement_function = "sleep_forever";
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(

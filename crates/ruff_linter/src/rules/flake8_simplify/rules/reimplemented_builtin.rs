@@ -107,7 +107,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 ReimplementedBuiltin {
                     replacement: contents.to_string(),
                 },
@@ -199,7 +199,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 ReimplementedBuiltin {
                     replacement: contents.to_string(),
                 },

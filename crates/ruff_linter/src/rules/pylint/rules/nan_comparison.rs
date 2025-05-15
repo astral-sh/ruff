@@ -66,13 +66,13 @@ fn nan_comparison_impl<'a>(checker: &Checker, comparators: impl Iterator<Item = 
         if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {
             match qualified_name.segments() {
                 ["numpy", "nan" | "NAN" | "NaN"] => {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
                         NanComparison { nan: Nan::NumPy },
                         expr.range(),
                     ));
                 }
                 ["math", "nan"] => {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
                         NanComparison { nan: Nan::Math },
                         expr.range(),
                     ));
@@ -82,7 +82,7 @@ fn nan_comparison_impl<'a>(checker: &Checker, comparators: impl Iterator<Item = 
         }
 
         if is_nan_float(expr, checker.semantic()) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 NanComparison { nan: Nan::Math },
                 expr.range(),
             ));

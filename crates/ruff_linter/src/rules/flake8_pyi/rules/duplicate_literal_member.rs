@@ -55,7 +55,7 @@ impl AlwaysFixableViolation for DuplicateLiteralMember {
 pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
     let mut seen_nodes: HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
     let mut unique_nodes: Vec<&Expr> = Vec::new();
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
+    let mut diagnostics: Vec<crate::message::Diagnostic> = Vec::new();
 
     // Adds a member to `literal_exprs` if it is a `Literal` annotation
     let mut check_for_duplicate_members = |expr: &'a Expr, _: &'a Expr| {
@@ -63,7 +63,7 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
         if seen_nodes.insert(expr.into()) {
             unique_nodes.push(expr);
         } else {
-            diagnostics.push(Diagnostic::new(
+            diagnostics.push(crate::message::Diagnostic::new(
                 DuplicateLiteralMember {
                     duplicate_name: checker.generator().expr(expr),
                 },

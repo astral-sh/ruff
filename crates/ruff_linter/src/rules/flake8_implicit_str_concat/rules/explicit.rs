@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
+use crate::message::Diagnostic;
 use crate::settings::LinterSettings;
 use crate::Locator;
 

@@ -64,7 +64,7 @@ pub(crate) fn loop_variable_overrides_iterator(checker: &Checker, target: &Expr,
 
     for (name, expr) in target_names {
         if iter_names.contains_key(name) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 LoopVariableOverridesIterator {
                     name: name.to_string(),
                 },

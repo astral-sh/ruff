@@ -62,7 +62,7 @@ pub(crate) fn runtime_cast_value(checker: &Checker, type_expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(RuntimeCastValue, type_expr.range());
+    let mut diagnostic = crate::message::Diagnostic::new(RuntimeCastValue, type_expr.range());
     let edit = quote_type_expression(
         type_expr,
         checker.semantic(),

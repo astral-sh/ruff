@@ -110,7 +110,7 @@ pub(crate) fn unnecessary_builtin_import(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnnecessaryBuiltinImport {
             names: unused_imports
                 .iter()

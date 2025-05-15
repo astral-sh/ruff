@@ -64,7 +64,7 @@ pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) {
             continue;
         };
         if let Some(field_name) = is_nullable_field(value, checker.semantic()) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 DjangoNullableModelStringField {
                     field_name: field_name.to_string(),
                 },

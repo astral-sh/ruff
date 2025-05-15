@@ -74,7 +74,7 @@ pub(crate) fn invalid_index_return(checker: &Checker, function_def: &ast::StmtFu
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             InvalidIndexReturnType,
             function_def.identifier(),
         ));
@@ -94,11 +94,17 @@ pub(crate) fn invalid_index_return(checker: &Checker, function_def: &ast::StmtFu
                 ResolvedPythonType::Unknown
                     | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
             ) {
-                checker.report_diagnostic(Diagnostic::new(InvalidIndexReturnType, value.range()));
+                checker.report_diagnostic(crate::message::Diagnostic::new(
+                    InvalidIndexReturnType,
+                    value.range(),
+                ));
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidIndexReturnType, stmt.range()));
+            checker.report_diagnostic(crate::message::Diagnostic::new(
+                InvalidIndexReturnType,
+                stmt.range(),
+            ));
         }
     }
 }

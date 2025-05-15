@@ -8,6 +8,7 @@ use ruff_python_index::Indexer;
 use ruff_python_parser::Parsed;
 
 use crate::directives::IsortDirectives;
+use crate::message::Diagnostic;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
 use crate::rules::isort;
@@ -40,7 +41,7 @@ pub(crate) fn check_imports(
 
     // Enforce import rules.
     let mut diagnostics = vec![];
-    if settings.rules.enabled(Rule::UnsortedImports) {
+    if settings.rules.enabled(Some(Rule::UnsortedImports)) {
         for block in &blocks {
             if !block.imports.is_empty() {
                 if let Some(diagnostic) = isort::rules::organize_imports(
@@ -59,7 +60,7 @@ pub(crate) fn check_imports(
             }
         }
     }
-    if settings.rules.enabled(Rule::MissingRequiredImport) {
+    if settings.rules.enabled(Some(Rule::MissingRequiredImport)) {
         diagnostics.extend(isort::rules::add_required_imports(
             parsed,
             locator,

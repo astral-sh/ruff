@@ -126,7 +126,7 @@ pub(crate) fn type_name_incorrect_variance(checker: &Checker, value: &Expr) {
         VarVariance::Invariance => name_root.to_string(),
     };
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         TypeNameIncorrectVariance {
             kind,
             param_name: param_name.to_string(),

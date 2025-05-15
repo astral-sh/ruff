@@ -161,7 +161,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
             if let Some(encoding_arg) = match_encoding_arg(&call.arguments) {
                 if literal.to_str().is_ascii() {
                     // Ex) Convert `"foo".encode()` to `b"foo"`.
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = crate::message::Diagnostic::new(
                         UnnecessaryEncodeUTF8 {
                             reason: Reason::BytesLiteral,
                         },
@@ -176,7 +176,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                 } else if let EncodingArg::Keyword(kwarg) = encoding_arg {
                     // Ex) Convert `"unicode text©".encode(encoding="utf-8")` to
                     // `"unicode text©".encode()`.
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = crate::message::Diagnostic::new(
                         UnnecessaryEncodeUTF8 {
                             reason: Reason::DefaultArgument,
                         },
@@ -194,7 +194,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                     checker.report_diagnostic(diagnostic);
                 } else if let EncodingArg::Positional(arg) = encoding_arg {
                     // Ex) Convert `"unicode text©".encode("utf-8")` to `"unicode text©".encode()`.
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = crate::message::Diagnostic::new(
                         UnnecessaryEncodeUTF8 {
                             reason: Reason::DefaultArgument,
                         },
@@ -219,7 +219,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                 if let EncodingArg::Keyword(kwarg) = encoding_arg {
                     // Ex) Convert `f"unicode text©".encode(encoding="utf-8")` to
                     // `f"unicode text©".encode()`.
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = crate::message::Diagnostic::new(
                         UnnecessaryEncodeUTF8 {
                             reason: Reason::DefaultArgument,
                         },
@@ -237,7 +237,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                     checker.report_diagnostic(diagnostic);
                 } else if let EncodingArg::Positional(arg) = encoding_arg {
                     // Ex) Convert `f"unicode text©".encode("utf-8")` to `f"unicode text©".encode()`.
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = crate::message::Diagnostic::new(
                         UnnecessaryEncodeUTF8 {
                             reason: Reason::DefaultArgument,
                         },

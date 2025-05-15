@@ -72,7 +72,7 @@ pub(crate) fn unreliable_callable_check(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnreliableCallableCheck, expr.range());
+    let mut diagnostic = crate::message::Diagnostic::new(UnreliableCallableCheck, expr.range());
     if builtins_function == "hasattr" {
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(

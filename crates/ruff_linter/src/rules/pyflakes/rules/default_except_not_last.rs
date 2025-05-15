@@ -57,11 +57,11 @@ impl Violation for DefaultExceptNotLast {
 pub(crate) fn default_except_not_last(
     handlers: &[ExceptHandler],
     locator: &Locator,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     for (idx, handler) in handlers.iter().enumerate() {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) = handler;
         if type_.is_none() && idx < handlers.len() - 1 {
-            return Some(Diagnostic::new(
+            return Some(crate::message::Diagnostic::new(
                 DefaultExceptNotLast,
                 except(handler, locator.contents()),
             ));

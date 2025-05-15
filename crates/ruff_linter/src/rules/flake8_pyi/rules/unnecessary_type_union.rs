@@ -116,7 +116,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
         .map(|type_expr| Name::new(checker.locator().slice(type_expr)))
         .collect();
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnnecessaryTypeUnion {
             members: type_members.clone(),
             union_kind,

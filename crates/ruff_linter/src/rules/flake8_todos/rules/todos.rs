@@ -248,7 +248,7 @@ static ISSUE_LINK_TODO_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
 });
 
 pub(crate) fn todos(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
     todo_comments: &[TodoComment],
     locator: &Locator,
     comment_ranges: &CommentRanges,
@@ -307,20 +307,23 @@ pub(crate) fn todos(
 
         if !has_issue_link {
             // TD003
-            diagnostics.push(Diagnostic::new(MissingTodoLink, directive.range));
+            diagnostics.push(crate::message::Diagnostic::new(
+                MissingTodoLink,
+                directive.range,
+            ));
         }
     }
 }
 
 /// Check that the directive itself is valid. This function modifies `diagnostics` in-place.
-fn directive_errors(diagnostics: &mut Vec<Diagnostic>, directive: &TodoDirective) {
+fn directive_errors(diagnostics: &mut Vec<crate::message::Diagnostic>, directive: &TodoDirective) {
     if directive.content == "TODO" {
         return;
     }
 
     if directive.content.to_uppercase() == "TODO" {
         // TD006
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             InvalidTodoCapitalization {
                 tag: directive.content.to_string(),
             },
@@ -335,7 +338,7 @@ fn directive_errors(diagnostics: &mut Vec<Diagnostic>, directive: &TodoDirective
         diagnostics.push(diagnostic);
     } else {
         // TD001
-        diagnostics.push(Diagnostic::new(
+        diagnostics.push(crate::message::Diagnostic::new(
             InvalidTodoTag {
                 tag: directive.content.to_string(),
             },
@@ -346,7 +349,7 @@ fn directive_errors(diagnostics: &mut Vec<Diagnostic>, directive: &TodoDirective
 
 /// Checks for "static" errors in the comment: missing colon, missing author, etc.
 fn static_errors(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
     comment: &str,
     comment_range: TextRange,
     directive: &TodoDirective,
@@ -367,13 +370,19 @@ fn static_errors(
                 TextSize::try_from(end_index).unwrap()
             } else {
                 // TD002
-                diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
+                diagnostics.push(crate::message::Diagnostic::new(
+                    MissingTodoAuthor,
+                    directive.range,
+                ));
 
                 TextSize::new(0)
             }
         } else {
             // TD002
-            diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
+            diagnostics.push(crate::message::Diagnostic::new(
+                MissingTodoAuthor,
+                directive.range,
+            ));
 
             TextSize::new(0)
         };
@@ -382,18 +391,30 @@ fn static_errors(
     if let Some(after_colon) = after_author.strip_prefix(':') {
         if after_colon.is_empty() {
             // TD005
-            diagnostics.push(Diagnostic::new(MissingTodoDescription, directive.range));
+            diagnostics.push(crate::message::Diagnostic::new(
+                MissingTodoDescription,
+                directive.range,
+            ));
         } else if !after_colon.starts_with(char::is_whitespace) {
             // TD007
-            diagnostics.push(Diagnostic::new(MissingSpaceAfterTodoColon, directive.range));
+            diagnostics.push(crate::message::Diagnostic::new(
+                MissingSpaceAfterTodoColon,
+                directive.range,
+            ));
         }
     } else {
         // TD004
-        diagnostics.push(Diagnostic::new(MissingTodoColon, directive.range));
+        diagnostics.push(crate::message::Diagnostic::new(
+            MissingTodoColon,
+            directive.range,
+        ));
 
         if after_author.is_empty() {
             // TD005
-            diagnostics.push(Diagnostic::new(MissingTodoDescription, directive.range));
+            diagnostics.push(crate::message::Diagnostic::new(
+                MissingTodoDescription,
+                directive.range,
+            ));
         }
     }
 }

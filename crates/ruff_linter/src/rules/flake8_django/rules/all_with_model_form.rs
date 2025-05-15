@@ -78,7 +78,7 @@ pub(crate) fn all_with_model_form(checker: &Checker, class_def: &ast::StmtClassD
                 match value.as_ref() {
                     Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                         if value == "__all__" {
-                            checker.report_diagnostic(Diagnostic::new(
+                            checker.report_diagnostic(crate::message::Diagnostic::new(
                                 DjangoAllWithModelForm,
                                 element.range(),
                             ));
@@ -87,7 +87,7 @@ pub(crate) fn all_with_model_form(checker: &Checker, class_def: &ast::StmtClassD
                     }
                     Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
                         if value == "__all__".as_bytes() {
-                            checker.report_diagnostic(Diagnostic::new(
+                            checker.report_diagnostic(crate::message::Diagnostic::new(
                                 DjangoAllWithModelForm,
                                 element.range(),
                             ));

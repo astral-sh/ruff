@@ -552,7 +552,7 @@ pub(crate) fn not_missing(
                 return true;
             }
             if checker.enabled(Rule::UndocumentedPublicModule) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(crate::message::Diagnostic::new(
                     UndocumentedPublicModule,
                     TextRange::default(),
                 ));
@@ -564,7 +564,7 @@ pub(crate) fn not_missing(
             ..
         }) => {
             if checker.enabled(Rule::UndocumentedPublicPackage) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(crate::message::Diagnostic::new(
                     UndocumentedPublicPackage,
                     TextRange::default(),
                 ));
@@ -576,7 +576,7 @@ pub(crate) fn not_missing(
             ..
         }) => {
             if checker.enabled(Rule::UndocumentedPublicClass) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(crate::message::Diagnostic::new(
                     UndocumentedPublicClass,
                     class.identifier(),
                 ));
@@ -588,7 +588,7 @@ pub(crate) fn not_missing(
             ..
         }) => {
             if checker.enabled(Rule::UndocumentedPublicNestedClass) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(crate::message::Diagnostic::new(
                     UndocumentedPublicNestedClass,
                     function.identifier(),
                 ));
@@ -603,7 +603,7 @@ pub(crate) fn not_missing(
                 true
             } else {
                 if checker.enabled(Rule::UndocumentedPublicFunction) {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
                         UndocumentedPublicFunction,
                         function.identifier(),
                     ));
@@ -621,7 +621,7 @@ pub(crate) fn not_missing(
                 true
             } else if is_init(&function.name) {
                 if checker.enabled(Rule::UndocumentedPublicInit) {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
                         UndocumentedPublicInit,
                         function.identifier(),
                     ));
@@ -629,7 +629,7 @@ pub(crate) fn not_missing(
                 true
             } else if is_new(&function.name) || is_call(&function.name) {
                 if checker.enabled(Rule::UndocumentedPublicMethod) {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
                         UndocumentedPublicMethod,
                         function.identifier(),
                     ));
@@ -637,7 +637,7 @@ pub(crate) fn not_missing(
                 true
             } else if is_magic(&function.name) {
                 if checker.enabled(Rule::UndocumentedMagicMethod) {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
                         UndocumentedMagicMethod,
                         function.identifier(),
                     ));
@@ -645,7 +645,7 @@ pub(crate) fn not_missing(
                 true
             } else {
                 if checker.enabled(Rule::UndocumentedPublicMethod) {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
                         UndocumentedPublicMethod,
                         function.identifier(),
                     ));

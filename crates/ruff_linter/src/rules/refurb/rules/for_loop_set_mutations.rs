@@ -128,7 +128,7 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
         applicability,
     );
 
-    let diagnostic = Diagnostic::new(
+    let diagnostic = crate::message::Diagnostic::new(
         ForLoopSetMutations {
             method_name,
             batch_method_name,

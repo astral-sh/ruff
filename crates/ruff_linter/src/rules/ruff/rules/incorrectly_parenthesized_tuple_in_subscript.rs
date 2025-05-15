@@ -112,7 +112,7 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &Checker, subscript: &
     let edit = Edit::range_replacement(new_source, source_range);
 
     checker.report_diagnostic(
-        Diagnostic::new(
+        crate::message::Diagnostic::new(
             IncorrectlyParenthesizedTupleInSubscript { prefer_parentheses },
             source_range,
         )

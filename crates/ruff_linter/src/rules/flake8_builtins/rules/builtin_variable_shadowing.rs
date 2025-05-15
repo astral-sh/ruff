@@ -73,7 +73,7 @@ pub(crate) fn builtin_variable_shadowing(checker: &Checker, name: &str, range: T
         &checker.settings.flake8_builtins.ignorelist,
         checker.target_version(),
     ) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             BuiltinVariableShadowing {
                 name: name.to_string(),
             },

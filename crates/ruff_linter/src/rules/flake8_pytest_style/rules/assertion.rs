@@ -213,7 +213,7 @@ impl Violation for PytestUnittestAssertion {
 struct ExceptionHandlerVisitor<'a> {
     exception_name: &'a str,
     current_assert: Option<&'a Stmt>,
-    errors: Vec<Diagnostic>,
+    errors: Vec<crate::message::Diagnostic>,
 }
 
 impl<'a> ExceptionHandlerVisitor<'a> {
@@ -243,7 +243,7 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
             Expr::Name(ast::ExprName { id, .. }) => {
                 if let Some(current_assert) = self.current_assert {
                     if id.as_str() == self.exception_name {
-                        self.errors.push(Diagnostic::new(
+                        self.errors.push(crate::message::Diagnostic::new(
                             PytestAssertInExcept {
                                 name: id.to_string(),
                             },
@@ -257,7 +257,7 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
     }
 }
 
-fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Diagnostic> {
+fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<crate::message::Diagnostic> {
     // Walk body to find assert statements that reference the exception name
     let mut visitor = ExceptionHandlerVisitor::new(name);
     for stmt in body {
@@ -282,7 +282,7 @@ pub(crate) fn unittest_assertion(
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         PytestUnittestAssertion {
             assertion: unittest_assert.to_string(),
         },
@@ -388,7 +388,7 @@ pub(crate) fn unittest_raises_assertion_call(checker: &Checker, call: &ast::Expr
 pub(crate) fn unittest_raises_assertion_binding(
     checker: &Checker,
     binding: &Binding,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     if !matches!(binding.kind, BindingKind::WithItemVar) {
         return None;
     }
@@ -457,7 +457,7 @@ fn unittest_raises_assertion(
     call: &ast::ExprCall,
     extra_edits: Vec<Edit>,
     checker: &Checker,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = call.func.as_ref() else {
         return None;
     };
@@ -469,7 +469,7 @@ fn unittest_raises_assertion(
         return None;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         PytestUnittestRaisesAssertion {
             assertion: attr.to_string(),
         },
@@ -590,7 +590,10 @@ fn to_pytest_raises_args<'a>(
 pub(crate) fn assert_falsy(checker: &Checker, stmt: &Stmt, test: &Expr) {
     let truthiness = Truthiness::from_expr(test, |id| checker.semantic().has_builtin_binding(id));
     if truthiness.into_bool() == Some(false) {
-        checker.report_diagnostic(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));
+        checker.report_diagnostic(crate::message::Diagnostic::new(
+            PytestAssertAlwaysFalse,
+            stmt.range(),
+        ));
     }
 }
 
@@ -827,7 +830,8 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 pub(crate) fn composite_condition(checker: &Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
-        let mut diagnostic = Diagnostic::new(PytestCompositeAssertion, stmt.range());
+        let mut diagnostic =
+            crate::message::Diagnostic::new(PytestCompositeAssertion, stmt.range());
         if matches!(composite, CompositionKind::Simple)
             && msg.is_none()
             && !checker.comment_ranges().intersects(stmt.range())

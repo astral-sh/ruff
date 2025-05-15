@@ -94,7 +94,7 @@ pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
             return;
         }
 
-        let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, call.range());
+        let mut diagnostic = crate::message::Diagnostic::new(ReplaceStdoutStderr, call.range());
         if call.arguments.find_keyword("capture_output").is_none() {
             diagnostic
                 .try_set_fix(|| generate_fix(stdout, stderr, call, checker.locator().contents()));

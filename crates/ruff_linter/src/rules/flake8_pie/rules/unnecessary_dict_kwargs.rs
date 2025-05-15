@@ -92,7 +92,8 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
 
         // Ex) `foo(**{**bar})`
         if let [ast::DictItem { key: None, value }] = dict.items.as_slice() {
-            let diagnostic = Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
+            let diagnostic =
+                crate::message::Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
             let edit = Edit::range_replacement(
                 format!("**{}", checker.locator().slice(value)),
                 keyword.range(),
@@ -111,7 +112,8 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
+        let mut diagnostic =
+            crate::message::Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
 
         if dict.is_empty() {
             diagnostic.try_set_fix(|| {

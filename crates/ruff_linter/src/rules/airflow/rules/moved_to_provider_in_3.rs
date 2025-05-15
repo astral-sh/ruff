@@ -929,7 +929,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         _ => return,
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         Airflow3MovedToProvider {
             deprecated: qualified_name.to_string(),
             replacement: replacement.clone(),

@@ -227,7 +227,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         IfElseBlockInsteadOfIfExp {
             contents: contents.clone(),
             kind: assignment_kind,

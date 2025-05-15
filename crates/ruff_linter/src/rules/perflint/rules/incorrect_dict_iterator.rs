@@ -99,7 +99,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
         }
         (true, false) => {
             // The key is unused, so replace with `dict.values()`.
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 IncorrectDictIterator {
                     subset: DictSubset::Values,
                 },
@@ -119,7 +119,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
         }
         (false, true) => {
             // The value is unused, so replace with `dict.keys()`.
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 IncorrectDictIterator {
                     subset: DictSubset::Keys,
                 },

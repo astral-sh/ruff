@@ -140,10 +140,10 @@ pub(crate) fn too_many_statements(
     stmt: &Stmt,
     body: &[Stmt],
     max_statements: usize,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let statements = num_statements(body);
     if statements > max_statements {
-        Some(Diagnostic::new(
+        Some(crate::message::Diagnostic::new(
             TooManyStatements {
                 statements,
                 max_statements,

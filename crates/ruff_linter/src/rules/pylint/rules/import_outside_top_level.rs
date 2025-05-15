@@ -84,7 +84,10 @@ pub(crate) fn import_outside_top_level(checker: &Checker, stmt: &Stmt) {
     }
 
     // Emit the diagnostic
-    checker.report_diagnostic(Diagnostic::new(ImportOutsideTopLevel, stmt.range()));
+    checker.report_diagnostic(crate::message::Diagnostic::new(
+        ImportOutsideTopLevel,
+        stmt.range(),
+    ));
 }
 
 fn is_banned_module_level_import(policy: &NameMatchPolicy, checker: &Checker) -> bool {

@@ -329,7 +329,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         ComprehensionType::Extend
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         ManualListComprehension {
             is_async: for_stmt.is_async,
             comprehension_type: Some(comprehension_type),

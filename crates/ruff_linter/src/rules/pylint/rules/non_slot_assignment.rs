@@ -74,7 +74,7 @@ pub(crate) fn non_slot_assignment(checker: &Checker, class_def: &ast::StmtClassD
     }
 
     for attribute in is_attributes_not_in_slots(&class_def.body) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             NonSlotAssignment {
                 name: attribute.name.to_string(),
             },

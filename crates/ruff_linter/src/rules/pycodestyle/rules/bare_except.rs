@@ -60,13 +60,13 @@ pub(crate) fn bare_except(
     body: &[Stmt],
     handler: &ExceptHandler,
     locator: &Locator,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     if type_.is_none()
         && !body
             .iter()
             .any(|stmt| matches!(stmt, Stmt::Raise(ast::StmtRaise { exc: None, .. })))
     {
-        Some(Diagnostic::new(
+        Some(crate::message::Diagnostic::new(
             BareExcept,
             except(handler, locator.contents()),
         ))

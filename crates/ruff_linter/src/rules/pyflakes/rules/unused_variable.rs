@@ -256,7 +256,7 @@ pub(crate) fn unused_variable(checker: &Checker, name: &str, binding: &Binding) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnusedVariable {
             name: name.to_string(),
         },

@@ -60,7 +60,7 @@ pub(crate) fn unnecessary_list_comprehension_set(checker: &Checker, call: &ast::
     if !argument.is_list_comp_expr() {
         return;
     }
-    let diagnostic = Diagnostic::new(UnnecessaryListComprehensionSet, call.range());
+    let diagnostic = crate::message::Diagnostic::new(UnnecessaryListComprehensionSet, call.range());
     let one = TextSize::from(1);
 
     // Replace `set(` with `{`.

@@ -193,7 +193,8 @@ pub(crate) fn native_literals(
 
     match args.first() {
         None => {
-            let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
+            let mut diagnostic =
+                crate::message::Diagnostic::new(NativeLiterals { literal_type }, call.range());
 
             // Do not suggest fix for attribute access on an int like `int().attribute`
             // Ex) `int().denominator` is valid but `0.denominator` is not
@@ -291,7 +292,8 @@ pub(crate) fn native_literals(
             let edit = Edit::range_replacement(content, call.range());
             let fix = Fix::applicable_edit(edit, applicability);
 
-            let diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
+            let diagnostic =
+                crate::message::Diagnostic::new(NativeLiterals { literal_type }, call.range());
             checker.report_diagnostic(diagnostic.with_fix(fix));
         }
     }

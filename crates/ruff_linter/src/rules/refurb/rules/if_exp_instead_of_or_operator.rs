@@ -67,7 +67,7 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &Checker, if_expr: &ast::Ex
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(IfExpInsteadOfOrOperator, *range);
+    let mut diagnostic = crate::message::Diagnostic::new(IfExpInsteadOfOrOperator, *range);
 
     // Replace with `{test} or {orelse}`.
     diagnostic.set_fix(Fix::applicable_edit(

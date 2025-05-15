@@ -73,7 +73,7 @@ pub(crate) fn invalid_length_return(checker: &Checker, function_def: &ast::StmtF
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             InvalidLengthReturnType,
             function_def.identifier(),
         ));
@@ -95,11 +95,17 @@ pub(crate) fn invalid_length_return(checker: &Checker, function_def: &ast::StmtF
                         | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
                 )
             {
-                checker.report_diagnostic(Diagnostic::new(InvalidLengthReturnType, value.range()));
+                checker.report_diagnostic(crate::message::Diagnostic::new(
+                    InvalidLengthReturnType,
+                    value.range(),
+                ));
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidLengthReturnType, stmt.range()));
+            checker.report_diagnostic(crate::message::Diagnostic::new(
+                InvalidLengthReturnType,
+                stmt.range(),
+            ));
         }
     }
 }

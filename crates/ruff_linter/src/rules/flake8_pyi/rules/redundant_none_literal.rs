@@ -121,7 +121,7 @@ pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Ex
     // N.B. Applying the fix can leave an unused import to be fixed by the `unused-import` rule.
     for none_expr in none_exprs {
         let mut diagnostic =
-            Diagnostic::new(RedundantNoneLiteral { union_kind }, none_expr.range());
+            crate::message::Diagnostic::new(RedundantNoneLiteral { union_kind }, none_expr.range());
         diagnostic.try_set_optional_fix(|| {
             create_fix(
                 checker,

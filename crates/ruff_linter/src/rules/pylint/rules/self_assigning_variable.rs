@@ -73,7 +73,7 @@ pub(crate) fn self_annotated_assignment(checker: &Checker, assign: &ast::StmtAnn
     checker.report_diagnostics(diagnostics);
 }
 
-fn visit_assignments(left: &Expr, right: &Expr, diagnostics: &mut Vec<Diagnostic>) {
+fn visit_assignments(left: &Expr, right: &Expr, diagnostics: &mut Vec<crate::message::Diagnostic>) {
     match (left, right) {
         (Expr::Tuple(lhs), Expr::Tuple(rhs)) if lhs.len() == rhs.len() => lhs
             .iter()
@@ -83,7 +83,7 @@ fn visit_assignments(left: &Expr, right: &Expr, diagnostics: &mut Vec<Diagnostic
             Expr::Name(ast::ExprName { id: lhs_name, .. }),
             Expr::Name(ast::ExprName { id: rhs_name, .. }),
         ) if lhs_name == rhs_name => {
-            diagnostics.push(Diagnostic::new(
+            diagnostics.push(crate::message::Diagnostic::new(
                 SelfAssigningVariable {
                     name: lhs_name.to_string(),
                 },

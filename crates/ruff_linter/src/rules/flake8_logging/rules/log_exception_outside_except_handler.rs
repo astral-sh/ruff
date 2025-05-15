@@ -99,7 +99,8 @@ pub(crate) fn log_exception_outside_except_handler(checker: &Checker, call: &Exp
         _ => return,
     };
 
-    let mut diagnostic = Diagnostic::new(LogExceptionOutsideExceptHandler, call.range);
+    let mut diagnostic =
+        crate::message::Diagnostic::new(LogExceptionOutsideExceptHandler, call.range);
 
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);

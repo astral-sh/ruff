@@ -73,7 +73,7 @@ pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr) {
                 _ => None,
             })
     {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             NumpyDeprecatedFunction {
                 existing: existing.to_string(),
                 replacement: replacement.to_string(),

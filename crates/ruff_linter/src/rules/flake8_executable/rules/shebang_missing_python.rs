@@ -3,7 +3,7 @@ use ruff_text_size::TextRange;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 
-use crate::comments::shebang::ShebangDirective;
+use crate::{comments::shebang::ShebangDirective, message::Diagnostic};
 
 /// ## What it does
 /// Checks for a shebang directive in `.py` files that does not contain `python`,

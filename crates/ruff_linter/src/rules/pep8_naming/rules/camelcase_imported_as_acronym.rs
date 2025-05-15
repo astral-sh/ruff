@@ -62,7 +62,7 @@ pub(crate) fn camelcase_imported_as_acronym(
     alias: &Alias,
     stmt: &Stmt,
     checker: &Checker,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     if helpers::is_camelcase(name)
         && !str::is_cased_lowercase(asname)
         && str::is_cased_uppercase(asname)
@@ -80,7 +80,7 @@ pub(crate) fn camelcase_imported_as_acronym(
             return None;
         }
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             CamelcaseImportedAsAcronym {
                 name: name.to_string(),
                 asname: asname.to_string(),

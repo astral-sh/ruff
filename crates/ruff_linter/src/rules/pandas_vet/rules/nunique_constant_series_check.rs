@@ -113,7 +113,7 @@ pub(crate) fn nunique_constant_series_check(
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         PandasNuniqueConstantSeriesCheck,
         expr.range(),
     ));

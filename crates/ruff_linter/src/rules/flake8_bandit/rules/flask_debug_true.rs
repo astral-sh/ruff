@@ -67,6 +67,9 @@ pub(crate) fn flask_debug_true(checker: &Checker, call: &ExprCall) {
     if typing::resolve_assignment(value, checker.semantic())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["flask", "Flask"]))
     {
-        checker.report_diagnostic(Diagnostic::new(FlaskDebugTrue, debug_argument.range()));
+        checker.report_diagnostic(crate::message::Diagnostic::new(
+            FlaskDebugTrue,
+            debug_argument.range(),
+        ));
     }
 }

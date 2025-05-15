@@ -113,7 +113,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnnecessaryDictComprehensionForIterable {
             is_value_none_literal: dict_comp.value.is_none_literal_expr(),
         },

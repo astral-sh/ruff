@@ -102,7 +102,7 @@ pub(crate) fn used_dummy_variable(
     checker: &Checker,
     binding: &Binding,
     binding_id: BindingId,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let name = binding.name(checker.source());
 
     // Ignore `_` and dunder variables
@@ -167,7 +167,7 @@ pub(crate) fn used_dummy_variable(
 
     // If the name doesn't start with an underscore, we don't consider it for a fix
     if !name.starts_with('_') {
-        return Some(Diagnostic::new(
+        return Some(crate::message::Diagnostic::new(
             UsedDummyVariable {
                 name: name.to_string(),
                 shadowed_kind: None,
@@ -181,7 +181,7 @@ pub(crate) fn used_dummy_variable(
 
     let shadowed_kind = ShadowedKind::new(binding, trimmed_name, checker);
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UsedDummyVariable {
             name: name.to_string(),
             shadowed_kind: Some(shadowed_kind),

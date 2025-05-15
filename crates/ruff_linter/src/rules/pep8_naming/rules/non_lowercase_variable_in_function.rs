@@ -81,7 +81,7 @@ pub(crate) fn non_lowercase_variable_in_function(checker: &Checker, expr: &Expr,
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         NonLowercaseVariableInFunction {
             name: name.to_string(),
         },

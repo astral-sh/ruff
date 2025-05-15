@@ -61,7 +61,7 @@ pub(crate) fn request_with_no_cert_validation(checker: &Checker, call: &ast::Exp
     {
         if let Some(keyword) = call.arguments.find_keyword("verify") {
             if is_const_false(&keyword.value) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(crate::message::Diagnostic::new(
                     RequestWithNoCertValidation {
                         string: target.to_string(),
                     },

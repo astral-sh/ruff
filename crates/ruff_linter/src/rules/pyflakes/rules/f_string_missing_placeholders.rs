@@ -91,7 +91,8 @@ pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &ast::ExprF
             TextSize::new(1),
         );
 
-        let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, f_string.range());
+        let mut diagnostic =
+            crate::message::Diagnostic::new(FStringMissingPlaceholders, f_string.range());
         diagnostic.set_fix(convert_f_string_to_regular_string(
             prefix_range,
             f_string.range(),

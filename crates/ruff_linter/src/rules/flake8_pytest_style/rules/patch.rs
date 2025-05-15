@@ -73,7 +73,7 @@ impl<'a> Visitor<'a> for LambdaBodyVisitor<'a> {
     }
 }
 
-fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<Diagnostic> {
+fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<crate::message::Diagnostic> {
     if call.arguments.find_keyword("return_value").is_some() {
         return None;
     }
@@ -99,11 +99,14 @@ fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<Diagnostic> {
         }
     }
 
-    Some(Diagnostic::new(PytestPatchWithLambda, call.func.range()))
+    Some(crate::message::Diagnostic::new(
+        PytestPatchWithLambda,
+        call.func.range(),
+    ))
 }
 
 /// PT008
-pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<Diagnostic> {
+pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<crate::message::Diagnostic> {
     let name = UnqualifiedName::from_expr(&call.func)?;
 
     if matches!(

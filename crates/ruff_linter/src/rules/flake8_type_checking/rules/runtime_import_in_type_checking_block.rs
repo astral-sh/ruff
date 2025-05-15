@@ -198,7 +198,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                     ..
                 } in imports
                 {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = crate::message::Diagnostic::new(
                         RuntimeImportInTypeCheckingBlock {
                             qualified_name: import.qualified_name().to_string(),
                             strategy: Strategy::MoveImport,
@@ -227,7 +227,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                     ..
                 } in imports
                 {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = crate::message::Diagnostic::new(
                         RuntimeImportInTypeCheckingBlock {
                             qualified_name: import.qualified_name().to_string(),
                             strategy: Strategy::QuoteUsages,
@@ -252,7 +252,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                     ..
                 } in imports
                 {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = crate::message::Diagnostic::new(
                         RuntimeImportInTypeCheckingBlock {
                             qualified_name: import.qualified_name().to_string(),
                             strategy: Strategy::MoveImport,

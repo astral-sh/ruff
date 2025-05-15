@@ -85,7 +85,7 @@ fn add_diagnostic(checker: &Checker, expr: &Expr) {
     {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnnecessaryComprehension {
             kind: comprehension_kind,
         },

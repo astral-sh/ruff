@@ -90,7 +90,7 @@ pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) 
         let comparable = ComparableExpr::from(value);
 
         if !seen_targets.insert(comparable) {
-            let diagnostic = Diagnostic::new(
+            let diagnostic = crate::message::Diagnostic::new(
                 NonUniqueEnums {
                     value: checker.generator().expr(value),
                 },

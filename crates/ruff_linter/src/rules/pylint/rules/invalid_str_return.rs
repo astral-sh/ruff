@@ -68,7 +68,7 @@ pub(crate) fn invalid_str_return(checker: &Checker, function_def: &ast::StmtFunc
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             InvalidStrReturnType,
             function_def.identifier(),
         ));
@@ -87,11 +87,17 @@ pub(crate) fn invalid_str_return(checker: &Checker, function_def: &ast::StmtFunc
                 ResolvedPythonType::from(value),
                 ResolvedPythonType::Unknown | ResolvedPythonType::Atom(PythonType::String)
             ) {
-                checker.report_diagnostic(Diagnostic::new(InvalidStrReturnType, value.range()));
+                checker.report_diagnostic(crate::message::Diagnostic::new(
+                    InvalidStrReturnType,
+                    value.range(),
+                ));
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidStrReturnType, stmt.range()));
+            checker.report_diagnostic(crate::message::Diagnostic::new(
+                InvalidStrReturnType,
+                stmt.range(),
+            ));
         }
     }
 }

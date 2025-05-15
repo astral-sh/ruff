@@ -292,7 +292,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             DictComprehensionType::Update
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             ManualDictComprehension {
                 fix_type,
                 is_async: for_stmt.is_async,
@@ -313,7 +313,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
 
         checker.report_diagnostic(diagnostic);
     } else {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             ManualDictComprehension {
                 fix_type: DictComprehensionType::Comprehension,
                 is_async: for_stmt.is_async,

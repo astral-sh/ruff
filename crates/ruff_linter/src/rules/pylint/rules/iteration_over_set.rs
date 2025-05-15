@@ -63,7 +63,7 @@ pub(crate) fn iteration_over_set(checker: &Checker, expr: &Expr) {
         }
     }
 
-    let mut diagnostic = Diagnostic::new(IterationOverSet, expr.range());
+    let mut diagnostic = crate::message::Diagnostic::new(IterationOverSet, expr.range());
 
     let tuple = if let [elt] = set.elts.as_slice() {
         let elt = checker.locator().slice(elt);

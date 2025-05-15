@@ -117,13 +117,14 @@ pub(crate) fn banned_relative_import(
     module: Option<&str>,
     module_path: Option<&[String]>,
     strictness: Strictness,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let strictness_level = match strictness {
         Strictness::All => 0,
         Strictness::Parents => 1,
     };
     if level > strictness_level {
-        let mut diagnostic = Diagnostic::new(RelativeImports { strictness }, stmt.range());
+        let mut diagnostic =
+            crate::message::Diagnostic::new(RelativeImports { strictness }, stmt.range());
         if let Some(fix) =
             fix_banned_relative_import(stmt, level, module, module_path, checker.generator())
         {

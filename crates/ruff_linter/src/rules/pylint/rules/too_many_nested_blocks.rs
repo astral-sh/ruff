@@ -74,7 +74,7 @@ pub(crate) fn too_many_nested_blocks(checker: &Checker, stmt: &Stmt) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         TooManyNestedBlocks {
             nested_blocks: count,
             max_nested_blocks,

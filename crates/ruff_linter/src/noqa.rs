@@ -1215,8 +1215,8 @@ mod tests {
 
     use ruff_diagnostics::Edit;
     use ruff_python_trivia::CommentRanges;
-    use ruff_source_file::{LineEnding, SourceFileBuilder};
-    use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+    use ruff_source_file::LineEnding;
+    use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::message::Diagnostic;
     use crate::noqa::{
@@ -1246,12 +1246,10 @@ mod tests {
     /// Create a [`Message`] with a placeholder filename and rule code from `diagnostic`.
     fn message_from_diagnostic(
         diagnostic: Diagnostic,
-        path: impl AsRef<Path>,
-        source: &str,
+        _path: impl AsRef<Path>,
+        _source: &str,
     ) -> Diagnostic {
-        let noqa_offset = diagnostic.start();
-        let file = SourceFileBuilder::new(path.as_ref().to_string_lossy(), source).finish();
-        Diagnostic::from_diagnostic(diagnostic, file, Some(noqa_offset))
+        diagnostic
     }
 
     #[test]

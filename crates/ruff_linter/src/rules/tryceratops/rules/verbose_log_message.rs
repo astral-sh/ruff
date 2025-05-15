@@ -78,7 +78,10 @@ pub(crate) fn verbose_log_message(checker: &Checker, handlers: &[ExceptHandler])
                     };
                     let binding = checker.semantic().binding(id);
                     if binding.kind.is_bound_exception() {
-                        checker.report_diagnostic(Diagnostic::new(VerboseLogMessage, expr.range()));
+                        checker.report_diagnostic(crate::message::Diagnostic::new(
+                            VerboseLogMessage,
+                            expr.range(),
+                        ));
                     }
                 }
             }

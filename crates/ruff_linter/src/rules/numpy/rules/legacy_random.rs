@@ -137,7 +137,7 @@ pub(crate) fn legacy_random(checker: &Checker, expr: &Expr) {
                 }
             })
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             NumpyLegacyRandom {
                 method_name: method_name.to_string(),
             },

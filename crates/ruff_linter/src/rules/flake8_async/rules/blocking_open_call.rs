@@ -52,7 +52,7 @@ pub(crate) fn blocking_open_call(checker: &Checker, call: &ast::ExprCall) {
     if is_open_call(&call.func, checker.semantic())
         || is_open_call_from_pathlib(call.func.as_ref(), checker.semantic())
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             BlockingOpenCallInAsyncFunction,
             call.func.range(),
         ));

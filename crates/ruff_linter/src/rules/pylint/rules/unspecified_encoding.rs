@@ -91,7 +91,7 @@ pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnspecifiedEncoding {
             function_name,
             mode,

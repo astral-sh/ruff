@@ -94,7 +94,7 @@ pub(crate) fn dict_iter_missing_items(checker: &Checker, target: &Expr, iter: &E
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(DictIterMissingItems, iter.range());
+    let mut diagnostic = crate::message::Diagnostic::new(DictIterMissingItems, iter.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         format!("{}.items()", name.id),
         iter.range(),

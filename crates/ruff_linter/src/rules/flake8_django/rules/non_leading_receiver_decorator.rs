@@ -70,7 +70,7 @@ pub(crate) fn non_leading_receiver_decorator(checker: &Checker, decorator_list: 
                 })
         });
         if i > 0 && is_receiver && !seen_receiver {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 DjangoNonLeadingReceiverDecorator,
                 decorator.range(),
             ));

@@ -74,7 +74,7 @@ pub(crate) fn deprecated_type_alias(checker: &Checker, expr: &Expr) {
                 }
             })
     {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             NumpyDeprecatedTypeAlias {
                 type_name: type_name.to_string(),
             },

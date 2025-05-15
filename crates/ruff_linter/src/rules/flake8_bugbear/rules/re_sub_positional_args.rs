@@ -75,7 +75,7 @@ pub(crate) fn re_sub_positional_args(checker: &Checker, call: &ast::ExprCall) {
     };
 
     if call.arguments.args.len() > method.num_args() {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             ReSubPositionalArgs { method },
             call.range(),
         ));

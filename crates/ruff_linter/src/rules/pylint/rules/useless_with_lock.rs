@@ -80,6 +80,9 @@ pub(crate) fn useless_with_lock(checker: &Checker, with: &ast::StmtWith) {
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(UselessWithLock, call.range()));
+        checker.report_diagnostic(crate::message::Diagnostic::new(
+            UselessWithLock,
+            call.range(),
+        ));
     }
 }

@@ -88,7 +88,7 @@ struct AvoidableEscapedQuoteChecker<'a> {
     locator: &'a Locator<'a>,
     quotes_settings: &'a flake8_quotes::settings::Settings,
     supports_pep701: bool,
-    diagnostics: Vec<Diagnostic>,
+    diagnostics: Vec<crate::message::Diagnostic>,
 }
 
 impl<'a> AvoidableEscapedQuoteChecker<'a> {
@@ -106,7 +106,7 @@ impl<'a> AvoidableEscapedQuoteChecker<'a> {
     }
 
     /// Consumes the checker and returns a vector of [`Diagnostic`] found during the visit.
-    fn into_diagnostics(self) -> Vec<Diagnostic> {
+    fn into_diagnostics(self) -> Vec<crate::message::Diagnostic> {
         self.diagnostics
     }
 }
@@ -222,7 +222,7 @@ fn check_string_or_bytes(
     quotes_settings: &flake8_quotes::settings::Settings,
     range: TextRange,
     flags: AnyStringFlags,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     assert!(!flags.is_f_string());
 
     if flags.is_triple_quoted() || flags.is_raw_string() {
@@ -242,7 +242,7 @@ fn check_string_or_bytes(
         return None;
     }
 
-    let mut diagnostic = Diagnostic::new(AvoidableEscapedQuote, range);
+    let mut diagnostic = crate::message::Diagnostic::new(AvoidableEscapedQuote, range);
     let fixed_contents = format!(
         "{prefix}{quote}{value}{quote}",
         prefix = flags.prefix(),
@@ -261,7 +261,7 @@ fn check_f_string(
     locator: &Locator,
     quotes_settings: &flake8_quotes::settings::Settings,
     f_string: &ast::FString,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let ast::FString { flags, range, .. } = f_string;
 
     if flags.is_triple_quoted() || flags.prefix().is_raw() {
@@ -321,7 +321,8 @@ fn check_f_string(
     ));
 
     Some(
-        Diagnostic::new(AvoidableEscapedQuote, *range).with_fix(Fix::safe_edits(start_edit, edits)),
+        crate::message::Diagnostic::new(AvoidableEscapedQuote, *range)
+            .with_fix(Fix::safe_edits(start_edit, edits)),
     )
 }
 

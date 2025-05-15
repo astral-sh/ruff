@@ -8,6 +8,7 @@ use ruff_python_stdlib::path::is_module_file;
 use ruff_python_stdlib::sys::is_known_standard_library;
 use ruff_text_size::TextRange;
 
+use crate::message::Diagnostic;
 use crate::settings::LinterSettings;
 
 /// ## What it does

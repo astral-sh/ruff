@@ -66,7 +66,7 @@ pub(crate) fn except_with_empty_tuple(checker: &Checker, except_handler: &Except
             .current_statement()
             .as_try_stmt()
             .is_some_and(|try_stmt| try_stmt.is_star);
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             ExceptWithEmptyTuple { is_star },
             except_handler.range(),
         ));

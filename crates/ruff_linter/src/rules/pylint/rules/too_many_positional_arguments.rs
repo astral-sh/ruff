@@ -112,7 +112,7 @@ pub(crate) fn too_many_positional_arguments(
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         TooManyPositionalArguments {
             c_pos: num_positional_args,
             max_pos: checker.settings.pylint.max_positional_args,

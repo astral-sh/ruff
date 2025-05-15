@@ -5,7 +5,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `print` statements.
@@ -118,13 +117,13 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
                     }
                 }
             }
-            Diagnostic::new(Print, call.func.range())
+            crate::message::Diagnostic::new(Print, call.func.range())
         }
-        ["pprint", "pprint"] => Diagnostic::new(PPrint, call.func.range()),
+        ["pprint", "pprint"] => crate::message::Diagnostic::new(PPrint, call.func.range()),
         _ => return,
     };
 
-    if !checker.enabled(diagnostic.rule()) {
+    if !checker.enabled(diagnostic.rule().expect("TODO(brent)")) {
         return;
     }
 

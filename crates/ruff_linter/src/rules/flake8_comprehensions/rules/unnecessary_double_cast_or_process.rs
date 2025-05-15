@@ -125,7 +125,7 @@ pub(crate) fn unnecessary_double_cast_or_process(
             | ("set", "set")
             | ("list" | "tuple", "list" | "tuple")
     ) {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             UnnecessaryDoubleCastOrProcess {
                 inner: inner_func_name.to_string(),
                 outer: outer_func_name.to_string(),

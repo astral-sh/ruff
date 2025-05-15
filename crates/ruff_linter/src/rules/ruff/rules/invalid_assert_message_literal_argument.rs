@@ -52,7 +52,7 @@ pub(crate) fn invalid_assert_message_literal_argument(checker: &Checker, stmt: &
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         InvalidAssertMessageLiteralArgument,
         message.range(),
     ));

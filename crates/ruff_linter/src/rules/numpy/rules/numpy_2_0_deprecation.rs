@@ -673,7 +673,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         Numpy2Deprecation {
             existing: replacement.existing.to_string(),
             migration_guide: replacement.details.guideline(),

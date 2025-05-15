@@ -10,6 +10,7 @@ use ruff_python_stdlib::typing::simple_magic_return_type;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::message::Diagnostic;
 use crate::registry::Rule;
 use crate::rules::flake8_annotations::helpers::auto_return_type;
 use crate::rules::ruff::typing::type_hint_resolves_to_any;
@@ -533,7 +534,7 @@ fn check_dynamically_typed<F>(
     checker: &Checker,
     annotation: &Expr,
     func: F,
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
 ) where
     F: FnOnce() -> String,
 {
@@ -604,7 +605,7 @@ pub(crate) fn definition(
     checker: &Checker,
     definition: &Definition,
     visibility: visibility::Visibility,
-) -> Vec<Diagnostic> {
+) -> Vec<crate::message::Diagnostic> {
     let Some(function) = definition.as_function_def() else {
         return vec![];
     };

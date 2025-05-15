@@ -70,20 +70,20 @@ pub(crate) fn jinja2_autoescape_false(checker: &Checker, call: &ast::ExprCall) {
                 Expr::Call(ast::ExprCall { func, .. }) => {
                     if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                         if id != "select_autoescape" {
-                            checker.report_diagnostic(Diagnostic::new(
+                            checker.report_diagnostic(crate::message::Diagnostic::new(
                                 Jinja2AutoescapeFalse { value: true },
                                 keyword.range(),
                             ));
                         }
                     }
                 }
-                _ => checker.report_diagnostic(Diagnostic::new(
+                _ => checker.report_diagnostic(crate::message::Diagnostic::new(
                     Jinja2AutoescapeFalse { value: true },
                     keyword.range(),
                 )),
             }
         } else {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 Jinja2AutoescapeFalse { value: false },
                 call.func.range(),
             ));

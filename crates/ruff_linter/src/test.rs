@@ -41,7 +41,7 @@ pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
 pub(crate) fn test_path(
     path: impl AsRef<Path>,
     settings: &LinterSettings,
-) -> Result<Vec<Diagnostic>> {
+) -> Result<Vec<crate::message::Diagnostic>> {
     let path = test_resource_path("fixtures").join(path);
     let source_type = PySourceType::from(&path);
     let source_kind = SourceKind::from_path(path.as_ref(), source_type)?.expect("valid source");
@@ -50,7 +50,7 @@ pub(crate) fn test_path(
 
 #[cfg(not(fuzzing))]
 pub(crate) struct TestedNotebook {
-    pub(crate) messages: Vec<Diagnostic>,
+    pub(crate) messages: Vec<crate::message::Diagnostic>,
     pub(crate) source_notebook: Notebook,
     pub(crate) linted_notebook: Notebook,
 }
@@ -86,7 +86,7 @@ pub(crate) fn assert_notebook_path(
 }
 
 /// Run [`check_path`] on a snippet of Python code.
-pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Diagnostic> {
+pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<crate::message::Diagnostic> {
     let path = Path::new("<filename>");
     let contents = dedent(contents);
     test_contents(&SourceKind::Python(contents.into_owned()), path, settings).0
@@ -110,7 +110,7 @@ pub(crate) fn test_contents<'a>(
     source_kind: &'a SourceKind,
     path: &Path,
     settings: &LinterSettings,
-) -> (Vec<Diagnostic>, Cow<'a, SourceKind>) {
+) -> (Vec<crate::message::Diagnostic>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
     let target_version = settings.resolve_target_version(path);
     let options =
@@ -318,7 +318,11 @@ fn print_syntax_errors(
 }
 
 /// Print the [`Message::Diagnostic`]s in `messages`.
-fn print_diagnostics(mut messages: Vec<Diagnostic>, path: &Path, source: &SourceKind) -> String {
+fn print_diagnostics(
+    mut messages: Vec<crate::message::Diagnostic>,
+    path: &Path,
+    source: &SourceKind,
+) -> String {
     messages.retain(Diagnostic::is_diagnostic_message);
 
     if let Some(notebook) = source.as_ipy_notebook() {

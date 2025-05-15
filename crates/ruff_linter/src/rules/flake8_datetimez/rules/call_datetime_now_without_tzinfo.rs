@@ -92,7 +92,7 @@ pub(crate) fn call_datetime_now_without_tzinfo(checker: &Checker, call: &ast::Ex
         None => DatetimeModuleAntipattern::NoTzArgumentPassed,
     };
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         CallDatetimeNowWithoutTzinfo(antipattern),
         call.range,
     ));

@@ -261,7 +261,7 @@ fn docstring(checker: &Checker, range: TextRange) {
     {
         // Fixing this would result in a one-sided multi-line docstring, which would
         // introduce a syntax error.
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             BadQuotesDocstring {
                 preferred_quote: quotes_settings.docstring_quotes,
             },
@@ -277,7 +277,7 @@ fn docstring(checker: &Checker, range: TextRange) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         BadQuotesDocstring {
             preferred_quote: quotes_settings.docstring_quotes,
         },
@@ -353,7 +353,7 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
                 continue;
             }
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 BadQuotesMultilineString {
                     preferred_quote: quotes_settings.multiline_quotes,
                 },
@@ -391,7 +391,7 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
                 // ```python
                 // ''"assert" ' SAM macro definitions '''
                 // ```
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(crate::message::Diagnostic::new(
                     BadQuotesInlineString {
                         preferred_quote: quotes_settings.inline_quotes,
                     },
@@ -406,7 +406,7 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
                 // ```python
                 // ''"assert" ' SAM macro definitions '''
                 // ```
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(crate::message::Diagnostic::new(
                     BadQuotesInlineString {
                         preferred_quote: quotes_settings.inline_quotes,
                     },
@@ -415,7 +415,7 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
                 continue;
             }
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 BadQuotesInlineString {
                     preferred_quote: quotes_settings.inline_quotes,
                 },

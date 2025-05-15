@@ -247,7 +247,7 @@ fn create_diagnostic(
     value: &Expr,
     type_vars: &[TypeVar],
     type_alias_kind: TypeAliasKind,
-) -> Diagnostic {
+) -> crate::message::Diagnostic {
     let source = checker.source();
     let comment_ranges = checker.comment_ranges();
 
@@ -285,7 +285,7 @@ fn create_diagnostic(
             }
         };
 
-    Diagnostic::new(
+    crate::message::Diagnostic::new(
         NonPEP695TypeAlias {
             name: name.to_string(),
             type_alias_kind,

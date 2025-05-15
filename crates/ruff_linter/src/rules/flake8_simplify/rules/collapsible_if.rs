@@ -107,7 +107,7 @@ pub(crate) fn nested_if_statements(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         CollapsibleIf,
         TextRange::new(nested_if.start(), colon.end()),
     );

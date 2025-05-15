@@ -94,7 +94,7 @@ pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCall)
     if let [generator] = generators.as_slice() {
         if generator.ifs.is_empty() && !generator.is_async {
             if ComparableExpr::from(elt) == ComparableExpr::from(&generator.target) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = crate::message::Diagnostic::new(
                     UnnecessaryGeneratorSet {
                         short_circuit: true,
                     },
@@ -112,7 +112,7 @@ pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCall)
     }
 
     // Convert `set(f(x) for x in y)` to `{f(x) for x in y}`.
-    let diagnostic = Diagnostic::new(
+    let diagnostic = crate::message::Diagnostic::new(
         UnnecessaryGeneratorSet {
             short_circuit: false,
         },

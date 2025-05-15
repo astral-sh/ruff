@@ -107,12 +107,12 @@ fn check_super_slots(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
     slot: &Slot,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     iter_super_class(class_def, semantic)
         .skip(1)
         .find_map(&|super_class: &ast::StmtClassDef| {
             if slots_members(&super_class.body).contains(slot) {
-                return Some(Diagnostic::new(
+                return Some(crate::message::Diagnostic::new(
                     RedefinedSlotsInSubclass {
                         base: super_class.name.to_string(),
                         slot_name: slot.name.to_string(),

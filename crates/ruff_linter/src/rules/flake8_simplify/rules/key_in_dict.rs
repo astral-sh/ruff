@@ -103,7 +103,7 @@ fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, pa
     )
     .unwrap_or(right.range());
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         InDictKeys {
             operator: operator.as_str().to_string(),
         },

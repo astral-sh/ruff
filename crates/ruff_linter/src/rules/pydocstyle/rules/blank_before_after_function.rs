@@ -126,7 +126,7 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
         }
 
         if blank_lines_before != 0 {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 BlankLineBeforeFunction {
                     num_lines: blank_lines_before,
                 },
@@ -180,7 +180,7 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
         }
 
         if blank_lines_after != 0 {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 BlankLineAfterFunction {
                     num_lines: blank_lines_after,
                 },

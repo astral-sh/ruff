@@ -101,7 +101,10 @@ impl Violation for PrivateTypeParameter {
 }
 
 /// UP049
-pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn private_type_parameter(
+    checker: &Checker,
+    binding: &Binding,
+) -> Option<crate::message::Diagnostic> {
     let semantic = checker.semantic();
     let stmt = binding.statement(semantic)?;
     if !binding.kind.is_type_param() {
@@ -126,7 +129,8 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
         return None;
     }
 
-    let mut diagnostic = Diagnostic::new(PrivateTypeParameter { kind }, binding.range);
+    let mut diagnostic =
+        crate::message::Diagnostic::new(PrivateTypeParameter { kind }, binding.range);
 
     let new_name = old_name.trim_start_matches('_');
 

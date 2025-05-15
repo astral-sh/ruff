@@ -70,7 +70,7 @@ pub(crate) fn camelcase_imported_as_constant(
     alias: &Alias,
     stmt: &Stmt,
     ignore_names: &IgnoreNames,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     // Single-character names are ambiguous. It could be a class or a constant.
     asname.chars().nth(1)?;
 
@@ -83,7 +83,7 @@ pub(crate) fn camelcase_imported_as_constant(
         if ignore_names.matches(name) || ignore_names.matches(asname) {
             return None;
         }
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             CamelcaseImportedAsConstant {
                 name: name.to_string(),
                 asname: asname.to_string(),

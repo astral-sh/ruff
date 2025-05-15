@@ -177,7 +177,8 @@ pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) 
         (Index::Last, true) => MinMax::Min,
     };
 
-    let mut diagnostic = Diagnostic::new(SortedMinMax { min_max }, subscript.range());
+    let mut diagnostic =
+        crate::message::Diagnostic::new(SortedMinMax { min_max }, subscript.range());
 
     if checker.semantic().has_builtin_binding(min_max.as_str()) {
         diagnostic.set_fix({

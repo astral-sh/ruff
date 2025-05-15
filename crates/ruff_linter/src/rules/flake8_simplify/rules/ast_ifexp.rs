@@ -150,7 +150,7 @@ pub(crate) fn if_expr_with_true_false(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         IfExprWithTrueFalse {
             is_compare: test.is_compare_expr(),
         },
@@ -211,7 +211,7 @@ pub(crate) fn if_expr_with_false_true(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(IfExprWithFalseTrue, expr.range());
+    let mut diagnostic = crate::message::Diagnostic::new(IfExprWithFalseTrue, expr.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(
             &ast::ExprUnaryOp {
@@ -257,7 +257,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         IfExprWithTwistedArms {
             expr_body: checker.generator().expr(body),
             expr_else: checker.generator().expr(orelse),

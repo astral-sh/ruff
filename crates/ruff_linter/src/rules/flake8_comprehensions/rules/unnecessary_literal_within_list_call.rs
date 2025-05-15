@@ -82,7 +82,7 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: &ast
         return;
     }
 
-    let diagnostic = Diagnostic::new(
+    let diagnostic = crate::message::Diagnostic::new(
         UnnecessaryLiteralWithinListCall {
             kind: argument_kind,
         },

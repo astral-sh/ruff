@@ -96,7 +96,7 @@ pub(crate) fn redundant_log_base(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         RedundantLogBase {
             base,
             arg: checker.locator().slice(arg).into(),

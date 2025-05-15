@@ -592,7 +592,6 @@ fn all_lines_fit(
 #[cfg(test)]
 mod tests {
     use anyhow::{anyhow, Result};
-    use ruff_source_file::SourceFileBuilder;
     use test_case::test_case;
 
     use ruff_diagnostics::{Edit, Fix};
@@ -737,24 +736,14 @@ x = 1 \
         let diag = {
             use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
             let mut iter = edits.into_iter();
-            let diag = Diagnostic::new(
+            Diagnostic::new(
                 MissingNewlineAtEndOfFile, // The choice of rule here is arbitrary.
                 TextRange::default(),
             )
             .with_fix(Fix::safe_edits(
                 iter.next().ok_or(anyhow!("expected edits nonempty"))?,
                 iter,
-            ));
-            Diagnostic::diagnostic(
-                diag.name,
-                diag.body,
-                diag.suggestion,
-                diag.range,
-                diag.fix,
-                diag.parent,
-                SourceFileBuilder::new("<filename>", "<code>").finish(),
-                None,
-            )
+            ))
         };
         assert_eq!(apply_fixes([diag].iter(), &locator).code, expect);
         Ok(())

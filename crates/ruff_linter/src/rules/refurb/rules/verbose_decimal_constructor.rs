@@ -120,7 +120,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
             };
 
             let replacement = format!("{unary}{rest}");
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 VerboseDecimalConstructor {
                     replacement: replacement.clone(),
                 },
@@ -184,7 +184,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 // does not make sense for this edge case.
                 replacement = "\"nan\"".to_string();
             }
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 VerboseDecimalConstructor {
                     replacement: replacement.clone(),
                 },

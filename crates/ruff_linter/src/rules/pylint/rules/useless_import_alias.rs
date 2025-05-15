@@ -73,7 +73,7 @@ pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
         .settings
         .isort
         .requires_module_import(alias.name.to_string(), Some(asname.to_string()));
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UselessImportAlias {
             required_import_conflict,
         },
@@ -110,7 +110,7 @@ pub(crate) fn useless_import_from_alias(
         Some(asname.to_string()),
         level,
     );
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UselessImportAlias {
             required_import_conflict,
         },

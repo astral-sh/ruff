@@ -90,7 +90,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
         };
 
         if builtin_types_in_union.contains(&literal_type) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 RedundantLiteralUnion {
                     literal: SourceCodeSnippet::from_str(
                         checker.locator().slice(typing_literal_expr),

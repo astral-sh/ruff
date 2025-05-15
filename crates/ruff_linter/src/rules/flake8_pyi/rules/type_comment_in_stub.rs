@@ -38,7 +38,7 @@ impl Violation for TypeCommentInStub {
 
 /// PYI033
 pub(crate) fn type_comment_in_stub(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
     locator: &Locator,
     comment_ranges: &CommentRanges,
 ) {
@@ -46,7 +46,7 @@ pub(crate) fn type_comment_in_stub(
         let comment = locator.slice(range);
 
         if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
-            diagnostics.push(Diagnostic::new(TypeCommentInStub, range));
+            diagnostics.push(crate::message::Diagnostic::new(TypeCommentInStub, range));
         }
     }
 }

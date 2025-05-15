@@ -139,7 +139,7 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
                 continue;
             }
 
-            let diagnostic = Diagnostic::new(
+            let diagnostic = crate::message::Diagnostic::new(
                 EnumerateForLoop {
                     index: index.id.to_string(),
                 },

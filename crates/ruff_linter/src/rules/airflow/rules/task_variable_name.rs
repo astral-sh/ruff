@@ -110,7 +110,7 @@ pub(crate) fn variable_name_task_id(checker: &Checker, targets: &[Expr], value: 
         return;
     }
 
-    let diagnostic = Diagnostic::new(
+    let diagnostic = crate::message::Diagnostic::new(
         AirflowVariableNameTaskIdMismatch {
             task_id: task_id.to_string(),
         },

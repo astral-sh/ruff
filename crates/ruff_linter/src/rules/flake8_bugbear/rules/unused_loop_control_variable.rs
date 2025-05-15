@@ -121,7 +121,7 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
             .is_match(rename.as_str())
             .then_some(rename);
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             UnusedLoopControlVariable {
                 name: name.to_string(),
                 rename: rename.clone(),

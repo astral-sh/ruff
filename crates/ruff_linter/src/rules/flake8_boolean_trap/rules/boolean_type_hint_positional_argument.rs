@@ -157,7 +157,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             BooleanTypeHintPositionalArgument,
             parameter.identifier(),
         ));

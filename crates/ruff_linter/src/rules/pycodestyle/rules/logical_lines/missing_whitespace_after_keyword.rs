@@ -71,7 +71,8 @@ pub(crate) fn missing_whitespace_after_keyword(
                 ))
             && tok0.end() == tok1.start()
         {
-            let mut diagnostic = Diagnostic::new(MissingWhitespaceAfterKeyword, tok0.range());
+            let mut diagnostic =
+                crate::message::Diagnostic::new(MissingWhitespaceAfterKeyword, tok0.range());
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(" ".to_string(), tok0.end())));
             context.push_diagnostic(diagnostic);
         }

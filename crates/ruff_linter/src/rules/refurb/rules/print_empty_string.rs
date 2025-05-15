@@ -84,7 +84,8 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                 Reason::EmptyArgument
             };
 
-            let mut diagnostic = Diagnostic::new(PrintEmptyString { reason }, call.range());
+            let mut diagnostic =
+                crate::message::Diagnostic::new(PrintEmptyString { reason }, call.range());
 
             diagnostic.set_fix(
                 EmptyStringFix::from_call(
@@ -107,7 +108,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
         [] | [_] => {
             // If there's a `sep` argument, remove it, regardless of what it is.
             if call.arguments.find_keyword("sep").is_some() {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = crate::message::Diagnostic::new(
                     PrintEmptyString {
                         reason: Reason::UselessSeparator,
                     },
@@ -170,7 +171,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                 Separator::Remove
             };
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 PrintEmptyString {
                     reason: if separator == Separator::Retain {
                         Reason::EmptyArgument

@@ -63,6 +63,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::checkers::ast::annotation::AnnotationContext;
 use crate::docstrings::extraction::ExtractionTarget;
 use crate::importer::{ImportRequest, Importer, ResolutionError};
+use crate::message::Diagnostic;
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::preview::{is_semantic_errors_enabled, is_undefined_export_in_dunder_init_enabled};
@@ -461,8 +462,8 @@ impl<'a> Checker<'a> {
 
     /// Returns whether the given rule should be checked.
     #[inline]
-    pub(crate) const fn enabled(&self, rule: Rule) -> bool {
-        self.settings.rules.enabled(rule)
+    pub(crate) fn enabled(&self, rule: Rule) -> bool {
+        self.settings.rules.enabled(Some(rule))
     }
 
     /// Returns whether any of the given rules should be checked.
@@ -603,7 +604,7 @@ impl SemanticSyntaxContext for Checker<'_> {
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
-                if self.settings.rules.enabled(Rule::LateFutureImport) {
+                if self.settings.rules.enabled(Some(Rule::LateFutureImport)) {
                     self.report_diagnostic(Diagnostic::new(LateFutureImport, error.range));
                 }
             }
@@ -611,7 +612,7 @@ impl SemanticSyntaxContext for Checker<'_> {
                 if self
                     .settings
                     .rules
-                    .enabled(Rule::LoadBeforeGlobalDeclaration)
+                    .enabled(Some(Rule::LoadBeforeGlobalDeclaration))
                 {
                     self.report_diagnostic(Diagnostic::new(
                         LoadBeforeGlobalDeclaration {
@@ -623,7 +624,11 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
             }
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
-                if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Some(Rule::YieldOutsideFunction))
+                {
                     self.report_diagnostic(Diagnostic::new(
                         YieldOutsideFunction::new(kind),
                         error.range,
@@ -631,12 +636,16 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
             }
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {
-                if self.settings.rules.enabled(Rule::ReturnOutsideFunction) {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Some(Rule::ReturnOutsideFunction))
+                {
                     self.report_diagnostic(Diagnostic::new(ReturnOutsideFunction, error.range));
                 }
             }
             SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(_) => {
-                if self.settings.rules.enabled(Rule::AwaitOutsideAsync) {
+                if self.settings.rules.enabled(Some(Rule::AwaitOutsideAsync)) {
                     self.report_diagnostic(Diagnostic::new(AwaitOutsideAsync, error.range));
                 }
             }

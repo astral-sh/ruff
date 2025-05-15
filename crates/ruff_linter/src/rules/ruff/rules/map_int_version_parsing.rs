@@ -53,7 +53,10 @@ pub(crate) fn map_int_version_parsing(checker: &Checker, call: &ast::ExprCall) {
     };
 
     if is_dunder_version_split_dot(second) && semantic.match_builtin_expr(first, "int") {
-        checker.report_diagnostic(Diagnostic::new(MapIntVersionParsing, call.range()));
+        checker.report_diagnostic(crate::message::Diagnostic::new(
+            MapIntVersionParsing,
+            call.range(),
+        ));
     }
 }
 

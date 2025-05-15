@@ -133,7 +133,7 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
                 match line.leading_whitespace(token) {
                     (Whitespace::Tab, offset) => {
                         let start = token.start();
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = crate::message::Diagnostic::new(
                             TabBeforeKeyword,
                             TextRange::at(start - offset, offset),
                         );
@@ -145,7 +145,7 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
                     }
                     (Whitespace::Many, offset) => {
                         let start = token.start();
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = crate::message::Diagnostic::new(
                             MultipleSpacesBeforeKeyword,
                             TextRange::at(start - offset, offset),
                         );
@@ -161,8 +161,10 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
 
             match line.trailing_whitespace(token) {
                 (Whitespace::Tab, len) => {
-                    let mut diagnostic =
-                        Diagnostic::new(TabAfterKeyword, TextRange::at(token.end(), len));
+                    let mut diagnostic = crate::message::Diagnostic::new(
+                        TabAfterKeyword,
+                        TextRange::at(token.end(), len),
+                    );
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         " ".to_string(),
                         TextRange::at(token.end(), len),
@@ -170,7 +172,7 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
                     context.push_diagnostic(diagnostic);
                 }
                 (Whitespace::Many, len) => {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = crate::message::Diagnostic::new(
                         MultipleSpacesAfterKeyword,
                         TextRange::at(token.end(), len),
                     );

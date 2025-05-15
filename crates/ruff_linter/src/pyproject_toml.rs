@@ -27,9 +27,10 @@ pub fn lint_pyproject_toml(source_file: SourceFile, settings: &LinterSettings) -
                     "{} is larger than 4GB, but ruff assumes all files to be smaller",
                     source_file.name(),
                 );
-                if settings.rules.enabled(Rule::IOError) {
-                    let diagnostic = Diagnostic::new(IOError { message }, TextRange::default());
-                    messages.push(Diagnostic::from_diagnostic(diagnostic, source_file, None));
+                if settings.rules.enabled(Some(Rule::IOError)) {
+                    let diagnostic =
+                        Diagnostic::new2(IOError { message }, TextRange::default(), source_file);
+                    messages.push(diagnostic);
                 } else {
                     warn!(
                         "{}{}{} {message}",
@@ -48,10 +49,14 @@ pub fn lint_pyproject_toml(source_file: SourceFile, settings: &LinterSettings) -
         }
     };
 
-    if settings.rules.enabled(Rule::InvalidPyprojectToml) {
+    if settings.rules.enabled(Some(Rule::InvalidPyprojectToml)) {
         let toml_err = err.message().to_string();
-        let diagnostic = Diagnostic::new(InvalidPyprojectToml { message: toml_err }, range);
-        messages.push(Diagnostic::from_diagnostic(diagnostic, source_file, None));
+        let diagnostic = Diagnostic::new2(
+            InvalidPyprojectToml { message: toml_err },
+            range,
+            source_file,
+        );
+        messages.push(diagnostic);
     }
 
     messages

@@ -36,9 +36,12 @@ impl Violation for InvalidAllObject {
 }
 
 /// PLE0604
-pub(crate) fn invalid_all_object(binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn invalid_all_object(binding: &Binding) -> Option<crate::message::Diagnostic> {
     if binding.is_invalid_all_object() {
-        Some(Diagnostic::new(InvalidAllObject, binding.range()))
+        Some(crate::message::Diagnostic::new(
+            InvalidAllObject,
+            binding.range(),
+        ))
     } else {
         None
     }

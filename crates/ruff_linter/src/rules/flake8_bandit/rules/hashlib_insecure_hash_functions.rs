@@ -141,7 +141,7 @@ fn detect_insecure_hashlib_calls(
                 hash_func_name.to_ascii_lowercase().as_str(),
                 "md4" | "md5" | "sha" | "sha1"
             ) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(crate::message::Diagnostic::new(
                     HashlibInsecureHashFunction {
                         library: "hashlib".to_string(),
                         string: hash_func_name.to_string(),
@@ -151,7 +151,7 @@ fn detect_insecure_hashlib_calls(
             }
         }
         HashlibCall::WeakHash(func_name) => {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 HashlibInsecureHashFunction {
                     library: "hashlib".to_string(),
                     string: (*func_name).to_string(),
@@ -186,7 +186,7 @@ fn detect_insecure_crypt_calls(checker: &Checker, call: &ast::ExprCall) {
         qualified_name.segments(),
         ["crypt", "METHOD_CRYPT" | "METHOD_MD5" | "METHOD_BLOWFISH"]
     ) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             HashlibInsecureHashFunction {
                 library: "crypt".to_string(),
                 string: qualified_name.to_string(),

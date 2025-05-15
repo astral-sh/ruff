@@ -82,7 +82,7 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         StrOrReprDefinedInStub {
             name: name.to_string(),
         },

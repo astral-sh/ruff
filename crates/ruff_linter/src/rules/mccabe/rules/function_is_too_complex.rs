@@ -157,10 +157,10 @@ pub(crate) fn function_is_too_complex(
     name: &str,
     body: &[Stmt],
     max_complexity: usize,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let complexity = get_complexity_number(body) + 1;
     if complexity > max_complexity {
-        Some(Diagnostic::new(
+        Some(crate::message::Diagnostic::new(
             ComplexStructure {
                 name: name.to_string(),
                 complexity,

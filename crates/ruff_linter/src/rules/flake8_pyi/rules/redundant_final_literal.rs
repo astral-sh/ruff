@@ -97,7 +97,7 @@ pub(crate) fn redundant_final_literal(checker: &Checker, ann_assign: &ast::StmtA
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         RedundantFinalLiteral {
             literal: SourceCodeSnippet::from_str(checker.locator().slice(literal.range())),
         },

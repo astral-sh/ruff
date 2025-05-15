@@ -68,7 +68,7 @@ pub(crate) fn invalid_bool_return(checker: &Checker, function_def: &ast::StmtFun
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             InvalidBoolReturnType,
             function_def.identifier(),
         ));
@@ -88,11 +88,17 @@ pub(crate) fn invalid_bool_return(checker: &Checker, function_def: &ast::StmtFun
                 ResolvedPythonType::Unknown
                     | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool))
             ) {
-                checker.report_diagnostic(Diagnostic::new(InvalidBoolReturnType, value.range()));
+                checker.report_diagnostic(crate::message::Diagnostic::new(
+                    InvalidBoolReturnType,
+                    value.range(),
+                ));
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidBoolReturnType, stmt.range()));
+            checker.report_diagnostic(crate::message::Diagnostic::new(
+                InvalidBoolReturnType,
+                stmt.range(),
+            ));
         }
     }
 }

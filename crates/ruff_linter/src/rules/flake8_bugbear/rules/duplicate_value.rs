@@ -60,7 +60,7 @@ pub(crate) fn duplicate_value(checker: &Checker, set: &ast::ExprSet) {
     for (index, value) in set.iter().enumerate() {
         if value.is_literal_expr() {
             if let Some(existing) = seen_values.insert(HashableExpr::from(value), value) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = crate::message::Diagnostic::new(
                     DuplicateValue {
                         value: checker.generator().expr(value),
                         existing: checker.generator().expr(existing),

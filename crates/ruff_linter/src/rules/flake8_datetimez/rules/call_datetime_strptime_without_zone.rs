@@ -139,7 +139,7 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &Checker, call: &ast:
         semantic.current_expression_grandparent(),
         semantic.current_expression_parent(),
     ) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             CallDatetimeStrptimeWithoutZone(antipattern),
             call.range,
         ));

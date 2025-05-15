@@ -36,11 +36,11 @@ impl Violation for MixedSpacesAndTabs {
 }
 
 /// E101
-pub(crate) fn mixed_spaces_and_tabs(line: &Line) -> Option<Diagnostic> {
+pub(crate) fn mixed_spaces_and_tabs(line: &Line) -> Option<crate::message::Diagnostic> {
     let indent = leading_indentation(line.as_str());
 
     if indent.contains(' ') && indent.contains('\t') {
-        Some(Diagnostic::new(
+        Some(crate::message::Diagnostic::new(
             MixedSpacesAndTabs,
             TextRange::at(line.start(), indent.text_len()),
         ))

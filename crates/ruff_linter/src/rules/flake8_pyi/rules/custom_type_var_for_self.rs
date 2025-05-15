@@ -115,7 +115,7 @@ impl Violation for CustomTypeVarForSelf {
 pub(crate) fn custom_type_var_instead_of_self(
     checker: &Checker,
     binding: &Binding,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let semantic = checker.semantic();
     let current_scope = &semantic.scopes[binding.scope];
     let function_def = binding.statement(semantic)?.as_function_def_stmt()?;
@@ -179,7 +179,7 @@ pub(crate) fn custom_type_var_instead_of_self(
         .map(Ranged::end)
         .unwrap_or_else(|| parameters.end());
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         CustomTypeVarForSelf {
             typevar_name: custom_typevar.name(checker.source()).to_string(),
         },

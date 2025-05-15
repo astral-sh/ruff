@@ -90,7 +90,7 @@ pub(crate) fn list_assign_reversed(checker: &Checker, assign: &StmtAssign) {
     }
 
     checker.report_diagnostic(
-        Diagnostic::new(
+        crate::message::Diagnostic::new(
             ListReverseCopy {
                 name: target_expr.id.to_string(),
             },

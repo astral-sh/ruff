@@ -84,7 +84,7 @@ pub(crate) fn any_eq_ne_annotation(checker: &Checker, name: &str, parameters: &P
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         AnyEqNeAnnotation {
             method_name: name.to_string(),
         },

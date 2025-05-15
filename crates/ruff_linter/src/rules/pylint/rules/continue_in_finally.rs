@@ -49,7 +49,10 @@ impl Violation for ContinueInFinally {
 fn traverse_body(checker: &Checker, body: &[Stmt]) {
     for stmt in body {
         if stmt.is_continue_stmt() {
-            checker.report_diagnostic(Diagnostic::new(ContinueInFinally, stmt.range()));
+            checker.report_diagnostic(crate::message::Diagnostic::new(
+                ContinueInFinally,
+                stmt.range(),
+            ));
         }
 
         match stmt {

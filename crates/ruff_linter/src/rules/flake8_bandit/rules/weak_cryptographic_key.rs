@@ -55,7 +55,7 @@ pub(crate) fn weak_cryptographic_key(checker: &Checker, call: &ExprCall) {
     };
 
     if cryptographic_key.is_vulnerable() {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             WeakCryptographicKey { cryptographic_key },
             range,
         ));

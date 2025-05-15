@@ -387,7 +387,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
             if ComparableExpr::from(outer_assignment_target.expr)
                 .eq(&(ComparableExpr::from(inner_assignment_target.expr)))
             {
-                diagnostics.push(Diagnostic::new(
+                diagnostics.push(crate::message::Diagnostic::new(
                     RedefinedLoopName {
                         name: checker.generator().expr(outer_assignment_target.expr),
                         outer_kind: outer_assignment_target.binding_kind,

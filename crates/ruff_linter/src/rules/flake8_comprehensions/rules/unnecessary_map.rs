@@ -138,7 +138,8 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryMap { object_type }, call.range);
+    let mut diagnostic =
+        crate::message::Diagnostic::new(UnnecessaryMap { object_type }, call.range);
     diagnostic.try_set_fix(|| {
         fixes::fix_unnecessary_map(
             call,

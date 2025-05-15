@@ -60,7 +60,7 @@ impl Violation for UnaliasedCollectionsAbcSetImport {
 pub(crate) fn unaliased_collections_abc_set_import(
     checker: &Checker,
     binding: &Binding,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let BindingKind::FromImport(import) = &binding.kind else {
         return None;
     };
@@ -76,7 +76,8 @@ pub(crate) fn unaliased_collections_abc_set_import(
         return None;
     }
 
-    let mut diagnostic = Diagnostic::new(UnaliasedCollectionsAbcSetImport, binding.range());
+    let mut diagnostic =
+        crate::message::Diagnostic::new(UnaliasedCollectionsAbcSetImport, binding.range());
     if checker.semantic().is_available("AbstractSet") {
         diagnostic.try_set_fix(|| {
             let semantic = checker.semantic();

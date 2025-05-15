@@ -236,10 +236,10 @@ pub(crate) fn too_many_branches(
     stmt: &Stmt,
     body: &[Stmt],
     max_branches: usize,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let branches = num_branches(body);
     if branches > max_branches {
-        Some(Diagnostic::new(
+        Some(crate::message::Diagnostic::new(
             TooManyBranches {
                 branches,
                 max_branches,

@@ -112,7 +112,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                         .map(|id| checker.semantic.reference(*id))
                         .all(ResolvedReference::is_load)
                     {
-                        checker.report_diagnostic(Diagnostic::new(
+                        checker.report_diagnostic(crate::message::Diagnostic::new(
                             pylint::rules::GlobalVariableNotAssigned {
                                 name: (*name).to_string(),
                             },
@@ -146,7 +146,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                     if scope.kind.is_generator() {
                         continue;
                     }
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
                         pylint::rules::RedefinedArgumentFromLocal {
                             name: name.to_string(),
                         },
@@ -186,7 +186,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                         continue;
                     }
 
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
                         pyflakes::rules::ImportShadowedByLoopVar {
                             name: name.to_string(),
                             row: checker.compute_source_row(shadowed.start()),
@@ -331,7 +331,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             // Create diagnostics for each statement.
             for (source, entries) in &redefinitions {
                 for (shadowed, binding) in entries {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = crate::message::Diagnostic::new(
                         pyflakes::rules::RedefinedWhileUnused {
                             name: binding.name(checker.source()).to_string(),
                             row: checker.compute_source_row(shadowed.start()),

@@ -9,7 +9,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_suspicious_function_reference_enabled;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for calls to `pickle` functions or modules that wrap them.
@@ -1041,33 +1040,37 @@ fn suspicious_function(
         | ["shelve", "open" | "DbfilenameShelf"]
         | ["jsonpickle", "decode"]
         | ["jsonpickle", "unpickler", "decode"]
-        | ["pandas", "read_pickle"] => Diagnostic::new(SuspiciousPickleUsage, range),
+        | ["pandas", "read_pickle"] => {
+            crate::message::Diagnostic::new(SuspiciousPickleUsage, range)
+        }
 
         // Marshal
-        ["marshal", "load" | "loads"] => Diagnostic::new(SuspiciousMarshalUsage, range),
+        ["marshal", "load" | "loads"] => {
+            crate::message::Diagnostic::new(SuspiciousMarshalUsage, range)
+        }
 
         // InsecureHash
         ["Crypto" | "Cryptodome", "Hash", "SHA" | "MD2" | "MD3" | "MD4" | "MD5", "new"]
         | ["cryptography", "hazmat", "primitives", "hashes", "SHA1" | "MD5"] => {
-            Diagnostic::new(SuspiciousInsecureHashUsage, range)
+            crate::message::Diagnostic::new(SuspiciousInsecureHashUsage, range)
         }
 
         // InsecureCipher
         ["Crypto" | "Cryptodome", "Cipher", "ARC2" | "Blowfish" | "DES" | "XOR", "new"]
         | ["cryptography", "hazmat", "primitives", "ciphers", "algorithms", "ARC4" | "Blowfish" | "IDEA"] => {
-            Diagnostic::new(SuspiciousInsecureCipherUsage, range)
+            crate::message::Diagnostic::new(SuspiciousInsecureCipherUsage, range)
         }
 
         // InsecureCipherMode
         ["cryptography", "hazmat", "primitives", "ciphers", "modes", "ECB"] => {
-            Diagnostic::new(SuspiciousInsecureCipherModeUsage, range)
+            crate::message::Diagnostic::new(SuspiciousInsecureCipherModeUsage, range)
         }
 
         // Mktemp
-        ["tempfile", "mktemp"] => Diagnostic::new(SuspiciousMktempUsage, range),
+        ["tempfile", "mktemp"] => crate::message::Diagnostic::new(SuspiciousMktempUsage, range),
 
         // Eval
-        ["" | "builtins", "eval"] => Diagnostic::new(SuspiciousEvalUsage, range),
+        ["" | "builtins", "eval"] => crate::message::Diagnostic::new(SuspiciousEvalUsage, range),
 
         // MarkSafe
         ["django", "utils", "safestring" | "html", "mark_safe"] => {
@@ -1078,7 +1081,7 @@ fn suspicious_function(
                     }
                 }
             }
-            Diagnostic::new(SuspiciousMarkSafeUsage, range)
+            crate::message::Diagnostic::new(SuspiciousMarkSafeUsage, range)
         }
 
         // URLOpen (`Request`)
@@ -1100,7 +1103,7 @@ fn suspicious_function(
                     }
                 }
             }
-            Diagnostic::new(SuspiciousURLOpenUsage, range)
+            crate::message::Diagnostic::new(SuspiciousURLOpenUsage, range)
         }
 
         // URLOpen (`urlopen`, `urlretrieve`)
@@ -1146,75 +1149,75 @@ fn suspicious_function(
                     }
                 }
             }
-            Diagnostic::new(SuspiciousURLOpenUsage, range)
+            crate::message::Diagnostic::new(SuspiciousURLOpenUsage, range)
         }
 
         // URLOpen (`URLopener`, `FancyURLopener`)
         ["urllib", "request", "URLopener" | "FancyURLopener"]
         | ["six", "moves", "urllib", "request", "URLopener" | "FancyURLopener"] => {
-            Diagnostic::new(SuspiciousURLOpenUsage, range)
+            crate::message::Diagnostic::new(SuspiciousURLOpenUsage, range)
         }
 
         // NonCryptographicRandom
         ["random", "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform"
         | "triangular" | "randbytes"] => {
-            Diagnostic::new(SuspiciousNonCryptographicRandomUsage, range)
+            crate::message::Diagnostic::new(SuspiciousNonCryptographicRandomUsage, range)
         }
 
         // UnverifiedContext
         ["ssl", "_create_unverified_context"] => {
-            Diagnostic::new(SuspiciousUnverifiedContextUsage, range)
+            crate::message::Diagnostic::new(SuspiciousUnverifiedContextUsage, range)
         }
 
         // XMLCElementTree
         ["xml", "etree", "cElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => {
-            Diagnostic::new(SuspiciousXMLCElementTreeUsage, range)
+            crate::message::Diagnostic::new(SuspiciousXMLCElementTreeUsage, range)
         }
 
         // XMLElementTree
         ["xml", "etree", "ElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => {
-            Diagnostic::new(SuspiciousXMLElementTreeUsage, range)
+            crate::message::Diagnostic::new(SuspiciousXMLElementTreeUsage, range)
         }
 
         // XMLExpatReader
         ["xml", "sax", "expatreader", "create_parser"] => {
-            Diagnostic::new(SuspiciousXMLExpatReaderUsage, range)
+            crate::message::Diagnostic::new(SuspiciousXMLExpatReaderUsage, range)
         }
 
         // XMLExpatBuilder
         ["xml", "dom", "expatbuilder", "parse" | "parseString"] => {
-            Diagnostic::new(SuspiciousXMLExpatBuilderUsage, range)
+            crate::message::Diagnostic::new(SuspiciousXMLExpatBuilderUsage, range)
         }
 
         // XMLSax
         ["xml", "sax", "parse" | "parseString" | "make_parser"] => {
-            Diagnostic::new(SuspiciousXMLSaxUsage, range)
+            crate::message::Diagnostic::new(SuspiciousXMLSaxUsage, range)
         }
 
         // XMLMiniDOM
         ["xml", "dom", "minidom", "parse" | "parseString"] => {
-            Diagnostic::new(SuspiciousXMLMiniDOMUsage, range)
+            crate::message::Diagnostic::new(SuspiciousXMLMiniDOMUsage, range)
         }
 
         // XMLPullDOM
         ["xml", "dom", "pulldom", "parse" | "parseString"] => {
-            Diagnostic::new(SuspiciousXMLPullDOMUsage, range)
+            crate::message::Diagnostic::new(SuspiciousXMLPullDOMUsage, range)
         }
 
         // XMLETree
         ["lxml", "etree", "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser"
-        | "check_docinfo"] => Diagnostic::new(SuspiciousXMLETreeUsage, range),
+        | "check_docinfo"] => crate::message::Diagnostic::new(SuspiciousXMLETreeUsage, range),
 
         // Telnet
-        ["telnetlib", ..] => Diagnostic::new(SuspiciousTelnetUsage, range),
+        ["telnetlib", ..] => crate::message::Diagnostic::new(SuspiciousTelnetUsage, range),
 
         // FTPLib
-        ["ftplib", ..] => Diagnostic::new(SuspiciousFTPLibUsage, range),
+        ["ftplib", ..] => crate::message::Diagnostic::new(SuspiciousFTPLibUsage, range),
 
         _ => return,
     };
 
-    if checker.enabled(diagnostic.rule()) {
+    if checker.enabled(diagnostic.rule().expect("TODO(brent)")) {
         checker.report_diagnostic(diagnostic);
     }
 }

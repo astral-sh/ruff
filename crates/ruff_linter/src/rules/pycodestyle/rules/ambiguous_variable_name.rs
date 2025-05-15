@@ -50,7 +50,7 @@ pub(crate) fn ambiguous_variable_name(checker: &Checker, name: &str, range: Text
         return;
     }
     if is_ambiguous_name(name) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             AmbiguousVariableName(name.to_string()),
             range,
         ));

@@ -225,7 +225,7 @@ pub(crate) fn yoda_conditions(
     }
 
     if let Ok(suggestion) = reverse_comparison(expr, checker.locator(), checker.stylist()) {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             YodaConditions {
                 suggestion: Some(SourceCodeSnippet::new(suggestion.clone())),
             },
@@ -237,7 +237,7 @@ pub(crate) fn yoda_conditions(
         )));
         checker.report_diagnostic(diagnostic);
     } else {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             YodaConditions { suggestion: None },
             expr.range(),
         ));

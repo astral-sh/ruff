@@ -84,8 +84,10 @@ pub(crate) fn fastapi_redundant_response_model(checker: &Checker, function_def: 
         else {
             continue;
         };
-        let mut diagnostic =
-            Diagnostic::new(FastApiRedundantResponseModel, response_model_arg.range());
+        let mut diagnostic = crate::message::Diagnostic::new(
+            FastApiRedundantResponseModel,
+            response_model_arg.range(),
+        );
         diagnostic.try_set_fix(|| {
             remove_argument(
                 response_model_arg,

@@ -82,5 +82,8 @@ pub(crate) fn call_datetime_utcnow(checker: &Checker, func: &Expr, location: Tex
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(CallDatetimeUtcnow, location));
+    checker.report_diagnostic(crate::message::Diagnostic::new(
+        CallDatetimeUtcnow,
+        location,
+    ));
 }

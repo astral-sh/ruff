@@ -71,7 +71,7 @@ pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: &ast
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnnecessaryLiteralWithinDictCall {
             kind: argument_kind,
         },

@@ -91,7 +91,7 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnnecessaryEmptyIterableWithinDequeCall {
             has_maxlen: maxlen.is_some(),
         },

@@ -726,7 +726,7 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
     );
 
     for (operation, fix) in fixer.without_renames() {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             DeprecatedImport {
                 deprecation: Deprecation::WithoutRename(operation),
             },
@@ -742,7 +742,7 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
     }
 
     for operation in fixer.with_renames() {
-        let diagnostic = Diagnostic::new(
+        let diagnostic = crate::message::Diagnostic::new(
             DeprecatedImport {
                 deprecation: Deprecation::WithRename(operation),
             },

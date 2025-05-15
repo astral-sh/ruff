@@ -58,13 +58,16 @@ pub(crate) fn starred_expressions(
     check_too_many_expressions: bool,
     check_two_starred_expressions: bool,
     location: TextRange,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let mut has_starred: bool = false;
     let mut starred_index: Option<usize> = None;
     for (index, elt) in elts.iter().enumerate() {
         if elt.is_starred_expr() {
             if has_starred && check_two_starred_expressions {
-                return Some(Diagnostic::new(MultipleStarredExpressions, location));
+                return Some(crate::message::Diagnostic::new(
+                    MultipleStarredExpressions,
+                    location,
+                ));
             }
             has_starred = true;
             starred_index = Some(index);
@@ -74,7 +77,10 @@ pub(crate) fn starred_expressions(
     if check_too_many_expressions {
         if let Some(starred_index) = starred_index {
             if starred_index >= 1 << 8 || elts.len() - starred_index > 1 << 24 {
-                return Some(Diagnostic::new(ExpressionsInStarAssignment, location));
+                return Some(crate::message::Diagnostic::new(
+                    ExpressionsInStarAssignment,
+                    location,
+                ));
             }
         }
     }

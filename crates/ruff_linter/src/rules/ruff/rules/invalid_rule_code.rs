@@ -1,3 +1,4 @@
+use crate::message::Diagnostic;
 use crate::noqa::{Code, Directive};
 use crate::registry::Rule;
 use crate::Locator;

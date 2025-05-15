@@ -35,11 +35,14 @@ impl Violation for ImportSelf {
 }
 
 /// PLW0406
-pub(crate) fn import_self(alias: &Alias, module_path: Option<&[String]>) -> Option<Diagnostic> {
+pub(crate) fn import_self(
+    alias: &Alias,
+    module_path: Option<&[String]>,
+) -> Option<crate::message::Diagnostic> {
     let module_path = module_path?;
 
     if alias.name.split('.').eq(module_path) {
-        return Some(Diagnostic::new(
+        return Some(crate::message::Diagnostic::new(
             ImportSelf {
                 name: alias.name.to_string(),
             },
@@ -56,7 +59,7 @@ pub(crate) fn import_from_self(
     module: Option<&str>,
     names: &[Alias],
     module_path: Option<&[String]>,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let module_path = module_path?;
     let imported_module_path = resolve_imported_module_path(level, module, Some(module_path))?;
 
@@ -68,7 +71,7 @@ pub(crate) fn import_from_self(
             .iter()
             .find(|alias| alias.name == module_path[module_path.len() - 1])
         {
-            return Some(Diagnostic::new(
+            return Some(crate::message::Diagnostic::new(
                 ImportSelf {
                     name: format!("{}.{}", imported_module_path, alias.name),
                 },

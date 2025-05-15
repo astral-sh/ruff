@@ -67,7 +67,7 @@ pub(crate) fn duplicate_bases(checker: &Checker, name: &str, arguments: Option<&
     for base in bases {
         if let Expr::Name(ast::ExprName { id, .. }) = base {
             if !seen.insert(id) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = crate::message::Diagnostic::new(
                     DuplicateBases {
                         base: id.to_string(),
                         class: name.to_string(),

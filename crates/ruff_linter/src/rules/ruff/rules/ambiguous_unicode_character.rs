@@ -9,7 +9,6 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_unicode_to_unicode_confusables_enabled;
-use crate::registry::AsRule;
 use crate::rules::ruff::rules::confusables::confusable;
 use crate::rules::ruff::rules::Context;
 use crate::settings::LinterSettings;
@@ -176,7 +175,7 @@ impl Violation for AmbiguousUnicodeCharacterComment {
 
 /// RUF003
 pub(crate) fn ambiguous_unicode_character_comment(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
     locator: &Locator,
     range: TextRange,
     settings: &LinterSettings,
@@ -233,7 +232,7 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like:
 }
 
 fn ambiguous_unicode_character(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
     text: &str,
     range: TextRange,
     context: Context,
@@ -352,25 +351,29 @@ impl Candidate {
         }
     }
 
-    fn into_diagnostic(self, context: Context, settings: &LinterSettings) -> Option<Diagnostic> {
+    fn into_diagnostic(
+        self,
+        context: Context,
+        settings: &LinterSettings,
+    ) -> Option<crate::message::Diagnostic> {
         if !settings.allowed_confusables.contains(&self.confusable) {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());
             let diagnostic = match context {
-                Context::String => Diagnostic::new(
+                Context::String => crate::message::Diagnostic::new(
                     AmbiguousUnicodeCharacterString {
                         confusable: self.confusable,
                         representant: self.representant,
                     },
                     char_range,
                 ),
-                Context::Docstring => Diagnostic::new(
+                Context::Docstring => crate::message::Diagnostic::new(
                     AmbiguousUnicodeCharacterDocstring {
                         confusable: self.confusable,
                         representant: self.representant,
                     },
                     char_range,
                 ),
-                Context::Comment => Diagnostic::new(
+                Context::Comment => crate::message::Diagnostic::new(
                     AmbiguousUnicodeCharacterComment {
                         confusable: self.confusable,
                         representant: self.representant,

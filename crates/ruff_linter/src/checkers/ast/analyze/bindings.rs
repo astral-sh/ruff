@@ -3,6 +3,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
+use crate::message::Diagnostic;
 use crate::rules::{
     flake8_import_conventions, flake8_pyi, flake8_pytest_style, flake8_type_checking, pyflakes,
     pylint, pyupgrade, refurb, ruff,

@@ -77,7 +77,7 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
     if !matches!(builtin, "exit" | "quit") {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         SysExitAlias {
             name: builtin.to_string(),
         },

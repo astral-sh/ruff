@@ -70,7 +70,7 @@ pub(crate) fn unnecessary_generator_dict(
     if tuple.iter().any(Expr::is_starred_expr) {
         return;
     }
-    let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
+    let mut diagnostic = crate::message::Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
     diagnostic
         .try_set_fix(|| fixes::fix_unnecessary_generator_dict(expr, checker).map(Fix::unsafe_edit));
     checker.report_diagnostic(diagnostic);

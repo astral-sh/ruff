@@ -100,7 +100,7 @@ pub(crate) fn default_factory_kwarg(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         DefaultFactoryKwarg {
             default_factory: SourceCodeSnippet::from_str(checker.locator().slice(keyword)),
         },

@@ -1,7 +1,7 @@
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 
-use crate::checkers::ast::Checker;
+use crate::{checkers::ast::Checker, message::Diagnostic};
 
 /// ## What it does
 /// Checks for the use of `global` statements to update identifiers.

@@ -70,6 +70,9 @@ pub(crate) fn invalid_envvar_default(checker: &Checker, call: &ast::ExprCall) {
         ) {
             return;
         }
-        checker.report_diagnostic(Diagnostic::new(InvalidEnvvarDefault, expr.range()));
+        checker.report_diagnostic(crate::message::Diagnostic::new(
+            InvalidEnvvarDefault,
+            expr.range(),
+        ));
     }
 }

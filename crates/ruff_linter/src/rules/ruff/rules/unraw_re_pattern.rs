@@ -161,7 +161,8 @@ fn check_string(checker: &Checker, literal: &StringLiteral, module: RegexModule,
     let kind = PatternKind::String;
     let func = func.to_string();
     let range = literal.range;
-    let mut diagnostic = Diagnostic::new(UnrawRePattern { module, func, kind }, range);
+    let mut diagnostic =
+        crate::message::Diagnostic::new(UnrawRePattern { module, func, kind }, range);
 
     if
     // The (no-op) `u` prefix is a syntax error when combined with `r`
@@ -188,7 +189,7 @@ fn check_bytes(checker: &Checker, literal: &BytesLiteral, module: RegexModule, f
     let kind = PatternKind::Bytes;
     let func = func.to_string();
     let range = literal.range;
-    let diagnostic = Diagnostic::new(UnrawRePattern { module, func, kind }, range);
+    let diagnostic = crate::message::Diagnostic::new(UnrawRePattern { module, func, kind }, range);
 
     checker.report_diagnostic(diagnostic);
 }

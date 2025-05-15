@@ -78,7 +78,7 @@ pub(crate) fn trailing_whitespace(
     locator: &Locator,
     indexer: &Indexer,
     settings: &LinterSettings,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let whitespace_len: TextSize = line
         .chars()
         .rev()
@@ -94,8 +94,9 @@ pub(crate) fn trailing_whitespace(
             Applicability::Safe
         };
         if range == line.range() {
-            if settings.rules.enabled(Rule::BlankLineWithWhitespace) {
-                let mut diagnostic = Diagnostic::new(BlankLineWithWhitespace, range);
+            if settings.rules.enabled(Some(Rule::BlankLineWithWhitespace)) {
+                let mut diagnostic =
+                    crate::message::Diagnostic::new(BlankLineWithWhitespace, range);
                 // Remove any preceding continuations, to avoid introducing a potential
                 // syntax error.
                 diagnostic.set_fix(Fix::applicable_edit(
@@ -109,8 +110,8 @@ pub(crate) fn trailing_whitespace(
                 ));
                 return Some(diagnostic);
             }
-        } else if settings.rules.enabled(Rule::TrailingWhitespace) {
-            let mut diagnostic = Diagnostic::new(TrailingWhitespace, range);
+        } else if settings.rules.enabled(Some(Rule::TrailingWhitespace)) {
+            let mut diagnostic = crate::message::Diagnostic::new(TrailingWhitespace, range);
             diagnostic.set_fix(Fix::applicable_edit(
                 Edit::range_deletion(range),
                 applicability,

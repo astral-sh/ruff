@@ -128,7 +128,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
     // Generate a `Diagnostic` for each duplicate.
     for ((attr_name, arg_name), indices) in duplicates {
         if indices.len() > 1 {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 MultipleStartsEndsWith {
                     attr: attr_name.to_string(),
                 },

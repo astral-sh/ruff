@@ -60,8 +60,10 @@ pub(crate) fn printf_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
         }) = &first
         {
             if left.is_string_literal_expr() {
-                checker
-                    .report_diagnostic(Diagnostic::new(PrintfInGetTextFuncCall {}, first.range()));
+                checker.report_diagnostic(crate::message::Diagnostic::new(
+                    PrintfInGetTextFuncCall {},
+                    first.range(),
+                ));
             }
         }
     }

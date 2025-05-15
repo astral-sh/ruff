@@ -3,6 +3,8 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::ops::Deref;
 
+use anyhow::Result;
+use log::debug;
 use ruff_db::diagnostic::{self as db, Annotation, DiagnosticId, LintName, Severity, Span};
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::FxHashMap;
@@ -16,7 +18,7 @@ pub use json_lines::JsonLinesEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 pub use rdjson::RdjsonEmitter;
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::{Fix, Violation};
 use ruff_notebook::NotebookIndex;
 use ruff_python_parser::{ParseError, UnsupportedSyntaxError};
 use ruff_source_file::{LineColumn, SourceFile};
@@ -67,7 +69,7 @@ impl Diagnostic {
         message: impl std::fmt::Display,
         range: TextRange,
         file: SourceFile,
-    ) -> Diagnostic {
+    ) -> crate::message::Diagnostic {
         let mut diag = db::Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, message);
         let span = Span::from(file).with_range(range);
         diag.annotate(Annotation::primary(span));
@@ -89,7 +91,7 @@ impl Diagnostic {
         parent: Option<TextSize>,
         file: SourceFile,
         noqa_offset: Option<TextSize>,
-    ) -> Diagnostic {
+    ) -> crate::message::Diagnostic {
         let mut diagnostic = db::Diagnostic::new(
             DiagnosticId::Lint(LintName::of(name)),
             Severity::Error,
@@ -110,12 +112,89 @@ impl Diagnostic {
         }
     }
 
+    #[expect(clippy::needless_pass_by_value)]
+    pub fn new<T: Violation>(kind: T, range: TextRange) -> Self {
+        Self::diagnostic(
+            T::rule_name(),
+            Violation::message(&kind),
+            Violation::fix_title(&kind),
+            range,
+            None,
+            None,
+            todo!("figure out how to pass a SourceFile to construct a diagnostic"),
+            None,
+        )
+    }
+
+    #[expect(clippy::needless_pass_by_value)]
+    pub fn new2<T: Violation>(kind: T, range: TextRange, file: SourceFile) -> Self {
+        Self::diagnostic(
+            T::rule_name(),
+            Violation::message(&kind),
+            Violation::fix_title(&kind),
+            range,
+            None,
+            None,
+            file,
+            None,
+        )
+    }
+
+    /// Consumes `self` and returns a new `Diagnostic` with the given `fix`.
+    #[inline]
+    #[must_use]
+    pub fn with_fix(mut self, fix: Fix) -> Self {
+        self.set_fix(fix);
+        self
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic.
+    #[inline]
+    pub fn set_fix(&mut self, fix: Fix) {
+        self.fix = Some(fix);
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Otherwise, log the error.
+    #[inline]
+    pub fn try_set_fix(&mut self, func: impl FnOnce() -> Result<Fix>) {
+        match func() {
+            Ok(fix) => self.fix = Some(fix),
+            Err(err) => debug!("Failed to create fix for {}: {}", self.name(), err),
+        }
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Otherwise, log the error.
+    #[inline]
+    pub fn try_set_optional_fix(&mut self, func: impl FnOnce() -> Result<Option<Fix>>) {
+        match func() {
+            Ok(None) => {}
+            Ok(Some(fix)) => self.fix = Some(fix),
+            Err(err) => debug!("Failed to create fix for {}: {}", self.name(), err),
+        }
+    }
+
+    /// Consumes `self` and returns a new `Diagnostic` with the given parent node.
+    #[inline]
+    #[must_use]
+    pub fn with_parent(mut self, parent: TextSize) -> Self {
+        self.set_parent(parent);
+        self
+    }
+
+    /// Set the location of the diagnostic's parent node.
+    #[inline]
+    pub fn set_parent(&mut self, parent: TextSize) {
+        self.parent = Some(parent);
+    }
+
     /// Create a [`Message`] from the given [`ParseError`].
     pub fn from_parse_error(
         parse_error: &ParseError,
         locator: &Locator,
         file: SourceFile,
-    ) -> Diagnostic {
+    ) -> crate::message::Diagnostic {
         // Try to create a non-empty range so that the diagnostic can print a caret at the right
         // position. This requires that we retrieve the next character, if any, and take its length
         // to maintain char-boundaries.
@@ -139,7 +218,7 @@ impl Diagnostic {
     pub fn from_unsupported_syntax_error(
         unsupported_syntax_error: &UnsupportedSyntaxError,
         file: SourceFile,
-    ) -> Diagnostic {
+    ) -> crate::message::Diagnostic {
         Diagnostic::syntax_error(
             format_args!("SyntaxError: {unsupported_syntax_error}"),
             unsupported_syntax_error.range,
@@ -151,7 +230,7 @@ impl Diagnostic {
     pub fn from_semantic_syntax_error(
         semantic_syntax_error: &SemanticSyntaxError,
         file: SourceFile,
-    ) -> Diagnostic {
+    ) -> crate::message::Diagnostic {
         Diagnostic::syntax_error(
             format_args!("SyntaxError: {semantic_syntax_error}"),
             semantic_syntax_error.range,
@@ -364,7 +443,7 @@ mod tests {
     use crate::message::{Diagnostic, Emitter, EmitterContext};
     use crate::Locator;
 
-    pub(super) fn create_syntax_error_messages() -> Vec<Diagnostic> {
+    pub(super) fn create_syntax_error_messages() -> Vec<crate::message::Diagnostic> {
         let source = r"from os import
 
 if call(foo
@@ -382,7 +461,7 @@ if call(foo
             .collect()
     }
 
-    pub(super) fn create_messages() -> Vec<Diagnostic> {
+    pub(super) fn create_messages() -> Vec<crate::message::Diagnostic> {
         let fib = r#"import os
 
 
@@ -446,8 +525,10 @@ def fibonacci(n):
         vec![unused_import, unused_variable, undefined_name]
     }
 
-    pub(super) fn create_notebook_messages() -> (Vec<Diagnostic>, FxHashMap<String, NotebookIndex>)
-    {
+    pub(super) fn create_notebook_messages() -> (
+        Vec<crate::message::Diagnostic>,
+        FxHashMap<String, NotebookIndex>,
+    ) {
         let notebook = r"# cell 1
 import os
 # cell 2

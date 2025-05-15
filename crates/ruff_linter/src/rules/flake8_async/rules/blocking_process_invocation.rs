@@ -6,7 +6,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+use crate::message::Diagnostic;
 
 /// ## What it does
 /// Checks that async functions do not create subprocesses with blocking methods.
@@ -147,7 +147,7 @@ pub(crate) fn blocking_process_invocation(checker: &Checker, call: &ast::ExprCal
         _ => return,
     };
 
-    if checker.enabled(diagnostic.rule()) {
+    if checker.enabled(diagnostic.rule().expect("TODO(brent)")) {
         checker.report_diagnostic(diagnostic);
     }
 }

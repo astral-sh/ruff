@@ -138,7 +138,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         NonPEP695GenericClass {
             name: name.to_string(),
         },

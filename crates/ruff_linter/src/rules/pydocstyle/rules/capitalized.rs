@@ -90,7 +90,7 @@ pub(crate) fn capitalized(checker: &Checker, docstring: &Docstring) {
 
     let leading_whitespace_len = body.text_len() - trim_start_body.text_len();
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         FirstWordUncapitalized {
             first_word: first_word.to_string(),
             capitalized_word: capitalized_word.to_string(),

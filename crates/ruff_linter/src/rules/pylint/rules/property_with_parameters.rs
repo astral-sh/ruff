@@ -57,6 +57,9 @@ pub(crate) fn property_with_parameters(
     let semantic = checker.semantic();
     let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
     if is_property(decorator_list, extra_property_decorators, semantic) {
-        checker.report_diagnostic(Diagnostic::new(PropertyWithParameters, stmt.identifier()));
+        checker.report_diagnostic(crate::message::Diagnostic::new(
+            PropertyWithParameters,
+            stmt.identifier(),
+        ));
     }
 }

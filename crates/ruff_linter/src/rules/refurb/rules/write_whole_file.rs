@@ -72,11 +72,11 @@ pub(crate) fn write_whole_file(checker: &Checker, with: &ast::StmtWith) {
     };
 
     // All the matched operations should be reported.
-    let diagnostics: Vec<Diagnostic> = matches
+    let diagnostics: Vec<crate::message::Diagnostic> = matches
         .iter()
         .zip(contents)
         .map(|(open, content)| {
-            Diagnostic::new(
+            crate::message::Diagnostic::new(
                 WriteWholeFile {
                     filename: SourceCodeSnippet::from_str(&checker.generator().expr(open.filename)),
                     suggestion: make_suggestion(open, content, checker.generator()),

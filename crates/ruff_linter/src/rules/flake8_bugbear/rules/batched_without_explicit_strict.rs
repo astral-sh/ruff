@@ -86,6 +86,6 @@ pub(crate) fn batched_without_explicit_strict(checker: &Checker, call: &ExprCall
         return;
     }
 
-    let diagnostic = Diagnostic::new(BatchedWithoutExplicitStrict, call.range);
+    let diagnostic = crate::message::Diagnostic::new(BatchedWithoutExplicitStrict, call.range);
     checker.report_diagnostic(diagnostic);
 }

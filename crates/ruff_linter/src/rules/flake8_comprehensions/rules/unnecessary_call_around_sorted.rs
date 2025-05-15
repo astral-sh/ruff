@@ -79,7 +79,7 @@ pub(crate) fn unnecessary_call_around_sorted(
     if !semantic.match_builtin_expr(inner_func, "sorted") {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnnecessaryCallAroundSorted {
             func: unnecessary_function,
         },

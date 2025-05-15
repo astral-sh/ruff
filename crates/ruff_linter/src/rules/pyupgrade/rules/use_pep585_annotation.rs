@@ -80,7 +80,7 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
     let Some(from) = UnqualifiedName::from_expr(expr) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         NonPEP585Annotation {
             from: from.to_string(),
             to: replacement.to_string(),

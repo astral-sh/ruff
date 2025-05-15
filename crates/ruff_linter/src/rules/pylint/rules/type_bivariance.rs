@@ -124,7 +124,7 @@ pub(crate) fn type_bivariance(checker: &Checker, value: &Expr) {
             return;
         };
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             TypeBivariance {
                 kind,
                 param_name: type_param_name(arguments).map(ToString::to_string),

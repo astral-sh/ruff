@@ -124,7 +124,7 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) 
             // Both the index and the value are used.
         }
         (true, false) => {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 UnnecessaryEnumerate {
                     subset: EnumerateSubset::Values,
                 },
@@ -167,7 +167,7 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) 
             }
 
             // The value is unused, so replace with `for index in range(len(sequence))`.
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 UnnecessaryEnumerate {
                     subset: EnumerateSubset::Indices,
                 },

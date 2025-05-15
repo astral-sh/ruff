@@ -75,7 +75,7 @@ pub(crate) fn redundant_backslash(
                     for continuation_line in &continuation_lines[start_index..end_index] {
                         let backslash_end = locator.line_end(*continuation_line);
                         let backslash_start = backslash_end - TextSize::new(1);
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = crate::message::Diagnostic::new(
                             RedundantBackslash,
                             TextRange::new(backslash_start, backslash_end),
                         );

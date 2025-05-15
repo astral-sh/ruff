@@ -5,6 +5,7 @@ use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::message::Diagnostic;
 use crate::Locator;
 
 /// Simplified token type.

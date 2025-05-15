@@ -8,6 +8,7 @@ use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::message::Diagnostic;
 use crate::registry::Rule;
 
 /// ## What it does

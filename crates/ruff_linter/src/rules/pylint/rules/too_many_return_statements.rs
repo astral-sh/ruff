@@ -80,10 +80,10 @@ pub(crate) fn too_many_return_statements(
     stmt: &Stmt,
     body: &[Stmt],
     max_returns: usize,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let returns = num_returns(body);
     if returns > max_returns {
-        Some(Diagnostic::new(
+        Some(crate::message::Diagnostic::new(
             TooManyReturnStatements {
                 returns,
                 max_returns,

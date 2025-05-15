@@ -52,7 +52,7 @@ pub(crate) fn dunder_function_name(
     stmt: &Stmt,
     name: &str,
     ignore_names: &IgnoreNames,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     if matches!(scope.kind, ScopeKind::Class(_)) {
         return None;
     }
@@ -67,5 +67,8 @@ pub(crate) fn dunder_function_name(
     if ignore_names.matches(name) {
         return None;
     }
-    Some(Diagnostic::new(DunderFunctionName, stmt.identifier()))
+    Some(crate::message::Diagnostic::new(
+        DunderFunctionName,
+        stmt.identifier(),
+    ))
 }

@@ -177,7 +177,7 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                     | Expr::Tuple(_)
                     | Expr::FString(_) => {
                         if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
-                            let mut diagnostic = Diagnostic::new(
+                            let mut diagnostic = crate::message::Diagnostic::new(
                                 MultiValueRepeatedKeyLiteral {
                                     name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
                                     existing: SourceCodeSnippet::from_str(
@@ -211,7 +211,7 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                     }
                     Expr::Name(_) => {
                         if checker.enabled(Rule::MultiValueRepeatedKeyVariable) {
-                            let mut diagnostic = Diagnostic::new(
+                            let mut diagnostic = crate::message::Diagnostic::new(
                                 MultiValueRepeatedKeyVariable {
                                     name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
                                 },

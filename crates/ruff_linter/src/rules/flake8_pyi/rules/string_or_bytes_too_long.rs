@@ -72,7 +72,7 @@ pub(crate) fn string_or_bytes_too_long(checker: &Checker, string: StringLike) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(StringOrBytesTooLong, string.range());
+    let mut diagnostic = crate::message::Diagnostic::new(StringOrBytesTooLong, string.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         string.range(),

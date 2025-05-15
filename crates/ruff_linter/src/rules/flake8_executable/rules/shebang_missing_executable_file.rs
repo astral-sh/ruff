@@ -49,14 +49,18 @@ impl Violation for ShebangMissingExecutableFile {
 
 /// EXE002
 #[cfg(target_family = "unix")]
-pub(crate) fn shebang_missing_executable_file(filepath: &Path) -> Option<Diagnostic> {
+pub(crate) fn shebang_missing_executable_file(
+    filepath: &Path,
+) -> Option<crate::message::Diagnostic> {
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
+
+    use crate::message::Diagnostic;
     if is_wsl::is_wsl() {
         return None;
     }
     if let Ok(true) = is_executable(filepath) {
-        return Some(Diagnostic::new(
+        return Some(crate::message::Diagnostic::new(
             ShebangMissingExecutableFile,
             TextRange::default(),
         ));
@@ -65,6 +69,8 @@ pub(crate) fn shebang_missing_executable_file(filepath: &Path) -> Option<Diagnos
 }
 
 #[cfg(not(target_family = "unix"))]
-pub(crate) fn shebang_missing_executable_file(_filepath: &Path) -> Option<Diagnostic> {
+pub(crate) fn shebang_missing_executable_file(
+    _filepath: &Path,
+) -> Option<crate::message::Diagnostic> {
     None
 }

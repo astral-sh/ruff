@@ -9,6 +9,7 @@ pub(crate) use shebang_not_first_line::*;
 
 use crate::codes::Rule;
 use crate::comments::shebang::ShebangDirective;
+use crate::message::Diagnostic;
 use crate::settings::LinterSettings;
 use crate::Locator;
 
@@ -35,7 +36,7 @@ pub(crate) fn from_tokens(
                 diagnostics.push(diagnostic);
             }
 
-            if settings.rules.enabled(Rule::ShebangNotExecutable) {
+            if settings.rules.enabled(Some(Rule::ShebangNotExecutable)) {
                 if let Some(diagnostic) = shebang_not_executable(path, range) {
                     diagnostics.push(diagnostic);
                 }
@@ -52,7 +53,10 @@ pub(crate) fn from_tokens(
     }
 
     if !has_any_shebang {
-        if settings.rules.enabled(Rule::ShebangMissingExecutableFile) {
+        if settings
+            .rules
+            .enabled(Some(Rule::ShebangMissingExecutableFile))
+        {
             if let Some(diagnostic) = shebang_missing_executable_file(path) {
                 diagnostics.push(diagnostic);
             }

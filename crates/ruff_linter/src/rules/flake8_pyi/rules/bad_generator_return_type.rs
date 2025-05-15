@@ -210,7 +210,7 @@ pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, che
             }
         }
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         GeneratorReturnFromIterMethod {
             return_type: member.to_iter(),
             method,

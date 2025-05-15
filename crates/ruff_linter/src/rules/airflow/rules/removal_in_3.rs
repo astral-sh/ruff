@@ -1,5 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::message::Diagnostic;
 use crate::rules::airflow::helpers::{
     is_airflow_builtin_or_provider, is_guarded_by_try_except, Replacement,
 };
@@ -166,7 +167,7 @@ fn check_function_parameters(checker: &Checker, function_def: &StmtFunctionDef) 
     for param in function_def.parameters.iter_non_variadic_params() {
         let param_name = param.name();
         if REMOVED_CONTEXT_KEYS.contains(&param_name.as_str()) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 Airflow3Removal {
                     deprecated: param_name.to_string(),
                     replacement: Replacement::None,
@@ -212,7 +213,7 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
         segments => {
             if is_airflow_auth_manager(segments) {
                 if !arguments.is_empty() {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
                         Airflow3Removal {
                             deprecated: String::from("appbuilder"),
                             replacement: Replacement::Message(
@@ -300,7 +301,7 @@ fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
     } else {
         None
     };
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         Airflow3Removal {
             deprecated: attr.to_string(),
             replacement,
@@ -377,7 +378,7 @@ fn check_context_key_usage_in_call(checker: &Checker, call_expr: &ExprCall) {
             continue;
         };
         if value == removed_key {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 Airflow3Removal {
                     deprecated: removed_key.to_string(),
                     replacement: Replacement::None,
@@ -418,7 +419,7 @@ fn check_context_key_usage_in_subscript(checker: &Checker, subscript: &ExprSubsc
     }
 
     if REMOVED_CONTEXT_KEYS.contains(&key.to_str()) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             Airflow3Removal {
                 deprecated: key.to_string(),
                 replacement: Replacement::None,
@@ -528,7 +529,7 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
         None
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         Airflow3Removal {
             deprecated: attr.to_string(),
             replacement,
@@ -897,7 +898,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         _ => return,
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         Airflow3Removal {
             deprecated: qualified_name.to_string(),
             replacement: replacement.clone(),
@@ -956,7 +957,7 @@ fn check_airflow_plugin_extension(
                     )
                 })
         }) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 Airflow3Removal {
                     deprecated: name.to_string(),
                     replacement: Replacement::Message(
@@ -975,7 +976,7 @@ fn diagnostic_for_argument(
     arguments: &Arguments,
     deprecated: &str,
     replacement: Option<&'static str>,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let keyword = arguments.find_keyword(deprecated)?;
     let mut diagnostic = Diagnostic::new(
         Airflow3Removal {
@@ -994,7 +995,7 @@ fn diagnostic_for_argument(
     if let Some(replacement) = replacement {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             replacement.to_string(),
-            diagnostic.range,
+            diagnostic.range(),
         )));
     }
 

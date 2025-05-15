@@ -70,7 +70,7 @@ pub(crate) fn blocking_http_call(checker: &Checker, call: &ExprCall) {
             .as_ref()
             .is_some_and(is_blocking_http_call)
         {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 BlockingHttpCallInAsyncFunction,
                 call.func.range(),
             ));

@@ -91,7 +91,7 @@ pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Paramete
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             BuiltinArgumentShadowing {
                 name: parameter.name.to_string(),
             },

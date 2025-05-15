@@ -6,6 +6,7 @@ use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::message::Diagnostic;
 use crate::rules::flake8_debugger::types::DebuggerUsingType;
 
 /// ## What it does

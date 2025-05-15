@@ -43,7 +43,10 @@ pub(crate) fn ssl_with_no_version(checker: &Checker, call: &ExprCall) {
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["ssl", "wrap_socket"]))
     {
         if call.arguments.find_keyword("ssl_version").is_none() {
-            checker.report_diagnostic(Diagnostic::new(SslWithNoVersion, call.range()));
+            checker.report_diagnostic(crate::message::Diagnostic::new(
+                SslWithNoVersion,
+                call.range(),
+            ));
         }
     }
 }

@@ -156,7 +156,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         IfElseBlockInsteadOfDictLookup,
         stmt_if.range(),
     ));

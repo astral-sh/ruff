@@ -4,7 +4,7 @@ use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
+use crate::{checkers::ast::Checker, message::Diagnostic};
 
 use super::super::helpers::{matches_password_name, string_literal};
 
@@ -54,7 +54,10 @@ impl Violation for HardcodedPasswordDefault {
     }
 }
 
-fn check_password_kwarg(parameter: &Parameter, default: &Expr) -> Option<Diagnostic> {
+fn check_password_kwarg(
+    parameter: &Parameter,
+    default: &Expr,
+) -> Option<crate::message::Diagnostic> {
     string_literal(default).filter(|string| !string.is_empty())?;
     let kwarg_name = &parameter.name;
     if !matches_password_name(kwarg_name) {

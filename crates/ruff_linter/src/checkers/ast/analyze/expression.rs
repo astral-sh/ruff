@@ -525,7 +525,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             match pyflakes::format::FormatSummary::try_from(string_value.to_str()) {
                                 Err(e) => {
                                     if checker.enabled(Rule::StringDotFormatInvalidFormat) {
-                                        checker.report_diagnostic(Diagnostic::new(
+                                        checker.report_diagnostic(crate::message::Diagnostic::new(
                                             pyflakes::rules::StringDotFormatInvalidFormat {
                                                 message: pyflakes::format::error_to_string(&e),
                                             },
@@ -1283,7 +1283,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             ..
                         }) => {
                             if checker.enabled(Rule::PercentFormatUnsupportedFormatCharacter) {
-                                checker.report_diagnostic(Diagnostic::new(
+                                checker.report_diagnostic(crate::message::Diagnostic::new(
                                     pyflakes::rules::PercentFormatUnsupportedFormatCharacter {
                                         char: c,
                                     },
@@ -1293,7 +1293,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         }
                         Err(e) => {
                             if checker.enabled(Rule::PercentFormatInvalidFormat) {
-                                checker.report_diagnostic(Diagnostic::new(
+                                checker.report_diagnostic(crate::message::Diagnostic::new(
                                     pyflakes::rules::PercentFormatInvalidFormat {
                                         message: e.to_string(),
                                     },

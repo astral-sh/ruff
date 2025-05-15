@@ -105,7 +105,8 @@ pub(crate) fn ends_with_punctuation(checker: &Checker, docstring: &Docstring) {
         }
 
         if !trimmed.ends_with(['.', '!', '?']) {
-            let mut diagnostic = Diagnostic::new(MissingTerminalPunctuation, docstring.range());
+            let mut diagnostic =
+                crate::message::Diagnostic::new(MissingTerminalPunctuation, docstring.range());
             // Best-effort fix: avoid adding a period after other punctuation marks.
             if !trimmed.ends_with([':', ';']) {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(

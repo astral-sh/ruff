@@ -4,6 +4,7 @@ use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::message::Diagnostic;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
 use crate::rules::pycodestyle::rules::logical_lines::{DefinitionState, LogicalLine};
 

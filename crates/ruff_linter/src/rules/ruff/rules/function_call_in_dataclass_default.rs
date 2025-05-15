@@ -150,7 +150,7 @@ pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &
         let kind = FunctionCallInDataclassDefaultArgument {
             name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
         };
-        let diagnostic = Diagnostic::new(kind, expr.range());
+        let diagnostic = crate::message::Diagnostic::new(kind, expr.range());
 
         checker.report_diagnostic(diagnostic);
     }

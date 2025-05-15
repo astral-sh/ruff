@@ -162,7 +162,7 @@ pub(crate) fn multiple_with_statements(
             return;
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             MultipleWithStatements,
             TextRange::new(with_stmt.start(), colon.end()),
         );

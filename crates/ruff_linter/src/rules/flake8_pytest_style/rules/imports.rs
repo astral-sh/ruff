@@ -36,11 +36,15 @@ fn is_pytest_or_subpackage(imported_name: &str) -> bool {
 }
 
 /// PT013
-pub(crate) fn import(import_from: &Stmt, name: &str, asname: Option<&str>) -> Option<Diagnostic> {
+pub(crate) fn import(
+    import_from: &Stmt,
+    name: &str,
+    asname: Option<&str>,
+) -> Option<crate::message::Diagnostic> {
     if is_pytest_or_subpackage(name) {
         if let Some(alias) = asname {
             if alias != name {
-                return Some(Diagnostic::new(
+                return Some(crate::message::Diagnostic::new(
                     PytestIncorrectPytestImport,
                     import_from.range(),
                 ));
@@ -55,7 +59,7 @@ pub(crate) fn import_from(
     import_from: &Stmt,
     module: Option<&str>,
     level: u32,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     // If level is not zero or module is none, return
     if level != 0 {
         return None;
@@ -63,7 +67,7 @@ pub(crate) fn import_from(
 
     if let Some(module) = module {
         if is_pytest_or_subpackage(module) {
-            return Some(Diagnostic::new(
+            return Some(crate::message::Diagnostic::new(
                 PytestIncorrectPytestImport,
                 import_from.range(),
             ));

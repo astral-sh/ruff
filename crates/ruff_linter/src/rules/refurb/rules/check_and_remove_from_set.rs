@@ -104,7 +104,7 @@ pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         CheckAndRemoveFromSet {
             element: SourceCodeSnippet::from_str(checker.locator().slice(check_element)),
             set: check_set.id.to_string(),

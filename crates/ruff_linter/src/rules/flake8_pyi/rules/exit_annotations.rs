@@ -167,7 +167,7 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
         .skip(3)
         .filter(|parameter| parameter.default.is_none())
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             BadExitAnnotation {
                 func_kind,
                 error_kind: ErrorKind::ArgsAfterFirstFourMustHaveDefault,
@@ -182,7 +182,7 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
         .iter()
         .filter(|arg| arg.default.is_none())
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             BadExitAnnotation {
                 func_kind,
                 error_kind: ErrorKind::AllKwargsMustHaveDefault,
@@ -202,7 +202,7 @@ fn check_short_args_list(checker: &Checker, parameters: &Parameters, func_kind: 
             .annotation()
             .filter(|ann| !is_object_or_unused(ann, checker.semantic()))
         {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 BadExitAnnotation {
                     func_kind,
                     error_kind: ErrorKind::StarArgsNotAnnotated,
@@ -223,7 +223,7 @@ fn check_short_args_list(checker: &Checker, parameters: &Parameters, func_kind: 
             checker.report_diagnostic(diagnostic);
         }
     } else {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             BadExitAnnotation {
                 func_kind,
                 error_kind: ErrorKind::MissingArgs,
@@ -270,7 +270,7 @@ fn check_positional_args_for_non_overloaded_method(
             continue;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             BadExitAnnotation {
                 func_kind: kind,
                 error_kind: error_info,
@@ -409,7 +409,7 @@ fn check_positional_args_for_overloaded_method(
     }
 
     // Okay, neither of them match...
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         BadExitAnnotation {
             func_kind: kind,
             error_kind: ErrorKind::UnrecognizedExitOverload,

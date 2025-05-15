@@ -62,7 +62,7 @@ pub(crate) fn no_surrounding_whitespace(checker: &Checker, docstring: &Docstring
     if line == trimmed {
         return;
     }
-    let mut diagnostic = Diagnostic::new(SurroundingWhitespace, docstring.range());
+    let mut diagnostic = crate::message::Diagnostic::new(SurroundingWhitespace, docstring.range());
     let quote = docstring.quote_style().as_char();
     // If removing whitespace would lead to an invalid string of quote
     // characters, avoid applying the fix.

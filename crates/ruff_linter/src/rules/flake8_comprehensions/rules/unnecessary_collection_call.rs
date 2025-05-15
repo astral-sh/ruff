@@ -88,8 +88,10 @@ pub(crate) fn unnecessary_collection_call(
         _ => return,
     };
 
-    let mut diagnostic =
-        Diagnostic::new(UnnecessaryCollectionCall { kind: collection }, call.range());
+    let mut diagnostic = crate::message::Diagnostic::new(
+        UnnecessaryCollectionCall { kind: collection },
+        call.range(),
+    );
 
     // Convert `dict()` to `{}`.
     if call.arguments.keywords.is_empty() {

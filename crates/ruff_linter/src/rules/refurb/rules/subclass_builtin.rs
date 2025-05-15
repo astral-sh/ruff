@@ -105,7 +105,7 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
 
     let user_symbol = supported_builtin.user_symbol();
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         SubclassBuiltin {
             subclass: symbol.to_string(),
             replacement: user_symbol.to_string(),

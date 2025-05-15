@@ -2,6 +2,7 @@ use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::message::Diagnostic;
 use crate::settings::LinterSettings;
 use crate::Locator;
 

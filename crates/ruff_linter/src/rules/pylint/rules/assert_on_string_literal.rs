@@ -49,7 +49,7 @@ impl Violation for AssertOnStringLiteral {
 pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
     match test {
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 AssertOnStringLiteral {
                     kind: if value.is_empty() {
                         Kind::Empty
@@ -61,7 +61,7 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
             ));
         }
         Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 AssertOnStringLiteral {
                     kind: if value.is_empty() {
                         Kind::Empty
@@ -100,7 +100,7 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
             } else {
                 Kind::Unknown
             };
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 AssertOnStringLiteral { kind },
                 test.range(),
             ));

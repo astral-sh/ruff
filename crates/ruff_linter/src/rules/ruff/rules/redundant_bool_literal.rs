@@ -111,7 +111,7 @@ pub(crate) fn redundant_bool_literal<'a>(checker: &Checker, literal_expr: &'a Ex
     let seen_others = seen_expr.contains(BooleanLiteral::OTHER);
 
     let mut diagnostic =
-        Diagnostic::new(RedundantBoolLiteral { seen_others }, literal_expr.range());
+        crate::message::Diagnostic::new(RedundantBoolLiteral { seen_others }, literal_expr.range());
 
     // Provide a [`Fix`] when the complete `Literal` can be replaced. Applying the fix
     // can leave an unused import to be fixed by the `unused-import` rule.

@@ -3,6 +3,7 @@ use std::path::Path;
 use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::CommentRanges;
 
+use crate::message::Diagnostic;
 use crate::package::PackageRoot;
 use crate::preview::is_allow_nested_roots_enabled;
 use crate::registry::Rule;
@@ -23,7 +24,7 @@ pub(crate) fn check_file_path(
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
     // flake8-no-pep420
-    if settings.rules.enabled(Rule::ImplicitNamespacePackage) {
+    if settings.rules.enabled(Some(Rule::ImplicitNamespacePackage)) {
         let allow_nested_roots = is_allow_nested_roots_enabled(settings);
         if let Some(diagnostic) = implicit_namespace_package(
             path,
@@ -39,7 +40,7 @@ pub(crate) fn check_file_path(
     }
 
     // pep8-naming
-    if settings.rules.enabled(Rule::InvalidModuleName) {
+    if settings.rules.enabled(Some(Rule::InvalidModuleName)) {
         if let Some(diagnostic) =
             invalid_module_name(path, package, &settings.pep8_naming.ignore_names)
         {
@@ -48,7 +49,7 @@ pub(crate) fn check_file_path(
     }
 
     // flake8-builtins
-    if settings.rules.enabled(Rule::StdlibModuleShadowing) {
+    if settings.rules.enabled(Some(Rule::StdlibModuleShadowing)) {
         if let Some(diagnostic) = stdlib_module_shadowing(path, settings, target_version) {
             diagnostics.push(diagnostic);
         }

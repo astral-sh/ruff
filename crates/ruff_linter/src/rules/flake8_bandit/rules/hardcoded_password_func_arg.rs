@@ -58,7 +58,7 @@ pub(crate) fn hardcoded_password_func_arg(checker: &Checker, keywords: &[Keyword
         if !matches_password_name(arg) {
             return None;
         }
-        Some(Diagnostic::new(
+        Some(crate::message::Diagnostic::new(
             HardcodedPasswordFuncArg {
                 name: arg.to_string(),
             },

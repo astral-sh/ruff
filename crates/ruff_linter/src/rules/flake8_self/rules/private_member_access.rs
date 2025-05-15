@@ -144,7 +144,7 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         }
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         PrivateMemberAccess {
             access: attr.to_string(),
         },

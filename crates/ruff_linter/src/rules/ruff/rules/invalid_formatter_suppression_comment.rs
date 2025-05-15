@@ -106,7 +106,7 @@ pub(crate) fn ignored_formatter_suppression_comment(checker: &Checker, suite: &a
 
     for (range, reason) in comments.ignored_comments() {
         checker.report_diagnostic(
-            Diagnostic::new(InvalidFormatterSuppressionComment { reason }, range)
+            crate::message::Diagnostic::new(InvalidFormatterSuppressionComment { reason }, range)
                 .with_fix(Fix::unsafe_edit(delete_comment(range, checker.locator()))),
         );
     }

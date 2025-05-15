@@ -1,7 +1,10 @@
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 
-use crate::directives::{TodoComment, TodoDirectiveKind};
+use crate::{
+    directives::{TodoComment, TodoDirectiveKind},
+    message::Diagnostic,
+};
 
 /// ## What it does
 /// Checks for "TODO" comments.

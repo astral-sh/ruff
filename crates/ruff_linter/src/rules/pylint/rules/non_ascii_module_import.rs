@@ -69,7 +69,7 @@ pub(crate) fn non_ascii_module_import(checker: &Checker, alias: &Alias) {
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             NonAsciiImportName {
                 name: asname.to_string(),
                 kind: Kind::Aliased,
@@ -81,7 +81,7 @@ pub(crate) fn non_ascii_module_import(checker: &Checker, alias: &Alias) {
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             NonAsciiImportName {
                 name: alias.name.to_string(),
                 kind: Kind::Unaliased,

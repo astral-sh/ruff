@@ -119,7 +119,7 @@ pub(crate) fn type_param_name_mismatch(checker: &Checker, value: &Expr, targets:
         return;
     };
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         TypeParamNameMismatch {
             kind,
             var_name: var_name.to_string(),

@@ -33,7 +33,7 @@ impl Violation for BreakOutsideLoop {
 pub(crate) fn break_outside_loop<'a>(
     stmt: &'a Stmt,
     parents: &mut impl Iterator<Item = &'a Stmt>,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let mut child = stmt;
     for parent in parents {
         match parent {
@@ -50,5 +50,8 @@ pub(crate) fn break_outside_loop<'a>(
         child = parent;
     }
 
-    Some(Diagnostic::new(BreakOutsideLoop, stmt.range()))
+    Some(crate::message::Diagnostic::new(
+        BreakOutsideLoop,
+        stmt.range(),
+    ))
 }

@@ -86,7 +86,8 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
             && !is_class_var_annotation(annotation, checker.semantic())
             && !is_immutable_annotation(annotation, checker.semantic(), &[])
         {
-            let diagnostic = Diagnostic::new(MutableDataclassDefault, value.range());
+            let diagnostic =
+                crate::message::Diagnostic::new(MutableDataclassDefault, value.range());
 
             checker.report_diagnostic(diagnostic);
         }

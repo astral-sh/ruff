@@ -88,7 +88,7 @@ pub(crate) fn use_pep646_unpack(checker: &Checker, expr: &ExprSubscript) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(NonPEP646Unpack, *range);
+    let mut diagnostic = crate::message::Diagnostic::new(NonPEP646Unpack, *range);
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         format!("*{}", checker.locator().slice(slice.as_ref())),
         *range,

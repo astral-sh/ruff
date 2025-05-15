@@ -95,7 +95,8 @@ pub(crate) fn singledispatchmethod_function(checker: &Checker, scope: &Scope) {
                 )
             })
         {
-            let mut diagnostic = Diagnostic::new(SingledispatchmethodFunction, decorator.range());
+            let mut diagnostic =
+                crate::message::Diagnostic::new(SingledispatchmethodFunction, decorator.range());
             diagnostic.try_set_fix(|| {
                 let (import_edit, binding) = checker.importer().get_or_import_symbol(
                     &ImportRequest::import("functools", "singledispatch"),

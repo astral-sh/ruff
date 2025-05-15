@@ -96,7 +96,8 @@ pub(crate) fn backslashes(checker: &Checker, docstring: &Docstring) {
 
         // Only allow continuations (backslashes followed by newlines) and Unicode escapes.
         if !matches!(*escaped_char, '\r' | '\n' | 'u' | 'U' | 'N') {
-            let mut diagnostic = Diagnostic::new(EscapeSequenceInDocstring, docstring.range());
+            let mut diagnostic =
+                crate::message::Diagnostic::new(EscapeSequenceInDocstring, docstring.range());
 
             if !docstring.is_u_string() {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(

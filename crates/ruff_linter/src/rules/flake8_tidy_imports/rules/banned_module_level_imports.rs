@@ -68,7 +68,7 @@ pub(crate) fn banned_module_level_imports(checker: &Checker, stmt: &Stmt) {
                 .flake8_tidy_imports
                 .banned_module_level_imports(),
         ) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 BannedModuleLevelImports {
                     name: banned_module,
                 },

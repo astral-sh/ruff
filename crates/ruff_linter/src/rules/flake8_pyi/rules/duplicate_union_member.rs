@@ -62,7 +62,7 @@ impl Violation for DuplicateUnionMember {
 pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
     let mut seen_nodes: HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
     let mut unique_nodes: Vec<&Expr> = Vec::new();
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
+    let mut diagnostics: Vec<crate::message::Diagnostic> = Vec::new();
 
     let mut union_type = UnionKind::TypingUnion;
     // Adds a member to `literal_exprs` if it is a `Literal` annotation
@@ -75,7 +75,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
         if seen_nodes.insert(expr.into()) {
             unique_nodes.push(expr);
         } else {
-            diagnostics.push(Diagnostic::new(
+            diagnostics.push(crate::message::Diagnostic::new(
                 DuplicateUnionMember {
                     duplicate_name: checker.generator().expr(expr),
                 },

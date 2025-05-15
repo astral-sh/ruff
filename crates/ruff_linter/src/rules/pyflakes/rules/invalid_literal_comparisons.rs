@@ -90,7 +90,8 @@ pub(crate) fn invalid_literal_comparison(
                 || helpers::is_mutable_iterable_initializer(left)
                 || helpers::is_mutable_iterable_initializer(right))
         {
-            let mut diagnostic = Diagnostic::new(IsLiteral { cmp_op: op.into() }, expr.range());
+            let mut diagnostic =
+                crate::message::Diagnostic::new(IsLiteral { cmp_op: op.into() }, expr.range());
             if lazy_located.is_none() {
                 lazy_located = Some(locate_cmp_ops(expr, checker.tokens()));
             }

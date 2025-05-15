@@ -134,7 +134,7 @@ pub(crate) fn builtin_attribute_shadowing(
                         == Some(scope_id)
                 })
             {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(crate::message::Diagnostic::new(
                     BuiltinAttributeShadowing {
                         kind,
                         name: name.to_string(),

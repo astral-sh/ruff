@@ -98,7 +98,7 @@ pub(crate) fn organize_imports(
     source_type: PySourceType,
     tokens: &Tokens,
     target_version: PythonVersion,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
     let indentation = leading_indentation(indentation);
 
@@ -110,7 +110,7 @@ pub(crate) fn organize_imports(
         || indexer
             .followed_by_multi_statement_line(block.imports.last().unwrap(), locator.contents())
     {
-        return Some(Diagnostic::new(UnsortedImports, range));
+        return Some(crate::message::Diagnostic::new(UnsortedImports, range));
     }
 
     // Extract comments. Take care to grab any inline comments from the last line.
@@ -155,7 +155,7 @@ pub(crate) fn organize_imports(
     if matches_ignoring_indentation(actual, &expected) {
         return None;
     }
-    let mut diagnostic = Diagnostic::new(UnsortedImports, range);
+    let mut diagnostic = crate::message::Diagnostic::new(UnsortedImports, range);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         indent(&expected, indentation).to_string(),
         fix_range,

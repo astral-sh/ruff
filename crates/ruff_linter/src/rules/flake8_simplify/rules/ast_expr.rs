@@ -175,7 +175,7 @@ pub(crate) fn use_capital_environment_variables(checker: &Checker, expr: &Expr) 
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         UncapitalizedEnvironmentVariables {
             expected: SourceCodeSnippet::new(capital_env_var),
             actual: SourceCodeSnippet::new(env_var.to_string()),
@@ -215,7 +215,7 @@ fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UncapitalizedEnvironmentVariables {
             expected: SourceCodeSnippet::new(capital_env_var.clone()),
             actual: SourceCodeSnippet::new(env_var.to_string()),
@@ -298,7 +298,7 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     );
     let actual = checker.locator().slice(expr);
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         DictGetWithNoneDefault {
             expected: SourceCodeSnippet::new(expected.clone()),
             actual: SourceCodeSnippet::from_str(actual),

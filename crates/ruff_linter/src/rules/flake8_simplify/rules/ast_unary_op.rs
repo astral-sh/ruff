@@ -173,7 +173,7 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
         }
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         NegateEqualOp {
             left: checker.generator().expr(left),
             right: checker.generator().expr(&comparators[0]),
@@ -228,7 +228,7 @@ pub(crate) fn negation_with_not_equal_op(
         }
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         NegateNotEqualOp {
             left: checker.generator().expr(left),
             right: checker.generator().expr(&comparators[0]),
@@ -265,7 +265,7 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         DoubleNegation {
             expr: checker.generator().expr(operand),
         },

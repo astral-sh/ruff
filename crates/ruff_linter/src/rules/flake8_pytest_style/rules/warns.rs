@@ -174,7 +174,7 @@ pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_warns(&call.func, checker.semantic()) {
         if checker.enabled(Rule::PytestWarnsWithoutWarning) {
             if call.arguments.is_empty() {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(crate::message::Diagnostic::new(
                     PytestWarnsWithoutWarning,
                     call.func.range(),
                 ));
@@ -222,7 +222,7 @@ pub(crate) fn complex_warns(checker: &Checker, stmt: &Stmt, items: &[WithItem], 
         };
 
         if is_too_complex {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 PytestWarnsWithMultipleStatements,
                 stmt.range(),
             ));
@@ -253,7 +253,7 @@ fn warning_needs_match(checker: &Checker, warning: &Expr) {
                     .then_some(qualified_name)
             })
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             PytestWarnsTooBroad {
                 warning: qualified_name,
             },

@@ -43,7 +43,10 @@ impl AlwaysFixableViolation for RedirectedNOQA {
 }
 
 /// RUF101 for in-line noqa directives
-pub(crate) fn redirected_noqa(diagnostics: &mut Vec<Diagnostic>, noqa_directives: &NoqaDirectives) {
+pub(crate) fn redirected_noqa(
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
+    noqa_directives: &NoqaDirectives,
+) {
     for line in noqa_directives.lines() {
         let Directive::Codes(directive) = &line.directive else {
             continue;
@@ -55,7 +58,7 @@ pub(crate) fn redirected_noqa(diagnostics: &mut Vec<Diagnostic>, noqa_directives
 
 /// RUF101 for file noqa directives
 pub(crate) fn redirected_file_noqa(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
     noqa_directives: &FileNoqaDirectives,
 ) {
     for line in noqa_directives.lines() {
@@ -68,10 +71,10 @@ pub(crate) fn redirected_file_noqa(
 }
 
 /// Convert a sequence of [Codes] into [Diagnostic]s and append them to `diagnostics`.
-fn build_diagnostics(diagnostics: &mut Vec<Diagnostic>, codes: &Codes<'_>) {
+fn build_diagnostics(diagnostics: &mut Vec<crate::message::Diagnostic>, codes: &Codes<'_>) {
     for code in codes.iter() {
         if let Some(redirected) = get_redirect_target(code.as_str()) {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 RedirectedNOQA {
                     original: code.to_string(),
                     target: redirected.to_string(),

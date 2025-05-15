@@ -69,7 +69,7 @@ pub(crate) fn unnecessary_range_start(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryRangeStart, start.range());
+    let mut diagnostic = crate::message::Diagnostic::new(UnnecessaryRangeStart, start.range());
     diagnostic.try_set_fix(|| {
         remove_argument(
             &start,

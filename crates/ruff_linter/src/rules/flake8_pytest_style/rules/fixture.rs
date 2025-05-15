@@ -672,7 +672,7 @@ fn pytest_fixture_parentheses(
     expected: Parentheses,
     actual: Parentheses,
 ) {
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         PytestFixtureIncorrectParenthesesStyle { expected, actual },
         decorator.range(),
     );
@@ -706,7 +706,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
 
             if checker.enabled(Rule::PytestFixturePositionalArgs) {
                 if !arguments.args.is_empty() {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
                         PytestFixturePositionalArgs {
                             function: func_name.to_string(),
                         },
@@ -718,8 +718,10 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
             if checker.enabled(Rule::PytestExtraneousScopeFunction) {
                 if let Some(keyword) = arguments.find_keyword("scope") {
                     if keyword_is_literal(keyword, "function") {
-                        let mut diagnostic =
-                            Diagnostic::new(PytestExtraneousScopeFunction, keyword.range());
+                        let mut diagnostic = crate::message::Diagnostic::new(
+                            PytestExtraneousScopeFunction,
+                            keyword.range(),
+                        );
                         diagnostic.try_set_fix(|| {
                             edits::remove_argument(
                                 keyword,
@@ -775,7 +777,7 @@ fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: 
         if visitor.yield_statements.len() != 1 {
             return;
         }
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             PytestUselessYieldFixture {
                 name: name.to_string(),
             },
@@ -854,7 +856,7 @@ fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorato
     for parameter in parameters.iter_non_variadic_params() {
         let name = parameter.name();
         if name.starts_with('_') && !named_parametrize.contains(name.as_str()) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 PytestFixtureParamWithoutValue {
                     name: name.to_string(),
                 },
@@ -867,7 +869,7 @@ fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorato
 /// PT020
 fn check_fixture_decorator_name(checker: &Checker, decorator: &Decorator) {
     if is_pytest_yield_fixture(decorator, checker.semantic()) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             PytestDeprecatedYieldFixture,
             decorator.range(),
         ));
@@ -887,7 +889,7 @@ fn check_fixture_addfinalizer(checker: &Checker, parameters: &Parameters, body: 
     }
 
     if let Some(addfinalizer) = visitor.addfinalizer_call {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             PytestFixtureFinalizerCallback,
             addfinalizer.range(),
         ));
@@ -899,8 +901,10 @@ fn check_fixture_marks(checker: &Checker, decorators: &[Decorator]) {
     for (expr, marker) in get_mark_decorators(decorators) {
         if checker.enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture) {
             if marker == "asyncio" {
-                let mut diagnostic =
-                    Diagnostic::new(PytestUnnecessaryAsyncioMarkOnFixture, expr.range());
+                let mut diagnostic = crate::message::Diagnostic::new(
+                    PytestUnnecessaryAsyncioMarkOnFixture,
+                    expr.range(),
+                );
                 let range = checker.locator().full_lines_range(expr.range());
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                 checker.report_diagnostic(diagnostic);
@@ -909,8 +913,10 @@ fn check_fixture_marks(checker: &Checker, decorators: &[Decorator]) {
 
         if checker.enabled(Rule::PytestErroneousUseFixturesOnFixture) {
             if marker == "usefixtures" {
-                let mut diagnostic =
-                    Diagnostic::new(PytestErroneousUseFixturesOnFixture, expr.range());
+                let mut diagnostic = crate::message::Diagnostic::new(
+                    PytestErroneousUseFixturesOnFixture,
+                    expr.range(),
+                );
                 let line_range = checker.locator().full_lines_range(expr.range());
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(line_range)));
                 checker.report_diagnostic(diagnostic);

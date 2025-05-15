@@ -12,6 +12,7 @@ use ruff_python_semantic::analyze::typing::{
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::message::Diagnostic;
 
 /// ## What it does
 /// Checks for function calls in default function arguments.
@@ -82,7 +83,7 @@ impl Violation for FunctionCallInDefaultArgument {
 struct ArgumentDefaultVisitor<'a, 'b> {
     semantic: &'a SemanticModel<'b>,
     extend_immutable_calls: &'a [QualifiedName<'b>],
-    diagnostics: Vec<Diagnostic>,
+    diagnostics: Vec<crate::message::Diagnostic>,
 }
 
 impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {

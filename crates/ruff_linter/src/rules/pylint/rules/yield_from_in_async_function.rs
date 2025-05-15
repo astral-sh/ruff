@@ -43,6 +43,9 @@ pub(crate) fn yield_from_in_async_function(checker: &Checker, expr: &ast::ExprYi
         checker.semantic().current_scope().kind,
         ScopeKind::Function(ast::StmtFunctionDef { is_async: true, .. })
     ) {
-        checker.report_diagnostic(Diagnostic::new(YieldFromInAsyncFunction, expr.range()));
+        checker.report_diagnostic(crate::message::Diagnostic::new(
+            YieldFromInAsyncFunction,
+            expr.range(),
+        ));
     }
 }

@@ -172,8 +172,12 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
 
             let range = TextRange::new(stmt.range().start(), stmt.range().start());
             let mut diagnostic = match method_type {
-                MethodType::Classmethod => Diagnostic::new(NoClassmethodDecorator, range),
-                MethodType::Staticmethod => Diagnostic::new(NoStaticmethodDecorator, range),
+                MethodType::Classmethod => {
+                    crate::message::Diagnostic::new(NoClassmethodDecorator, range)
+                }
+                MethodType::Staticmethod => {
+                    crate::message::Diagnostic::new(NoStaticmethodDecorator, range)
+                }
             };
 
             let indentation = indentation_at_offset(stmt.range().start(), checker.source());

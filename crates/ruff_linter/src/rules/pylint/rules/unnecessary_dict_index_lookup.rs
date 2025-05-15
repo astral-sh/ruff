@@ -59,7 +59,7 @@ pub(crate) fn unnecessary_dict_index_lookup(checker: &Checker, stmt_for: &StmtFo
     };
 
     for range in ranges {
-        let mut diagnostic = Diagnostic::new(UnnecessaryDictIndexLookup, range);
+        let mut diagnostic = crate::message::Diagnostic::new(UnnecessaryDictIndexLookup, range);
         diagnostic.set_fix(Fix::safe_edits(
             Edit::range_replacement(value_name.id.to_string(), range),
             [noop(index_name), noop(value_name)],
@@ -104,7 +104,7 @@ pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &Checker, exp
         };
 
         for range in ranges {
-            let mut diagnostic = Diagnostic::new(UnnecessaryDictIndexLookup, range);
+            let mut diagnostic = crate::message::Diagnostic::new(UnnecessaryDictIndexLookup, range);
             diagnostic.set_fix(Fix::safe_edits(
                 Edit::range_replacement(value_name.id.to_string(), range),
                 [noop(index_name), noop(value_name)],

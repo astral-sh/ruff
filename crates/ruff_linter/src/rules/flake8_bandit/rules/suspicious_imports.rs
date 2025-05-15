@@ -7,7 +7,6 @@ use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for imports of the `telnetlib` module.
@@ -561,8 +560,8 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
 }
 
 fn check_and_push_diagnostic<T: Violation>(checker: &Checker, diagnostic: T, range: TextRange) {
-    let diagnostic = Diagnostic::new(diagnostic, range);
-    if checker.enabled(diagnostic.rule()) {
+    let diagnostic = crate::message::Diagnostic::new(diagnostic, range);
+    if checker.enabled(diagnostic.rule().expect("TODO(brent)")) {
         checker.report_diagnostic(diagnostic);
     }
 }

@@ -98,7 +98,7 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, stmt: &Stmt, names: &
     if unused_imports.is_empty() {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnnecessaryFutureImport {
             names: unused_imports
                 .iter()

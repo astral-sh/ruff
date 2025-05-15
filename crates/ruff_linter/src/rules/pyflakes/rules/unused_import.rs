@@ -425,7 +425,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
             iter::zip(to_remove, iter::repeat(fix_remove)),
             iter::zip(to_reexport, iter::repeat(fix_reexport)),
         ) {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 UnusedImport {
                     name: binding.import.qualified_name().to_string(),
                     module: binding.import.member_name().to_string(),
@@ -451,7 +451,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
     // Separately, generate a diagnostic for every _ignored_ import, to ensure that the
     // suppression comments aren't marked as unused.
     for binding in ignored.into_values().flatten() {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             UnusedImport {
                 name: binding.import.qualified_name().to_string(),
                 module: binding.import.member_name().to_string(),

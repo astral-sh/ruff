@@ -115,7 +115,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(checker: &Checke
         Cow::Owned(format!("iter({iterable})"))
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnnecessaryIterableAllocationForFirstElement {
             iterable: SourceCodeSnippet::new(iterable.to_string()),
         },

@@ -87,7 +87,7 @@ pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
     }
 
     // group borrows from checker, so we can't directly push into checker.diagnostics
-    let diagnostics: Vec<Diagnostic> = group_appends(appends)
+    let diagnostics: Vec<crate::message::Diagnostic> = group_appends(appends)
         .iter()
         .filter_map(|group| {
             // Groups with just one element are fine, and shouldn't be replaced by `extend`.
@@ -97,7 +97,7 @@ pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
 
             let replacement = make_suggestion(group, checker.generator());
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 RepeatedAppend {
                     name: group.name().to_string(),
                     replacement: SourceCodeSnippet::new(replacement.clone()),

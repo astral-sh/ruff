@@ -130,7 +130,7 @@ pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
         checker.generator().expr(arg2),
     );
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         IfExprMinMax {
             min_max,
             expression: SourceCodeSnippet::from_str(checker.locator().slice(if_exp)),

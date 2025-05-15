@@ -87,7 +87,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &Checker, decorator_list: &[D
                 range: _,
             } = &keywords[0];
             if arg.as_ref().is_some_and(|arg| arg == "maxsize") && value.is_none_literal_expr() {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = crate::message::Diagnostic::new(
                     LRUCacheWithMaxsizeNone,
                     TextRange::new(func.end(), decorator.end()),
                 );

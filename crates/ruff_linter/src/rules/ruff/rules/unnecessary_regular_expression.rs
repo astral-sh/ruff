@@ -116,7 +116,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
     let new_expr = re_func.replacement();
 
     let repl = new_expr.map(|expr| checker.generator().expr(&expr));
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnnecessaryRegularExpression {
             replacement: repl.clone(),
         },

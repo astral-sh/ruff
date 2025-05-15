@@ -112,7 +112,7 @@ pub(crate) fn async_function_with_timeout(checker: &Checker, function_def: &ast:
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         AsyncFunctionWithTimeout { module },
         timeout.range(),
     ));

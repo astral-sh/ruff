@@ -64,25 +64,27 @@ pub(crate) fn zip_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
             .any(|arg| is_infinite_iterable(arg, semantic))
     {
         checker.report_diagnostic(
-            Diagnostic::new(ZipWithoutExplicitStrict, call.range()).with_fix(Fix::applicable_edit(
-                add_argument(
-                    "strict=False",
-                    &call.arguments,
-                    checker.comment_ranges(),
-                    checker.locator().contents(),
+            crate::message::Diagnostic::new(ZipWithoutExplicitStrict, call.range()).with_fix(
+                Fix::applicable_edit(
+                    add_argument(
+                        "strict=False",
+                        &call.arguments,
+                        checker.comment_ranges(),
+                        checker.locator().contents(),
+                    ),
+                    // If the function call contains `**kwargs`, mark the fix as unsafe.
+                    if call
+                        .arguments
+                        .keywords
+                        .iter()
+                        .any(|keyword| keyword.arg.is_none())
+                    {
+                        Applicability::Unsafe
+                    } else {
+                        Applicability::Safe
+                    },
                 ),
-                // If the function call contains `**kwargs`, mark the fix as unsafe.
-                if call
-                    .arguments
-                    .keywords
-                    .iter()
-                    .any(|keyword| keyword.arg.is_none())
-                {
-                    Applicability::Unsafe
-                } else {
-                    Applicability::Safe
-                },
-            )),
+            ),
         );
     }
 }

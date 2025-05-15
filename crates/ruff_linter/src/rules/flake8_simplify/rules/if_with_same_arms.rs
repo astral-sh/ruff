@@ -87,7 +87,7 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             IfWithSameArms,
             TextRange::new(current_branch.start(), following_branch.end()),
         );

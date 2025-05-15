@@ -1,5 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::message::Diagnostic;
 use crate::rules::airflow::helpers::{
     is_airflow_builtin_or_provider, is_guarded_by_try_except, Replacement,
 };
@@ -115,7 +116,7 @@ fn diagnostic_for_argument(
     arguments: &Arguments,
     deprecated: &str,
     replacement: Option<&'static str>,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let keyword = arguments.find_keyword(deprecated)?;
     let mut diagnostic = Diagnostic::new(
         Airflow3SuggestedUpdate {
@@ -134,7 +135,7 @@ fn diagnostic_for_argument(
     if let Some(replacement) = replacement {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             replacement.to_string(),
-            diagnostic.range,
+            diagnostic.range(),
         )));
     }
 
@@ -278,7 +279,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         _ => return,
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         Airflow3SuggestedUpdate {
             deprecated: qualified_name.to_string(),
             replacement: replacement.clone(),

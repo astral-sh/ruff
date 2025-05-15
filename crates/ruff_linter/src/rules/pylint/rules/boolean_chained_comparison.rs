@@ -148,7 +148,7 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
                 }
             };
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 BooleanChainedComparison,
                 TextRange::new(left_compare.start(), right_compare.end()),
             );

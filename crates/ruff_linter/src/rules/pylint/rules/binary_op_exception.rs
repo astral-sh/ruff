@@ -76,7 +76,7 @@ pub(crate) fn binary_op_exception(checker: &Checker, except_handler: &ExceptHand
         return;
     };
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         BinaryOpException { op: op.into() },
         type_.range(),
     ));

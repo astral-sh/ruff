@@ -6,7 +6,7 @@ use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_stdlib::open_mode::OpenMode;
 use ruff_text_size::{Ranged, TextSize};
 
-use crate::checkers::ast::Checker;
+use crate::{checkers::ast::Checker, message::Diagnostic};
 
 /// ## What it does
 /// Checks for redundant `open` mode arguments.

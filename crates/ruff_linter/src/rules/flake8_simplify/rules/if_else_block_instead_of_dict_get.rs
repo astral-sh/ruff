@@ -214,7 +214,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         IfElseBlockInsteadOfDictGet {
             contents: contents.clone(),
         },
@@ -303,7 +303,7 @@ pub(crate) fn if_exp_instead_of_dict_get(
 
     let contents = checker.generator().expr(&fixed_node.into());
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         IfElseBlockInsteadOfDictGet {
             contents: contents.clone(),
         },

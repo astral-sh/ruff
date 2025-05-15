@@ -48,7 +48,8 @@ pub(crate) fn unnecessary_class_parentheses(checker: &Checker, class_def: &ast::
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryClassParentheses, arguments.range());
+    let mut diagnostic =
+        crate::message::Diagnostic::new(UnnecessaryClassParentheses, arguments.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
         arguments.start(),
         arguments.end(),

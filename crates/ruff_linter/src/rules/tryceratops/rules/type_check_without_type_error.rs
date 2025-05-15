@@ -94,7 +94,10 @@ fn check_type_check_test(semantic: &SemanticModel, test: &Expr) -> bool {
 
 fn check_raise(checker: &Checker, exc: &Expr, item: &Stmt) {
     if is_builtin_exception(exc, checker.semantic()) {
-        checker.report_diagnostic(Diagnostic::new(TypeCheckWithoutTypeError, item.range()));
+        checker.report_diagnostic(crate::message::Diagnostic::new(
+            TypeCheckWithoutTypeError,
+            item.range(),
+        ));
     }
 }
 

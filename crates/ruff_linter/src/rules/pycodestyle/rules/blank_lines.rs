@@ -721,7 +721,11 @@ impl<'a> BlankLinesChecker<'a> {
     }
 
     /// E301, E302, E303, E304, E305, E306
-    pub(crate) fn check_lines(&self, tokens: &Tokens, diagnostics: &mut Vec<Diagnostic>) {
+    pub(crate) fn check_lines(
+        &self,
+        tokens: &Tokens,
+        diagnostics: &mut Vec<crate::message::Diagnostic>,
+    ) {
         let mut prev_indent_length: Option<usize> = None;
         let mut prev_logical_line: Option<LogicalLineInfo> = None;
         let mut state = BlankLinesState::default();
@@ -824,7 +828,7 @@ impl<'a> BlankLinesChecker<'a> {
         line: &LogicalLineInfo,
         state: &BlankLinesState,
         prev_indent_length: Option<usize>,
-        diagnostics: &mut Vec<Diagnostic>,
+        diagnostics: &mut Vec<crate::message::Diagnostic>,
     ) {
         if line.preceding_blank_lines == 0
             // Only applies to methods.
@@ -842,7 +846,8 @@ impl<'a> BlankLinesChecker<'a> {
             && !self.source_type.is_stub()
         {
             // E301
-            let mut diagnostic = Diagnostic::new(BlankLineBetweenMethods, line.first_token_range);
+            let mut diagnostic =
+                crate::message::Diagnostic::new(BlankLineBetweenMethods, line.first_token_range);
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 self.stylist.line_ending().to_string(),
                 self.locator.line_start(state.last_non_comment_line_end),
@@ -896,7 +901,7 @@ impl<'a> BlankLinesChecker<'a> {
             && !line.is_beginning_of_cell
         {
             // E302
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 BlankLinesTopLevel {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                     expected_blank_lines: expected_blank_lines_before_definition,
@@ -940,7 +945,7 @@ impl<'a> BlankLinesChecker<'a> {
 
         if line.blank_lines > max_blank_lines {
             // E303
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 TooManyBlankLines {
                     actual_blank_lines: line.blank_lines.count(),
                 },
@@ -966,7 +971,7 @@ impl<'a> BlankLinesChecker<'a> {
             && line.preceding_blank_lines > 0
         {
             // E304
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 BlankLineAfterDecorator {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                 },
@@ -1013,7 +1018,7 @@ impl<'a> BlankLinesChecker<'a> {
             && !line.is_beginning_of_cell
         {
             // E305
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 BlankLinesAfterFunctionOrClass {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                 },
@@ -1056,8 +1061,10 @@ impl<'a> BlankLinesChecker<'a> {
             && !self.source_type.is_stub()
         {
             // E306
-            let mut diagnostic =
-                Diagnostic::new(BlankLinesBeforeNestedDefinition, line.first_token_range);
+            let mut diagnostic = crate::message::Diagnostic::new(
+                BlankLinesBeforeNestedDefinition,
+                line.first_token_range,
+            );
 
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 self.stylist.line_ending().to_string(),

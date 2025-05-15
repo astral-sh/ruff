@@ -58,7 +58,10 @@ impl Violation for AssignmentInAssert {
 }
 
 /// RUF018
-pub(crate) fn assignment_in_assert(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn assignment_in_assert(
+    checker: &Checker,
+    binding: &Binding,
+) -> Option<crate::message::Diagnostic> {
     if !binding.in_assert_statement() {
         return None;
     }
@@ -74,7 +77,7 @@ pub(crate) fn assignment_in_assert(checker: &Checker, binding: &Binding) -> Opti
         return None;
     }
 
-    Some(Diagnostic::new(
+    Some(crate::message::Diagnostic::new(
         AssignmentInAssert,
         parent_expression.range(),
     ))

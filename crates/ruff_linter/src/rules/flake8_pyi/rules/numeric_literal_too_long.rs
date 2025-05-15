@@ -50,7 +50,7 @@ pub(crate) fn numeric_literal_too_long(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(NumericLiteralTooLong, expr.range());
+    let mut diagnostic = crate::message::Diagnostic::new(NumericLiteralTooLong, expr.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         expr.range(),

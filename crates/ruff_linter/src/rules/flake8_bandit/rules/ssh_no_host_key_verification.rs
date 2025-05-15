@@ -78,7 +78,7 @@ pub(crate) fn ssh_no_host_key_verification(checker: &Checker, call: &ExprCall) {
             ["paramiko", "client", "SSHClient"] | ["paramiko", "SSHClient"]
         )
     }) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             SSHNoHostKeyVerification,
             policy_argument.range(),
         ));

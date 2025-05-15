@@ -125,15 +125,15 @@ pub(crate) fn check(
         Some(result.unwrap_or_else(|(path, message)| {
             if let Some(path) = &path {
                 let settings = resolver.resolve(path);
-                if settings.linter.rules.enabled(Rule::IOError) {
+                if settings.linter.rules.enabled(Some(Rule::IOError)) {
                     let dummy =
                         SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
                     Diagnostics::new(
-                        vec![Diagnostic::from_diagnostic(
-                            Diagnostic::new(IOError { message }, TextRange::default()),
+                        vec![Diagnostic::new2(
+                            IOError { message },
+                            TextRange::default(),
                             dummy,
-                            None,
                         )],
                         FxHashMap::default(),
                     )

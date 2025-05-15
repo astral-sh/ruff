@@ -462,15 +462,6 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
                 match self { #rule_fixable_match_arms }
             }
         }
-
-        impl AsRule for ruff_diagnostics::Diagnostic {
-            fn rule(&self) -> Rule {
-                self.name
-                    .parse()
-                    .unwrap_or_else(|_| unreachable!("invalid rule name: {}", self.name))
-            }
-        }
-
     }
 }
 

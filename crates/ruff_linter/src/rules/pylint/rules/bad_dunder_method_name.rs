@@ -82,7 +82,7 @@ pub(crate) fn bad_dunder_method_name(checker: &Checker, method: &ast::StmtFuncti
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         BadDunderMethodName {
             name: method.name.to_string(),
         },

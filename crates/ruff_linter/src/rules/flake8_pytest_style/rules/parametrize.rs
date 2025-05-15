@@ -347,7 +347,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             checker.locator().contents(),
                         )
                         .unwrap_or(expr.range());
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = crate::message::Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 single_argument: false,
                                 expected: names_type,
@@ -383,7 +383,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             checker.locator().contents(),
                         )
                         .unwrap_or(expr.range());
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = crate::message::Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 single_argument: false,
                                 expected: names_type,
@@ -421,7 +421,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                 match names_type {
                     types::ParametrizeNameType::Tuple => {}
                     types::ParametrizeNameType::List => {
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = crate::message::Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 single_argument: false,
                                 expected: names_type,
@@ -440,7 +440,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                         checker.report_diagnostic(diagnostic);
                     }
                     types::ParametrizeNameType::Csv => {
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = crate::message::Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 single_argument: false,
                                 expected: names_type,
@@ -467,7 +467,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                 match names_type {
                     types::ParametrizeNameType::List => {}
                     types::ParametrizeNameType::Tuple => {
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = crate::message::Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 single_argument: false,
                                 expected: names_type,
@@ -487,7 +487,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                         checker.report_diagnostic(diagnostic);
                     }
                     types::ParametrizeNameType::Csv => {
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = crate::message::Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 single_argument: false,
                                 expected: names_type,
@@ -529,7 +529,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
     match values {
         Expr::List(ast::ExprList { elts, .. }) => {
             if values_type != types::ParametrizeValuesType::List {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = crate::message::Diagnostic::new(
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
@@ -577,7 +577,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
         }
         Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             if values_type != types::ParametrizeValuesType::Tuple {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = crate::message::Diagnostic::new(
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
@@ -662,7 +662,7 @@ fn check_duplicates(checker: &Checker, values: &Expr) {
         let expr = ComparableExpr::from(element);
         seen.entry(expr)
             .and_modify(|index| {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = crate::message::Diagnostic::new(
                     PytestDuplicateParametrizeTestCases { index: *index },
                     element.range(),
                 );
@@ -685,7 +685,7 @@ fn check_duplicates(checker: &Checker, values: &Expr) {
 }
 
 fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalues: &Expr) {
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         PytestParametrizeNamesWrongType {
             single_argument: true,
             expected: types::ParametrizeNameType::Csv,
@@ -773,7 +773,7 @@ fn handle_value_rows(
         match elt {
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 if values_row_type != types::ParametrizeValuesRowType::Tuple {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = crate::message::Diagnostic::new(
                         PytestParametrizeValuesWrongType {
                             values: values_type,
                             row: values_row_type,
@@ -816,7 +816,7 @@ fn handle_value_rows(
             }
             Expr::List(ast::ExprList { elts, .. }) => {
                 if values_row_type != types::ParametrizeValuesRowType::List {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = crate::message::Diagnostic::new(
                         PytestParametrizeValuesWrongType {
                             values: values_type,
                             row: values_row_type,

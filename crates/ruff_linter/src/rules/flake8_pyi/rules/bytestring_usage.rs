@@ -74,7 +74,7 @@ pub(crate) fn bytestring_attribute(checker: &Checker, attribute: &Expr) {
         ["collections", "abc", "ByteString"] => ByteStringOrigin::CollectionsAbc,
         _ => return,
     };
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         ByteStringUsage { origin },
         attribute.range(),
     ));
@@ -97,7 +97,10 @@ pub(crate) fn bytestring_import(checker: &Checker, import_from: &ast::StmtImport
 
     for name in names {
         if name.name.as_str() == "ByteString" {
-            checker.report_diagnostic(Diagnostic::new(ByteStringUsage { origin }, name.range()));
+            checker.report_diagnostic(crate::message::Diagnostic::new(
+                ByteStringUsage { origin },
+                name.range(),
+            ));
         }
     }
 }

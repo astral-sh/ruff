@@ -45,7 +45,7 @@ impl Violation for EmptyComment {
 
 /// PLR2044
 pub(crate) fn empty_comments(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
     comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {
@@ -65,7 +65,7 @@ pub(crate) fn empty_comments(
 }
 
 /// Return a [`Diagnostic`] if the comment at the given [`TextRange`] is empty.
-fn empty_comment(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
+fn empty_comment(range: TextRange, locator: &Locator) -> Option<crate::message::Diagnostic> {
     // Check: is the comment empty?
     if !locator
         .slice(range)
@@ -97,12 +97,13 @@ fn empty_comment(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
         });
 
     Some(
-        Diagnostic::new(EmptyComment, TextRange::new(first_hash_col, line.end())).with_fix(
-            Fix::safe_edit(if let Some(deletion_start_col) = deletion_start_col {
-                Edit::deletion(line.start() + deletion_start_col, line.end())
-            } else {
-                Edit::range_deletion(locator.full_line_range(first_hash_col))
-            }),
-        ),
+        crate::message::Diagnostic::new(EmptyComment, TextRange::new(first_hash_col, line.end()))
+            .with_fix(Fix::safe_edit(
+                if let Some(deletion_start_col) = deletion_start_col {
+                    Edit::deletion(line.start() + deletion_start_col, line.end())
+                } else {
+                    Edit::range_deletion(locator.full_line_range(first_hash_col))
+                },
+            )),
     )
 }

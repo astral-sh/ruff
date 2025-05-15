@@ -112,7 +112,7 @@ pub(crate) fn reimplemented_operator(checker: &Checker, target: &FunctionLike) {
         return;
     };
     let fix = target.try_fix(&operator, checker.importer(), checker.semantic());
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         ReimplementedOperator {
             operator,
             target: target.kind(),

@@ -55,7 +55,10 @@ impl AlwaysFixableViolation for ForLoopWrites {
 }
 
 /// FURB122
-pub(crate) fn for_loop_writes_binding(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn for_loop_writes_binding(
+    checker: &Checker,
+    binding: &Binding,
+) -> Option<crate::message::Diagnostic> {
     if !binding.kind.is_loop_var() {
         return None;
     }
@@ -125,7 +128,7 @@ fn for_loop_writes(
     for_stmt: &StmtFor,
     scope_id: ScopeId,
     binding_names: &[&ExprName],
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     if !for_stmt.orelse.is_empty() {
         return None;
     }
@@ -191,7 +194,7 @@ fn for_loop_writes(
         applicability,
     );
 
-    let diagnostic = Diagnostic::new(
+    let diagnostic = crate::message::Diagnostic::new(
         ForLoopWrites {
             name: io_object_name.id.to_string(),
         },

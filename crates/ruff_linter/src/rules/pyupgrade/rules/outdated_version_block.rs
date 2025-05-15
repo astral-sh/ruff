@@ -129,7 +129,7 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
                     ) {
                         Ok(false) => {}
                         Ok(true) => {
-                            let mut diagnostic = Diagnostic::new(
+                            let mut diagnostic = crate::message::Diagnostic::new(
                                 OutdatedVersionBlock {
                                     reason: if op.is_lt() || op.is_lt_e() {
                                         Reason::AlwaysFalse
@@ -149,7 +149,7 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
                             checker.report_diagnostic(diagnostic);
                         }
                         Err(_) => {
-                            checker.report_diagnostic(Diagnostic::new(
+                            checker.report_diagnostic(crate::message::Diagnostic::new(
                                 OutdatedVersionBlock {
                                     reason: Reason::Invalid,
                                 },
@@ -182,23 +182,27 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
                 };
                 match reason {
                     Reason::AlwaysTrue => {
-                        let mut diagnostic =
-                            Diagnostic::new(OutdatedVersionBlock { reason }, branch.test.range());
+                        let mut diagnostic = crate::message::Diagnostic::new(
+                            OutdatedVersionBlock { reason },
+                            branch.test.range(),
+                        );
                         if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
                             diagnostic.set_fix(fix);
                         }
                         checker.report_diagnostic(diagnostic);
                     }
                     Reason::AlwaysFalse => {
-                        let mut diagnostic =
-                            Diagnostic::new(OutdatedVersionBlock { reason }, branch.test.range());
+                        let mut diagnostic = crate::message::Diagnostic::new(
+                            OutdatedVersionBlock { reason },
+                            branch.test.range(),
+                        );
                         if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
                             diagnostic.set_fix(fix);
                         }
                         checker.report_diagnostic(diagnostic);
                     }
                     Reason::Invalid => {
-                        checker.report_diagnostic(Diagnostic::new(
+                        checker.report_diagnostic(crate::message::Diagnostic::new(
                             OutdatedVersionBlock {
                                 reason: Reason::Invalid,
                             },

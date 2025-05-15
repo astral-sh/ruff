@@ -91,7 +91,7 @@ fn check_string_or_bytes(
     locator: &Locator,
     range: TextRange,
     flags: AnyStringFlags,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     assert!(!flags.is_f_string());
 
     if flags.is_triple_quoted() || flags.is_raw_string() {
@@ -106,7 +106,7 @@ fn check_string_or_bytes(
         return None;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, range);
+    let mut diagnostic = crate::message::Diagnostic::new(UnnecessaryEscapedQuote, range);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         flags
             .display_contents(&unescape_string(contents, opposite_quote_char))
@@ -117,7 +117,10 @@ fn check_string_or_bytes(
 }
 
 /// Checks for unnecessary escaped quotes in an f-string.
-fn check_f_string(locator: &Locator, f_string: &ast::FString) -> Option<Diagnostic> {
+fn check_f_string(
+    locator: &Locator,
+    f_string: &ast::FString,
+) -> Option<crate::message::Diagnostic> {
     let ast::FString { flags, range, .. } = f_string;
     if flags.is_triple_quoted() || flags.prefix().is_raw() {
         return None;
@@ -140,7 +143,7 @@ fn check_f_string(locator: &Locator, f_string: &ast::FString) -> Option<Diagnost
     let mut edits_iter = edits.into_iter();
     let first = edits_iter.next()?;
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, *range);
+    let mut diagnostic = crate::message::Diagnostic::new(UnnecessaryEscapedQuote, *range);
     diagnostic.set_fix(Fix::safe_edits(first, edits_iter));
     Some(diagnostic)
 }

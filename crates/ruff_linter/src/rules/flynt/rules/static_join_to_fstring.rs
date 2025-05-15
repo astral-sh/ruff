@@ -152,7 +152,7 @@ pub(crate) fn static_join_to_fstring(checker: &Checker, expr: &Expr, joiner: &st
 
     let contents = checker.generator().expr(&new_expr);
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         StaticJoinToFString {
             expression: SourceCodeSnippet::new(contents.clone()),
         },

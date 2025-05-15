@@ -95,7 +95,8 @@ pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: 
             continue;
         }
 
-        let diagnostic = Diagnostic::new(ImplicitClassVarInDataclass, target.range());
+        let diagnostic =
+            crate::message::Diagnostic::new(ImplicitClassVarInDataclass, target.range());
 
         checker.report_diagnostic(diagnostic);
     }

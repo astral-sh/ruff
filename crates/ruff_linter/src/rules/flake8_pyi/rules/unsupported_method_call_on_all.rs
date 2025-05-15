@@ -67,7 +67,7 @@ pub(crate) fn unsupported_method_call_on_all(checker: &Checker, func: &Expr) {
     if !is_unsupported_method(attr.as_str()) {
         return;
     }
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         UnsupportedMethodCallOnAll {
             name: attr.to_string(),
         },

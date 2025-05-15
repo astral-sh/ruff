@@ -62,7 +62,7 @@ pub(crate) fn invalid_function_name(
     decorator_list: &[Decorator],
     ignore_names: &IgnoreNames,
     semantic: &SemanticModel,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     // Ignore any function names that are already lowercase.
     if str::is_lowercase(name) {
         return None;
@@ -82,7 +82,7 @@ pub(crate) fn invalid_function_name(
         return None;
     }
 
-    Some(Diagnostic::new(
+    Some(crate::message::Diagnostic::new(
         InvalidFunctionName {
             name: name.to_string(),
         },

@@ -102,7 +102,7 @@ fn check(checker: &Checker, value: &str, range: TextRange) {
         }
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         HardcodedTempFile {
             string: value.to_string(),
         },

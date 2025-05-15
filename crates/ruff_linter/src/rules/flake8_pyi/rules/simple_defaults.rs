@@ -507,7 +507,8 @@ pub(crate) fn typed_argument_simple_defaults(checker: &Checker, parameters: &Par
                 checker.locator(),
                 checker.semantic(),
             ) {
-                let mut diagnostic = Diagnostic::new(TypedArgumentDefaultInStub, default.range());
+                let mut diagnostic =
+                    crate::message::Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "...".to_string(),
@@ -533,7 +534,8 @@ pub(crate) fn argument_simple_defaults(checker: &Checker, parameters: &Parameter
                 checker.locator(),
                 checker.semantic(),
             ) {
-                let mut diagnostic = Diagnostic::new(ArgumentDefaultInStub, default.range());
+                let mut diagnostic =
+                    crate::message::Diagnostic::new(ArgumentDefaultInStub, default.range());
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "...".to_string(),
@@ -567,7 +569,7 @@ pub(crate) fn assignment_default_in_stub(checker: &Checker, targets: &[Expr], va
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
+    let mut diagnostic = crate::message::Diagnostic::new(AssignmentDefaultInStub, value.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         value.range(),
@@ -601,7 +603,7 @@ pub(crate) fn annotated_assignment_default_in_stub(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
+    let mut diagnostic = crate::message::Diagnostic::new(AssignmentDefaultInStub, value.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         value.range(),
@@ -636,7 +638,7 @@ pub(crate) fn unannotated_assignment_in_stub(checker: &Checker, targets: &[Expr]
             return;
         }
     }
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         UnannotatedAssignmentInStub {
             name: id.to_string(),
         },
@@ -654,7 +656,7 @@ pub(crate) fn unassigned_special_variable_in_stub(checker: &Checker, target: &Ex
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         UnassignedSpecialVariableInStub {
             name: id.to_string(),
         },
@@ -686,7 +688,7 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         TypeAliasWithoutAnnotation {
             module,
             name: id.to_string(),

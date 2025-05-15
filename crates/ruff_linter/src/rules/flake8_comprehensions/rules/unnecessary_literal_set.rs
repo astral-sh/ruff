@@ -67,7 +67,8 @@ pub(crate) fn unnecessary_literal_set(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryLiteralSet { kind }, call.range());
+    let mut diagnostic =
+        crate::message::Diagnostic::new(UnnecessaryLiteralSet { kind }, call.range());
 
     // Convert `set((1, 2))` to `{1, 2}`.
     diagnostic.set_fix({

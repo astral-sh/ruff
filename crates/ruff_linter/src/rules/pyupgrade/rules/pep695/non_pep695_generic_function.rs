@@ -164,7 +164,7 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
     };
 
     checker.report_diagnostic(
-        Diagnostic::new(
+        crate::message::Diagnostic::new(
             NonPEP695GenericFunction {
                 name: name.to_string(),
             },

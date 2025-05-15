@@ -55,13 +55,13 @@ pub(crate) fn camelcase_imported_as_lowercase(
     alias: &Alias,
     stmt: &Stmt,
     ignore_names: &IgnoreNames,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     if helpers::is_camelcase(name) && ruff_python_stdlib::str::is_cased_lowercase(asname) {
         // Ignore any explicitly-allowed names.
         if ignore_names.matches(name) || ignore_names.matches(asname) {
             return None;
         }
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             CamelcaseImportedAsLowercase {
                 name: name.to_string(),
                 asname: asname.to_string(),

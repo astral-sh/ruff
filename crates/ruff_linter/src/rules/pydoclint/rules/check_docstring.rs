@@ -919,7 +919,7 @@ pub(crate) fn check_docstring(
                                     semantic,
                                 )
                             {
-                                diagnostics.push(Diagnostic::new(
+                                diagnostics.push(crate::message::Diagnostic::new(
                                     DocstringMissingReturns,
                                     docstring.range(),
                                 ));
@@ -930,8 +930,10 @@ pub(crate) fn check_docstring(
                             .iter()
                             .any(|entry| !entry.is_none_return()) =>
                         {
-                            diagnostics
-                                .push(Diagnostic::new(DocstringMissingReturns, docstring.range()));
+                            diagnostics.push(crate::message::Diagnostic::new(
+                                DocstringMissingReturns,
+                                docstring.range(),
+                            ));
                         }
                         _ => {}
                     }
@@ -950,12 +952,16 @@ pub(crate) fn check_docstring(
                             |arguments| arguments.first().is_none_or(Expr::is_none_literal_expr),
                         ) =>
                     {
-                        diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
+                        diagnostics.push(crate::message::Diagnostic::new(
+                            DocstringMissingYields,
+                            docstring.range(),
+                        ));
                     }
                     None if body_entries.yields.iter().any(|entry| !entry.is_none_yield) => {
-                        diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
+                        diagnostics.push(crate::message::Diagnostic::new(
+                            DocstringMissingYields,
+                            docstring.range(),
+                        ));
                     }
                     _ => {}
                 }
@@ -982,7 +988,7 @@ pub(crate) fn check_docstring(
                         .ends_with(exception.segments())
                 })
             }) {
-                let diagnostic = Diagnostic::new(
+                let diagnostic = crate::message::Diagnostic::new(
                     DocstringMissingException {
                         id: (*name).to_string(),
                     },
@@ -1002,7 +1008,10 @@ pub(crate) fn check_docstring(
                 if body_entries.returns.is_empty()
                     || body_entries.returns.iter().all(ReturnEntry::is_implicit)
                 {
-                    let diagnostic = Diagnostic::new(DocstringExtraneousReturns, docstring.range());
+                    let diagnostic = crate::message::Diagnostic::new(
+                        DocstringExtraneousReturns,
+                        docstring.range(),
+                    );
                     diagnostics.push(diagnostic);
                 }
             }
@@ -1012,7 +1021,10 @@ pub(crate) fn check_docstring(
         if checker.enabled(Rule::DocstringExtraneousYields) {
             if docstring_sections.yields.is_some() {
                 if body_entries.yields.is_empty() {
-                    let diagnostic = Diagnostic::new(DocstringExtraneousYields, docstring.range());
+                    let diagnostic = crate::message::Diagnostic::new(
+                        DocstringExtraneousYields,
+                        docstring.range(),
+                    );
                     diagnostics.push(diagnostic);
                 }
             }
@@ -1033,7 +1045,7 @@ pub(crate) fn check_docstring(
                     }
                 }
                 if !extraneous_exceptions.is_empty() {
-                    let diagnostic = Diagnostic::new(
+                    let diagnostic = crate::message::Diagnostic::new(
                         DocstringExtraneousException {
                             ids: extraneous_exceptions,
                         },

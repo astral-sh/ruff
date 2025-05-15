@@ -74,7 +74,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &Checker, decorator_list: &[
                     matches!(qualified_name.segments(), ["functools", "lru_cache"])
                 })
         {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 LRUCacheWithoutParameters,
                 TextRange::new(func.end(), decorator.end()),
             );

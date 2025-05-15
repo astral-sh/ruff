@@ -78,7 +78,7 @@ pub(crate) fn useless_comparison(checker: &Checker, expr: &Expr) {
                 .and_then(Stmt::as_expr_stmt)
                 .is_some_and(|last_stmt| &*last_stmt.value == expr)
             {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(crate::message::Diagnostic::new(
                     UselessComparison {
                         at: ComparisonLocationAt::EndOfFunction,
                     },
@@ -88,7 +88,7 @@ pub(crate) fn useless_comparison(checker: &Checker, expr: &Expr) {
             }
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             UselessComparison {
                 at: ComparisonLocationAt::MiddleBody,
             },

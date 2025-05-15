@@ -107,7 +107,8 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
     let arguments = &call.arguments;
     let source = checker.source();
 
-    let mut diagnostic = Diagnostic::new(ExcInfoOutsideExceptHandler, exc_info.range);
+    let mut diagnostic =
+        crate::message::Diagnostic::new(ExcInfoOutsideExceptHandler, exc_info.range);
 
     diagnostic.try_set_fix(|| {
         let edit = remove_argument(exc_info, arguments, Parentheses::Preserve, source)?;

@@ -59,7 +59,7 @@ pub(crate) fn undocumented_warn(checker: &Checker, expr: &Expr) {
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["logging", "WARN"]))
     {
-        let mut diagnostic = Diagnostic::new(UndocumentedWarn, expr.range());
+        let mut diagnostic = crate::message::Diagnostic::new(UndocumentedWarn, expr.range());
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import("logging", "WARNING"),

@@ -120,7 +120,7 @@ pub(crate) fn suppressible_exception(
         handler_names.join(", ")
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         SuppressibleException {
             exception: exception.clone(),
         },

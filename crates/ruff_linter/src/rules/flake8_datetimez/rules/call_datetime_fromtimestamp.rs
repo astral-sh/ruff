@@ -97,7 +97,7 @@ pub(crate) fn call_datetime_fromtimestamp(checker: &Checker, call: &ast::ExprCal
         None => DatetimeModuleAntipattern::NoTzArgumentPassed,
     };
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         CallDatetimeFromtimestamp(antipattern),
         call.range,
     ));

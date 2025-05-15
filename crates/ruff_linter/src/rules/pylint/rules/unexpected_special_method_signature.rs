@@ -186,7 +186,7 @@ pub(crate) fn unexpected_special_method_signature(
     };
 
     if !valid_signature {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             UnexpectedSpecialMethodSignature {
                 method_name: name.to_owned(),
                 expected_params,

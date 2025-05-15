@@ -79,7 +79,7 @@ pub(crate) fn redundant_tuple_in_exception_handler(checker: &Checker, handlers: 
         if elt.is_starred_expr() {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             RedundantTupleInExceptionHandler {
                 name: checker.generator().expr(elt),
             },

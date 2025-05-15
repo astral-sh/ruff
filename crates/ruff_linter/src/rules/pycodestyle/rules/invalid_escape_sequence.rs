@@ -252,7 +252,7 @@ fn check(
     if contains_valid_escape_sequence {
         // Escape with backslash.
         for invalid_escape_char in &invalid_escape_chars {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 InvalidEscapeSequence {
                     ch: invalid_escape_char.ch,
                     fix_title: FixTitle::AddBackslash,
@@ -268,7 +268,7 @@ fn check(
     } else {
         // Turn into raw string.
         for invalid_escape_char in &invalid_escape_chars {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 InvalidEscapeSequence {
                     ch: invalid_escape_char.ch,
                     fix_title: FixTitle::UseRawStringLiteral,

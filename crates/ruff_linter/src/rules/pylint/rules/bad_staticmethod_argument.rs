@@ -101,7 +101,7 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
         _ => return,
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         BadStaticmethodArgument {
             argument_name: self_or_cls.name.to_string(),
         },

@@ -52,7 +52,7 @@ impl Violation for BlanketTypeIgnore {
 
 /// PGH003
 pub(crate) fn blanket_type_ignore(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
     comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {
@@ -92,7 +92,7 @@ pub(crate) fn blanket_type_ignore(
             // Match the optional `[...]` tag.
             if let Ok(codes) = parse_type_ignore_tag(comment) {
                 if codes.is_empty() {
-                    diagnostics.push(Diagnostic::new(
+                    diagnostics.push(crate::message::Diagnostic::new(
                         BlanketTypeIgnore,
                         range.add_start(TextSize::try_from(start).unwrap()),
                     ));

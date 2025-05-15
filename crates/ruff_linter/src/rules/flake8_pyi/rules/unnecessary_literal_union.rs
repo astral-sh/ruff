@@ -124,7 +124,7 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnnecessaryLiteralUnion {
             members: literal_exprs
                 .iter()

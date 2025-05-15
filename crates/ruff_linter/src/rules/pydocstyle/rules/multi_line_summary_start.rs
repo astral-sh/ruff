@@ -156,7 +156,8 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
 
     if is_triple_quote(&first_line) {
         if checker.enabled(Rule::MultiLineSummaryFirstLine) {
-            let mut diagnostic = Diagnostic::new(MultiLineSummaryFirstLine, docstring.range());
+            let mut diagnostic =
+                crate::message::Diagnostic::new(MultiLineSummaryFirstLine, docstring.range());
             // Delete until first non-whitespace char.
             for line in content_lines {
                 if let Some(end_column) = line.find(|c: char| !c.is_whitespace()) {
@@ -180,7 +181,8 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
         return;
     } else {
         if checker.enabled(Rule::MultiLineSummarySecondLine) {
-            let mut diagnostic = Diagnostic::new(MultiLineSummarySecondLine, docstring.range());
+            let mut diagnostic =
+                crate::message::Diagnostic::new(MultiLineSummarySecondLine, docstring.range());
             let mut indentation = Cow::Borrowed(docstring.compute_indentation());
             let mut fixable = true;
             if !indentation.chars().all(char::is_whitespace) {

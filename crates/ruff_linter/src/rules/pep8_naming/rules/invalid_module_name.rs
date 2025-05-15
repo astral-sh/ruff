@@ -53,7 +53,7 @@ pub(crate) fn invalid_module_name(
     path: &Path,
     package: Option<PackageRoot<'_>>,
     ignore_names: &IgnoreNames,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file_or_stub) {
         return None;
     }
@@ -79,7 +79,7 @@ pub(crate) fn invalid_module_name(
             if ignore_names.matches(&module_name) {
                 return None;
             }
-            return Some(Diagnostic::new(
+            return Some(crate::message::Diagnostic::new(
                 InvalidModuleName {
                     name: module_name.to_string(),
                 },

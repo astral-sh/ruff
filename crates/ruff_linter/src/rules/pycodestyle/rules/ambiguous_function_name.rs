@@ -36,9 +36,9 @@ impl Violation for AmbiguousFunctionName {
 }
 
 /// E743
-pub(crate) fn ambiguous_function_name(name: &Identifier) -> Option<Diagnostic> {
+pub(crate) fn ambiguous_function_name(name: &Identifier) -> Option<crate::message::Diagnostic> {
     if is_ambiguous_name(name) {
-        Some(Diagnostic::new(
+        Some(crate::message::Diagnostic::new(
             AmbiguousFunctionName(name.to_string()),
             name.range(),
         ))

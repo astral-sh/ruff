@@ -66,7 +66,7 @@ struct CodingCommentRange {
 
 /// UP009
 pub(crate) fn unnecessary_coding_comment(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
     locator: &Locator,
     comment_ranges: &CommentRanges,
 ) {
@@ -106,7 +106,7 @@ pub(crate) fn unnecessary_coding_comment(
     }
 
     let fix = Fix::safe_edit(Edit::range_deletion(range.line));
-    let diagnostic = Diagnostic::new(UTF8EncodingDeclaration, range.comment);
+    let diagnostic = crate::message::Diagnostic::new(UTF8EncodingDeclaration, range.comment);
 
     diagnostics.push(diagnostic.with_fix(fix));
 }

@@ -84,7 +84,7 @@ pub(crate) fn line_too_long(
     line: &Line,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let limit = settings.pycodestyle.max_line_length;
 
     Overlong::try_from_line(
@@ -99,7 +99,7 @@ pub(crate) fn line_too_long(
         settings.tab_size,
     )
     .map(|overlong| {
-        Diagnostic::new(
+        crate::message::Diagnostic::new(
             LineTooLong(overlong.width(), limit.value() as usize),
             overlong.range(),
         )

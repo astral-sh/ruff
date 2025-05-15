@@ -173,22 +173,37 @@ pub(crate) fn call(checker: &Checker, func: &Expr) {
 
     let range = func.range();
     let diagnostic = match attr.as_str() {
-        "isnull" if checker.settings.rules.enabled(Rule::PandasUseOfDotIsNull) => {
-            Diagnostic::new(PandasUseOfDotIsNull, range)
+        "isnull"
+            if checker
+                .settings
+                .rules
+                .enabled(Some(Rule::PandasUseOfDotIsNull)) =>
+        {
+            crate::message::Diagnostic::new(PandasUseOfDotIsNull, range)
         }
-        "notnull" if checker.settings.rules.enabled(Rule::PandasUseOfDotNotNull) => {
-            Diagnostic::new(PandasUseOfDotNotNull, range)
+        "notnull"
+            if checker
+                .settings
+                .rules
+                .enabled(Some(Rule::PandasUseOfDotNotNull)) =>
+        {
+            crate::message::Diagnostic::new(PandasUseOfDotNotNull, range)
         }
         "pivot" | "unstack"
             if checker
                 .settings
                 .rules
-                .enabled(Rule::PandasUseOfDotPivotOrUnstack) =>
+                .enabled(Some(Rule::PandasUseOfDotPivotOrUnstack)) =>
         {
-            Diagnostic::new(PandasUseOfDotPivotOrUnstack, range)
+            crate::message::Diagnostic::new(PandasUseOfDotPivotOrUnstack, range)
         }
-        "stack" if checker.settings.rules.enabled(Rule::PandasUseOfDotStack) => {
-            Diagnostic::new(PandasUseOfDotStack, range)
+        "stack"
+            if checker
+                .settings
+                .rules
+                .enabled(Some(Rule::PandasUseOfDotStack)) =>
+        {
+            crate::message::Diagnostic::new(PandasUseOfDotStack, range)
         }
         _ => return,
     };

@@ -38,7 +38,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if !checker.semantic.scope_id.is_global() {
                     for name in names {
                         if checker.semantic.nonlocal(name).is_none() {
-                            checker.report_diagnostic(Diagnostic::new(
+                            checker.report_diagnostic(crate::message::Diagnostic::new(
                                 pylint::rules::NonlocalWithoutBinding {
                                     name: name.to_string(),
                                 },
@@ -852,7 +852,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 } else if &alias.name == "*" {
                     if checker.enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
                         if !matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
-                            checker.report_diagnostic(Diagnostic::new(
+                            checker.report_diagnostic(crate::message::Diagnostic::new(
                                 pyflakes::rules::UndefinedLocalWithNestedImportStarUsage {
                                     name: helpers::format_import_from(level, module).to_string(),
                                 },
@@ -861,7 +861,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         }
                     }
                     if checker.enabled(Rule::UndefinedLocalWithImportStar) {
-                        checker.report_diagnostic(Diagnostic::new(
+                        checker.report_diagnostic(crate::message::Diagnostic::new(
                             pyflakes::rules::UndefinedLocalWithImportStar {
                                 name: helpers::format_import_from(level, module).to_string(),
                             },
@@ -1511,30 +1511,42 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker
                 .settings
                 .rules
-                .enabled(Rule::AirflowVariableNameTaskIdMismatch)
+                .enabled(Some(Rule::AirflowVariableNameTaskIdMismatch))
             {
                 airflow::rules::variable_name_task_id(checker, targets, value);
             }
-            if checker.settings.rules.enabled(Rule::SelfAssigningVariable) {
+            if checker
+                .settings
+                .rules
+                .enabled(Some(Rule::SelfAssigningVariable))
+            {
                 pylint::rules::self_assignment(checker, assign);
             }
-            if checker.settings.rules.enabled(Rule::TypeParamNameMismatch) {
+            if checker
+                .settings
+                .rules
+                .enabled(Some(Rule::TypeParamNameMismatch))
+            {
                 pylint::rules::type_param_name_mismatch(checker, value, targets);
             }
             if checker
                 .settings
                 .rules
-                .enabled(Rule::TypeNameIncorrectVariance)
+                .enabled(Some(Rule::TypeNameIncorrectVariance))
             {
                 pylint::rules::type_name_incorrect_variance(checker, value);
             }
-            if checker.settings.rules.enabled(Rule::TypeBivariance) {
+            if checker.settings.rules.enabled(Some(Rule::TypeBivariance)) {
                 pylint::rules::type_bivariance(checker, value);
             }
             if checker.enabled(Rule::NonAugmentedAssignment) {
                 pylint::rules::non_augmented_assignment(checker, assign);
             }
-            if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
+            if checker
+                .settings
+                .rules
+                .enabled(Some(Rule::UnsortedDunderAll))
+            {
                 ruff::rules::sort_dunder_all_assign(checker, assign);
             }
             if checker.source_type.is_stub() {
@@ -1625,7 +1637,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     );
                 }
             }
-            if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
+            if checker
+                .settings
+                .rules
+                .enabled(Some(Rule::UnsortedDunderAll))
+            {
                 ruff::rules::sort_dunder_all_ann_assign(checker, assign_stmt);
             }
             if checker.source_type.is_stub() {

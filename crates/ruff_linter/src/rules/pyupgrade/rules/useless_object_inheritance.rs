@@ -55,7 +55,7 @@ pub(crate) fn useless_object_inheritance(checker: &Checker, class_def: &ast::Stm
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             UselessObjectInheritance {
                 name: class_def.name.to_string(),
             },

@@ -110,7 +110,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnnecessaryLiteralWithinTupleCall {
             literal_kind: argument_kind,
         },

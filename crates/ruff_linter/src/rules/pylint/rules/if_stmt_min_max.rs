@@ -174,7 +174,7 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
         checker.locator().slice(arg2),
     );
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         IfStmtMinMax {
             min_max,
             replacement: SourceCodeSnippet::from_str(replacement.as_str()),

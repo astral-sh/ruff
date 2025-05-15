@@ -167,12 +167,17 @@ enum FunctionType {
 }
 
 impl FunctionType {
-    fn diagnostic_kind(self, argument_name: String, range: TextRange) -> Diagnostic {
+    fn diagnostic_kind(
+        self,
+        argument_name: String,
+        range: TextRange,
+    ) -> crate::message::Diagnostic {
         match self {
-            Self::Method => {
-                Diagnostic::new(InvalidFirstArgumentNameForMethod { argument_name }, range)
-            }
-            Self::ClassMethod => Diagnostic::new(
+            Self::Method => crate::message::Diagnostic::new(
+                InvalidFirstArgumentNameForMethod { argument_name },
+                range,
+            ),
+            Self::ClassMethod => crate::message::Diagnostic::new(
                 InvalidFirstArgumentNameForClassMethod {
                     argument_name,
                     is_new: false,

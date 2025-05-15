@@ -43,7 +43,7 @@ pub(crate) fn banned_api<T: Ranged>(checker: &Checker, policy: &NameMatchPolicy,
     let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
     if let Some(banned_module) = policy.find(banned_api.keys().map(AsRef::as_ref)) {
         if let Some(reason) = banned_api.get(&banned_module) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 BannedApi {
                     name: banned_module,
                     message: reason.msg.to_string(),
@@ -71,7 +71,7 @@ pub(crate) fn banned_attribute_access(checker: &Checker, expr: &Expr) {
                 })
             })
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             BannedApi {
                 name: banned_path.to_string(),
                 message: ban.msg.to_string(),

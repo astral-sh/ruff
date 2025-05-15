@@ -66,7 +66,7 @@ pub(crate) fn bad_open_mode(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         BadOpenMode {
             mode: value.to_string(),
         },

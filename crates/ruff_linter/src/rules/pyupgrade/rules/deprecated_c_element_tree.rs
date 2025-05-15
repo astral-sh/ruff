@@ -42,7 +42,7 @@ fn add_check_for_node<T>(checker: &Checker, node: &T)
 where
     T: Ranged,
 {
-    let mut diagnostic = Diagnostic::new(DeprecatedCElementTree, node.range());
+    let mut diagnostic = crate::message::Diagnostic::new(DeprecatedCElementTree, node.range());
     let contents = checker.locator().slice(node);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         contents.replacen("cElementTree", "ElementTree", 1),

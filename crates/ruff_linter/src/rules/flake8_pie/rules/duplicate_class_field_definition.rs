@@ -93,7 +93,7 @@ pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: &[Stmt])
         }
 
         if !seen_targets.insert(target.id.as_str()) {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 DuplicateClassFieldDefinition {
                     name: target.id.to_string(),
                 },

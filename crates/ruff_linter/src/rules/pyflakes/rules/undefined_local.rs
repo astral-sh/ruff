@@ -62,7 +62,7 @@ pub(crate) fn undefined_local(checker: &Checker, scope_id: ScopeId, scope: &Scop
                     }
                 }) {
                     // Then it's probably an error.
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
                         UndefinedLocal {
                             name: name.to_string(),
                         },

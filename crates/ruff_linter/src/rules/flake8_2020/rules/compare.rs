@@ -243,7 +243,7 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                     ) = (ops, comparators)
                     {
                         if *n == 3 && checker.enabled(Rule::SysVersionInfo0Eq3) {
-                            checker.report_diagnostic(Diagnostic::new(
+                            checker.report_diagnostic(crate::message::Diagnostic::new(
                                 SysVersionInfo0Eq3,
                                 left.range(),
                             ));
@@ -259,7 +259,7 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                     ) = (ops, comparators)
                     {
                         if checker.enabled(Rule::SysVersionInfo1CmpInt) {
-                            checker.report_diagnostic(Diagnostic::new(
+                            checker.report_diagnostic(crate::message::Diagnostic::new(
                                 SysVersionInfo1CmpInt,
                                 left.range(),
                             ));
@@ -281,7 +281,7 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
             ) = (ops, comparators)
             {
                 if checker.enabled(Rule::SysVersionInfoMinorCmpInt) {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
                         SysVersionInfoMinorCmpInt,
                         left.range(),
                     ));
@@ -300,10 +300,16 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
         {
             if value.len() == 1 {
                 if checker.enabled(Rule::SysVersionCmpStr10) {
-                    checker.report_diagnostic(Diagnostic::new(SysVersionCmpStr10, left.range()));
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
+                        SysVersionCmpStr10,
+                        left.range(),
+                    ));
                 }
             } else if checker.enabled(Rule::SysVersionCmpStr3) {
-                checker.report_diagnostic(Diagnostic::new(SysVersionCmpStr3, left.range()));
+                checker.report_diagnostic(crate::message::Diagnostic::new(
+                    SysVersionCmpStr3,
+                    left.range(),
+                ));
             }
         }
     }

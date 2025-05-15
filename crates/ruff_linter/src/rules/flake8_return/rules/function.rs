@@ -22,7 +22,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::edits;
 use crate::fix::edits::adjust_indentation;
 use crate::preview::is_only_add_return_none_at_end_enabled;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 use crate::rules::flake8_return::helpers::end_of_last_statement;
 use crate::Locator;
 
@@ -385,7 +385,7 @@ fn unnecessary_return_none(checker: &Checker, decorator_list: &[Decorator], stac
             return;
         }
 
-        let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range());
+        let mut diagnostic = crate::message::Diagnostic::new(UnnecessaryReturnNone, stmt.range());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "return".to_string(),
             stmt.range(),
@@ -400,7 +400,7 @@ fn implicit_return_value(checker: &Checker, stack: &Stack) {
         if stmt.value.is_some() {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(ImplicitReturnValue, stmt.range());
+        let mut diagnostic = crate::message::Diagnostic::new(ImplicitReturnValue, stmt.range());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "return None".to_string(),
             stmt.range(),
@@ -455,7 +455,7 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 fn add_return_none(checker: &Checker, stmt: &Stmt, range: TextRange) {
-    let mut diagnostic = Diagnostic::new(ImplicitReturn, range);
+    let mut diagnostic = crate::message::Diagnostic::new(ImplicitReturn, range);
     if let Some(indent) = indentation(checker.source(), stmt) {
         let mut content = String::new();
         content.push_str(checker.stylist().line_ending().as_str());
@@ -607,7 +607,7 @@ fn unnecessary_assign(checker: &Checker, stack: &Stack) {
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             UnnecessaryAssign {
                 name: assigned_id.to_string(),
             },
@@ -669,12 +669,12 @@ fn superfluous_else_node(
     };
     for child in if_elif_body {
         if child.is_return_stmt() {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 SuperfluousElseReturn { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
-            if checker.enabled(diagnostic.rule()) {
+            if checker.enabled(diagnostic.rule().expect("TODO(brent)")) {
                 diagnostic.try_set_fix(|| {
                     remove_else(
                         elif_else,
@@ -687,12 +687,12 @@ fn superfluous_else_node(
             }
             return true;
         } else if child.is_break_stmt() {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 SuperfluousElseBreak { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
-            if checker.enabled(diagnostic.rule()) {
+            if checker.enabled(diagnostic.rule().expect("TODO(brent)")) {
                 diagnostic.try_set_fix(|| {
                     remove_else(
                         elif_else,
@@ -706,12 +706,12 @@ fn superfluous_else_node(
             }
             return true;
         } else if child.is_raise_stmt() {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 SuperfluousElseRaise { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
-            if checker.enabled(diagnostic.rule()) {
+            if checker.enabled(diagnostic.rule().expect("TODO(brent)")) {
                 diagnostic.try_set_fix(|| {
                     remove_else(
                         elif_else,
@@ -725,12 +725,12 @@ fn superfluous_else_node(
             }
             return true;
         } else if child.is_continue_stmt() {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 SuperfluousElseContinue { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
-            if checker.enabled(diagnostic.rule()) {
+            if checker.enabled(diagnostic.rule().expect("TODO(brent)")) {
                 diagnostic.try_set_fix(|| {
                     remove_else(
                         elif_else,

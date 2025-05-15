@@ -258,7 +258,7 @@ pub(crate) fn deprecated_mock_attribute(checker: &Checker, attribute: &ast::Expr
     if UnqualifiedName::from_expr(&attribute.value)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["mock", "mock"]))
     {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             DeprecatedMockImport {
                 reference_type: MockReference::Attribute,
             },
@@ -297,7 +297,7 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
                 // Add a `Diagnostic` for each `mock` import.
                 for name in names {
                     if &name.name == "mock" || &name.name == "mock.mock" {
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = crate::message::Diagnostic::new(
                             DeprecatedMockImport {
                                 reference_type: MockReference::Import,
                             },
@@ -324,7 +324,7 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
             }
 
             if module == "mock" {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = crate::message::Diagnostic::new(
                     DeprecatedMockImport {
                         reference_type: MockReference::Import,
                     },

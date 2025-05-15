@@ -55,7 +55,7 @@ pub(crate) fn math_constant(checker: &Checker, literal: &ast::ExprNumberLiteral)
     };
 
     if let Some(constant) = Constant::from_value(value) {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             MathConstant {
                 literal: checker.locator().slice(literal).into(),
                 constant: constant.name(),

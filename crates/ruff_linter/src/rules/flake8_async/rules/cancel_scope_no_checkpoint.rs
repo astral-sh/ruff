@@ -98,7 +98,7 @@ pub(crate) fn cancel_scope_no_checkpoint(
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         CancelScopeNoCheckpoint { method_name },
         with_stmt.range,
     ));

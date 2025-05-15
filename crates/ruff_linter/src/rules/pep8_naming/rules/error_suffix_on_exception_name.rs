@@ -52,7 +52,7 @@ pub(crate) fn error_suffix_on_exception_name(
     arguments: Option<&Arguments>,
     name: &str,
     ignore_names: &IgnoreNames,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     if name.ends_with("Error") {
         return None;
     }
@@ -74,7 +74,7 @@ pub(crate) fn error_suffix_on_exception_name(
         return None;
     }
 
-    Some(Diagnostic::new(
+    Some(crate::message::Diagnostic::new(
         ErrorSuffixOnExceptionName {
             name: name.to_string(),
         },

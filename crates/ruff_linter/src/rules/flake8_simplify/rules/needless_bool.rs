@@ -299,7 +299,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         .as_ref()
         .map(|expr| checker.generator().expr(expr));
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         NeedlessBool {
             condition: condition.map(SourceCodeSnippet::new),
             negate: inverted,

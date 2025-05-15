@@ -206,7 +206,7 @@ fn add_diagnostic(
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         NonSelfReturnType {
             class_name: class_def.name.to_string(),
             method_name: method_name.to_string(),

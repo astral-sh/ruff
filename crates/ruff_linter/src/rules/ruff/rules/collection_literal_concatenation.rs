@@ -210,7 +210,7 @@ pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
         Type::Tuple => format!("({})", checker.generator().expr(&new_expr)),
         Type::List => checker.generator().expr(&new_expr),
     };
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         CollectionLiteralConcatenation {
             expression: SourceCodeSnippet::new(contents.clone()),
         },

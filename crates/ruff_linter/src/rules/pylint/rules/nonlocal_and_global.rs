@@ -59,7 +59,7 @@ pub(crate) fn nonlocal_and_global(checker: &Checker, nonlocal: &ast::StmtNonloca
     // `global`.
     for name in &nonlocal.names {
         if let Some(global) = checker.semantic().global(name) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 NonlocalAndGlobal {
                     name: name.to_string(),
                 },

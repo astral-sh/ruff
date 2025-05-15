@@ -65,7 +65,7 @@ pub(crate) fn non_empty_stub_body(checker: &Checker, body: &[Stmt]) {
         }
     }
 
-    let mut diagnostic = Diagnostic::new(NonEmptyStubBody, stmt.range());
+    let mut diagnostic = crate::message::Diagnostic::new(NonEmptyStubBody, stmt.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         stmt.range(),

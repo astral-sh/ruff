@@ -58,7 +58,7 @@ pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         ManualFromImport {
             module: module.to_string(),
             name: name.to_string(),

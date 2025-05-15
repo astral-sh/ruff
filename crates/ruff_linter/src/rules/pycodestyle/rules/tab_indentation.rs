@@ -34,7 +34,7 @@ impl Violation for TabIndentation {
 
 /// W191
 pub(crate) fn tab_indentation(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
     locator: &Locator,
     indexer: &Indexer,
 ) {
@@ -46,7 +46,7 @@ pub(crate) fn tab_indentation(
 
         // Determine whether the tab is part of the line's indentation.
         if let Some(indent) = tab_indentation_at_line_start(range.start(), locator, indexer) {
-            diagnostics.push(Diagnostic::new(TabIndentation, indent));
+            diagnostics.push(crate::message::Diagnostic::new(TabIndentation, indent));
         }
 
         // Advance to the next line.

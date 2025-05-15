@@ -125,8 +125,10 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                 if definition_state.in_type_params() || (annotated_func_arg && parens == 1) {
                     let start = token.start();
                     if start == prev_end && prev_end != TextSize::new(0) {
-                        let mut diagnostic =
-                            Diagnostic::new(MissingWhitespaceAroundParameterEquals, token.range);
+                        let mut diagnostic = crate::message::Diagnostic::new(
+                            MissingWhitespaceAroundParameterEquals,
+                            token.range,
+                        );
                         diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                             " ".to_string(),
                             token.start(),
@@ -141,7 +143,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                             let next_start = next.start();
 
                             if next_start == token.end() {
-                                let mut diagnostic = Diagnostic::new(
+                                let mut diagnostic = crate::message::Diagnostic::new(
                                     MissingWhitespaceAroundParameterEquals,
                                     token.range,
                                 );
@@ -157,7 +159,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                 } else {
                     // If there's space between the preceding token and the equals sign, report it.
                     if token.start() != prev_end {
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = crate::message::Diagnostic::new(
                             UnexpectedSpacesAroundKeywordParameterEquals,
                             TextRange::new(prev_end, token.start()),
                         );
@@ -171,7 +173,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                             iter.next();
                         } else {
                             if next.start() != token.end() {
-                                let mut diagnostic = Diagnostic::new(
+                                let mut diagnostic = crate::message::Diagnostic::new(
                                     UnexpectedSpacesAroundKeywordParameterEquals,
                                     TextRange::new(token.end(), next.start()),
                                 );

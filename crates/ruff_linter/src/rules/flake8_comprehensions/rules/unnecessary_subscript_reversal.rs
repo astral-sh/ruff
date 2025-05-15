@@ -86,7 +86,7 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: &ast::Expr
     if !matches!(function_name, "reversed" | "set" | "sorted") {
         return;
     }
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         UnnecessarySubscriptReversal {
             func: function_name.to_string(),
         },

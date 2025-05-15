@@ -102,7 +102,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
     let expected = format!("{}.items()", checker.locator().slice(var1));
     let actual = checker.locator().slice(expr);
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         ZipDictKeysAndValues {
             expected: SourceCodeSnippet::new(expected.clone()),
             actual: SourceCodeSnippet::from_str(actual),

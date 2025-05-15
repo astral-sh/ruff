@@ -71,7 +71,7 @@ pub(crate) fn star_arg_unpacking_after_keyword_arg(
         if arg.start() <= keyword.start() {
             continue;
         }
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             StarArgUnpackingAfterKeywordArg,
             arg.range(),
         ));

@@ -136,13 +136,13 @@ pub(crate) fn unnecessary_comprehension_in_call(
     }
 
     let mut diagnostic = match (arg, builtin_function.duplication_variance()) {
-        (Expr::ListComp(_), _) => Diagnostic::new(
+        (Expr::ListComp(_), _) => crate::message::Diagnostic::new(
             UnnecessaryComprehensionInCall {
                 comprehension_kind: ComprehensionKind::List,
             },
             arg.range(),
         ),
-        (Expr::SetComp(_), DuplicationVariance::Invariant) => Diagnostic::new(
+        (Expr::SetComp(_), DuplicationVariance::Invariant) => crate::message::Diagnostic::new(
             UnnecessaryComprehensionInCall {
                 comprehension_kind: ComprehensionKind::Set,
             },

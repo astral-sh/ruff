@@ -97,7 +97,7 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
     });
 
     if is_modified {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             ModifiedIteratingSet {
                 name: name.id.clone(),
             },

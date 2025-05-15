@@ -60,7 +60,7 @@ pub(crate) fn unconventional_import_alias(
     checker: &Checker,
     binding: &Binding,
     conventions: &FxHashMap<String, String>,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let import = binding.as_any_import()?;
     let qualified_name = import.qualified_name().to_string();
     let expected_alias = conventions.get(qualified_name.as_str())?;
@@ -70,7 +70,7 @@ pub(crate) fn unconventional_import_alias(
         return None;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnconventionalImportAlias {
             name: qualified_name,
             asname: expected_alias.to_string(),

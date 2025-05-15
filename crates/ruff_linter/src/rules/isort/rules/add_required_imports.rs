@@ -91,7 +91,7 @@ fn add_required_import(
     locator: &Locator,
     stylist: &Stylist,
     source_type: PySourceType,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     // Don't add imports to semantically-empty files.
     if parsed.suite().iter().all(is_docstring_stmt) {
         return None;
@@ -112,7 +112,7 @@ fn add_required_import(
     }
 
     // Always insert the diagnostic at top-of-file.
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         MissingRequiredImport(required_import.to_string()),
         TextRange::default(),
     );
@@ -129,7 +129,7 @@ pub(crate) fn add_required_imports(
     stylist: &Stylist,
     settings: &LinterSettings,
     source_type: PySourceType,
-) -> Vec<Diagnostic> {
+) -> Vec<crate::message::Diagnostic> {
     settings
         .isort
         .required_imports

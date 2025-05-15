@@ -12,6 +12,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
+use crate::message::Diagnostic;
 use crate::preview::is_full_path_match_source_strategy_enabled;
 use crate::rules::flake8_type_checking::helpers::{
     filter_contained, is_typing_reference, quote_annotation,

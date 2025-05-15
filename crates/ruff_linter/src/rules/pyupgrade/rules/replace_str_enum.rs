@@ -126,7 +126,7 @@ pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDef)
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         ReplaceStrEnum {
             name: class_def.name.to_string(),
         },

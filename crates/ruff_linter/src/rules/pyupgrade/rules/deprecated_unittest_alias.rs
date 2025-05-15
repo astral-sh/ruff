@@ -91,7 +91,7 @@ pub(crate) fn deprecated_unittest_alias(checker: &Checker, expr: &Expr) {
     if id != "self" {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         DeprecatedUnittestAlias {
             alias: attr.to_string(),
             target: (*target).to_string(),

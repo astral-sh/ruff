@@ -74,7 +74,7 @@ pub(crate) fn async_busy_wait(checker: &Checker, while_stmt: &ast::StmtWhile) {
         qualified_name.segments(),
         ["trio" | "anyio", "sleep" | "sleep_until"] | ["asyncio", "sleep"]
     ) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             AsyncBusyWait {
                 module: AsyncModule::try_from(&qualified_name).unwrap(),
             },

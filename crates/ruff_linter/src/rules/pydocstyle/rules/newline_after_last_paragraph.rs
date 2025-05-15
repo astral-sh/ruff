@@ -78,8 +78,10 @@ pub(crate) fn newline_after_last_paragraph(checker: &Checker, docstring: &Docstr
                 .map(|l| l.as_str().trim())
             {
                 if last_line != "\"\"\"" && last_line != "'''" {
-                    let mut diagnostic =
-                        Diagnostic::new(NewLineAfterLastParagraph, docstring.range());
+                    let mut diagnostic = crate::message::Diagnostic::new(
+                        NewLineAfterLastParagraph,
+                        docstring.range(),
+                    );
                     // Insert a newline just before the end-quote(s).
                     let num_trailing_quotes = "'''".text_len();
                     let num_trailing_spaces: TextSize = last_line

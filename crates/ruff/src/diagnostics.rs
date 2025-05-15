@@ -58,19 +58,16 @@ impl Diagnostics {
             // IO errors.
             SourceError::Io(_)
             | SourceError::Notebook(NotebookError::Io(_) | NotebookError::Json(_)) => {
-                if settings.rules.enabled(Rule::IOError) {
+                if settings.rules.enabled(Some(Rule::IOError)) {
                     let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
                     let source_file = SourceFileBuilder::new(name, "").finish();
                     Self::new(
-                        vec![Diagnostic::from_diagnostic(
-                            Diagnostic::new(
-                                IOError {
-                                    message: err.to_string(),
-                                },
-                                TextRange::default(),
-                            ),
+                        vec![Diagnostic::new2(
+                            IOError {
+                                message: err.to_string(),
+                            },
+                            TextRange::default(),
                             source_file,
-                            None,
                         )],
                         FxHashMap::default(),
                     )

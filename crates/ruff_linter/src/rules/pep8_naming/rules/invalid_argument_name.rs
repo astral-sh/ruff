@@ -94,7 +94,7 @@ fn invalid_argument_name(checker: &Checker, parameters: &Parameters) {
             continue;
         }
 
-        let diagnostic = Diagnostic::new(
+        let diagnostic = crate::message::Diagnostic::new(
             InvalidArgumentName {
                 name: name.to_string(),
             },

@@ -305,7 +305,7 @@ pub(crate) fn function_uses_loop_variable(checker: &Checker, node: &Node) {
         for name in suspicious_variables {
             if reassigned_in_loop.contains(&name.id.as_str()) {
                 if checker.insert_flake8_bugbear_range(name.range()) {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
                         FunctionUsesLoopVariable {
                             name: name.id.to_string(),
                         },

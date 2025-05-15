@@ -78,7 +78,7 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 SliceToRemovePrefixOrSuffix {
                     affix_kind: kind,
                     stmt_or_expression: StmtOrExpr::Expression,
@@ -108,7 +108,7 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 SliceToRemovePrefixOrSuffix {
                     affix_kind: kind,
                     stmt_or_expression: StmtOrExpr::Statement,

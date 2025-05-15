@@ -78,7 +78,8 @@ pub(crate) fn unnecessary_literal_dict(
     if !checker.semantic().has_builtin_binding("dict") {
         return;
     }
-    let mut diagnostic = Diagnostic::new(UnnecessaryLiteralDict { obj_type: kind }, expr.range());
+    let mut diagnostic =
+        crate::message::Diagnostic::new(UnnecessaryLiteralDict { obj_type: kind }, expr.range());
     diagnostic
         .try_set_fix(|| fixes::fix_unnecessary_literal_dict(expr, checker).map(Fix::unsafe_edit));
     checker.report_diagnostic(diagnostic);

@@ -40,7 +40,7 @@ impl AlwaysFixableViolation for MissingNewlineAtEndOfFile {
 pub(crate) fn no_newline_at_end_of_file(
     locator: &Locator,
     stylist: &Stylist,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let source = locator.contents();
 
     // Ignore empty and BOM only files.
@@ -51,7 +51,7 @@ pub(crate) fn no_newline_at_end_of_file(
     if !source.ends_with(['\n', '\r']) {
         let range = TextRange::empty(locator.contents().text_len());
 
-        let mut diagnostic = Diagnostic::new(MissingNewlineAtEndOfFile, range);
+        let mut diagnostic = crate::message::Diagnostic::new(MissingNewlineAtEndOfFile, range);
         diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
             stylist.line_ending().to_string(),
             range.start(),

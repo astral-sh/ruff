@@ -97,7 +97,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         ConvertTypedDictFunctionalToClass {
             name: class_name.to_string(),
         },

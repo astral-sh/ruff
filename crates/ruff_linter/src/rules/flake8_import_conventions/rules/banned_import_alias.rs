@@ -52,13 +52,13 @@ pub(crate) fn banned_import_alias(
     name: &str,
     asname: &str,
     banned_conventions: &FxHashMap<String, BannedAliases>,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     if let Some(banned_aliases) = banned_conventions.get(name) {
         if banned_aliases
             .iter()
             .any(|banned_alias| banned_alias == asname)
         {
-            return Some(Diagnostic::new(
+            return Some(crate::message::Diagnostic::new(
                 BannedImportAlias {
                     name: name.to_string(),
                     asname: asname.to_string(),

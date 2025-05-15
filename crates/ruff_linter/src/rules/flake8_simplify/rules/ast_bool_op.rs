@@ -374,7 +374,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
             };
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = crate::message::Diagnostic::new(
                 DuplicateIsinstanceCall {
                     name: if let Expr::Name(ast::ExprName { id, .. }) = target {
                         Some(id.to_string())
@@ -557,7 +557,7 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
             range: TextRange::default(),
         };
         let in_expr = node2.into();
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             CompareWithTuple {
                 replacement: checker.generator().expr(&in_expr),
             },
@@ -629,7 +629,7 @@ pub(crate) fn expr_and_not_expr(checker: &Checker, expr: &Expr) {
     for negate_expr in negated_expr {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = crate::message::Diagnostic::new(
                     ExprAndNotExpr {
                         name: id.to_string(),
                     },
@@ -686,7 +686,7 @@ pub(crate) fn expr_or_not_expr(checker: &Checker, expr: &Expr) {
     for negate_expr in negated_expr {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = crate::message::Diagnostic::new(
                     ExprOrNotExpr {
                         name: id.to_string(),
                     },
@@ -838,7 +838,7 @@ pub(crate) fn expr_or_true(checker: &Checker, expr: &Expr) {
     }
 
     if let Some((edit, remove)) = is_short_circuit(expr, BoolOp::Or, checker) {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             ExprOrTrue {
                 expr: edit.content().unwrap_or_default().to_string(),
                 remove,
@@ -857,7 +857,7 @@ pub(crate) fn expr_and_false(checker: &Checker, expr: &Expr) {
     }
 
     if let Some((edit, remove)) = is_short_circuit(expr, BoolOp::And, checker) {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             ExprAndFalse {
                 expr: edit.content().unwrap_or_default().to_string(),
                 remove,

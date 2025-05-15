@@ -181,7 +181,7 @@ impl Violation for InvalidCharacterZeroWidthSpace {
 
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
 pub(crate) fn invalid_string_characters(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
     token: &Token,
     locator: &Locator,
 ) {
@@ -197,13 +197,25 @@ pub(crate) fn invalid_string_characters(
         let c = match_.chars().next().unwrap();
         let range = TextRange::at(location, c.text_len());
         let (replacement, mut diagnostic) = match c {
-            '\x08' => ("\\b", Diagnostic::new(InvalidCharacterBackspace, range)),
-            '\x1A' => ("\\x1A", Diagnostic::new(InvalidCharacterSub, range)),
-            '\x1B' => ("\\x1B", Diagnostic::new(InvalidCharacterEsc, range)),
-            '\0' => ("\\0", Diagnostic::new(InvalidCharacterNul, range)),
+            '\x08' => (
+                "\\b",
+                crate::message::Diagnostic::new(InvalidCharacterBackspace, range),
+            ),
+            '\x1A' => (
+                "\\x1A",
+                crate::message::Diagnostic::new(InvalidCharacterSub, range),
+            ),
+            '\x1B' => (
+                "\\x1B",
+                crate::message::Diagnostic::new(InvalidCharacterEsc, range),
+            ),
+            '\0' => (
+                "\\0",
+                crate::message::Diagnostic::new(InvalidCharacterNul, range),
+            ),
             '\u{200b}' => (
                 "\\u200b",
-                Diagnostic::new(InvalidCharacterZeroWidthSpace, range),
+                crate::message::Diagnostic::new(InvalidCharacterZeroWidthSpace, range),
             ),
             _ => {
                 continue;

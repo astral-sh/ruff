@@ -49,7 +49,8 @@ impl Violation for MultipleImportsOnOneLine {
 /// E401
 pub(crate) fn multiple_imports_on_one_line(checker: &Checker, stmt: &Stmt, names: &[Alias]) {
     if names.len() > 1 {
-        let mut diagnostic = Diagnostic::new(MultipleImportsOnOneLine, stmt.range());
+        let mut diagnostic =
+            crate::message::Diagnostic::new(MultipleImportsOnOneLine, stmt.range());
         diagnostic.set_fix(split_imports(
             stmt,
             names,

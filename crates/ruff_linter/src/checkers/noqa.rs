@@ -10,11 +10,12 @@ use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::fix::edits::delete_comment;
+use crate::message::Diagnostic;
 use crate::noqa::{
     Code, Directive, FileExemption, FileNoqaDirectives, NoqaDirectives, NoqaMapping,
 };
 use crate::preview::is_check_file_level_directives_enabled;
-use crate::registry::{AsRule, Rule, RuleSet};
+use crate::registry::{Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
@@ -47,7 +48,9 @@ pub(crate) fn check_noqa(
 
     // Remove any ignored diagnostics.
     'outer: for (index, diagnostic) in diagnostics.iter().enumerate() {
-        let rule = diagnostic.rule();
+        let Some(rule) = diagnostic.rule() else {
+            continue;
+        };
 
         if matches!(rule, Rule::BlanketNOQA) {
             continue;
@@ -106,7 +109,7 @@ pub(crate) fn check_noqa(
 
     // Enforce that the noqa directive was actually used (RUF100), unless RUF100 was itself
     // suppressed.
-    if settings.rules.enabled(Rule::UnusedNOQA)
+    if settings.rules.enabled(Some(Rule::UnusedNOQA))
         && analyze_directives
         && !exemption.includes(Rule::UnusedNOQA)
         && !per_file_ignores.contains(Rule::UnusedNOQA)
@@ -161,7 +164,7 @@ pub(crate) fn check_noqa(
                             let is_code_used = if is_file_level {
                                 diagnostics
                                     .iter()
-                                    .any(|diag| diag.rule().noqa_code() == code)
+                                    .any(|diag| diag.noqa_code().is_some_and(|noqa| noqa == code))
                             } else {
                                 matches.iter().any(|match_| *match_ == code)
                             } || settings
@@ -172,7 +175,7 @@ pub(crate) fn check_noqa(
                             if is_code_used {
                                 valid_codes.push(original_code);
                             } else if let Ok(rule) = Rule::from_code(code) {
-                                if settings.rules.enabled(rule) {
+                                if settings.rules.enabled(Some(rule)) {
                                     unmatched_codes.push(original_code);
                                 } else {
                                     disabled_codes.push(original_code);
@@ -243,7 +246,7 @@ pub(crate) fn check_noqa(
         }
     }
 
-    if settings.rules.enabled(Rule::RedirectedNOQA)
+    if settings.rules.enabled(Some(Rule::RedirectedNOQA))
         && !per_file_ignores.contains(Rule::RedirectedNOQA)
         && !exemption.includes(Rule::RedirectedNOQA)
     {
@@ -251,7 +254,7 @@ pub(crate) fn check_noqa(
         ruff::rules::redirected_file_noqa(diagnostics, &file_noqa_directives);
     }
 
-    if settings.rules.enabled(Rule::BlanketNOQA)
+    if settings.rules.enabled(Some(Rule::BlanketNOQA))
         && !per_file_ignores.contains(Rule::BlanketNOQA)
         && !exemption.enumerates(Rule::BlanketNOQA)
     {
@@ -263,7 +266,7 @@ pub(crate) fn check_noqa(
         );
     }
 
-    if settings.rules.enabled(Rule::InvalidRuleCode)
+    if settings.rules.enabled(Some(Rule::InvalidRuleCode))
         && !per_file_ignores.contains(Rule::InvalidRuleCode)
         && !exemption.enumerates(Rule::InvalidRuleCode)
     {

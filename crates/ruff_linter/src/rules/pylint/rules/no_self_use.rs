@@ -126,7 +126,7 @@ pub(crate) fn no_self_use(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
         .map(|binding_id| semantic.binding(binding_id))
         .is_some_and(|binding| binding.kind.is_argument() && binding.is_unused())
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             NoSelfUse {
                 method_name: name.to_string(),
             },

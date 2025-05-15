@@ -92,7 +92,7 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnnecessaryFromFloat {
             method_name,
             constructor,

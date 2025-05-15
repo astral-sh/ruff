@@ -5,7 +5,8 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::line_width::IndentWidth;
-use crate::registry::{AsRule, Rule};
+use crate::message::Diagnostic;
+use crate::registry::Rule;
 use crate::rules::pycodestyle::rules::logical_lines::{
     extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
     missing_whitespace_around_operator, redundant_backslash, space_after_comma,
@@ -38,7 +39,7 @@ pub(crate) fn check_logical_lines(
     indexer: &Indexer,
     stylist: &Stylist,
     settings: &LinterSettings,
-) -> Vec<Diagnostic> {
+) -> Vec<crate::message::Diagnostic> {
     let mut context = LogicalLinesContext::new(settings);
 
     let mut prev_line = None;
@@ -61,7 +62,7 @@ pub(crate) fn check_logical_lines(
         Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
         Rule::MissingWhitespaceAroundModuloOperator,
     ]);
-    let enforce_missing_whitespace = settings.rules.enabled(Rule::MissingWhitespace);
+    let enforce_missing_whitespace = settings.rules.enabled(Some(Rule::MissingWhitespace));
     let enforce_space_after_comma = settings
         .rules
         .any_enabled(&[Rule::MultipleSpacesAfterComma, Rule::TabAfterComma]);
@@ -76,17 +77,19 @@ pub(crate) fn check_logical_lines(
         Rule::TabAfterKeyword,
         Rule::TabBeforeKeyword,
     ]);
-    let enforce_missing_whitespace_after_keyword =
-        settings.rules.enabled(Rule::MissingWhitespaceAfterKeyword);
+    let enforce_missing_whitespace_after_keyword = settings
+        .rules
+        .enabled(Some(Rule::MissingWhitespaceAfterKeyword));
     let enforce_whitespace_before_comment = settings.rules.any_enabled(&[
         Rule::TooFewSpacesBeforeInlineComment,
         Rule::NoSpaceAfterInlineComment,
         Rule::NoSpaceAfterBlockComment,
         Rule::MultipleLeadingHashesForBlockComment,
     ]);
-    let enforce_whitespace_before_parameters =
-        settings.rules.enabled(Rule::WhitespaceBeforeParameters);
-    let enforce_redundant_backslash = settings.rules.enabled(Rule::RedundantBackslash);
+    let enforce_whitespace_before_parameters = settings
+        .rules
+        .enabled(Some(Rule::WhitespaceBeforeParameters));
+    let enforce_redundant_backslash = settings.rules.enabled(Some(Rule::RedundantBackslash));
     let enforce_indentation = settings.rules.any_enabled(&[
         Rule::IndentationWithInvalidMultiple,
         Rule::NoIndentedBlock,
@@ -194,7 +197,7 @@ pub(crate) fn check_logical_lines(
 #[derive(Debug, Clone)]
 pub(crate) struct LogicalLinesContext<'a> {
     settings: &'a LinterSettings,
-    diagnostics: Vec<Diagnostic>,
+    diagnostics: Vec<crate::message::Diagnostic>,
 }
 
 impl<'a> LogicalLinesContext<'a> {

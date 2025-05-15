@@ -49,9 +49,9 @@ pub(crate) fn banned_import_from(
     stmt: &Stmt,
     name: &str,
     banned_conventions: &FxHashSet<String>,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     if banned_conventions.contains(name) {
-        return Some(Diagnostic::new(
+        return Some(crate::message::Diagnostic::new(
             BannedImportFrom {
                 name: name.to_string(),
             },

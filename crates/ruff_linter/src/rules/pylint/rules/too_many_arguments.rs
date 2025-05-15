@@ -108,7 +108,7 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         TooManyArguments {
             c_args: num_arguments,
             max_args: checker.settings.pylint.max_args,

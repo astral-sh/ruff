@@ -808,7 +808,7 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             // The formatter always removes blank lines before the docstring.
             Rule::IncorrectBlankLineBeforeClass,
         ] {
-            if setting.linter.rules.enabled(rule) {
+            if setting.linter.rules.enabled(Some(rule)) {
                 incompatible_rules.insert(rule);
             }
         }
@@ -830,7 +830,7 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
     // Next, validate settings-specific incompatibilities.
     for setting in resolver.settings() {
         // Validate all rules that rely on tab styles.
-        if setting.linter.rules.enabled(Rule::TabIndentation)
+        if setting.linter.rules.enabled(Some(Rule::TabIndentation))
             && setting.formatter.indent_style.is_tab()
         {
             warn_user_once!("The `format.indent-style=\"tab\"` option is incompatible with `W191`, which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`.");
@@ -839,18 +839,21 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
         if !setting
             .linter
             .rules
-            .enabled(Rule::SingleLineImplicitStringConcatenation)
+            .enabled(Some(Rule::SingleLineImplicitStringConcatenation))
             && setting
                 .linter
                 .rules
-                .enabled(Rule::MultiLineImplicitStringConcatenation)
+                .enabled(Some(Rule::MultiLineImplicitStringConcatenation))
             && !setting.linter.flake8_implicit_str_concat.allow_multiline
         {
             warn_user_once!("The `lint.flake8-implicit-str-concat.allow-multiline = false` option is incompatible with the formatter unless `ISC001` is enabled. We recommend enabling `ISC001` or setting `allow-multiline=true`.");
         }
 
         // Validate all rules that rely on tab styles.
-        if setting.linter.rules.enabled(Rule::DocstringTabIndentation)
+        if setting
+            .linter
+            .rules
+            .enabled(Some(Rule::DocstringTabIndentation))
             && setting.formatter.indent_style.is_tab()
         {
             warn_user_once!("The `format.indent-style=\"tab\"` option is incompatible with `D206`, with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`.");
@@ -885,7 +888,10 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             }
         }
 
-        if setting.linter.rules.enabled(Rule::BadQuotesMultilineString)
+        if setting
+            .linter
+            .rules
+            .enabled(Some(Rule::BadQuotesMultilineString))
             && setting.linter.flake8_quotes.multiline_quotes == Quote::Single
             && matches!(
                 setting.formatter.quote_style,
@@ -895,7 +901,7 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             warn_user_once!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `\"double\"`.`");
         }
 
-        if setting.linter.rules.enabled(Rule::BadQuotesDocstring)
+        if setting.linter.rules.enabled(Some(Rule::BadQuotesDocstring))
             && setting.linter.flake8_quotes.docstring_quotes == Quote::Single
             && matches!(
                 setting.formatter.quote_style,
@@ -906,7 +912,7 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
         }
 
         // Validate all isort settings.
-        if setting.linter.rules.enabled(Rule::UnsortedImports) {
+        if setting.linter.rules.enabled(Some(Rule::UnsortedImports)) {
             // The formatter removes empty lines if the value is larger than 2 but always inserts a empty line after imports.
             // Two empty lines are okay because `isort` only uses this setting for top-level imports (not in nested blocks).
             if !matches!(setting.linter.isort.lines_after_imports, 1 | 2 | -1) {

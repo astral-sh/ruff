@@ -115,7 +115,10 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
     // "in" might also make sense but we don't currently have one.
     if !matches!(op, CmpOp::Eq | CmpOp::NotEq) {
         if checker.enabled(Rule::UnrecognizedPlatformCheck) {
-            checker.report_diagnostic(Diagnostic::new(UnrecognizedPlatformCheck, test.range()));
+            checker.report_diagnostic(crate::message::Diagnostic::new(
+                UnrecognizedPlatformCheck,
+                test.range(),
+            ));
         }
         return;
     }
@@ -125,7 +128,7 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
         // This protects against typos.
         if checker.enabled(Rule::UnrecognizedPlatformName) {
             if !matches!(value.to_str(), "linux" | "win32" | "cygwin" | "darwin") {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(crate::message::Diagnostic::new(
                     UnrecognizedPlatformName {
                         platform: value.to_string(),
                     },
@@ -135,7 +138,10 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
         }
     } else {
         if checker.enabled(Rule::UnrecognizedPlatformCheck) {
-            checker.report_diagnostic(Diagnostic::new(UnrecognizedPlatformCheck, test.range()));
+            checker.report_diagnostic(crate::message::Diagnostic::new(
+                UnrecognizedPlatformCheck,
+                test.range(),
+            ));
         }
     }
 }

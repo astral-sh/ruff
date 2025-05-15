@@ -60,7 +60,7 @@ pub(crate) fn implicit_namespace_package(
     project_root: &Path,
     src: &[PathBuf],
     allow_nested_roots: bool,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     if package.is_none()
         // Ignore non-`.py` files, which don't require an `__init__.py`.
         && PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file)
@@ -83,7 +83,7 @@ pub(crate) fn implicit_namespace_package(
         let path = path
             .to_string_lossy()
             .replace(std::path::MAIN_SEPARATOR, "/"); // The snapshot test expects / as the path separator.
-        return Some(Diagnostic::new(
+        return Some(crate::message::Diagnostic::new(
             ImplicitNamespacePackage {
                 filename: fs::relativize_path(path),
                 parent: None,
@@ -105,7 +105,7 @@ pub(crate) fn implicit_namespace_package(
                         .to_string_lossy()
                         .replace(std::path::MAIN_SEPARATOR, "/"); // The snapshot test expects / as the path separator.
 
-                    return Some(Diagnostic::new(
+                    return Some(crate::message::Diagnostic::new(
                         ImplicitNamespacePackage {
                             filename: fs::relativize_path(path),
                             parent: Some(fs::relativize_path(parent)),

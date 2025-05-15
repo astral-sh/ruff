@@ -78,7 +78,7 @@ pub(crate) fn unused_unpacked_variable(checker: &Checker, name: &str, binding: &
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnusedUnpackedVariable {
             name: name.to_string(),
         },

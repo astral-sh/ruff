@@ -115,7 +115,7 @@ fn match_extraneous_parentheses(tokens: &mut Iter<'_, Token>) -> Option<(TextRan
 
 /// UP034
 pub(crate) fn extraneous_parentheses(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
     tokens: &Tokens,
     locator: &Locator,
 ) {
@@ -129,7 +129,7 @@ pub(crate) fn extraneous_parentheses(
             continue;
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = crate::message::Diagnostic::new(
             ExtraneousParentheses,
             TextRange::new(start_range.start(), end_range.end()),
         );

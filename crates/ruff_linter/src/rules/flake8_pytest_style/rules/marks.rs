@@ -126,7 +126,7 @@ fn pytest_mark_parentheses(
     preferred: Parentheses,
     actual: Parentheses,
 ) {
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         PytestIncorrectMarkParenthesesStyle {
             mark_name: marker.to_string(),
             expected_parens: preferred,
@@ -204,7 +204,8 @@ fn check_useless_usefixtures(checker: &Checker, decorator: &Decorator, marker: &
         _ => return,
     }
 
-    let mut diagnostic = Diagnostic::new(PytestUseFixturesWithoutParameters, decorator.range());
+    let mut diagnostic =
+        crate::message::Diagnostic::new(PytestUseFixturesWithoutParameters, decorator.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(decorator.range())));
     checker.report_diagnostic(diagnostic);
 }

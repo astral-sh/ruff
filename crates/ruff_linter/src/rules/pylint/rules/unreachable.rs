@@ -64,7 +64,7 @@ pub(crate) fn in_function(checker: &Checker, name: &Identifier, body: &[Stmt]) {
         let start = cfg.range(start_block).start();
         let end = cfg.range(end_block).end();
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             UnreachableCode {
                 name: name.to_string(),
             },

@@ -5,6 +5,8 @@ use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
+use crate::message::Diagnostic;
+
 /// ## What it does
 /// Checks for uses of the `assert` keyword.
 ///
@@ -41,6 +43,6 @@ impl Violation for Assert {
 }
 
 /// S101
-pub(crate) fn assert_used(stmt: &Stmt) -> Diagnostic {
+pub(crate) fn assert_used(stmt: &Stmt) -> crate::message::Diagnostic {
     Diagnostic::new(Assert, TextRange::at(stmt.start(), "assert".text_len()))
 }

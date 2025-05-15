@@ -113,7 +113,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
         }
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         ConvertNamedTupleFunctionalToClass {
             name: typename.to_string(),
         },

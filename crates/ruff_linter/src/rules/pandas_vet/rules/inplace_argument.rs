@@ -78,7 +78,8 @@ pub(crate) fn inplace_argument(checker: &Checker, call: &ast::ExprCall) {
         };
         if arg == "inplace" {
             if is_const_true(&keyword.value) {
-                let mut diagnostic = Diagnostic::new(PandasUseOfInplaceArgument, keyword.range());
+                let mut diagnostic =
+                    crate::message::Diagnostic::new(PandasUseOfInplaceArgument, keyword.range());
                 // Avoid applying the fix if:
                 // 1. The keyword argument is followed by a star argument (we can't be certain that
                 //    the star argument _doesn't_ contain an override).

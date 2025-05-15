@@ -38,7 +38,7 @@ impl Violation for PandasDfVariableName {
 }
 
 /// PD901
-pub(crate) fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
+pub(crate) fn assignment_to_df(targets: &[Expr]) -> Option<crate::message::Diagnostic> {
     let [target] = targets else {
         return None;
     };
@@ -48,5 +48,8 @@ pub(crate) fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
     if id != "df" {
         return None;
     }
-    Some(Diagnostic::new(PandasDfVariableName, target.range()))
+    Some(crate::message::Diagnostic::new(
+        PandasDfVariableName,
+        target.range(),
+    ))
 }

@@ -125,7 +125,7 @@ pub(crate) fn iter_method_return_iterable(checker: &Checker, definition: &Defini
             }
         })
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             IterMethodReturnIterable { is_async },
             returns.range(),
         ));

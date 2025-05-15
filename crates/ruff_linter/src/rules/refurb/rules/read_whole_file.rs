@@ -71,10 +71,10 @@ pub(crate) fn read_whole_file(checker: &Checker, with: &ast::StmtWith) {
     };
 
     // All the matched operations should be reported.
-    let diagnostics: Vec<Diagnostic> = matches
+    let diagnostics: Vec<crate::message::Diagnostic> = matches
         .iter()
         .map(|open| {
-            Diagnostic::new(
+            crate::message::Diagnostic::new(
                 ReadWholeFile {
                     filename: SourceCodeSnippet::from_str(&checker.generator().expr(open.filename)),
                     suggestion: make_suggestion(open, checker.generator()),

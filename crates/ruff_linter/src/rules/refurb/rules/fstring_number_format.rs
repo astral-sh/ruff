@@ -145,7 +145,7 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
 
     let replacement = try_create_replacement(checker, arg, base);
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         FStringNumberFormat {
             replacement: replacement.as_deref().map(SourceCodeSnippet::from_str),
             base,

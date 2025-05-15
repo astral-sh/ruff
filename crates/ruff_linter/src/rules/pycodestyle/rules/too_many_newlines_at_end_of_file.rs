@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for TooManyNewlinesAtEndOfFile {
 
 /// W391
 pub(crate) fn too_many_newlines_at_end_of_file(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
     tokens: &Tokens,
     cell_offsets: Option<&CellOffsets>,
 ) {
@@ -75,7 +75,7 @@ pub(crate) fn too_many_newlines_at_end_of_file(
 fn notebook_newline_diagnostics<'a>(
     mut tokens_iter: Peekable<impl Iterator<Item = &'a Token>>,
     cell_offsets: &CellOffsets,
-) -> Vec<Diagnostic> {
+) -> Vec<crate::message::Diagnostic> {
     let mut results = Vec::new();
     let offset_iter = cell_offsets.iter().rev();
 
@@ -100,7 +100,7 @@ fn notebook_newline_diagnostics<'a>(
 fn newline_diagnostic<'a>(
     tokens_iter: &mut Peekable<impl Iterator<Item = &'a Token>>,
     in_notebook: bool,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let mut num_trailing_newlines: u32 = 0;
     let mut newline_range_start: Option<TextSize> = None;
     let mut newline_range_end: Option<TextSize> = None;
@@ -136,7 +136,7 @@ fn newline_diagnostic<'a>(
 
     let diagnostic_range = TextRange::new(start, end);
     Some(
-        Diagnostic::new(
+        crate::message::Diagnostic::new(
             TooManyNewlinesAtEndOfFile {
                 num_trailing_newlines,
                 in_notebook,

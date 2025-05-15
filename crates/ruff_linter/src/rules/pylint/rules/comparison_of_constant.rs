@@ -62,7 +62,7 @@ pub(crate) fn comparison_of_constant(
         .zip(ops)
     {
         if left.is_literal_expr() && right.is_literal_expr() {
-            let diagnostic = Diagnostic::new(
+            let diagnostic = crate::message::Diagnostic::new(
                 ComparisonOfConstant {
                     left_constant: checker.generator().expr(left),
                     op: *op,

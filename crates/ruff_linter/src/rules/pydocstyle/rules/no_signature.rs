@@ -86,6 +86,9 @@ pub(crate) fn no_signature(checker: &Checker, docstring: &Docstring) {
             true
         })
     {
-        checker.report_diagnostic(Diagnostic::new(SignatureInDocstring, docstring.range()));
+        checker.report_diagnostic(crate::message::Diagnostic::new(
+            SignatureInDocstring,
+            docstring.range(),
+        ));
     }
 }

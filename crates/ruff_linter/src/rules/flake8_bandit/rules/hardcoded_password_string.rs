@@ -79,7 +79,7 @@ pub(crate) fn compare_to_hardcoded_password_string(
     checker.report_diagnostics(comparators.iter().filter_map(|comp| {
         string_literal(comp).filter(|string| !string.is_empty())?;
         let name = password_target(left)?;
-        Some(Diagnostic::new(
+        Some(crate::message::Diagnostic::new(
             HardcodedPasswordString {
                 name: name.to_string(),
             },
@@ -96,7 +96,7 @@ pub(crate) fn assign_hardcoded_password_string(checker: &Checker, value: &Expr, 
     {
         for target in targets {
             if let Some(name) = password_target(target) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(crate::message::Diagnostic::new(
                     HardcodedPasswordString {
                         name: name.to_string(),
                     },

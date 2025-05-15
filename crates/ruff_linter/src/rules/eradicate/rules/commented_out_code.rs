@@ -4,6 +4,7 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{LineRanges, UniversalNewlineIterator};
 use ruff_text_size::TextRange;
 
+use crate::message::Diagnostic;
 use crate::settings::LinterSettings;
 use crate::Locator;
 
@@ -47,7 +48,7 @@ impl Violation for CommentedOutCode {
 
 /// ERA001
 pub(crate) fn commented_out_code(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<crate::message::Diagnostic>,
     locator: &Locator,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,

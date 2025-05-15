@@ -57,14 +57,14 @@ pub(crate) fn invalid_class_name(
     class_def: &Stmt,
     name: &str,
     ignore_names: &IgnoreNames,
-) -> Option<Diagnostic> {
+) -> Option<crate::message::Diagnostic> {
     let stripped = name.trim_start_matches('_');
     if !stripped.chars().next().is_some_and(char::is_uppercase) || stripped.contains('_') {
         // Ignore any explicitly-allowed names.
         if ignore_names.matches(name) {
             return None;
         }
-        return Some(Diagnostic::new(
+        return Some(crate::message::Diagnostic::new(
             InvalidClassName {
                 name: name.to_string(),
             },

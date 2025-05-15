@@ -110,7 +110,10 @@ const SORTING_STYLE: SortingStyle = SortingStyle::Natural;
 /// This routine checks whether the display is sorted, and emits a
 /// violation if it is not sorted. If the tuple/list/set was not sorted,
 /// it attempts to set a `Fix` on the violation.
-pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn sort_dunder_slots(
+    checker: &Checker,
+    binding: &Binding,
+) -> Option<crate::message::Diagnostic> {
     let semantic = checker.semantic();
 
     let (target, value) = match binding.statement(semantic)? {
@@ -141,7 +144,7 @@ pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) -> Option<
         return None;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         UnsortedDunderSlots {
             class_name: enclosing_class.name.id.clone(),
         },

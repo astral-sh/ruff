@@ -138,7 +138,7 @@ fn add_diagnostic(
     let isolation_level = Checker::isolation(checker.semantic().current_statement_id());
     let fix = Fix::applicable_edit(edit, applicability).isolate(isolation_level);
 
-    let diagnostic = Diagnostic::new(
+    let diagnostic = crate::message::Diagnostic::new(
         UnnecessaryPlaceholder {
             kind: placeholder_kind,
         },

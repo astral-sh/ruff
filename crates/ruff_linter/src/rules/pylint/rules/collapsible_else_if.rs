@@ -82,7 +82,7 @@ pub(crate) fn collapsible_else_if(checker: &Checker, stmt: &Stmt) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         CollapsibleElseIf,
         TextRange::new(else_clause.start(), first.start()),
     );

@@ -110,7 +110,7 @@ pub(crate) fn unordered_body_content_in_model(checker: &Checker, class_def: &ast
             .iter()
             .find(|&&prev_element_type| prev_element_type > element_type)
         {
-            let diagnostic = Diagnostic::new(
+            let diagnostic = crate::message::Diagnostic::new(
                 DjangoUnorderedBodyContentInModel {
                     element_type,
                     prev_element_type,

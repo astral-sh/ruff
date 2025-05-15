@@ -5,6 +5,7 @@ use ruff_python_index::Indexer;
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::TextSize;
 
+use crate::message::Diagnostic;
 use crate::registry::Rule;
 use crate::rules::flake8_copyright::rules::missing_copyright_notice;
 use crate::rules::pycodestyle::rules::{
@@ -25,15 +26,17 @@ pub(crate) fn check_physical_lines(
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let enforce_doc_line_too_long = settings.rules.enabled(Rule::DocLineTooLong);
-    let enforce_line_too_long = settings.rules.enabled(Rule::LineTooLong);
-    let enforce_no_newline_at_end_of_file = settings.rules.enabled(Rule::MissingNewlineAtEndOfFile);
-    let enforce_mixed_spaces_and_tabs = settings.rules.enabled(Rule::MixedSpacesAndTabs);
-    let enforce_bidirectional_unicode = settings.rules.enabled(Rule::BidirectionalUnicode);
-    let enforce_trailing_whitespace = settings.rules.enabled(Rule::TrailingWhitespace);
+    let enforce_doc_line_too_long = settings.rules.enabled(Some(Rule::DocLineTooLong));
+    let enforce_line_too_long = settings.rules.enabled(Some(Rule::LineTooLong));
+    let enforce_no_newline_at_end_of_file = settings
+        .rules
+        .enabled(Some(Rule::MissingNewlineAtEndOfFile));
+    let enforce_mixed_spaces_and_tabs = settings.rules.enabled(Some(Rule::MixedSpacesAndTabs));
+    let enforce_bidirectional_unicode = settings.rules.enabled(Some(Rule::BidirectionalUnicode));
+    let enforce_trailing_whitespace = settings.rules.enabled(Some(Rule::TrailingWhitespace));
     let enforce_blank_line_contains_whitespace =
-        settings.rules.enabled(Rule::BlankLineWithWhitespace);
-    let enforce_copyright_notice = settings.rules.enabled(Rule::MissingCopyrightNotice);
+        settings.rules.enabled(Some(Rule::BlankLineWithWhitespace));
+    let enforce_copyright_notice = settings.rules.enabled(Some(Rule::MissingCopyrightNotice));
 
     let mut doc_lines_iter = doc_lines.iter().peekable();
     let comment_ranges = indexer.comment_ranges();
@@ -72,7 +75,7 @@ pub(crate) fn check_physical_lines(
             }
         }
 
-        if settings.rules.enabled(Rule::IndentedFormFeed) {
+        if settings.rules.enabled(Some(Rule::IndentedFormFeed)) {
             if let Some(diagnostic) = indented_form_feed(&line) {
                 diagnostics.push(diagnostic);
             }

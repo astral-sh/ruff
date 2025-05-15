@@ -237,7 +237,7 @@ fn create_diagnostic(
         return seen_default;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         FastApiNonAnnotatedDependency {
             py_version: checker.target_version(),
         },

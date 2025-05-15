@@ -70,7 +70,7 @@ pub(crate) fn lambda_assignment(
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = crate::message::Diagnostic::new(
         LambdaAssignment {
             name: id.to_string(),
         },

@@ -71,7 +71,7 @@ pub(crate) fn exclude_with_model_form(checker: &Checker, class_def: &ast::StmtCl
                     continue;
                 };
                 if id == "exclude" {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(crate::message::Diagnostic::new(
                         DjangoExcludeWithModelForm,
                         target.range(),
                     ));

@@ -100,7 +100,7 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
         // Flag attributes as useless expressions, even if they're attached to calls or other
         // expressions.
         if value.is_attribute_expr() {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(crate::message::Diagnostic::new(
                 UselessExpression {
                     kind: Kind::Attribute,
                 },
@@ -110,7 +110,7 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(crate::message::Diagnostic::new(
         UselessExpression {
             kind: Kind::Expression,
         },

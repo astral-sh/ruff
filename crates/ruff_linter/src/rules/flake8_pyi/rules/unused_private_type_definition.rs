@@ -224,7 +224,7 @@ pub(crate) fn unused_private_type_var(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        let diagnostic = Diagnostic::new(
+        let diagnostic = crate::message::Diagnostic::new(
             UnusedPrivateTypeVar {
                 type_var_like_name: id.to_string(),
                 type_var_like_kind: type_var_like_kind.to_string(),
@@ -271,7 +271,7 @@ pub(crate) fn unused_private_protocol(checker: &Checker, scope: &Scope) {
             continue;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             UnusedPrivateProtocol {
                 name: class_def.name.to_string(),
             },
@@ -303,7 +303,7 @@ pub(crate) fn unused_private_type_alias(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             UnusedPrivateTypeAlias {
                 name: alias_name.to_string(),
             },
@@ -358,7 +358,7 @@ pub(crate) fn unused_private_typed_dict(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(crate::message::Diagnostic::new(
             UnusedPrivateTypedDict {
                 name: class_name.to_string(),
             },

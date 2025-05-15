@@ -74,7 +74,10 @@ pub(crate) fn datetime_min_max(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(DatetimeMinMax { min_max }, expr.range()));
+    checker.report_diagnostic(crate::message::Diagnostic::new(
+        DatetimeMinMax { min_max },
+        expr.range(),
+    ));
 }
 
 /// Check if the current expression has the pattern `foo.replace(tzinfo=bar)` or `foo.time()`.
