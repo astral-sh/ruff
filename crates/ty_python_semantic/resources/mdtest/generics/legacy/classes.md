@@ -319,7 +319,7 @@ class C(Generic[T, U]):
 class D(C[V, int]):
     def __init__(self, x: V) -> None: ...
 
-reveal_type(D(1))  # revealed: D[Literal[1]]
+reveal_type(D(1))  # revealed: C[V, int]
 ```
 
 ### `__init__` is itself generic
