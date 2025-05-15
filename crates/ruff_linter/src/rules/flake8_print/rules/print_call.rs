@@ -124,7 +124,7 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
         _ => return,
     };
 
-    if !checker.enabled(diagnostic.kind.rule()) {
+    if !checker.enabled(diagnostic.rule()) {
         return;
     }
 

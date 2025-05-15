@@ -2561,7 +2561,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.11.9"
+version = "0.11.10"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2801,7 +2801,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.11.9"
+version = "0.11.10"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -2866,6 +2866,7 @@ dependencies = [
 name = "ruff_macros"
 version = "0.0.0"
 dependencies = [
+ "heck",
  "itertools 0.14.0",
  "proc-macro2",
  "quote",
@@ -3136,7 +3137,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.11.9"
+version = "0.11.10"
 dependencies = [
  "console_error_panic_hook",
  "console_log",

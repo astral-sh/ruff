@@ -1,8 +1,8 @@
 use ruff_python_ast::{self as ast, Expr, Parameters};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
+use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::visitor;
@@ -83,7 +83,7 @@ impl Violation for FunctionCallInDefaultArgument {
 struct ArgumentDefaultVisitor<'a, 'b> {
     semantic: &'a SemanticModel<'b>,
     extend_immutable_calls: &'a [QualifiedName<'b>],
-    diagnostics: Vec<(DiagnosticKind, TextRange)>,
+    diagnostics: Vec<Diagnostic>,
 }
 
 impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
@@ -109,11 +109,10 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
                         is_immutable_newtype_call(name, self.semantic, self.extend_immutable_calls)
                     })
                 {
-                    self.diagnostics.push((
+                    self.diagnostics.push(Diagnostic::new(
                         FunctionCallInDefaultArgument {
                             name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
-                        }
-                        .into(),
+                        },
                         expr.range(),
                     ));
                 }
@@ -149,7 +148,5 @@ pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: &
         }
     }
 
-    for (check, range) in visitor.diagnostics {
-        checker.report_diagnostic(Diagnostic::new(check, range));
-    }
+    checker.report_diagnostics(visitor.diagnostics);
 }

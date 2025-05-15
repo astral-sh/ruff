@@ -49,7 +49,7 @@ pub fn derive_combine(input: TokenStream) -> TokenStream {
         .into()
 }
 
-/// Converts a screaming snake case identifier to a kebab case string.
+/// Converts an identifier to a kebab case string.
 #[proc_macro]
 pub fn kebab_case(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as syn::Ident);

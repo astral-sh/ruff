@@ -13,12 +13,13 @@ use itertools::Itertools;
 use log::{debug, error};
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelBridge};
+use ruff_linter::{codes::Rule, registry::AsRule};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
-use ruff_diagnostics::{DiagnosticKind, Fix};
+use ruff_diagnostics::Fix;
 use ruff_linter::message::{DiagnosticMessage, Message};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{warn_user, VERSION};
@@ -348,7 +349,9 @@ impl FileCache {
                     .iter()
                     .map(|msg| {
                         Message::Diagnostic(DiagnosticMessage {
-                            kind: msg.kind.clone(),
+                            name: msg.rule.into(),
+                            body: msg.body.clone(),
+                            suggestion: msg.suggestion.clone(),
                             range: msg.range,
                             fix: msg.fix.clone(),
                             file: file.clone(),
@@ -444,7 +447,9 @@ impl LintCacheData {
                     "message uses a different source file"
                 );
                 CacheMessage {
-                    kind: msg.kind.clone(),
+                    rule: msg.rule(),
+                    body: msg.body.clone(),
+                    suggestion: msg.suggestion.clone(),
                     range: msg.range,
                     parent: msg.parent,
                     fix: msg.fix.clone(),
@@ -464,7 +469,12 @@ impl LintCacheData {
 /// On disk representation of a diagnostic message.
 #[derive(Deserialize, Debug, Serialize, PartialEq)]
 pub(super) struct CacheMessage {
-    kind: DiagnosticKind,
+    /// The rule for the cached diagnostic.
+    rule: Rule,
+    /// The message body to display to the user, to explain the diagnostic.
+    body: String,
+    /// The message to display to the user, to explain the suggested fix.
+    suggestion: Option<String>,
     /// Range into the message's [`FileCache::source`].
     range: TextRange,
     parent: Option<TextSize>,

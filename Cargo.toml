@@ -85,6 +85,7 @@ hashbrown = { version = "0.15.0", default-features = false, features = [
     "equivalent",
     "inline-more",
 ] }
+heck = "0.5.0"
 ignore = { version = "0.4.22" }
 imara-diff = { version = "0.1.5" }
 imperative = { version = "1.0.4" }
@@ -162,6 +163,8 @@ tracing-log = { version = "0.2.0" }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = [
     "env-filter",
     "fmt",
+    "ansi",
+    "smallvec"
 ] }
 tryfn = { version = "0.2.1" }
 typed-arena = { version = "2.0.2" }
@@ -254,6 +257,9 @@ codegen-units = 1
 opt-level = 3
 
 [profile.dev.package.similar]
+opt-level = 3
+
+[profile.dev.package.salsa]
 opt-level = 3
 
 # Reduce complexity of a parser function that would trigger a locals limit in a wasm tool.

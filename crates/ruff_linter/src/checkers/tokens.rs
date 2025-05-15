@@ -184,7 +184,7 @@ pub(crate) fn check_tokens(
         );
     }
 
-    diagnostics.retain(|diagnostic| settings.rules.enabled(diagnostic.kind.rule()));
+    diagnostics.retain(|diagnostic| settings.rules.enabled(diagnostic.rule()));
 
     diagnostics
 }
