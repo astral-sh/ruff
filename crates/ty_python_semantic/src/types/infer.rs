@@ -5048,16 +5048,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             overload.parameter_types()
                                         {
                                             let db = self.db();
-                                            if (source_type.is_equivalent_to(db, *casted_type)
-                                                || source_type.normalized(db)
-                                                    == casted_type.normalized(db))
-                                                && !source_type.any_over_type(db, &|ty| {
-                                                    matches!(
-                                                        ty,
-                                                        Type::Dynamic(dynamic)
-                                                            if dynamic != DynamicType::Any
-                                                    )
-                                                })
+                                            let contains_unknown_or_todo = |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
+                                            if source_type.is_equivalent_to(db, *casted_type)
+                                                || (source_type.normalized(db)
+                                                    == casted_type.normalized(db)
+                                                    && !casted_type.any_over_type(db, &|ty| {
+                                                        contains_unknown_or_todo(ty)
+                                                    })
+                                                    && !source_type.any_over_type(db, &|ty| {
+                                                        contains_unknown_or_todo(ty)
+                                                    }))
                                             {
                                                 if let Some(builder) = self
                                                     .context

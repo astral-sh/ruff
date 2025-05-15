@@ -985,15 +985,15 @@ impl<'db> Type<'db> {
             Type::Tuple(tuple) => Type::Tuple(tuple.normalized(db)),
             Type::Callable(callable) => Type::Callable(callable.normalized(db)),
             Type::ProtocolInstance(protocol) => protocol.normalized(db),
+            Type::NominalInstance(instance) => Type::NominalInstance(instance.normalized(db)),
+            Type::Dynamic(_) => Type::any(),
             Type::LiteralString
-            | Type::NominalInstance(_)
             | Type::PropertyInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
             | Type::StringLiteral(_)
-            | Type::Dynamic(_)
             | Type::Never
             | Type::FunctionLiteral(_)
             | Type::MethodWrapper(_)
@@ -1007,10 +1007,7 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(_)
             | Type::BoundSuper(_)
             | Type::SubclassOf(_) => self,
-            Type::GenericAlias(generic) => {
-                let specialization = generic.specialization(db).normalized(db);
-                Type::GenericAlias(GenericAlias::new(db, generic.origin(db), specialization))
-            }
+            Type::GenericAlias(generic) => Type::GenericAlias(generic.normalized(db)),
             Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     Type::TypeVar(TypeVarInstance::new(

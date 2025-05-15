@@ -75,6 +75,10 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
+        Self::from_class(self.class.normalized(db))
+    }
+
     pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
         // N.B. The subclass relation is fully static
         self.class.is_subclass_of(db, other.class)

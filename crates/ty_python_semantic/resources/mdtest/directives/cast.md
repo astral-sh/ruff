@@ -73,5 +73,8 @@ def f(x: Any, y: Unknown, z: Any | str | int):
     c = cast(Unknown, y)
     reveal_type(c)  # revealed: Unknown
 
-    d = cast(str | int | Any, z)  # error: [redundant-cast]
+    d = cast(Unknown, x)
+    reveal_type(d)  # revealed: Unknown
+
+    e = cast(str | int | Any, z)  # error: [redundant-cast]
 ```
