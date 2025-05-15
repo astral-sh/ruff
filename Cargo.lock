@@ -1416,6 +1416,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "intrusive-collections"
+version = "0.9.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "189d0897e4cbe8c75efedf3502c18c887b05046e59d28404d4d8e46cbc4d1e86"
+dependencies = [
+ "memoffset",
+]
+
+[[package]]
 name = "is-docker"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1741,6 +1750,15 @@ name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
+
+[[package]]
+name = "memoffset"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
+dependencies = [
+ "autocfg",
+]
 
 [[package]]
 name = "mimalloc"
@@ -3180,16 +3198,17 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "salsa"
-version = "0.21.1"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=4818b15f3b7516555d39f5a41cb75970448bee4c#4818b15f3b7516555d39f5a41cb75970448bee4c"
+version = "0.22.0"
+source = "git+https://github.com/ibraheemdev/salsa?rev=e9dd043f0a5ba971130a649e0e4559fe11253188#e9dd043f0a5ba971130a649e0e4559fe11253188"
 dependencies = [
  "boxcar",
  "compact_str",
  "crossbeam-queue",
- "dashmap 6.1.0",
+ "crossbeam-utils",
  "hashbrown 0.15.3",
  "hashlink",
  "indexmap",
+ "intrusive-collections",
  "parking_lot",
  "portable-atomic",
  "rayon",
@@ -3203,13 +3222,13 @@ dependencies = [
 
 [[package]]
 name = "salsa-macro-rules"
-version = "0.21.1"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=4818b15f3b7516555d39f5a41cb75970448bee4c#4818b15f3b7516555d39f5a41cb75970448bee4c"
+version = "0.22.0"
+source = "git+https://github.com/ibraheemdev/salsa?rev=e9dd043f0a5ba971130a649e0e4559fe11253188#e9dd043f0a5ba971130a649e0e4559fe11253188"
 
 [[package]]
 name = "salsa-macros"
-version = "0.21.1"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=4818b15f3b7516555d39f5a41cb75970448bee4c#4818b15f3b7516555d39f5a41cb75970448bee4c"
+version = "0.22.0"
+source = "git+https://github.com/ibraheemdev/salsa?rev=e9dd043f0a5ba971130a649e0e4559fe11253188#e9dd043f0a5ba971130a649e0e4559fe11253188"
 dependencies = [
  "heck",
  "proc-macro2",
