@@ -1516,6 +1516,15 @@ impl<'db> Type<'db> {
                 true
             }
 
+            // Every `type[...]` is assignable to `type`
+            (Type::SubclassOf(_), _)
+                if KnownClass::Type
+                    .to_instance(db)
+                    .is_assignable_to(db, target) =>
+            {
+                true
+            }
+
             // All `type[...]` types are assignable to `type[Any]`, because `type[Any]` can
             // materialize to any `type[...]` type.
             //
