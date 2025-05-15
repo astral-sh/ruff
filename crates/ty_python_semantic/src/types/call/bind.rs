@@ -626,16 +626,28 @@ impl<'db> Bindings<'db> {
                                 // TODO: Handle generic functions, and unions/intersections of
                                 // generic types
                                 overload.set_return_type(match ty {
-                                    Type::ClassLiteral(class) => match class.generic_context(db) {
-                                        Some(generic_context) => TupleType::from_elements(
+                                    Type::ClassLiteral(class) => (class.generic_context(db))
+                                        .map(|generic_context| generic_context.as_tuple(db))
+                                        .unwrap_or(Type::none(db)),
+
+                                    Type::FunctionLiteral(function) => {
+                                        let union = UnionType::from_elements(
                                             db,
-                                            generic_context
-                                                .variables(db)
+                                            function
+                                                .signature(db)
+                                                .overloads
                                                 .iter()
-                                                .map(|typevar| Type::TypeVar(*typevar)),
-                                        ),
-                                        None => Type::none(db),
-                                    },
+                                                .filter_map(|signature| signature.generic_context)
+                                                .map(|generic_context| {
+                                                    generic_context.as_tuple(db)
+                                                }),
+                                        );
+                                        if union.is_never() {
+                                            Type::none(db)
+                                        } else {
+                                            union
+                                        }
+                                    }
 
                                     _ => Type::none(db),
                                 });

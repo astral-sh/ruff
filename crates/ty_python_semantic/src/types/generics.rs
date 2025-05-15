@@ -171,6 +171,16 @@ impl<'db> GenericContext<'db> {
         self.specialize(db, types.into())
     }
 
+    /// Returns a tuple type of the typevars introduced by this generic context.
+    pub(crate) fn as_tuple(self, db: &'db dyn Db) -> Type<'db> {
+        TupleType::from_elements(
+            db,
+            self.variables(db)
+                .iter()
+                .map(|typevar| Type::TypeVar(*typevar)),
+        )
+    }
+
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
         self.variables(db).is_subset(other.variables(db))
     }
