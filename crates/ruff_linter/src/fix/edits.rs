@@ -605,7 +605,7 @@ mod tests {
     use crate::fix::edits::{
         add_to_dunder_all, make_redundant_alias, next_stmt_break, trailing_semicolon,
     };
-    use crate::message::Message;
+    use crate::message::Diagnostic;
     use crate::Locator;
 
     /// Parse the given source using [`Mode::Module`] and return the first statement.
@@ -745,7 +745,7 @@ x = 1 \
                 iter.next().ok_or(anyhow!("expected edits nonempty"))?,
                 iter,
             ));
-            Message::diagnostic(
+            Diagnostic::diagnostic(
                 diag.name,
                 diag.body,
                 diag.suggestion,

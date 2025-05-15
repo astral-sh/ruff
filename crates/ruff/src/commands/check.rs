@@ -13,7 +13,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::panic::catch_unwind;
 
-use ruff_linter::message::Message;
+use ruff_linter::message::Diagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::UnsafeFixes;
@@ -130,7 +130,7 @@ pub(crate) fn check(
                         SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
                     Diagnostics::new(
-                        vec![Message::from_diagnostic(
+                        vec![Diagnostic::from_diagnostic(
                             Diagnostic::new(IOError { message }, TextRange::default()),
                             dummy,
                             None,

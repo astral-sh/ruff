@@ -13,7 +13,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::fs::relativize_path;
 use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Diagnostic, Emitter, EmitterContext};
 use crate::settings::types::UnsafeFixes;
 use crate::Locator;
 
@@ -66,7 +66,7 @@ impl Emitter for TextEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        messages: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {
@@ -140,7 +140,7 @@ impl Emitter for TextEmitter {
 }
 
 pub(super) struct RuleCodeAndBody<'a> {
-    pub(crate) message: &'a Message,
+    pub(crate) message: &'a Diagnostic,
     pub(crate) show_fix_status: bool,
     pub(crate) unsafe_fixes: UnsafeFixes,
 }
@@ -178,7 +178,7 @@ impl Display for RuleCodeAndBody<'_> {
 }
 
 pub(super) struct MessageCodeFrame<'a> {
-    pub(crate) message: &'a Message,
+    pub(crate) message: &'a Diagnostic,
     pub(crate) notebook_index: Option<&'a NotebookIndex>,
 }
 

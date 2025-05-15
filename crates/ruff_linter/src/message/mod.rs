@@ -53,7 +53,7 @@ mod text;
 /// [`Diagnostic::body`], and the primary annotation optionally contains the suggestion accompanying
 /// a fix. The `db::Diagnostic::id` field contains the kebab-case lint name derived from the `Rule`.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Message {
+pub struct Diagnostic {
     pub diagnostic: db::Diagnostic,
 
     // these fields are specific to rule violations
@@ -62,12 +62,12 @@ pub struct Message {
     pub(crate) noqa_offset: Option<TextSize>,
 }
 
-impl Message {
+impl Diagnostic {
     pub fn syntax_error(
         message: impl std::fmt::Display,
         range: TextRange,
         file: SourceFile,
-    ) -> Message {
+    ) -> Diagnostic {
         let mut diag = db::Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, message);
         let span = Span::from(file).with_range(range);
         diag.annotate(Annotation::primary(span));
@@ -89,7 +89,7 @@ impl Message {
         parent: Option<TextSize>,
         file: SourceFile,
         noqa_offset: Option<TextSize>,
-    ) -> Message {
+    ) -> Diagnostic {
         let mut diagnostic = db::Diagnostic::new(
             DiagnosticId::Lint(LintName::of(name)),
             Severity::Error,
@@ -102,7 +102,7 @@ impl Message {
         }
         diagnostic.annotate(annotation);
 
-        Message {
+        Diagnostic {
             diagnostic,
             fix,
             parent,
@@ -110,38 +110,12 @@ impl Message {
         }
     }
 
-    /// Create a [`Message`] from the given [`Diagnostic`] corresponding to a rule violation.
-    pub fn from_diagnostic(
-        diagnostic: Diagnostic,
-        file: SourceFile,
-        noqa_offset: Option<TextSize>,
-    ) -> Message {
-        let Diagnostic {
-            name,
-            body,
-            suggestion,
-            range,
-            fix,
-            parent,
-        } = diagnostic;
-        Self::diagnostic(
-            name,
-            body,
-            suggestion,
-            range,
-            fix,
-            parent,
-            file,
-            noqa_offset,
-        )
-    }
-
     /// Create a [`Message`] from the given [`ParseError`].
     pub fn from_parse_error(
         parse_error: &ParseError,
         locator: &Locator,
         file: SourceFile,
-    ) -> Message {
+    ) -> Diagnostic {
         // Try to create a non-empty range so that the diagnostic can print a caret at the right
         // position. This requires that we retrieve the next character, if any, and take its length
         // to maintain char-boundaries.
@@ -151,7 +125,7 @@ impl Message {
             .next()
             .map_or(TextSize::new(0), TextLen::text_len);
 
-        Message::syntax_error(
+        Diagnostic::syntax_error(
             format_args!(
                 "SyntaxError: {}",
                 DisplayParseErrorType::new(&parse_error.error)
@@ -165,8 +139,8 @@ impl Message {
     pub fn from_unsupported_syntax_error(
         unsupported_syntax_error: &UnsupportedSyntaxError,
         file: SourceFile,
-    ) -> Message {
-        Message::syntax_error(
+    ) -> Diagnostic {
+        Diagnostic::syntax_error(
             format_args!("SyntaxError: {unsupported_syntax_error}"),
             unsupported_syntax_error.range,
             file,
@@ -177,8 +151,8 @@ impl Message {
     pub fn from_semantic_syntax_error(
         semantic_syntax_error: &SemanticSyntaxError,
         file: SourceFile,
-    ) -> Message {
-        Message::syntax_error(
+    ) -> Diagnostic {
+        Diagnostic::syntax_error(
             format_args!("SyntaxError: {semantic_syntax_error}"),
             semantic_syntax_error.range,
             file,
@@ -294,19 +268,19 @@ impl Message {
     }
 }
 
-impl Ord for Message {
+impl Ord for Diagnostic {
     fn cmp(&self, other: &Self) -> Ordering {
         (self.source_file(), self.start()).cmp(&(other.source_file(), other.start()))
     }
 }
 
-impl PartialOrd for Message {
+impl PartialOrd for Diagnostic {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ranged for Message {
+impl Ranged for Diagnostic {
     fn range(&self) -> TextRange {
         self.diagnostic
             .expect_primary_span()
@@ -316,19 +290,21 @@ impl Ranged for Message {
 }
 
 struct MessageWithLocation<'a> {
-    message: &'a Message,
+    message: &'a Diagnostic,
     start_location: LineColumn,
 }
 
 impl Deref for MessageWithLocation<'_> {
-    type Target = Message;
+    type Target = Diagnostic;
 
     fn deref(&self) -> &Self::Target {
         self.message
     }
 }
 
-fn group_messages_by_filename(messages: &[Message]) -> BTreeMap<String, Vec<MessageWithLocation>> {
+fn group_messages_by_filename(
+    messages: &[Diagnostic],
+) -> BTreeMap<String, Vec<MessageWithLocation>> {
     let mut grouped_messages = BTreeMap::default();
     for message in messages {
         grouped_messages
@@ -350,7 +326,7 @@ pub trait Emitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        messages: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()>;
 }
@@ -385,10 +361,10 @@ mod tests {
     use ruff_source_file::{OneIndexed, SourceFileBuilder};
     use ruff_text_size::{TextRange, TextSize};
 
-    use crate::message::{Emitter, EmitterContext, Message};
+    use crate::message::{Diagnostic, Emitter, EmitterContext};
     use crate::Locator;
 
-    pub(super) fn create_syntax_error_messages() -> Vec<Message> {
+    pub(super) fn create_syntax_error_messages() -> Vec<Diagnostic> {
         let source = r"from os import
 
 if call(foo
@@ -401,12 +377,12 @@ if call(foo
             .errors()
             .iter()
             .map(|parse_error| {
-                Message::from_parse_error(parse_error, &locator, source_file.clone())
+                Diagnostic::from_parse_error(parse_error, &locator, source_file.clone())
             })
             .collect()
     }
 
-    pub(super) fn create_messages() -> Vec<Message> {
+    pub(super) fn create_messages() -> Vec<Diagnostic> {
         let fib = r#"import os
 
 
@@ -424,7 +400,7 @@ def fibonacci(n):
         let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
 
         let unused_import_start = TextSize::from(7);
-        let unused_import = Message::diagnostic(
+        let unused_import = Diagnostic::diagnostic(
             "unused-import",
             "`os` imported but unused".to_string(),
             Some("Remove unused import: `os`".to_string()),
@@ -439,7 +415,7 @@ def fibonacci(n):
         );
 
         let unused_variable_start = TextSize::from(94);
-        let unused_variable = Message::diagnostic(
+        let unused_variable = Diagnostic::diagnostic(
             "unused-variable",
             "Local variable `x` is assigned to but never used".to_string(),
             Some("Remove assignment to unused variable `x`".to_string()),
@@ -456,7 +432,7 @@ def fibonacci(n):
         let file_2 = r"if a == 1: pass";
 
         let undefined_name_start = TextSize::from(3);
-        let undefined_name = Message::diagnostic(
+        let undefined_name = Diagnostic::diagnostic(
             "undefined-name",
             "Undefined name `a`".to_string(),
             None,
@@ -470,7 +446,8 @@ def fibonacci(n):
         vec![unused_import, unused_variable, undefined_name]
     }
 
-    pub(super) fn create_notebook_messages() -> (Vec<Message>, FxHashMap<String, NotebookIndex>) {
+    pub(super) fn create_notebook_messages() -> (Vec<Diagnostic>, FxHashMap<String, NotebookIndex>)
+    {
         let notebook = r"# cell 1
 import os
 # cell 2
@@ -486,7 +463,7 @@ def foo():
         let notebook_source = SourceFileBuilder::new("notebook.ipynb", notebook).finish();
 
         let unused_import_os_start = TextSize::from(16);
-        let unused_import_os = Message::diagnostic(
+        let unused_import_os = Diagnostic::diagnostic(
             "unused-import",
             "`os` imported but unused".to_string(),
             Some("Remove unused import: `os`".to_string()),
@@ -501,7 +478,7 @@ def foo():
         );
 
         let unused_import_math_start = TextSize::from(35);
-        let unused_import_math = Message::diagnostic(
+        let unused_import_math = Diagnostic::diagnostic(
             "unused-import",
             "`math` imported but unused".to_string(),
             Some("Remove unused import: `math`".to_string()),
@@ -516,7 +493,7 @@ def foo():
         );
 
         let unused_variable_start = TextSize::from(98);
-        let unused_variable = Message::diagnostic(
+        let unused_variable = Diagnostic::diagnostic(
             "unused-variable",
             "Local variable `x` is assigned to but never used".to_string(),
             Some("Remove assignment to unused variable `x`".to_string()),
@@ -569,7 +546,7 @@ def foo():
 
     pub(super) fn capture_emitter_output(
         emitter: &mut dyn Emitter,
-        messages: &[Message],
+        messages: &[Diagnostic],
     ) -> String {
         let notebook_indexes = FxHashMap::default();
         let context = EmitterContext::new(&notebook_indexes);
@@ -581,7 +558,7 @@ def foo():
 
     pub(super) fn capture_emitter_notebook_output(
         emitter: &mut dyn Emitter,
-        messages: &[Message],
+        messages: &[Diagnostic],
         notebook_indexes: &FxHashMap<String, NotebookIndex>,
     ) -> String {
         let context = EmitterContext::new(notebook_indexes);

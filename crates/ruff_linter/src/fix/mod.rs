@@ -7,7 +7,7 @@ use ruff_diagnostics::{Edit, Fix, IsolationLevel, SourceMap};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::linter::FixTable;
-use crate::message::Message;
+use crate::message::Diagnostic;
 use crate::registry::Rule;
 use crate::settings::types::UnsafeFixes;
 use crate::Locator;
@@ -27,7 +27,7 @@ pub(crate) struct FixResult {
 
 /// Fix errors in a file, and write the fixed source code to disk.
 pub(crate) fn fix_file(
-    messages: &[Message],
+    messages: &[Diagnostic],
     locator: &Locator,
     unsafe_fixes: UnsafeFixes,
 ) -> Option<FixResult> {
@@ -52,7 +52,7 @@ pub(crate) fn fix_file(
 
 /// Apply a series of fixes.
 fn apply_fixes<'a>(
-    diagnostics: impl Iterator<Item = &'a Message>,
+    diagnostics: impl Iterator<Item = &'a Diagnostic>,
     locator: &'a Locator<'a>,
 ) -> FixResult {
     let mut output = String::with_capacity(locator.len());
@@ -163,7 +163,7 @@ mod tests {
     use ruff_text_size::{Ranged, TextSize};
 
     use crate::fix::{apply_fixes, FixResult};
-    use crate::message::Message;
+    use crate::message::Diagnostic;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
     use crate::Locator;
 
@@ -171,12 +171,12 @@ mod tests {
         filename: &str,
         source: &str,
         edit: impl IntoIterator<Item = Edit>,
-    ) -> Vec<Message> {
+    ) -> Vec<Diagnostic> {
         edit.into_iter()
             .map(|edit| {
                 // The choice of rule here is arbitrary.
                 let diagnostic = Diagnostic::new(MissingNewlineAtEndOfFile, edit.range());
-                Message::from_diagnostic(
+                Diagnostic::from_diagnostic(
                     diagnostic.with_fix(Fix::safe_edit(edit)),
                     SourceFileBuilder::new(filename, source).finish(),
                     None,

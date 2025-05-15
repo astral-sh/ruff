@@ -13,8 +13,8 @@ use serde::Serialize;
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
-    AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JsonLinesEmitter, JunitEmitter, Message, PylintEmitter, RdjsonEmitter,
+    AzureEmitter, Diagnostic, Emitter, EmitterContext, GithubEmitter, GitlabEmitter,
+    GroupedEmitter, JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, RdjsonEmitter,
     SarifEmitter, TextEmitter,
 };
 use ruff_linter::notify_user;
@@ -317,7 +317,7 @@ impl Printer {
             .sorted_by_key(|(code, message)| (*code, message.fixable()))
             .fold(
                 vec![],
-                |mut acc: Vec<((Option<NoqaCode>, &Message), usize)>, (code, message)| {
+                |mut acc: Vec<((Option<NoqaCode>, &Diagnostic), usize)>, (code, message)| {
                     if let Some(((prev_code, _prev_message), count)) = acc.last_mut() {
                         if *prev_code == code {
                             *count += 1;

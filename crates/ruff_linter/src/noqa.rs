@@ -16,7 +16,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
-use crate::message::Message;
+use crate::message::Diagnostic;
 use crate::registry::{Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 use crate::Locator;
@@ -28,7 +28,7 @@ use crate::Locator;
 /// simultaneously.
 pub fn generate_noqa_edits(
     path: &Path,
-    messages: &[Message],
+    messages: &[Diagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -702,7 +702,7 @@ impl Error for LexicalError {}
 /// Adds noqa comments to suppress all messages of a file.
 pub(crate) fn add_noqa(
     path: &Path,
-    messages: &[Message],
+    messages: &[Diagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -725,7 +725,7 @@ pub(crate) fn add_noqa(
 
 fn add_noqa_inner(
     path: &Path,
-    messages: &[Message],
+    messages: &[Diagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -830,7 +830,7 @@ struct NoqaComment<'a> {
 }
 
 fn find_noqa_comments<'a>(
-    messages: &'a [Message],
+    messages: &'a [Diagnostic],
     locator: &'a Locator,
     exemption: &'a FileExemption,
     directives: &'a NoqaDirectives,
@@ -1218,7 +1218,7 @@ mod tests {
     use ruff_source_file::{LineEnding, SourceFileBuilder};
     use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-    use crate::message::Message;
+    use crate::message::Diagnostic;
     use crate::noqa::{
         add_noqa_inner, lex_codes, lex_file_exemption, lex_inline_noqa, Directive, LexicalError,
         NoqaLexerOutput, NoqaMapping,
@@ -1248,10 +1248,10 @@ mod tests {
         diagnostic: Diagnostic,
         path: impl AsRef<Path>,
         source: &str,
-    ) -> Message {
+    ) -> Diagnostic {
         let noqa_offset = diagnostic.start();
         let file = SourceFileBuilder::new(path.as_ref().to_string_lossy(), source).finish();
-        Message::from_diagnostic(diagnostic, file, Some(noqa_offset))
+        Diagnostic::from_diagnostic(diagnostic, file, Some(noqa_offset))
     }
 
     #[test]
