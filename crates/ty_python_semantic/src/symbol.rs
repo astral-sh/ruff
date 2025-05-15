@@ -324,6 +324,8 @@ pub(crate) fn imported_symbol<'db>(
         || {
             if name == "__getattr__" {
                 Symbol::Unbound.into()
+            } else if name == "__builtins__" {
+                Symbol::bound(Type::any()).into()
             } else {
                 KnownClass::ModuleType.to_instance(db).member(db, name)
             }
@@ -1013,6 +1015,8 @@ mod implicit_globals {
         // None`.
         if name == "__file__" {
             Symbol::bound(KnownClass::Str.to_instance(db)).into()
+        } else if name == "__builtins__" {
+            Symbol::bound(Type::any()).into()
         }
         // In general we wouldn't check to see whether a symbol exists on a class before doing the
         // `.member()` call on the instance type -- we'd just do the `.member`() call on the instance
