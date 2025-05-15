@@ -141,7 +141,6 @@ pub fn setup_logging_with_filter(filter: &str) -> Option<LoggingGuard> {
 #[derive(Debug)]
 pub struct LoggingBuilder {
     filter: EnvFilter,
-    hierarchical: bool,
 }
 
 impl LoggingBuilder {
@@ -154,50 +153,26 @@ impl LoggingBuilder {
                         .parse()
                         .expect("Hardcoded directive to be valid"),
                 ),
-            hierarchical: false,
         }
     }
 
     pub fn with_filter(filter: &str) -> Option<Self> {
         let filter = EnvFilter::builder().parse(filter).ok()?;
 
-        Some(Self {
-            filter,
-            hierarchical: false,
-        })
-    }
-
-    pub fn with_hierarchical(mut self, hierarchical: bool) -> Self {
-        self.hierarchical = hierarchical;
-        self
+        Some(Self { filter })
     }
 
     pub fn build(self) -> LoggingGuard {
         let registry = tracing_subscriber::registry().with(self.filter);
 
-        let guard = if self.hierarchical {
-            let subscriber = registry.with(
-                tracing_tree::HierarchicalLayer::default()
-                    .with_indent_lines(true)
-                    .with_indent_amount(2)
-                    .with_bracketed_fields(true)
-                    .with_thread_ids(true)
-                    .with_targets(true)
-                    .with_writer(std::io::stderr)
-                    .with_timer(tracing_tree::time::Uptime::default()),
-            );
+        let subscriber = registry.with(
+            tracing_subscriber::fmt::layer()
+                .compact()
+                .with_writer(std::io::stderr)
+                .with_timer(tracing_subscriber::fmt::time()),
+        );
 
-            tracing::subscriber::set_default(subscriber)
-        } else {
-            let subscriber = registry.with(
-                tracing_subscriber::fmt::layer()
-                    .compact()
-                    .with_writer(std::io::stderr)
-                    .with_timer(tracing_subscriber::fmt::time()),
-            );
-
-            tracing::subscriber::set_default(subscriber)
-        };
+        let guard = tracing::subscriber::set_default(subscriber);
 
         LoggingGuard { _guard: guard }
     }

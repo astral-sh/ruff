@@ -1,10 +1,11 @@
 //! Sets up logging for ty
 
+use crate::args::TerminalColor;
 use anyhow::Context;
 use colored::Colorize;
 use std::fmt;
 use std::fs::File;
-use std::io::BufWriter;
+use std::io::{BufWriter, IsTerminal};
 use tracing::{Event, Subscriber};
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::format::Writer;
@@ -76,7 +77,10 @@ impl VerbosityLevel {
     }
 }
 
-pub(crate) fn setup_tracing(level: VerbosityLevel) -> anyhow::Result<TracingGuard> {
+pub(crate) fn setup_tracing(
+    level: VerbosityLevel,
+    color: TerminalColor,
+) -> anyhow::Result<TracingGuard> {
     use tracing_subscriber::prelude::*;
 
     // The `TY_LOG` environment variable overrides the default log level.
@@ -115,16 +119,21 @@ pub(crate) fn setup_tracing(level: VerbosityLevel) -> anyhow::Result<TracingGuar
         .with(filter)
         .with(profiling_layer);
 
+    let ansi = match color {
+        TerminalColor::Auto => {
+            colored::control::SHOULD_COLORIZE.should_colorize() && std::io::stderr().is_terminal()
+        }
+        TerminalColor::Always => true,
+        TerminalColor::Never => false,
+    };
+
     if level.is_trace() {
         let subscriber = registry.with(
-            tracing_tree::HierarchicalLayer::default()
-                .with_indent_lines(true)
-                .with_indent_amount(2)
-                .with_bracketed_fields(true)
+            tracing_subscriber::fmt::layer()
+                .event_format(tracing_subscriber::fmt::format().pretty())
                 .with_thread_ids(true)
-                .with_targets(true)
-                .with_writer(std::io::stderr)
-                .with_timer(tracing_tree::time::Uptime::default()),
+                .with_ansi(ansi)
+                .with_writer(std::io::stderr),
         );
 
         subscriber.init();
@@ -136,6 +145,7 @@ pub(crate) fn setup_tracing(level: VerbosityLevel) -> anyhow::Result<TracingGuar
                     display_timestamp: level.is_extra_verbose(),
                     show_spans: false,
                 })
+                .with_ansi(ansi)
                 .with_writer(std::io::stderr),
         );
 

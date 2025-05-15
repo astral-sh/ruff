@@ -163,7 +163,6 @@ tracing-subscriber = { version = "0.3.18", default-features = false, features = 
     "env-filter",
     "fmt",
 ] }
-tracing-tree = { version = "0.4.0" }
 tryfn = { version = "0.2.1" }
 typed-arena = { version = "2.0.2" }
 unic-ucd-category = { version = "0.9" }
