@@ -49,7 +49,7 @@ fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
     semantic_index(db, scope.file(db)).ast_ids(scope.file_scope_id(db))
 }
 
-/// Uniquely identifies a use of a name in a [`crate::semantic_index::symbol::FileScopeId`].
+/// Uniquely identifies a use of a name in a [`crate::semantic_index::target::FileScopeId`].
 #[newtype_index]
 pub struct ScopedUseId;
 
@@ -93,7 +93,7 @@ impl HasScopedUseId for ast::ExprRef<'_> {
     }
 }
 
-/// Uniquely identifies an [`ast::Expr`] in a [`crate::semantic_index::symbol::FileScopeId`].
+/// Uniquely identifies an [`ast::Expr`] in a [`crate::semantic_index::target::FileScopeId`].
 #[newtype_index]
 #[derive(salsa::Update)]
 pub struct ScopedExpressionId;

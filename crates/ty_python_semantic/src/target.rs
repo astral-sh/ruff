@@ -420,7 +420,7 @@ fn core_module_scope(db: &dyn Db, core_module: KnownModule) -> Option<ScopeId<'_
 }
 
 /// Infer the combined type from an iterator of bindings, and return it
-/// together with boundness information in a [`ResoledTarget`].
+/// together with boundness information in a [`ResolvedTarget`].
 ///
 /// The type will be a union if there are multiple bindings with different types.
 pub(super) fn target_from_bindings<'db>(
@@ -445,7 +445,7 @@ pub(crate) fn target_from_declarations<'db>(
     target_from_declarations_impl(db, declarations, RequiresExplicitReExport::No)
 }
 
-/// The result of looking up a declared type from declarations; see [`symbol_from_declarations`].
+/// The result of looking up a declared type from declarations; see [`target_from_declarations`].
 pub(crate) type TargetFromDeclarationsResult<'db> =
     Result<TargetAndQualifiers<'db>, (TypeAndQualifiers<'db>, Box<[Type<'db>]>)>;
 
