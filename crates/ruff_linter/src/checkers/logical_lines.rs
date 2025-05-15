@@ -169,16 +169,17 @@ pub(crate) fn check_logical_lines(
         let indent_size = 4;
 
         if enforce_indentation {
-            for kind in indentation(
+            for diagnostic in indentation(
                 &line,
                 prev_line.as_ref(),
                 indent_char,
                 indent_level,
                 prev_indent_level,
                 indent_size,
+                range,
             ) {
-                if settings.rules.enabled(kind.rule()) {
-                    context.push_diagnostic(Diagnostic::new(kind, range));
+                if settings.rules.enabled(diagnostic.rule()) {
+                    context.push_diagnostic(diagnostic);
                 }
             }
         }
@@ -206,7 +207,7 @@ impl<'a> LogicalLinesContext<'a> {
     }
 
     pub(crate) fn push_diagnostic(&mut self, diagnostic: Diagnostic) {
-        if self.settings.rules.enabled(diagnostic.kind.rule()) {
+        if self.settings.rules.enabled(diagnostic.rule()) {
             self.diagnostics.push(diagnostic);
         }
     }

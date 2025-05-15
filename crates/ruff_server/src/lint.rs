@@ -9,7 +9,7 @@ use crate::{
     session::DocumentQuery,
     PositionEncoding, DIAGNOSTIC_NAME,
 };
-use ruff_diagnostics::{Applicability, DiagnosticKind, Edit, Fix};
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
     directives::{extract_directives, Flags},
     generate_noqa_edits,
@@ -32,7 +32,7 @@ use ruff_text_size::{Ranged, TextRange};
 /// This is serialized on the diagnostic `data` field.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct AssociatedDiagnosticData {
-    pub(crate) kind: DiagnosticKind,
+    pub(crate) title: String,
     /// Edits to fix the diagnostic. If this is empty, a fix
     /// does not exist.
     pub(crate) edits: Vec<lsp_types::TextEdit>,
@@ -227,10 +227,7 @@ pub(crate) fn fixes_for_diagnostics(
             Ok(Some(DiagnosticFix {
                 fixed_diagnostic,
                 code: associated_data.code,
-                title: associated_data
-                    .kind
-                    .suggestion
-                    .unwrap_or(associated_data.kind.name),
+                title: associated_data.title,
                 noqa_edit: associated_data.noqa_edit,
                 edits: associated_data.edits,
             }))
@@ -248,14 +245,15 @@ fn to_lsp_diagnostic(
     index: &LineIndex,
     encoding: PositionEncoding,
 ) -> (usize, lsp_types::Diagnostic) {
+    let rule = diagnostic.rule();
     let DiagnosticMessage {
-        kind,
         range: diagnostic_range,
         fix,
+        name,
+        body,
+        suggestion,
         ..
     } = diagnostic;
-
-    let rule = kind.rule();
 
     let fix = fix.and_then(|fix| fix.applies(Applicability::Unsafe).then_some(fix));
 
@@ -275,7 +273,7 @@ fn to_lsp_diagnostic(
                 new_text: noqa_edit.into_content().unwrap_or_default().into_string(),
             });
             serde_json::to_value(AssociatedDiagnosticData {
-                kind: kind.clone(),
+                title: suggestion.unwrap_or_else(|| name.to_string()),
                 noqa_edit,
                 edits,
                 code: rule.noqa_code().to_string(),
@@ -314,7 +312,7 @@ fn to_lsp_diagnostic(
                 })
             }),
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: kind.body,
+            message: body,
             related_information: None,
             data,
         },

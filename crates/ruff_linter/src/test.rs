@@ -235,7 +235,7 @@ Source with applied fixes:
         .into_iter()
         .filter_map(Message::into_diagnostic_message)
         .map(|mut diagnostic| {
-            let rule = diagnostic.kind.rule();
+            let rule = diagnostic.rule();
             let fixable = diagnostic.fix.as_ref().is_some_and(|fix| {
                 matches!(
                     fix.applicability(),
@@ -269,7 +269,7 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             }
 
             assert!(
-                !(fixable && diagnostic.kind.suggestion.is_none()),
+                !(fixable && diagnostic.suggestion.is_none()),
                 "Diagnostic emitted by {rule:?} is fixable but \
                 `Violation::fix_title` returns `None`"
             );

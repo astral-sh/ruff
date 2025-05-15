@@ -2,7 +2,7 @@ use std::fmt;
 
 use bitflags::bitflags;
 
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, StringLike};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -355,27 +355,30 @@ impl Candidate {
     fn into_diagnostic(self, context: Context, settings: &LinterSettings) -> Option<Diagnostic> {
         if !settings.allowed_confusables.contains(&self.confusable) {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());
-            let diagnostic = Diagnostic::new::<DiagnosticKind>(
-                match context {
-                    Context::String => AmbiguousUnicodeCharacterString {
+            let diagnostic = match context {
+                Context::String => Diagnostic::new(
+                    AmbiguousUnicodeCharacterString {
                         confusable: self.confusable,
                         representant: self.representant,
-                    }
-                    .into(),
-                    Context::Docstring => AmbiguousUnicodeCharacterDocstring {
+                    },
+                    char_range,
+                ),
+                Context::Docstring => Diagnostic::new(
+                    AmbiguousUnicodeCharacterDocstring {
                         confusable: self.confusable,
                         representant: self.representant,
-                    }
-                    .into(),
-                    Context::Comment => AmbiguousUnicodeCharacterComment {
+                    },
+                    char_range,
+                ),
+                Context::Comment => Diagnostic::new(
+                    AmbiguousUnicodeCharacterComment {
                         confusable: self.confusable,
                         representant: self.representant,
-                    }
-                    .into(),
-                },
-                char_range,
-            );
-            if settings.rules.enabled(diagnostic.kind.rule()) {
+                    },
+                    char_range,
+                ),
+            };
+            if settings.rules.enabled(diagnostic.rule()) {
                 return Some(diagnostic);
             }
         }

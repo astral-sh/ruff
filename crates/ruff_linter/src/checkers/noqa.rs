@@ -47,7 +47,7 @@ pub(crate) fn check_noqa(
 
     // Remove any ignored diagnostics.
     'outer: for (index, diagnostic) in diagnostics.iter().enumerate() {
-        if matches!(diagnostic.kind.rule(), Rule::BlanketNOQA) {
+        if matches!(diagnostic.rule(), Rule::BlanketNOQA) {
             continue;
         }
 
@@ -59,7 +59,7 @@ pub(crate) fn check_noqa(
             }
             FileExemption::Codes(codes) => {
                 // If the diagnostic is ignored by a global exemption, ignore it.
-                if codes.contains(&&diagnostic.kind.rule().noqa_code()) {
+                if codes.contains(&&diagnostic.rule().noqa_code()) {
                     ignored_diagnostics.push(index);
                     continue;
                 }
@@ -78,17 +78,13 @@ pub(crate) fn check_noqa(
             {
                 let suppressed = match &directive_line.directive {
                     Directive::All(_) => {
-                        directive_line
-                            .matches
-                            .push(diagnostic.kind.rule().noqa_code());
+                        directive_line.matches.push(diagnostic.rule().noqa_code());
                         ignored_diagnostics.push(index);
                         true
                     }
                     Directive::Codes(directive) => {
-                        if directive.includes(diagnostic.kind.rule()) {
-                            directive_line
-                                .matches
-                                .push(diagnostic.kind.rule().noqa_code());
+                        if directive.includes(diagnostic.rule()) {
+                            directive_line.matches.push(diagnostic.rule().noqa_code());
                             ignored_diagnostics.push(index);
                             true
                         } else {
@@ -161,7 +157,7 @@ pub(crate) fn check_noqa(
                             let is_code_used = if is_file_level {
                                 diagnostics
                                     .iter()
-                                    .any(|diag| diag.kind.rule().noqa_code() == code)
+                                    .any(|diag| diag.rule().noqa_code() == code)
                             } else {
                                 matches.iter().any(|match_| *match_ == code)
                             } || settings

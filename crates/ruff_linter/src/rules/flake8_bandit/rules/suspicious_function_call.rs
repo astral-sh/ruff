@@ -2,7 +2,7 @@
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
 use itertools::Either;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operator};
 use ruff_text_size::{Ranged, TextRange};
@@ -1035,39 +1035,39 @@ fn suspicious_function(
         return;
     };
 
-    let diagnostic_kind: DiagnosticKind = match qualified_name.segments() {
+    let diagnostic = match qualified_name.segments() {
         // Pickle
         ["pickle" | "dill", "load" | "loads" | "Unpickler"]
         | ["shelve", "open" | "DbfilenameShelf"]
         | ["jsonpickle", "decode"]
         | ["jsonpickle", "unpickler", "decode"]
-        | ["pandas", "read_pickle"] => SuspiciousPickleUsage.into(),
+        | ["pandas", "read_pickle"] => Diagnostic::new(SuspiciousPickleUsage, range),
 
         // Marshal
-        ["marshal", "load" | "loads"] => SuspiciousMarshalUsage.into(),
+        ["marshal", "load" | "loads"] => Diagnostic::new(SuspiciousMarshalUsage, range),
 
         // InsecureHash
         ["Crypto" | "Cryptodome", "Hash", "SHA" | "MD2" | "MD3" | "MD4" | "MD5", "new"]
         | ["cryptography", "hazmat", "primitives", "hashes", "SHA1" | "MD5"] => {
-            SuspiciousInsecureHashUsage.into()
+            Diagnostic::new(SuspiciousInsecureHashUsage, range)
         }
 
         // InsecureCipher
         ["Crypto" | "Cryptodome", "Cipher", "ARC2" | "Blowfish" | "DES" | "XOR", "new"]
         | ["cryptography", "hazmat", "primitives", "ciphers", "algorithms", "ARC4" | "Blowfish" | "IDEA"] => {
-            SuspiciousInsecureCipherUsage.into()
+            Diagnostic::new(SuspiciousInsecureCipherUsage, range)
         }
 
         // InsecureCipherMode
         ["cryptography", "hazmat", "primitives", "ciphers", "modes", "ECB"] => {
-            SuspiciousInsecureCipherModeUsage.into()
+            Diagnostic::new(SuspiciousInsecureCipherModeUsage, range)
         }
 
         // Mktemp
-        ["tempfile", "mktemp"] => SuspiciousMktempUsage.into(),
+        ["tempfile", "mktemp"] => Diagnostic::new(SuspiciousMktempUsage, range),
 
         // Eval
-        ["" | "builtins", "eval"] => SuspiciousEvalUsage.into(),
+        ["" | "builtins", "eval"] => Diagnostic::new(SuspiciousEvalUsage, range),
 
         // MarkSafe
         ["django", "utils", "safestring" | "html", "mark_safe"] => {
@@ -1078,7 +1078,7 @@ fn suspicious_function(
                     }
                 }
             }
-            SuspiciousMarkSafeUsage.into()
+            Diagnostic::new(SuspiciousMarkSafeUsage, range)
         }
 
         // URLOpen (`Request`)
@@ -1100,7 +1100,7 @@ fn suspicious_function(
                     }
                 }
             }
-            SuspiciousURLOpenUsage.into()
+            Diagnostic::new(SuspiciousURLOpenUsage, range)
         }
 
         // URLOpen (`urlopen`, `urlretrieve`)
@@ -1146,64 +1146,75 @@ fn suspicious_function(
                     }
                 }
             }
-            SuspiciousURLOpenUsage.into()
+            Diagnostic::new(SuspiciousURLOpenUsage, range)
         }
 
         // URLOpen (`URLopener`, `FancyURLopener`)
         ["urllib", "request", "URLopener" | "FancyURLopener"]
         | ["six", "moves", "urllib", "request", "URLopener" | "FancyURLopener"] => {
-            SuspiciousURLOpenUsage.into()
+            Diagnostic::new(SuspiciousURLOpenUsage, range)
         }
 
         // NonCryptographicRandom
         ["random", "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform"
-        | "triangular" | "randbytes"] => SuspiciousNonCryptographicRandomUsage.into(),
+        | "triangular" | "randbytes"] => {
+            Diagnostic::new(SuspiciousNonCryptographicRandomUsage, range)
+        }
 
         // UnverifiedContext
-        ["ssl", "_create_unverified_context"] => SuspiciousUnverifiedContextUsage.into(),
+        ["ssl", "_create_unverified_context"] => {
+            Diagnostic::new(SuspiciousUnverifiedContextUsage, range)
+        }
 
         // XMLCElementTree
         ["xml", "etree", "cElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => {
-            SuspiciousXMLCElementTreeUsage.into()
+            Diagnostic::new(SuspiciousXMLCElementTreeUsage, range)
         }
 
         // XMLElementTree
         ["xml", "etree", "ElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => {
-            SuspiciousXMLElementTreeUsage.into()
+            Diagnostic::new(SuspiciousXMLElementTreeUsage, range)
         }
 
         // XMLExpatReader
-        ["xml", "sax", "expatreader", "create_parser"] => SuspiciousXMLExpatReaderUsage.into(),
+        ["xml", "sax", "expatreader", "create_parser"] => {
+            Diagnostic::new(SuspiciousXMLExpatReaderUsage, range)
+        }
 
         // XMLExpatBuilder
         ["xml", "dom", "expatbuilder", "parse" | "parseString"] => {
-            SuspiciousXMLExpatBuilderUsage.into()
+            Diagnostic::new(SuspiciousXMLExpatBuilderUsage, range)
         }
 
         // XMLSax
-        ["xml", "sax", "parse" | "parseString" | "make_parser"] => SuspiciousXMLSaxUsage.into(),
+        ["xml", "sax", "parse" | "parseString" | "make_parser"] => {
+            Diagnostic::new(SuspiciousXMLSaxUsage, range)
+        }
 
         // XMLMiniDOM
-        ["xml", "dom", "minidom", "parse" | "parseString"] => SuspiciousXMLMiniDOMUsage.into(),
+        ["xml", "dom", "minidom", "parse" | "parseString"] => {
+            Diagnostic::new(SuspiciousXMLMiniDOMUsage, range)
+        }
 
         // XMLPullDOM
-        ["xml", "dom", "pulldom", "parse" | "parseString"] => SuspiciousXMLPullDOMUsage.into(),
+        ["xml", "dom", "pulldom", "parse" | "parseString"] => {
+            Diagnostic::new(SuspiciousXMLPullDOMUsage, range)
+        }
 
         // XMLETree
         ["lxml", "etree", "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser"
-        | "check_docinfo"] => SuspiciousXMLETreeUsage.into(),
+        | "check_docinfo"] => Diagnostic::new(SuspiciousXMLETreeUsage, range),
 
         // Telnet
-        ["telnetlib", ..] => SuspiciousTelnetUsage.into(),
+        ["telnetlib", ..] => Diagnostic::new(SuspiciousTelnetUsage, range),
 
         // FTPLib
-        ["ftplib", ..] => SuspiciousFTPLibUsage.into(),
+        ["ftplib", ..] => Diagnostic::new(SuspiciousFTPLibUsage, range),
 
         _ => return,
     };
 
-    let diagnostic = Diagnostic::new(diagnostic_kind, range);
-    if checker.enabled(diagnostic.kind.rule()) {
+    if checker.enabled(diagnostic.rule()) {
         checker.report_diagnostic(diagnostic);
     }
 }
