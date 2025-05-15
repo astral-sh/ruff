@@ -16,7 +16,27 @@ from ._base import (
 from .process import ProcessPoolExecutor as ProcessPoolExecutor
 from .thread import ThreadPoolExecutor as ThreadPoolExecutor
 
-if sys.version_info >= (3, 13):
+if sys.version_info >= (3, 14):
+    from .interpreter import InterpreterPoolExecutor as InterpreterPoolExecutor
+
+    __all__ = (
+        "FIRST_COMPLETED",
+        "FIRST_EXCEPTION",
+        "ALL_COMPLETED",
+        "CancelledError",
+        "TimeoutError",
+        "InvalidStateError",
+        "BrokenExecutor",
+        "Future",
+        "Executor",
+        "wait",
+        "as_completed",
+        "ProcessPoolExecutor",
+        "ThreadPoolExecutor",
+        "InterpreterPoolExecutor",
+    )
+
+elif sys.version_info >= (3, 13):
     __all__ = (
         "FIRST_COMPLETED",
         "FIRST_EXCEPTION",

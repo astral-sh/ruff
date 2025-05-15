@@ -15,10 +15,15 @@ from collections.abc import Callable, Generator, Iterator, Sequence
 from io import BufferedRandom, BufferedReader, BufferedWriter, FileIO, TextIOWrapper
 from os import PathLike, stat_result
 from types import GenericAlias, TracebackType
-from typing import IO, Any, BinaryIO, ClassVar, Literal, overload
+from typing import IO, Any, BinaryIO, ClassVar, Literal, TypeVar, overload
 from typing_extensions import Never, Self, deprecated
 
+_PathT = TypeVar("_PathT", bound=PurePath)
+
 __all__ = ["PurePath", "PurePosixPath", "PureWindowsPath", "Path", "PosixPath", "WindowsPath"]
+
+if sys.version_info >= (3, 14):
+    from pathlib.types import PathInfo
 
 if sys.version_info >= (3, 13):
     __all__ += ["UnsupportedOperation"]
@@ -63,7 +68,9 @@ class PurePath(PathLike[str]):
     def as_uri(self) -> str: ...
     def is_absolute(self) -> bool: ...
     def is_reserved(self) -> bool: ...
-    if sys.version_info >= (3, 12):
+    if sys.version_info >= (3, 14):
+        def is_relative_to(self, other: StrPath) -> bool: ...
+    elif sys.version_info >= (3, 12):
         def is_relative_to(self, other: StrPath, /, *_deprecated: StrPath) -> bool: ...
     else:
         def is_relative_to(self, *other: StrPath) -> bool: ...
@@ -73,7 +80,9 @@ class PurePath(PathLike[str]):
     else:
         def match(self, path_pattern: str) -> bool: ...
 
-    if sys.version_info >= (3, 12):
+    if sys.version_info >= (3, 14):
+        def relative_to(self, other: StrPath, *, walk_up: bool = False) -> Self: ...
+    elif sys.version_info >= (3, 12):
         def relative_to(self, other: StrPath, /, *_deprecated: StrPath, walk_up: bool = False) -> Self: ...
     else:
         def relative_to(self, *other: StrPath) -> Self: ...
@@ -154,17 +163,25 @@ class Path(PurePath):
     def mkdir(self, mode: int = 0o777, parents: bool = False, exist_ok: bool = False) -> None: ...
 
     if sys.version_info >= (3, 14):
-        def copy(self, target: StrPath, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> None: ...
-        def copytree(
-            self,
-            target: StrPath,
-            *,
-            follow_symlinks: bool = True,
-            preserve_metadata: bool = False,
-            dirs_exist_ok: bool = False,
-            ignore: Callable[[Self], bool] | None = None,
-            on_error: Callable[[OSError], object] | None = None,
-        ) -> None: ...
+
+        @property
+        def info(self) -> PathInfo: ...
+        @overload
+        def move_into(self, target_dir: _PathT) -> _PathT: ...  # type: ignore[overload-overlap]
+        @overload
+        def move_into(self, target_dir: StrPath) -> Self: ...  # type: ignore[overload-overlap]
+        @overload
+        def move(self, target: _PathT) -> _PathT: ...  # type: ignore[overload-overlap]
+        @overload
+        def move(self, target: StrPath) -> Self: ...  # type: ignore[overload-overlap]
+        @overload
+        def copy_into(self, target_dir: _PathT, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> _PathT: ...  # type: ignore[overload-overlap]
+        @overload
+        def copy_into(self, target_dir: StrPath, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> Self: ...  # type: ignore[overload-overlap]
+        @overload
+        def copy(self, target: _PathT, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> _PathT: ...  # type: ignore[overload-overlap]
+        @overload
+        def copy(self, target: StrPath, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> Self: ...  # type: ignore[overload-overlap]
 
     # Adapted from builtins.open
     # Text mode: always returns a TextIOWrapper
@@ -253,9 +270,6 @@ class Path(PurePath):
 
     def resolve(self, strict: bool = False) -> Self: ...
     def rmdir(self) -> None: ...
-    if sys.version_info >= (3, 14):
-        def delete(self, ignore_errors: bool = False, on_error: Callable[[OSError], object] | None = None) -> None: ...
-
     def symlink_to(self, target: StrOrBytesPath, target_is_directory: bool = False) -> None: ...
     if sys.version_info >= (3, 10):
         def hardlink_to(self, target: StrOrBytesPath) -> None: ...
@@ -285,9 +299,6 @@ class Path(PurePath):
         def walk(
             self, top_down: bool = ..., on_error: Callable[[OSError], object] | None = ..., follow_symlinks: bool = ...
         ) -> Iterator[tuple[Self, list[str], list[str]]]: ...
-
-    if sys.version_info >= (3, 14):
-        def rmtree(self, ignore_errors: bool = False, on_error: Callable[[OSError], object] | None = None) -> None: ...
 
 class PosixPath(Path, PurePosixPath): ...
 class WindowsPath(Path, PureWindowsPath): ...
