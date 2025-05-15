@@ -1,5 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::fix::edits::remove_unused_imports;
+use crate::importer::ImportRequest;
 use crate::rules::airflow::helpers::{is_guarded_by_try_except, match_head, ProviderReplacement};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -965,6 +966,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
     );
 
     let semantic = checker.semantic();
+
     if let Some((module, name)) = match &replacement {
         ProviderReplacement::AutoImport { module, name, .. } => Some((module, *name)),
         ProviderReplacement::SourceModuleMovedToProvider { module, name, .. } => {
@@ -976,36 +978,64 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             return;
         }
 
-        diagnostic.try_set_fix(|| {
-            let head = match_head(expr);
-            let binding = checker
-                .semantic()
-                .resolve_name(head.expect(""))
-                .or_else(|| checker.semantic().lookup_symbol(&head.unwrap().id))
-                .map(|id| checker.semantic().binding(id));
-            let stmt = binding.expect("").statement(semantic);
-            let remove_import_edit = remove_unused_imports(
-                std::iter::once(name),
-                stmt.expect(""),
-                None,
-                checker.locator(),
-                checker.stylist(),
-                checker.indexer(),
-            );
-            let import_edit = checker.importer().add_import(
-                &NameImport::ImportFrom(MemberNameImport::member(
-                    (*module).to_string(),
-                    name.to_string(),
-                )),
-                expr.start(),
-            );
+        if let Some(fix) = generate_name_changed_fix(expr, checker, module, name, ranged) {
+            diagnostic.try_set_fix(|| Ok(fix));
+        } else if let Some(fix) = generate_module_change_only_fix(expr, checker, module, name) {
+            diagnostic.try_set_fix(|| Ok(fix));
+        }
 
-            let replacement_edit = Edit::range_replacement(name.to_string(), ranged.range());
-            Ok(Fix::unsafe_edits(
-                remove_import_edit.expect(""),
-                [import_edit, replacement_edit], // add_import_edit.into_edits(), //, replacement_edit],
-            ))
-        });
+        checker.report_diagnostic(diagnostic);
     }
-    checker.report_diagnostic(diagnostic);
+}
+
+fn generate_name_changed_fix(
+    expr: &Expr,
+    checker: &Checker,
+    module: &str,
+    name: &str,
+    ranged: TextRange,
+) -> Option<Fix> {
+    let (import_edit, binding) = checker
+        .importer()
+        .get_or_import_symbol(
+            &ImportRequest::import_from(module, name),
+            expr.start(),
+            checker.semantic(),
+        )
+        .ok()?;
+    let replacement_edit = Edit::range_replacement(binding, ranged.range());
+    Some(Fix::safe_edits(import_edit, [replacement_edit]))
+}
+
+fn generate_module_change_only_fix(
+    expr: &Expr,
+    checker: &Checker,
+    module: &str,
+    name: &str,
+) -> Option<Fix> {
+    let head = match_head(expr)?;
+    let semantic = checker.semantic();
+    let binding = semantic
+        .resolve_name(head)
+        .or_else(|| checker.semantic().lookup_symbol(&head.id))
+        .map(|id| checker.semantic().binding(id))?;
+    let stmt = binding.statement(semantic)?;
+    let remove_edit = remove_unused_imports(
+        std::iter::once(name),
+        stmt,
+        None,
+        checker.locator(),
+        checker.stylist(),
+        checker.indexer(),
+    )
+    .ok()?;
+    let import_edit = checker.importer().add_import(
+        &NameImport::ImportFrom(MemberNameImport::member(
+            (*module).to_string(),
+            name.to_string(),
+        )),
+        expr.start(),
+    );
+
+    Some(Fix::unsafe_edits(remove_edit, [import_edit]))
 }

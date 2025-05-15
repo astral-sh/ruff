@@ -93,7 +93,3 @@ AIR302_druid.py:16:1: AIR302 [*] `airflow.operators.hive_to_druid.HiveToDruidTra
 11 11 | 
 12 12 | DruidDbApiHook()
 13 13 | DruidHook()
-14 14 | 
-15 15 | HiveToDruidOperator()
-16    |-HiveToDruidTransfer()
-   16 |+HiveToDruidOperator()

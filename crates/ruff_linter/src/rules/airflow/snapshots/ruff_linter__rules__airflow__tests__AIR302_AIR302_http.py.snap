@@ -32,7 +32,7 @@ AIR302_http.py:8:1: AIR302 [*] `airflow.operators.http_operator.SimpleHttpOperat
   |
   = help: Install `apache-airflow-providers-http>=5.0.0` and use `airflow.providers.http.operators.http.HttpOperator` instead.
 
-ℹ Unsafe fix
+ℹ Safe fix
 3  3  | from airflow.hooks.http_hook import HttpHook
 4  4  | from airflow.operators.http_operator import SimpleHttpOperator
 5  5  | from airflow.sensors.http_sensor import HttpSensor
