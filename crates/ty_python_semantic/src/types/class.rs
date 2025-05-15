@@ -1132,6 +1132,18 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> SymbolAndQualifiers<'db> {
+        if name == "__dataclass_fields__" && self.dataclass_params(db).is_some() {
+            // Make this class look like a subclass of the `DataClassInstance` protocol
+            return Symbol::bound(KnownClass::Dict.to_specialized_instance(
+                db,
+                [
+                    KnownClass::Str.to_instance(db),
+                    KnownClass::Field.to_specialized_instance(db, [Type::any()]),
+                ],
+            ))
+            .with_qualifiers(TypeQualifiers::CLASS_VAR);
+        }
+
         let body_scope = self.body_scope(db);
         let symbol = class_symbol(db, body_scope, name).map_type(|ty| {
             // The `__new__` and `__init__` members of a non-specialized generic class are handled
