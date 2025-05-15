@@ -72,7 +72,7 @@ fn message_to_rdjson_value(message: &Message) -> Value {
             },
             "code": {
                 "value": message.noqa_code().map(|code| code.to_string()),
-                "url": message.rule().and_then(|rule| rule.url()),
+                "url": message.url(),
             },
             "suggestions": rdjson_suggestions(fix.edits(), &source_code),
         })
@@ -85,7 +85,7 @@ fn message_to_rdjson_value(message: &Message) -> Value {
             },
             "code": {
                 "value": message.noqa_code().map(|code| code.to_string()),
-                "url": message.rule().and_then(|rule| rule.url()),
+                "url": message.url(),
             },
         })
     }
