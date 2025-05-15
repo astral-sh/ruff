@@ -184,10 +184,14 @@ impl Target {
         &self.root_name
     }
 
-    pub(super) fn is_instance_attribute(&self, name: &str) -> bool {
+    pub(super) fn is_instance_attribute_named(&self, name: &str) -> bool {
         self.flags.contains(TargetFlags::IS_INSTANCE_ATTRIBUTE)
             && self.sub_segments.len() == 1
             && self.sub_segments[0].as_member().unwrap().as_str() == name
+    }
+
+    pub fn is_instance_attribute(&self) -> bool {
+        self.flags.contains(TargetFlags::IS_INSTANCE_ATTRIBUTE)
     }
 
     /// Is the target used in its containing scope?
@@ -543,7 +547,7 @@ impl TargetTable {
     ) -> Option<ScopedTargetId> {
         self.targets
             .indices()
-            .find(|id| self.targets[*id].is_instance_attribute(name))
+            .find(|id| self.targets[*id].is_instance_attribute_named(name))
     }
 
     fn hash_name(name: &str) -> u64 {

@@ -258,8 +258,8 @@ class C:
         self.w += None
 
 # TODO: Mypy and pyright do not support this, but it would be great if we could
-# infer `Unknown | str` or at least `Unknown | Weird | str` here.
-reveal_type(C().w)  # revealed: Unknown | Weird
+# infer `Unknown | str` here.
+reveal_type(C().w)  # revealed: Unknown
 ```
 
 #### Attributes defined in tuple unpackings

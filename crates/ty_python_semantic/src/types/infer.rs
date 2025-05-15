@@ -1424,7 +1424,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn add_binding(&mut self, node: AnyNodeRef, binding: Definition<'db>, ty: Type<'db>) {
         debug_assert!(binding
             .kind(self.db())
-            .category(self.context.in_stub())
+            .category(self.context.in_stub(), false)
             .is_binding());
 
         let db = self.db();
@@ -1532,7 +1532,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) {
         debug_assert!(declaration
             .kind(self.db())
-            .category(self.context.in_stub())
+            .category(self.context.in_stub(), false)
             .is_declaration());
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_declaration(declaration);
@@ -1576,11 +1576,11 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) {
         debug_assert!(definition
             .kind(self.db())
-            .category(self.context.in_stub())
+            .category(self.context.in_stub(), false)
             .is_binding());
         debug_assert!(definition
             .kind(self.db())
-            .category(self.context.in_stub())
+            .category(self.context.in_stub(), false)
             .is_declaration());
 
         let (declared_ty, inferred_ty) = match *declared_and_inferred_ty {
@@ -7116,6 +7116,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     target_from_bindings(db, use_def.bindings_at_use(use_id))
                 };
                 if let ResolvedTarget::Type(ty, Boundness::Bound) = symbol {
+                    self.infer_expression(value);
+                    self.infer_expression(slice);
                     return ty;
                 }
             }

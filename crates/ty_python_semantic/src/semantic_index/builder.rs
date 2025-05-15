@@ -23,13 +23,11 @@ use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::definition::{
-    AnnotatedAssignmentDefinitionKind, AnnotatedAssignmentDefinitionNodeRef,
-    AssignmentDefinitionKind, AssignmentDefinitionNodeRef, ComprehensionDefinitionKind,
-    ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionKind,
-    DefinitionNodeKey, DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef,
-    ForStmtDefinitionKind, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
-    ImportFromDefinitionNodeRef, MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef,
-    TargetKind, WithItemDefinitionKind, WithItemDefinitionNodeRef,
+    AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
+    ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
+    DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef,
+    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, MatchPatternDefinitionNodeRef,
+    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::predicate::{
@@ -456,7 +454,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         #[expect(unsafe_code)]
         // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
         let kind = unsafe { definition_node.into_owned(self.module.clone()) };
-        let category = kind.category(self.source_type.is_stub());
+        let is_instance_attribute = self
+            .current_target_table()
+            .target(target)
+            .is_instance_attribute();
+        let category = kind.category(self.source_type.is_stub(), is_instance_attribute);
         let is_reexported = kind.is_reexported();
 
         let definition = Definition::new(
@@ -496,34 +498,6 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.try_node_context_stack_manager = try_node_stack_manager;
 
         (definition, num_definitions)
-    }
-
-    fn add_definition_by_definition_kind(
-        &mut self,
-        target: ScopedTargetId,
-        definition_kind: DefinitionKind<'db>,
-    ) -> Definition {
-        let category = definition_kind.category(self.source_type.is_stub());
-        let definition = Definition::new(
-            self.db,
-            self.file,
-            self.current_scope(),
-            target,
-            definition_kind,
-            false,
-            countme::Count::default(),
-        );
-
-        if category.is_binding() {
-            self.mark_target_bound(target);
-        }
-        if category.is_declaration() {
-            self.mark_target_declared(target);
-        }
-
-        self.current_use_def_map_mut()
-            .record_binding(target, definition);
-        definition
     }
 
     fn record_expression_narrowing_constraint(
@@ -683,30 +657,6 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn current_assignment_mut(&mut self) -> Option<&mut CurrentAssignment<'db>> {
         self.current_assignments.last_mut()
-    }
-
-    /// Records the fact that we saw an attribute / subscript assignment of the form
-    /// `object{.attr|[index]}: <annotation>( = …)` or `object{.attr|[index]} = <value>`
-    fn register_attribute_subscript_assignment(
-        &mut self,
-        expr: &ast::Expr,
-        definition_kind: DefinitionKind<'db>,
-    ) {
-        if let Ok(mut target) = Target::try_from(expr) {
-            if self.is_method_of_class().is_some() {
-                // We specifically mark attribute assignments to the first parameter of a method,
-                // i.e. typically `self` or `cls`.
-                let accessed_object_refers_to_first_parameter = self
-                    .current_first_parameter_name
-                    .is_some_and(|fst| target.root_name().as_str() == fst);
-
-                if accessed_object_refers_to_first_parameter && target.is_member() {
-                    target.mark_instance_attribute();
-                }
-            }
-            let id = self.add_target(target);
-            self.add_definition_by_definition_kind(id, definition_kind);
-        }
     }
 
     fn predicate_kind(&mut self, pattern: &ast::Pattern) -> PatternPredicateKind<'db> {
@@ -1967,109 +1917,148 @@ where
         let node_key = NodeKey::from_node(expr);
 
         match expr {
-            ast::Expr::Name(ast::ExprName { id, ctx, .. }) => {
-                let (is_use, is_definition) = match (ctx, self.current_assignment()) {
-                    (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
-                        // For augmented assignment, the target expression is also used.
-                        (true, true)
-                    }
-                    (ast::ExprContext::Load, _) => (true, false),
-                    (ast::ExprContext::Store, _) => (false, true),
-                    (ast::ExprContext::Del, _) => (false, true),
-                    (ast::ExprContext::Invalid, _) => (false, false),
-                };
-                let symbol = self.add_symbol(id.clone());
+            ast::Expr::Name(ast::ExprName { ctx, .. })
+            | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
+            | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
+                if let Ok(mut target) = Target::try_from(expr) {
+                    let comprehension_scope = if matches!(
+                        self.current_assignment(),
+                        Some(CurrentAssignment::Comprehension { .. })
+                    ) && (expr.is_attribute_expr()
+                        || expr.is_subscript_expr())
+                    {
+                        // Temporarily move to the scope of the method to which the attribute / subscript value is defined.
+                        // SAFETY: `self.scope_stack` is not empty because the targets in comprehensions should always introduce a new scope.
+                        Some(self.scope_stack.pop().expect("The popped scope must be a comprehension, which must have a parent scope"))
+                    } else {
+                        None
+                    };
+                    if self.is_method_of_class().is_some() {
+                        // We specifically mark attribute assignments to the first parameter of a method,
+                        // i.e. typically `self` or `cls`.
+                        let accessed_object_refers_to_first_parameter = self
+                            .current_first_parameter_name
+                            .is_some_and(|fst| target.root_name().as_str() == fst);
 
-                if is_use {
-                    self.mark_target_used(symbol);
-                    let use_id = self.current_ast_ids().record_use(expr);
+                        if accessed_object_refers_to_first_parameter && target.is_member() {
+                            target.mark_instance_attribute();
+                        }
+                    }
+
+                    let (is_use, is_definition) = match (ctx, self.current_assignment()) {
+                        (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
+                            // For augmented assignment, the target expression is also used.
+                            (true, true)
+                        }
+                        (ast::ExprContext::Load, _) => (true, false),
+                        (ast::ExprContext::Store, _) => (false, true),
+                        (ast::ExprContext::Del, _) => (false, true),
+                        (ast::ExprContext::Invalid, _) => (false, false),
+                    };
+                    let target_id = self.add_target(target);
+
+                    if is_use {
+                        self.mark_target_used(target_id);
+                        let use_id = self.current_ast_ids().record_use(expr);
+                        self.current_use_def_map_mut()
+                            .record_use(target_id, use_id, node_key);
+                    }
+
+                    if is_definition {
+                        match self.current_assignment() {
+                            Some(CurrentAssignment::Assign { node, unpack }) => {
+                                self.add_definition(
+                                    target_id,
+                                    AssignmentDefinitionNodeRef {
+                                        unpack,
+                                        value: &node.value,
+                                        target: expr,
+                                    },
+                                );
+                            }
+                            Some(CurrentAssignment::AnnAssign(ann_assign)) => {
+                                self.add_standalone_type_expression(&ann_assign.annotation);
+                                self.add_definition(
+                                    target_id,
+                                    AnnotatedAssignmentDefinitionNodeRef {
+                                        node: ann_assign,
+                                        annotation: &ann_assign.annotation,
+                                        value: ann_assign.value.as_deref(),
+                                        target: expr,
+                                    },
+                                );
+                            }
+                            Some(CurrentAssignment::AugAssign(aug_assign)) => {
+                                self.add_definition(target_id, aug_assign);
+                            }
+                            Some(CurrentAssignment::For { node, unpack }) => {
+                                self.add_definition(
+                                    target_id,
+                                    ForStmtDefinitionNodeRef {
+                                        unpack,
+                                        iterable: &node.iter,
+                                        target: expr,
+                                        is_async: node.is_async,
+                                    },
+                                );
+                            }
+                            Some(CurrentAssignment::Named(named)) => {
+                                // TODO(dhruvmanila): If the current scope is a comprehension, then the
+                                // named expression is implicitly nonlocal. This is yet to be
+                                // implemented.
+                                self.add_definition(target_id, named);
+                            }
+                            Some(CurrentAssignment::Comprehension {
+                                unpack,
+                                node,
+                                first,
+                            }) => {
+                                self.add_definition(
+                                    target_id,
+                                    ComprehensionDefinitionNodeRef {
+                                        unpack,
+                                        iterable: &node.iter,
+                                        target: expr,
+                                        first,
+                                        is_async: node.is_async,
+                                    },
+                                );
+                                if let Some(scope) = comprehension_scope {
+                                    self.scope_stack.push(scope);
+                                }
+                            }
+                            Some(CurrentAssignment::WithItem {
+                                item,
+                                is_async,
+                                unpack,
+                            }) => {
+                                self.add_definition(
+                                    target_id,
+                                    WithItemDefinitionNodeRef {
+                                        unpack,
+                                        context_expr: &item.context_expr,
+                                        target: expr,
+                                        is_async,
+                                    },
+                                );
+                            }
+                            None => {}
+                        }
+                    }
+
+                    if let Some(unpack_position) = self
+                        .current_assignment_mut()
+                        .and_then(CurrentAssignment::unpack_position_mut)
+                    {
+                        *unpack_position = UnpackPosition::Other;
+                    }
+                }
+
+                // Track reachability of attribute expressions to silence `unresolved-attribute`
+                // diagnostics in unreachable code.
+                if expr.is_attribute_expr() || expr.is_subscript_expr() {
                     self.current_use_def_map_mut()
-                        .record_use(symbol, use_id, node_key);
-                }
-
-                if is_definition {
-                    match self.current_assignment() {
-                        Some(CurrentAssignment::Assign { node, unpack }) => {
-                            self.add_definition(
-                                symbol,
-                                AssignmentDefinitionNodeRef {
-                                    unpack,
-                                    value: &node.value,
-                                    target: expr,
-                                },
-                            );
-                        }
-                        Some(CurrentAssignment::AnnAssign(ann_assign)) => {
-                            self.add_definition(
-                                symbol,
-                                AnnotatedAssignmentDefinitionNodeRef {
-                                    node: ann_assign,
-                                    annotation: &ann_assign.annotation,
-                                    value: ann_assign.value.as_deref(),
-                                    target: expr,
-                                },
-                            );
-                        }
-                        Some(CurrentAssignment::AugAssign(aug_assign)) => {
-                            self.add_definition(symbol, aug_assign);
-                        }
-                        Some(CurrentAssignment::For { node, unpack }) => {
-                            self.add_definition(
-                                symbol,
-                                ForStmtDefinitionNodeRef {
-                                    unpack,
-                                    iterable: &node.iter,
-                                    target: expr,
-                                    is_async: node.is_async,
-                                },
-                            );
-                        }
-                        Some(CurrentAssignment::Named(named)) => {
-                            // TODO(dhruvmanila): If the current scope is a comprehension, then the
-                            // named expression is implicitly nonlocal. This is yet to be
-                            // implemented.
-                            self.add_definition(symbol, named);
-                        }
-                        Some(CurrentAssignment::Comprehension {
-                            unpack,
-                            node,
-                            first,
-                        }) => {
-                            self.add_definition(
-                                symbol,
-                                ComprehensionDefinitionNodeRef {
-                                    unpack,
-                                    iterable: &node.iter,
-                                    target: expr,
-                                    first,
-                                    is_async: node.is_async,
-                                },
-                            );
-                        }
-                        Some(CurrentAssignment::WithItem {
-                            item,
-                            is_async,
-                            unpack,
-                        }) => {
-                            self.add_definition(
-                                symbol,
-                                WithItemDefinitionNodeRef {
-                                    unpack,
-                                    context_expr: &item.context_expr,
-                                    target: expr,
-                                    is_async,
-                                },
-                            );
-                        }
-                        None => {}
-                    }
-                }
-
-                if let Some(unpack_position) = self
-                    .current_assignment_mut()
-                    .and_then(CurrentAssignment::unpack_position_mut)
-                {
-                    *unpack_position = UnpackPosition::Other;
+                        .record_node_reachability(node_key);
                 }
 
                 walk_expr(self, expr);
@@ -2234,136 +2223,6 @@ where
                 }
 
                 self.simplify_visibility_constraints(pre_op);
-            }
-            ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
-            | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
-                let (is_use, is_definition) = match (ctx, self.current_assignment()) {
-                    (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
-                        // For augmented assignment, the target expression is also used.
-                        (true, true)
-                    }
-                    (ast::ExprContext::Load, _) => (true, false),
-                    (ast::ExprContext::Store, _) => (false, true),
-                    (ast::ExprContext::Del, _) => (false, true),
-                    (ast::ExprContext::Invalid, _) => (false, false),
-                };
-
-                if is_use {
-                    if let Ok(target) = Target::try_from(expr) {
-                        let target = self.add_target(target);
-                        self.mark_target_used(target);
-                        let use_id = self.current_ast_ids().record_use(expr);
-                        self.current_use_def_map_mut()
-                            .record_use(target, use_id, node_key);
-                    }
-                }
-                if is_definition {
-                    match self.current_assignment() {
-                        Some(CurrentAssignment::Assign { node, unpack, .. }) => {
-                            // SAFETY: `value` and `expr` belong to the `self.module` tree
-                            #[expect(unsafe_code)]
-                            let assignment = AssignmentDefinitionKind::new(
-                                TargetKind::from(unpack),
-                                unsafe { AstNodeRef::new(self.module.clone(), &node.value) },
-                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
-                            );
-                            self.register_attribute_subscript_assignment(
-                                expr,
-                                DefinitionKind::Assignment(assignment),
-                            );
-                        }
-                        Some(CurrentAssignment::AnnAssign(ann_assign)) => {
-                            self.add_standalone_type_expression(&ann_assign.annotation);
-                            // SAFETY: `annotation`, `value` and `expr` belong to the `self.module` tree
-                            #[expect(unsafe_code)]
-                            let assignment = AnnotatedAssignmentDefinitionKind::new(
-                                unsafe {
-                                    AstNodeRef::new(self.module.clone(), &ann_assign.annotation)
-                                },
-                                ann_assign.value.as_deref().map(|value| unsafe {
-                                    AstNodeRef::new(self.module.clone(), value)
-                                }),
-                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
-                            );
-                            self.register_attribute_subscript_assignment(
-                                expr,
-                                DefinitionKind::AnnotatedAssignment(assignment),
-                            );
-                        }
-                        Some(CurrentAssignment::For { node, unpack, .. }) => {
-                            // // SAFETY: `iter` and `expr` belong to the `self.module` tree
-                            #[expect(unsafe_code)]
-                            let assignment = ForStmtDefinitionKind::new(
-                                TargetKind::from(unpack),
-                                unsafe { AstNodeRef::new(self.module.clone(), &node.iter) },
-                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
-                                node.is_async,
-                            );
-                            self.register_attribute_subscript_assignment(
-                                expr,
-                                DefinitionKind::For(assignment),
-                            );
-                        }
-                        Some(CurrentAssignment::WithItem {
-                            item,
-                            unpack,
-                            is_async,
-                            ..
-                        }) => {
-                            // SAFETY: `context_expr` and `expr` belong to the `self.module` tree
-                            #[expect(unsafe_code)]
-                            let assignment = WithItemDefinitionKind::new(
-                                TargetKind::from(unpack),
-                                unsafe { AstNodeRef::new(self.module.clone(), &item.context_expr) },
-                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
-                                is_async,
-                            );
-                            self.register_attribute_subscript_assignment(
-                                expr,
-                                DefinitionKind::WithItem(assignment),
-                            );
-                        }
-                        Some(CurrentAssignment::Comprehension {
-                            unpack,
-                            node,
-                            first,
-                        }) => {
-                            // SAFETY: `iter` and `expr` belong to the `self.module` tree
-                            #[expect(unsafe_code)]
-                            let assignment = ComprehensionDefinitionKind {
-                                target_kind: TargetKind::from(unpack),
-                                iterable: unsafe {
-                                    AstNodeRef::new(self.module.clone(), &node.iter)
-                                },
-                                target: unsafe { AstNodeRef::new(self.module.clone(), expr) },
-                                first,
-                                is_async: node.is_async,
-                            };
-                            // Temporarily move to the scope of the method to which the instance attribute is defined.
-                            // SAFETY: `self.scope_stack` is not empty because the targets in comprehensions should always introduce a new scope.
-                            let scope = self.scope_stack.pop().expect("The popped scope must be a comprehension, which must have a parent scope");
-                            self.register_attribute_subscript_assignment(
-                                expr,
-                                DefinitionKind::Comprehension(assignment),
-                            );
-                            self.scope_stack.push(scope);
-                        }
-                        Some(CurrentAssignment::AugAssign(_)) => {
-                            // TODO:
-                        }
-                        Some(CurrentAssignment::Named(_)) => {
-                            // A named expression whose target is an attribute is syntactically prohibited
-                        }
-                        None => {}
-                    }
-                }
-
-                // Track reachability of attribute expressions to silence `unresolved-attribute`
-                // diagnostics in unreachable code.
-                self.current_use_def_map_mut()
-                    .record_node_reachability(node_key);
-
-                walk_expr(self, expr);
             }
             ast::Expr::StringLiteral(_) => {
                 // Track reachability of string literals, as they could be a stringified annotation

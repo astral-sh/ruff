@@ -640,7 +640,11 @@ impl DefinitionKind<'_> {
         }
     }
 
-    pub(crate) fn category(&self, in_stub: bool) -> DefinitionCategory {
+    pub(crate) fn category(
+        &self,
+        in_stub: bool,
+        is_instance_attribute: bool,
+    ) -> DefinitionCategory {
         match self {
             // functions, classes, and imports always bind, and we consider them declarations
             DefinitionKind::Function(_)
@@ -671,8 +675,10 @@ impl DefinitionKind<'_> {
             }
             // Annotated assignment is always a declaration. It is also a binding if there is a RHS
             // or if we are in a stub file. Unfortunately, it is common for stubs to omit even an `...` value placeholder.
+            // Also, currently we consider instance attributes that are only declared to be bound as well
+            // (see mdtest/attributes.md - Attributes - Class and instance variables).
             DefinitionKind::AnnotatedAssignment(ann_assign) => {
-                if in_stub || ann_assign.value.is_some() {
+                if in_stub || ann_assign.value.is_some() || is_instance_attribute {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
                     DefinitionCategory::Declaration
@@ -835,18 +841,6 @@ pub struct AssignmentDefinitionKind<'db> {
 }
 
 impl<'db> AssignmentDefinitionKind<'db> {
-    pub(crate) fn new(
-        target_kind: TargetKind<'db>,
-        value: AstNodeRef<ast::Expr>,
-        target: AstNodeRef<ast::Expr>,
-    ) -> Self {
-        Self {
-            target_kind,
-            value,
-            target,
-        }
-    }
-
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
         self.target_kind
     }
@@ -868,18 +862,6 @@ pub struct AnnotatedAssignmentDefinitionKind {
 }
 
 impl AnnotatedAssignmentDefinitionKind {
-    pub(crate) fn new(
-        annotation: AstNodeRef<ast::Expr>,
-        value: Option<AstNodeRef<ast::Expr>>,
-        target: AstNodeRef<ast::Expr>,
-    ) -> Self {
-        Self {
-            annotation,
-            value,
-            target,
-        }
-    }
-
     pub(crate) fn value(&self) -> Option<&ast::Expr> {
         self.value.as_deref()
     }
@@ -902,20 +884,6 @@ pub struct WithItemDefinitionKind<'db> {
 }
 
 impl<'db> WithItemDefinitionKind<'db> {
-    pub(crate) fn new(
-        target_kind: TargetKind<'db>,
-        context_expr: AstNodeRef<ast::Expr>,
-        target: AstNodeRef<ast::Expr>,
-        is_async: bool,
-    ) -> Self {
-        Self {
-            target_kind,
-            context_expr,
-            target,
-            is_async,
-        }
-    }
-
     pub(crate) fn context_expr(&self) -> &ast::Expr {
         self.context_expr.node()
     }
@@ -942,20 +910,6 @@ pub struct ForStmtDefinitionKind<'db> {
 }
 
 impl<'db> ForStmtDefinitionKind<'db> {
-    pub(crate) fn new(
-        target_kind: TargetKind<'db>,
-        iterable: AstNodeRef<ast::Expr>,
-        target: AstNodeRef<ast::Expr>,
-        is_async: bool,
-    ) -> Self {
-        Self {
-            target_kind,
-            iterable,
-            target,
-            is_async,
-        }
-    }
-
     pub(crate) fn iterable(&self) -> &ast::Expr {
         self.iterable.node()
     }
@@ -1022,6 +976,18 @@ impl From<&ast::StmtTypeAlias> for DefinitionNodeKey {
 
 impl From<&ast::ExprName> for DefinitionNodeKey {
     fn from(node: &ast::ExprName) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::ExprAttribute> for DefinitionNodeKey {
+    fn from(node: &ast::ExprAttribute) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::ExprSubscript> for DefinitionNodeKey {
+    fn from(node: &ast::ExprSubscript) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
