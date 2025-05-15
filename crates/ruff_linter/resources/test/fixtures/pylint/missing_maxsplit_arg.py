@@ -129,49 +129,49 @@ Bar.split[-1]
 
 # TODO
 
-# ## Test accessor
-# class Baz():
-#     def __init__(self):
-#         self.my_str = "1,2,3"
+## Test accessor
+class Baz():
+    def __init__(self):
+        self.my_str = "1,2,3"
 
-#     def get_string(self) -> str:
-#         return self.my_str
+    def get_string(self) -> str:
+        return self.my_str
 
-# # Errors
-# Baz().get_string().split(",")[0]  # [missing-maxsplit-arg]
-# Baz().get_string().split(",")[-1]  # [missing-maxsplit-arg]
-# # OK
-# Baz().get_string().split(",")[1]
-# Baz().get_string().split(",")[-2]
-
-
-# ## Test split result index modified in loop
-# # OK
-# result_index = 0
-# for j in range(3):
-#     print(SEQ.split(",")[result_index])
-#     result_index = result_index + 1
+# Errors
+Baz().get_string().split(",")[0]  # TODO: [missing-maxsplit-arg]
+Baz().get_string().split(",")[-1]  # TODO: [missing-maxsplit-arg]
+# OK
+Baz().get_string().split(",")[1]
+Baz().get_string().split(",")[-2]
 
 
-# ## Test unpacked dict instance kwargs 
-# # Errors
-# kwargs_without_maxsplit = {"seq": ","}
-# "1,2,3".split(**kwargs_without_maxsplit)[0]  # [missing-maxsplit-arg]
-# # OK
-# kwargs_with_maxsplit = {"maxsplit": 1}
-# "1,2,3".split(",", **kwargs_with_maxsplit)[0]
-# kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
-# "1,2,3".split(**kwargs_with_maxsplit)[0]
+## Test split result index modified in loop
+# OK
+result_index = 0
+for j in range(3):
+    print(SEQ.split(",")[result_index])
+    result_index = result_index + 1
 
 
-# ## Test variable split result index
-# # Errors
-# result_index = 0
-# "1,2,3".split(",")[result_index]  # [missing-maxsplit-arg]
-# result_index = -1
-# "1,2,3".split(",")[result_index]  # [missing-maxsplit-arg]
-# # OK 
-# result_index = 1
-# "1,2,3".split(",")[result_index]
-# result_index = -2
-# "1,2,3".split(",")[result_index]
+## Test unpacked dict instance kwargs 
+# Errors
+kwargs_without_maxsplit = {"seq": ","}
+"1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
+# OK
+kwargs_with_maxsplit = {"maxsplit": 1}
+"1,2,3".split(",", **kwargs_with_maxsplit)[0]
+kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
+"1,2,3".split(**kwargs_with_maxsplit)[0]
+
+
+## Test variable split result index
+# Errors
+result_index = 0
+"1,2,3".split(",")[result_index]  # TODO: [missing-maxsplit-arg]
+result_index = -1
+"1,2,3".split(",")[result_index]  # TODO: [missing-maxsplit-arg]
+# OK 
+result_index = 1
+"1,2,3".split(",")[result_index]
+result_index = -2
+"1,2,3".split(",")[result_index]

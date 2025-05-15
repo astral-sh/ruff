@@ -4,7 +4,7 @@ use ruff_python_ast::{
     DictItem, Expr, ExprAttribute, ExprCall, ExprDict, ExprNumberLiteral, ExprStringLiteral,
     ExprSubscript, ExprUnaryOp, Keyword, Number, UnaryOp,
 };
-use ruff_python_semantic::analyze::typing;
+use ruff_python_semantic::{analyze::typing, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -14,7 +14,7 @@ use crate::checkers::ast::Checker;
 /// `maxsplit=1`
 ///
 /// ## Why is this bad?
-/// Calling `str.split()` without maxsplit set splits on every delimiter in the
+/// Calling `str.split()` without `maxsplit` set splits on every delimiter in the
 /// string. When accessing only the first or last element of the result, it
 /// would be more efficient to only split once.
 ///
@@ -39,6 +39,30 @@ impl Violation for MissingMaxsplitArg {
         "Accessing only the first or last element of `str.split()` without setting `maxsplit=1`"
             .to_string()
     }
+}
+
+fn is_string(expr: &Expr, semantic: &SemanticModel) -> bool {
+    if let Expr::Name(name) = expr {
+        let Some(binding_id) = semantic.only_binding(name) else {
+            return false;
+        };
+        let binding = semantic.binding(binding_id);
+
+        if !typing::is_string(binding, semantic) {
+            return false;
+        }
+        return true;
+    } else if let Some(binding_id) = semantic.lookup_attribute(expr) {
+        let binding = semantic.binding(binding_id);
+        if !typing::is_string(binding, semantic) {
+            return false;
+        }
+        return true;
+    } else if let Expr::StringLiteral(_) = expr {
+        return true;
+    }
+
+    false
 }
 
 /// PLC0207
@@ -75,41 +99,25 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         return;
     }
 
-    if let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() {
-        // Check the function is "split" or "rsplit"
-        let attr = attr.as_str();
-        if !matches!(attr, "split" | "rsplit") {
-            return;
-        }
+    let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() else {
+        return;
+    };
 
-        let mut target_instance = value;
-        while let Expr::Subscript(ExprSubscript { value, .. }) = target_instance.as_ref() {
-            target_instance = value;
-        }
+    // Check the function is "split" or "rsplit"
+    let attr = attr.as_str();
+    if !matches!(attr, "split" | "rsplit") {
+        return;
+    }
 
-        let semantic = checker.semantic();
+    let mut target_instance = value;
+    // a subscripted value could technically be subscripted further ad-infinitum, so we
+    // recurse into the subscript expressions until we find the value being subscripted
+    while let Expr::Subscript(ExprSubscript { value, .. }) = target_instance.as_ref() {
+        target_instance = value;
+    }
 
-        // Check the function is called on a string
-        if let Expr::Name(name) = target_instance.as_ref() {
-            let Some(binding_id) = semantic.only_binding(name) else {
-                return;
-            };
-            let binding = semantic.binding(binding_id);
-
-            if !typing::is_string(binding, semantic) {
-                return;
-            }
-        } else if let Some(binding_id) = semantic.lookup_attribute(target_instance) {
-            let binding = semantic.binding(binding_id);
-            if !typing::is_string(binding, semantic) {
-                return;
-            }
-        } else if let Expr::StringLiteral(_) = target_instance.as_ref() {
-            // pass
-        } else {
-            return;
-        }
-    } else {
+    // Check the function is called on a string
+    if !is_string(target_instance, checker.semantic()) {
         return;
     }
 
