@@ -71,7 +71,7 @@ fn message_to_rdjson_value(message: &Message) -> Value {
                 "range": rdjson_range(start_location, end_location),
             },
             "code": {
-                "value": message.rule().map(|rule| rule.noqa_code().to_string()),
+                "value": message.noqa_code().map(|code| code.to_string()),
                 "url": message.rule().and_then(|rule| rule.url()),
             },
             "suggestions": rdjson_suggestions(fix.edits(), &source_code),
@@ -84,7 +84,7 @@ fn message_to_rdjson_value(message: &Message) -> Value {
                 "range": rdjson_range(start_location, end_location),
             },
             "code": {
-                "value": message.rule().map(|rule| rule.noqa_code().to_string()),
+                "value": message.noqa_code().map(|code| code.to_string()),
                 "url": message.rule().and_then(|rule| rule.url()),
             },
         })

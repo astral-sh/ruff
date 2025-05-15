@@ -105,8 +105,7 @@ impl Codes<'_> {
 
     /// Returns `true` if the string list of `codes` includes `code` (or an alias
     /// thereof).
-    pub(crate) fn includes(&self, needle: Rule) -> bool {
-        let needle = needle.noqa_code();
+    pub(crate) fn includes(&self, needle: NoqaCode) -> bool {
         self.iter()
             .any(|code| needle == get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
     }
@@ -140,7 +139,7 @@ pub(crate) fn rule_is_ignored(
         Ok(Some(NoqaLexerOutput {
             directive: Directive::Codes(codes),
             ..
-        })) => codes.includes(code),
+        })) => codes.includes(code.noqa_code()),
         _ => false,
     }
 }
@@ -847,6 +846,8 @@ fn find_noqa_comments<'a>(
             continue;
         };
 
+        let code = rule.noqa_code();
+
         match &exemption {
             FileExemption::All(_) => {
                 // If the file is exempted, don't add any noqa directives.
@@ -855,7 +856,7 @@ fn find_noqa_comments<'a>(
             }
             FileExemption::Codes(codes) => {
                 // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
-                if codes.contains(&&rule.noqa_code()) {
+                if codes.contains(&&code) {
                     comments_by_line.push(None);
                     continue;
                 }
@@ -873,7 +874,7 @@ fn find_noqa_comments<'a>(
                         continue;
                     }
                     Directive::Codes(codes) => {
-                        if codes.includes(rule) {
+                        if codes.includes(code) {
                             comments_by_line.push(None);
                             continue;
                         }
@@ -892,7 +893,7 @@ fn find_noqa_comments<'a>(
                     continue;
                 }
                 directive @ Directive::Codes(codes) => {
-                    if !codes.includes(rule) {
+                    if !codes.includes(code) {
                         comments_by_line.push(Some(NoqaComment {
                             line: directive_line.start(),
                             rule,

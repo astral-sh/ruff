@@ -24,6 +24,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
 
+use crate::codes::NoqaCode;
 use crate::logging::DisplayParseErrorType;
 use crate::registry::Rule;
 use crate::Locator;
@@ -238,6 +239,11 @@ impl Message {
         } else {
             Some(self.name().parse().expect("Expected a valid rule name"))
         }
+    }
+
+    /// Returns the [`NoqaCode`] corresponding to the diagnostic message.
+    pub fn noqa_code(&self) -> Option<NoqaCode> {
+        self.rule().map(|rule| rule.noqa_code())
     }
 
     /// Returns the filename for the message.

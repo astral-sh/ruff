@@ -210,9 +210,9 @@ impl Workspace {
             .map(|msg| {
                 let message = msg.body().to_string();
                 let range = msg.range();
-                match msg.rule() {
-                    Some(rule) => ExpandedMessage {
-                        code: Some(rule.noqa_code().to_string()),
+                match msg.noqa_code() {
+                    Some(code) => ExpandedMessage {
+                        code: Some(code.to_string()),
                         message,
                         start_location: source_code.line_column(range.start()).into(),
                         end_location: source_code.line_column(range.end()).into(),
