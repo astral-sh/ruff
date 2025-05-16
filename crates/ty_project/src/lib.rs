@@ -680,6 +680,7 @@ mod tests {
             &db,
             ProgramSettings {
                 python_version: PythonVersion::default(),
+                python_version_source: ty_python_semantic::ValueSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings::new(vec![SystemPathBuf::from(".")]),
             },

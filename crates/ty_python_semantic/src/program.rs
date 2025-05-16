@@ -4,14 +4,19 @@ use crate::site_packages::SysPrefixPathOrigin;
 use crate::Db;
 
 use anyhow::Context;
+use ruff_db::files::File;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
+use ruff_text_size::TextRange;
 use salsa::Durability;
 use salsa::Setter;
 
 #[salsa::input(singleton)]
 pub struct Program {
     pub python_version: PythonVersion,
+
+    #[returns(ref)]
+    pub python_version_source: ValueSource,
 
     #[returns(ref)]
     pub python_platform: PythonPlatform,
@@ -24,6 +29,7 @@ impl Program {
     pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> anyhow::Result<Self> {
         let ProgramSettings {
             python_version,
+            python_version_source,
             python_platform,
             search_paths,
         } = settings;
@@ -33,11 +39,14 @@ impl Program {
         let search_paths = SearchPaths::from_settings(db, &search_paths)
             .with_context(|| "Invalid search path settings")?;
 
-        Ok(
-            Program::builder(python_version, python_platform, search_paths)
-                .durability(Durability::HIGH)
-                .new(db),
+        Ok(Program::builder(
+            python_version,
+            python_version_source,
+            python_platform,
+            search_paths,
         )
+        .durability(Durability::HIGH)
+        .new(db))
     }
 
     pub fn update_from_settings(
@@ -47,6 +56,7 @@ impl Program {
     ) -> anyhow::Result<()> {
         let ProgramSettings {
             python_version,
+            python_version_source,
             python_platform,
             search_paths,
         } = settings;
@@ -54,6 +64,11 @@ impl Program {
         if &python_platform != self.python_platform(db) {
             tracing::debug!("Updating python platform: `{python_platform:?}`");
             self.set_python_platform(db).to(python_platform);
+        }
+
+        if &python_version_source != self.python_version_source(db) {
+            tracing::debug!("Updating python version source: `{python_version_source:?}`");
+            self.set_python_version_source(db).to(python_version_source);
         }
 
         if python_version != self.python_version(db) {
@@ -90,8 +105,24 @@ impl Program {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ProgramSettings {
     pub python_version: PythonVersion,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub python_version_source: ValueSource,
     pub python_platform: PythonPlatform,
     pub search_paths: SearchPathSettings,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
+pub enum ValueSource {
+    /// Value loaded from a project's configuration file.
+    File(Option<File>, Option<TextRange>),
+
+    /// The value comes from a CLI argument, while it's left open if specified using a short argument,
+    /// long argument (`--extra-paths`) or `--config key=value`.
+    Cli,
+
+    /// We fell back to a default value because the value was not specified via the CLI or a config file.
+    #[default]
+    Default,
 }
 
 /// Configures the search paths for module resolution.

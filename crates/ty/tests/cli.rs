@@ -241,6 +241,72 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn config_file_annotation_showing_where_python_version_set() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            python-version = "3.8"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            aiter
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `aiter` used when not defined
+     --> test.py:2:1
+      |
+    2 | aiter
+      | ^^^^^
+      |
+    info: `aiter` was added as a builtin in Python 3.10, but Python 3.8 was assumed when resolving types
+     --> pyproject.toml:3:18
+      |
+    2 | [tool.ty.environment]
+    3 | python-version = "3.8"
+      |                  ^^^^^ Python 3.8 assumed due to this configuration setting
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `aiter` used when not defined
+     --> test.py:2:1
+      |
+    2 | aiter
+      | ^^^^^
+      |
+    info: `aiter` was added as a builtin in Python 3.10, but Python 3.9 was assumed when resolving types
+    info: This is because Python 3.9 was specified on the command line
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
 /// Paths specified on the CLI are relative to the current working directory and not the project root.
 ///
 /// We test this by adding an extra search path from the CLI to the libs directory when

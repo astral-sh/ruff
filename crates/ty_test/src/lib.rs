@@ -261,6 +261,7 @@ fn run_test(
 
     let settings = ProgramSettings {
         python_version,
+        python_version_source: ty_python_semantic::ValueSource::Cli,
         python_platform: configuration
             .python_platform()
             .unwrap_or(PythonPlatform::Identifier("linux".to_string())),
