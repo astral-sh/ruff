@@ -2132,50 +2132,48 @@ impl<'db> TypeInferenceBuilder<'db> {
             let ty = if let Some(default_ty) = default_ty {
                 UnionType::from_elements(self.db(), [Type::unknown(), default_ty])
             } else {
-                let func =
-                    enclosing_function_definition(self.db(), self.index, self.scope()).unwrap();
-                let DefinitionKind::Function(func_def) = func.kind(self.db()) else {
-                    panic!("Expected function definition");
-                };
-                let func_type =
-                    enclosing_function_type(self.db(), self.index, self.scope()).unwrap();
-                // TODO: Enum or something better
-                let mut first_self_or_cls = 1;
-
-                if func_type.has_known_decorator(self.db(), FunctionDecorators::CLASSMETHOD) {
-                    first_self_or_cls = 2;
-                }
-                // if func_type
-                //     .has_known_decorator(self.db(), FunctionDecorators::STATICMETHOD)
-                // {
-                //     first_self_or_cls = 3;
-                // }
-
-                // If this parameter is the first parameter
-                if func_def
-                    .parameters
-                    .index(parameter.name())
-                    .is_some_and(|index| index == 0)
-                {
-                    // if the first parameter is `self`
-                    if first_self_or_cls == 1 {
-                        let ty = Type::KnownInstance(KnownInstanceType::TypingSelf)
-                            .in_type_expression(self.db(), self.scope())
-                            .unwrap();
-                        ty
-                    // TODO: if the first parameter is `cls`
-                    } else if first_self_or_cls == 2 {
-                        // type[Self]
-                        Type::unknown()
-                    // TODO: This is a static method
-                    } else {
-                        Type::unknown()
-                    }
-                } else {
-                    Type::unknown()
-                }
+                self.special_first_method_argument(parameter)
             };
             self.add_binding(parameter.into(), definition, ty);
+        }
+    }
+
+    // Extract this logic into a separate function
+    fn special_first_method_argument(&self, parameter: &ast::Parameter) -> Type<'db> {
+        let Some(func_type) = enclosing_function_type(self.db(), self.index, self.scope()) else {
+            return Type::unknown();
+        };
+        let Some(func) = enclosing_function_definition(self.db(), self.index, self.scope()) else {
+            return Type::unknown();
+        };
+        let DefinitionKind::Function(func_def) = func.kind(self.db()) else {
+            return Type::unknown();
+        };
+
+        let method_type =
+            if func_type.has_known_decorator(self.db(), FunctionDecorators::CLASSMETHOD) {
+                2 // cls
+                  // } else if func_type.has_known_decorator(self.db(), FunctionDecorators::STATICMETHOD) {
+                  //     3 // static
+            } else {
+                1 // self
+            };
+
+        let is_first_param = func_def
+            .parameters
+            .index(parameter.name())
+            .is_some_and(|index| index == 0);
+
+        if !is_first_param {
+            return Type::unknown();
+        }
+
+        match method_type {
+            1 => Type::KnownInstance(KnownInstanceType::TypingSelf)
+                .in_type_expression(self.db(), self.scope())
+                .unwrap_or_else(|_| Type::unknown()),
+            2 => Type::unknown(), // TODO: type[Self]
+            _ => Type::unknown(), // TODO: This is a static method
         }
     }
 

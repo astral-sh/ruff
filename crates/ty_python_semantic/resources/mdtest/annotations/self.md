@@ -130,5 +130,6 @@ class Container(Generic[T]):
     def set_value(self: Self, value: T) -> Self:
         return self
 
-reveal_type(Shape().implicit_self())  # revealed: Shape
+c = Container[int]()
+reveal_type(c.set_value(1))  # revealed: Container[int]
 ```

@@ -1044,29 +1044,31 @@ impl<'db> Parameters<'db> {
         } else {
             false
         };
-        let classmethod = if matches!(definition.kind(db), DefinitionKind::Function(_)) {
-            let result = infer_definition_types(db, definition);
-            match result.declaration_type(definition).inner_type() {
-                Type::FunctionLiteral(t) => {
-                    t.decorators(db).contains(FunctionDecorators::CLASSMETHOD)
+        let classmethod = if let DefinitionKind::Function(f) = definition.kind(db) {
+            if f.name.id() == "__new__" {
+                true
+            } else {
+                let result = infer_definition_types(db, definition);
+                match result.declaration_type(definition).inner_type() {
+                    Type::FunctionLiteral(t) => {
+                        t.decorators(db).contains(FunctionDecorators::CLASSMETHOD)
+                    }
+                    _ => false,
                 }
-                _ => false,
             }
         } else {
             false
         };
         let positional_or_keyword = args.iter().enumerate().map(|(index, arg)| {
-            if index == 0 && function_is_method && arg.parameter.annotation().is_none() {
-                let implicit_annotation = if classmethod {
-                    Type::KnownInstance(KnownInstanceType::TypingSelf)
-                        .to_meta_type(db)
-                        .in_type_expression(db, definition.scope(db))
-                        .unwrap()
-                } else {
-                    Type::KnownInstance(KnownInstanceType::TypingSelf)
-                        .in_type_expression(db, definition.scope(db))
-                        .unwrap()
-                };
+            if index == 0
+                && function_is_method
+                && arg.parameter.annotation().is_none()
+                // TODO: Handle type of cls
+                && !classmethod
+            {
+                let implicit_annotation = Type::KnownInstance(KnownInstanceType::TypingSelf)
+                    .in_type_expression(db, definition.scope(db))
+                    .unwrap();
                 Parameter {
                     annotated_type: Some(implicit_annotation),
                     kind: ParameterKind::PositionalOrKeyword {
