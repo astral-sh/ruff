@@ -129,7 +129,34 @@ Bar.split[-1]
 
 # TODO
 
+## Test variable split result index
+## TODO: These require the ability to resolve a variable name to a value
+# Errors
+result_index = 0
+"1,2,3".split(",")[result_index]  # TODO: [missing-maxsplit-arg]
+result_index = -1
+"1,2,3".split(",")[result_index]  # TODO: [missing-maxsplit-arg]
+# OK 
+result_index = 1
+"1,2,3".split(",")[result_index]
+result_index = -2
+"1,2,3".split(",")[result_index]
+
+
+## Test split result index modified in loop
+## TODO: These require the ability to recognize being in a loop where:
+##     - the result of split called on a string is indexed by a variable
+##     - the variable index above is modified
+# OK
+result_index = 0
+for j in range(3):
+    print(SEQ.split(",")[result_index])
+    result_index = result_index + 1
+
+
 ## Test accessor
+## TODO: These require the ability to get the return type of a method
+## (possibly via `typing::is_string`)
 class Baz():
     def __init__(self):
         self.my_str = "1,2,3"
@@ -145,15 +172,8 @@ Baz().get_string().split(",")[1]
 Baz().get_string().split(",")[-2]
 
 
-## Test split result index modified in loop
-# OK
-result_index = 0
-for j in range(3):
-    print(SEQ.split(",")[result_index])
-    result_index = result_index + 1
-
-
-## Test unpacked dict instance kwargs 
+## Test unpacked dict instance kwargs
+## TODO: These require the ability to resolve a dict variable name to a value
 # Errors
 kwargs_without_maxsplit = {"seq": ","}
 "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
@@ -162,16 +182,3 @@ kwargs_with_maxsplit = {"maxsplit": 1}
 "1,2,3".split(",", **kwargs_with_maxsplit)[0]
 kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
 "1,2,3".split(**kwargs_with_maxsplit)[0]
-
-
-## Test variable split result index
-# Errors
-result_index = 0
-"1,2,3".split(",")[result_index]  # TODO: [missing-maxsplit-arg]
-result_index = -1
-"1,2,3".split(",")[result_index]  # TODO: [missing-maxsplit-arg]
-# OK 
-result_index = 1
-"1,2,3".split(",")[result_index]
-result_index = -2
-"1,2,3".split(",")[result_index]

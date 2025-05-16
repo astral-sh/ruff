@@ -295,30 +295,30 @@ missing_maxsplit_arg.py:58:1: PLC0207 Accessing only the first or last element o
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
    |
 
-missing_maxsplit_arg.py:159:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:179:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
     |
-157 | # Errors
-158 | kwargs_without_maxsplit = {"seq": ","}
-159 | "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
+177 | # Errors
+178 | kwargs_without_maxsplit = {"seq": ","}
+179 | "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
-160 | # OK
-161 | kwargs_with_maxsplit = {"maxsplit": 1}
+180 | # OK
+181 | kwargs_with_maxsplit = {"maxsplit": 1}
     |
 
-missing_maxsplit_arg.py:162:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:182:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
     |
-160 | # OK
-161 | kwargs_with_maxsplit = {"maxsplit": 1}
-162 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]
+180 | # OK
+181 | kwargs_with_maxsplit = {"maxsplit": 1}
+182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
-163 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
-164 | "1,2,3".split(**kwargs_with_maxsplit)[0]
+183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
+184 | "1,2,3".split(**kwargs_with_maxsplit)[0]
     |
 
-missing_maxsplit_arg.py:164:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:184:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
     |
-162 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]
-163 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
-164 | "1,2,3".split(**kwargs_with_maxsplit)[0]
+182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]
+183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
+184 | "1,2,3".split(**kwargs_with_maxsplit)[0]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
     |
