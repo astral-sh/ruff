@@ -153,5 +153,80 @@ AIR302_standard.py:49:1: AIR302 `airflow.operators.dummy_operator.EmptyOperator`
 48 | DummyOperator()
 49 | EmptyOperator()
    | ^^^^^^^^^^^^^ AIR302
+50 |
+51 | from airflow.hooks.subprocess import SubprocessResult
    |
    = help: Install `apache-airflow-providers-standard>=0.0.2` and use `airflow.providers.standard.operators.empty.EmptyOperator` instead.
+
+AIR302_standard.py:52:1: AIR302 `airflow.hooks.subprocess.SubprocessResult` is moved into `standard` provider in Airflow 3.0;
+   |
+51 | from airflow.hooks.subprocess import SubprocessResult
+52 | SubprocessResult()
+   | ^^^^^^^^^^^^^^^^ AIR302
+53 | from airflow.hooks.subprocess import working_directory
+54 | working_directory()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `airflow.providers.standard.hooks.subprocess.SubprocessResult` instead.
+
+AIR302_standard.py:54:1: AIR302 `airflow.hooks.subprocess.working_directory` is moved into `standard` provider in Airflow 3.0;
+   |
+52 | SubprocessResult()
+53 | from airflow.hooks.subprocess import working_directory
+54 | working_directory()
+   | ^^^^^^^^^^^^^^^^^ AIR302
+55 | from airflow.operators.datetime import target_times_as_dates
+56 | target_times_as_dates()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `airflow.providers.standard.hooks.subprocess.working_directory` instead.
+
+AIR302_standard.py:56:1: AIR302 `airflow.operators.datetime.target_times_as_dates` is moved into `standard` provider in Airflow 3.0;
+   |
+54 | working_directory()
+55 | from airflow.operators.datetime import target_times_as_dates
+56 | target_times_as_dates()
+   | ^^^^^^^^^^^^^^^^^^^^^ AIR302
+57 | from airflow.operators.trigger_dagrun import TriggerDagRunLink
+58 | TriggerDagRunLink()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.1` and use `airflow.providers.standard.operators.datetime.target_times_as_dates` instead.
+
+AIR302_standard.py:58:1: AIR302 `airflow.operators.trigger_dagrun.TriggerDagRunLink` is moved into `standard` provider in Airflow 3.0;
+   |
+56 | target_times_as_dates()
+57 | from airflow.operators.trigger_dagrun import TriggerDagRunLink
+58 | TriggerDagRunLink()
+   | ^^^^^^^^^^^^^^^^^ AIR302
+59 | from airflow.sensors.external_task import ExternalTaskSensorLink
+60 | ExternalTaskSensorLink()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.2` and use `airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunLink` instead.
+
+AIR302_standard.py:60:1: AIR302 [*] `airflow.sensors.external_task.ExternalTaskSensorLink` is moved into `standard` provider in Airflow 3.0;
+   |
+58 | TriggerDagRunLink()
+59 | from airflow.sensors.external_task import ExternalTaskSensorLink
+60 | ExternalTaskSensorLink()
+   | ^^^^^^^^^^^^^^^^^^^^^^ AIR302
+61 | from airflow.sensors.time_delta import WaitSensor
+62 | WaitSensor()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `airflow.providers.standard.sensors.external_task.ExternalDagLink` instead.
+
+ℹ Safe fix
+57 57 | from airflow.operators.trigger_dagrun import TriggerDagRunLink
+58 58 | TriggerDagRunLink()
+59 59 | from airflow.sensors.external_task import ExternalTaskSensorLink
+60    |-ExternalTaskSensorLink()
+   60 |+from airflow.providers.standard.sensors.external_task import ExternalDagLink
+   61 |+ExternalDagLink()
+61 62 | from airflow.sensors.time_delta import WaitSensor
+62 63 | WaitSensor()
+
+AIR302_standard.py:62:1: AIR302 `airflow.sensors.time_delta.WaitSensor` is moved into `standard` provider in Airflow 3.0;
+   |
+60 | ExternalTaskSensorLink()
+61 | from airflow.sensors.time_delta import WaitSensor
+62 | WaitSensor()
+   | ^^^^^^^^^^ AIR302
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.1` and use `airflow.providers.standard.sensors.time_delta.WaitSensor` instead.
