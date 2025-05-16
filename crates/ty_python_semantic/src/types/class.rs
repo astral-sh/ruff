@@ -1289,6 +1289,14 @@ impl<'db> ClassLiteral<'db> {
 
                 Some(Type::Callable(CallableType::single(db, signature)))
             }
+            (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
+                KnownClass::NamedTupleFallback
+                    .to_class_literal(db)
+                    .into_class_literal()?
+                    .own_class_member(db, None, name)
+                    .symbol
+                    .ignore_possibly_unbound()
+            }
             _ => None,
         }
     }
@@ -1985,6 +1993,8 @@ pub enum KnownClass {
     NotImplementedType,
     // dataclasses
     Field,
+    // _typeshed._type_checker_internals
+    NamedTupleFallback,
 }
 
 impl<'db> KnownClass {
@@ -2067,7 +2077,8 @@ impl<'db> KnownClass {
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
             | Self::NotImplementedType
             | Self::Classmethod
-            | Self::Field => Truthiness::Ambiguous,
+            | Self::Field
+            | Self::NamedTupleFallback => Truthiness::Ambiguous,
         }
     }
 
@@ -2141,7 +2152,8 @@ impl<'db> KnownClass {
             | Self::EllipsisType
             | Self::NotImplementedType
             | Self::UnionType
-            | Self::Field => false,
+            | Self::Field
+            | Self::NamedTupleFallback => false,
         }
     }
 
@@ -2217,6 +2229,7 @@ impl<'db> KnownClass {
             }
             Self::NotImplementedType => "_NotImplementedType",
             Self::Field => "Field",
+            Self::NamedTupleFallback => "NamedTupleFallback",
         }
     }
 
@@ -2446,6 +2459,7 @@ impl<'db> KnownClass {
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field => KnownModule::Dataclasses,
+            Self::NamedTupleFallback => KnownModule::TypeCheckerInternals,
         }
     }
 
@@ -2508,7 +2522,8 @@ impl<'db> KnownClass {
             | Self::Super
             | Self::NamedTuple
             | Self::NewType
-            | Self::Field => false,
+            | Self::Field
+            | Self::NamedTupleFallback => false,
         }
     }
 
@@ -2573,7 +2588,8 @@ impl<'db> KnownClass {
             | Self::UnionType
             | Self::NamedTuple
             | Self::NewType
-            | Self::Field => false,
+            | Self::Field
+            | Self::NamedTupleFallback => false,
         }
     }
 
@@ -2646,6 +2662,7 @@ impl<'db> KnownClass {
             }
             "_NotImplementedType" => Self::NotImplementedType,
             "Field" => Self::Field,
+            "NamedTupleFallback" => Self::NamedTupleFallback,
             _ => return None,
         };
 
@@ -2700,7 +2717,8 @@ impl<'db> KnownClass {
             | Self::GeneratorType
             | Self::AsyncGeneratorType
             | Self::WrapperDescriptorType
-            | Self::Field => module == self.canonical_module(db),
+            | Self::Field
+            | Self::NamedTupleFallback => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeVar
