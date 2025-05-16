@@ -6688,6 +6688,7 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
+        let inherited_generic_context = self.inherited_generic_context(db);
         let specialization = self.specialization(db);
         if let Some(overloaded) = self.to_overloaded(db) {
             FunctionSignature {
@@ -6695,13 +6696,13 @@ impl<'db> FunctionType<'db> {
                     Type::FunctionLiteral(self),
                     overloaded.overloads.iter().copied().map(|overload| {
                         overload
-                            .internal_signature(db)
+                            .internal_signature(db, inherited_generic_context)
                             .apply_optional_specialization(db, specialization)
                     }),
                 ),
                 implementation: overloaded.implementation.map(|implementation| {
                     implementation
-                        .internal_signature(db)
+                        .internal_signature(db, inherited_generic_context)
                         .apply_optional_specialization(db, specialization)
                 }),
             }
@@ -6709,7 +6710,7 @@ impl<'db> FunctionType<'db> {
             FunctionSignature {
                 overloads: CallableSignature::single(
                     Type::FunctionLiteral(self),
-                    self.internal_signature(db)
+                    self.internal_signature(db, inherited_generic_context)
                         .apply_optional_specialization(db, specialization),
                 ),
                 implementation: None,
@@ -6727,7 +6728,11 @@ impl<'db> FunctionType<'db> {
     ///
     /// Don't call this when checking any other file; only when type-checking the function body
     /// scope.
-    fn internal_signature(self, db: &'db dyn Db) -> Signature<'db> {
+    fn internal_signature(
+        self,
+        db: &'db dyn Db,
+        inherited_generic_context: Option<GenericContext<'db>>,
+    ) -> Signature<'db> {
         let scope = self.body_scope(db);
         let function_stmt_node = scope.node(db).expect_function();
         let definition = self.definition(db);
@@ -6738,7 +6743,7 @@ impl<'db> FunctionType<'db> {
         Signature::from_function(
             db,
             generic_context,
-            self.inherited_generic_context(db),
+            inherited_generic_context,
             definition,
             function_stmt_node,
         )
