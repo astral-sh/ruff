@@ -80,8 +80,7 @@ pub(crate) fn single_item_membership_test(
     };
 
     // Check if the right-hand side is a single-item object
-    let semantic = checker.semantic();
-    let Some(item) = single_item(right, semantic) else {
+    let Some(item) = single_item(right, checker.semantic()) else {
         return;
     };
 
@@ -135,10 +134,9 @@ fn single_item<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Ex
                 return None;
             }
 
-            match arguments.find_positional(0) {
-                Some(arg) => single_item(arg, semantic),
-                None => None,
-            }
+            arguments
+                .find_positional(0)
+                .and_then(|arg| single_item(arg, semantic))
         }
         string_expr @ Expr::StringLiteral(ExprStringLiteral { value: string, .. })
             if string.chars().count() == 1 =>
