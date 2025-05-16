@@ -17,8 +17,8 @@ mod tests {
     use crate::rules::{flake8_tidy_imports, pylint};
 
     use crate::assert_messages;
-    use crate::settings::types::PreviewMode;
     use crate::settings::LinterSettings;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
 
     #[test_case(Rule::SingledispatchMethod, Path::new("singledispatch_method.py"))]

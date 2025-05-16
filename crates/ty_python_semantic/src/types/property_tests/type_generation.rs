@@ -220,8 +220,6 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
         Ty::KnownClassInstance(KnownClass::Str),
         Ty::KnownClassInstance(KnownClass::Int),
         Ty::KnownClassInstance(KnownClass::Bool),
-        Ty::KnownClassInstance(KnownClass::List),
-        Ty::KnownClassInstance(KnownClass::Tuple),
         Ty::KnownClassInstance(KnownClass::FunctionType),
         Ty::KnownClassInstance(KnownClass::SpecialForm),
         Ty::KnownClassInstance(KnownClass::TypeVar),

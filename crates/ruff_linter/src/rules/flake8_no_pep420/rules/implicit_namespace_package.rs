@@ -1,16 +1,16 @@
 use std::path::{Path, PathBuf};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::script::ScriptTag;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PySourceType;
+use ruff_python_ast::script::ScriptTag;
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::Locator;
 use crate::comments::shebang::ShebangDirective;
 use crate::fs;
 use crate::package::PackageRoot;
-use crate::Locator;
 
 /// ## What it does
 /// Checks for packages that are missing an `__init__.py` file.
@@ -42,10 +42,14 @@ impl Violation for ImplicitNamespacePackage {
         let ImplicitNamespacePackage { filename, parent } = self;
         match parent {
             None => {
-                format!("File `{filename}` is part of an implicit namespace package. Add an `__init__.py`.")
+                format!(
+                    "File `{filename}` is part of an implicit namespace package. Add an `__init__.py`."
+                )
             }
             Some(parent) => {
-                format!("File `{filename}` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `{parent}`.")
+                format!(
+                    "File `{filename}` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `{parent}`."
+                )
             }
         }
     }
@@ -79,10 +83,6 @@ pub(crate) fn implicit_namespace_package(
         // Ignore PEP 723 scripts.
         && ScriptTag::parse(locator.contents().as_bytes()).is_none()
     {
-        #[cfg(all(test, windows))]
-        let path = path
-            .to_string_lossy()
-            .replace(std::path::MAIN_SEPARATOR, "/"); // The snapshot test expects / as the path separator.
         return Some(Diagnostic::new(
             ImplicitNamespacePackage {
                 filename: fs::relativize_path(path),
@@ -100,11 +100,6 @@ pub(crate) fn implicit_namespace_package(
                     .ancestors()
                     .find(|parent| !parent.join("__init__.py").exists())
                 {
-                    #[cfg(all(test, windows))]
-                    let path = path
-                        .to_string_lossy()
-                        .replace(std::path::MAIN_SEPARATOR, "/"); // The snapshot test expects / as the path separator.
-
                     return Some(Diagnostic::new(
                         ImplicitNamespacePackage {
                             filename: fs::relativize_path(path),

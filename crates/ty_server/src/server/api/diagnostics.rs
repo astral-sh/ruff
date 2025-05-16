@@ -1,8 +1,8 @@
 use lsp_server::ErrorCode;
-use lsp_types::{notification::PublishDiagnostics, PublishDiagnosticsParams, Url};
+use lsp_types::{PublishDiagnosticsParams, Url, notification::PublishDiagnostics};
 
-use crate::server::client::Notifier;
 use crate::server::Result;
+use crate::server::client::Notifier;
 
 use super::LSPResult;
 

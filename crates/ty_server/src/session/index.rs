@@ -5,8 +5,8 @@ use lsp_types::Url;
 use rustc_hash::FxHashMap;
 
 use crate::{
-    document::{DocumentKey, DocumentVersion, NotebookDocument},
     PositionEncoding, TextDocument,
+    document::{DocumentKey, DocumentVersion, NotebookDocument},
 };
 
 use super::ClientSettings;

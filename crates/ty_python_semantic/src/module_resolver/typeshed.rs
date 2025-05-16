@@ -7,9 +7,9 @@ use std::str::FromStr;
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
 
+use crate::Program;
 use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::Program;
 
 pub(in crate::module_resolver) fn vendored_typeshed_versions(db: &dyn Db) -> TypeshedVersions {
     TypeshedVersions::from_str(
@@ -237,7 +237,7 @@ impl FromStr for TypeshedVersions {
                     return Err(TypeshedVersionsParseError {
                         line_number: Some(line_number),
                         reason,
-                    })
+                    });
                 }
             };
         }

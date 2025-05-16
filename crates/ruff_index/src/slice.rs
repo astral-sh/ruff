@@ -1,5 +1,5 @@
-use crate::vec::IndexVec;
 use crate::Idx;
+use crate::vec::IndexVec;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut, Range};

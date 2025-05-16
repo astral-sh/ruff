@@ -2,11 +2,11 @@ use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId};
-use crate::Db;
 
 /// This ingredient represents a single unpacking.
 ///

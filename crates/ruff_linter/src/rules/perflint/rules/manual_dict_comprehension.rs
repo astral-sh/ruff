@@ -1,9 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    self as ast, comparable::ComparableExpr, helpers::any_over_expr, Expr, Stmt,
+    self as ast, Expr, Stmt, comparable::ComparableExpr, helpers::any_over_expr,
 };
-use ruff_python_semantic::{analyze::typing::is_dict, Binding};
+use ruff_python_semantic::{Binding, analyze::typing::is_dict};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -91,12 +91,14 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         //     if idx % 2 == 0:
         //         result[name] = idx
         // ```
-        [Stmt::If(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            test,
-            ..
-        })] => {
+        [
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                test,
+                ..
+            }),
+        ] => {
             // TODO(charlie): If there's an `else` clause, verify that the `else` has the
             // same structure.
             if !elif_else_clauses.is_empty() {
@@ -124,11 +126,13 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         return;
     };
 
-    let [Expr::Subscript(ast::ExprSubscript {
-        value: subscript_value,
-        slice: key,
-        ..
-    })] = targets.as_slice()
+    let [
+        Expr::Subscript(ast::ExprSubscript {
+            value: subscript_value,
+            slice: key,
+            ..
+        }),
+    ] = targets.as_slice()
     else {
         return;
     };

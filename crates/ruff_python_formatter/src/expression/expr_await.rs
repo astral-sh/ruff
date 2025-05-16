@@ -4,7 +4,7 @@ use ruff_python_ast::ExprAwait;
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parenthesize,
+    NeedsParentheses, OptionalParentheses, Parenthesize, is_expression_parenthesized,
 };
 use crate::prelude::*;
 

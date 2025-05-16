@@ -4,16 +4,16 @@ use camino::Utf8Path;
 use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
+use ruff_db::Upcast;
 use ruff_db::diagnostic::{
-    create_parse_diagnostic, create_unsupported_syntax_diagnostic, Diagnostic,
-    DisplayDiagnosticConfig,
+    Diagnostic, DisplayDiagnosticConfig, create_parse_diagnostic,
+    create_unsupported_syntax_diagnostic,
 };
-use ruff_db::files::{system_path_to_file, File};
+use ruff_db::files::{File, system_path_to_file};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
-use ruff_db::Upcast;
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
@@ -56,7 +56,10 @@ pub fn run(
     let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
     for test in suite.tests() {
-        if filter.as_ref().is_some_and(|f| !test.name().contains(f)) {
+        if filter
+            .as_ref()
+            .is_some_and(|f| !test.uncontracted_name().contains(f))
+        {
             continue;
         }
 
@@ -170,7 +173,6 @@ fn run_test(
 
     let mut typeshed_files = vec![];
     let mut has_custom_versions_file = false;
-    let mut has_custom_pyvenv_cfg_file = false;
 
     let test_files: Vec<_> = test
         .files()
@@ -196,9 +198,8 @@ fn run_test(
                 }
             } else if let Some(python_path) = python_path {
                 if let Ok(relative_path) = full_path.strip_prefix(python_path) {
-                    if relative_path.as_str() == "pyvenv.cfg" {
-                        has_custom_pyvenv_cfg_file = true;
-                    } else {
+                    // Construct the path to the site-packages directory
+                    if relative_path.as_str() != "pyvenv.cfg" {
                         let mut new_path = SystemPathBuf::new();
                         for component in full_path.components() {
                             let component = component.as_str();
@@ -253,16 +254,6 @@ fn run_test(
                     content
                 });
             db.write_file(&versions_file, contents).unwrap();
-        }
-    }
-
-    if let Some(python_path) = python_path {
-        if !has_custom_pyvenv_cfg_file {
-            let pyvenv_cfg_file = python_path.join("pyvenv.cfg");
-            let home_directory = SystemPathBuf::from(format!("/Python{python_version}"));
-            db.create_directory_all(&home_directory).unwrap();
-            db.write_file(&pyvenv_cfg_file, format!("home = {home_directory}"))
-                .unwrap();
         }
     }
 
@@ -432,7 +423,7 @@ fn create_diagnostic_snapshot(
     let mut snapshot = String::new();
     writeln!(snapshot).unwrap();
     writeln!(snapshot, "---").unwrap();
-    writeln!(snapshot, "mdtest name: {}", test.name()).unwrap();
+    writeln!(snapshot, "mdtest name: {}", test.uncontracted_name()).unwrap();
     writeln!(snapshot, "mdtest path: {relative_fixture_path}").unwrap();
     writeln!(snapshot, "---").unwrap();
     writeln!(snapshot).unwrap();

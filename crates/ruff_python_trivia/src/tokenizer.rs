@@ -2,7 +2,7 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::{is_python_whitespace, Cursor};
+use crate::{Cursor, is_python_whitespace};
 
 /// Searches for the first non-trivia character after `offset`.
 ///

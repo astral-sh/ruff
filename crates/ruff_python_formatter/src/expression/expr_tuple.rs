@@ -1,11 +1,11 @@
-use ruff_formatter::{format_args, FormatRuleWithOptions};
+use ruff_formatter::{FormatRuleWithOptions, format_args};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprTuple;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::builders::parenthesize_if_expands;
 use crate::expression::parentheses::{
-    empty_parenthesized, optional_parentheses, parenthesized, NeedsParentheses, OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, empty_parenthesized, optional_parentheses, parenthesized,
 };
 use crate::other::commas::has_trailing_comma;
 use crate::prelude::*;

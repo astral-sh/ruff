@@ -3,13 +3,13 @@ use lsp_types::{self as types, request as req};
 use rustc_hash::FxHashSet;
 use types::{CodeActionKind, CodeActionOrCommand};
 
-use crate::edit::WorkspaceEditTracker;
-use crate::lint::{fixes_for_diagnostics, DiagnosticFix};
-use crate::server::api::LSPResult;
-use crate::server::SupportedCodeAction;
-use crate::server::{client::Notifier, Result};
-use crate::session::DocumentSnapshot;
 use crate::DIAGNOSTIC_NAME;
+use crate::edit::WorkspaceEditTracker;
+use crate::lint::{DiagnosticFix, fixes_for_diagnostics};
+use crate::server::SupportedCodeAction;
+use crate::server::api::LSPResult;
+use crate::server::{Result, client::Notifier};
+use crate::session::DocumentSnapshot;
 
 use super::code_action_resolve::{resolve_edit_for_fix_all, resolve_edit_for_organize_imports};
 

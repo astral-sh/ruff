@@ -11,7 +11,7 @@ use crate::fs::relativize_path;
 use crate::message::diff::calculate_print_width;
 use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
 use crate::message::{
-    group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
+    Emitter, EmitterContext, Message, MessageWithLocation, group_messages_by_filename,
 };
 use crate::settings::types::UnsafeFixes;
 
@@ -205,10 +205,10 @@ impl std::fmt::Write for PadAdapter<'_> {
 mod tests {
     use insta::assert_snapshot;
 
+    use crate::message::GroupedEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
-    use crate::message::GroupedEmitter;
     use crate::settings::types::UnsafeFixes;
 
     #[test]

@@ -8,8 +8,8 @@ use ruff_python_semantic::Binding;
 use ruff_python_trivia::{BackwardsTokenizer, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
-use crate::cst::matchers::{match_call_mut, match_dict, transform_expression};
 use crate::Locator;
+use crate::cst::matchers::{match_call_mut, match_dict, transform_expression};
 
 /// Generate a [`Edit`] to remove unused keys from format dict.
 pub(super) fn remove_unused_format_arguments_from_dict(

@@ -11,9 +11,9 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Locator;
 use crate::noqa::NoqaMapping;
 use crate::settings::LinterSettings;
-use crate::Locator;
 
 bitflags! {
     #[derive(Debug, Copy, Clone)]
@@ -366,11 +366,11 @@ mod tests {
     use ruff_python_trivia::CommentRanges;
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
+    use crate::Locator;
     use crate::directives::{
-        extract_isort_directives, extract_noqa_line_for, TodoDirective, TodoDirectiveKind,
+        TodoDirective, TodoDirectiveKind, extract_isort_directives, extract_noqa_line_for,
     };
     use crate::noqa::NoqaMapping;
-    use crate::Locator;
 
     use super::IsortDirectives;
 

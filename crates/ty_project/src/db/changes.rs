@@ -5,9 +5,9 @@ use crate::{Project, ProjectMetadata};
 use std::collections::BTreeSet;
 
 use crate::walk::ProjectFilesWalker;
+use ruff_db::Db as _;
 use ruff_db::files::{File, Files};
 use ruff_db::system::SystemPath;
-use ruff_db::Db as _;
 use rustc_hash::FxHashSet;
 use ty_python_semantic::Program;
 
@@ -186,7 +186,9 @@ impl ProjectDatabase {
 
                     let program = Program::get(self);
                     if let Err(error) = program.update_from_settings(self, program_settings) {
-                        tracing::error!("Failed to update the program settings, keeping the old program settings: {error}");
+                        tracing::error!(
+                            "Failed to update the program settings, keeping the old program settings: {error}"
+                        );
                     }
 
                     if metadata.root() == project.root(self) {

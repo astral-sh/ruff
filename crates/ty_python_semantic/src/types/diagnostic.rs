@@ -2,17 +2,19 @@ use super::context::InferContext;
 use super::mro::DuplicateBaseError;
 use super::{ClassLiteral, KnownClass};
 use crate::db::Db;
-use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
+use crate::types::LintDiagnosticGuard;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{protocol_class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
+use crate::types::{KnownFunction, KnownInstanceType, Type, protocol_class::ProtocolClassLiteral};
+use crate::{Program, declare_lint};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
@@ -787,7 +789,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for expressions that are used as type expressions
+    /// Checks for expressions that are used as [type expressions]
     /// but cannot validly be interpreted as such.
     ///
     /// ## Why is this bad?
@@ -801,6 +803,7 @@ declare_lint! {
     /// a: type[1]  # `1` is not a type
     /// b: Annotated[int]  # `Annotated` expects at least two arguments
     /// ```
+    /// [type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
     pub(crate) static INVALID_TYPE_FORM = {
         summary: "detects invalid type forms",
         status: LintStatus::preview("1.0.0"),
@@ -1543,11 +1546,11 @@ pub(super) fn report_invalid_return_type(
         return;
     };
 
-    let return_type_span = Span::from(context.file()).with_range(return_type_range.range());
+    let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     diag.set_primary_message(format_args!(
-        "Expected `{expected_ty}`, found `{actual_ty}`",
+        "expected `{expected_ty}`, found `{actual_ty}`",
         expected_ty = expected_ty.display(context.db()),
         actual_ty = actual_ty.display(context.db()),
     ));
@@ -1572,7 +1575,7 @@ pub(super) fn report_invalid_generator_function_return_type(
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     let inferred_ty = inferred_return.display(context.db());
     diag.set_primary_message(format_args!(
-        "Expected `{expected_ty}`, found `{inferred_ty}`",
+        "expected `{expected_ty}`, found `{inferred_ty}`",
         expected_ty = expected_ty.display(context.db()),
     ));
 
@@ -1650,7 +1653,24 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
     };
 
     let ast::ExprName { id, .. } = expr_name_node;
-    builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
+    let mut diagnostic = builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
+    if let Some(version_added_to_builtins) = version_builtin_was_added(id) {
+        diagnostic.info(format_args!(
+            "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
+        ));
+
+        // TODO: can we tell the user *why* we're inferring this target version?
+        // CLI flag? pyproject.toml? Python environment?
+        diagnostic.info(format_args!(
+            "The inferred target version of your project is Python {}",
+            Program::get(context.db()).python_version(context.db())
+        ));
+
+        diagnostic.info(
+            "If using a pyproject.toml file, \
+            consider adjusting the `project.requires-python` or `tool.ty.environment.python-version` field"
+        );
+    }
 }
 
 pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
@@ -1756,6 +1776,13 @@ pub(crate) fn report_invalid_arguments_to_callable(
     ));
 }
 
+pub(crate) fn add_type_expression_reference_link(mut diag: LintDiagnosticGuard) {
+    diag.info("See the following page for a reference on valid type expressions:");
+    diag.info(
+        "https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
+    );
+}
+
 pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     context: &InferContext,
     call: &ast::ExprCall,
@@ -1849,16 +1876,13 @@ pub(crate) fn report_duplicate_bases(
         ),
     );
     sub_diagnostic.annotate(
-        Annotation::secondary(
-            Span::from(context.file()).with_range(bases_list[*first_index].range()),
-        )
-        .message(format_args!(
+        Annotation::secondary(context.span(&bases_list[*first_index])).message(format_args!(
             "Class `{duplicate_name}` first included in bases list here"
         )),
     );
     for index in later_indices {
         sub_diagnostic.annotate(
-            Annotation::primary(Span::from(context.file()).with_range(bases_list[*index].range()))
+            Annotation::primary(context.span(&bases_list[*index]))
                 .message(format_args!("Class `{duplicate_name}` later repeated here")),
         );
     }

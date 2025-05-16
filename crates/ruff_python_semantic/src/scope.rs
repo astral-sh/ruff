@@ -4,7 +4,7 @@ use bitflags::bitflags;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
-use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
+use ruff_index::{Idx, IndexSlice, IndexVec, newtype_index};
 
 use crate::binding::BindingId;
 use crate::globals::GlobalsId;

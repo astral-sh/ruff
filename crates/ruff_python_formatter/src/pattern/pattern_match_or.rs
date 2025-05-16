@@ -4,8 +4,8 @@ use ruff_python_ast::PatternMatchOr;
 
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{
-    in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space, NeedsParentheses,
-    OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, in_parentheses_only_group,
+    in_parentheses_only_soft_line_break_or_space,
 };
 use crate::prelude::*;
 

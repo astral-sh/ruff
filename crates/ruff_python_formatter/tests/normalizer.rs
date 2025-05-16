@@ -9,7 +9,7 @@ use ruff_python_ast::{
     self as ast, BytesLiteralFlags, Expr, FStringElement, FStringFlags, FStringLiteralElement,
     FStringPart, Stmt, StringFlags,
 };
-use ruff_python_ast::{visitor::transformer, StringLiteralFlags};
+use ruff_python_ast::{StringLiteralFlags, visitor::transformer};
 use ruff_text_size::{Ranged, TextRange};
 
 /// A struct to normalize AST nodes for the purpose of comparing formatted representations for

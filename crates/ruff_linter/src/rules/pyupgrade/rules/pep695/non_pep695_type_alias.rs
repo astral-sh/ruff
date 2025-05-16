@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 use ruff_python_ast::PythonVersion;
 
 use super::{
-    expr_name_to_type_var, DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor,
+    DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor, expr_name_to_type_var,
 };
 
 /// ## What it does
@@ -138,11 +138,13 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
 
     let type_params = match arguments.keywords.as_ref() {
         [] => &[],
-        [Keyword {
-            arg: Some(name),
-            value: Expr::Tuple(type_params),
-            ..
-        }] if name.as_str() == "type_params" => type_params.elts.as_slice(),
+        [
+            Keyword {
+                arg: Some(name),
+                value: Expr::Tuple(type_params),
+                ..
+            },
+        ] if name.as_str() == "type_params" => type_params.elts.as_slice(),
         _ => return,
     };
 

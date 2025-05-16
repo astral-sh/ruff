@@ -7,8 +7,8 @@ use ruff_notebook::Notebook;
 use ruff_python_ast::PySourceType;
 use ruff_source_file::LineIndex;
 
-use crate::files::{File, FilePath};
 use crate::Db;
+use crate::files::{File, FilePath};
 
 /// Reads the source text of a python text file (must be valid UTF8) or notebook.
 #[salsa::tracked]
@@ -133,7 +133,7 @@ struct SourceTextInner {
 #[derive(Eq, PartialEq)]
 enum SourceTextKind {
     Text(String),
-    Notebook(Notebook),
+    Notebook(Box<Notebook>),
 }
 
 impl From<String> for SourceTextKind {
@@ -144,7 +144,7 @@ impl From<String> for SourceTextKind {
 
 impl From<Notebook> for SourceTextKind {
     fn from(notebook: Notebook) -> Self {
-        SourceTextKind::Notebook(notebook)
+        SourceTextKind::Notebook(Box::new(notebook))
     }
 }
 
@@ -216,9 +216,11 @@ mod tests {
 
         let events = db.take_salsa_events();
 
-        assert!(!events
-            .iter()
-            .any(|event| matches!(event.kind, EventKind::WillExecute { .. })));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event.kind, EventKind::WillExecute { .. }))
+        );
 
         Ok(())
     }

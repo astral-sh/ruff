@@ -4,12 +4,12 @@ use std::str::FromStr;
 use crate::edit::WorkspaceEditTracker;
 use crate::server::api::LSPResult;
 use crate::server::schedule::Task;
-use crate::server::{client, SupportedCommand};
+use crate::server::{SupportedCommand, client};
 use crate::session::Session;
+use crate::{DIAGNOSTIC_NAME, DocumentKey};
 use crate::{edit::DocumentVersion, server};
-use crate::{DocumentKey, DIAGNOSTIC_NAME};
 use lsp_server::ErrorCode;
-use lsp_types::{self as types, request as req, TextDocumentIdentifier};
+use lsp_types::{self as types, TextDocumentIdentifier, request as req};
 use serde::Deserialize;
 
 pub(crate) struct ExecuteCommand;

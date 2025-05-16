@@ -8,7 +8,9 @@ from logging import FileHandler, Handler, LogRecord
 from re import Pattern
 from socket import SocketKind, socket
 from threading import Thread
+from types import TracebackType
 from typing import Any, ClassVar, Final, Protocol, TypeVar
+from typing_extensions import Self
 
 _T = TypeVar("_T")
 
@@ -142,9 +144,19 @@ class SysLogHandler(Handler):
     priority_names: ClassVar[dict[str, int]]  # undocumented
     facility_names: ClassVar[dict[str, int]]  # undocumented
     priority_map: ClassVar[dict[str, str]]  # undocumented
-    def __init__(
-        self, address: tuple[str, int] | str = ("localhost", 514), facility: str | int = 1, socktype: SocketKind | None = None
-    ) -> None: ...
+    if sys.version_info >= (3, 14):
+        timeout: float | None
+        def __init__(
+            self,
+            address: tuple[str, int] | str = ("localhost", 514),
+            facility: str | int = 1,
+            socktype: SocketKind | None = None,
+            timeout: float | None = None,
+        ) -> None: ...
+    else:
+        def __init__(
+            self, address: tuple[str, int] | str = ("localhost", 514), facility: str | int = 1, socktype: SocketKind | None = None
+        ) -> None: ...
     if sys.version_info >= (3, 11):
         def createSocket(self) -> None: ...
 
@@ -237,3 +249,9 @@ class QueueListener:
     def stop(self) -> None: ...
     def enqueue_sentinel(self) -> None: ...
     def handle(self, record: LogRecord) -> None: ...
+
+    if sys.version_info >= (3, 14):
+        def __enter__(self) -> Self: ...
+        def __exit__(
+            self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
+        ) -> None: ...

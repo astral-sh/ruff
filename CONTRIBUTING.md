@@ -2,6 +2,11 @@
 
 Welcome! We're happy to have you here. Thank you in advance for your contribution to Ruff.
 
+> [!NOTE]
+>
+> This guide is for Ruff. If you're looking to contribute to ty, please see [the ty contributing
+> guide](https://github.com/astral-sh/ruff/blob/main/crates/ty/CONTRIBUTING.md).
+
 ## The Basics
 
 Ruff welcomes contributions in the form of pull requests.

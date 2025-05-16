@@ -94,3 +94,6 @@ Path("foo.txt").write_text(text, **kwargs)
 # Violation but not detectable
 x = Path("foo.txt")
 x.open()
+
+# https://github.com/astral-sh/ruff/issues/18107
+codecs.open("plw1514.py", "r", "utf-8").close() # this is fine

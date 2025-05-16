@@ -1,0 +1,188 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: union_call.md - Calling a union of function types - Try to cover all possible reasons - Cover non-keyword related reasons
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from inspect import getattr_static
+ 2 | 
+ 3 | def f1() -> int:
+ 4 |     return 0
+ 5 | 
+ 6 | def f2(name: str) -> int:
+ 7 |     return 0
+ 8 | 
+ 9 | def f3(a: int, b: int) -> int:
+10 |     return 0
+11 | 
+12 | def f4[T: str](x: T) -> int:
+13 |     return 0
+14 | 
+15 | class OverloadExample:
+16 |     def f(self, x: str) -> int:
+17 |         return 0
+18 | 
+19 | f5 = getattr_static(OverloadExample, "f").__get__
+20 | 
+21 | def _(n: int):
+22 |     class PossiblyNotCallable:
+23 |         if n == 0:
+24 |             def __call__(self) -> int:
+25 |                 return 0
+26 | 
+27 |     if n == 0:
+28 |         f = f1
+29 |     elif n == 1:
+30 |         f = f2
+31 |     elif n == 2:
+32 |         f = f3
+33 |     elif n == 3:
+34 |         f = f4
+35 |     elif n == 4:
+36 |         f = 5
+37 |     elif n == 5:
+38 |         f = f5
+39 |     else:
+40 |         f = PossiblyNotCallable()
+41 |     # error: [too-many-positional-arguments]
+42 |     # error: [invalid-argument-type] "Argument to function `f2` is incorrect: Expected `str`, found `Literal[3]`"
+43 |     # error: [missing-argument]
+44 |     # error: [invalid-argument-type] "Argument to function `f4` is incorrect: Argument type `Literal[3]` does not satisfy upper bound of type variable `T`"
+45 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
+```
+
+# Diagnostics
+
+```
+error[call-non-callable]: Object of type `Literal[5]` is not callable
+  --> src/mdtest_snippet.py:48:9
+   |
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
+   |         ^^^^
+   |
+info: Union variant `Literal[5]` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
+info: rule `call-non-callable` is enabled by default
+
+```
+
+```
+error[call-non-callable]: Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)
+  --> src/mdtest_snippet.py:48:9
+   |
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
+   |         ^^^^
+   |
+info: Union variant `PossiblyNotCallable` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
+info: rule `call-non-callable` is enabled by default
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `b` of function `f3`
+  --> src/mdtest_snippet.py:48:9
+   |
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
+   |         ^^^^
+   |
+info: Union variant `def f3(a: int, b: int) -> int` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
+info: rule `missing-argument` is enabled by default
+
+```
+
+```
+error[no-matching-overload]: No overload of method wrapper `__get__` of function `f` matches arguments
+  --> src/mdtest_snippet.py:48:9
+   |
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
+   |         ^^^^
+   |
+info: Union variant `<method-wrapper `__get__` of `f`>` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
+info: rule `no-matching-overload` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `f2` is incorrect
+  --> src/mdtest_snippet.py:48:11
+   |
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
+   |           ^ Expected `str`, found `Literal[3]`
+   |
+info: Function defined here
+ --> src/mdtest_snippet.py:6:5
+  |
+4 |     return 0
+5 |
+6 | def f2(name: str) -> int:
+  |     ^^ --------- Parameter declared here
+7 |     return 0
+  |
+info: Union variant `def f2(name: str) -> int` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `f4` is incorrect
+  --> src/mdtest_snippet.py:48:11
+   |
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
+   |           ^ Argument type `Literal[3]` does not satisfy upper bound of type variable `T`
+   |
+info: Type variable defined here
+  --> src/mdtest_snippet.py:12:8
+   |
+10 |     return 0
+11 |
+12 | def f4[T: str](x: T) -> int:
+   |        ^^^^^^
+13 |     return 0
+   |
+info: Union variant `def f4(x: T) -> int` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[too-many-positional-arguments]: Too many positional arguments to function `f1`: expected 0, got 1
+  --> src/mdtest_snippet.py:48:11
+   |
+46 |     # error: [no-matching-overload]
+47 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+48 |     x = f(3)
+   |           ^
+   |
+info: Union variant `def f1() -> int` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | (def f4(x: T) -> int) | Literal[5] | Unknown | (<method-wrapper `__get__` of `f`>) | PossiblyNotCallable`
+info: rule `too-many-positional-arguments` is enabled by default
+
+```

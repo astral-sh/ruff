@@ -1,11 +1,11 @@
-use ruff_formatter::{format_args, write, FormatRuleWithOptions};
+use ruff_formatter::{FormatRuleWithOptions, format_args, write};
 use ruff_python_ast::{AnyNodeRef, Parameters};
 use ruff_python_trivia::{CommentLinePosition, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::{
-    dangling_comments, dangling_open_parenthesis_comments, leading_comments, leading_node_comments,
-    trailing_comments, SourceComment,
+    SourceComment, dangling_comments, dangling_open_parenthesis_comments, leading_comments,
+    leading_node_comments, trailing_comments,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::empty_parenthesized;
@@ -670,10 +670,28 @@ fn has_trailing_comma(
     // The slash lacks its own node
     if ends_with_pos_only_argument_separator {
         let comma = tokens.next();
-        assert!(matches!(comma, Some(SimpleToken { kind: SimpleTokenKind::Comma, .. })), "The last positional only argument must be separated by a `,` from the positional only parameters separator `/` but found '{comma:?}'.");
+        assert!(
+            matches!(
+                comma,
+                Some(SimpleToken {
+                    kind: SimpleTokenKind::Comma,
+                    ..
+                })
+            ),
+            "The last positional only argument must be separated by a `,` from the positional only parameters separator `/` but found '{comma:?}'."
+        );
 
         let slash = tokens.next();
-        assert!(matches!(slash, Some(SimpleToken { kind: SimpleTokenKind::Slash, .. })), "The positional argument separator must be present for a function that has positional only parameters but found '{slash:?}'.");
+        assert!(
+            matches!(
+                slash,
+                Some(SimpleToken {
+                    kind: SimpleTokenKind::Slash,
+                    ..
+                })
+            ),
+            "The positional argument separator must be present for a function that has positional only parameters but found '{slash:?}'."
+        );
     }
 
     tokens

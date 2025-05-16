@@ -124,7 +124,9 @@ impl Connection {
             lsp::Message::Notification(lsp::Notification { method, .. })
                 if method == lsp_types::notification::Exit::METHOD =>
             {
-                anyhow::bail!("Server received an exit notification before a shutdown request was sent. Exiting...");
+                anyhow::bail!(
+                    "Server received an exit notification before a shutdown request was sent. Exiting..."
+                );
             }
             _ => Ok(false),
         }

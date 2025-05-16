@@ -6,10 +6,10 @@ use ruff_db::source::{line_index, source_text};
 use ty_ide::goto_type_definition;
 use ty_project::ProjectDatabase;
 
+use crate::DocumentSnapshot;
 use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::client::Notifier;
-use crate::DocumentSnapshot;
 
 pub(crate) struct GotoTypeDefinitionRequestHandler;
 

@@ -114,11 +114,12 @@ pub enum KnownModule {
     TypingExtensions,
     Typing,
     Sys,
-    #[allow(dead_code)]
-    Abc, // currently only used in tests
+    Abc,
     Dataclasses,
     Collections,
     Inspect,
+    #[strum(serialize = "_typeshed._type_checker_internals")]
+    TypeCheckerInternals,
     TyExtensions,
 }
 
@@ -136,6 +137,7 @@ impl KnownModule {
             Self::Dataclasses => "dataclasses",
             Self::Collections => "collections",
             Self::Inspect => "inspect",
+            Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
             Self::TyExtensions => "ty_extensions",
         }
     }

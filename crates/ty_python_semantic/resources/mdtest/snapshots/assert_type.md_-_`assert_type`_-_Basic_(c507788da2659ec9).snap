@@ -1,0 +1,38 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: assert_type.md - `assert_type` - Basic
+mdtest path: crates/ty_python_semantic/resources/mdtest/directives/assert_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing_extensions import assert_type
+2 | 
+3 | def _(x: int):
+4 |     assert_type(x, int)  # fine
+5 |     assert_type(x, str)  # error: [type-assertion-failure]
+```
+
+# Diagnostics
+
+```
+error[type-assertion-failure]: Argument does not have asserted type `str`
+ --> src/mdtest_snippet.py:5:5
+  |
+3 | def _(x: int):
+4 |     assert_type(x, int)  # fine
+5 |     assert_type(x, str)  # error: [type-assertion-failure]
+  |     ^^^^^^^^^^^^-^^^^^^
+  |                 |
+  |                 Inferred type of argument is `int`
+  |
+info: `str` and `int` are not equivalent types
+info: rule `type-assertion-failure` is enabled by default
+
+```

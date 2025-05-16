@@ -1,0 +1,31 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: basic.md - Structures - Multiple objects imported from an unresolved module
+mdtest path: crates/ty_python_semantic/resources/mdtest/import/basic.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | # error: [unresolved-import]
+2 | from does_not_exist import foo, bar, baz
+```
+
+# Diagnostics
+
+```
+error[unresolved-import]: Cannot resolve imported module `does_not_exist`
+ --> src/mdtest_snippet.py:2:6
+  |
+1 | # error: [unresolved-import]
+2 | from does_not_exist import foo, bar, baz
+  |      ^^^^^^^^^^^^^^
+  |
+info: rule `unresolved-import` is enabled by default
+
+```

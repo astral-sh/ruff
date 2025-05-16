@@ -28,7 +28,7 @@ def f() -> None:
 ```py
 type IntOrStr = int | str
 
-reveal_type(IntOrStr.__value__)  # revealed: Any
+reveal_type(IntOrStr.__value__)  # revealed: @Todo(Support for `typing.TypeAlias`)
 ```
 
 ## Invalid assignment
@@ -68,10 +68,7 @@ y: MyIntOrStr = None
 
 ```py
 type ListOrSet[T] = list[T] | set[T]
-
-# TODO: Should be `tuple[typing.TypeVar | typing.ParamSpec | typing.TypeVarTuple, ...]`,
-# as specified in the `typeshed` stubs.
-reveal_type(ListOrSet.__type_params__)  # revealed: @Todo(full tuple[...] support)
+reveal_type(ListOrSet.__type_params__)  # revealed: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
 ```
 
 ## `TypeAliasType` properties

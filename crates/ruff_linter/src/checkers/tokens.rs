@@ -9,6 +9,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Tokens;
 
+use crate::Locator;
 use crate::directives::TodoComment;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::BlankLinesChecker;
@@ -17,7 +18,6 @@ use crate::rules::{
     flake8_pyi, flake8_todos, pycodestyle, pygrep_hooks, pylint, pyupgrade, ruff,
 };
 use crate::settings::LinterSettings;
-use crate::Locator;
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn check_tokens(
@@ -184,7 +184,7 @@ pub(crate) fn check_tokens(
         );
     }
 
-    diagnostics.retain(|diagnostic| settings.rules.enabled(diagnostic.kind.rule()));
+    diagnostics.retain(|diagnostic| settings.rules.enabled(diagnostic.rule()));
 
     diagnostics
 }

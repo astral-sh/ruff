@@ -1,8 +1,8 @@
-use ruff_formatter::{format_args, write, FormatRuleWithOptions};
+use ruff_formatter::{FormatRuleWithOptions, format_args, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprGenerator;
 
-use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, parenthesized};
 use crate::prelude::*;
 
 #[derive(Eq, PartialEq, Debug, Default)]

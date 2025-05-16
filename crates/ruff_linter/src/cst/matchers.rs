@@ -1,5 +1,5 @@
 use crate::fix::codemods::CodegenStylist;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use libcst_native::{
     Arg, Attribute, Call, Comparison, CompoundStatement, Dict, Expression, FormattedString,
     FormattedStringContent, FormattedStringExpression, FunctionDef, GeneratorExp, If, Import,

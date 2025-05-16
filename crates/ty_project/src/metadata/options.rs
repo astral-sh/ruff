@@ -1,5 +1,5 @@
-use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
 use crate::Db;
+use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, Severity, Span};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath};
@@ -31,7 +31,7 @@ pub struct Options {
 
     /// Configures the enabled rules and their severity.
     ///
-    /// See [the rules documentation](https://github.com/astral-sh/ty/blob/main/docs/rules.md) for a list of all available rules.
+    /// See [the rules documentation](https://ty.dev/rules) for a list of all available rules.
     ///
     /// Valid severities are:
     ///
@@ -352,13 +352,13 @@ pub struct EnvironmentOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SrcOptions {
-    /// The root(s) of the project, used for finding first-party modules.
+    /// The root of the project, used for finding first-party modules.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"[".", "./src"]"#,
-        value_type = "list[str]",
+        value_type = "str",
         example = r#"
-            root = ["./app"]
+            root = "./app"
         "#
     )]
     pub root: Option<RelativePathBuf>,
@@ -417,11 +417,11 @@ pub struct TerminalOptions {
 #[cfg(feature = "schemars")]
 mod schema {
     use crate::DEFAULT_LINT_REGISTRY;
-    use schemars::gen::SchemaGenerator;
+    use schemars::JsonSchema;
+    use schemars::r#gen::SchemaGenerator;
     use schemars::schema::{
         InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SubschemaValidation,
     };
-    use schemars::JsonSchema;
     use ty_python_semantic::lint::Level;
 
     pub(super) struct Rules;
@@ -431,10 +431,10 @@ mod schema {
             "Rules".to_string()
         }
 
-        fn json_schema(gen: &mut SchemaGenerator) -> Schema {
+        fn json_schema(generator: &mut SchemaGenerator) -> Schema {
             let registry = &*DEFAULT_LINT_REGISTRY;
 
-            let level_schema = gen.subschema_for::<Level>();
+            let level_schema = generator.subschema_for::<Level>();
 
             let properties: schemars::Map<String, Schema> = registry
                 .lints()

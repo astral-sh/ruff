@@ -47,10 +47,10 @@ impl Emitter for AzureEmitter {
 mod tests {
     use insta::assert_snapshot;
 
+    use crate::message::AzureEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
-    use crate::message::AzureEmitter;
 
     #[test]
     fn output() {

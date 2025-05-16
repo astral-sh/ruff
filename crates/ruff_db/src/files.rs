@@ -16,7 +16,7 @@ use crate::files::file_root::FileRoots;
 use crate::files::private::FileStatus;
 use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
-use crate::{vendored, Db, FxDashMap};
+use crate::{Db, FxDashMap, vendored};
 
 mod file_root;
 mod path;
@@ -552,7 +552,7 @@ impl Ranged for FileRange {
 #[cfg(test)]
 mod tests {
     use crate::file_revision::FileRevision;
-    use crate::files::{system_path_to_file, vendored_path_to_file, FileError};
+    use crate::files::{FileError, system_path_to_file, vendored_path_to_file};
     use crate::system::DbWithWritableSystem as _;
     use crate::tests::TestDb;
     use crate::vendored::VendoredFileSystemBuilder;

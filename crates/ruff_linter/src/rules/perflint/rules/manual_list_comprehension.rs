@@ -4,13 +4,13 @@ use crate::{
     checkers::ast::Checker, preview::is_fix_manual_list_comprehension_enabled,
     rules::perflint::helpers::statement_deletion_range,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::perflint::helpers::comment_strings_in_range;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_semantic::{analyze::typing::is_list, Binding};
+use ruff_python_semantic::{Binding, analyze::typing::is_list};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 /// ## What it does
@@ -113,12 +113,14 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         //     if z:
         //         filtered.append(x)
         // ```
-        [ast::Stmt::If(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            test,
-            ..
-        })] => {
+        [
+            ast::Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                test,
+                ..
+            }),
+        ] => {
             if !elif_else_clauses.is_empty() {
                 return;
             }

@@ -1,8 +1,8 @@
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
-use ruff_python_semantic::analyze::logging;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 
 /// Collect `logging`-like calls from an AST.

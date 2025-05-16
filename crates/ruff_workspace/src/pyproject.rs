@@ -183,9 +183,13 @@ pub(super) fn load_options<P: AsRef<Path>>(
                         if let Some(dir) = path.parent() {
                             let fallback = get_fallback_target_version(dir);
                             if let Some(version) = fallback {
-                                debug!("Derived `target-version` from `requires-python` in `pyproject.toml`: {version:?}");
+                                debug!(
+                                    "Derived `target-version` from `requires-python` in `pyproject.toml`: {version:?}"
+                                );
                             } else {
-                                debug!("No `pyproject.toml` with `requires-python` in same directory; `target-version` unspecified");
+                                debug!(
+                                    "No `pyproject.toml` with `requires-python` in same directory; `target-version` unspecified"
+                                );
                             }
                             ruff.target_version = fallback;
                         }
@@ -277,7 +281,7 @@ mod tests {
     use ruff_linter::settings::types::PatternPrefixPair;
 
     use crate::options::{Flake8BuiltinsOptions, LintCommonOptions, LintOptions, Options};
-    use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
+    use crate::pyproject::{Pyproject, Tools, find_settings_toml, parse_pyproject_toml};
 
     #[test]
 
@@ -436,33 +440,39 @@ strict-checking = false
         );
         assert!(!settings.strict_checking);
 
-        assert!(toml::from_str::<Pyproject>(
-            r"
+        assert!(
+            toml::from_str::<Pyproject>(
+                r"
 [tool.black]
 [tool.ruff]
 line_length = 79
 ",
-        )
-        .is_err());
+            )
+            .is_err()
+        );
 
-        assert!(toml::from_str::<Pyproject>(
-            r#"
+        assert!(
+            toml::from_str::<Pyproject>(
+                r#"
 [tool.black]
 [tool.ruff.lint]
 select = ["E123"]
 "#,
-        )
-        .is_err());
+            )
+            .is_err()
+        );
 
-        assert!(toml::from_str::<Pyproject>(
-            r"
+        assert!(
+            toml::from_str::<Pyproject>(
+                r"
 [tool.black]
 [tool.ruff]
 line-length = 79
 other-attribute = 1
 ",
-        )
-        .is_err());
+            )
+            .is_err()
+        );
 
         Ok(())
     }

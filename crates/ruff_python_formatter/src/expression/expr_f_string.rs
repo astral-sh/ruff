@@ -1,14 +1,14 @@
 use ruff_python_ast::{AnyNodeRef, ExprFString, StringLike};
 
 use crate::expression::parentheses::{
-    in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, in_parentheses_only_group,
 };
 use crate::other::f_string::FStringLayout;
 use crate::prelude::*;
+use crate::string::StringLikeExtensions;
 use crate::string::implicit::{
     FormatImplicitConcatenatedString, FormatImplicitConcatenatedStringFlat,
 };
-use crate::string::StringLikeExtensions;
 
 #[derive(Default)]
 pub struct FormatExprFString;

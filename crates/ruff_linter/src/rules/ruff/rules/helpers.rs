@@ -1,6 +1,6 @@
-use ruff_python_ast::helpers::{map_callable, map_subscript, Truthiness};
+use ruff_python_ast::helpers::{Truthiness, map_callable, map_subscript};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
-use ruff_python_semantic::{analyze, BindingKind, Modules, SemanticModel};
+use ruff_python_semantic::{BindingKind, Modules, SemanticModel, analyze};
 
 /// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
 ///

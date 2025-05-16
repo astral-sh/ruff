@@ -8,13 +8,20 @@ use ruff_python_semantic::SemanticModel;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Replacement {
+    // There's no replacement or suggestion other than removal
     None,
-    Name(&'static str),
+    // The attribute name of a class has been changed.
+    AttrName(&'static str),
+    // Additional information. Used when there's replacement but they're not direct mapping.
     Message(&'static str),
+    // Symbols updated in Airflow 3 with replacement
+    // e.g., `airflow.datasets.Dataset` to `airflow.sdk.Asset`
     AutoImport {
         module: &'static str,
         name: &'static str,
     },
+    // Symbols updated in Airflow 3 with only module changed. Used when we want to match multiple names.
+    // e.g., `airflow.configuration.as_dict | get` to `airflow.configuration.conf.as_dict | get`
     SourceModuleMoved {
         module: &'static str,
         name: String,
@@ -24,11 +31,6 @@ pub(crate) enum Replacement {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ProviderReplacement {
     None,
-    ProviderName {
-        name: &'static str,
-        provider: &'static str,
-        version: &'static str,
-    },
     AutoImport {
         module: &'static str,
         name: &'static str,
@@ -45,7 +47,8 @@ pub(crate) enum ProviderReplacement {
 
 pub(crate) fn is_guarded_by_try_except(
     expr: &Expr,
-    replacement: &Replacement,
+    module: &str,
+    name: &str,
     semantic: &SemanticModel,
 ) -> bool {
     match expr {
@@ -63,7 +66,7 @@ pub(crate) fn is_guarded_by_try_except(
             if !suspended_exceptions.contains(Exceptions::ATTRIBUTE_ERROR) {
                 return false;
             }
-            try_block_contains_undeprecated_attribute(try_node, replacement, semantic)
+            try_block_contains_undeprecated_attribute(try_node, module, name, semantic)
         }
         Expr::Name(ExprName { id, .. }) => {
             let Some(binding_id) = semantic.lookup_symbol(id.as_str()) else {
@@ -89,7 +92,7 @@ pub(crate) fn is_guarded_by_try_except(
             {
                 return false;
             }
-            try_block_contains_undeprecated_import(try_node, replacement)
+            try_block_contains_undeprecated_import(try_node, module, name)
         }
         _ => false,
     }
@@ -100,12 +103,10 @@ pub(crate) fn is_guarded_by_try_except(
 /// member is being accessed from the non-deprecated location?
 fn try_block_contains_undeprecated_attribute(
     try_node: &StmtTry,
-    replacement: &Replacement,
+    module: &str,
+    name: &str,
     semantic: &SemanticModel,
 ) -> bool {
-    let Replacement::AutoImport { module, name } = replacement else {
-        return false;
-    };
     let undeprecated_qualified_name = {
         let mut builder = QualifiedNameBuilder::default();
         for part in module.split('.') {
@@ -122,10 +123,7 @@ fn try_block_contains_undeprecated_attribute(
 /// Given an [`ast::StmtTry`] node, does the `try` branch of that node
 /// contain any [`ast::StmtImportFrom`] nodes that indicate the airflow
 /// member is being imported from the non-deprecated location?
-fn try_block_contains_undeprecated_import(try_node: &StmtTry, replacement: &Replacement) -> bool {
-    let Replacement::AutoImport { module, name } = replacement else {
-        return false;
-    };
+fn try_block_contains_undeprecated_import(try_node: &StmtTry, module: &str, name: &str) -> bool {
     let mut import_searcher = ImportSearcher::new(module, name);
     import_searcher.visit_body(&try_node.body);
     import_searcher.found_import

@@ -1,5 +1,5 @@
-use crate::combine::Combine;
 use crate::Db;
+use crate::combine::Combine;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::Combine;
 use ruff_text_size::{TextRange, TextSize};

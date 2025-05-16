@@ -1,13 +1,13 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_source_file::LineRanges;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::sequence_sorting::{
-    sort_single_line_elements_sequence, MultilineStringSequenceValue, SequenceKind,
-    SortClassification, SortingStyle,
+    MultilineStringSequenceValue, SequenceKind, SortClassification, SortingStyle,
+    sort_single_line_elements_sequence,
 };
 
 /// ## What it does

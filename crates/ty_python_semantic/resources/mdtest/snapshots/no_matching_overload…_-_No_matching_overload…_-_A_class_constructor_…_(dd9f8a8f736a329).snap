@@ -1,0 +1,29 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: no_matching_overload.md - No matching overload diagnostics - A class constructor with unmatched overloads
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/no_matching_overload.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | type()  # error: [no-matching-overload]
+```
+
+# Diagnostics
+
+```
+error[no-matching-overload]: No overload of class `type` matches arguments
+ --> src/mdtest_snippet.py:1:1
+  |
+1 | type()  # error: [no-matching-overload]
+  | ^^^^^^
+  |
+info: rule `no-matching-overload` is enabled by default
+
+```

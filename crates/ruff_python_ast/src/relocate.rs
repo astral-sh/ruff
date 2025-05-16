@@ -1,6 +1,6 @@
 use ruff_text_size::TextRange;
 
-use crate::visitor::transformer::{walk_expr, walk_keyword, Transformer};
+use crate::visitor::transformer::{Transformer, walk_expr, walk_keyword};
 use crate::{self as ast};
 use crate::{Expr, Keyword};
 

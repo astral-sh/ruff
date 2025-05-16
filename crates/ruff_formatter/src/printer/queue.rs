@@ -325,10 +325,10 @@ impl FitsEndPredicate for SingleEntryPredicate {
 
 #[cfg(test)]
 mod tests {
+    use crate::FormatElement;
     use crate::format_element::LineMode;
     use crate::prelude::Tag;
     use crate::printer::queue::{PrintQueue, Queue};
-    use crate::FormatElement;
 
     #[test]
     fn extend_back_pop_last() {

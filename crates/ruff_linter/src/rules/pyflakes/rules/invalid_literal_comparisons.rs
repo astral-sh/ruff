@@ -1,7 +1,7 @@
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers;
 use ruff_python_ast::{CmpOp, Expr};
 use ruff_python_parser::{TokenKind, Tokens};
@@ -246,7 +246,7 @@ mod tests {
     use ruff_python_parser::parse_expression;
     use ruff_text_size::TextSize;
 
-    use super::{locate_cmp_ops, LocatedCmpOp};
+    use super::{LocatedCmpOp, locate_cmp_ops};
 
     fn extract_cmp_op_locations(source: &str) -> Result<Vec<LocatedCmpOp>> {
         let parsed = parse_expression(source)?;

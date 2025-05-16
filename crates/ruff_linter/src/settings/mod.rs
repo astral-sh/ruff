@@ -23,7 +23,7 @@ use crate::rules::{
     pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use crate::settings::types::{CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet};
-use crate::{codes, fs, RuleSelector};
+use crate::{RuleSelector, codes, fs};
 
 use super::line_width::IndentWidth;
 

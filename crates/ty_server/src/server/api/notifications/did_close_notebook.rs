@@ -1,14 +1,14 @@
-use lsp_types::notification::DidCloseNotebookDocument;
 use lsp_types::DidCloseNotebookDocumentParams;
+use lsp_types::notification::DidCloseNotebookDocument;
 
 use ty_project::watch::ChangeEvent;
 
-use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
-use crate::server::api::LSPResult;
-use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
+use crate::server::api::LSPResult;
+use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
+use crate::server::client::{Notifier, Requester};
 use crate::session::Session;
-use crate::system::{url_to_any_system_path, AnySystemPath};
+use crate::system::{AnySystemPath, url_to_any_system_path};
 
 pub(crate) struct DidCloseNotebookHandler;
 

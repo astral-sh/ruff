@@ -1,4 +1,4 @@
-use crate::server::{client::Notifier, Result};
+use crate::server::{Result, client::Notifier};
 use crate::session::DocumentSnapshot;
 use anyhow::Context;
 use lsp_types::{self as types, request as req};

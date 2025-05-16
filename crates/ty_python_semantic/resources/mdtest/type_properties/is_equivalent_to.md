@@ -118,6 +118,23 @@ class R: ...
 static_assert(is_equivalent_to(Intersection[tuple[P | Q], R], Intersection[tuple[Q | P], R]))
 ```
 
+## Unions containing generic instances parameterized by unions
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import is_equivalent_to, static_assert
+
+class A: ...
+class B: ...
+class Foo[T]: ...
+
+static_assert(is_equivalent_to(A | Foo[A | B], Foo[B | A] | A))
+```
+
 ## Callable
 
 ### Equivalent

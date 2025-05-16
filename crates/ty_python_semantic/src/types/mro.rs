@@ -3,10 +3,10 @@ use std::ops::Deref;
 
 use rustc_hash::FxHashMap;
 
+use crate::Db;
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
 use crate::types::{ClassLiteral, ClassType, Type};
-use crate::Db;
 
 /// The inferred method resolution order of a given class.
 ///

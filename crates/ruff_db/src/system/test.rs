@@ -3,15 +3,15 @@ use ruff_notebook::{Notebook, NotebookError};
 use std::panic::RefUnwindSafe;
 use std::sync::{Arc, Mutex};
 
+use crate::Db;
 use crate::files::File;
 use crate::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, Result, System,
     SystemPath, SystemPathBuf, SystemVirtualPath,
 };
-use crate::Db;
 
-use super::walk_directory::WalkDirectoryBuilder;
 use super::WritableSystem;
+use super::walk_directory::WalkDirectoryBuilder;
 
 /// System implementation intended for testing.
 ///
@@ -117,7 +117,7 @@ impl System for TestSystem {
         &self,
         pattern: &str,
     ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
         PatternError,
     > {
         self.system().glob(pattern)
@@ -343,7 +343,7 @@ impl System for InMemorySystem {
         &self,
         pattern: &str,
     ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
         PatternError,
     > {
         let iterator = self.memory_fs.glob(pattern)?;

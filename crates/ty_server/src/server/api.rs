@@ -1,6 +1,6 @@
 use crate::server::schedule::Task;
 use crate::session::Session;
-use crate::system::{url_to_any_system_path, AnySystemPath};
+use crate::system::{AnySystemPath, url_to_any_system_path};
 use lsp_server as server;
 use lsp_types::notification::Notification;
 
@@ -14,7 +14,7 @@ use requests as request;
 
 use self::traits::{NotificationHandler, RequestHandler};
 
-use super::{client::Responder, schedule::BackgroundSchedule, Result};
+use super::{Result, client::Responder, schedule::BackgroundSchedule};
 
 pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
     let id = req.id.clone();

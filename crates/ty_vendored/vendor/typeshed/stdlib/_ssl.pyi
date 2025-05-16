@@ -283,6 +283,8 @@ HAS_TLSv1: bool
 HAS_TLSv1_1: bool
 HAS_TLSv1_2: bool
 HAS_TLSv1_3: bool
+if sys.version_info >= (3, 14):
+    HAS_PHA: bool
 
 # version info
 OPENSSL_VERSION_NUMBER: int

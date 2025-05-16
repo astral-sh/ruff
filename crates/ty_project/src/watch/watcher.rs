@@ -1,5 +1,5 @@
 use notify::event::{CreateKind, MetadataKind, ModifyKind, RemoveKind, RenameMode};
-use notify::{recommended_watcher, EventKind, RecommendedWatcher, RecursiveMode, Watcher as _};
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher as _, recommended_watcher};
 
 use ruff_db::system::{SystemPath, SystemPathBuf};
 

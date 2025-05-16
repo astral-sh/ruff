@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.11.10
+
+### Preview features
+
+- \[`ruff`\] Implement a recursive check for `RUF060` ([#17976](https://github.com/astral-sh/ruff/pull/17976))
+- \[`airflow`\] Enable autofixes for `AIR301` and `AIR311` ([#17941](https://github.com/astral-sh/ruff/pull/17941))
+- \[`airflow`\] Apply try catch guard to all `AIR3` rules ([#17887](https://github.com/astral-sh/ruff/pull/17887))
+- \[`airflow`\] Extend `AIR311` rules ([#17913](https://github.com/astral-sh/ruff/pull/17913))
+
+### Bug fixes
+
+- \[`flake8-bugbear`\] Ignore `B028` if `skip_file_prefixes` is present ([#18047](https://github.com/astral-sh/ruff/pull/18047))
+- \[`flake8-pie`\] Mark autofix for `PIE804` as unsafe if the dictionary contains comments ([#18046](https://github.com/astral-sh/ruff/pull/18046))
+- \[`flake8-simplify`\] Correct behavior for `str.split`/`rsplit` with `maxsplit=0` (`SIM905`) ([#18075](https://github.com/astral-sh/ruff/pull/18075))
+- \[`flake8-simplify`\] Fix `SIM905` autofix for `rsplit` creating a reversed list literal ([#18045](https://github.com/astral-sh/ruff/pull/18045))
+- \[`flake8-use-pathlib`\] Suppress diagnostics for all `os.*` functions that have the `dir_fd` parameter (`PTH`) ([#17968](https://github.com/astral-sh/ruff/pull/17968))
+- \[`refurb`\] Mark autofix as safe only for number literals (`FURB116`) ([#17692](https://github.com/astral-sh/ruff/pull/17692))
+
+### Rule changes
+
+- \[`flake8-bandit`\] Skip `S608` for expressionless f-strings ([#17999](https://github.com/astral-sh/ruff/pull/17999))
+- \[`flake8-pytest-style`\] Don't recommend `usefixtures` for `parametrize` values (`PT019`) ([#17650](https://github.com/astral-sh/ruff/pull/17650))
+- \[`pyupgrade`\] Add `resource.error` as deprecated alias of `OSError` (`UP024`) ([#17933](https://github.com/astral-sh/ruff/pull/17933))
+
+### CLI
+
+- Disable jemalloc on Android ([#18033](https://github.com/astral-sh/ruff/pull/18033))
+
+### Documentation
+
+- Update Neovim setup docs ([#18108](https://github.com/astral-sh/ruff/pull/18108))
+- \[`flake8-simplify`\] Add fix safety section (`SIM103`) ([#18086](https://github.com/astral-sh/ruff/pull/18086))
+- \[`flake8-simplify`\] Add fix safety section (`SIM112`) ([#18099](https://github.com/astral-sh/ruff/pull/18099))
+- \[`pylint`\] Add fix safety section (`PLC0414`) ([#17802](https://github.com/astral-sh/ruff/pull/17802))
+- \[`pylint`\] Add fix safety section (`PLE4703`) ([#17824](https://github.com/astral-sh/ruff/pull/17824))
+- \[`pylint`\] Add fix safety section (`PLW1514`) ([#17932](https://github.com/astral-sh/ruff/pull/17932))
+- \[`pylint`\] Add fix safety section (`PLW3301`) ([#17878](https://github.com/astral-sh/ruff/pull/17878))
+- \[`ruff`\] Add fix safety section (`RUF007`) ([#17755](https://github.com/astral-sh/ruff/pull/17755))
+- \[`ruff`\] Add fix safety section (`RUF033`) ([#17760](https://github.com/astral-sh/ruff/pull/17760))
+
 ## 0.11.9
 
 ### Preview features

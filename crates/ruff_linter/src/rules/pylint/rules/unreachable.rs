@@ -2,11 +2,11 @@ use std::collections::HashSet;
 
 use itertools::Itertools;
 use ruff_python_ast::{Identifier, Stmt};
-use ruff_python_semantic::cfg::graph::{build_cfg, BlockId, Condition, ControlFlowGraph};
+use ruff_python_semantic::cfg::graph::{BlockId, Condition, ControlFlowGraph, build_cfg};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
 

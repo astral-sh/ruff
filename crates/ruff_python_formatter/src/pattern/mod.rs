@@ -3,7 +3,7 @@ use ruff_python_ast::{AnyNodeRef, Expr};
 use ruff_python_ast::{MatchCase, Pattern};
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{
-    first_non_trivia_token, BackwardsTokenizer, SimpleToken, SimpleTokenKind,
+    BackwardsTokenizer, SimpleToken, SimpleTokenKind, first_non_trivia_token,
 };
 use ruff_text_size::Ranged;
 use std::cmp::Ordering;
@@ -11,7 +11,7 @@ use std::cmp::Ordering;
 use crate::builders::parenthesize_if_expands;
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
-    optional_parentheses, parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+    NeedsParentheses, OptionalParentheses, Parentheses, optional_parentheses, parenthesized,
 };
 use crate::prelude::*;
 

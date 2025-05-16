@@ -18,7 +18,7 @@ use ruff_text_size::TextSize;
 use crate::cell::CellOffsets;
 use crate::index::NotebookIndex;
 use crate::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
-use crate::{schema, CellMetadata, RawNotebookMetadata};
+use crate::{CellMetadata, RawNotebookMetadata, schema};
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
 pub fn round_trip(path: &Path) -> anyhow::Result<String> {
@@ -43,7 +43,9 @@ pub enum NotebookError {
     Io(#[from] io::Error),
     #[error(transparent)]
     Json(serde_json::Error),
-    #[error("Expected a Jupyter Notebook, which must be internally stored as JSON, but this file isn't valid JSON: {0}")]
+    #[error(
+        "Expected a Jupyter Notebook, which must be internally stored as JSON, but this file isn't valid JSON: {0}"
+    )]
     InvalidJson(serde_json::Error),
     #[error("This file does not match the schema expected of Jupyter Notebooks: {0}")]
     InvalidSchema(serde_json::Error),

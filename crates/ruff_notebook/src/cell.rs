@@ -5,8 +5,8 @@ use itertools::Itertools;
 
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::schema::{Cell, SourceValue};
 use crate::CellMetadata;
+use crate::schema::{Cell, SourceValue};
 
 impl fmt::Display for SourceValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use annotate::annotate_imports;
 use block::{Block, Trailer};
 pub(crate) use categorize::categorize;
-use categorize::{categorize_imports, MatchSourceStrategy};
 pub use categorize::{ImportSection, ImportType};
+use categorize::{MatchSourceStrategy, categorize_imports};
 use comments::Comment;
 use normalize::normalize_imports;
 use order::order_imports;
@@ -17,9 +17,9 @@ use settings::Settings;
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, ImportBlock, TrailingComma};
 
+use crate::Locator;
 use crate::line_width::{LineLength, LineWidthBuilder};
 use crate::package::PackageRoot;
-use crate::Locator;
 use ruff_python_ast::PythonVersion;
 
 mod annotate;

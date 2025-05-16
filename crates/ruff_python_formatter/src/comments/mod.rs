@@ -514,7 +514,7 @@ mod tests {
 
     use ruff_formatter::SourceCode;
     use ruff_python_ast::{Mod, PySourceType};
-    use ruff_python_parser::{parse, ParseOptions, Parsed};
+    use ruff_python_parser::{ParseOptions, Parsed, parse};
     use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;

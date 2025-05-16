@@ -4,7 +4,7 @@ use ruff_python_ast::ExprDictComp;
 use ruff_text_size::Ranged;
 
 use crate::comments::dangling_comments;
-use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, parenthesized};
 use crate::prelude::*;
 
 #[derive(Default)]

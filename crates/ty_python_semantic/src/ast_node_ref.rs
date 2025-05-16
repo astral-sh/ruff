@@ -115,7 +115,7 @@ where
 #[expect(unsafe_code)]
 unsafe impl<T> salsa::Update for AstNodeRef<T> {
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_ref = &mut (*old_pointer);
+        let old_ref = unsafe { &mut (*old_pointer) };
 
         if old_ref.parsed == new_value.parsed && old_ref.node.eq(&new_value.node) {
             false

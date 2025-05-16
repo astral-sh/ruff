@@ -1,0 +1,148 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: no_matching_overload.md - No matching overload diagnostics - Calls to overloaded functions with lots of parameters
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/no_matching_overload.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import overload
+ 2 | 
+ 3 | @overload
+ 4 | def f(
+ 5 |     lion: int,
+ 6 |     turtle: int,
+ 7 |     tortoise: int,
+ 8 |     goat: int,
+ 9 |     capybara: int,
+10 |     chicken: int,
+11 |     ostrich: int,
+12 |     gorilla: int,
+13 |     giraffe: int,
+14 |     condor: int,
+15 |     kangaroo: int,
+16 |     anaconda: int,
+17 |     tarantula: int,
+18 |     millipede: int,
+19 |     leopard: int,
+20 |     hyena: int,
+21 | ) -> int: ...
+22 | @overload
+23 | def f(
+24 |     lion: str,
+25 |     turtle: str,
+26 |     tortoise: str,
+27 |     goat: str,
+28 |     capybara: str,
+29 |     chicken: str,
+30 |     ostrich: str,
+31 |     gorilla: str,
+32 |     giraffe: str,
+33 |     condor: str,
+34 |     kangaroo: str,
+35 |     anaconda: str,
+36 |     tarantula: str,
+37 |     millipede: str,
+38 |     leopard: str,
+39 |     hyena: str,
+40 | ) -> str: ...
+41 | def f(
+42 |     lion: int | str,
+43 |     turtle: int | str,
+44 |     tortoise: int | str,
+45 |     goat: int | str,
+46 |     capybara: int | str,
+47 |     chicken: int | str,
+48 |     ostrict: int | str,
+49 |     gorilla: int | str,
+50 |     giraffe: int | str,
+51 |     condor: int | str,
+52 |     kangaroo: int | str,
+53 |     anaconda: int | str,
+54 |     tarantula: int | str,
+55 |     millipede: int | str,
+56 |     leopard: int | str,
+57 |     hyena: int | str,
+58 | ) -> int | str:
+59 |     return 0
+60 | 
+61 | f(b"foo")  # error: [no-matching-overload]
+```
+
+# Diagnostics
+
+```
+error[no-matching-overload]: No overload of function `f` matches arguments
+  --> src/mdtest_snippet.py:61:1
+   |
+59 |     return 0
+60 |
+61 | f(b"foo")  # error: [no-matching-overload]
+   | ^^^^^^^^^
+   |
+info: First overload defined here
+  --> src/mdtest_snippet.py:4:5
+   |
+ 3 |   @overload
+ 4 |   def f(
+   |  _____^
+ 5 | |     lion: int,
+ 6 | |     turtle: int,
+ 7 | |     tortoise: int,
+ 8 | |     goat: int,
+ 9 | |     capybara: int,
+10 | |     chicken: int,
+11 | |     ostrich: int,
+12 | |     gorilla: int,
+13 | |     giraffe: int,
+14 | |     condor: int,
+15 | |     kangaroo: int,
+16 | |     anaconda: int,
+17 | |     tarantula: int,
+18 | |     millipede: int,
+19 | |     leopard: int,
+20 | |     hyena: int,
+21 | | ) -> int: ...
+   | |________^
+22 |   @overload
+23 |   def f(
+   |
+info: Possible overloads for function `f`:
+info:   (lion: int, turtle: int, tortoise: int, goat: int, capybara: int, chicken: int, ostrich: int, gorilla: int, giraffe: int, condor: int, kangaroo: int, anaconda: int, tarantula: int, millipede: int, leopard: int, hyena: int) -> int
+info:   (lion: str, turtle: str, tortoise: str, goat: str, capybara: str, chicken: str, ostrich: str, gorilla: str, giraffe: str, condor: str, kangaroo: str, anaconda: str, tarantula: str, millipede: str, leopard: str, hyena: str) -> str
+info: Overload implementation defined here
+  --> src/mdtest_snippet.py:41:5
+   |
+39 |       hyena: str,
+40 |   ) -> str: ...
+41 |   def f(
+   |  _____^
+42 | |     lion: int | str,
+43 | |     turtle: int | str,
+44 | |     tortoise: int | str,
+45 | |     goat: int | str,
+46 | |     capybara: int | str,
+47 | |     chicken: int | str,
+48 | |     ostrict: int | str,
+49 | |     gorilla: int | str,
+50 | |     giraffe: int | str,
+51 | |     condor: int | str,
+52 | |     kangaroo: int | str,
+53 | |     anaconda: int | str,
+54 | |     tarantula: int | str,
+55 | |     millipede: int | str,
+56 | |     leopard: int | str,
+57 | |     hyena: int | str,
+58 | | ) -> int | str:
+   | |______________^
+59 |       return 0
+   |
+info: rule `no-matching-overload` is enabled by default
+
+```

@@ -1,9 +1,9 @@
-use ruff_formatter::{write, FormatRuleWithOptions};
+use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::WithItem;
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, parenthesized, Parentheses, Parenthesize,
+    Parentheses, Parenthesize, is_expression_parenthesized, parenthesized,
 };
 use crate::prelude::*;
 

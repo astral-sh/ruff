@@ -1,0 +1,70 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: union_call.md - Calling a union of function types - A smaller scale example
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def f1() -> int:
+ 2 |     return 0
+ 3 | 
+ 4 | def f2(name: str) -> int:
+ 5 |     return 0
+ 6 | 
+ 7 | def _(flag: bool):
+ 8 |     if flag:
+ 9 |         f = f1
+10 |     else:
+11 |         f = f2
+12 |     # error: [too-many-positional-arguments]
+13 |     # error: [invalid-argument-type]
+14 |     x = f(3)
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to function `f2` is incorrect
+  --> src/mdtest_snippet.py:14:11
+   |
+12 |     # error: [too-many-positional-arguments]
+13 |     # error: [invalid-argument-type]
+14 |     x = f(3)
+   |           ^ Expected `str`, found `Literal[3]`
+   |
+info: Function defined here
+ --> src/mdtest_snippet.py:4:5
+  |
+2 |     return 0
+3 |
+4 | def f2(name: str) -> int:
+  |     ^^ --------- Parameter declared here
+5 |     return 0
+  |
+info: Union variant `def f2(name: str) -> int` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int)`
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[too-many-positional-arguments]: Too many positional arguments to function `f1`: expected 0, got 1
+  --> src/mdtest_snippet.py:14:11
+   |
+12 |     # error: [too-many-positional-arguments]
+13 |     # error: [invalid-argument-type]
+14 |     x = f(3)
+   |           ^
+   |
+info: Union variant `def f1() -> int` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int)`
+info: rule `too-many-positional-arguments` is enabled by default
+
+```

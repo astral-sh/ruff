@@ -1,4 +1,4 @@
-use crate::{parse, parse_expression, parse_module, Mode, ParseOptions};
+use crate::{Mode, ParseOptions, parse, parse_expression, parse_module};
 
 #[test]
 fn test_modes() {

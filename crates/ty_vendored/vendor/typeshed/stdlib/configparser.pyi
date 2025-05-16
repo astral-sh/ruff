@@ -5,7 +5,33 @@ from re import Pattern
 from typing import Any, ClassVar, Final, Literal, TypeVar, overload
 from typing_extensions import TypeAlias
 
-if sys.version_info >= (3, 13):
+if sys.version_info >= (3, 14):
+    __all__ = (
+        "NoSectionError",
+        "DuplicateOptionError",
+        "DuplicateSectionError",
+        "NoOptionError",
+        "InterpolationError",
+        "InterpolationDepthError",
+        "InterpolationMissingOptionError",
+        "InterpolationSyntaxError",
+        "ParsingError",
+        "MissingSectionHeaderError",
+        "MultilineContinuationError",
+        "UnnamedSectionDisabledError",
+        "InvalidWriteError",
+        "ConfigParser",
+        "RawConfigParser",
+        "Interpolation",
+        "BasicInterpolation",
+        "ExtendedInterpolation",
+        "SectionProxy",
+        "ConverterMapping",
+        "DEFAULTSECT",
+        "MAX_INTERPOLATION_DEPTH",
+        "UNNAMED_SECTION",
+    )
+elif sys.version_info >= (3, 13):
     __all__ = (
         "NoSectionError",
         "DuplicateOptionError",
@@ -429,3 +455,10 @@ if sys.version_info >= (3, 13):
         lineno: int
         line: str
         def __init__(self, filename: str, lineno: int, line: str) -> None: ...
+
+if sys.version_info >= (3, 14):
+    class UnnamedSectionDisabledError(Error):
+        msg: Final = "Support for UNNAMED_SECTION is disabled."
+        def __init__(self) -> None: ...
+
+    class InvalidWriteError(Error): ...

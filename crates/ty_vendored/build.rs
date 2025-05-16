@@ -10,9 +10,9 @@ use std::io::Write;
 use std::path::Path;
 
 use path_slash::PathExt;
+use zip::CompressionMethod;
 use zip::result::ZipResult;
 use zip::write::{FileOptions, ZipWriter};
-use zip::CompressionMethod;
 
 const TYPESHED_SOURCE_DIR: &str = "vendor/typeshed";
 const TY_EXTENSIONS_STUBS: &str = "ty_extensions/ty_extensions.pyi";

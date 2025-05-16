@@ -12,7 +12,7 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
         #[expect(deprecated)]
         impl ruff_diagnostics::ViolationMetadata for #name {
             fn rule_name() -> &'static str {
-                stringify!(#name)
+                ::ruff_macros::kebab_case!(#name)
             }
 
             fn explain() -> Option<&'static str> {

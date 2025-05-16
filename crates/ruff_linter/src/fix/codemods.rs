@@ -2,21 +2,21 @@
 //! and return the modified code snippet as output.
 use std::borrow::Cow;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use libcst_native::{
     Codegen, CodegenState, Expression, ImportNames, NameOrAttribute, ParenthesizableWhitespace,
     SmallStatement, Statement,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use unicode_normalization::UnicodeNormalization;
 
-use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::Stmt;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_codegen::Stylist;
 
-use crate::cst::matchers::match_statement;
 use crate::Locator;
+use crate::cst::matchers::match_statement;
 
 /// Glue code to make libcst codegen work with ruff's Stylist
 pub(crate) trait CodegenStylist<'a>: Codegen<'a> {

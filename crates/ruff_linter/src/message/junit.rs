@@ -6,7 +6,7 @@ use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, X
 use ruff_source_file::LineColumn;
 
 use crate::message::{
-    group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
+    Emitter, EmitterContext, Message, MessageWithLocation, group_messages_by_filename,
 };
 
 #[derive(Default)]
@@ -95,10 +95,10 @@ impl Emitter for JunitEmitter {
 mod tests {
     use insta::assert_snapshot;
 
+    use crate::message::JunitEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
-    use crate::message::JunitEmitter;
 
     #[test]
     fn output() {

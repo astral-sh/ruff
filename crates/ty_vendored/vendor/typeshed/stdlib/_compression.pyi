@@ -1,4 +1,6 @@
-from _typeshed import WriteableBuffer
+# _compression is replaced by compression._common._streams on Python 3.14+ (PEP-784)
+
+from _typeshed import Incomplete, WriteableBuffer
 from collections.abc import Callable
 from io import DEFAULT_BUFFER_SIZE, BufferedIOBase, RawIOBase
 from typing import Any, Protocol
@@ -16,9 +18,9 @@ class DecompressReader(RawIOBase):
     def __init__(
         self,
         fp: _Reader,
-        decomp_factory: Callable[..., object],
+        decomp_factory: Callable[..., Incomplete],
         trailing_error: type[Exception] | tuple[type[Exception], ...] = (),
-        **decomp_args: Any,
+        **decomp_args: Any,  # These are passed to decomp_factory.
     ) -> None: ...
     def readinto(self, b: WriteableBuffer) -> int: ...
     def read(self, size: int = -1) -> bytes: ...

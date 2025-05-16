@@ -2,18 +2,20 @@ use std::hash::BuildHasherDefault;
 use std::sync::{LazyLock, Mutex};
 
 use super::{
-    class_base::ClassBase, infer_expression_type, infer_unpack_types, IntersectionBuilder,
-    KnownFunction, MemberLookupPolicy, Mro, MroError, MroIterator, SubclassOfType, Truthiness,
-    Type, TypeQualifiers,
+    IntersectionBuilder, KnownFunction, MemberLookupPolicy, Mro, MroError, MroIterator,
+    SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase, infer_expression_type,
+    infer_unpack_types,
 };
-use crate::semantic_index::definition::Definition;
 use crate::semantic_index::DeclarationWithConstraint;
+use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, Specialization, TypeMapping};
 use crate::types::signatures::{Parameter, Parameters};
 use crate::types::{
     CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, Signature,
+    TypeVarInstance,
 };
 use crate::{
+    Db, FxOrderSet, KnownModule, Program,
     module_resolver::file_to_module,
     semantic_index::{
         ast_ids::HasScopedExpressionId,
@@ -24,14 +26,13 @@ use crate::{
         symbol_table, use_def_map,
     },
     symbol::{
-        class_symbol, known_module_symbol, symbol_from_bindings, symbol_from_declarations,
-        Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
+        Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers, class_symbol,
+        known_module_symbol, symbol_from_bindings, symbol_from_declarations,
     },
     types::{
-        definition_expression_type, CallArgumentTypes, CallError, CallErrorKind, DynamicType,
-        MetaclassCandidate, TupleType, UnionBuilder, UnionType,
+        CallArgumentTypes, CallError, CallErrorKind, DynamicType, MetaclassCandidate, TupleType,
+        UnionBuilder, UnionType, definition_expression_type,
     },
-    Db, KnownModule, Program,
 };
 use indexmap::IndexSet;
 use itertools::Itertools as _;
@@ -163,16 +164,32 @@ pub struct GenericAlias<'db> {
 }
 
 impl<'db> GenericAlias<'db> {
+    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
+        Self::new(db, self.origin(db), self.specialization(db).normalized(db))
+    }
+
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.origin(db).definition(db)
     }
 
-    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+    pub(super) fn apply_type_mapping<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: TypeMapping<'a, 'db>,
+    ) -> Self {
         Self::new(
             db,
             self.origin(db),
             self.specialization(db).apply_type_mapping(db, type_mapping),
         )
+    }
+
+    pub(super) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        self.specialization(db).find_legacy_typevars(db, typevars);
     }
 }
 
@@ -194,6 +211,13 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
+    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::NonGeneric(_) => self,
+            Self::Generic(generic) => Self::Generic(generic.normalized(db)),
+        }
+    }
+
     /// Returns the class literal and specialization for this class. For a non-generic class, this
     /// is the class itself. For a generic alias, this is the alias's origin.
     pub(crate) fn class_literal(
@@ -259,6 +283,17 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => Self::Generic(generic.apply_type_mapping(db, type_mapping)),
+        }
+    }
+
+    pub(super) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        match self {
+            Self::NonGeneric(_) => {}
+            Self::Generic(generic) => generic.find_legacy_typevars(db, typevars),
         }
     }
 
@@ -872,8 +907,8 @@ impl<'db> ClassLiteral<'db> {
         } else {
             let name = Type::string_literal(db, self.name(db));
             let bases = TupleType::from_elements(db, self.explicit_bases(db));
-            // TODO: Should be `dict[str, Any]`
-            let namespace = KnownClass::Dict.to_instance(db);
+            let namespace = KnownClass::Dict
+                .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()]);
 
             // TODO: Other keyword arguments?
             let arguments = CallArgumentTypes::positional([name, bases, namespace]);
@@ -1097,6 +1132,18 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> SymbolAndQualifiers<'db> {
+        if name == "__dataclass_fields__" && self.dataclass_params(db).is_some() {
+            // Make this class look like a subclass of the `DataClassInstance` protocol
+            return Symbol::bound(KnownClass::Dict.to_specialized_instance(
+                db,
+                [
+                    KnownClass::Str.to_instance(db),
+                    KnownClass::Field.to_specialized_instance(db, [Type::any()]),
+                ],
+            ))
+            .with_qualifiers(TypeQualifiers::CLASS_VAR);
+        }
+
         let body_scope = self.body_scope(db);
         let symbol = class_symbol(db, body_scope, name).map_type(|ty| {
             // The `__new__` and `__init__` members of a non-specialized generic class are handled
@@ -1241,6 +1288,14 @@ impl<'db> ClassLiteral<'db> {
                 );
 
                 Some(Type::Callable(CallableType::single(db, signature)))
+            }
+            (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
+                KnownClass::NamedTupleFallback
+                    .to_class_literal(db)
+                    .into_class_literal()?
+                    .own_class_member(db, None, name)
+                    .symbol
+                    .ignore_possibly_unbound()
             }
             _ => None,
         }
@@ -1515,7 +1570,9 @@ impl<'db> ClassLiteral<'db> {
                             Truthiness::Ambiguous => {
                                 return Symbol::possibly_unbound(annotation_ty);
                             }
-                            Truthiness::AlwaysFalse => unreachable!("If the attribute assignments are all invisible, inference of their types should be skipped"),
+                            Truthiness::AlwaysFalse => unreachable!(
+                                "If the attribute assignments are all invisible, inference of their types should be skipped"
+                            ),
                         }
                     }
                     DefinitionKind::Assignment(assign) => {
@@ -1887,10 +1944,11 @@ pub enum KnownClass {
     FrozenSet,
     Dict,
     Slice,
-    Range,
     Property,
     BaseException,
+    Exception,
     BaseExceptionGroup,
+    ExceptionGroup,
     Classmethod,
     Super,
     // enum
@@ -1935,6 +1993,10 @@ pub enum KnownClass {
     // backported as `builtins.ellipsis` by typeshed on Python <=3.9
     EllipsisType,
     NotImplementedType,
+    // dataclasses
+    Field,
+    // _typeshed._type_checker_internals
+    NamedTupleFallback,
 }
 
 impl<'db> KnownClass {
@@ -1979,6 +2041,8 @@ impl<'db> KnownClass {
 
             Self::Any
             | Self::BaseException
+            | Self::Exception
+            | Self::ExceptionGroup
             | Self::Object
             | Self::OrderedDict
             | Self::BaseExceptionGroup
@@ -1996,7 +2060,6 @@ impl<'db> KnownClass {
             | Self::Bytes
             | Self::Bytearray
             | Self::FrozenSet
-            | Self::Range
             | Self::Property
             | Self::SpecialForm
             | Self::Dict
@@ -2015,7 +2078,9 @@ impl<'db> KnownClass {
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
             | Self::NotImplementedType
-            | Self::Classmethod => Truthiness::Ambiguous,
+            | Self::Classmethod
+            | Self::Field
+            | Self::NamedTupleFallback => Truthiness::Ambiguous,
         }
     }
 
@@ -2051,10 +2116,11 @@ impl<'db> KnownClass {
             | Self::List
             | Self::Type
             | Self::Slice
-            | Self::Range
             | Self::Property
             | Self::BaseException
             | Self::BaseExceptionGroup
+            | Self::Exception
+            | Self::ExceptionGroup
             | Self::Classmethod
             | Self::GenericAlias
             | Self::GeneratorType
@@ -2087,7 +2153,9 @@ impl<'db> KnownClass {
             | Self::VersionInfo
             | Self::EllipsisType
             | Self::NotImplementedType
-            | Self::UnionType => false,
+            | Self::UnionType
+            | Self::Field
+            | Self::NamedTupleFallback => false,
         }
     }
 
@@ -2109,10 +2177,11 @@ impl<'db> KnownClass {
             Self::List => "list",
             Self::Type => "type",
             Self::Slice => "slice",
-            Self::Range => "range",
             Self::Property => "property",
             Self::BaseException => "BaseException",
             Self::BaseExceptionGroup => "BaseExceptionGroup",
+            Self::Exception => "Exception",
+            Self::ExceptionGroup => "ExceptionGroup",
             Self::Classmethod => "classmethod",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
@@ -2161,6 +2230,8 @@ impl<'db> KnownClass {
                 }
             }
             Self::NotImplementedType => "_NotImplementedType",
+            Self::Field => "Field",
+            Self::NamedTupleFallback => "NamedTupleFallback",
         }
     }
 
@@ -2209,7 +2280,9 @@ impl<'db> KnownClass {
         db: &'db dyn Db,
         specialization: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
-        let class_literal = self.to_class_literal(db).expect_class_literal();
+        let Type::ClassLiteral(class_literal) = self.to_class_literal(db) else {
+            return Type::unknown();
+        };
         let Some(generic_context) = class_literal.generic_context(db) else {
             return Type::unknown();
         };
@@ -2329,9 +2402,10 @@ impl<'db> KnownClass {
             | Self::Dict
             | Self::BaseException
             | Self::BaseExceptionGroup
+            | Self::Exception
+            | Self::ExceptionGroup
             | Self::Classmethod
             | Self::Slice
-            | Self::Range
             | Self::Super
             | Self::Property => KnownModule::Builtins,
             Self::VersionInfo => KnownModule::Sys,
@@ -2386,6 +2460,8 @@ impl<'db> KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
+            Self::Field => KnownModule::Dataclasses,
+            Self::NamedTupleFallback => KnownModule::TypeCheckerInternals,
         }
     }
 
@@ -2416,10 +2492,11 @@ impl<'db> KnownClass {
             | Self::FrozenSet
             | Self::Dict
             | Self::Slice
-            | Self::Range
             | Self::Property
             | Self::BaseException
             | Self::BaseExceptionGroup
+            | Self::Exception
+            | Self::ExceptionGroup
             | Self::Classmethod
             | Self::GenericAlias
             | Self::ModuleType
@@ -2446,7 +2523,9 @@ impl<'db> KnownClass {
             | Self::ABCMeta
             | Self::Super
             | Self::NamedTuple
-            | Self::NewType => false,
+            | Self::NewType
+            | Self::Field
+            | Self::NamedTupleFallback => false,
         }
     }
 
@@ -2478,7 +2557,6 @@ impl<'db> KnownClass {
             | Self::List
             | Self::Type
             | Self::Slice
-            | Self::Range
             | Self::Property
             | Self::GenericAlias
             | Self::ModuleType
@@ -2498,6 +2576,8 @@ impl<'db> KnownClass {
             | Self::SupportsIndex
             | Self::BaseException
             | Self::BaseExceptionGroup
+            | Self::Exception
+            | Self::ExceptionGroup
             | Self::Classmethod
             | Self::TypeVar
             | Self::ParamSpec
@@ -2509,7 +2589,9 @@ impl<'db> KnownClass {
             | Self::Super
             | Self::UnionType
             | Self::NamedTuple
-            | Self::NewType => false,
+            | Self::NewType
+            | Self::Field
+            | Self::NamedTupleFallback => false,
         }
     }
 
@@ -2537,10 +2619,11 @@ impl<'db> KnownClass {
             "dict" => Self::Dict,
             "list" => Self::List,
             "slice" => Self::Slice,
-            "range" => Self::Range,
             "property" => Self::Property,
             "BaseException" => Self::BaseException,
             "BaseExceptionGroup" => Self::BaseExceptionGroup,
+            "Exception" => Self::Exception,
+            "ExceptionGroup" => Self::ExceptionGroup,
             "classmethod" => Self::Classmethod,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
@@ -2580,6 +2663,8 @@ impl<'db> KnownClass {
                 Self::EllipsisType
             }
             "_NotImplementedType" => Self::NotImplementedType,
+            "Field" => Self::Field,
+            "NamedTupleFallback" => Self::NamedTupleFallback,
             _ => return None,
         };
 
@@ -2607,7 +2692,6 @@ impl<'db> KnownClass {
             | Self::FrozenSet
             | Self::Dict
             | Self::Slice
-            | Self::Range
             | Self::Property
             | Self::GenericAlias
             | Self::ChainMap
@@ -2619,6 +2703,8 @@ impl<'db> KnownClass {
             | Self::ModuleType
             | Self::VersionInfo
             | Self::BaseException
+            | Self::Exception
+            | Self::ExceptionGroup
             | Self::EllipsisType
             | Self::BaseExceptionGroup
             | Self::Classmethod
@@ -2632,7 +2718,9 @@ impl<'db> KnownClass {
             | Self::UnionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
-            | Self::WrapperDescriptorType => module == self.canonical_module(db),
+            | Self::WrapperDescriptorType
+            | Self::Field
+            | Self::NamedTupleFallback => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeVar
@@ -2692,7 +2780,7 @@ impl<'db> KnownClassLookupError<'db> {
                         f,
                         "Error looking up `{class}` in typeshed on Python {python_version}: \
                         expected to find a fully bound symbol, but found one that is possibly unbound",
-                    )
+                    ),
                 }
             }
         }
@@ -2718,7 +2806,7 @@ impl<'db> Type<'db> {
     /// The type must be a specialization of the `slice` builtin type, where the specialized
     /// typevars are statically known integers or `None`.
     pub(crate) fn slice_literal(self, db: &'db dyn Db) -> Option<SliceLiteral> {
-        let ClassType::Generic(alias) = self.into_nominal_instance()?.class() else {
+        let ClassType::Generic(alias) = self.into_nominal_instance()?.class else {
             return None;
         };
         if !alias.origin(db).is_known(db, KnownClass::Slice) {
@@ -2732,7 +2820,7 @@ impl<'db> Type<'db> {
             Type::IntLiteral(n) => i32::try_from(*n).map(Some).ok(),
             Type::BooleanLiteral(b) => Some(Some(i32::from(*b))),
             Type::NominalInstance(instance)
-                if instance.class().is_known(db, KnownClass::NoneType) =>
+                if instance.class.is_known(db, KnownClass::NoneType) =>
             {
                 Some(None)
             }
@@ -2831,7 +2919,7 @@ mod tests {
         for class in KnownClass::iter() {
             let version_added = match class {
                 KnownClass::UnionType => PythonVersion::PY310,
-                KnownClass::BaseExceptionGroup => PythonVersion::PY311,
+                KnownClass::BaseExceptionGroup | KnownClass::ExceptionGroup => PythonVersion::PY311,
                 KnownClass::GenericAlias => PythonVersion::PY39,
                 _ => PythonVersion::PY37,
             };

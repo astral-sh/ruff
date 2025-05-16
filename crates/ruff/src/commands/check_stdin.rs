@@ -4,10 +4,10 @@ use anyhow::Result;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging;
 use ruff_linter::settings::flags;
-use ruff_workspace::resolver::{match_exclusion, python_file_at_path, PyprojectConfig, Resolver};
+use ruff_workspace::resolver::{PyprojectConfig, Resolver, match_exclusion, python_file_at_path};
 
 use crate::args::ConfigArguments;
-use crate::diagnostics::{lint_stdin, Diagnostics};
+use crate::diagnostics::{Diagnostics, lint_stdin};
 use crate::stdin::{parrot_stdin, read_from_stdin};
 
 /// Run the linter over a single file, read from `stdin`.

@@ -1,0 +1,99 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: return_type.md - Function return type - Invalid implicit return type
+mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def f() -> None:
+ 2 |     if False:
+ 3 |         # error: [invalid-return-type]
+ 4 |         return 1
+ 5 | 
+ 6 | # error: [invalid-return-type]
+ 7 | def f(cond: bool) -> int:
+ 8 |     if cond:
+ 9 |         return 1
+10 | 
+11 | # error: [invalid-return-type]
+12 | def f(cond: bool) -> int:
+13 |     if cond:
+14 |         raise ValueError()
+15 | 
+16 | # error: [invalid-return-type]
+17 | def f(cond: bool) -> int:
+18 |     if cond:
+19 |         cond = False
+20 |     else:
+21 |         return 1
+22 |     if cond:
+23 |         return 2
+```
+
+# Diagnostics
+
+```
+error[invalid-return-type]: Return type does not match returned value
+ --> src/mdtest_snippet.py:1:12
+  |
+1 | def f() -> None:
+  |            ---- Expected `None` because of return type
+2 |     if False:
+3 |         # error: [invalid-return-type]
+4 |         return 1
+  |                ^ expected `None`, found `Literal[1]`
+5 |
+6 | # error: [invalid-return-type]
+  |
+info: rule `invalid-return-type` is enabled by default
+
+```
+
+```
+error[invalid-return-type]: Function can implicitly return `None`, which is not assignable to return type `int`
+ --> src/mdtest_snippet.py:7:22
+  |
+6 | # error: [invalid-return-type]
+7 | def f(cond: bool) -> int:
+  |                      ^^^
+8 |     if cond:
+9 |         return 1
+  |
+info: rule `invalid-return-type` is enabled by default
+
+```
+
+```
+error[invalid-return-type]: Function can implicitly return `None`, which is not assignable to return type `int`
+  --> src/mdtest_snippet.py:12:22
+   |
+11 | # error: [invalid-return-type]
+12 | def f(cond: bool) -> int:
+   |                      ^^^
+13 |     if cond:
+14 |         raise ValueError()
+   |
+info: rule `invalid-return-type` is enabled by default
+
+```
+
+```
+error[invalid-return-type]: Function can implicitly return `None`, which is not assignable to return type `int`
+  --> src/mdtest_snippet.py:17:22
+   |
+16 | # error: [invalid-return-type]
+17 | def f(cond: bool) -> int:
+   |                      ^^^
+18 |     if cond:
+19 |         cond = False
+   |
+info: rule `invalid-return-type` is enabled by default
+
+```

@@ -328,16 +328,16 @@ macro_rules! format {
 /// [`MostExpanded`]: crate::format_element::BestFittingVariants::most_expanded
 #[macro_export]
 macro_rules! best_fitting {
-    ($least_expanded:expr, $($tail:expr),+ $(,)?) => {{
+    ($least_expanded:expr, $($tail:expr),+ $(,)?) => {
         // OK because the macro syntax requires at least two variants.
         $crate::BestFitting::from_arguments_unchecked($crate::format_args!($least_expanded, $($tail),+))
-    }}
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
-    use crate::{write, FormatState, SimpleFormatOptions, VecBuffer};
+    use crate::{FormatState, SimpleFormatOptions, VecBuffer, write};
 
     struct TestFormat;
 
@@ -386,7 +386,7 @@ mod tests {
     #[test]
     fn best_fitting_variants_print_as_lists() {
         use crate::prelude::*;
-        use crate::{format, format_args, Formatted};
+        use crate::{Formatted, format, format_args};
 
         // The second variant below should be selected when printing at a width of 30
         let formatted_best_fitting = format!(
@@ -398,34 +398,36 @@ mod tests {
                     format_args![token(
                         "Something that will not fit on a line with 30 character print width."
                     )],
-                    format_args![group(&format_args![
-                        token("Start"),
-                        soft_line_break(),
-                        group(&soft_block_indent(&format_args![
-                            token("1,"),
-                            soft_line_break_or_space(),
-                            token("2,"),
-                            soft_line_break_or_space(),
-                            token("3"),
-                        ])),
-                        soft_line_break_or_space(),
-                        soft_block_indent(&format_args![
-                            token("1,"),
-                            soft_line_break_or_space(),
-                            token("2,"),
-                            soft_line_break_or_space(),
-                            group(&format_args!(
-                                token("A,"),
+                    format_args![
+                        group(&format_args![
+                            token("Start"),
+                            soft_line_break(),
+                            group(&soft_block_indent(&format_args![
+                                token("1,"),
                                 soft_line_break_or_space(),
-                                token("B")
-                            )),
+                                token("2,"),
+                                soft_line_break_or_space(),
+                                token("3"),
+                            ])),
                             soft_line_break_or_space(),
-                            token("3")
-                        ]),
-                        soft_line_break_or_space(),
-                        token("End")
-                    ])
-                    .should_expand(true)],
+                            soft_block_indent(&format_args![
+                                token("1,"),
+                                soft_line_break_or_space(),
+                                token("2,"),
+                                soft_line_break_or_space(),
+                                group(&format_args!(
+                                    token("A,"),
+                                    soft_line_break_or_space(),
+                                    token("B")
+                                )),
+                                soft_line_break_or_space(),
+                                token("3")
+                            ]),
+                            soft_line_break_or_space(),
+                            token("End")
+                        ])
+                        .should_expand(true)
+                    ],
                     format_args!(token("Most"), hard_line_break(), token("Expanded"))
                 ]
             ]

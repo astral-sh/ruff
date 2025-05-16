@@ -1,12 +1,12 @@
-use ruff_formatter::{write, FormatRuleWithOptions};
+use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprSubscript};
 
+use crate::expression::CallChainLayout;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized, parenthesized,
 };
-use crate::expression::CallChainLayout;
 use crate::prelude::*;
 
 #[derive(Default)]

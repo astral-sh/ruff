@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use crate::db::Db;
 
 use super::{
-    class_base::ClassBase, subclass_of::SubclassOfInner, DynamicType, KnownInstanceType,
-    SuperOwnerKind, TodoType, Type,
+    DynamicType, KnownInstanceType, SuperOwnerKind, TodoType, Type, class_base::ClassBase,
+    subclass_of::SubclassOfInner,
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
@@ -126,9 +126,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::SubclassOf(_), _) => Ordering::Less,
         (_, Type::SubclassOf(_)) => Ordering::Greater,
 
-        (Type::NominalInstance(left), Type::NominalInstance(right)) => {
-            left.class().cmp(&right.class())
-        }
+        (Type::NominalInstance(left), Type::NominalInstance(right)) => left.class.cmp(&right.class),
         (Type::NominalInstance(_), _) => Ordering::Less,
         (_, Type::NominalInstance(_)) => Ordering::Greater,
 
@@ -171,7 +169,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SuperOwnerKind::Class(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Class(_)) => Ordering::Greater,
                 (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => {
-                    left.class().cmp(&right.class())
+                    left.class.cmp(&right.class)
                 }
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
@@ -185,9 +183,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
         (Type::KnownInstance(left_instance), Type::KnownInstance(right_instance)) => {
             match (left_instance, right_instance) {
-                (KnownInstanceType::Any, _) => Ordering::Less,
-                (_, KnownInstanceType::Any) => Ordering::Greater,
-
                 (KnownInstanceType::Tuple, _) => Ordering::Less,
                 (_, KnownInstanceType::Tuple) => Ordering::Greater,
 

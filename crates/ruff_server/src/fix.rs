@@ -3,16 +3,16 @@ use std::borrow::Cow;
 use rustc_hash::FxHashMap;
 
 use crate::{
+    PositionEncoding,
     edit::{Replacement, ToRangeExt},
     resolve::is_document_excluded_for_linting,
     session::DocumentQuery,
-    PositionEncoding,
 };
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{
     linter::FixerResult,
     packaging::detect_package_root,
-    settings::{flags, LinterSettings},
+    settings::{LinterSettings, flags},
 };
 use ruff_notebook::SourceValue;
 use ruff_source_file::LineIndex;

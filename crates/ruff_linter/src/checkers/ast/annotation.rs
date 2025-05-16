@@ -46,7 +46,7 @@ impl AnnotationContext {
                     semantic,
                 ) =>
             {
-                return Self::RuntimeRequired
+                return Self::RuntimeRequired;
             }
             ScopeKind::Function(function_def)
                 if flake8_type_checking::helpers::runtime_required_function(
@@ -55,7 +55,7 @@ impl AnnotationContext {
                     semantic,
                 ) =>
             {
-                return Self::RuntimeRequired
+                return Self::RuntimeRequired;
             }
             _ => {}
         }

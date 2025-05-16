@@ -8,8 +8,6 @@ from typing_extensions import deprecated
 __all__ = [
     "get_importer",
     "iter_importers",
-    "get_loader",
-    "find_loader",
     "walk_packages",
     "iter_modules",
     "get_data",
@@ -17,6 +15,8 @@ __all__ = [
     "extend_path",
     "ModuleInfo",
 ]
+if sys.version_info < (3, 14):
+    __all__ += ["get_loader", "find_loader"]
 if sys.version_info < (3, 12):
     __all__ += ["ImpImporter", "ImpLoader"]
 
@@ -36,11 +36,13 @@ if sys.version_info < (3, 12):
     class ImpLoader:
         def __init__(self, fullname: str, file: IO[str], filename: StrOrBytesPath, etc: tuple[str, str, int]) -> None: ...
 
-@deprecated("Use importlib.util.find_spec() instead. Will be removed in Python 3.14.")
-def find_loader(fullname: str) -> LoaderProtocol | None: ...
+if sys.version_info < (3, 14):
+    @deprecated("Use importlib.util.find_spec() instead. Will be removed in Python 3.14.")
+    def find_loader(fullname: str) -> LoaderProtocol | None: ...
+    @deprecated("Use importlib.util.find_spec() instead. Will be removed in Python 3.14.")
+    def get_loader(module_or_name: str) -> LoaderProtocol | None: ...
+
 def get_importer(path_item: StrOrBytesPath) -> PathEntryFinderProtocol | None: ...
-@deprecated("Use importlib.util.find_spec() instead. Will be removed in Python 3.14.")
-def get_loader(module_or_name: str) -> LoaderProtocol | None: ...
 def iter_importers(fullname: str = "") -> Iterator[MetaPathFinderProtocol | PathEntryFinderProtocol]: ...
 def iter_modules(path: Iterable[StrOrBytesPath] | None = None, prefix: str = "") -> Iterator[ModuleInfo]: ...
 def read_code(stream: SupportsRead[bytes]) -> Any: ...  # undocumented

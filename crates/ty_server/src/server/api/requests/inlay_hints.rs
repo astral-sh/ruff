@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
+use crate::DocumentSnapshot;
 use crate::document::{RangeExt, TextSizeExt};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::client::Notifier;
-use crate::DocumentSnapshot;
 use lsp_types::request::InlayHintRequest;
 use lsp_types::{InlayHintParams, Url};
 use ruff_db::source::{line_index, source_text};

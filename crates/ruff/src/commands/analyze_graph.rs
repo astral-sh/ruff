@@ -1,6 +1,6 @@
 use crate::args::{AnalyzeGraphArgs, ConfigArguments};
 use crate::resolve::resolve;
-use crate::{resolve_default_files, ExitStatus};
+use crate::{ExitStatus, resolve_default_files};
 use anyhow::Result;
 use log::{debug, warn};
 use path_absolutize::CWD;
@@ -9,7 +9,7 @@ use ruff_graph::{Direction, ImportMap, ModuleDb, ModuleImports};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{warn_user, warn_user_once};
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile};
+use ruff_workspace::resolver::{ResolvedFile, match_exclusion, python_files_in_path};
 use rustc_hash::FxHashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};

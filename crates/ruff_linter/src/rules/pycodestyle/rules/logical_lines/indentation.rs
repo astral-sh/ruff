@@ -1,7 +1,8 @@
-use ruff_diagnostics::DiagnosticKind;
+use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
+use ruff_text_size::TextRange;
 
 use super::LogicalLine;
 
@@ -261,18 +262,25 @@ pub(crate) fn indentation(
     indent_level: usize,
     prev_indent_level: Option<usize>,
     indent_size: usize,
-) -> Vec<DiagnosticKind> {
+    range: TextRange,
+) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     if indent_level % indent_size != 0 {
         diagnostics.push(if logical_line.is_comment_only() {
-            DiagnosticKind::from(IndentationWithInvalidMultipleComment {
-                indent_width: indent_size,
-            })
+            Diagnostic::new(
+                IndentationWithInvalidMultipleComment {
+                    indent_width: indent_size,
+                },
+                range,
+            )
         } else {
-            DiagnosticKind::from(IndentationWithInvalidMultiple {
-                indent_width: indent_size,
-            })
+            Diagnostic::new(
+                IndentationWithInvalidMultiple {
+                    indent_width: indent_size,
+                },
+                range,
+            )
         });
     }
     let indent_expect = prev_logical_line
@@ -281,29 +289,29 @@ pub(crate) fn indentation(
 
     if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
         diagnostics.push(if logical_line.is_comment_only() {
-            DiagnosticKind::from(NoIndentedBlockComment)
+            Diagnostic::new(NoIndentedBlockComment, range)
         } else {
-            DiagnosticKind::from(NoIndentedBlock)
+            Diagnostic::new(NoIndentedBlock, range)
         });
     } else if !indent_expect
         && prev_indent_level.is_some_and(|prev_indent_level| indent_level > prev_indent_level)
     {
         diagnostics.push(if logical_line.is_comment_only() {
-            DiagnosticKind::from(UnexpectedIndentationComment)
+            Diagnostic::new(UnexpectedIndentationComment, range)
         } else {
-            DiagnosticKind::from(UnexpectedIndentation)
+            Diagnostic::new(UnexpectedIndentation, range)
         });
     }
     if indent_expect {
         let expected_indent_amount = if indent_char == '\t' { 8 } else { 4 };
         let expected_indent_level = prev_indent_level.unwrap_or(0) + expected_indent_amount;
         if indent_level > expected_indent_level {
-            diagnostics.push(
+            diagnostics.push(Diagnostic::new(
                 OverIndented {
                     is_comment: logical_line.is_comment_only(),
-                }
-                .into(),
-            );
+                },
+                range,
+            ));
         }
     }
 

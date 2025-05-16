@@ -7,8 +7,8 @@ use filetime::FileTime;
 use rustc_hash::FxHashMap;
 
 use crate::system::{
-    file_time_now, walk_directory, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata,
-    Result, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
+    DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, SystemPath,
+    SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, file_time_now, walk_directory,
 };
 
 use super::walk_directory::{
@@ -236,7 +236,7 @@ impl MemoryFileSystem {
         &self,
         pattern: &str,
     ) -> std::result::Result<
-        impl Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>,
+        impl Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_,
         glob::PatternError,
     > {
         // Very naive implementation that iterates over all files and collects all that match the given pattern.
@@ -463,17 +463,17 @@ fn not_found() -> std::io::Error {
 fn is_a_directory() -> std::io::Error {
     // Note: Rust returns `ErrorKind::IsADirectory` for this error but this is a nightly only variant :(.
     //   So we have to use other for now.
-    std::io::Error::new(std::io::ErrorKind::Other, "Is a directory")
+    std::io::Error::other("Is a directory")
 }
 
 fn not_a_directory() -> std::io::Error {
     // Note: Rust returns `ErrorKind::NotADirectory` for this error but this is a nightly only variant :(.
     //   So we have to use `Other` for now.
-    std::io::Error::new(std::io::ErrorKind::Other, "Not a directory")
+    std::io::Error::other("Not a directory")
 }
 
 fn directory_not_empty() -> std::io::Error {
-    std::io::Error::new(std::io::ErrorKind::Other, "directory not empty")
+    std::io::Error::other("directory not empty")
 }
 
 fn create_dir_all(
@@ -701,8 +701,8 @@ mod tests {
 
     use std::time::Duration;
 
-    use crate::system::walk_directory::tests::DirectoryEntryToString;
     use crate::system::walk_directory::WalkState;
+    use crate::system::walk_directory::tests::DirectoryEntryToString;
     use crate::system::{
         DirectoryEntry, FileType, MemoryFileSystem, Result, SystemPath, SystemPathBuf,
         SystemVirtualPath,

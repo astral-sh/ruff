@@ -1,5 +1,5 @@
 use crate::server::api::diagnostics::generate_diagnostics;
-use crate::server::{client::Notifier, Result};
+use crate::server::{Result, client::Notifier};
 use crate::session::DocumentSnapshot;
 use lsp_types::{self as types, request as req};
 use types::{

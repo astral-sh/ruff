@@ -1,5 +1,5 @@
 use ruff_python_ast::identifier;
-use ruff_python_parser::{parse_module, ParseError};
+use ruff_python_parser::{ParseError, parse_module};
 use ruff_text_size::{TextRange, TextSize};
 
 #[test]

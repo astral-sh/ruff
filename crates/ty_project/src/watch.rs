@@ -1,6 +1,6 @@
 pub use project_watcher::ProjectWatcher;
 use ruff_db::system::{SystemPath, SystemPathBuf, SystemVirtualPathBuf};
-pub use watcher::{directory_watcher, EventHandler, Watcher};
+pub use watcher::{EventHandler, Watcher, directory_watcher};
 
 mod project_watcher;
 mod watcher;

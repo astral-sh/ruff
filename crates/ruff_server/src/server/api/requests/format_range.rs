@@ -1,10 +1,10 @@
 use anyhow::Context;
-use lsp_types::{self as types, request as req, Range};
+use lsp_types::{self as types, Range, request as req};
 
 use crate::edit::{RangeExt, ToRangeExt};
 use crate::resolve::is_document_excluded_for_formatting;
 use crate::server::api::LSPResult;
-use crate::server::{client::Notifier, Result};
+use crate::server::{Result, client::Notifier};
 use crate::session::{DocumentQuery, DocumentSnapshot};
 use crate::{PositionEncoding, TextDocument};
 

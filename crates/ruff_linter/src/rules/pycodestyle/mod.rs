@@ -257,7 +257,9 @@ mod tests {
         lines_after_imports: isize,
         lines_between_types: usize,
     ) -> Result<()> {
-        let snapshot = format!("too_many_blank_lines_isort_compatibility-lines-after({lines_after_imports})-between({lines_between_types})");
+        let snapshot = format!(
+            "too_many_blank_lines_isort_compatibility-lines-after({lines_after_imports})-between({lines_between_types})"
+        );
         let diagnostics = test_path(
             Path::new("pycodestyle").join("E30_isort.py"),
             &settings::LinterSettings {

@@ -1,9 +1,9 @@
-use crate::server::api::diagnostics::publish_diagnostics_for_document;
-use crate::server::api::LSPResult;
-use crate::server::client::{Notifier, Requester};
-use crate::server::Result;
-use crate::session::Session;
 use crate::TextDocument;
+use crate::server::Result;
+use crate::server::api::LSPResult;
+use crate::server::api::diagnostics::publish_diagnostics_for_document;
+use crate::server::client::{Notifier, Requester};
+use crate::session::Session;
 use lsp_types as types;
 use lsp_types::notification as notif;
 

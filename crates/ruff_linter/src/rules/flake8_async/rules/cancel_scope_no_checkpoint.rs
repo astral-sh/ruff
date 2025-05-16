@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::helpers::{any_over_body, AwaitVisitor};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::helpers::{AwaitVisitor, any_over_body};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Expr, StmtWith, WithItem};
 
@@ -47,7 +47,9 @@ impl Violation for CancelScopeNoCheckpoint {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { method_name } = self;
-        format!("A `with {method_name}(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.")
+        format!(
+            "A `with {method_name}(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint."
+        )
     }
 }
 

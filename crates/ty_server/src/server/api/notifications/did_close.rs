@@ -1,15 +1,15 @@
 use lsp_server::ErrorCode;
-use lsp_types::notification::DidCloseTextDocument;
 use lsp_types::DidCloseTextDocumentParams;
+use lsp_types::notification::DidCloseTextDocument;
 use ty_project::watch::ChangeEvent;
 
+use crate::server::Result;
+use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::clear_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
-use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
-use crate::server::Result;
 use crate::session::Session;
-use crate::system::{url_to_any_system_path, AnySystemPath};
+use crate::system::{AnySystemPath, url_to_any_system_path};
 
 pub(crate) struct DidCloseTextDocumentHandler;
 

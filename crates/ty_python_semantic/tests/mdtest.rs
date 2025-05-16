@@ -1,5 +1,5 @@
 use camino::Utf8Path;
-use dir_test::{dir_test, Fixture};
+use dir_test::{Fixture, dir_test};
 use ty_test::OutputFormat;
 
 /// See `crates/ty_test/README.md` for documentation on these tests.

@@ -1,4 +1,4 @@
-use ruff_formatter::{format_args, write, FormatError, RemoveSoftLinesBuffer};
+use ruff_formatter::{FormatError, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{
     AnyNodeRef, Expr, ExprAttribute, ExprCall, FString, Operator, StmtAssign, StringLike,
     TypeParams,
@@ -6,12 +6,12 @@ use ruff_python_ast::{
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{
-    trailing_comments, Comments, LeadingDanglingTrailingComments, SourceComment,
+    Comments, LeadingDanglingTrailingComments, SourceComment, trailing_comments,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
-    is_expression_parenthesized, optional_parentheses, NeedsParentheses, OptionalParentheses,
-    Parentheses, Parenthesize,
+    NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize, is_expression_parenthesized,
+    optional_parentheses,
 };
 use crate::expression::{
     can_omit_optional_parentheses, has_own_parentheses, has_parentheses,
@@ -19,11 +19,11 @@ use crate::expression::{
 };
 use crate::other::f_string::FStringLayout;
 use crate::statement::trailing_semicolon;
+use crate::string::StringLikeExtensions;
 use crate::string::implicit::{
     FormatImplicitConcatenatedStringExpanded, FormatImplicitConcatenatedStringFlat,
     ImplicitConcatenatedLayout,
 };
-use crate::string::StringLikeExtensions;
 use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
@@ -413,7 +413,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                 soft_block_indent(&format_args![flat, inline_comments]),
                                 token(")"),
                             ])
-                            .with_group_id(Some(group_id))
+                            .with_id(Some(group_id))
                             .should_expand(true)
                             .fmt(f)
                         });
@@ -433,7 +433,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                 token(")"),
                                 inline_comments,
                             ])
-                            .with_group_id(Some(group_id))
+                            .with_id(Some(group_id))
                             .should_expand(true)
                             .fmt(f)
                         });
@@ -501,7 +501,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                 soft_block_indent(&format_args![f_string_flat, inline_comments]),
                                 token(")"),
                             ])
-                            .with_group_id(Some(group_id))
+                            .with_id(Some(group_id))
                             .should_expand(true)
                             .fmt(f)
                         });
@@ -817,7 +817,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                 space(),
                                 token("("),
                                 group(&soft_block_indent(&format_expanded))
-                                    .with_group_id(Some(group_id))
+                                    .with_id(Some(group_id))
                                     .should_expand(true),
                                 token(")"),
                                 inline_comments
@@ -875,7 +875,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                 space(),
                                 token("("),
                                 group(&soft_block_indent(&format_expanded))
-                                    .with_group_id(Some(group_id))
+                                    .with_id(Some(group_id))
                                     .should_expand(true),
                                 token(")"),
                                 inline_comments
@@ -1153,7 +1153,10 @@ impl<'a> OptionalParenthesesInlinedComments<'a> {
         let (expression_inline_comments, trailing_own_line_comments) =
             expression_comments.trailing.split_at(after_end_of_line);
 
-        debug_assert!(trailing_own_line_comments.is_empty(), "The method should have returned early if the expression has trailing own line comments");
+        debug_assert!(
+            trailing_own_line_comments.is_empty(),
+            "The method should have returned early if the expression has trailing own line comments"
+        );
 
         Some(OptionalParenthesesInlinedComments {
             expression: expression_inline_comments,

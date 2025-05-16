@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::helpers::to_module_path;
-use ruff_python_parser::{parse, Mode, ParseOptions};
+use ruff_python_parser::{Mode, ParseOptions, parse};
 
 use crate::collector::Collector;
 pub use crate::db::ModuleDb;

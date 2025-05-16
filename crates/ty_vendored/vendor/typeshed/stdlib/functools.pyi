@@ -3,7 +3,7 @@ import types
 from _typeshed import SupportsAllComparisons, SupportsItems
 from collections.abc import Callable, Hashable, Iterable, Sized
 from types import GenericAlias
-from typing import Any, Generic, Literal, NamedTuple, TypedDict, TypeVar, final, overload
+from typing import Any, Final, Generic, Literal, NamedTuple, TypedDict, TypeVar, final, overload
 from typing_extensions import ParamSpec, Self, TypeAlias
 
 __all__ = [
@@ -31,10 +31,16 @@ _RWrapped = TypeVar("_RWrapped")
 _PWrapper = ParamSpec("_PWrapper")
 _RWrapper = TypeVar("_RWrapper")
 
+if sys.version_info >= (3, 14):
+    @overload
+    def reduce(function: Callable[[_T, _S], _T], iterable: Iterable[_S], /, initial: _T) -> _T: ...
+
+else:
+    @overload
+    def reduce(function: Callable[[_T, _S], _T], iterable: Iterable[_S], initial: _T, /) -> _T: ...
+
 @overload
-def reduce(function: Callable[[_T, _S], _T], sequence: Iterable[_S], initial: _T, /) -> _T: ...
-@overload
-def reduce(function: Callable[[_T, _T], _T], sequence: Iterable[_T], /) -> _T: ...
+def reduce(function: Callable[[_T, _T], _T], iterable: Iterable[_T], /) -> _T: ...
 
 class _CacheInfo(NamedTuple):
     hits: int
@@ -61,19 +67,33 @@ def lru_cache(maxsize: int | None = 128, typed: bool = False) -> Callable[[Calla
 @overload
 def lru_cache(maxsize: Callable[..., _T], typed: bool = False) -> _lru_cache_wrapper[_T]: ...
 
-if sys.version_info >= (3, 12):
-    WRAPPER_ASSIGNMENTS: tuple[
-        Literal["__module__"],
-        Literal["__name__"],
-        Literal["__qualname__"],
-        Literal["__doc__"],
-        Literal["__annotations__"],
-        Literal["__type_params__"],
+if sys.version_info >= (3, 14):
+    WRAPPER_ASSIGNMENTS: Final[
+        tuple[
+            Literal["__module__"],
+            Literal["__name__"],
+            Literal["__qualname__"],
+            Literal["__doc__"],
+            Literal["__annotate__"],
+            Literal["__type_params__"],
+        ]
+    ]
+elif sys.version_info >= (3, 12):
+    WRAPPER_ASSIGNMENTS: Final[
+        tuple[
+            Literal["__module__"],
+            Literal["__name__"],
+            Literal["__qualname__"],
+            Literal["__doc__"],
+            Literal["__annotations__"],
+            Literal["__type_params__"],
+        ]
     ]
 else:
-    WRAPPER_ASSIGNMENTS: tuple[
-        Literal["__module__"], Literal["__name__"], Literal["__qualname__"], Literal["__doc__"], Literal["__annotations__"]
+    WRAPPER_ASSIGNMENTS: Final[
+        tuple[Literal["__module__"], Literal["__name__"], Literal["__qualname__"], Literal["__doc__"], Literal["__annotations__"]]
     ]
+
 WRAPPER_UPDATES: tuple[Literal["__dict__"]]
 
 class _Wrapped(Generic[_PWrapped, _RWrapped, _PWrapper, _RWrapper]):
@@ -86,7 +106,20 @@ class _Wrapped(Generic[_PWrapped, _RWrapped, _PWrapper, _RWrapper]):
 class _Wrapper(Generic[_PWrapped, _RWrapped]):
     def __call__(self, f: Callable[_PWrapper, _RWrapper]) -> _Wrapped[_PWrapped, _RWrapped, _PWrapper, _RWrapper]: ...
 
-if sys.version_info >= (3, 12):
+if sys.version_info >= (3, 14):
+    def update_wrapper(
+        wrapper: Callable[_PWrapper, _RWrapper],
+        wrapped: Callable[_PWrapped, _RWrapped],
+        assigned: Iterable[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotate__", "__type_params__"),
+        updated: Iterable[str] = ("__dict__",),
+    ) -> _Wrapped[_PWrapped, _RWrapped, _PWrapper, _RWrapper]: ...
+    def wraps(
+        wrapped: Callable[_PWrapped, _RWrapped],
+        assigned: Iterable[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotate__", "__type_params__"),
+        updated: Iterable[str] = ("__dict__",),
+    ) -> _Wrapper[_PWrapped, _RWrapped]: ...
+
+elif sys.version_info >= (3, 12):
     def update_wrapper(
         wrapper: Callable[_PWrapper, _RWrapper],
         wrapped: Callable[_PWrapped, _RWrapped],
@@ -204,3 +237,11 @@ def _make_key(
     type: Any = ...,
     len: Callable[[Sized], int] = ...,
 ) -> Hashable: ...
+
+if sys.version_info >= (3, 14):
+    @final
+    class _PlaceholderType: ...
+
+    Placeholder: Final[_PlaceholderType]
+
+    __all__ += ["Placeholder"]

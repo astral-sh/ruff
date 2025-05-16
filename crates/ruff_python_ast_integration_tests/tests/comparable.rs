@@ -1,5 +1,5 @@
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_parser::{parse_expression, ParseError};
+use ruff_python_parser::{ParseError, parse_expression};
 
 #[test]
 fn concatenated_strings_compare_equal() -> Result<(), ParseError> {

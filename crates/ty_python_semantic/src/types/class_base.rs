@@ -1,8 +1,8 @@
+use crate::Db;
 use crate::types::generics::{GenericContext, Specialization, TypeMapping};
 use crate::types::{
-    todo_type, ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, Type,
+    ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, Type, todo_type,
 };
-use crate::Db;
 
 /// Enumeration of the possible kinds of types we allow in class bases.
 ///
@@ -26,10 +26,6 @@ pub enum ClassBase<'db> {
 }
 
 impl<'db> ClassBase<'db> {
-    pub(crate) const fn any() -> Self {
-        Self::Dynamic(DynamicType::Any)
-    }
-
     pub(crate) const fn unknown() -> Self {
         Self::Dynamic(DynamicType::Unknown)
     }
@@ -107,12 +103,52 @@ impl<'db> ClassBase<'db> {
             }
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
-                if instance.class().is_known(db, KnownClass::GenericAlias) =>
+                if instance.class.is_known(db, KnownClass::GenericAlias) =>
             {
                 Self::try_from_type(db, todo_type!("GenericAlias instance"))
             }
-            Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
-            Type::Intersection(_) => None, // TODO -- probably incorrect?
+            Type::SubclassOf(subclass_of) => subclass_of
+                .subclass_of()
+                .into_dynamic()
+                .map(ClassBase::Dynamic),
+            Type::Intersection(inter) => {
+                let valid_element = inter
+                    .positive(db)
+                    .iter()
+                    .find_map(|elem| ClassBase::try_from_type(db, *elem))?;
+
+                if ty.is_disjoint_from(db, KnownClass::Type.to_instance(db)) {
+                    None
+                } else {
+                    Some(valid_element)
+                }
+            }
+            Type::Union(union) => {
+                // We do not support full unions of MROs (yet). Until we do,
+                // support the cases where one of the types in the union is
+                // a dynamic type such as `Any` or `Unknown`, and all other
+                // types *would be* valid class bases. In this case, we can
+                // "fold" the other potential bases into the dynamic type,
+                // and return `Any`/`Unknown` as the class base to prevent
+                // invalid-base diagnostics and further downstream errors.
+                let Some(Type::Dynamic(dynamic)) = union
+                    .elements(db)
+                    .iter()
+                    .find(|elem| matches!(elem, Type::Dynamic(_)))
+                else {
+                    return None;
+                };
+
+                if union
+                    .elements(db)
+                    .iter()
+                    .all(|elem| ClassBase::try_from_type(db, *elem).is_some())
+                {
+                    Some(ClassBase::Dynamic(*dynamic))
+                } else {
+                    None
+                }
+            }
             Type::NominalInstance(_) => None, // TODO -- handle `__mro_entries__`?
             Type::PropertyInstance(_) => None,
             Type::Never
@@ -130,7 +166,6 @@ impl<'db> ClassBase<'db> {
             | Type::LiteralString
             | Type::Tuple(_)
             | Type::ModuleLiteral(_)
-            | Type::SubclassOf(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::ProtocolInstance(_)
@@ -164,7 +199,6 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::AlwaysTruthy
                 | KnownInstanceType::AlwaysFalsy => None,
                 KnownInstanceType::Unknown => Some(Self::unknown()),
-                KnownInstanceType::Any => Some(Self::any()),
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
                 KnownInstanceType::Dict => {
                     Self::try_from_type(db, KnownClass::Dict.to_class_literal(db))

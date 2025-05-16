@@ -5,7 +5,7 @@ use std::path::Path;
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::is_executable;

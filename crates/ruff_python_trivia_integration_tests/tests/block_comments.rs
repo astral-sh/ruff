@@ -1,4 +1,4 @@
-use ruff_python_parser::{parse_unchecked, Mode, ParseOptions};
+use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::TextSize;
 

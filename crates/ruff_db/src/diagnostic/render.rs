@@ -7,12 +7,12 @@ use ruff_annotate_snippets::{
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::diagnostic::stylesheet::{fmt_styled, DiagnosticStylesheet};
+use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
 use crate::{
-    files::File,
-    source::{line_index, source_text, SourceText},
-    system::SystemPath,
     Db,
+    files::File,
+    source::{SourceText, line_index, source_text},
+    system::SystemPath,
 };
 
 use super::{
@@ -708,11 +708,11 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
 #[cfg(test)]
 mod tests {
 
+    use crate::Upcast;
     use crate::diagnostic::{Annotation, DiagnosticId, Severity, Span};
     use crate::files::system_path_to_file;
     use crate::system::{DbWithWritableSystem, SystemPath};
     use crate::tests::TestDb;
-    use crate::Upcast;
 
     use super::*;
 

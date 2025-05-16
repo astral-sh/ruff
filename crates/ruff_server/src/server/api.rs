@@ -11,7 +11,7 @@ use requests as request;
 
 use self::traits::{NotificationHandler, RequestHandler};
 
-use super::{client::Responder, schedule::BackgroundSchedule, Result};
+use super::{Result, client::Responder, schedule::BackgroundSchedule};
 
 /// Defines the `document_url` method for implementers of [`traits::Notification`] and [`traits::Request`],
 /// given the parameter type used by the implementer.
@@ -96,7 +96,9 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
     }
     .unwrap_or_else(|err| {
         tracing::error!("Encountered error when routing notification: {err}");
-        show_err_msg!("Ruff failed to handle a notification from the editor. Check the logs for more details.");
+        show_err_msg!(
+            "Ruff failed to handle a notification from the editor. Check the logs for more details."
+        );
         Task::nothing()
     })
 }

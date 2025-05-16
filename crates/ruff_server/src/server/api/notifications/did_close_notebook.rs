@@ -1,6 +1,6 @@
+use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
-use crate::server::Result;
 use crate::session::Session;
 use lsp_types::notification as notif;
 use lsp_types::{self as types, NotebookDocumentIdentifier};

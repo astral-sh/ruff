@@ -1,0 +1,43 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_argument_type.md - Invalid argument type diagnostics - Calls to methods
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_argument_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class C:
+2 |     def square(self, x: int) -> int:
+3 |         return x * x
+4 | 
+5 | c = C()
+6 | c.square("hello")  # error: [invalid-argument-type]
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to bound method `square` is incorrect
+ --> src/mdtest_snippet.py:6:10
+  |
+5 | c = C()
+6 | c.square("hello")  # error: [invalid-argument-type]
+  |          ^^^^^^^ Expected `int`, found `Literal["hello"]`
+  |
+info: Function defined here
+ --> src/mdtest_snippet.py:2:9
+  |
+1 | class C:
+2 |     def square(self, x: int) -> int:
+  |         ^^^^^^       ------ Parameter declared here
+3 |         return x * x
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```

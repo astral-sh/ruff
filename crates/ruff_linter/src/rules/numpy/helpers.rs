@@ -1,9 +1,9 @@
+use ruff_python_ast::Expr;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::visitor::{walk_expr, walk_stmt};
-use ruff_python_ast::Expr;
-use ruff_python_ast::{statement_visitor, Alias, Stmt, StmtImportFrom};
+use ruff_python_ast::{Alias, Stmt, StmtImportFrom, statement_visitor};
 use ruff_python_semantic::SemanticModel;
 
 /// AST visitor that searches an AST tree for [`ast::StmtImportFrom`] nodes

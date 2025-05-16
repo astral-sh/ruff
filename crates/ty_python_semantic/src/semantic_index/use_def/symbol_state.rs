@@ -44,7 +44,7 @@
 
 use itertools::{EitherOrBoth, Itertools};
 use ruff_index::newtype_index;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 
 use crate::semantic_index::narrowing_constraints::{
     NarrowingConstraintsBuilder, ScopedNarrowingConstraint, ScopedNarrowingConstraintPredicate,

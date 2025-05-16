@@ -1,11 +1,11 @@
-use ruff_formatter::{format_args, write, FormatRuleWithOptions};
+use ruff_formatter::{FormatRuleWithOptions, format_args, write};
 use ruff_python_ast::MatchCase;
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::pattern::maybe_parenthesize_pattern;
 use crate::prelude::*;
-use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
+use crate::statement::clause::{ClauseHeader, clause_body, clause_header};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]

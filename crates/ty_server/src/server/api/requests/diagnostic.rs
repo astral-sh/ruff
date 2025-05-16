@@ -9,7 +9,7 @@ use lsp_types::{
 
 use crate::document::ToRangeExt;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
-use crate::server::{client::Notifier, Result};
+use crate::server::{Result, client::Notifier};
 use crate::session::DocumentSnapshot;
 use ruff_db::diagnostic::Severity;
 use ruff_db::source::{line_index, source_text};

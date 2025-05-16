@@ -1,5 +1,5 @@
-use super::notebook;
 use super::PositionEncoding;
+use super::notebook;
 use crate::system::file_to_url;
 
 use lsp_types as types;
@@ -21,7 +21,7 @@ pub(crate) struct NotebookRange {
 
 pub(crate) trait RangeExt {
     fn to_text_range(&self, text: &str, index: &LineIndex, encoding: PositionEncoding)
-        -> TextRange;
+    -> TextRange;
 }
 
 pub(crate) trait PositionExt {

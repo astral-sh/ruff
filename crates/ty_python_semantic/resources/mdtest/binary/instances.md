@@ -317,8 +317,7 @@ reveal_type(A() + b"foo")  # revealed: A
 reveal_type(b"foo" + A())  # revealed: bytes
 
 reveal_type(A() + ())  # revealed: A
-# TODO this should be `A`, since `tuple.__add__` doesn't support `A` instances
-reveal_type(() + A())  # revealed: @Todo(full tuple[...] support)
+reveal_type(() + A())  # revealed: A
 
 literal_string_instance = "foo" * 1_000_000_000
 # the test is not testing what it's meant to be testing if this isn't a `LiteralString`:

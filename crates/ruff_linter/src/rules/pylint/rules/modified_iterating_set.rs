@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_body;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, StmtFor};
@@ -37,6 +37,11 @@ use crate::checkers::ast::Checker;
 /// for num in nums.copy():
 ///     nums.add(num + 5)
 /// ```
+///
+/// ## Fix safety
+/// This fix is always unsafe because it changes the program’s behavior. Replacing the
+/// original set with a copy during iteration allows code that would previously raise a
+/// `RuntimeError` to run without error.
 ///
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)

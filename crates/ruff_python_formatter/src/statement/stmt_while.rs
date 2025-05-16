@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::statement::clause::{clause_body, clause_header, ClauseHeader, ElseClause};
+use crate::statement::clause::{ClauseHeader, ElseClause, clause_body, clause_header};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]

@@ -6,7 +6,7 @@ use anyhow::Result;
 
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::{parse, ParseOptions};
+use ruff_python_parser::{ParseOptions, parse};
 
 #[derive(clap::Args)]
 pub(crate) struct Args {

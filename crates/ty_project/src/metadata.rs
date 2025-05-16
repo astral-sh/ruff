@@ -128,7 +128,7 @@ impl ProjectMetadata {
                         return Err(ProjectDiscoveryError::InvalidPyProject {
                             path: pyproject_path,
                             source: Box::new(error),
-                        })
+                        });
                     }
                 }
             } else {
@@ -147,7 +147,7 @@ impl ProjectMetadata {
                         return Err(ProjectDiscoveryError::InvalidTyToml {
                             path: ty_toml_path,
                             source: Box::new(error),
-                        })
+                        });
                     }
                 };
 
@@ -156,7 +156,9 @@ impl ProjectMetadata {
                     .is_some_and(|project| project.ty().is_some())
                 {
                     // TODO: Consider using a diagnostic here
-                    tracing::warn!("Ignoring the `tool.ty` section in `{pyproject_path}` because `{ty_toml_path}` takes precedence.");
+                    tracing::warn!(
+                        "Ignoring the `tool.ty` section in `{pyproject_path}` because `{ty_toml_path}` takes precedence."
+                    );
                 }
 
                 tracing::debug!("Found project at '{}'", project_root);
@@ -211,7 +213,9 @@ impl ProjectMetadata {
 
             closest_project
         } else {
-            tracing::debug!("The ancestor directories contain no `pyproject.toml`. Falling back to a virtual project.");
+            tracing::debug!(
+                "The ancestor directories contain no `pyproject.toml`. Falling back to a virtual project."
+            );
 
             // Create a project with a default configuration
             Self::new(
@@ -304,7 +308,7 @@ pub enum ProjectDiscoveryError {
 mod tests {
     //! Integration tests for project discovery
 
-    use anyhow::{anyhow, Context};
+    use anyhow::{Context, anyhow};
     use insta::assert_ron_snapshot;
     use ruff_db::system::{SystemPathBuf, TestSystem};
     use ruff_python_ast::PythonVersion;
@@ -405,7 +409,9 @@ mod tests {
             .context("Failed to write files")?;
 
         let Err(error) = ProjectMetadata::discover(&root, &system) else {
-            return Err(anyhow!("Expected project discovery to fail because of invalid syntax in the pyproject.toml"));
+            return Err(anyhow!(
+                "Expected project discovery to fail because of invalid syntax in the pyproject.toml"
+            ));
         };
 
         assert_error_eq(
@@ -868,10 +874,15 @@ expected `.`, `]`
             .context("Failed to write file")?;
 
         let Err(error) = ProjectMetadata::discover(&root, &system) else {
-            return Err(anyhow!("Expected project discovery to fail because the `requires-python` doesn't specify a lower bound (it only specifies an upper bound)."));
+            return Err(anyhow!(
+                "Expected project discovery to fail because the `requires-python` doesn't specify a lower bound (it only specifies an upper bound)."
+            ));
         };
 
-        assert_error_eq(&error, "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `<3.12` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.");
+        assert_error_eq(
+            &error,
+            "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `<3.12` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.",
+        );
 
         Ok(())
     }
@@ -893,10 +904,15 @@ expected `.`, `]`
             .context("Failed to write file")?;
 
         let Err(error) = ProjectMetadata::discover(&root, &system) else {
-            return Err(anyhow!("Expected project discovery to fail because the `requires-python` specifiers are empty and don't define a lower bound."));
+            return Err(anyhow!(
+                "Expected project discovery to fail because the `requires-python` specifiers are empty and don't define a lower bound."
+            ));
         };
 
-        assert_error_eq(&error, "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.");
+        assert_error_eq(
+            &error,
+            "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.",
+        );
 
         Ok(())
     }
@@ -918,10 +934,15 @@ expected `.`, `]`
             .context("Failed to write file")?;
 
         let Err(error) = ProjectMetadata::discover(&root, &system) else {
-            return Err(anyhow!("Expected project discovery to fail because of the requires-python major version that is larger than 255."));
+            return Err(anyhow!(
+                "Expected project discovery to fail because of the requires-python major version that is larger than 255."
+            ));
         };
 
-        assert_error_eq(&error, "Invalid `requires-python` version specifier (`/app/pyproject.toml`): The major version `999` is larger than the maximum supported value 255");
+        assert_error_eq(
+            &error,
+            "Invalid `requires-python` version specifier (`/app/pyproject.toml`): The major version `999` is larger than the maximum supported value 255",
+        );
 
         Ok(())
     }

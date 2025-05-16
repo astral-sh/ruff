@@ -91,6 +91,10 @@ static_assert(is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1]])
 static_assert(is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1], Literal[3]]))
 
 static_assert(not is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1], int]))
+static_assert(not is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[int, ...]))
+
+# TODO: should pass
+static_assert(is_disjoint_from(tuple[int, int], tuple[None, ...]))  # error: [static-assert-error]
 ```
 
 ## Unions
@@ -373,6 +377,29 @@ class UsesMeta1(metaclass=Meta1): ...
 class UsesMeta2(metaclass=Meta2): ...
 
 static_assert(is_disjoint_from(type[UsesMeta1], type[UsesMeta2]))
+```
+
+### `property`
+
+```py
+from ty_extensions import is_disjoint_from, static_assert, TypeOf
+from typing import final
+
+class C:
+    @property
+    def prop(self) -> int:
+        return 1
+
+reveal_type(C.prop)  # revealed: property
+
+@final
+class D:
+    pass
+
+static_assert(not is_disjoint_from(int, TypeOf[C.prop]))
+static_assert(not is_disjoint_from(TypeOf[C.prop], int))
+static_assert(is_disjoint_from(TypeOf[C.prop], D))
+static_assert(is_disjoint_from(D, TypeOf[C.prop]))
 ```
 
 ## Callables

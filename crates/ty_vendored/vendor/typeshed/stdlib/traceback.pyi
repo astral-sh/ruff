@@ -27,6 +27,9 @@ __all__ = [
     "walk_tb",
 ]
 
+if sys.version_info >= (3, 14):
+    __all__ += ["print_list"]
+
 _FrameSummaryTuple: TypeAlias = tuple[str, int, str, str | None]
 
 def print_tb(tb: TracebackType | None, limit: int | None = None, file: SupportsWrite[str] | None = None) -> None: ...
@@ -81,8 +84,6 @@ def print_stack(f: FrameType | None = None, limit: int | None = None, file: Supp
 def extract_tb(tb: TracebackType | None, limit: int | None = None) -> StackSummary: ...
 def extract_stack(f: FrameType | None = None, limit: int | None = None) -> StackSummary: ...
 def format_list(extracted_list: Iterable[FrameSummary | _FrameSummaryTuple]) -> list[str]: ...
-
-# undocumented
 def print_list(extracted_list: Iterable[FrameSummary | _FrameSummaryTuple], file: SupportsWrite[str] | None = None) -> None: ...
 
 if sys.version_info >= (3, 13):

@@ -201,10 +201,10 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 mod tests {
     use crate::db::tests::TestDb;
     use insta::internals::SettingsBindDropGuard;
-    use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
-    use ruff_db::files::{system_path_to_file, File};
-    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_db::Upcast;
+    use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
+    use ruff_db::files::{File, system_path_to_file};
+    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
     use ruff_text_size::TextSize;
     use ty_python_semantic::{

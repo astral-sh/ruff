@@ -1,0 +1,33 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: unresolved_import.md - Unresolved import diagnostics - Using `from` with an unresolvable module
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unresolved_import.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from does_not_exist import add  # error: [unresolved-import]
+2 | 
+3 | stat = add(10, 15)
+```
+
+# Diagnostics
+
+```
+error[unresolved-import]: Cannot resolve imported module `does_not_exist`
+ --> src/mdtest_snippet.py:1:6
+  |
+1 | from does_not_exist import add  # error: [unresolved-import]
+  |      ^^^^^^^^^^^^^^
+2 |
+3 | stat = add(10, 15)
+  |
+info: rule `unresolved-import` is enabled by default
+
+```

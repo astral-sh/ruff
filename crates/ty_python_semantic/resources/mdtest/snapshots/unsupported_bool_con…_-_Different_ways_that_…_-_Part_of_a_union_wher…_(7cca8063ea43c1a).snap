@@ -1,0 +1,44 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: unsupported_bool_conversion.md - Different ways that `unsupported-bool-conversion` can occur - Part of a union where at least one member has incorrect `__bool__` method
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_bool_conversion.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class NotBoolable1:
+ 2 |     def __bool__(self) -> str:
+ 3 |         return "wat"
+ 4 | 
+ 5 | class NotBoolable2:
+ 6 |     pass
+ 7 | 
+ 8 | class NotBoolable3:
+ 9 |     __bool__: int = 3
+10 | 
+11 | def get() -> NotBoolable1 | NotBoolable2 | NotBoolable3:
+12 |     return NotBoolable2()
+13 | 
+14 | # error: [unsupported-bool-conversion]
+15 | 10 and get() and True
+```
+
+# Diagnostics
+
+```
+error[unsupported-bool-conversion]: Boolean conversion is unsupported for union `NotBoolable1 | NotBoolable2 | NotBoolable3` because `NotBoolable1` doesn't implement `__bool__` correctly
+  --> src/mdtest_snippet.py:15:8
+   |
+14 | # error: [unsupported-bool-conversion]
+15 | 10 and get() and True
+   |        ^^^^^
+   |
+info: rule `unsupported-bool-conversion` is enabled by default
+
+```

@@ -368,7 +368,9 @@ impl KnownModules {
         let mut seen = FxHashSet::with_capacity_and_hasher(known.len(), FxBuildHasher);
         for (module, _) in &known {
             if !seen.insert(module) {
-                warn_user_once!("One or more modules are part of multiple import sections, including: `{module}`");
+                warn_user_once!(
+                    "One or more modules are part of multiple import sections, including: `{module}`"
+                );
                 break;
             }
         }
@@ -479,7 +481,7 @@ pub(crate) enum MatchSourceStrategy {
 
 #[cfg(test)]
 mod tests {
-    use crate::rules::isort::categorize::{match_sources, MatchSourceStrategy};
+    use crate::rules::isort::categorize::{MatchSourceStrategy, match_sources};
 
     use std::fs;
     use std::path::{Path, PathBuf};

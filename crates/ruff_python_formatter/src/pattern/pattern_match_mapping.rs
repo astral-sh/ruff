@@ -5,9 +5,9 @@ use ruff_python_ast::{Expr, Identifier, Pattern};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::comments::{leading_comments, trailing_comments, SourceComment};
+use crate::comments::{SourceComment, leading_comments, trailing_comments};
 use crate::expression::parentheses::{
-    empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, empty_parenthesized, parenthesized,
 };
 use crate::prelude::*;
 

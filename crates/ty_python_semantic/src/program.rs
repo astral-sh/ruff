@@ -1,7 +1,7 @@
+use crate::Db;
 use crate::module_resolver::SearchPaths;
 use crate::python_platform::PythonPlatform;
 use crate::site_packages::SysPrefixPathOrigin;
-use crate::Db;
 
 use anyhow::Context;
 use ruff_db::system::{SystemPath, SystemPathBuf};
@@ -145,6 +145,9 @@ pub enum PythonPath {
     /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
     SysPrefix(SystemPathBuf, SysPrefixPathOrigin),
 
+    /// Resolve a path to an executable (or environment directory) into a usable environment.
+    Resolve(SystemPathBuf, SysPrefixPathOrigin),
+
     /// Tries to discover a virtual environment in the given path.
     Discover(SystemPathBuf),
 
@@ -161,6 +164,6 @@ impl PythonPath {
     }
 
     pub fn from_cli_flag(path: SystemPathBuf) -> Self {
-        Self::SysPrefix(path, SysPrefixPathOrigin::PythonCliFlag)
+        Self::Resolve(path, SysPrefixPathOrigin::PythonCliFlag)
     }
 }

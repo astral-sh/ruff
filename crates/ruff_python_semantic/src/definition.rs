@@ -5,17 +5,17 @@ use std::fmt::Debug;
 use std::ops::Deref;
 use std::path::Path;
 
-use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_index::{IndexSlice, IndexVec, newtype_index};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Stmt, StmtFunctionDef};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::SemanticModel;
 use crate::analyze::visibility::{
-    class_visibility, function_visibility, is_property, method_visibility, module_visibility,
-    Visibility,
+    Visibility, class_visibility, function_visibility, is_property, method_visibility,
+    module_visibility,
 };
 use crate::model::all::DunderAllName;
-use crate::SemanticModel;
 
 /// Id uniquely identifying a definition in a program.
 #[newtype_index]

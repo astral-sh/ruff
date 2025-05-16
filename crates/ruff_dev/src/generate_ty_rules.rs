@@ -5,12 +5,12 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use itertools::Itertools as _;
 use pretty_assertions::StrComparison;
 
-use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
 use crate::ROOT_DIR;
+use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
 
 #[derive(clap::Args)]
 pub(crate) struct Args {
@@ -134,7 +134,7 @@ mod tests {
 
     use crate::generate_all::Mode;
 
-    use super::{main, Args};
+    use super::{Args, main};
 
     #[test]
     fn ty_rules_up_to_date() -> Result<()> {

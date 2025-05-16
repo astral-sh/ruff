@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -59,7 +59,9 @@ impl Violation for TypeNameIncorrectVariance {
             variance,
             replacement_name,
         } = self;
-        format!("`{kind}` name \"{param_name}\" does not reflect its {variance}; consider renaming it to \"{replacement_name}\"")
+        format!(
+            "`{kind}` name \"{param_name}\" does not reflect its {variance}; consider renaming it to \"{replacement_name}\""
+        )
     }
 }
 

@@ -1462,6 +1462,14 @@ Instance attributes also take precedence over the `__getattr__` method:
 reveal_type(c.instance_attr)  # revealed: str
 ```
 
+Importantly, `__getattr__` is only called if attributes are accessed on instances, not if they are
+accessed on the class itself:
+
+```py
+# error: [unresolved-attribute]
+CustomGetAttr.whatever
+```
+
 ### Type of the `name` parameter
 
 If the `name` parameter of the `__getattr__` method is annotated with a (union of) literal type(s),
@@ -1676,7 +1684,7 @@ functions are instances of that class:
 ```py
 def f(): ...
 
-reveal_type(f.__defaults__)  # revealed: @Todo(full tuple[...] support) | None
+reveal_type(f.__defaults__)  # revealed: tuple[Any, ...] | None
 reveal_type(f.__kwdefaults__)  # revealed: dict[str, Any] | None
 ```
 
@@ -1730,7 +1738,7 @@ All attribute access on literal `bytes` types is currently delegated to `builtin
 ```py
 # revealed: bound method Literal[b"foo"].join(iterable_of_bytes: Iterable[@Todo(Support for `typing.TypeAlias`)], /) -> bytes
 reveal_type(b"foo".join)
-# revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`), start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+# revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`) | tuple[@Todo(Support for `typing.TypeAlias`), ...], start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
 reveal_type(b"foo".endswith)
 ```
 

@@ -58,9 +58,9 @@ impl Default for PythonPlatform {
 mod schema {
     use crate::PythonPlatform;
     use schemars::_serde_json::Value;
-    use schemars::gen::SchemaGenerator;
-    use schemars::schema::{Metadata, Schema, SchemaObject, SubschemaValidation};
     use schemars::JsonSchema;
+    use schemars::r#gen::SchemaGenerator;
+    use schemars::schema::{Metadata, Schema, SchemaObject, SubschemaValidation};
 
     impl JsonSchema for PythonPlatform {
         fn schema_name() -> String {

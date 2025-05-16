@@ -6,9 +6,9 @@ use ruff_text_size::Ranged;
 use crate::comments::format::{
     empty_lines_after_leading_comments, empty_lines_before_trailing_comments,
 };
-use crate::comments::{leading_comments, trailing_comments, SourceComment};
+use crate::comments::{SourceComment, leading_comments, trailing_comments};
 use crate::prelude::*;
-use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
+use crate::statement::clause::{ClauseHeader, clause_body, clause_header};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]

@@ -4,7 +4,7 @@ use ruff_python_ast::ExprList;
 use ruff_text_size::Ranged;
 
 use crate::expression::parentheses::{
-    empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, empty_parenthesized, parenthesized,
 };
 use crate::prelude::*;
 

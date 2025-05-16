@@ -3,13 +3,14 @@ from _typeshed import ExcInfo, TraceFunction, Unused
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from types import CodeType, FrameType, TracebackType
-from typing import IO, Any, Final, SupportsInt, TypeVar
-from typing_extensions import ParamSpec
+from typing import IO, Any, Final, Literal, SupportsInt, TypeVar
+from typing_extensions import ParamSpec, TypeAlias
 
 __all__ = ["BdbQuit", "Bdb", "Breakpoint"]
 
 _T = TypeVar("_T")
 _P = ParamSpec("_P")
+_Backend: TypeAlias = Literal["settrace", "monitoring"]
 
 # A union of code-object flags at runtime.
 # The exact values of code-object flags are implementation details,
@@ -28,7 +29,12 @@ class Bdb:
     stopframe: FrameType | None
     returnframe: FrameType | None
     stoplineno: int
-    def __init__(self, skip: Iterable[str] | None = None) -> None: ...
+    if sys.version_info >= (3, 14):
+        backend: _Backend
+        def __init__(self, skip: Iterable[str] | None = None, backend: _Backend = "settrace") -> None: ...
+    else:
+        def __init__(self, skip: Iterable[str] | None = None) -> None: ...
+
     def canonic(self, filename: str) -> str: ...
     def reset(self) -> None: ...
     if sys.version_info >= (3, 12):
@@ -85,6 +91,11 @@ class Bdb:
     def runeval(self, expr: str, globals: dict[str, Any] | None = None, locals: Mapping[str, Any] | None = None) -> None: ...
     def runctx(self, cmd: str | CodeType, globals: dict[str, Any] | None, locals: Mapping[str, Any] | None) -> None: ...
     def runcall(self, func: Callable[_P, _T], /, *args: _P.args, **kwds: _P.kwargs) -> _T | None: ...
+    if sys.version_info >= (3, 14):
+        def start_trace(self) -> None: ...
+        def stop_trace(self) -> None: ...
+        def disable_current_event(self) -> None: ...
+        def restart_events(self) -> None: ...
 
 class Breakpoint:
     next: int

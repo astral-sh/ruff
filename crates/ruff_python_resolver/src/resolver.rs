@@ -505,7 +505,7 @@ fn pick_best_import(
                         best_import_so_far
                     } else {
                         new_import
-                    }
+                    };
                 }
                 _ => {}
             }
@@ -582,7 +582,7 @@ fn pick_best_import(
                         best_import_so_far
                     } else {
                         new_import
-                    }
+                    };
                 }
                 _ => {}
             }

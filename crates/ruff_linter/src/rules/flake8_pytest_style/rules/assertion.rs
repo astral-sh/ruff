@@ -2,14 +2,14 @@ use std::borrow::Cow;
 use std::iter;
 
 use anyhow::Result;
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use libcst_native::{
     self, Assert, BooleanOp, CompoundStatement, Expression, ParenthesizedNode, SimpleStatementLine,
     SimpleWhitespace, SmallStatement, Statement, TrailingWhitespace,
 };
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
@@ -22,13 +22,13 @@ use ruff_python_semantic::{Binding, BindingKind};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::cst::helpers::negate;
 use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::fix::codemods::CodegenStylist;
 use crate::importer::ImportRequest;
-use crate::Locator;
 
 use super::unittest_assert::UnittestAssert;
 

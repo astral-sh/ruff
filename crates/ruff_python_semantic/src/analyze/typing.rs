@@ -15,7 +15,7 @@ use ruff_python_stdlib::typing::{
     is_typed_dict, is_typed_dict_member,
 };
 use ruff_text_size::Ranged;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 
 use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
@@ -252,9 +252,7 @@ pub fn is_immutable_annotation(
                 .is_some_and(|qualified_name| {
                     is_immutable_non_generic_type(qualified_name.segments())
                         || is_immutable_generic_type(qualified_name.segments())
-                        || extend_immutable_calls
-                            .iter()
-                            .any(|target| qualified_name == *target)
+                        || extend_immutable_calls.contains(&qualified_name)
                 })
         }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => semantic
@@ -308,9 +306,7 @@ pub fn is_immutable_func(
         .resolve_qualified_name(map_subscript(func))
         .is_some_and(|qualified_name| {
             is_immutable_return_type(qualified_name.segments())
-                || extend_immutable_calls
-                    .iter()
-                    .any(|target| qualified_name == *target)
+                || extend_immutable_calls.contains(&qualified_name)
         })
 }
 
@@ -1165,7 +1161,7 @@ pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) ->
             Some(Stmt::Assign(ast::StmtAssign { value, targets, .. })) => {
                 return targets
                     .iter()
-                    .find_map(|target| match_value(binding, target, value))
+                    .find_map(|target| match_value(binding, target, value));
             }
             Some(Stmt::AnnAssign(ast::StmtAnnAssign {
                 value: Some(value),

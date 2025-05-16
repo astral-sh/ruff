@@ -5,7 +5,7 @@ use clap::Parser;
 use colored::Colorize;
 
 use ruff::args::Args;
-use ruff::{run, ExitStatus};
+use ruff::{ExitStatus, run};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -15,6 +15,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
     not(target_os = "windows"),
     not(target_os = "openbsd"),
     not(target_os = "aix"),
+    not(target_os = "android"),
     any(
         target_arch = "x86_64",
         target_arch = "aarch64",

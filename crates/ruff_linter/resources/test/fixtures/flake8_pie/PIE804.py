@@ -28,3 +28,14 @@ abc(a=1, **{'a': c}, **{'b': c})  # PIE804
 # Some values need to be parenthesized.
 abc(foo=1, **{'bar': (bar := 1)})  # PIE804
 abc(foo=1, **{'bar': (yield 1)})  # PIE804
+
+# https://github.com/astral-sh/ruff/issues/18036
+# The autofix for this is unsafe due to the comments inside the dictionary.
+foo(
+    **{
+        # Comment 1
+        "x": 1.0,
+        # Comment 2
+        "y": 2.0,
+    }
+)

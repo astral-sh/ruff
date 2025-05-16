@@ -1,12 +1,12 @@
 use ruff_benchmark::criterion;
 
 use criterion::{
-    criterion_group, criterion_main, measurement::WallTime, BenchmarkId, Criterion, Throughput,
+    BenchmarkId, Criterion, Throughput, criterion_group, criterion_main, measurement::WallTime,
 };
 use ruff_benchmark::{
-    TestCase, LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, UNICODE_PYPINYIN,
+    LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
 };
-use ruff_python_parser::{lexer, Mode, TokenKind};
+use ruff_python_parser::{Mode, TokenKind, lexer};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]

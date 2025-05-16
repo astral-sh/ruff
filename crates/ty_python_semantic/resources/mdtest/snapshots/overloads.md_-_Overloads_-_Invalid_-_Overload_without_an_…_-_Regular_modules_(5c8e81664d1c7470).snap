@@ -1,0 +1,59 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: overloads.md - Overloads - Invalid - Overload without an implementation - Regular modules
+mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import overload
+ 2 | 
+ 3 | @overload
+ 4 | def func(x: int) -> int: ...
+ 5 | @overload
+ 6 | # error: [invalid-overload] "Overloaded non-stub function `func` must have an implementation"
+ 7 | def func(x: str) -> str: ...
+ 8 | 
+ 9 | class Foo:
+10 |     @overload
+11 |     def method(self, x: int) -> int: ...
+12 |     @overload
+13 |     # error: [invalid-overload] "Overloaded non-stub function `method` must have an implementation"
+14 |     def method(self, x: str) -> str: ...
+```
+
+# Diagnostics
+
+```
+error[invalid-overload]: Overloaded non-stub function `func` must have an implementation
+ --> src/mdtest_snippet.py:7:5
+  |
+5 | @overload
+6 | # error: [invalid-overload] "Overloaded non-stub function `func` must have an implementation"
+7 | def func(x: str) -> str: ...
+  |     ^^^^
+8 |
+9 | class Foo:
+  |
+info: rule `invalid-overload` is enabled by default
+
+```
+
+```
+error[invalid-overload]: Overloaded non-stub function `method` must have an implementation
+  --> src/mdtest_snippet.py:14:9
+   |
+12 |     @overload
+13 |     # error: [invalid-overload] "Overloaded non-stub function `method` must have an implementation"
+14 |     def method(self, x: str) -> str: ...
+   |         ^^^^^^
+   |
+info: rule `invalid-overload` is enabled by default
+
+```

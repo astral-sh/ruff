@@ -4,7 +4,7 @@ use std::str::CharIndices;
 
 use ruff_diagnostics::Fix;
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};
 use ruff_python_semantic::{BindingKind, Modules, ScopeKind, SemanticModel};
@@ -81,7 +81,9 @@ impl Violation for FastApiUnusedPathParameter {
         } = self;
         #[expect(clippy::if_not_else)]
         if !is_positional {
-            format!("Parameter `{arg_name}` appears in route path, but not in `{function_name}` signature")
+            format!(
+                "Parameter `{arg_name}` appears in route path, but not in `{function_name}` signature"
+            )
         } else {
             format!(
                 "Parameter `{arg_name}` appears in route path, but only as a positional-only argument in `{function_name}` signature"

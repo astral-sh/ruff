@@ -3,7 +3,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{
-    pep_604_union, typing_optional, typing_union, ReturnStatementVisitor,
+    ReturnStatementVisitor, pep_604_union, typing_optional, typing_union,
 };
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::Visitor;

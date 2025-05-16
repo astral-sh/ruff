@@ -5,6 +5,7 @@ import sys
 import types
 from _typeshed import MaybeNone, ReadableBuffer, SupportsRead, SupportsReadline, WriteableBuffer
 from collections.abc import Callable, Iterable, Iterator, Mapping
+from email._policybase import _MessageT
 from socket import socket
 from typing import BinaryIO, Literal, TypeVar, overload
 from typing_extensions import Self, TypeAlias
@@ -33,7 +34,6 @@ __all__ = [
 
 _DataType: TypeAlias = SupportsRead[bytes] | Iterable[ReadableBuffer] | ReadableBuffer
 _T = TypeVar("_T")
-_MessageT = TypeVar("_MessageT", bound=email.message.Message)
 _HeaderValue: TypeAlias = ReadableBuffer | str | int
 
 HTTP_PORT: int

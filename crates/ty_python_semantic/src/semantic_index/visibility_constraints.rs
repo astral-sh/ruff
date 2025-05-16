@@ -178,15 +178,15 @@ use std::cmp::Ordering;
 use ruff_index::{Idx, IndexVec};
 use rustc_hash::FxHashMap;
 
+use crate::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
 };
 use crate::semantic_index::symbol_table;
-use crate::symbol::{imported_symbol, RequiresExplicitReExport};
-use crate::types::{infer_expression_type, Truthiness, Type};
-use crate::Db;
+use crate::symbol::{RequiresExplicitReExport, imported_symbol};
+use crate::types::{Truthiness, Type, infer_expression_type};
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
 /// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the
@@ -663,7 +663,7 @@ impl VisibilityConstraints {
                         if all_names.contains(symbol_name) {
                             Some(RequiresExplicitReExport::No)
                         } else {
-                            tracing::debug!(
+                            tracing::trace!(
                                 "Symbol `{}` (via star import) not found in `__all__` of `{}`",
                                 symbol_name,
                                 referenced_file.path(db)

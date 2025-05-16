@@ -24,7 +24,7 @@ def _(subclass_of_c: type[C]):
     reveal_type(subclass_of_c("a"))  # revealed: C
     # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
     reveal_type(subclass_of_c())  # revealed: C
-    # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+    # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 2, got 3"
     reveal_type(subclass_of_c(1, 2))  # revealed: C
 ```
 

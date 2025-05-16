@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_bugbear::rules::is_infinite_iterable;
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 use ruff_python_ast::PythonVersion;
 

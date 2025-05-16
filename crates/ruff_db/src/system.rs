@@ -19,8 +19,8 @@ use walk_directory::WalkDirectoryBuilder;
 use crate::file_revision::FileRevision;
 
 pub use self::path::{
-    deduplicate_nested_paths, DeduplicatedNestedPathsIter, SystemPath, SystemPathBuf,
-    SystemVirtualPath, SystemVirtualPathBuf,
+    DeduplicatedNestedPathsIter, SystemPath, SystemPathBuf, SystemVirtualPath,
+    SystemVirtualPathBuf, deduplicate_nested_paths,
 };
 
 mod memory_fs;
@@ -167,7 +167,7 @@ pub trait System: Debug {
         &self,
         pattern: &str,
     ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
         PatternError,
     >;
 

@@ -1,5 +1,5 @@
 use crate::{Db, IOErrorDiagnostic, IOErrorKind, Project};
-use ruff_db::files::{system_path_to_file, File};
+use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::walk_directory::{ErrorKind, WalkDirectoryBuilder, WalkState};
 use ruff_db::system::{FileType, SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;

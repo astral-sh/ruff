@@ -1,0 +1,34 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - Invalid iterable
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | nonsense = 123
+2 | for x in nonsense:  # error: [not-iterable]
+3 |     pass
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `Literal[123]` is not iterable
+ --> src/mdtest_snippet.py:2:10
+  |
+1 | nonsense = 123
+2 | for x in nonsense:  # error: [not-iterable]
+  |          ^^^^^^^^
+3 |     pass
+  |
+info: It doesn't have an `__iter__` method or a `__getitem__` method
+info: rule `not-iterable` is enabled by default
+
+```

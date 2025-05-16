@@ -1,0 +1,54 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: union_call.md - Calling a union of function types - Multiple variants but only one is invalid
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def f1(a: int) -> int:
+ 2 |     return 0
+ 3 | 
+ 4 | def f2(name: str) -> int:
+ 5 |     return 0
+ 6 | 
+ 7 | def _(flag: bool):
+ 8 |     if flag:
+ 9 |         f = f1
+10 |     else:
+11 |         f = f2
+12 |     # error: [invalid-argument-type]
+13 |     x = f(3)
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to function `f2` is incorrect
+  --> src/mdtest_snippet.py:13:11
+   |
+11 |         f = f2
+12 |     # error: [invalid-argument-type]
+13 |     x = f(3)
+   |           ^ Expected `str`, found `Literal[3]`
+   |
+info: Function defined here
+ --> src/mdtest_snippet.py:4:5
+  |
+2 |     return 0
+3 |
+4 | def f2(name: str) -> int:
+  |     ^^ --------- Parameter declared here
+5 |     return 0
+  |
+info: Union variant `def f2(name: str) -> int` is incompatible with this call site
+info: Attempted to call union type `(def f1(a: int) -> int) | (def f2(name: str) -> int)`
+info: rule `invalid-argument-type` is enabled by default
+
+```

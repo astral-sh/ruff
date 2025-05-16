@@ -1,12 +1,12 @@
 use std::iter::Peekable;
 
 use ruff_python_ast::{
+    AnyNodeRef, Suite,
     helpers::comment_indentation_after,
     visitor::source_order::{self, SourceOrderVisitor, TraversalSignal},
-    AnyNodeRef, Suite,
 };
 use ruff_python_trivia::{
-    indentation_at_offset, CommentLinePosition, SimpleTokenizer, SuppressionKind,
+    CommentLinePosition, SimpleTokenizer, SuppressionKind, indentation_at_offset,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 

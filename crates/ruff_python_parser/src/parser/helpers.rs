@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, CmpOp, Expr, ExprContext, Number};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{error::RelaxedDecoratorError, TokenKind};
+use crate::{TokenKind, error::RelaxedDecoratorError};
 
 /// Set the `ctx` for `Expr::Id`, `Expr::Attribute`, `Expr::Subscript`, `Expr::Starred`,
 /// `Expr::Tuple` and `Expr::List`. If `expr` is either `Expr::Tuple` or `Expr::List`,
@@ -58,7 +58,7 @@ pub(super) fn detect_invalid_pre_py39_decorator_node(
         Expr::Name(_) => return None,
 
         Expr::Attribute(attribute) => {
-            return detect_invalid_pre_py39_decorator_node(&attribute.value)
+            return detect_invalid_pre_py39_decorator_node(&attribute.value);
         }
 
         Expr::Call(_) => return Some((RelaxedDecoratorError::CallExpression, expr.range())),

@@ -10,19 +10,19 @@ use itertools::Itertools;
 use regex::Regex;
 
 use ruff_formatter::printer::SourceMapGeneration;
-use ruff_python_ast::{str::Quote, AnyStringFlags, StringFlags};
+use ruff_python_ast::{AnyStringFlags, StringFlags, str::Quote};
 use ruff_python_parser::ParseOptions;
 use ruff_python_trivia::CommentRanges;
 use {
-    ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
-    ruff_python_trivia::{is_python_whitespace, PythonWhitespace},
+    ruff_formatter::{FormatOptions, IndentStyle, LineWidth, Printed, write},
+    ruff_python_trivia::{PythonWhitespace, is_python_whitespace},
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
 use super::NormalizedString;
 use crate::preview::is_no_chaperone_for_escaped_quote_in_triple_quoted_docstring_enabled;
 use crate::string::StringQuotes;
-use crate::{prelude::*, DocstringCodeLineWidth, FormatModuleError};
+use crate::{DocstringCodeLineWidth, FormatModuleError, prelude::*};
 
 /// Format a docstring by trimming whitespace and adjusting the indentation.
 ///
@@ -1796,7 +1796,7 @@ impl Indentation {
                     }),
 
                     _ => None,
-                }
+                };
             }
             Self::Mixed { .. } => return None,
         };

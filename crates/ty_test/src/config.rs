@@ -57,6 +57,15 @@ impl MarkdownTestConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct Environment {
     /// Target Python version to assume when resolving types.
+    ///
+    /// The Python version affects allowed syntax, type definitions of the standard library, and
+    /// type definitions of first- and third-party modules that are conditional on the Python version.
+    ///
+    /// By default, the Python version is inferred as the lower bound of the project's
+    /// `requires-python` field from the `pyproject.toml`, if available. Otherwise, the latest
+    /// stable version supported by ty is used, which is currently 3.13.
+    ///
+    /// ty will not infer the Python version from the Python environment at this time.
     pub(crate) python_version: Option<PythonVersion>,
 
     /// Target platform to assume when resolving types.
@@ -68,12 +77,17 @@ pub(crate) struct Environment {
     /// Additional search paths to consider when resolving modules.
     pub(crate) extra_paths: Option<Vec<SystemPathBuf>>,
 
-    /// Path to the Python installation from which ty resolves type information and third-party dependencies.
+    /// Path to the Python environment.
     ///
-    /// ty will search in the path's `site-packages` directories for type information and
-    /// third-party imports.
+    /// ty uses the Python environment to resolve type information and third-party dependencies.
     ///
-    /// This option is commonly used to specify the path to a virtual environment.
+    /// If a path to a Python interpreter is provided, e.g., `.venv/bin/python3`, ty will attempt to
+    /// find an environment two directories up from the interpreter's path, e.g., `.venv`. At this
+    /// time, ty does not invoke the interpreter to determine the location of the environment. This
+    /// means that ty will not resolve dynamic executables such as a shim.
+    ///
+    /// ty will search in the resolved environment's `site-packages` directories for type
+    /// information and third-party imports.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub python: Option<SystemPathBuf>,
 }

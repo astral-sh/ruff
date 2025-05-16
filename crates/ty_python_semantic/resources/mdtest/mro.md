@@ -154,6 +154,46 @@ reveal_type(E.__mro__)  # revealed: tuple[<class 'E'>, <class 'B'>, <class 'C'>,
 reveal_type(F.__mro__)
 ```
 
+## Inheritance with intersections that include `Unknown`
+
+An intersection that includes `Unknown` or `Any` is permitted as long as the intersection is not
+disjoint from `type`.
+
+```py
+from does_not_exist import DoesNotExist  # error: [unresolved-import]
+
+reveal_type(DoesNotExist)  # revealed: Unknown
+
+if hasattr(DoesNotExist, "__mro__"):
+    reveal_type(DoesNotExist)  # revealed: Unknown & <Protocol with members '__mro__'>
+
+    class Foo(DoesNotExist): ...  # no error!
+    reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+
+if not isinstance(DoesNotExist, type):
+    reveal_type(DoesNotExist)  # revealed: Unknown & ~type
+
+    class Foo(DoesNotExist): ...  # error: [invalid-base]
+    reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+```
+
+## Inheritance from `type[Any]` and `type[Unknown]`
+
+Inheritance from `type[Any]` and `type[Unknown]` is also permitted, in keeping with the gradual
+guarantee:
+
+```py
+from typing import Any
+from ty_extensions import Unknown, Intersection
+
+def f(x: type[Any], y: Intersection[Unknown, type[Any]]):
+    class Foo(x): ...
+    reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Any, <class 'object'>]
+
+    class Bar(y): ...
+    reveal_type(Bar.__mro__)  # revealed: tuple[<class 'Bar'>, Unknown, <class 'object'>]
+```
+
 ## `__bases__` lists that cause errors at runtime
 
 If the class's `__bases__` cause an exception to be raised at runtime and therefore the class
@@ -214,6 +254,25 @@ reveal_type(x)  # revealed: <class 'A'> | <class 'B'>
 class Foo(x): ...
 
 reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+```
+
+## `__bases__` is a union of a dynamic type and valid bases
+
+If a dynamic type such as `Any` or `Unknown` is one of the elements in the union, and all other
+types *would be* valid class bases, we do not emit an `invalid-base` diagnostic and use the dynamic
+type as a base to prevent further downstream errors.
+
+```py
+from typing import Any
+
+def _(flag: bool, any: Any):
+    if flag:
+        Base = any
+    else:
+        class Base: ...
+
+    class Foo(Base): ...
+    reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Any, <class 'object'>]
 ```
 
 ## `__bases__` includes multiple `Union`s

@@ -1,4 +1,4 @@
-use ruff_formatter::{write, Argument, Arguments};
+use ruff_formatter::{Argument, Arguments, write};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::context::{NodeLevel, WithNodeLevel};

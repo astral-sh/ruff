@@ -4,7 +4,7 @@ use ruff_python_ast::UnaryOp;
 
 use crate::comments::trailing_comments;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
 };
 use crate::prelude::*;
 

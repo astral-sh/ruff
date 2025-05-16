@@ -73,6 +73,11 @@ class date:
     @property
     def day(self) -> int: ...
     def ctime(self) -> str: ...
+
+    if sys.version_info >= (3, 14):
+        @classmethod
+        def strptime(cls, date_string: str, format: str, /) -> Self: ...
+
     # On <3.12, the name of the parameter in the pure-Python implementation
     # didn't match the name in the C implementation,
     # meaning it is only *safe* to pass it as a keyword argument on 3.12+
@@ -142,6 +147,11 @@ class time:
     def isoformat(self, timespec: str = ...) -> str: ...
     @classmethod
     def fromisoformat(cls, time_string: str, /) -> Self: ...
+
+    if sys.version_info >= (3, 14):
+        @classmethod
+        def strptime(cls, date_string: str, format: str, /) -> Self: ...
+
     # On <3.12, the name of the parameter in the pure-Python implementation
     # didn't match the name in the C implementation,
     # meaning it is only *safe* to pass it as a keyword argument on 3.12+

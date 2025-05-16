@@ -39,7 +39,9 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::ImplicitNamespacePackage)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+            assert_messages!(snapshot, diagnostics);
+        });
         Ok(())
     }
 }

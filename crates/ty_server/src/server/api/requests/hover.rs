@@ -1,14 +1,14 @@
 use std::borrow::Cow;
 
+use crate::DocumentSnapshot;
 use crate::document::{PositionExt, ToRangeExt};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::client::Notifier;
-use crate::DocumentSnapshot;
 use lsp_types::request::HoverRequest;
 use lsp_types::{HoverContents, HoverParams, MarkupContent, Url};
 use ruff_db::source::{line_index, source_text};
 use ruff_text_size::Ranged;
-use ty_ide::{hover, MarkupKind};
+use ty_ide::{MarkupKind, hover};
 use ty_project::ProjectDatabase;
 
 pub(crate) struct HoverRequestHandler;

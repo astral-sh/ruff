@@ -1,5 +1,5 @@
 import sys
-from codeop import CommandCompiler
+from codeop import CommandCompiler, compile_command as compile_command
 from collections.abc import Callable
 from types import CodeType
 from typing import Any
@@ -52,5 +52,3 @@ else:
         local: dict[str, Any] | None = None,
         exitmsg: str | None = None,
     ) -> None: ...
-
-def compile_command(source: str, filename: str = "<input>", symbol: str = "single") -> CodeType | None: ...

@@ -54,7 +54,7 @@ pub(crate) fn order_imports<'a>(
                 },
             );
 
-    let ordered_imports = if matches!(section, ImportSection::Known(ImportType::Future)) {
+    if matches!(section, ImportSection::Known(ImportType::Future)) {
         from_imports
             .sorted_by_cached_key(|(import_from, _, _, aliases)| {
                 ModuleKey::from_module(
@@ -140,7 +140,5 @@ pub(crate) fn order_imports<'a>(
                 .chain(ordered_from_imports.into_iter().map(ImportFrom))
                 .collect()
         }
-    };
-
-    ordered_imports
+    }
 }

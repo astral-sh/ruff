@@ -13,18 +13,19 @@
 use std::{collections::HashMap, slice::Iter};
 
 use itertools::EitherOrBoth;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 
-use super::infer::{enclosing_class_definition, enclosing_function_definition};
+use super::infer::enclosing_class_definition;
 use super::{
-    definition_expression_type, infer_definition_types, DynamicType, FunctionDecorators, Type,
+    DynamicType, FunctionDecorators, Type, definition_expression_type, infer_definition_types,
 };
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::ScopeKind;
 use crate::types::generics::{GenericContext, Specialization, TypeMapping};
-use crate::types::{todo_type, ClassLiteral, KnownInstanceType, TypeVarInstance};
-use crate::{Db, FxOrderSet};
+use crate::{
+    Db, FxOrderSet,
+    types::{ClassLiteral, KnownInstanceType, TypeVarInstance, todo_type},
+};
 use ruff_python_ast::{self as ast, name::Name};
 
 /// The signature of a possible union of callables.
@@ -128,7 +129,7 @@ pub(crate) struct CallableSignature<'db> {
     ///
     /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a
     /// non-overloaded callable.
-    overloads: SmallVec<[Signature<'db>; 1]>,
+    pub(crate) overloads: SmallVec<[Signature<'db>; 1]>,
 }
 
 impl<'db> CallableSignature<'db> {
@@ -198,6 +199,10 @@ impl<'db> CallableSignature<'db> {
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Signature<'db>> {
         self.overloads.iter()
+    }
+
+    pub(crate) fn as_slice(&self) -> &[Signature<'db>] {
+        self.overloads.as_slice()
     }
 
     fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
@@ -314,12 +319,16 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn apply_specialization(
-        &self,
+    pub(crate) fn apply_optional_specialization(
+        self,
         db: &'db dyn Db,
-        specialization: Specialization<'db>,
+        specialization: Option<Specialization<'db>>,
     ) -> Self {
-        self.apply_type_mapping(db, specialization.type_mapping())
+        if let Some(specialization) = specialization {
+            self.apply_type_mapping(db, specialization.type_mapping())
+        } else {
+            self
+        }
     }
 
     pub(crate) fn apply_type_mapping<'a>(
@@ -1541,7 +1550,7 @@ pub(crate) enum ParameterForm {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::tests::{setup_db, TestDb};
+    use crate::db::tests::{TestDb, setup_db};
     use crate::symbol::global_symbol;
     use crate::types::{FunctionSignature, FunctionType, KnownClass};
     use ruff_db::system::DbWithWritableSystem as _;
@@ -1642,11 +1651,13 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        let [Parameter {
-            annotated_type,
-            kind: ParameterKind::PositionalOrKeyword { name, .. },
-            ..
-        }] = &sig.parameters.value[..]
+        let [
+            Parameter {
+                annotated_type,
+                kind: ParameterKind::PositionalOrKeyword { name, .. },
+                ..
+            },
+        ] = &sig.parameters.value[..]
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -1676,11 +1687,13 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        let [Parameter {
-            annotated_type,
-            kind: ParameterKind::PositionalOrKeyword { name, .. },
-            ..
-        }] = &sig.parameters.value[..]
+        let [
+            Parameter {
+                annotated_type,
+                kind: ParameterKind::PositionalOrKeyword { name, .. },
+                ..
+            },
+        ] = &sig.parameters.value[..]
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -1710,15 +1723,18 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        let [Parameter {
-            annotated_type: a_annotated_ty,
-            kind: ParameterKind::PositionalOrKeyword { name: a_name, .. },
-            ..
-        }, Parameter {
-            annotated_type: b_annotated_ty,
-            kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
-            ..
-        }] = &sig.parameters.value[..]
+        let [
+            Parameter {
+                annotated_type: a_annotated_ty,
+                kind: ParameterKind::PositionalOrKeyword { name: a_name, .. },
+                ..
+            },
+            Parameter {
+                annotated_type: b_annotated_ty,
+                kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
+                ..
+            },
+        ] = &sig.parameters.value[..]
         else {
             panic!("expected two positional-or-keyword parameters");
         };
@@ -1753,15 +1769,18 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        let [Parameter {
-            annotated_type: a_annotated_ty,
-            kind: ParameterKind::PositionalOrKeyword { name: a_name, .. },
-            ..
-        }, Parameter {
-            annotated_type: b_annotated_ty,
-            kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
-            ..
-        }] = &sig.parameters.value[..]
+        let [
+            Parameter {
+                annotated_type: a_annotated_ty,
+                kind: ParameterKind::PositionalOrKeyword { name: a_name, .. },
+                ..
+            },
+            Parameter {
+                annotated_type: b_annotated_ty,
+                kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
+                ..
+            },
+        ] = &sig.parameters.value[..]
         else {
             panic!("expected two positional-or-keyword parameters");
         };
@@ -1789,7 +1808,10 @@ mod tests {
         // With no decorators, internal and external signature are the same
         assert_eq!(
             func.signature(&db),
-            &FunctionSignature::Single(expected_sig)
+            &FunctionSignature {
+                overloads: CallableSignature::single(Type::FunctionLiteral(func), expected_sig),
+                implementation: None
+            },
         );
     }
 }

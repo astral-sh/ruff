@@ -111,13 +111,20 @@ from ast import (
 from typing import Literal
 
 if sys.version_info >= (3, 12):
-    from ast import ParamSpec as ParamSpec, TypeVar as TypeVar, TypeVarTuple as TypeVarTuple, type_param as type_param
+    from ast import (
+        ParamSpec as ParamSpec,
+        TypeAlias as TypeAlias,
+        TypeVar as TypeVar,
+        TypeVarTuple as TypeVarTuple,
+        type_param as type_param,
+    )
 
 if sys.version_info >= (3, 11):
     from ast import TryStar as TryStar
 
 if sys.version_info >= (3, 10):
     from ast import (
+        Match as Match,
         MatchAs as MatchAs,
         MatchClass as MatchClass,
         MatchMapping as MatchMapping,

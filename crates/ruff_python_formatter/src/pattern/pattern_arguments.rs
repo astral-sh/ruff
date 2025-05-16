@@ -3,7 +3,7 @@ use ruff_python_ast::{Pattern, PatternArguments};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::expression::parentheses::{empty_parenthesized, parenthesized, Parentheses};
+use crate::expression::parentheses::{Parentheses, empty_parenthesized, parenthesized};
 use crate::prelude::*;
 
 #[derive(Default)]

@@ -18,8 +18,8 @@ pub(crate) use whitespace_around_named_parameter_equals::*;
 pub(crate) use whitespace_before_comment::*;
 pub(crate) use whitespace_before_parameters::*;
 
-use crate::rules::pycodestyle::helpers::is_non_logical_token;
 use crate::Locator;
+use crate::rules::pycodestyle::helpers::is_non_logical_token;
 
 mod extraneous_whitespace;
 mod indentation;

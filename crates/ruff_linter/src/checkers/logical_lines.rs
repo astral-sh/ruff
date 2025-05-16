@@ -5,16 +5,17 @@ use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::line_width::IndentWidth;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::logical_lines::{
-    extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
-    missing_whitespace_around_operator, redundant_backslash, space_after_comma,
-    space_around_operator, whitespace_around_keywords, whitespace_around_named_parameter_equals,
-    whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
+    LogicalLines, TokenFlags, extraneous_whitespace, indentation, missing_whitespace,
+    missing_whitespace_after_keyword, missing_whitespace_around_operator, redundant_backslash,
+    space_after_comma, space_around_operator, whitespace_around_keywords,
+    whitespace_around_named_parameter_equals, whitespace_before_comment,
+    whitespace_before_parameters,
 };
 use crate::settings::LinterSettings;
-use crate::Locator;
 
 /// Return the amount of indentation, expanding tabs to the next multiple of the settings' tab size.
 pub(crate) fn expand_indent(line: &str, indent_width: IndentWidth) -> usize {
@@ -169,16 +170,17 @@ pub(crate) fn check_logical_lines(
         let indent_size = 4;
 
         if enforce_indentation {
-            for kind in indentation(
+            for diagnostic in indentation(
                 &line,
                 prev_line.as_ref(),
                 indent_char,
                 indent_level,
                 prev_indent_level,
                 indent_size,
+                range,
             ) {
-                if settings.rules.enabled(kind.rule()) {
-                    context.push_diagnostic(Diagnostic::new(kind, range));
+                if settings.rules.enabled(diagnostic.rule()) {
+                    context.push_diagnostic(diagnostic);
                 }
             }
         }
@@ -206,7 +208,7 @@ impl<'a> LogicalLinesContext<'a> {
     }
 
     pub(crate) fn push_diagnostic(&mut self, diagnostic: Diagnostic) {
-        if self.settings.rules.enabled(diagnostic.kind.rule()) {
+        if self.settings.rules.enabled(diagnostic.rule()) {
             self.diagnostics.push(diagnostic);
         }
     }

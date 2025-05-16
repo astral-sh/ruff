@@ -3,7 +3,11 @@ from types import CodeType
 
 __all__ = ["compile_command", "Compile", "CommandCompiler"]
 
-def compile_command(source: str, filename: str = "<input>", symbol: str = "single") -> CodeType | None: ...
+if sys.version_info >= (3, 14):
+    def compile_command(source: str, filename: str = "<input>", symbol: str = "single", flags: int = 0) -> CodeType | None: ...
+
+else:
+    def compile_command(source: str, filename: str = "<input>", symbol: str = "single") -> CodeType | None: ...
 
 class Compile:
     flags: int

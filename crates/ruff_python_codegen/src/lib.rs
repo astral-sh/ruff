@@ -1,5 +1,5 @@
 pub use generator::Generator;
-use ruff_python_parser::{parse_module, ParseError};
+use ruff_python_parser::{ParseError, parse_module};
 pub use stylist::Stylist;
 
 mod generator;

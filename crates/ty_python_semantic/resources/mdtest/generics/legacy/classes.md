@@ -454,6 +454,28 @@ reveal_type(d.method3())  # revealed: SomeProtocol[int]
 reveal_type(d.method3().x)  # revealed: int
 ```
 
+When a method is overloaded, the specialization is applied to all overloads.
+
+```py
+from typing import overload, Generic, TypeVar
+
+S = TypeVar("S")
+
+class WithOverloadedMethod(Generic[T]):
+    @overload
+    def method(self, x: T) -> T:
+        return x
+
+    @overload
+    def method(self, x: S) -> S | T:
+        return x
+
+    def method(self, x: S | T) -> S | T:
+        return x
+
+reveal_type(WithOverloadedMethod[int].method)  # revealed: Overload[(self, x: int) -> int, (self, x: S) -> S | int]
+```
+
 ## Cyclic class definitions
 
 ### F-bounded quantification

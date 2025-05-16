@@ -32,7 +32,9 @@ impl Emitter for GithubEmitter {
             write!(
                 writer,
                 "::error title=Ruff{code},file={file},line={row},col={column},endLine={end_row},endColumn={end_column}::",
-                code = message.rule().map_or_else(String::new, |rule| format!(" ({})", rule.noqa_code())),
+                code = message
+                    .rule()
+                    .map_or_else(String::new, |rule| format!(" ({})", rule.noqa_code())),
                 file = message.filename(),
                 row = source_location.line,
                 column = source_location.column,
@@ -63,10 +65,10 @@ impl Emitter for GithubEmitter {
 mod tests {
     use insta::assert_snapshot;
 
+    use crate::message::GithubEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
-    use crate::message::GithubEmitter;
 
     #[test]
     fn output() {

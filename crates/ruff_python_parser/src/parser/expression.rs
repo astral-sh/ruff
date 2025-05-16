@@ -13,8 +13,8 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::error::{FStringKind, StarTupleKind, UnparenthesizedNamedExprKind};
 use crate::parser::progress::ParserProgress;
-use crate::parser::{helpers, FunctionKind, Parser};
-use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
+use crate::parser::{FunctionKind, Parser, helpers};
+use crate::string::{StringType, parse_fstring_literal_element, parse_string_literal};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
 use crate::{

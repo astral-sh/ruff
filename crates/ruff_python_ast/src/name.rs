@@ -3,8 +3,8 @@ use std::fmt::{Debug, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
-use crate::generated::ExprName;
 use crate::Expr;
+use crate::generated::ExprName;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -192,14 +192,14 @@ impl schemars::JsonSchema for Name {
         String::schema_id()
     }
 
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        String::json_schema(gen)
+    fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
+        String::json_schema(generator)
     }
 
     fn _schemars_private_non_optional_json_schema(
-        gen: &mut schemars::gen::SchemaGenerator,
+        generator: &mut schemars::r#gen::SchemaGenerator,
     ) -> schemars::schema::Schema {
-        String::_schemars_private_non_optional_json_schema(gen)
+        String::_schemars_private_non_optional_json_schema(generator)
     }
 
     fn _schemars_private_is_option() -> bool {
@@ -396,7 +396,7 @@ impl<'a> UnqualifiedName<'a> {
             Expr::Attribute(attr2) => attr2,
             // Ex) `foo.bar`
             Expr::Name(ExprName { id, .. }) => {
-                return Some(Self::from_slice(&[id.as_str(), attr1.attr.as_str()]))
+                return Some(Self::from_slice(&[id.as_str(), attr1.attr.as_str()]));
             }
             _ => return None,
         };

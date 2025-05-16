@@ -1,6 +1,8 @@
 use crate::symbol::SymbolAndQualifiers;
+use crate::types::generics::TypeMapping;
+use crate::{Db, FxOrderSet};
 
-use super::{ClassType, Db, DynamicType, KnownClass, MemberLookupPolicy, Type};
+use super::{ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeVarInstance};
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
@@ -64,6 +66,32 @@ impl<'db> SubclassOfType<'db> {
 
     pub(crate) const fn is_fully_static(self) -> bool {
         !self.is_dynamic()
+    }
+
+    pub(super) fn apply_type_mapping<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: TypeMapping<'a, 'db>,
+    ) -> Self {
+        match self.subclass_of {
+            SubclassOfInner::Class(class) => Self {
+                subclass_of: SubclassOfInner::Class(class.apply_type_mapping(db, type_mapping)),
+            },
+            SubclassOfInner::Dynamic(_) => self,
+        }
+    }
+
+    pub(super) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        match self.subclass_of {
+            SubclassOfInner::Class(class) => {
+                class.find_legacy_typevars(db, typevars);
+            }
+            SubclassOfInner::Dynamic(_) => {}
+        }
     }
 
     pub(crate) fn find_name_in_mro_with_policy(
@@ -135,6 +163,13 @@ impl<'db> SubclassOfInner<'db> {
         match self {
             Self::Class(class) => Some(class),
             Self::Dynamic(_) => None,
+        }
+    }
+
+    pub(crate) const fn into_dynamic(self) -> Option<DynamicType> {
+        match self {
+            Self::Class(_) => None,
+            Self::Dynamic(dynamic) => Some(dynamic),
         }
     }
 

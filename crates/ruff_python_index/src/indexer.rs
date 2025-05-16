@@ -4,7 +4,7 @@
 use ruff_python_ast::Stmt;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::{
-    has_leading_content, has_trailing_content, is_python_whitespace, CommentRanges,
+    CommentRanges, has_leading_content, has_trailing_content, is_python_whitespace,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};

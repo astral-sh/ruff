@@ -24,9 +24,6 @@ from airflow.contrib.aws_athena_hook import AWSAthenaHook
 from airflow.datasets import DatasetAliasEvent
 from airflow.hooks.base_hook import BaseHook
 from airflow.operators.subdag import SubDagOperator
-from airflow.providers.mysql.datasets import mysql
-from airflow.providers.postgres.datasets import postgres
-from airflow.providers.trino.datasets import trino
 from airflow.secrets.local_filesystem import LocalFilesystemBackend
 from airflow.sensors.base_sensor_operator import BaseSensorOperator
 from airflow.triggers.external_task import TaskStateTrigger
@@ -78,14 +75,6 @@ BaseHook()
 # airflow.operators.subdag.*
 SubDagOperator()
 
-# airflow.providers.mysql
-mysql.sanitize_uri
-
-# airflow.providers.postgres
-postgres.sanitize_uri
-
-# airflow.providers.trino
-trino.sanitize_uri
 
 # airflow.secrets
 # get_connection
@@ -155,3 +144,18 @@ should_hide_value_for_key
 from airflow.operators.python import get_current_context
 
 get_current_context()
+
+# airflow.providers.mysql
+from airflow.providers.mysql.datasets.mysql import sanitize_uri
+
+sanitize_uri
+
+# airflow.providers.postgres
+from airflow.providers.postgres.datasets.postgres import sanitize_uri
+
+sanitize_uri
+
+# airflow.providers.trino
+from airflow.providers.trino.datasets.trino import sanitize_uri
+
+sanitize_uri

@@ -7,8 +7,8 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
-use anyhow::{anyhow, bail};
 use anyhow::{Context, Result};
+use anyhow::{anyhow, bail};
 use globset::{Candidate, GlobSet};
 use ignore::{DirEntry, Error, ParallelVisitor, WalkBuilder, WalkState};
 use itertools::Itertools;
@@ -23,9 +23,9 @@ use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging::is_package;
 
 use crate::configuration::Configuration;
-use crate::pyproject::{settings_toml, TargetVersionStrategy};
+use crate::pyproject::{TargetVersionStrategy, settings_toml};
 use crate::settings::Settings;
-use crate::{pyproject, FileResolverSettings};
+use crate::{FileResolverSettings, pyproject};
 
 /// The configuration information from a `pyproject.toml` file.
 #[derive(Debug)]
@@ -667,7 +667,7 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
 impl Drop for PythonFilesVisitor<'_, '_> {
     fn drop(&mut self) {
         let mut merged = self.global.merged.lock().unwrap();
-        let (ref mut files, ref mut error) = &mut *merged;
+        let (files, error) = &mut *merged;
 
         if files.is_empty() {
             *files = std::mem::take(&mut self.local_files);
@@ -910,7 +910,7 @@ pub fn match_any_inclusion(
 
 #[cfg(test)]
 mod tests {
-    use std::fs::{create_dir, File};
+    use std::fs::{File, create_dir};
     use std::path::Path;
 
     use anyhow::Result;
@@ -924,9 +924,9 @@ mod tests {
     use crate::configuration::Configuration;
     use crate::pyproject::find_settings_toml;
     use crate::resolver::{
-        is_file_excluded, match_exclusion, python_files_in_path, resolve_root_settings,
         ConfigurationOrigin, ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy,
-        ResolvedFile, Resolver,
+        ResolvedFile, Resolver, is_file_excluded, match_exclusion, python_files_in_path,
+        resolve_root_settings,
     };
     use crate::settings::Settings;
     use crate::tests::test_resource_path;

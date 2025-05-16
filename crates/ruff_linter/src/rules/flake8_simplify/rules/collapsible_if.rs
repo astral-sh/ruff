@@ -1,24 +1,24 @@
 use std::borrow::Cow;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use libcst_native::ParenthesizedNode;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{self as ast, whitespace, ElifElseClause, Expr, Stmt};
+use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt, whitespace};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::cst::helpers::space;
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};
 use crate::fix::codemods::CodegenStylist;
 use crate::fix::edits::fits;
-use crate::Locator;
 
 /// ## What it does
 /// Checks for nested `if` statements that can be collapsed into a single `if`
@@ -230,12 +230,14 @@ fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf> {
 ///         ...
 /// ```
 fn find_last_nested_if(body: &[Stmt]) -> Option<&Expr> {
-    let [Stmt::If(ast::StmtIf {
-        test,
-        body: inner_body,
-        elif_else_clauses,
-        ..
-    })] = body
+    let [
+        Stmt::If(ast::StmtIf {
+            test,
+            body: inner_body,
+            elif_else_clauses,
+            ..
+        }),
+    ] = body
     else {
         return None;
     };
@@ -343,7 +345,7 @@ pub(super) fn collapse_nested_if(
     let outer_if = match_if(statement)?;
 
     let libcst_native::If {
-        body: libcst_native::Suite::IndentedBlock(ref mut outer_body),
+        body: libcst_native::Suite::IndentedBlock(outer_body),
         orelse: None,
         ..
     } = outer_if
@@ -351,9 +353,11 @@ pub(super) fn collapse_nested_if(
         bail!("Expected outer if to have indented body and no else")
     };
 
-    let [libcst_native::Statement::Compound(libcst_native::CompoundStatement::If(
-        inner_if @ libcst_native::If { orelse: None, .. },
-    ))] = &mut *outer_body.body
+    let [
+        libcst_native::Statement::Compound(libcst_native::CompoundStatement::If(
+            inner_if @ libcst_native::If { orelse: None, .. },
+        )),
+    ] = &mut *outer_body.body
     else {
         bail!("Expected one inner if statement");
     };

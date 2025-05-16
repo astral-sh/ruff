@@ -32,10 +32,10 @@ fn super_resolution_overview() {
         &ClientCapabilities::default(),
         ruff_server::PositionEncoding::UTF16,
         ClientSettings::default(),
-        &Workspaces::new(vec![Workspace::new(
-            lsp_types::Url::from_file_path(file_path.parent().unwrap()).unwrap(),
-        )
-        .with_settings(ClientSettings::default())]),
+        &Workspaces::new(vec![
+            Workspace::new(lsp_types::Url::from_file_path(file_path.parent().unwrap()).unwrap())
+                .with_settings(ClientSettings::default()),
+        ]),
     )
     .unwrap();
 

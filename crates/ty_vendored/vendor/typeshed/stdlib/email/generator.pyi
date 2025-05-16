@@ -7,7 +7,7 @@ from typing_extensions import Self
 __all__ = ["Generator", "DecodedGenerator", "BytesGenerator"]
 
 # By default, generators do not have a message policy.
-_MessageT = TypeVar("_MessageT", bound=Message, default=Any)
+_MessageT = TypeVar("_MessageT", bound=Message[Any, Any], default=Any)
 
 class Generator(Generic[_MessageT]):
     maxheaderlen: int | None

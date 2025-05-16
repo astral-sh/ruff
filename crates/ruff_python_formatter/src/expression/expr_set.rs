@@ -2,7 +2,7 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprSet;
 use ruff_text_size::Ranged;
 
-use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, parenthesized};
 use crate::prelude::*;
 
 #[derive(Default)]

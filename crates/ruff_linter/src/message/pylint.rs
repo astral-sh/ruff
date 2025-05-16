@@ -51,10 +51,10 @@ impl Emitter for PylintEmitter {
 mod tests {
     use insta::assert_snapshot;
 
+    use crate::message::PylintEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
-    use crate::message::PylintEmitter;
 
     #[test]
     fn output() {

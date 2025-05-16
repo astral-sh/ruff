@@ -65,7 +65,7 @@ use std::cmp::Ordering;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
-use ruff_index::{newtype_index, IndexVec};
+use ruff_index::{IndexVec, newtype_index};
 
 /// A handle to an association list. Use [`ListStorage`] to access its elements, and
 /// [`ListBuilder`] to construct other lists based on this one.

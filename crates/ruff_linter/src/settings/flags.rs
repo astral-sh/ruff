@@ -19,11 +19,7 @@ impl Noqa {
 
 impl From<bool> for Noqa {
     fn from(value: bool) -> Self {
-        if value {
-            Noqa::Enabled
-        } else {
-            Noqa::Disabled
-        }
+        if value { Noqa::Enabled } else { Noqa::Disabled }
     }
 }
 

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use crate::commands::completions::config::{OptionString, OptionStringParser};
 use anyhow::bail;
 use clap::builder::{TypedValueParser, ValueParserFactory};
-use clap::{command, Parser, Subcommand};
+use clap::{Parser, Subcommand, command};
 use colored::Colorize;
 use itertools::Itertools;
 use path_absolutize::path_dedot;
@@ -1126,10 +1126,10 @@ impl std::fmt::Display for FormatRangeParseError {
                 write!(
                     f,
                     "the start position '{start_invalid}' is greater than the end position '{end_invalid}'.\n  {tip} Try switching start and end: '{end}-{start}'",
-                    start_invalid=start.to_string().bold().yellow(),
-                    end_invalid=end.to_string().bold().yellow(),
-                    start=start.to_string().green().bold(),
-                    end=end.to_string().green().bold()
+                    start_invalid = start.to_string().bold().yellow(),
+                    end_invalid = end.to_string().bold().yellow(),
+                    start = start.to_string().green().bold(),
+                    end = end.to_string().green().bold()
                 )
             }
             FormatRangeParseError::InvalidStart(inner) => inner.write(f, true),
@@ -1230,30 +1230,36 @@ impl LineColumnParseError {
 
         match self {
             LineColumnParseError::ColumnParseError(inner) => {
-                write!(f, "the {range}s column is not a valid number ({inner})'\n  {tip} The format is 'line:column'.")
+                write!(
+                    f,
+                    "the {range}s column is not a valid number ({inner})'\n  {tip} The format is 'line:column'."
+                )
             }
             LineColumnParseError::LineParseError(inner) => {
-                write!(f, "the {range} line is not a valid number ({inner})\n  {tip} The format is 'line:column'.")
+                write!(
+                    f,
+                    "the {range} line is not a valid number ({inner})\n  {tip} The format is 'line:column'."
+                )
             }
             LineColumnParseError::ZeroColumnIndex { line } => {
                 write!(
                     f,
                     "the {range} column is 0, but it should be 1 or greater.\n  {tip} The column numbers start at 1.\n  {tip} Try {suggestion} instead.",
-                    suggestion=format!("{line}:1").green().bold()
+                    suggestion = format!("{line}:1").green().bold()
                 )
             }
             LineColumnParseError::ZeroLineIndex { column } => {
                 write!(
                     f,
                     "the {range} line is 0, but it should be 1 or greater.\n  {tip} The line numbers start at 1.\n  {tip} Try {suggestion} instead.",
-                    suggestion=format!("1:{column}").green().bold()
+                    suggestion = format!("1:{column}").green().bold()
                 )
             }
             LineColumnParseError::ZeroLineAndColumnIndex => {
                 write!(
                     f,
                     "the {range} line and column are both 0, but they should be 1 or greater.\n  {tip} The line and column numbers start at 1.\n  {tip} Try {suggestion} instead.",
-                    suggestion="1:1".to_string().green().bold()
+                    suggestion = "1:1".to_string().green().bold()
                 )
             }
         }

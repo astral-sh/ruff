@@ -1,8 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{ExprLambda, Parameters, StmtFunctionDef};
-use ruff_python_semantic::analyze::visibility::is_override;
 use ruff_python_semantic::ScopeKind;
+use ruff_python_semantic::analyze::visibility::is_override;
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 

@@ -2,10 +2,13 @@ use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
 use crate::semantic_index::SemanticIndex;
+use crate::types::class::ClassType;
+use crate::types::class_base::ClassBase;
+use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    declaration_type, todo_type, KnownInstanceType, Type, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarVariance, UnionType,
+    KnownInstanceType, Type, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance,
+    UnionType, declaration_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -454,10 +457,13 @@ impl<'db> Specialization<'db> {
             // corresponding typevar:
             //   - covariant: verify that self_type <: other_type
             //   - contravariant: verify that other_type <: self_type
-            //   - invariant: verify that self_type == other_type
+            //   - invariant: verify that self_type <: other_type AND other_type <: self_type
             //   - bivariant: skip, can't make assignability false
             let compatible = match typevar.variance(db) {
-                TypeVarVariance::Invariant => self_type.is_gradual_equivalent_to(db, *other_type),
+                TypeVarVariance::Invariant => {
+                    self_type.is_assignable_to(db, *other_type)
+                        && other_type.is_assignable_to(db, *self_type)
+                }
                 TypeVarVariance::Covariant => self_type.is_assignable_to(db, *other_type),
                 TypeVarVariance::Contravariant => other_type.is_assignable_to(db, *self_type),
                 TypeVarVariance::Bivariant => true,
@@ -627,7 +633,10 @@ impl<'db> SpecializationBuilder<'db> {
         // ```
         //
         // without specializing `T` to `None`.
-        if !actual.is_never() && actual.is_subtype_of(self.db, formal) {
+        if !matches!(formal, Type::ProtocolInstance(_))
+            && !actual.is_never()
+            && actual.is_subtype_of(self.db, formal)
+        {
             return Ok(());
         }
 
@@ -668,6 +677,43 @@ impl<'db> SpecializationBuilder<'db> {
                     {
                         self.infer(*formal_element, *actual_element)?;
                     }
+                }
+            }
+
+            (
+                Type::NominalInstance(NominalInstanceType {
+                    class: ClassType::Generic(formal_alias),
+                    ..
+                })
+                // TODO: This will only handle classes that explicit implement a generic protocol
+                // by listing it as a base class. To handle classes that implicitly implement a
+                // generic protocol, we will need to check the types of the protocol members to be
+                // able to infer the specialization of the protocol that the class implements.
+                | Type::ProtocolInstance(ProtocolInstanceType {
+                    inner: Protocol::FromClass(ClassType::Generic(formal_alias)),
+                    ..
+                }),
+                Type::NominalInstance(NominalInstanceType {
+                    class: actual_class,
+                    ..
+                }),
+            ) => {
+                let formal_origin = formal_alias.origin(self.db);
+                for base in actual_class.iter_mro(self.db) {
+                    let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
+                        continue;
+                    };
+                    if formal_origin != base_alias.origin(self.db) {
+                        continue;
+                    }
+                    let formal_specialization = formal_alias.specialization(self.db).types(self.db);
+                    let base_specialization = base_alias.specialization(self.db).types(self.db);
+                    for (formal_ty, base_ty) in
+                        formal_specialization.iter().zip(base_specialization)
+                    {
+                        self.infer(*formal_ty, *base_ty)?;
+                    }
+                    return Ok(());
                 }
             }
 
