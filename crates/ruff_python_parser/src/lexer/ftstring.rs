@@ -2,10 +2,9 @@ use ruff_python_ast::StringFlags;
 
 use super::TokenFlags;
 
-/// The context representing the current f-string that the lexer is in.
+/// The context representing the current f-string or t-string that the lexer is in.
 #[derive(Clone, Debug)]
 pub(crate) struct FTStringContext {
-    kind: FTStringKind,
     flags: TokenFlags,
 
     /// The level of nesting for the lexer when it entered the current f/t-string.
@@ -20,22 +19,22 @@ pub(crate) struct FTStringContext {
 }
 
 impl FTStringContext {
-    pub(crate) const fn new(kind: FTStringKind, flags: TokenFlags, nesting: u32) -> Self {
-        match kind {
-            FTStringKind::FString => assert!(flags.is_f_string()),
-            FTStringKind::TString => assert!(flags.is_t_string()),
-        }
-
+    pub(crate) const fn new(flags: TokenFlags, nesting: u32) -> Self {
         Self {
-            kind,
             flags,
             nesting,
             format_spec_depth: 0,
         }
     }
 
-    pub(crate) const fn kind(&self) -> FTStringKind {
-        self.kind
+    pub(crate) fn kind(&self) -> FTStringKind {
+        if self.flags.is_f_string() {
+            FTStringKind::FString
+        } else if self.flags.is_t_string() {
+            FTStringKind::TString
+        } else {
+            panic!("Expected `FTStringContext` to have either f-string or t-string flag")
+        }
     }
 
     pub(crate) const fn flags(&self) -> TokenFlags {
