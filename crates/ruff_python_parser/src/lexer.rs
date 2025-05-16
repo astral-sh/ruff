@@ -18,7 +18,7 @@ use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Mode;
-use crate::error::{FStringErrorType, LexicalError, LexicalErrorType, TStringErrorType};
+use crate::error::{FTStringErrorType, LexicalError, LexicalErrorType};
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
 use crate::lexer::ftstring::{FTStringContext, FTStringKind, FTStrings, FTStringsCheckpoint};
 use crate::lexer::indentation::{Indentation, Indentations, IndentationsCheckpoint};
@@ -166,7 +166,7 @@ impl<'src> Lexer<'src> {
             if !ftstring.is_in_expression(self.nesting) {
                 match ftstring.kind() {
                     FTStringKind::FString => {
-                        if let Some(token) = self.lex_fstring_middle_or_end() {
+                        if let Some(token) = self.lex_ftstring_middle_or_end() {
                             if matches!(token, TokenKind::FStringEnd) {
                                 self.ftstrings.pop();
                             }
@@ -174,7 +174,7 @@ impl<'src> Lexer<'src> {
                         }
                     }
                     FTStringKind::TString => {
-                        if let Some(token) = self.lex_tstring_middle_or_end() {
+                        if let Some(token) = self.lex_ftstring_middle_or_end() {
                             if matches!(token, TokenKind::TStringEnd) {
                                 self.ftstrings.pop();
                             }
@@ -522,10 +522,10 @@ impl<'src> Lexer<'src> {
                     if ftstring.nesting() == self.nesting {
                         let error_type = match ftstring.kind() {
                             FTStringKind::FString => {
-                                LexicalErrorType::FStringError(FStringErrorType::SingleRbrace)
+                                LexicalErrorType::FStringError(FTStringErrorType::SingleRbrace)
                             }
                             FTStringKind::TString => {
-                                LexicalErrorType::TStringError(TStringErrorType::SingleRbrace)
+                                LexicalErrorType::TStringError(FTStringErrorType::SingleRbrace)
                             }
                         };
                         return self.push_error(LexicalError::new(error_type, self.token_range()));
@@ -644,12 +644,8 @@ impl<'src> Lexer<'src> {
         };
 
         if let Some(quote) = quote {
-            if self.current_flags.is_f_string() {
-                return self.lex_fstring_start(quote);
-            }
-
-            if self.current_flags.is_t_string() {
-                return self.lex_tstring_start(quote);
+            if self.current_flags.is_f_string() || self.current_flags.is_t_string() {
+                return self.lex_ftstring_start(quote);
             }
 
             return self.lex_string(quote);
@@ -739,6 +735,7 @@ impl<'src> Lexer<'src> {
             'R' => self.current_flags |= TokenFlags::RAW_STRING_UPPERCASE,
             _ => return false,
         }
+        dbg!(self.current_flags);
         true
     }
 
@@ -769,8 +766,8 @@ impl<'src> Lexer<'src> {
         true
     }
 
-    /// Lex a f-string start token.
-    fn lex_fstring_start(&mut self, quote: char) -> TokenKind {
+    /// Lex a f-string or t-string start token.
+    fn lex_ftstring_start(&mut self, quote: char) -> TokenKind {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
 
@@ -782,30 +779,40 @@ impl<'src> Lexer<'src> {
             self.current_flags |= TokenFlags::TRIPLE_QUOTED_STRING;
         }
 
-        self.ftstrings.push(FTStringContext::new(
-            FTStringKind::FString,
-            self.current_flags,
-            self.nesting,
-        ));
+        let ftcontext = FTStringContext::new(self.current_flags, self.nesting);
 
-        TokenKind::FStringStart
+        let kind = ftcontext.kind();
+
+        self.ftstrings.push(ftcontext);
+
+        match kind {
+            FTStringKind::FString => TokenKind::FStringStart,
+            FTStringKind::TString => TokenKind::TStringStart,
+        }
     }
 
     /// Lex a f-string middle or end token.
-    fn lex_fstring_middle_or_end(&mut self) -> Option<TokenKind> {
+    fn lex_ftstring_middle_or_end(&mut self) -> Option<TokenKind> {
         // SAFETY: Safe because the function is only called when `self.fstrings` is not empty.
-        let fstring = self.ftstrings.current().unwrap();
+        let ftstring = self.ftstrings.current().unwrap();
+        let string_kind = ftstring.kind();
 
         // Check if we're at the end of the f-string.
-        if fstring.is_triple_quoted() {
-            let quote_char = fstring.quote_char();
+        if ftstring.is_triple_quoted() {
+            let quote_char = ftstring.quote_char();
             if self.cursor.eat_char3(quote_char, quote_char, quote_char) {
-                self.current_flags = fstring.flags();
-                return Some(TokenKind::FStringEnd);
+                self.current_flags = ftstring.flags();
+                return Some(match string_kind {
+                    FTStringKind::FString => TokenKind::FStringEnd,
+                    FTStringKind::TString => TokenKind::TStringEnd,
+                });
             }
-        } else if self.cursor.eat_char(fstring.quote_char()) {
-            self.current_flags = fstring.flags();
-            return Some(TokenKind::FStringEnd);
+        } else if self.cursor.eat_char(ftstring.quote_char()) {
+            self.current_flags = ftstring.flags();
+            return Some(match string_kind {
+                FTStringKind::FString => TokenKind::FStringEnd,
+                FTStringKind::TString => TokenKind::TStringEnd,
+            });
         }
 
         // We have to decode `{{` and `}}` into `{` and `}` respectively. As an
@@ -817,7 +824,7 @@ impl<'src> Lexer<'src> {
         let mut last_offset = self.offset();
 
         // This isn't going to change for the duration of the loop.
-        let in_format_spec = fstring.is_in_format_spec(self.nesting);
+        let in_format_spec = ftstring.is_in_format_spec(self.nesting);
 
         let mut in_named_unicode = false;
 
@@ -827,18 +834,21 @@ impl<'src> Lexer<'src> {
                 // in the source code and the one returned by `self.cursor.first()` when
                 // we reach the end of the source code.
                 EOF_CHAR if self.cursor.is_eof() => {
-                    let error = if fstring.is_triple_quoted() {
-                        FStringErrorType::UnterminatedTripleQuotedString
+                    let error = if ftstring.is_triple_quoted() {
+                        FTStringErrorType::UnterminatedTripleQuotedString
                     } else {
-                        FStringErrorType::UnterminatedString
+                        FTStringErrorType::UnterminatedString
                     };
                     self.ftstrings.pop();
                     return Some(self.push_error(LexicalError::new(
-                        LexicalErrorType::FStringError(error),
+                        match string_kind {
+                            FTStringKind::FString => LexicalErrorType::FStringError(error),
+                            FTStringKind::TString => LexicalErrorType::TStringError(error),
+                        },
                         self.token_range(),
                     )));
                 }
-                '\n' | '\r' if !fstring.is_triple_quoted() => {
+                '\n' | '\r' if !ftstring.is_triple_quoted() => {
                     // If we encounter a newline while we're in a format spec, then
                     // we stop here and let the lexer emit the newline token.
                     //
@@ -847,10 +857,16 @@ impl<'src> Lexer<'src> {
                         break;
                     }
                     self.ftstrings.pop();
-                    return Some(self.push_error(LexicalError::new(
-                        LexicalErrorType::FStringError(FStringErrorType::UnterminatedString),
-                        self.token_range(),
-                    )));
+                    return Some(self.push_error(match string_kind {
+                        FTStringKind::FString => LexicalError::new(
+                            LexicalErrorType::FStringError(FTStringErrorType::UnterminatedString),
+                            self.token_range(),
+                        ),
+                        FTStringKind::TString => LexicalError::new(
+                            LexicalErrorType::TStringError(FTStringErrorType::UnterminatedString),
+                            self.token_range(),
+                        ),
+                    }));
                 }
                 '\\' => {
                     self.cursor.bump(); // '\'
@@ -858,7 +874,7 @@ impl<'src> Lexer<'src> {
                         // Don't consume `{` or `}` as we want them to be emitted as tokens.
                         // They will be handled in the next iteration.
                         continue;
-                    } else if !fstring.is_raw_string() {
+                    } else if !ftstring.is_raw_string() {
                         if self.cursor.eat_char2('N', '{') {
                             in_named_unicode = true;
                             continue;
@@ -871,8 +887,8 @@ impl<'src> Lexer<'src> {
                         self.cursor.bump();
                     }
                 }
-                quote @ ('\'' | '"') if quote == fstring.quote_char() => {
-                    if let Some(triple_quotes) = fstring.triple_quotes() {
+                quote @ ('\'' | '"') if quote == ftstring.quote_char() => {
+                    if let Some(triple_quotes) = ftstring.triple_quotes() {
                         if self.cursor.rest().starts_with(triple_quotes) {
                             break;
                         }
@@ -923,172 +939,16 @@ impl<'src> Lexer<'src> {
             normalized
         };
 
-        self.current_value = TokenValue::FStringMiddle(value.into_boxed_str());
-
-        self.current_flags = fstring.flags();
-        Some(TokenKind::FStringMiddle)
-    }
-
-    /// Lex a t-string start token.
-    fn lex_tstring_start(&mut self, quote: char) -> TokenKind {
-        #[cfg(debug_assertions)]
-        debug_assert_eq!(self.cursor.previous(), quote);
-
-        if quote == '"' {
-            self.current_flags |= TokenFlags::DOUBLE_QUOTES;
-        }
-
-        if self.cursor.eat_char2(quote, quote) {
-            self.current_flags |= TokenFlags::TRIPLE_QUOTED_STRING;
-        }
-
-        self.ftstrings.push(FTStringContext::new(
-            FTStringKind::TString,
-            self.current_flags,
-            self.nesting,
-        ));
-
-        TokenKind::TStringStart
-    }
-
-    /// Lex a t-string middle or end token.
-    fn lex_tstring_middle_or_end(&mut self) -> Option<TokenKind> {
-        // SAFETY: Safe because the function is only called when `self.ftstrings` is not empty.
-        let tstring = self.ftstrings.current().unwrap();
-
-        assert!(matches!(tstring.kind(), FTStringKind::TString));
-
-        // Check if we're at the end of the t-string.
-        if tstring.is_triple_quoted() {
-            let quote_char = tstring.quote_char();
-            if self.cursor.eat_char3(quote_char, quote_char, quote_char) {
-                self.current_flags = tstring.flags();
-                return Some(TokenKind::TStringEnd);
-            }
-        } else if self.cursor.eat_char(tstring.quote_char()) {
-            self.current_flags = tstring.flags();
-            return Some(TokenKind::TStringEnd);
-        }
-
-        // We have to decode `{{` and `}}` into `{` and `}` respectively. As an
-        // optimization, we only allocate a new string if we find any escaped curly braces,
-        // otherwise this string will remain empty and we'll use a source slice instead.
-        let mut normalized = String::new();
-
-        // Tracks the last offset of token value that has been written to `normalized`.
-        let mut last_offset = self.offset();
-
-        // This isn't going to change for the duration of the loop.
-        let in_format_spec = tstring.is_in_format_spec(self.nesting);
-
-        let mut in_named_unicode = false;
-
-        loop {
-            match self.cursor.first() {
-                // The condition is to differentiate between the `NUL` (`\0`) character
-                // in the source code and the one returned by `self.cursor.first()` when
-                // we reach the end of the source code.
-                EOF_CHAR if self.cursor.is_eof() => {
-                    let error = if tstring.is_triple_quoted() {
-                        TStringErrorType::UnterminatedTripleQuotedString
-                    } else {
-                        TStringErrorType::UnterminatedString
-                    };
-                    self.ftstrings.pop();
-                    return Some(self.push_error(LexicalError::new(
-                        LexicalErrorType::TStringError(error),
-                        self.token_range(),
-                    )));
-                }
-                '\n' | '\r' if !tstring.is_triple_quoted() => {
-                    // If we encounter a newline while we're in a format spec, then
-                    // we stop here and let the lexer emit the newline token.
-                    //
-                    // Relevant discussion: https://github.com/python/cpython/issues/110259
-                    if in_format_spec {
-                        break;
-                    }
-                    self.ftstrings.pop();
-                    return Some(self.push_error(LexicalError::new(
-                        LexicalErrorType::TStringError(TStringErrorType::UnterminatedString),
-                        self.token_range(),
-                    )));
-                }
-                '\\' => {
-                    self.cursor.bump(); // '\'
-                    if matches!(self.cursor.first(), '{' | '}') {
-                        // Don't consume `{` or `}` as we want them to be emitted as tokens.
-                        // They will be handled in the next iteration.
-                        continue;
-                    } else if !tstring.is_raw_string() {
-                        if self.cursor.eat_char2('N', '{') {
-                            in_named_unicode = true;
-                            continue;
-                        }
-                    }
-                    // Consume the escaped character.
-                    if self.cursor.eat_char('\r') {
-                        self.cursor.eat_char('\n');
-                    } else {
-                        self.cursor.bump();
-                    }
-                }
-                quote @ ('\'' | '"') if quote == tstring.quote_char() => {
-                    if let Some(triple_quotes) = tstring.triple_quotes() {
-                        if self.cursor.rest().starts_with(triple_quotes) {
-                            break;
-                        }
-                        self.cursor.bump();
-                    } else {
-                        break;
-                    }
-                }
-                '{' => {
-                    if self.cursor.second() == '{' && !in_format_spec {
-                        self.cursor.bump();
-                        normalized
-                            .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
-                        self.cursor.bump(); // Skip the second `{`
-                        last_offset = self.offset();
-                    } else {
-                        break;
-                    }
-                }
-                '}' => {
-                    if in_named_unicode {
-                        in_named_unicode = false;
-                        self.cursor.bump();
-                    } else if self.cursor.second() == '}' && !in_format_spec {
-                        self.cursor.bump();
-                        normalized
-                            .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
-                        self.cursor.bump(); // Skip the second `}`
-                        last_offset = self.offset();
-                    } else {
-                        break;
-                    }
-                }
-                _ => {
-                    self.cursor.bump();
-                }
-            }
-        }
-        let range = self.token_range();
-        if range.is_empty() {
-            return None;
-        }
-
-        let value = if normalized.is_empty() {
-            self.source[range].to_string()
-        } else {
-            normalized.push_str(&self.source[TextRange::new(last_offset, self.offset())]);
-            normalized
+        self.current_value = match string_kind {
+            FTStringKind::FString => TokenValue::FStringMiddle(value.into_boxed_str()),
+            FTStringKind::TString => TokenValue::TStringMiddle(value.into_boxed_str()),
         };
 
-        self.current_value = TokenValue::TStringMiddle(value.into_boxed_str());
-
-        self.current_flags = tstring.flags();
-        Some(TokenKind::TStringMiddle)
+        self.current_flags = ftstring.flags();
+        match string_kind {
+            FTStringKind::FString => Some(TokenKind::FStringMiddle),
+            FTStringKind::TString => Some(TokenKind::TStringMiddle),
+        }
     }
 
     /// Lex a string literal.
@@ -2837,7 +2697,7 @@ t"{(lambda x:{x})}"
         assert_snapshot!(lex_jupyter_source(source));
     }
 
-    fn lex_fstring_error(source: &str) -> FStringErrorType {
+    fn lex_fstring_error(source: &str) -> FTStringErrorType {
         let output = lex(source, Mode::Module, TextSize::default());
         match output
             .errors
@@ -2853,7 +2713,7 @@ t"{(lambda x:{x})}"
 
     #[test]
     fn test_fstring_error() {
-        use FStringErrorType::{SingleRbrace, UnterminatedString, UnterminatedTripleQuotedString};
+        use FTStringErrorType::{SingleRbrace, UnterminatedString, UnterminatedTripleQuotedString};
 
         assert_eq!(lex_fstring_error("f'}'"), SingleRbrace);
         assert_eq!(lex_fstring_error("f'{{}'"), SingleRbrace);
@@ -2879,7 +2739,7 @@ t"{(lambda x:{x})}"
         );
     }
 
-    fn lex_tstring_error(source: &str) -> TStringErrorType {
+    fn lex_tstring_error(source: &str) -> FTStringErrorType {
         let output = lex(source, Mode::Module, TextSize::default());
         match output
             .errors
@@ -2895,7 +2755,7 @@ t"{(lambda x:{x})}"
 
     #[test]
     fn test_tstring_error() {
-        use TStringErrorType::{SingleRbrace, UnterminatedString, UnterminatedTripleQuotedString};
+        use FTStringErrorType::{SingleRbrace, UnterminatedString, UnterminatedTripleQuotedString};
 
         assert_eq!(lex_tstring_error("t'}'"), SingleRbrace);
         assert_eq!(lex_tstring_error("t'{{}'"), SingleRbrace);
