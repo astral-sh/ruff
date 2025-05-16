@@ -328,10 +328,10 @@ macro_rules! format {
 /// [`MostExpanded`]: crate::format_element::BestFittingVariants::most_expanded
 #[macro_export]
 macro_rules! best_fitting {
-    ($least_expanded:expr, $($tail:expr),+ $(,)?) => {{
+    ($least_expanded:expr, $($tail:expr),+ $(,)?) => {
         // OK because the macro syntax requires at least two variants.
         $crate::BestFitting::from_arguments_unchecked($crate::format_args!($least_expanded, $($tail),+))
-    }}
+    }
 }
 
 #[cfg(test)]

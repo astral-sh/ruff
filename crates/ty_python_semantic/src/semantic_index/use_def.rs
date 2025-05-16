@@ -604,15 +604,14 @@ impl<'db> ConstraintsIterator<'_, 'db> {
         if constraint_tys.is_empty() {
             base_ty
         } else {
-            let intersection_ty = constraint_tys
+            constraint_tys
                 .into_iter()
                 .rev()
                 .fold(
                     IntersectionBuilder::new(db).add_positive(base_ty),
                     IntersectionBuilder::add_positive,
                 )
-                .build();
-            intersection_ty
+                .build()
         }
     }
 }

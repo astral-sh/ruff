@@ -255,7 +255,7 @@ impl System for MdtestSystem {
         &self,
         pattern: &str,
     ) -> Result<
-        Box<dyn Iterator<Item = Result<SystemPathBuf, ruff_db::system::GlobError>>>,
+        Box<dyn Iterator<Item = Result<SystemPathBuf, ruff_db::system::GlobError>> + '_>,
         ruff_db::system::PatternError,
     > {
         self.as_system()

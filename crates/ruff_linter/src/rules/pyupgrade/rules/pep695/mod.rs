@@ -281,7 +281,7 @@ pub(crate) fn expr_name_to_type_var<'a>(
 
     match value.as_ref() {
         Expr::Subscript(ExprSubscript {
-            value: ref subscript_value,
+            value: subscript_value,
             ..
         }) => {
             if semantic.match_typing_expr(subscript_value, "TypeVar") {

@@ -236,7 +236,7 @@ impl MemoryFileSystem {
         &self,
         pattern: &str,
     ) -> std::result::Result<
-        impl Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>,
+        impl Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_,
         glob::PatternError,
     > {
         // Very naive implementation that iterates over all files and collects all that match the given pattern.

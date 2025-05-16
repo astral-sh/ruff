@@ -667,7 +667,7 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
 impl Drop for PythonFilesVisitor<'_, '_> {
     fn drop(&mut self) {
         let mut merged = self.global.merged.lock().unwrap();
-        let (ref mut files, ref mut error) = &mut *merged;
+        let (files, error) = &mut *merged;
 
         if files.is_empty() {
             *files = std::mem::take(&mut self.local_files);

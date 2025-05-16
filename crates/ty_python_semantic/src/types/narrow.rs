@@ -860,7 +860,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             }
             (BoolOp::Or, true) | (BoolOp::And, false) => {
                 let (first, rest) = sub_constraints.split_first_mut()?;
-                if let Some(ref mut first) = first {
+                if let Some(first) = first {
                     for rest_constraint in rest {
                         if let Some(rest_constraint) = rest_constraint {
                             merge_constraints_or(first, rest_constraint, self.db);

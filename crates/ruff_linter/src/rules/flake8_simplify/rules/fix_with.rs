@@ -55,7 +55,7 @@ pub(crate) fn fix_multiple_with_statements(
     let outer_with = match_with(statement)?;
 
     let With {
-        body: Suite::IndentedBlock(ref mut outer_body),
+        body: Suite::IndentedBlock(outer_body),
         ..
     } = outer_with
     else {

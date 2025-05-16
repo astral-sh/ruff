@@ -221,7 +221,7 @@ impl System for LSPSystem {
         &self,
         pattern: &str,
     ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
         PatternError,
     > {
         self.os_system.glob(pattern)

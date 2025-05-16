@@ -161,7 +161,7 @@ fn match_remove(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
         ..
     } = attr.as_attribute_expr()?;
 
-    let Expr::Name(ref set @ ast::ExprName { .. }) = receiver.as_ref() else {
+    let Expr::Name(set @ ast::ExprName { .. }) = receiver.as_ref() else {
         return None;
     };
 

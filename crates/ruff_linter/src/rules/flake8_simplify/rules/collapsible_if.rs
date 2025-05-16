@@ -345,7 +345,7 @@ pub(super) fn collapse_nested_if(
     let outer_if = match_if(statement)?;
 
     let libcst_native::If {
-        body: libcst_native::Suite::IndentedBlock(ref mut outer_body),
+        body: libcst_native::Suite::IndentedBlock(outer_body),
         orelse: None,
         ..
     } = outer_if

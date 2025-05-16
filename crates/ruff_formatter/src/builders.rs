@@ -2567,7 +2567,7 @@ impl<'a, Context> BestFitting<'a, Context> {
     /// # Panics
     ///
     /// When the slice contains less than two variants.
-    pub fn from_arguments_unchecked(variants: Arguments<'a, Context>) -> Self {
+    pub const fn from_arguments_unchecked(variants: Arguments<'a, Context>) -> Self {
         assert!(
             variants.0.len() >= 2,
             "Requires at least the least expanded and most expanded variants"
@@ -2575,7 +2575,7 @@ impl<'a, Context> BestFitting<'a, Context> {
 
         Self {
             variants,
-            mode: BestFittingMode::default(),
+            mode: BestFittingMode::FirstLine,
         }
     }
 

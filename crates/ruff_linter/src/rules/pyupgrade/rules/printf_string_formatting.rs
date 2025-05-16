@@ -303,7 +303,7 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
 /// [`Expr`] can be converted.
 fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
     for (.., format_part) in format_string.iter() {
-        let CFormatPart::Spec(ref fmt) = format_part else {
+        let CFormatPart::Spec(fmt) = format_part else {
             continue;
         };
 
@@ -391,7 +391,7 @@ pub(crate) fn printf_string_formatting(
 
         // Count the number of positional and keyword arguments.
         for (.., format_part) in format_string.iter() {
-            let CFormatPart::Spec(ref fmt) = format_part else {
+            let CFormatPart::Spec(fmt) = format_part else {
                 continue;
             };
             if fmt.mapping_key.is_none() {

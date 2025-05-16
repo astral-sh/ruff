@@ -673,7 +673,7 @@ impl System for WasmSystem {
     fn glob(
         &self,
         pattern: &str,
-    ) -> Result<Box<dyn Iterator<Item = Result<SystemPathBuf, GlobError>>>, PatternError> {
+    ) -> Result<Box<dyn Iterator<Item = Result<SystemPathBuf, GlobError>> + '_>, PatternError> {
         Ok(Box::new(self.fs.glob(pattern)?))
     }
 

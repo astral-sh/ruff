@@ -409,7 +409,7 @@ impl Project {
     pub fn files(self, db: &dyn Db) -> Indexed<'_> {
         let files = self.file_set(db);
 
-        let indexed = match files.get() {
+        match files.get() {
             Index::Lazy(vacant) => {
                 let _entered =
                     tracing::debug_span!("Project::index_files", project = %self.name(db))
@@ -422,9 +422,7 @@ impl Project {
                 vacant.set(files, diagnostics)
             }
             Index::Indexed(indexed) => indexed,
-        };
-
-        indexed
+        }
     }
 
     pub fn reload_files(self, db: &mut dyn Db) {

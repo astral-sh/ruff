@@ -4349,7 +4349,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 } = expression;
                                 let ty = self.infer_expression(expression);
 
-                                if let Some(ref format_spec) = format_spec {
+                                if let Some(format_spec) = format_spec {
                                     for element in format_spec.elements.expressions() {
                                         self.infer_expression(&element.expression);
                                     }
@@ -7187,14 +7187,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let literal_value = literal_ty.value(self.db());
 
                 let chars: Vec<_> = literal_value.chars().collect();
-                let result = if let Ok(new_chars) = chars.py_slice(start, stop, step) {
+
+                if let Ok(new_chars) = chars.py_slice(start, stop, step) {
                     let literal: String = new_chars.collect();
                     Type::string_literal(self.db(), &literal)
                 } else {
                     report_slice_step_size_zero(&self.context, value_node.into());
                     Type::unknown()
-                };
-                result
+                }
             }
             // Ex) Given `b"value"[1]`, return `b"a"`
             (Type::BytesLiteral(literal_ty), Type::IntLiteral(int), _)
@@ -8488,8 +8488,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 _ => {
                     // NB: This calls `infer_expression` instead of `infer_type_expression`.
-                    let argument_type = self.infer_expression(arguments_slice);
-                    argument_type
+
+                    self.infer_expression(arguments_slice)
                 }
             },
             KnownInstanceType::CallableTypeOf => match arguments_slice {
@@ -8737,7 +8737,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | ast::Expr::BytesLiteral(_)
             | ast::Expr::BooleanLiteral(_)
             | ast::Expr::NoneLiteral(_)) => self.infer_expression(literal),
-            literal @ ast::Expr::NumberLiteral(ref number) if number.value.is_int() => {
+            literal @ ast::Expr::NumberLiteral(number) if number.value.is_int() => {
                 self.infer_expression(literal)
             }
             // For enum values
@@ -8751,7 +8751,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .unwrap_or(Type::unknown())
             }
             // for negative and positive numbers
-            ast::Expr::UnaryOp(ref u)
+            ast::Expr::UnaryOp(u)
                 if matches!(u.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
                     && u.operand.is_number_literal_expr() =>
             {

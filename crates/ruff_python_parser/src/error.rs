@@ -192,7 +192,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::ExpectedToken { found, expected } => {
                 write!(f, "Expected {expected}, found {found}",)
             }
-            ParseErrorType::Lexical(ref lex_error) => write!(f, "{lex_error}"),
+            ParseErrorType::Lexical(lex_error) => write!(f, "{lex_error}"),
             ParseErrorType::SimpleStatementsOnSameLine => {
                 f.write_str("Simple statements must be separated by newlines or semicolons")
             }
@@ -289,7 +289,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::UnexpectedIpythonEscapeCommand => {
                 f.write_str("IPython escape commands are only allowed in `Mode::Ipython`")
             }
-            ParseErrorType::FStringError(ref fstring_error) => {
+            ParseErrorType::FStringError(fstring_error) => {
                 write!(f, "f-string: {fstring_error}")
             }
             ParseErrorType::UnexpectedExpressionToken => {

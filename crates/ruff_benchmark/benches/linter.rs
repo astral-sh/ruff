@@ -45,8 +45,8 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
         target_arch = "powerpc64"
     )
 ))]
+#[unsafe(export_name = "_rjem_malloc_conf")]
 #[expect(non_upper_case_globals)]
-#[export_name = "_rjem_malloc_conf"]
 #[expect(unsafe_code)]
 pub static _rjem_malloc_conf: &[u8] = b"dirty_decay_ms:-1,muzzy_decay_ms:-1\0";
 
