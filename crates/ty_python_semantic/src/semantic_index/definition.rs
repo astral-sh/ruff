@@ -5,11 +5,11 @@ use ruff_db::parsed::ParsedModule;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
 use crate::unpack::{Unpack, UnpackPosition};
-use crate::Db;
 
 /// A definition of a symbol.
 ///

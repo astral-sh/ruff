@@ -1,8 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::{
-    is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility,
+    Visibility, is_call, is_init, is_magic, is_new, is_overload, is_override,
 };
 use ruff_python_semantic::{Definition, Member, MemberKind, Module, ModuleKind};
 use ruff_text_size::TextRange;

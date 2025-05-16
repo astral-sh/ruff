@@ -8,14 +8,14 @@ use ruff_db::{
 };
 use ruff_text_size::{Ranged, TextRange};
 
-use super::{binding_type, Type, TypeCheckDiagnostics};
+use super::{Type, TypeCheckDiagnostics, binding_type};
 
 use crate::lint::LintSource;
 use crate::semantic_index::symbol::ScopeId;
 use crate::{
+    Db,
     lint::{LintId, LintMetadata},
     suppression::suppressions,
-    Db,
 };
 use crate::{semantic_index::semantic_index, types::FunctionDecorators};
 
@@ -48,7 +48,9 @@ impl<'db> InferContext<'db> {
             file: scope.file(db),
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
             no_type_check: InNoTypeCheck::default(),
-            bomb: DebugDropBomb::new("`InferContext` needs to be explicitly consumed by calling `::finish` to prevent accidental loss of diagnostics."),
+            bomb: DebugDropBomb::new(
+                "`InferContext` needs to be explicitly consumed by calling `::finish` to prevent accidental loss of diagnostics.",
+            ),
         }
     }
 

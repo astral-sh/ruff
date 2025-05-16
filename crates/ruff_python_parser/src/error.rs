@@ -864,7 +864,9 @@ impl Display for UnsupportedSyntaxError {
             ) => "Cannot use unparenthesized assignment expression as an element in a set literal",
             UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
                 UnparenthesizedNamedExprKind::SetComprehension,
-            ) => "Cannot use unparenthesized assignment expression as an element in a set comprehension",
+            ) => {
+                "Cannot use unparenthesized assignment expression as an element in a set comprehension"
+            }
             UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
                 "Cannot use parenthesized keyword argument name"
             }
@@ -894,7 +896,7 @@ impl Display for UnsupportedSyntaxError {
                         self.target_version,
                         changed = self.kind.changed_version(),
                     ),
-                }
+                };
             }
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 "Cannot use positional-only parameter separator"

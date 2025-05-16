@@ -3,17 +3,17 @@ use std::fmt;
 use bitflags::bitflags;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, StringLike};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::preview::is_unicode_to_unicode_confusables_enabled;
 use crate::registry::AsRule;
-use crate::rules::ruff::rules::confusables::confusable;
 use crate::rules::ruff::rules::Context;
+use crate::rules::ruff::rules::confusables::confusable;
 use crate::settings::LinterSettings;
-use crate::Locator;
 
 /// ## What it does
 /// Checks for ambiguous Unicode characters in strings.

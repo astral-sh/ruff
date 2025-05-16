@@ -1,7 +1,7 @@
 //! Test helpers for working with Salsa databases
 
-use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::layer::SubscriberExt;
 
 pub fn assert_function_query_was_not_run<Db, Q, QDb, I, R>(
     db: &Db,

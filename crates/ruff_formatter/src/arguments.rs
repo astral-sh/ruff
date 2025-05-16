@@ -98,7 +98,7 @@ impl<'fmt, Context> From<&'fmt Argument<'fmt, Context>> for Arguments<'fmt, Cont
 mod tests {
     use crate::format_element::tag::Tag;
     use crate::prelude::*;
-    use crate::{format_args, write, FormatState, VecBuffer};
+    use crate::{FormatState, VecBuffer, format_args, write};
 
     #[test]
     fn test_nesting() {

@@ -8,24 +8,24 @@ use wasm_bindgen::prelude::*;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{FormatResult, Formatted, IndentStyle};
+use ruff_linter::Locator;
 use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::linter::check_path;
 use ruff_linter::registry::AsRule;
-use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
+use ruff_linter::settings::{DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, flags};
 use ruff_linter::source_kind::SourceKind;
-use ruff_linter::Locator;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
-use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
+use ruff_python_formatter::{PyFormatContext, QuoteStyle, format_module_ast, pretty_comments};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{parse, parse_unchecked, Mode, ParseOptions, Parsed};
+use ruff_python_parser::{Mode, ParseOptions, Parsed, parse, parse_unchecked};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{LineColumn, OneIndexed};
 use ruff_text_size::Ranged;
+use ruff_workspace::Settings;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::options::{FormatOptions, LintCommonOptions, LintOptions, Options};
-use ruff_workspace::Settings;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"

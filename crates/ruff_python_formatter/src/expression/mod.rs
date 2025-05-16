@@ -2,21 +2,21 @@ use std::cmp::Ordering;
 use std::slice;
 
 use ruff_formatter::{
-    write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
+    FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions, write,
 };
 use ruff_python_ast::parenthesize::parentheses_iterator;
-use ruff_python_ast::visitor::source_order::{walk_expr, SourceOrderVisitor};
+use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, walk_expr};
 use ruff_python_ast::{self as ast};
 use ruff_python_ast::{AnyNodeRef, Expr, ExprRef, Operator};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
-use crate::comments::{leading_comments, trailing_comments, LeadingDanglingTrailingComments};
+use crate::comments::{LeadingDanglingTrailingComments, leading_comments, trailing_comments};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
-    is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
-    OptionalParentheses, Parentheses, Parenthesize,
+    NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize, is_expression_parenthesized,
+    optional_parentheses, parenthesized,
 };
 use crate::prelude::*;
 use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
@@ -391,7 +391,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                         .fmt(f)
                 } else {
                     expression.format().with_options(Parentheses::Never).fmt(f)
-                }
+                };
             }
             needs_parentheses => needs_parentheses,
         };

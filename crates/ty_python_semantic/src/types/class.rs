@@ -2,12 +2,12 @@ use std::hash::BuildHasherDefault;
 use std::sync::{LazyLock, Mutex};
 
 use super::{
-    class_base::ClassBase, infer_expression_type, infer_unpack_types, IntersectionBuilder,
-    KnownFunction, MemberLookupPolicy, Mro, MroError, MroIterator, SubclassOfType, Truthiness,
-    Type, TypeQualifiers,
+    IntersectionBuilder, KnownFunction, MemberLookupPolicy, Mro, MroError, MroIterator,
+    SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase, infer_expression_type,
+    infer_unpack_types,
 };
-use crate::semantic_index::definition::Definition;
 use crate::semantic_index::DeclarationWithConstraint;
+use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, Specialization, TypeMapping};
 use crate::types::signatures::{Parameter, Parameters};
 use crate::types::{
@@ -15,6 +15,7 @@ use crate::types::{
     TypeVarInstance,
 };
 use crate::{
+    Db, FxOrderSet, KnownModule, Program,
     module_resolver::file_to_module,
     semantic_index::{
         ast_ids::HasScopedExpressionId,
@@ -25,14 +26,13 @@ use crate::{
         symbol_table, use_def_map,
     },
     symbol::{
-        class_symbol, known_module_symbol, symbol_from_bindings, symbol_from_declarations,
-        Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
+        Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers, class_symbol,
+        known_module_symbol, symbol_from_bindings, symbol_from_declarations,
     },
     types::{
-        definition_expression_type, CallArgumentTypes, CallError, CallErrorKind, DynamicType,
-        MetaclassCandidate, TupleType, UnionBuilder, UnionType,
+        CallArgumentTypes, CallError, CallErrorKind, DynamicType, MetaclassCandidate, TupleType,
+        UnionBuilder, UnionType, definition_expression_type,
     },
-    Db, FxOrderSet, KnownModule, Program,
 };
 use indexmap::IndexSet;
 use itertools::Itertools as _;
@@ -1562,7 +1562,9 @@ impl<'db> ClassLiteral<'db> {
                             Truthiness::Ambiguous => {
                                 return Symbol::possibly_unbound(annotation_ty);
                             }
-                            Truthiness::AlwaysFalse => unreachable!("If the attribute assignments are all invisible, inference of their types should be skipped"),
+                            Truthiness::AlwaysFalse => unreachable!(
+                                "If the attribute assignments are all invisible, inference of their types should be skipped"
+                            ),
                         }
                     }
                     DefinitionKind::Assignment(assign) => {
@@ -2760,7 +2762,7 @@ impl<'db> KnownClassLookupError<'db> {
                         f,
                         "Error looking up `{class}` in typeshed on Python {python_version}: \
                         expected to find a fully bound symbol, but found one that is possibly unbound",
-                    )
+                    ),
                 }
             }
         }

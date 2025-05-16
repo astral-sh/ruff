@@ -7,8 +7,8 @@ use filetime::FileTime;
 use rustc_hash::FxHashMap;
 
 use crate::system::{
-    file_time_now, walk_directory, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata,
-    Result, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
+    DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, SystemPath,
+    SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, file_time_now, walk_directory,
 };
 
 use super::walk_directory::{
@@ -701,8 +701,8 @@ mod tests {
 
     use std::time::Duration;
 
-    use crate::system::walk_directory::tests::DirectoryEntryToString;
     use crate::system::walk_directory::WalkState;
+    use crate::system::walk_directory::tests::DirectoryEntryToString;
     use crate::system::{
         DirectoryEntry, FileType, MemoryFileSystem, Result, SystemPath, SystemPathBuf,
         SystemVirtualPath,

@@ -15,7 +15,7 @@ use ruff_python_stdlib::typing::{
     is_typed_dict, is_typed_dict_member,
 };
 use ruff_text_size::Ranged;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 
 use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
@@ -1161,7 +1161,7 @@ pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) ->
             Some(Stmt::Assign(ast::StmtAssign { value, targets, .. })) => {
                 return targets
                     .iter()
-                    .find_map(|target| match_value(binding, target, value))
+                    .find_map(|target| match_value(binding, target, value));
             }
             Some(Stmt::AnnAssign(ast::StmtAnnAssign {
                 value: Some(value),

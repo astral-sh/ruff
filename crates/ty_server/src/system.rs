@@ -13,8 +13,8 @@ use ruff_db::system::{
 use ruff_notebook::{Notebook, NotebookError};
 use ty_python_semantic::Db;
 
-use crate::session::index::Index;
 use crate::DocumentQuery;
+use crate::session::index::Index;
 
 /// Converts the given [`Url`] to an [`AnySystemPath`].
 ///

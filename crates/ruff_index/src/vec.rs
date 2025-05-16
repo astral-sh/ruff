@@ -1,5 +1,5 @@
-use crate::slice::IndexSlice;
 use crate::Idx;
+use crate::slice::IndexSlice;
 use std::borrow::{Borrow, BorrowMut};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;

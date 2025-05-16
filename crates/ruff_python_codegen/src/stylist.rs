@@ -5,7 +5,7 @@ use std::ops::Deref;
 
 use ruff_python_ast::str::Quote;
 use ruff_python_parser::{Token, TokenKind, Tokens};
-use ruff_source_file::{find_newline, LineEnding, LineRanges};
+use ruff_source_file::{LineEnding, LineRanges, find_newline};
 use ruff_text_size::Ranged;
 
 #[derive(Debug, Clone)]
@@ -49,7 +49,7 @@ fn detect_quote(tokens: &[Token]) -> Quote {
     for token in tokens {
         match token.kind() {
             TokenKind::String if !token.is_triple_quoted_string() => {
-                return token.string_quote_style()
+                return token.string_quote_style();
             }
             TokenKind::FStringStart => return token.string_quote_style(),
             _ => continue,
@@ -148,8 +148,8 @@ impl Deref for Indentation {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_parser::{parse_module, parse_unchecked, Mode, ParseOptions};
-    use ruff_source_file::{find_newline, LineEnding};
+    use ruff_python_parser::{Mode, ParseOptions, parse_module, parse_unchecked};
+    use ruff_source_file::{LineEnding, find_newline};
 
     use super::{Indentation, Quote, Stylist};
 

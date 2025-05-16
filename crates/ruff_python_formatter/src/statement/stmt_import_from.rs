@@ -2,7 +2,7 @@ use ruff_formatter::write;
 use ruff_python_ast::StmtImportFrom;
 use ruff_text_size::Ranged;
 
-use crate::builders::{parenthesize_if_expands, PyFormatterExtensions, TrailingComma};
+use crate::builders::{PyFormatterExtensions, TrailingComma, parenthesize_if_expands};
 use crate::comments::SourceComment;
 use crate::expression::parentheses::parenthesized;
 use crate::has_skip_comment;

@@ -25,9 +25,9 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
 
+use crate::Locator;
 use crate::logging::DisplayParseErrorType;
 use crate::registry::{AsRule, Rule};
-use crate::Locator;
 
 mod azure;
 mod diff;
@@ -385,12 +385,12 @@ mod tests {
 
     use ruff_diagnostics::{Edit, Fix};
     use ruff_notebook::NotebookIndex;
-    use ruff_python_parser::{parse_unchecked, Mode, ParseOptions};
+    use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
     use ruff_source_file::{OneIndexed, SourceFileBuilder};
     use ruff_text_size::{TextRange, TextSize};
 
-    use crate::message::{DiagnosticMessage, Emitter, EmitterContext, Message};
     use crate::Locator;
+    use crate::message::{DiagnosticMessage, Emitter, EmitterContext, Message};
 
     pub(super) fn create_syntax_error_messages() -> Vec<Message> {
         let source = r"from os import

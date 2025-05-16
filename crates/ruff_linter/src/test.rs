@@ -20,16 +20,16 @@ use ruff_python_parser::{ParseError, ParseOptions};
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::SourceFileBuilder;
 
-use crate::fix::{fix_file, FixResult};
+use crate::fix::{FixResult, fix_file};
 use crate::linter::check_path;
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
 use crate::settings::types::UnsafeFixes;
-use crate::settings::{flags, LinterSettings};
+use crate::settings::{LinterSettings, flags};
 use crate::source_kind::SourceKind;
-use crate::{directives, Locator};
+use crate::{Locator, directives};
 
 #[cfg(not(fuzzing))]
 pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {

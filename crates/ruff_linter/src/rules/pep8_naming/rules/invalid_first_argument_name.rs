@@ -1,11 +1,11 @@
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Fix, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
 use ruff_python_codegen::Stylist;
-use ruff_python_semantic::analyze::class::{is_metaclass, IsMetaclass};
+use ruff_python_semantic::analyze::class::{IsMetaclass, is_metaclass};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_stdlib::open_mode::OpenMode;

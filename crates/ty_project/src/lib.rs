@@ -7,12 +7,12 @@ use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
 use ruff_db::diagnostic::{
-    create_parse_diagnostic, create_unsupported_syntax_diagnostic, Annotation, Diagnostic,
-    DiagnosticId, Severity, Span, SubDiagnostic,
+    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, create_parse_diagnostic,
+    create_unsupported_syntax_diagnostic,
 };
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_db::source::{source_text, SourceTextError};
+use ruff_db::source::{SourceTextError, source_text};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use salsa::Durability;
@@ -660,13 +660,13 @@ where
 #[cfg(test)]
 mod tests {
     use crate::db::tests::TestDb;
-    use crate::{check_file_impl, ProjectMetadata};
+    use crate::{ProjectMetadata, check_file_impl};
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
-    use ruff_python_ast::name::Name;
     use ruff_python_ast::PythonVersion;
+    use ruff_python_ast::name::Name;
     use ty_python_semantic::types::check_types;
     use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, SearchPathSettings};
 

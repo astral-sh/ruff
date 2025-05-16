@@ -37,7 +37,7 @@ use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::visitor::{walk_expr, Visitor};
+use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -58,40 +58,39 @@ use crate::semantic_index::narrowing_constraints::ConstraintKey;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind, ScopedSymbolId,
 };
-use crate::semantic_index::{semantic_index, EagerSnapshotResult, SemanticIndex};
+use crate::semantic_index::{EagerSnapshotResult, SemanticIndex, semantic_index};
 use crate::symbol::{
-    builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, symbol,
-    symbol_from_bindings, symbol_from_declarations, typing_extensions_symbol, Boundness,
-    LookupError,
+    Boundness, LookupError, builtins_module_scope, builtins_symbol, explicit_global_symbol,
+    global_symbol, module_type_implicit_global_declaration, module_type_implicit_global_symbol,
+    symbol, symbol_from_bindings, symbol_from_declarations, typing_extensions_symbol,
 };
 use crate::types::call::{Argument, Bindings, CallArgumentTypes, CallArguments, CallError};
 use crate::types::class::{MetaclassErrorKind, SliceLiteral};
 use crate::types::diagnostic::{
-    self, report_implicit_return_type, report_invalid_arguments_to_annotated,
-    report_invalid_arguments_to_callable, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
-    report_invalid_return_type, report_possibly_unbound_attribute, TypeCheckDiagnostics,
-    CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS,
+    self, CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS,
     CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, INCONSISTENT_MRO,
     INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
     INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
     INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
-    UNSUPPORTED_OPERATOR,
+    POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR, report_implicit_return_type,
+    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_generator_function_return_type, report_invalid_return_type,
+    report_possibly_unbound_attribute,
 };
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    binding_type, todo_type, CallDunderError, CallableSignature, CallableType, ClassLiteral,
-    ClassType, DataclassParams, DynamicType, FunctionDecorators, FunctionType, GenericAlias,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
-    MemberLookupPolicy, MetaclassCandidate, Parameter, ParameterForm, Parameters, Signature,
-    Signatures, StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness,
-    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder,
-    UnionType,
+    CallDunderError, CallableSignature, CallableType, ClassLiteral, ClassType, DataclassParams,
+    DynamicType, FunctionDecorators, FunctionType, GenericAlias, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownFunction, KnownInstanceType, MemberLookupPolicy,
+    MetaclassCandidate, Parameter, ParameterForm, Parameters, Signature, Signatures,
+    StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type,
+    TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
+    todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -99,19 +98,19 @@ use crate::{Db, FxOrderSet};
 
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
-    report_attempted_protocol_instantiation, report_bad_argument_to_get_protocol_members,
-    report_duplicate_bases, report_index_out_of_bounds, report_invalid_exception_caught,
-    report_invalid_exception_cause, report_invalid_exception_raised,
-    report_invalid_type_checking_constant, report_non_subscriptable,
-    report_possibly_unresolved_reference,
+    INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
+    SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE, report_attempted_protocol_instantiation,
+    report_bad_argument_to_get_protocol_members, report_duplicate_bases,
+    report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
+    report_invalid_exception_raised, report_invalid_type_checking_constant,
+    report_non_subscriptable, report_possibly_unresolved_reference,
     report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
-    report_unresolved_reference, INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL,
-    REDUNDANT_CAST, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
+    report_unresolved_reference,
 };
 use super::generics::{GenericContextOrigin, LegacyGenericBase};
 use super::slots::check_class_slots;
 use super::string_annotation::{
-    parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
+    BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION, parse_string_annotation,
 };
 use super::subclass_of::SubclassOfInner;
 use super::{BoundSuperError, BoundSuperType, ClassBase};
@@ -1422,10 +1421,12 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn add_binding(&mut self, node: AnyNodeRef, binding: Definition<'db>, ty: Type<'db>) {
-        debug_assert!(binding
-            .kind(self.db())
-            .category(self.context.in_stub())
-            .is_binding());
+        debug_assert!(
+            binding
+                .kind(self.db())
+                .category(self.context.in_stub())
+                .is_binding()
+        );
 
         let file_scope_id = binding.file_scope(self.db());
         let symbol_table = self.index.symbol_table(file_scope_id);
@@ -1508,10 +1509,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         declaration: Definition<'db>,
         ty: TypeAndQualifiers<'db>,
     ) {
-        debug_assert!(declaration
-            .kind(self.db())
-            .category(self.context.in_stub())
-            .is_declaration());
+        debug_assert!(
+            declaration
+                .kind(self.db())
+                .category(self.context.in_stub())
+                .is_declaration()
+        );
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
@@ -1556,14 +1559,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
         declared_and_inferred_ty: &DeclaredAndInferredType<'db>,
     ) {
-        debug_assert!(definition
-            .kind(self.db())
-            .category(self.context.in_stub())
-            .is_binding());
-        debug_assert!(definition
-            .kind(self.db())
-            .category(self.context.in_stub())
-            .is_declaration());
+        debug_assert!(
+            definition
+                .kind(self.db())
+                .category(self.context.in_stub())
+                .is_binding()
+        );
+        debug_assert!(
+            definition
+                .kind(self.db())
+                .category(self.context.in_stub())
+                .is_declaration()
+        );
 
         let (declared_ty, inferred_ty) = match *declared_and_inferred_ty {
             DeclaredAndInferredType::AreTheSame(ty) => (ty.into(), ty),
@@ -1764,12 +1771,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         if let Some(returns) = function.returns.as_deref() {
             fn is_stub_suite(suite: &[ast::Stmt]) -> bool {
                 match suite {
-                    [ast::Stmt::Expr(ast::StmtExpr { value: first, .. }), ast::Stmt::Expr(ast::StmtExpr { value: second, .. }), ..] => {
-                        first.is_string_literal_expr() && second.is_ellipsis_literal_expr()
-                    }
-                    [ast::Stmt::Expr(ast::StmtExpr { value, .. }), ast::Stmt::Pass(_), ..] => {
-                        value.is_string_literal_expr()
-                    }
+                    [
+                        ast::Stmt::Expr(ast::StmtExpr { value: first, .. }),
+                        ast::Stmt::Expr(ast::StmtExpr { value: second, .. }),
+                        ..,
+                    ] => first.is_string_literal_expr() && second.is_ellipsis_literal_expr(),
+                    [
+                        ast::Stmt::Expr(ast::StmtExpr { value, .. }),
+                        ast::Stmt::Pass(_),
+                        ..,
+                    ] => value.is_string_literal_expr(),
                     [ast::Stmt::Expr(ast::StmtExpr { value, .. }), ..] => {
                         value.is_ellipsis_literal_expr() || value.is_string_literal_expr()
                     }
@@ -5206,8 +5217,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             continue;
                                         };
 
-                                        let [Some(name_param), constraints, bound, default, contravariant, covariant, _infer_variance] =
-                                            overload.parameter_types()
+                                        let [
+                                            Some(name_param),
+                                            constraints,
+                                            bound,
+                                            default,
+                                            contravariant,
+                                            covariant,
+                                            _infer_variance,
+                                        ] = overload.parameter_types()
                                         else {
                                             continue;
                                         };
@@ -6278,11 +6296,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
 
                 if is_last {
-                    if done {
-                        Type::Never
-                    } else {
-                        ty
-                    }
+                    if done { Type::Never } else { ty }
                 } else {
                     let truthiness = ty.try_bool(self.db()).unwrap_or_else(|err| {
                         err.report_diagnostic(&self.context, range);
@@ -9027,14 +9041,14 @@ fn contains_string_literal(expr: &ast::Expr) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::tests::{setup_db, TestDb};
+    use crate::db::tests::{TestDb, setup_db};
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::symbol::global_symbol;
     use crate::types::check_types;
     use ruff_db::diagnostic::Diagnostic;
-    use ruff_db::files::{system_path_to_file, File};
+    use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 

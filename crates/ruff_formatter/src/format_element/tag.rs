@@ -370,7 +370,10 @@ impl PartialEq for LabelId {
         #[cfg(debug_assertions)]
         {
             if is_equal {
-                assert_eq!(self.name, other.name, "Two `LabelId`s with different names have the same `value`. Are you mixing labels of two different `LabelDefinition` or are the values returned by the `LabelDefinition` not unique?");
+                assert_eq!(
+                    self.name, other.name,
+                    "Two `LabelId`s with different names have the same `value`. Are you mixing labels of two different `LabelDefinition` or are the values returned by the `LabelDefinition` not unique?"
+                );
             }
         }
 

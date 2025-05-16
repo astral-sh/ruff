@@ -10,12 +10,12 @@ use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Locator;
 use crate::fs::relativize_path;
 use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::settings::types::UnsafeFixes;
-use crate::Locator;
 
 bitflags! {
     #[derive(Default)]
@@ -407,11 +407,11 @@ impl<'a> SourceCode<'a> {
 mod tests {
     use insta::assert_snapshot;
 
+    use crate::message::TextEmitter;
     use crate::message::tests::{
         capture_emitter_notebook_output, capture_emitter_output, create_messages,
         create_notebook_messages, create_syntax_error_messages,
     };
-    use crate::message::TextEmitter;
     use crate::settings::types::UnsafeFixes;
 
     #[test]

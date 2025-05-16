@@ -3,7 +3,7 @@
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
 use itertools::Either;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -1047,21 +1047,45 @@ fn suspicious_function(
         ["marshal", "load" | "loads"] => Diagnostic::new(SuspiciousMarshalUsage, range),
 
         // InsecureHash
-        ["Crypto" | "Cryptodome", "Hash", "SHA" | "MD2" | "MD3" | "MD4" | "MD5", "new"]
-        | ["cryptography", "hazmat", "primitives", "hashes", "SHA1" | "MD5"] => {
-            Diagnostic::new(SuspiciousInsecureHashUsage, range)
-        }
+        [
+            "Crypto" | "Cryptodome",
+            "Hash",
+            "SHA" | "MD2" | "MD3" | "MD4" | "MD5",
+            "new",
+        ]
+        | [
+            "cryptography",
+            "hazmat",
+            "primitives",
+            "hashes",
+            "SHA1" | "MD5",
+        ] => Diagnostic::new(SuspiciousInsecureHashUsage, range),
 
         // InsecureCipher
-        ["Crypto" | "Cryptodome", "Cipher", "ARC2" | "Blowfish" | "DES" | "XOR", "new"]
-        | ["cryptography", "hazmat", "primitives", "ciphers", "algorithms", "ARC4" | "Blowfish" | "IDEA"] => {
-            Diagnostic::new(SuspiciousInsecureCipherUsage, range)
-        }
+        [
+            "Crypto" | "Cryptodome",
+            "Cipher",
+            "ARC2" | "Blowfish" | "DES" | "XOR",
+            "new",
+        ]
+        | [
+            "cryptography",
+            "hazmat",
+            "primitives",
+            "ciphers",
+            "algorithms",
+            "ARC4" | "Blowfish" | "IDEA",
+        ] => Diagnostic::new(SuspiciousInsecureCipherUsage, range),
 
         // InsecureCipherMode
-        ["cryptography", "hazmat", "primitives", "ciphers", "modes", "ECB"] => {
-            Diagnostic::new(SuspiciousInsecureCipherModeUsage, range)
-        }
+        [
+            "cryptography",
+            "hazmat",
+            "primitives",
+            "ciphers",
+            "modes",
+            "ECB",
+        ] => Diagnostic::new(SuspiciousInsecureCipherModeUsage, range),
 
         // Mktemp
         ["tempfile", "mktemp"] => Diagnostic::new(SuspiciousMktempUsage, range),
@@ -1105,7 +1129,13 @@ fn suspicious_function(
 
         // URLOpen (`urlopen`, `urlretrieve`)
         ["urllib", "request", "urlopen" | "urlretrieve"]
-        | ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve"] => {
+        | [
+            "six",
+            "moves",
+            "urllib",
+            "request",
+            "urlopen" | "urlretrieve",
+        ] => {
             if let Some(arguments) = arguments {
                 if arguments.args.iter().all(|arg| !arg.is_starred_expr())
                     && arguments
@@ -1151,15 +1181,20 @@ fn suspicious_function(
 
         // URLOpen (`URLopener`, `FancyURLopener`)
         ["urllib", "request", "URLopener" | "FancyURLopener"]
-        | ["six", "moves", "urllib", "request", "URLopener" | "FancyURLopener"] => {
-            Diagnostic::new(SuspiciousURLOpenUsage, range)
-        }
+        | [
+            "six",
+            "moves",
+            "urllib",
+            "request",
+            "URLopener" | "FancyURLopener",
+        ] => Diagnostic::new(SuspiciousURLOpenUsage, range),
 
         // NonCryptographicRandom
-        ["random", "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform"
-        | "triangular" | "randbytes"] => {
-            Diagnostic::new(SuspiciousNonCryptographicRandomUsage, range)
-        }
+        [
+            "random",
+            "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform"
+            | "triangular" | "randbytes",
+        ] => Diagnostic::new(SuspiciousNonCryptographicRandomUsage, range),
 
         // UnverifiedContext
         ["ssl", "_create_unverified_context"] => {
@@ -1167,14 +1202,20 @@ fn suspicious_function(
         }
 
         // XMLCElementTree
-        ["xml", "etree", "cElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => {
-            Diagnostic::new(SuspiciousXMLCElementTreeUsage, range)
-        }
+        [
+            "xml",
+            "etree",
+            "cElementTree",
+            "parse" | "iterparse" | "fromstring" | "XMLParser",
+        ] => Diagnostic::new(SuspiciousXMLCElementTreeUsage, range),
 
         // XMLElementTree
-        ["xml", "etree", "ElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => {
-            Diagnostic::new(SuspiciousXMLElementTreeUsage, range)
-        }
+        [
+            "xml",
+            "etree",
+            "ElementTree",
+            "parse" | "iterparse" | "fromstring" | "XMLParser",
+        ] => Diagnostic::new(SuspiciousXMLElementTreeUsage, range),
 
         // XMLExpatReader
         ["xml", "sax", "expatreader", "create_parser"] => {
@@ -1202,8 +1243,12 @@ fn suspicious_function(
         }
 
         // XMLETree
-        ["lxml", "etree", "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser"
-        | "check_docinfo"] => Diagnostic::new(SuspiciousXMLETreeUsage, range),
+        [
+            "lxml",
+            "etree",
+            "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser"
+            | "check_docinfo",
+        ] => Diagnostic::new(SuspiciousXMLETreeUsage, range),
 
         // Telnet
         ["telnetlib", ..] => Diagnostic::new(SuspiciousTelnetUsage, range),

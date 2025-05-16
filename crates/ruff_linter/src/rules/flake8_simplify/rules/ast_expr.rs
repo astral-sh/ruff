@@ -1,11 +1,11 @@
-use ruff_python_ast::{self as ast, str_prefix::StringLiteralPrefix, Arguments, Expr};
+use ruff_python_ast::{self as ast, Arguments, Expr, str_prefix::StringLiteralPrefix};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_semantic::analyze::typing::is_dict;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
+use ruff_python_semantic::analyze::typing::is_dict;
 
 use crate::checkers::ast::Checker;
 

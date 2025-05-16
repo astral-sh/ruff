@@ -19,8 +19,8 @@ use walk_directory::WalkDirectoryBuilder;
 use crate::file_revision::FileRevision;
 
 pub use self::path::{
-    deduplicate_nested_paths, DeduplicatedNestedPathsIter, SystemPath, SystemPathBuf,
-    SystemVirtualPath, SystemVirtualPathBuf,
+    DeduplicatedNestedPathsIter, SystemPath, SystemPathBuf, SystemVirtualPath,
+    SystemVirtualPathBuf, deduplicate_nested_paths,
 };
 
 mod memory_fs;

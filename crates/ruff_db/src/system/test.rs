@@ -3,15 +3,15 @@ use ruff_notebook::{Notebook, NotebookError};
 use std::panic::RefUnwindSafe;
 use std::sync::{Arc, Mutex};
 
+use crate::Db;
 use crate::files::File;
 use crate::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, Result, System,
     SystemPath, SystemPathBuf, SystemVirtualPath,
 };
-use crate::Db;
 
-use super::walk_directory::WalkDirectoryBuilder;
 use super::WritableSystem;
+use super::walk_directory::WalkDirectoryBuilder;
 
 /// System implementation intended for testing.
 ///

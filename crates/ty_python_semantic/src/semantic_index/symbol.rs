@@ -5,16 +5,16 @@ use bitflags::bitflags;
 use hashbrown::hash_map::RawEntryMut;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
-use ruff_index::{newtype_index, IndexVec};
+use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHasher;
 
+use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
 use crate::semantic_index::visibility_constraints::ScopedVisibilityConstraintId;
-use crate::semantic_index::{semantic_index, SemanticIndex, SymbolMap};
-use crate::Db;
+use crate::semantic_index::{SemanticIndex, SymbolMap, semantic_index};
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct Symbol {

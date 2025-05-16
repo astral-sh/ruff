@@ -2,7 +2,7 @@ use std::io::Write;
 
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use ruff_diagnostics::Edit;
 use ruff_source_file::SourceCode;
@@ -119,10 +119,10 @@ fn rdjson_range(start: LineColumn, end: LineColumn) -> Value {
 mod tests {
     use insta::assert_snapshot;
 
+    use crate::message::RdjsonEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
-    use crate::message::RdjsonEmitter;
 
     #[test]
     fn output() {

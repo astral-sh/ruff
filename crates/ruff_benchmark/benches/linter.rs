@@ -1,18 +1,18 @@
 use ruff_benchmark::criterion;
 
 use criterion::{
-    criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
+    BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
 };
 use ruff_benchmark::{
-    TestCase, LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, UNICODE_PYPINYIN,
+    LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
 };
-use ruff_linter::linter::{lint_only, ParseSource};
+use ruff_linter::linter::{ParseSource, lint_only};
 use ruff_linter::rule_selector::PreviewOptions;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::PreviewMode;
-use ruff_linter::settings::{flags, LinterSettings};
+use ruff_linter::settings::{LinterSettings, flags};
 use ruff_linter::source_kind::SourceKind;
-use ruff_linter::{registry::Rule, RuleSelector};
+use ruff_linter::{RuleSelector, registry::Rule};
 use ruff_python_ast::PySourceType;
 use ruff_python_parser::parse_module;
 
