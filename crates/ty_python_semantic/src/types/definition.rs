@@ -24,16 +24,17 @@ impl TypeDefinition<'_> {
         }
     }
 
-    pub fn full_range(&self, db: &dyn Db) -> FileRange {
+    pub fn full_range(&self, db: &dyn Db) -> Option<FileRange> {
         match self {
             Self::Module(module) => {
-                let source = source_text(db.upcast(), module.file());
-                FileRange::new(module.file(), TextRange::up_to(source.text_len()))
+                let file = module.file()?;
+                let source = source_text(db.upcast(), file);
+                Some(FileRange::new(file, TextRange::up_to(source.text_len())))
             }
             Self::Class(definition)
             | Self::Function(definition)
             | Self::TypeVar(definition)
-            | Self::TypeAlias(definition) => definition.full_range(db),
+            | Self::TypeAlias(definition) => Some(definition.full_range(db)),
         }
     }
 }

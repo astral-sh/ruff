@@ -1336,7 +1336,9 @@ where
                             continue;
                         };
 
-                        let referenced_module = module.file();
+                        let Some(referenced_module) = module.file() else {
+                            continue;
+                        };
 
                         // In order to understand the visibility of definitions created by a `*` import,
                         // we need to know the visibility of the global-scope definitions in the

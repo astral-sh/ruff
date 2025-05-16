@@ -143,6 +143,23 @@ impl ModulePath {
         }
     }
 
+    pub(super) fn to_system_path(&self) -> Option<SystemPathBuf> {
+        let ModulePath {
+            search_path,
+            relative_path,
+        } = self;
+        match &*search_path.0 {
+            SearchPathInner::Extra(search_path)
+            | SearchPathInner::FirstParty(search_path)
+            | SearchPathInner::SitePackages(search_path)
+            | SearchPathInner::Editable(search_path) => Some(search_path.join(relative_path)),
+            SearchPathInner::StandardLibraryCustom(stdlib_root) => {
+                Some(stdlib_root.join(relative_path))
+            }
+            SearchPathInner::StandardLibraryVendored(_) => None,
+        }
+    }
+
     #[must_use]
     pub(super) fn to_file(&self, resolver: &ResolverContext) -> Option<File> {
         let db = resolver.db.upcast();

@@ -14,15 +14,16 @@ pub struct Module {
 }
 
 impl Module {
-    pub(crate) fn new(
+    pub(crate) fn file_module(
         name: ModuleName,
         kind: ModuleKind,
         search_path: SearchPath,
         file: File,
     ) -> Self {
         let known = KnownModule::try_from_search_path_and_name(&search_path, &name);
+
         Self {
-            inner: Arc::new(ModuleInner {
+            inner: Arc::new(ModuleInner::FileModule {
                 name,
                 kind,
                 search_path,
@@ -32,19 +33,36 @@ impl Module {
         }
     }
 
+    pub(crate) fn namespace_package(name: ModuleName) -> Self {
+        Self {
+            inner: Arc::new(ModuleInner::NamespacePackage { name }),
+        }
+    }
+
     /// The absolute name of the module (e.g. `foo.bar`)
     pub fn name(&self) -> &ModuleName {
-        &self.inner.name
+        match &*self.inner {
+            ModuleInner::FileModule { name, .. } => name,
+            ModuleInner::NamespacePackage { name, .. } => name,
+        }
     }
 
     /// The file to the source code that defines this module
-    pub fn file(&self) -> File {
-        self.inner.file
+    ///
+    /// This is `None` for namespace packages.
+    pub fn file(&self) -> Option<File> {
+        match &*self.inner {
+            ModuleInner::FileModule { file, .. } => Some(*file),
+            ModuleInner::NamespacePackage { .. } => None,
+        }
     }
 
     /// Is this a module that we special-case somehow? If so, which one?
     pub fn known(&self) -> Option<KnownModule> {
-        self.inner.known
+        match &*self.inner {
+            ModuleInner::FileModule { known, .. } => *known,
+            ModuleInner::NamespacePackage { .. } => None,
+        }
     }
 
     /// Does this module represent the given known module?
@@ -53,13 +71,19 @@ impl Module {
     }
 
     /// The search path from which the module was resolved.
-    pub(crate) fn search_path(&self) -> &SearchPath {
-        &self.inner.search_path
+    pub(crate) fn search_path(&self) -> Option<&SearchPath> {
+        match &*self.inner {
+            ModuleInner::FileModule { search_path, .. } => Some(search_path),
+            ModuleInner::NamespacePackage { .. } => None,
+        }
     }
 
     /// Determine whether this module is a single-file module or a package
     pub fn kind(&self) -> ModuleKind {
-        self.inner.kind
+        match &*self.inner {
+            ModuleInner::FileModule { kind, .. } => *kind,
+            ModuleInner::NamespacePackage { .. } => ModuleKind::Package,
+        }
     }
 }
 
@@ -70,17 +94,26 @@ impl std::fmt::Debug for Module {
             .field("kind", &self.kind())
             .field("file", &self.file())
             .field("search_path", &self.search_path())
+            .field("known", &self.known())
             .finish()
     }
 }
 
 #[derive(PartialEq, Eq, Hash)]
-struct ModuleInner {
-    name: ModuleName,
-    kind: ModuleKind,
-    search_path: SearchPath,
-    file: File,
-    known: Option<KnownModule>,
+enum ModuleInner {
+    /// A module that resolves to a file (`lib.py` or `package/__init__.py`)
+    FileModule {
+        name: ModuleName,
+        kind: ModuleKind,
+        search_path: SearchPath,
+        file: File,
+        known: Option<KnownModule>,
+    },
+
+    /// A namespace package. Namespace packages are special because
+    /// there are multiple possible paths and they have no corresponding
+    /// code file.
+    NamespacePackage { name: ModuleName },
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
