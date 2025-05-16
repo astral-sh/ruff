@@ -644,4 +644,60 @@ def f(x: int, y: str) -> None: ...
 c1: Callable[[int], None] = partial(f, y="a")
 ```
 
+## Generics
+
+### Assignability of generic types parameterized by gradual types
+
+If `Foo` is a class that is generic over a single type variable `T`, `Foo[X]` will be assignable to
+`Foo[Y]` iff `X` is assignable to `Y` AND `Y` is assignable to `X`.
+
+This might appear to be the same principle as the "gradual equivalence" relation, but it is subtly
+different. Two gradual types can be said to be "gradually equivalent" iff they have exactly the same
+sets of possible materializations -- if they represent the same sets of possible types (the same
+sets of sets of possible runtime objects). By this principle `int | Any` is gradually equivalent to
+`Unknown | int`, since they have exactly the same sets of posisble materializations. But
+`bool | Any` is not equivalent to `int`, since there are many possible materializations of
+`bool | Any` that are not assignable to `int`. It is therefore *not* necessary for `X` to be
+gradually equivalent to `Y` in order for `Foo[X]` to be assignable to `Foo[Y]`; it is *only*
+necessary for `X` and `Y` to be mutually assignable.
+
+```py
+from typing import Any, TypeVar, Generic
+from ty_extensions import static_assert, is_assignable_to
+
+InvariantTypeVar = TypeVar("InvariantTypeVar")
+
+class Foo(Generic[InvariantTypeVar]):
+    x: InvariantTypeVar
+
+class A: ...
+class B(A): ...
+class C: ...
+
+static_assert(is_assignable_to(Foo[A], Foo[B | Any]))
+static_assert(is_assignable_to(Foo[B | Any], Foo[A]))
+static_assert(is_assignable_to(Foo[Foo[Any]], Foo[Foo[A | C]]))
+static_assert(is_assignable_to(Foo[Foo[A | C]], Foo[Foo[Any]]))
+static_assert(is_assignable_to(Foo[tuple[A]], Foo[tuple[Any] | tuple[B]]))
+static_assert(is_assignable_to(Foo[tuple[Any] | tuple[B]], Foo[tuple[A]]))
+
+def f(obj: Foo[A]):
+    g(obj)
+
+def g(obj: Foo[B | Any]):
+    f(obj)
+
+def f2(obj: Foo[Foo[Any]]):
+    g2(obj)
+
+def g2(obj: Foo[Foo[A | C]]):
+    f2(obj)
+
+def f3(obj: Foo[tuple[Any] | tuple[B]]):
+    g3(obj)
+
+def g3(obj: Foo[tuple[A]]):
+    f3(obj)
+```
+
 [typing documentation]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
