@@ -139,6 +139,33 @@ class Property[T](NamedTuple):
 reveal_type(Property("height", 3.4))  # revealed: Property[Unknown]
 ```
 
+## Attributes on `NamedTuple`
+
+The following attributes are available on `NamedTuple` classes / instances:
+
+```py
+from typing import NamedTuple
+
+class Person(NamedTuple):
+    name: str
+    age: int | None = None
+
+reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
+reveal_type(Person._fields)  # revealed: tuple[str, ...]
+reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Self
+reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
+reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self
+
+# TODO: should be `Person` once we support `Self`
+reveal_type(Person._make(("Alice", 42)))  # revealed: Unknown
+
+person = Person("Alice", 42)
+
+reveal_type(person._asdict())  # revealed: dict[str, Any]
+# TODO: should be `Person` once we support `Self`
+reveal_type(person._replace(name="Bob"))  # revealed: Unknown
+```
+
 ## `collections.namedtuple`
 
 ```py
