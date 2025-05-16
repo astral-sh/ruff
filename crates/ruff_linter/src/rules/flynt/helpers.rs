@@ -14,7 +14,7 @@ fn to_f_string_expression_element(inner: &Expr) -> ast::FStringElement {
 
 /// Convert a string to a [`ast::FStringElement::Literal`].
 pub(super) fn to_f_string_literal_element(s: &str) -> ast::FStringElement {
-    ast::FStringElement::Literal(ast::FStringLiteralElement {
+    ast::FStringElement::Literal(ast::FTStringLiteralElement {
         value: Box::from(s),
         range: TextRange::default(),
     })
@@ -52,7 +52,7 @@ fn is_simple_callee(func: &Expr) -> bool {
 pub(super) fn to_f_string_element(expr: &Expr) -> Option<ast::FStringElement> {
     match expr {
         Expr::StringLiteral(ast::ExprStringLiteral { value, range }) => {
-            Some(ast::FStringElement::Literal(ast::FStringLiteralElement {
+            Some(ast::FStringElement::Literal(ast::FTStringLiteralElement {
                 value: value.to_string().into_boxed_str(),
                 range: *range,
             }))

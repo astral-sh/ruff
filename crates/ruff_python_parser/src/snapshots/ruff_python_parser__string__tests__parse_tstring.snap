@@ -46,7 +46,7 @@ expression: suite
                                             },
                                         ),
                                         Literal(
-                                            TStringLiteralElement {
+                                            FTStringLiteralElement {
                                                 range: 10..17,
                                                 value: "{foo}",
                                             },

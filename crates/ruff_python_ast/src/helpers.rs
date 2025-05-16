@@ -1423,7 +1423,7 @@ fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
                 value
                     .elements()
                     .all(|f_string_element| match f_string_element {
-                        FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => {
+                        FStringElement::Literal(ast::FTStringLiteralElement { value, .. }) => {
                             value.is_empty()
                         }
                         FStringElement::Expression(ast::FStringExpressionElement {

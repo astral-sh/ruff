@@ -331,18 +331,18 @@ pub struct FStringExpressionElement {
 
 /// An `FStringLiteralElement` with an empty `value` is an invalid f-string element.
 #[derive(Clone, Debug, PartialEq)]
-pub struct FStringLiteralElement {
+pub struct FTStringLiteralElement {
     pub range: TextRange,
     pub value: Box<str>,
 }
 
-impl FStringLiteralElement {
+impl FTStringLiteralElement {
     pub fn is_valid(&self) -> bool {
         !self.value.is_empty()
     }
 }
 
-impl Deref for FStringLiteralElement {
+impl Deref for FTStringLiteralElement {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -570,27 +570,6 @@ pub struct TStringInterpolationElement {
     pub debug_text: Option<DebugText>,
     pub conversion: ConversionFlag,
     pub format_spec: Option<Box<TStringFormatSpec>>,
-}
-
-/// A `TStringLiteralElement` with an empty `value` is an invalid t-string element.
-#[derive(Clone, Debug, PartialEq)]
-pub struct TStringLiteralElement {
-    pub range: TextRange,
-    pub value: Box<str>,
-}
-
-impl TStringLiteralElement {
-    pub fn is_valid(&self) -> bool {
-        !self.value.is_empty()
-    }
-}
-
-impl Deref for TStringLiteralElement {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.value
-    }
 }
 
 impl ExprTString {
@@ -1004,7 +983,7 @@ pub struct FStringElements(Vec<FStringElement>);
 
 impl FStringElements {
     /// Returns an iterator over all the [`FStringLiteralElement`] nodes contained in this f-string.
-    pub fn literals(&self) -> impl Iterator<Item = &FStringLiteralElement> {
+    pub fn literals(&self) -> impl Iterator<Item = &FTStringLiteralElement> {
         self.iter().filter_map(|element| element.as_literal())
     }
 
@@ -1219,7 +1198,7 @@ pub struct TStringElements(Vec<TStringElement>);
 
 impl TStringElements {
     /// Returns an iterator over all the [`TStringLiteralElement`] nodes contained in this t-string.
-    pub fn literals(&self) -> impl Iterator<Item = &TStringLiteralElement> {
+    pub fn literals(&self) -> impl Iterator<Item = &FTStringLiteralElement> {
         self.iter().filter_map(|element| element.as_literal())
     }
 

@@ -15,9 +15,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::error::{FStringKind, StarTupleKind, UnparenthesizedNamedExprKind};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{FunctionKind, Parser, helpers};
-use crate::string::{
-    StringType, parse_fstring_literal_element, parse_string_literal, parse_tstring_literal_element,
-};
+use crate::string::{StringType, parse_ftstring_literal_element, parse_string_literal};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
 use crate::{
@@ -1556,7 +1554,7 @@ impl<'src> Parser<'src> {
                         unreachable!()
                     };
                     FStringElement::Literal(
-                        parse_fstring_literal_element(value, flags, range).unwrap_or_else(
+                        parse_ftstring_literal_element(value, flags, range).unwrap_or_else(
                             |lex_error| {
                                 // test_err invalid_fstring_literal_element
                                 // f'hello \N{INVALID} world'
@@ -1566,7 +1564,7 @@ impl<'src> Parser<'src> {
                                     ParseErrorType::Lexical(lex_error.into_error()),
                                     location,
                                 );
-                                ast::FStringLiteralElement {
+                                ast::FTStringLiteralElement {
                                     value: "".into(),
                                     range,
                                 }
@@ -1797,7 +1795,7 @@ impl<'src> Parser<'src> {
                         unreachable!()
                     };
                     TStringElement::Literal(
-                        parse_tstring_literal_element(value, flags, range).unwrap_or_else(
+                        parse_ftstring_literal_element(value, flags, range).unwrap_or_else(
                             |lex_error| {
                                 // test_err invalid_tstring_literal_element
                                 // # parse_options: { "target-version": "3.14" }
@@ -1808,7 +1806,7 @@ impl<'src> Parser<'src> {
                                     ParseErrorType::Lexical(lex_error.into_error()),
                                     location,
                                 );
-                                ast::TStringLiteralElement {
+                                ast::FTStringLiteralElement {
                                     value: "".into(),
                                     range,
                                 }

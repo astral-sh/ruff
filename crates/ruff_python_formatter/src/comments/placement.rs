@@ -334,7 +334,7 @@ fn handle_enclosed_comment<'a>(
             if matches!(
                 comment.preceding_node(),
                 Some(
-                    AnyNodeRef::FStringExpressionElement(_) | AnyNodeRef::FStringLiteralElement(_)
+                    AnyNodeRef::FStringExpressionElement(_) | AnyNodeRef::FTStringLiteralElement(_)
                 )
             ) {
                 CommentPlacement::trailing(comment.enclosing_node(), comment)
@@ -358,7 +358,7 @@ fn handle_enclosed_comment<'a>(
                 comment.preceding_node(),
                 Some(
                     AnyNodeRef::TStringInterpolationElement(_)
-                        | AnyNodeRef::TStringLiteralElement(_)
+                        | AnyNodeRef::FTStringLiteralElement(_)
                 )
             ) {
                 CommentPlacement::trailing(comment.enclosing_node(), comment)

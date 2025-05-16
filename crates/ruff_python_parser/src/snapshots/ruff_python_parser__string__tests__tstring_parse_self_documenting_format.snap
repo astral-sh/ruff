@@ -37,7 +37,7 @@ expression: suite
                                                         range: 9..12,
                                                         elements: [
                                                             Literal(
-                                                                TStringLiteralElement {
+                                                                FTStringLiteralElement {
                                                                     range: 9..12,
                                                                     value: ">10",
                                                                 },

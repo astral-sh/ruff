@@ -6,8 +6,8 @@ use {
 
 use ruff_python_ast::visitor::transformer::Transformer;
 use ruff_python_ast::{
-    self as ast, BytesLiteralFlags, Expr, FStringElement, FStringFlags, FStringLiteralElement,
-    FStringPart, Stmt, StringFlags,
+    self as ast, BytesLiteralFlags, Expr, FStringElement, FStringFlags, FStringPart,
+    FTStringLiteralElement, Stmt, StringFlags,
 };
 use ruff_python_ast::{StringLiteralFlags, visitor::transformer};
 use ruff_text_size::{Ranged, TextRange};
@@ -138,7 +138,7 @@ impl Transformer for Normalizer {
                                         TextRange::new(existing_literal.start(), range.end());
                                 } else {
                                     self.elements.push(FStringElement::Literal(
-                                        FStringLiteralElement {
+                                        FTStringLiteralElement {
                                             range,
                                             value: literal.into(),
                                         },

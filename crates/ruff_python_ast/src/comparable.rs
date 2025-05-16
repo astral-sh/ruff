@@ -528,7 +528,7 @@ pub struct FStringExpressionElement<'a> {
 impl<'a> From<&'a ast::FStringElement> for ComparableFStringElement<'a> {
     fn from(fstring_element: &'a ast::FStringElement) -> Self {
         match fstring_element {
-            ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => {
+            ast::FStringElement::Literal(ast::FTStringLiteralElement { value, .. }) => {
                 Self::Literal(value.as_ref().into())
             }
             ast::FStringElement::Expression(formatted_value) => formatted_value.into(),
@@ -596,7 +596,7 @@ impl<'a> From<&'a ast::FStringExpressionElement> for ComparableTStringElement<'a
 impl<'a> From<&'a ast::TStringElement> for ComparableTStringElement<'a> {
     fn from(fstring_element: &'a ast::TStringElement) -> Self {
         match fstring_element {
-            ast::TStringElement::Literal(ast::TStringLiteralElement { value, .. }) => {
+            ast::TStringElement::Literal(ast::FTStringLiteralElement { value, .. }) => {
                 Self::Literal(value.as_ref().into())
             }
             ast::TStringElement::Interpolation(interpolation) => interpolation.into(),

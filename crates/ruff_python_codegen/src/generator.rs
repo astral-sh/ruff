@@ -1384,7 +1384,7 @@ impl<'a> Generator<'a> {
 
     fn unparse_f_string_element(&mut self, element: &ast::FStringElement) {
         match element {
-            ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => {
+            ast::FStringElement::Literal(ast::FTStringLiteralElement { value, .. }) => {
                 self.unparse_f_string_literal_element(value);
             }
             ast::FStringElement::Expression(ast::FStringExpressionElement {
@@ -1487,7 +1487,7 @@ impl<'a> Generator<'a> {
 
     fn unparse_t_string_element(&mut self, element: &ast::TStringElement) {
         match element {
-            ast::TStringElement::Literal(ast::TStringLiteralElement { value, .. }) => {
+            ast::TStringElement::Literal(ast::FTStringLiteralElement { value, .. }) => {
                 self.unparse_t_string_literal_element(value);
             }
             ast::TStringElement::Interpolation(ast::TStringInterpolationElement {
