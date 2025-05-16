@@ -284,3 +284,33 @@ from shapes import Hexagon, Pentagon
 reveal_type(Pentagon().sides)  # revealed: int
 reveal_type(Hexagon().area)  # revealed: int | float
 ```
+
+## Relative import in stub package
+
+Regression test for <https://github.com/astral-sh/ty/issues/408>
+
+```toml
+[environment]
+extra-paths = ["/packages"]
+```
+
+`/packages/yaml-stubs/__init__.pyi`:
+
+```pyi
+from .loader import *
+```
+
+`/packages/yaml-stubs/loader.pyi`:
+
+```pyi
+class YamlLoader: ...
+```
+
+`main.py`:
+
+```py
+import yaml
+
+# TODO: This should not be an error
+yaml.YamlLoader  # error: [unresolved-attribute] "Type `<module 'yaml'>` has no attribute `YamlLoader`"
+```
