@@ -44,7 +44,7 @@ impl ModuleDb {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version,
+                python_version: Some(python_version),
                 python_platform: PythonPlatform::default(),
                 search_paths,
             },

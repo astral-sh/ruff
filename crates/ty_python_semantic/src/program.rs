@@ -28,10 +28,14 @@ impl Program {
             search_paths,
         } = settings;
 
-        tracing::info!("Python version: Python {python_version}, platform: {python_platform}");
-
         let search_paths = SearchPaths::from_settings(db, &search_paths)
             .with_context(|| "Invalid search path settings")?;
+
+        let python_version = python_version
+            .or_else(|| search_paths.python_version())
+            .unwrap_or(PythonVersion::latest_ty());
+
+        tracing::info!("Python version: Python {python_version}, platform: {python_platform}");
 
         Ok(
             Program::builder(python_version, python_platform, search_paths)
@@ -56,9 +60,11 @@ impl Program {
             self.set_python_platform(db).to(python_platform);
         }
 
-        if python_version != self.python_version(db) {
-            tracing::debug!("Updating python version: Python {python_version}");
-            self.set_python_version(db).to(python_version);
+        if let Some(python_version) = python_version {
+            if python_version != self.python_version(db) {
+                tracing::debug!("Updating python version: Python {python_version}");
+                self.set_python_version(db).to(python_version);
+            }
         }
 
         self.update_search_paths(db, &search_paths)?;
@@ -89,7 +95,7 @@ impl Program {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ProgramSettings {
-    pub python_version: PythonVersion,
+    pub python_version: Option<PythonVersion>,
     pub python_platform: PythonPlatform,
     pub search_paths: SearchPathSettings,
 }

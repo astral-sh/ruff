@@ -60,6 +60,13 @@ impl PythonEnvironment {
             Self::System(env) => env.site_packages_directories(system),
         }
     }
+
+    pub(crate) fn python_version(&self) -> Option<PythonVersion> {
+        match self {
+            Self::Virtual(env) => env.version,
+            Self::System(_) => None,
+        }
+    }
 }
 
 /// Abstraction for a Python virtual environment.

@@ -179,7 +179,7 @@ pub(crate) mod tests {
             Program::from_settings(
                 &db,
                 ProgramSettings {
-                    python_version: self.python_version,
+                    python_version: Some(self.python_version),
                     python_platform: self.python_platform,
                     search_paths: SearchPathSettings::new(vec![src_root]),
                 },
