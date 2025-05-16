@@ -330,7 +330,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::FStringError(fstring_error) => {
                 write!(f, "f-string: {fstring_error}")
             }
-            ParseErrorType::TStringError(ref tstring_error) => {
+            ParseErrorType::TStringError(tstring_error) => {
                 write!(f, "t-string: {tstring_error}")
             }
             ParseErrorType::UnexpectedExpressionToken => {

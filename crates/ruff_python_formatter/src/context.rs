@@ -6,7 +6,6 @@ use ruff_python_ast::str::Quote;
 use ruff_python_parser::Tokens;
 
 use crate::PyFormatOptions;
-use crate::PyFormatOptions;
 use crate::comments::Comments;
 use crate::other::f_string_element::FStringExpressionElementContext;
 use crate::other::t_string_element::TStringInterpolationElementContext;

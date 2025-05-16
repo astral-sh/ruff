@@ -14,7 +14,7 @@ use ruff_text_size::{Ranged, TextRange, TextSlice};
 use crate::QuoteStyle;
 use crate::context::FTStringState;
 use crate::prelude::*;
-use crate::string::StringQuotes;
+use crate::string::{Quote, StringQuotes, TripleQuotes};
 
 pub(crate) struct StringNormalizer<'a, 'src> {
     preferred_quote_style: Option<QuoteStyle>,
