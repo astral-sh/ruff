@@ -4,6 +4,8 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::Checker;
+
 /// ## What it does
 /// Checks for `break` statements outside of loops.
 ///
@@ -31,6 +33,7 @@ impl Violation for BreakOutsideLoop {
 
 /// F701
 pub(crate) fn break_outside_loop<'a>(
+    checker: &Checker,
     stmt: &'a Stmt,
     parents: &mut impl Iterator<Item = &'a Stmt>,
 ) -> Option<Diagnostic> {

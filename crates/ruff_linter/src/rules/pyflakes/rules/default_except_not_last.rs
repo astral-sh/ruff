@@ -4,6 +4,7 @@ use ruff_python_ast::identifier::except;
 use ruff_python_ast::{self as ast, ExceptHandler};
 
 use crate::Locator;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for `except` blocks that handle all exceptions, but are not the last
@@ -55,6 +56,7 @@ impl Violation for DefaultExceptNotLast {
 
 /// F707
 pub(crate) fn default_except_not_last(
+    checker: &Checker,
     handlers: &[ExceptHandler],
     locator: &Locator,
 ) -> Option<Diagnostic> {

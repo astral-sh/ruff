@@ -222,7 +222,7 @@ enum Argumentable {
 }
 
 impl Argumentable {
-    fn check_for(self, name: String, range: TextRange) -> Diagnostic {
+    fn check_for(self, checker: &Checker, name: String, range: TextRange) -> Diagnostic {
         match self {
             Self::Function => Diagnostic::new(
                 UnusedFunctionArgument { name },
@@ -328,7 +328,7 @@ fn call<'a>(
             && binding.is_unused()
             && !dummy_variable_rgx.is_match(arg.name())
         {
-            Some(argumentable.check_for(arg.name.to_string(), binding.range()))
+            Some(argumentable.check_for(checker, arg.name.to_string(), binding.range()))
         } else {
             None
         }

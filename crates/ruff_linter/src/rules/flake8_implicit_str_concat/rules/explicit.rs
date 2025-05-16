@@ -5,6 +5,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::Locator;
+use crate::checkers::ast::Checker;
 use crate::settings::LinterSettings;
 
 /// ## What it does
@@ -43,6 +44,7 @@ impl Violation for ExplicitStringConcatenation {
 
 /// ISC003
 pub(crate) fn explicit(
+    checker: &Checker,
     expr: &Expr,
     locator: &Locator,
     settings: &LinterSettings,

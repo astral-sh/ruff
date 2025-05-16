@@ -1,3 +1,4 @@
+use ruff_source_file::SourceFile;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
@@ -47,6 +48,7 @@ impl AlwaysFixableViolation for ShebangLeadingWhitespace {
 pub(crate) fn shebang_leading_whitespace(
     range: TextRange,
     locator: &Locator,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     // If the shebang is at the beginning of the file, abort.
     if range.start() == TextSize::from(0) {
@@ -63,7 +65,7 @@ pub(crate) fn shebang_leading_whitespace(
     }
 
     let prefix = TextRange::up_to(range.start());
-    let mut diagnostic = Diagnostic::new(ShebangLeadingWhitespace, prefix, checker.source_file());
+    let mut diagnostic = Diagnostic::new(ShebangLeadingWhitespace, prefix, source_file);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(prefix)));
     Some(diagnostic)
 }

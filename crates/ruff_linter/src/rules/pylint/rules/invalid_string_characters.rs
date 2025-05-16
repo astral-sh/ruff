@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::{Token, TokenKind};
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -184,6 +185,7 @@ pub(crate) fn invalid_string_characters(
     diagnostics: &mut Vec<Diagnostic>,
     token: &Token,
     locator: &Locator,
+    source_file: &SourceFile,
 ) {
     let text = match token.kind() {
         // We can't use the `value` field since it's decoded and e.g. for f-strings removed a curly
@@ -199,23 +201,23 @@ pub(crate) fn invalid_string_characters(
         let (replacement, mut diagnostic) = match c {
             '\x08' => (
                 "\\b",
-                Diagnostic::new(InvalidCharacterBackspace, range, checker.source_file()),
+                Diagnostic::new(InvalidCharacterBackspace, range, source_file.clone()),
             ),
             '\x1A' => (
                 "\\x1A",
-                Diagnostic::new(InvalidCharacterSub, range, checker.source_file()),
+                Diagnostic::new(InvalidCharacterSub, range, source_file.clone()),
             ),
             '\x1B' => (
                 "\\x1B",
-                Diagnostic::new(InvalidCharacterEsc, range, checker.source_file()),
+                Diagnostic::new(InvalidCharacterEsc, range, source_file.clone()),
             ),
             '\0' => (
                 "\\0",
-                Diagnostic::new(InvalidCharacterNul, range, checker.source_file()),
+                Diagnostic::new(InvalidCharacterNul, range, source_file.clone()),
             ),
             '\u{200b}' => (
                 "\\u200b",
-                Diagnostic::new(InvalidCharacterZeroWidthSpace, range, checker.source_file()),
+                Diagnostic::new(InvalidCharacterZeroWidthSpace, range, source_file.clone()),
             ),
             _ => {
                 continue;

@@ -5,6 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_stdlib::str::{self};
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
@@ -65,6 +66,7 @@ impl Violation for CamelcaseImportedAsConstant {
 
 /// N814
 pub(crate) fn camelcase_imported_as_constant(
+    checker: &Checker,
     name: &str,
     asname: &str,
     alias: &Alias,

@@ -393,8 +393,12 @@ pub(crate) fn typing_only_runtime_import(
             ..
         } in imports
         {
-            let mut diagnostic =
-                diagnostic_for(import_type, import.qualified_name().to_string(), range);
+            let mut diagnostic = diagnostic_for(
+                checker,
+                import_type,
+                import.qualified_name().to_string(),
+                range,
+            );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
@@ -415,8 +419,12 @@ pub(crate) fn typing_only_runtime_import(
             ..
         } in imports
         {
-            let mut diagnostic =
-                diagnostic_for(import_type, import.qualified_name().to_string(), range);
+            let mut diagnostic = diagnostic_for(
+                checker,
+                import_type,
+                import.qualified_name().to_string(),
+                range,
+            );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
@@ -436,7 +444,12 @@ fn rule_for(import_type: ImportType) -> Rule {
 }
 
 /// Return the [`Diagnostic`] for the given import type.
-fn diagnostic_for(import_type: ImportType, qualified_name: String, range: TextRange) -> Diagnostic {
+fn diagnostic_for(
+    checker: &Checker,
+    import_type: ImportType,
+    qualified_name: String,
+    range: TextRange,
+) -> Diagnostic {
     match import_type {
         ImportType::StandardLibrary => Diagnostic::new(
             TypingOnlyStandardLibraryImport { qualified_name },

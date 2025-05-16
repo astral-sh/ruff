@@ -4,7 +4,10 @@ use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 
-use crate::rules::pep8_naming::{helpers, settings::IgnoreNames};
+use crate::{
+    checkers::ast::Checker,
+    rules::pep8_naming::{helpers, settings::IgnoreNames},
+};
 
 /// ## What it does
 /// Checks for constant imports that are aliased to non-constant-style
@@ -63,6 +66,7 @@ impl Violation for ConstantImportedAsNonConstant {
 
 /// N811
 pub(crate) fn constant_imported_as_non_constant(
+    checker: &Checker,
     name: &str,
     asname: &str,
     alias: &Alias,

@@ -4,7 +4,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 
-use crate::rules::pep8_naming::settings::IgnoreNames;
+use crate::{checkers::ast::Checker, rules::pep8_naming::settings::IgnoreNames};
 
 /// ## What it does
 /// Checks for custom exception definitions that omit the `Error` suffix.
@@ -48,6 +48,7 @@ impl Violation for ErrorSuffixOnExceptionName {
 
 /// N818
 pub(crate) fn error_suffix_on_exception_name(
+    checker: &Checker,
     class_def: &Stmt,
     arguments: Option<&Arguments>,
     name: &str,

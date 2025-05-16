@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
@@ -88,6 +89,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundParameterEquals {
 pub(crate) fn whitespace_around_named_parameter_equals(
     line: &LogicalLine,
     context: &mut LogicalLinesContext,
+    source_file: &SourceFile,
 ) {
     let mut parens = 0u32;
     let mut fstrings = 0u32;
@@ -128,7 +130,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                         let mut diagnostic = Diagnostic::new(
                             MissingWhitespaceAroundParameterEquals,
                             token.range,
-                            checker.source_file(),
+                            source_file.clone(),
                         );
                         diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                             " ".to_string(),
@@ -147,7 +149,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                                 let mut diagnostic = Diagnostic::new(
                                     MissingWhitespaceAroundParameterEquals,
                                     token.range,
-                                    checker.source_file(),
+                                    source_file.clone(),
                                 );
                                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                                     " ".to_string(),
@@ -164,7 +166,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                         let mut diagnostic = Diagnostic::new(
                             UnexpectedSpacesAroundKeywordParameterEquals,
                             TextRange::new(prev_end, token.start()),
-                            checker.source_file(),
+                            source_file.clone(),
                         );
                         diagnostic.set_fix(Fix::safe_edit(Edit::deletion(prev_end, token.start())));
                         context.push_diagnostic(diagnostic);
@@ -179,7 +181,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                                 let mut diagnostic = Diagnostic::new(
                                     UnexpectedSpacesAroundKeywordParameterEquals,
                                     TextRange::new(token.end(), next.start()),
-                                    checker.source_file(),
+                                    source_file.clone(),
                                 );
                                 diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                                     token.end(),

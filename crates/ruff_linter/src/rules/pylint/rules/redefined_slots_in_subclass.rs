@@ -69,7 +69,7 @@ pub(crate) fn redefined_slots_in_subclass(checker: &Checker, class_def: &ast::St
     let semantic = checker.semantic();
     let diagnostics = class_slots
         .iter()
-        .filter_map(|slot| check_super_slots(class_def, semantic, slot));
+        .filter_map(|slot| check_super_slots(checker, class_def, semantic, slot));
     checker.report_diagnostics(diagnostics);
 }
 
@@ -104,6 +104,7 @@ impl Ranged for Slot<'_> {
 }
 
 fn check_super_slots(
+    checker: &Checker,
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
     slot: &Slot,

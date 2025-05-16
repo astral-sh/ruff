@@ -5,6 +5,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::resolve_imported_module_path;
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::Checker;
+
 /// ## What it does
 /// Checks for import statements that import the current module.
 ///
@@ -35,7 +37,11 @@ impl Violation for ImportSelf {
 }
 
 /// PLW0406
-pub(crate) fn import_self(alias: &Alias, module_path: Option<&[String]>) -> Option<Diagnostic> {
+pub(crate) fn import_self(
+    checker: &Checker,
+    alias: &Alias,
+    module_path: Option<&[String]>,
+) -> Option<Diagnostic> {
     let module_path = module_path?;
 
     if alias.name.split('.').eq(module_path) {
@@ -53,6 +59,7 @@ pub(crate) fn import_self(alias: &Alias, module_path: Option<&[String]>) -> Opti
 
 /// PLW0406
 pub(crate) fn import_from_self(
+    checker: &Checker,
     level: u32,
     module: Option<&str>,
     names: &[Alias],

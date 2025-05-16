@@ -5,6 +5,7 @@ use ruff_python_ast::{self as ast, ModModule, PySourceType, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::Parsed;
 use ruff_python_semantic::{FutureImport, NameImport};
+use ruff_source_file::SourceFile;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
@@ -91,6 +92,7 @@ fn add_required_import(
     locator: &Locator,
     stylist: &Stylist,
     source_type: PySourceType,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     // Don't add imports to semantically-empty files.
     if parsed.suite().iter().all(is_docstring_stmt) {
@@ -115,7 +117,7 @@ fn add_required_import(
     let mut diagnostic = Diagnostic::new(
         MissingRequiredImport(required_import.to_string()),
         TextRange::default(),
-        checker.source_file(),
+        source_file,
     );
     diagnostic.set_fix(Fix::safe_edit(
         Importer::new(parsed, locator, stylist).add_import(required_import, TextSize::default()),
@@ -130,13 +132,21 @@ pub(crate) fn add_required_imports(
     stylist: &Stylist,
     settings: &LinterSettings,
     source_type: PySourceType,
+    source_file: &SourceFile,
 ) -> Vec<Diagnostic> {
     settings
         .isort
         .required_imports
         .iter()
         .filter_map(|required_import| {
-            add_required_import(required_import, parsed, locator, stylist, source_type)
+            add_required_import(
+                required_import,
+                parsed,
+                locator,
+                stylist,
+                source_type,
+                source_file.clone(),
+            )
         })
         .collect()
 }

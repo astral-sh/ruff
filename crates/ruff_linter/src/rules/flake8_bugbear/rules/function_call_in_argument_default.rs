@@ -83,6 +83,7 @@ impl Violation for FunctionCallInDefaultArgument {
 }
 
 struct ArgumentDefaultVisitor<'a, 'b> {
+    checker: &'a Checker<'b>,
     semantic: &'a SemanticModel<'b>,
     extend_immutable_calls: &'a [QualifiedName<'b>],
     diagnostics: Vec<Diagnostic>,
@@ -90,10 +91,12 @@ struct ArgumentDefaultVisitor<'a, 'b> {
 
 impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
     fn new(
+        checker: &'a Checker<'b>,
         semantic: &'a SemanticModel<'b>,
         extend_immutable_calls: &'a [QualifiedName<'b>],
     ) -> Self {
         Self {
+            checker,
             semantic,
             extend_immutable_calls,
             diagnostics: Vec::new(),
@@ -116,7 +119,7 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
                             name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
                         },
                         expr.range(),
-                        checker.source_file(),
+                        self.checker.source_file(),
                     ));
                 }
                 visitor::walk_expr(self, expr);
@@ -140,7 +143,8 @@ pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: &
         .map(|target| QualifiedName::from_dotted_name(target))
         .collect();
 
-    let mut visitor = ArgumentDefaultVisitor::new(checker.semantic(), &extend_immutable_calls);
+    let mut visitor =
+        ArgumentDefaultVisitor::new(checker, checker.semantic(), &extend_immutable_calls);
     for parameter in parameters.iter_non_variadic_params() {
         if let Some(default) = parameter.default() {
             if !parameter.annotation().is_some_and(|expr| {

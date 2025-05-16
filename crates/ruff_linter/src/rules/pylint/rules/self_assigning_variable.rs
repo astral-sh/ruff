@@ -51,7 +51,7 @@ pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssign) {
         .chain(std::iter::once(assign.value.as_ref()))
         .tuple_combinations()
     {
-        visit_assignments(left, right, &mut diagnostics);
+        visit_assignments(checker, left, right, &mut diagnostics);
     }
     checker.report_diagnostics(diagnostics);
 }
@@ -69,16 +69,22 @@ pub(crate) fn self_annotated_assignment(checker: &Checker, assign: &ast::StmtAnn
     }
     let mut diagnostics = Vec::new();
 
-    visit_assignments(&assign.target, value, &mut diagnostics);
+    visit_assignments(checker, &assign.target, value, &mut diagnostics);
     checker.report_diagnostics(diagnostics);
 }
 
-fn visit_assignments(left: &Expr, right: &Expr, diagnostics: &mut Vec<Diagnostic>) {
+fn visit_assignments(
+    checker: &Checker,
+    left: &Expr,
+    right: &Expr,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     match (left, right) {
-        (Expr::Tuple(lhs), Expr::Tuple(rhs)) if lhs.len() == rhs.len() => lhs
-            .iter()
-            .zip(rhs)
-            .for_each(|(lhs_elem, rhs_elem)| visit_assignments(lhs_elem, rhs_elem, diagnostics)),
+        (Expr::Tuple(lhs), Expr::Tuple(rhs)) if lhs.len() == rhs.len() => {
+            lhs.iter().zip(rhs).for_each(|(lhs_elem, rhs_elem)| {
+                visit_assignments(checker, lhs_elem, rhs_elem, diagnostics);
+            });
+        }
         (
             Expr::Name(ast::ExprName { id: lhs_name, .. }),
             Expr::Name(ast::ExprName { id: rhs_name, .. }),

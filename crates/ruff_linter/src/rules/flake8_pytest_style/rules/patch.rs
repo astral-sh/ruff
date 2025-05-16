@@ -4,6 +4,7 @@ use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Parameters};
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -73,7 +74,11 @@ impl<'a> Visitor<'a> for LambdaBodyVisitor<'a> {
     }
 }
 
-fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<Diagnostic> {
+fn check_patch_call(
+    call: &ast::ExprCall,
+    index: usize,
+    source_file: SourceFile,
+) -> Option<Diagnostic> {
     if call.arguments.find_keyword("return_value").is_some() {
         return None;
     }
@@ -102,12 +107,15 @@ fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<Diagnostic> {
     Some(Diagnostic::new(
         PytestPatchWithLambda,
         call.func.range(),
-        checker.source_file(),
+        source_file,
     ))
 }
 
 /// PT008
-pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<Diagnostic> {
+pub(crate) fn patch_with_lambda(
+    call: &ast::ExprCall,
+    source_file: SourceFile,
+) -> Option<Diagnostic> {
     let name = UnqualifiedName::from_expr(&call.func)?;
 
     if matches!(
@@ -122,7 +130,7 @@ pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<Diagnostic> {
             "patch"
         ] | ["unittest", "mock", "patch"]
     ) {
-        check_patch_call(call, 1)
+        check_patch_call(call, 1, source_file)
     } else if matches!(
         name.segments(),
         [
@@ -136,7 +144,7 @@ pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<Diagnostic> {
             "object"
         ] | ["unittest", "mock", "patch", "object"]
     ) {
-        check_patch_call(call, 2)
+        check_patch_call(call, 2, source_file)
     } else {
         None
     }

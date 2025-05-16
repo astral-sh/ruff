@@ -5,6 +5,7 @@ use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenIterWithContext, TokenKind, Tokens};
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::Locator;
@@ -104,6 +105,7 @@ pub(crate) fn compound_statements(
     indexer: &Indexer,
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
+    source_file: &SourceFile,
 ) {
     // Track the last seen instance of a variety of tokens.
     let mut colon = None;
@@ -168,7 +170,7 @@ pub(crate) fn compound_statements(
                             }))
                     {
                         let mut diagnostic =
-                            Diagnostic::new(UselessSemicolon, range, checker.source_file());
+                            Diagnostic::new(UselessSemicolon, range, source_file.clone());
                         diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                             indexer
                                 .preceded_by_continuations(range.start(), locator.contents())
@@ -228,7 +230,7 @@ pub(crate) fn compound_statements(
                     diagnostics.push(Diagnostic::new(
                         MultipleStatementsOnOneLineSemicolon,
                         range,
-                        checker.source_file(),
+                        source_file.clone(),
                     ));
 
                     // Reset.
@@ -240,7 +242,7 @@ pub(crate) fn compound_statements(
                     diagnostics.push(Diagnostic::new(
                         MultipleStatementsOnOneLineColon,
                         range,
-                        checker.source_file(),
+                        source_file.clone(),
                     ));
 
                     // Reset.

@@ -7,6 +7,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_stdlib::str;
 
+use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
@@ -57,6 +58,7 @@ impl Violation for InvalidFunctionName {
 
 /// N802
 pub(crate) fn invalid_function_name(
+    checker: &Checker,
     stmt: &Stmt,
     name: &str,
     decorator_list: &[Decorator],

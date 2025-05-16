@@ -53,17 +53,23 @@ pub(crate) fn bindings(checker: &Checker) {
             }
         }
         if checker.enabled(Rule::InvalidAllFormat) {
-            if let Some(diagnostic) = pylint::rules::invalid_all_format(binding) {
+            if let Some(diagnostic) =
+                pylint::rules::invalid_all_format(binding, checker.source_file())
+            {
                 checker.report_diagnostic(diagnostic);
             }
         }
         if checker.enabled(Rule::InvalidAllObject) {
-            if let Some(diagnostic) = pylint::rules::invalid_all_object(binding) {
+            if let Some(diagnostic) =
+                pylint::rules::invalid_all_object(binding, checker.source_file())
+            {
                 checker.report_diagnostic(diagnostic);
             }
         }
         if checker.enabled(Rule::NonAsciiName) {
-            if let Some(diagnostic) = pylint::rules::non_ascii_name(binding, checker.locator) {
+            if let Some(diagnostic) =
+                pylint::rules::non_ascii_name(binding, checker.locator, checker.source_file())
+            {
                 checker.report_diagnostic(diagnostic);
             }
         }

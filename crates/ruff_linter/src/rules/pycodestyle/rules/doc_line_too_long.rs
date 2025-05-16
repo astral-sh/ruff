@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Line;
+use ruff_source_file::{Line, SourceFile};
 
 use crate::rules::pycodestyle::overlong::Overlong;
 use crate::settings::LinterSettings;
@@ -86,6 +86,7 @@ pub(crate) fn doc_line_too_long(
     line: &Line,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     let limit = settings.pycodestyle.max_doc_length?;
     Overlong::try_from_line(
@@ -103,7 +104,7 @@ pub(crate) fn doc_line_too_long(
         Diagnostic::new(
             DocLineTooLong(overlong.width(), limit.value() as usize),
             overlong.range(),
-            checker.source_file(),
+            source_file,
         )
     })
 }

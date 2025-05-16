@@ -192,23 +192,36 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
         ["airflow", .., "DAG" | "dag"] => {
             // with replacement
             checker.report_diagnostics(diagnostic_for_argument(
+                checker,
                 arguments,
                 "fail_stop",
                 Some("fail_fast"),
             ));
             checker.report_diagnostics(diagnostic_for_argument(
+                checker,
                 arguments,
                 "schedule_interval",
                 Some("schedule"),
             ));
             checker.report_diagnostics(diagnostic_for_argument(
+                checker,
                 arguments,
                 "timetable",
                 Some("schedule"),
             ));
             // without replacement
-            checker.report_diagnostics(diagnostic_for_argument(arguments, "default_view", None));
-            checker.report_diagnostics(diagnostic_for_argument(arguments, "orientation", None));
+            checker.report_diagnostics(diagnostic_for_argument(
+                checker,
+                arguments,
+                "default_view",
+                None,
+            ));
+            checker.report_diagnostics(diagnostic_for_argument(
+                checker,
+                arguments,
+                "orientation",
+                None,
+            ));
         }
         segments => {
             if is_airflow_auth_manager(segments) {
@@ -226,12 +239,14 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                 }
             } else if is_airflow_task_handler(segments) {
                 checker.report_diagnostics(diagnostic_for_argument(
+                    checker,
                     arguments,
                     "filename_template",
                     None,
                 ));
             } else if is_airflow_builtin_or_provider(segments, "operators", "Operator") {
                 checker.report_diagnostics(diagnostic_for_argument(
+                    checker,
                     arguments,
                     "task_concurrency",
                     Some("max_active_tis_per_dag"),
@@ -245,6 +260,7 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                         "TriggerDagRunOperator",
                     ] => {
                         checker.report_diagnostics(diagnostic_for_argument(
+                            checker,
                             arguments,
                             "execution_date",
                             Some("logical_date"),
@@ -265,6 +281,7 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                         "DayOfWeekSensor" | "BranchDayOfWeekOperator",
                     ] => {
                         checker.report_diagnostics(diagnostic_for_argument(
+                            checker,
                             arguments,
                             "use_task_execution_day",
                             Some("use_task_logical_date"),
@@ -1083,6 +1100,7 @@ fn check_airflow_plugin_extension(
 /// Check if the `deprecated` keyword argument is being used and create a diagnostic if so along
 /// with a possible `replacement`.
 fn diagnostic_for_argument(
+    checker: &Checker,
     arguments: &Arguments,
     deprecated: &str,
     replacement: Option<&'static str>,

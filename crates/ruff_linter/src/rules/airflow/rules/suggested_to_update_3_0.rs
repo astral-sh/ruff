@@ -112,6 +112,7 @@ pub(crate) fn airflow_3_0_suggested_update_expr(checker: &Checker, expr: &Expr) 
 /// Check if the `deprecated` keyword argument is being used and create a diagnostic if so along
 /// with a possible `replacement`.
 fn diagnostic_for_argument(
+    checker: &Checker,
     arguments: &Arguments,
     deprecated: &str,
     replacement: Option<&'static str>,
@@ -154,6 +155,7 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
     match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
             checker.report_diagnostics(diagnostic_for_argument(
+                checker,
                 arguments,
                 "sla_miss_callback",
                 None,
@@ -161,7 +163,8 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
         }
         segments => {
             if is_airflow_builtin_or_provider(segments, "operators", "Operator") {
-                checker.report_diagnostics(diagnostic_for_argument(arguments, "sla", None));
+                checker
+                    .report_diagnostics(diagnostic_for_argument(checker, arguments, "sla", None));
             }
         }
     }

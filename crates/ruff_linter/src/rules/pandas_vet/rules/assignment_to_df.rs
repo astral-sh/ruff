@@ -4,6 +4,8 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::Checker;
+
 /// ## What it does
 /// Checks for assignments to the variable `df`.
 ///
@@ -38,7 +40,7 @@ impl Violation for PandasDfVariableName {
 }
 
 /// PD901
-pub(crate) fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
+pub(crate) fn assignment_to_df(checker: &Checker, targets: &[Expr]) -> Option<Diagnostic> {
     let [target] = targets else {
         return None;
     };

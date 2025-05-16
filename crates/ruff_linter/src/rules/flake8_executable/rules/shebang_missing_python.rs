@@ -1,3 +1,4 @@
+use ruff_source_file::SourceFile;
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -44,14 +45,11 @@ impl Violation for ShebangMissingPython {
 pub(crate) fn shebang_missing_python(
     range: TextRange,
     shebang: &ShebangDirective,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     if shebang.contains("python") || shebang.contains("pytest") || shebang.contains("uv run") {
         return None;
     }
 
-    Some(Diagnostic::new(
-        ShebangMissingPython,
-        range,
-        checker.source_file(),
-    ))
+    Some(Diagnostic::new(ShebangMissingPython, range, source_file))
 }

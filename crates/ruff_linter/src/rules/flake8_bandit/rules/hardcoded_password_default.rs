@@ -54,7 +54,11 @@ impl Violation for HardcodedPasswordDefault {
     }
 }
 
-fn check_password_kwarg(parameter: &Parameter, default: &Expr) -> Option<Diagnostic> {
+fn check_password_kwarg(
+    checker: &Checker,
+    parameter: &Parameter,
+    default: &Expr,
+) -> Option<Diagnostic> {
     string_literal(default).filter(|string| !string.is_empty())?;
     let kwarg_name = &parameter.name;
     if !matches_password_name(kwarg_name) {
@@ -75,7 +79,7 @@ pub(crate) fn hardcoded_password_default(checker: &Checker, parameters: &Paramet
         let Some(default) = parameter.default() else {
             continue;
         };
-        if let Some(diagnostic) = check_password_kwarg(&parameter.parameter, default) {
+        if let Some(diagnostic) = check_password_kwarg(checker, &parameter.parameter, default) {
             checker.report_diagnostic(diagnostic);
         }
     }

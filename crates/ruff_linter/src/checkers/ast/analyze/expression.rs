@@ -196,6 +196,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 let check_two_starred_expressions =
                     checker.enabled(Rule::MultipleStarredExpressions);
                 if let Some(diagnostic) = pyflakes::rules::starred_expressions(
+                    checker,
                     elts,
                     check_too_many_expressions,
                     check_two_starred_expressions,
@@ -937,7 +938,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 pylint::rules::repeated_keyword_argument(checker, call);
             }
             if checker.enabled(Rule::PytestPatchWithLambda) {
-                if let Some(diagnostic) = flake8_pytest_style::rules::patch_with_lambda(call) {
+                if let Some(diagnostic) =
+                    flake8_pytest_style::rules::patch_with_lambda(call, checker.source_file())
+                {
                     checker.report_diagnostic(diagnostic);
                 }
             }
@@ -1368,6 +1371,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
         }) => {
             if checker.enabled(Rule::ExplicitStringConcatenation) {
                 if let Some(diagnostic) = flake8_implicit_str_concat::rules::explicit(
+                    checker,
                     expr,
                     checker.locator,
                     checker.settings,

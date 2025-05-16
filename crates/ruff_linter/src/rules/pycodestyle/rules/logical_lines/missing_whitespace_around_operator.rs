@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
@@ -145,6 +146,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundModuloOperator {
 pub(crate) fn missing_whitespace_around_operator(
     line: &LogicalLine,
     context: &mut LogicalLinesContext,
+    source_file: &SourceFile,
 ) {
     let mut definition_state = DefinitionState::from_tokens(line.tokens());
     let mut tokens = line.tokens().iter().peekable();
@@ -253,29 +255,32 @@ pub(crate) fn missing_whitespace_around_operator(
                 // Operator with trailing but no leading space, enforce consistent spacing.
                 (false, true) => {
                     context.push_diagnostic(
-                        diagnostic_kind_for_operator(kind, token.range()).with_fix(Fix::safe_edit(
-                            Edit::insertion(" ".to_string(), token.start()),
-                        )),
+                        diagnostic_kind_for_operator(kind, token.range(), source_file.clone())
+                            .with_fix(Fix::safe_edit(Edit::insertion(
+                                " ".to_string(),
+                                token.start(),
+                            ))),
                     );
                 }
                 // Operator with leading but no trailing space, enforce consistent spacing.
                 (true, false) => {
                     context.push_diagnostic(
-                        diagnostic_kind_for_operator(kind, token.range()).with_fix(Fix::safe_edit(
-                            Edit::insertion(" ".to_string(), token.end()),
-                        )),
+                        diagnostic_kind_for_operator(kind, token.range(), source_file.clone())
+                            .with_fix(Fix::safe_edit(Edit::insertion(
+                                " ".to_string(),
+                                token.end(),
+                            ))),
                     );
                 }
                 // Operator with no space, require spaces if it is required by the operator.
                 (false, false) => {
                     if needs_space == NeedsSpace::Yes {
                         context.push_diagnostic(
-                            diagnostic_kind_for_operator(kind, token.range()).with_fix(
-                                Fix::safe_edits(
+                            diagnostic_kind_for_operator(kind, token.range(), source_file.clone())
+                                .with_fix(Fix::safe_edits(
                                     Edit::insertion(" ".to_string(), token.start()),
                                     [Edit::insertion(" ".to_string(), token.end())],
-                                ),
-                            ),
+                                )),
                         );
                     }
                 }
@@ -314,31 +319,27 @@ impl From<bool> for NeedsSpace {
     }
 }
 
-fn diagnostic_kind_for_operator(operator: TokenKind, range: TextRange) -> Diagnostic {
+fn diagnostic_kind_for_operator(
+    operator: TokenKind,
+    range: TextRange,
+    source_file: SourceFile,
+) -> Diagnostic {
     if operator == TokenKind::Percent {
-        Diagnostic::new(
-            MissingWhitespaceAroundModuloOperator,
-            range,
-            checker.source_file(),
-        )
+        Diagnostic::new(MissingWhitespaceAroundModuloOperator, range, source_file)
     } else if operator.is_bitwise_or_shift() {
         Diagnostic::new(
             MissingWhitespaceAroundBitwiseOrShiftOperator,
             range,
-            checker.source_file(),
+            source_file,
         )
     } else if operator.is_arithmetic() {
         Diagnostic::new(
             MissingWhitespaceAroundArithmeticOperator,
             range,
-            checker.source_file(),
+            source_file,
         )
     } else {
-        Diagnostic::new(
-            MissingWhitespaceAroundOperator,
-            range,
-            checker.source_file(),
-        )
+        Diagnostic::new(MissingWhitespaceAroundOperator, range, source_file)
     }
 }
 

@@ -4,6 +4,8 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 
+use crate::checkers::ast::Checker;
+
 /// ## What it does
 /// Checks for functions with a high `McCabe` complexity.
 ///
@@ -153,6 +155,7 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
 }
 
 pub(crate) fn function_is_too_complex(
+    checker: &Checker,
     stmt: &Stmt,
     name: &str,
     body: &[Stmt],

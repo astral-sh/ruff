@@ -6,7 +6,7 @@ use regex::Regex;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::LineRanges;
+use ruff_source_file::{LineRanges, SourceFile};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
@@ -69,6 +69,7 @@ pub(crate) fn unnecessary_coding_comment(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
     comment_ranges: &CommentRanges,
+    source_file: SourceFile,
 ) {
     let mut iter = CodingCommentIterator::new(locator, comment_ranges)
         .skip_while(|comment| matches!(comment, CodingComment::NoEncoding));
@@ -106,11 +107,7 @@ pub(crate) fn unnecessary_coding_comment(
     }
 
     let fix = Fix::safe_edit(Edit::range_deletion(range.line));
-    let diagnostic = Diagnostic::new(
-        UTF8EncodingDeclaration,
-        range.comment,
-        checker.source_file(),
-    );
+    let diagnostic = Diagnostic::new(UTF8EncodingDeclaration, range.comment, source_file);
 
     diagnostics.push(diagnostic.with_fix(fix));
 }

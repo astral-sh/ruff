@@ -259,9 +259,9 @@ impl<'a> Checker<'a> {
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
         target_version: TargetVersion,
+        source_file: SourceFile,
     ) -> Checker<'a> {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
-        let builder = SourceFileBuilder::new(path.to_string_lossy(), locator.contents());
         Self {
             parsed,
             parsed_type_annotation: None,
@@ -289,7 +289,7 @@ impl<'a> Checker<'a> {
             target_version,
             semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
-            source_file: builder.finish(),
+            source_file,
         }
     }
 }
@@ -2883,13 +2883,14 @@ impl<'a> Checker<'a> {
                 } else {
                     if self.semantic.global_scope().uses_star_imports() {
                         if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
+                            let source_file = self.source_file();
                             self.diagnostics.get_mut().push(
                                 Diagnostic::new(
                                     pyflakes::rules::UndefinedLocalWithImportStarUsage {
                                         name: name.to_string(),
                                     },
                                     range,
-                                    self.source_file(),
+                                    source_file,
                                 )
                                 .with_parent(definition.start()),
                             );
@@ -2899,13 +2900,14 @@ impl<'a> Checker<'a> {
                             if is_undefined_export_in_dunder_init_enabled(self.settings)
                                 || !self.path.ends_with("__init__.py")
                             {
+                                let source_file = self.source_file();
                                 self.diagnostics.get_mut().push(
                                     Diagnostic::new(
                                         pyflakes::rules::UndefinedExport {
                                             name: name.to_string(),
                                         },
                                         range,
-                                        self.source_file(),
+                                        source_file,
                                     )
                                     .with_parent(definition.start()),
                                 );
@@ -2969,6 +2971,7 @@ pub(crate) fn check_ast(
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
     target_version: TargetVersion,
+    source_file: SourceFile,
 ) -> (Vec<Diagnostic>, Vec<SemanticSyntaxError>) {
     let module_path = package
         .map(PackageRoot::path)
@@ -3009,6 +3012,7 @@ pub(crate) fn check_ast(
         cell_offsets,
         notebook_index,
         target_version,
+        source_file,
     );
     checker.bind_builtins();
 

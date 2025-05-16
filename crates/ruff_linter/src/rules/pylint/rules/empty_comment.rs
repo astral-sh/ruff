@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::{CommentRanges, is_python_whitespace};
-use ruff_source_file::LineRanges;
+use ruff_source_file::{LineRanges, SourceFile};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
@@ -48,6 +48,7 @@ pub(crate) fn empty_comments(
     diagnostics: &mut Vec<Diagnostic>,
     comment_ranges: &CommentRanges,
     locator: &Locator,
+    source_file: &SourceFile,
 ) {
     let block_comments = comment_ranges.block_comments(locator.contents());
 
@@ -58,14 +59,18 @@ pub(crate) fn empty_comments(
         }
 
         // If the line contains an empty comment, add a diagnostic.
-        if let Some(diagnostic) = empty_comment(range, locator) {
+        if let Some(diagnostic) = empty_comment(range, locator, source_file.clone()) {
             diagnostics.push(diagnostic);
         }
     }
 }
 
 /// Return a [`Diagnostic`] if the comment at the given [`TextRange`] is empty.
-fn empty_comment(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
+fn empty_comment(
+    range: TextRange,
+    locator: &Locator,
+    source_file: SourceFile,
+) -> Option<Diagnostic> {
     // Check: is the comment empty?
     if !locator
         .slice(range)
@@ -100,7 +105,7 @@ fn empty_comment(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
         Diagnostic::new(
             EmptyComment,
             TextRange::new(first_hash_col, line.end()),
-            checker.source_file(),
+            source_file,
         )
         .with_fix(Fix::safe_edit(
             if let Some(deletion_start_col) = deletion_start_col {

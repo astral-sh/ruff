@@ -17,6 +17,7 @@ use ruff_python_parser::TokenIterWithContext;
 use ruff_python_parser::TokenKind;
 use ruff_python_parser::Tokens;
 use ruff_python_trivia::PythonWhitespace;
+use ruff_source_file::SourceFile;
 use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
@@ -721,7 +722,12 @@ impl<'a> BlankLinesChecker<'a> {
     }
 
     /// E301, E302, E303, E304, E305, E306
-    pub(crate) fn check_lines(&self, tokens: &Tokens, diagnostics: &mut Vec<Diagnostic>) {
+    pub(crate) fn check_lines(
+        &self,
+        tokens: &Tokens,
+        diagnostics: &mut Vec<Diagnostic>,
+        source_file: &SourceFile,
+    ) {
         let mut prev_indent_length: Option<usize> = None;
         let mut prev_logical_line: Option<LogicalLineInfo> = None;
         let mut state = BlankLinesState::default();
@@ -762,7 +768,13 @@ impl<'a> BlankLinesChecker<'a> {
             state.class_status.update(&logical_line);
             state.fn_status.update(&logical_line);
 
-            self.check_line(&logical_line, &state, prev_indent_length, diagnostics);
+            self.check_line(
+                &logical_line,
+                &state,
+                prev_indent_length,
+                diagnostics,
+                source_file.clone(),
+            );
 
             match logical_line.kind {
                 LogicalLineKind::Class => {
@@ -825,6 +837,7 @@ impl<'a> BlankLinesChecker<'a> {
         state: &BlankLinesState,
         prev_indent_length: Option<usize>,
         diagnostics: &mut Vec<Diagnostic>,
+        source_file: SourceFile,
     ) {
         if line.preceding_blank_lines == 0
             // Only applies to methods.
@@ -845,7 +858,7 @@ impl<'a> BlankLinesChecker<'a> {
             let mut diagnostic = Diagnostic::new(
                 BlankLineBetweenMethods,
                 line.first_token_range,
-                checker.source_file(),
+                source_file.clone(),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 self.stylist.line_ending().to_string(),
@@ -906,7 +919,7 @@ impl<'a> BlankLinesChecker<'a> {
                     expected_blank_lines: expected_blank_lines_before_definition,
                 },
                 line.first_token_range,
-                checker.source_file(),
+                source_file.clone(),
             );
 
             if let Some(blank_lines_range) = line.blank_lines.range() {
@@ -950,7 +963,7 @@ impl<'a> BlankLinesChecker<'a> {
                     actual_blank_lines: line.blank_lines.count(),
                 },
                 line.first_token_range,
-                checker.source_file(),
+                source_file.clone(),
             );
 
             if let Some(blank_lines_range) = line.blank_lines.range() {
@@ -977,7 +990,7 @@ impl<'a> BlankLinesChecker<'a> {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                 },
                 line.first_token_range,
-                checker.source_file(),
+                source_file.clone(),
             );
 
             // Get all the lines between the last decorator line (included) and the current line (included).
@@ -1025,7 +1038,7 @@ impl<'a> BlankLinesChecker<'a> {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                 },
                 line.first_token_range,
-                checker.source_file(),
+                source_file.clone(),
             );
 
             if let Some(blank_lines_range) = line.blank_lines.range() {
@@ -1067,7 +1080,7 @@ impl<'a> BlankLinesChecker<'a> {
             let mut diagnostic = Diagnostic::new(
                 BlankLinesBeforeNestedDefinition,
                 line.first_token_range,
-                checker.source_file(),
+                source_file,
             );
 
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(

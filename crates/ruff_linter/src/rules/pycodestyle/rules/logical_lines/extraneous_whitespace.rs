@@ -4,6 +4,7 @@ use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
@@ -126,7 +127,11 @@ impl AlwaysFixableViolation for WhitespaceBeforePunctuation {
 }
 
 /// E201, E202, E203
-pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLinesContext) {
+pub(crate) fn extraneous_whitespace(
+    line: &LogicalLine,
+    context: &mut LogicalLinesContext,
+    source_file: &SourceFile,
+) {
     let mut fstrings = 0u32;
     let mut brackets = vec![];
     let mut prev_token = None;
@@ -168,7 +173,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                         let mut diagnostic = Diagnostic::new(
                             WhitespaceAfterOpenBracket { symbol },
                             TextRange::at(token.end(), trailing_len),
-                            checker.source_file(),
+                            source_file.clone(),
                         );
                         diagnostic
                             .set_fix(Fix::safe_edit(Edit::range_deletion(diagnostic.range())));
@@ -183,7 +188,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                             let mut diagnostic = Diagnostic::new(
                                 WhitespaceBeforeCloseBracket { symbol },
                                 TextRange::at(token.start() - offset, offset),
-                                checker.source_file(),
+                                source_file.clone(),
                             );
                             diagnostic
                                 .set_fix(Fix::safe_edit(Edit::range_deletion(diagnostic.range())));
@@ -210,7 +215,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                     let mut diagnostic = Diagnostic::new(
                                         WhitespaceBeforePunctuation { symbol },
                                         TextRange::at(token.start() - offset, offset),
-                                        checker.source_file(),
+                                        source_file.clone(),
                                     );
                                     diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(
                                         diagnostic.range(),
@@ -226,7 +231,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                         let mut diagnostic = Diagnostic::new(
                                             WhitespaceBeforePunctuation { symbol },
                                             TextRange::at(token.start() - offset, offset),
-                                            checker.source_file(),
+                                            source_file.clone(),
                                         );
                                         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(
                                             diagnostic.range(),
@@ -252,7 +257,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                         let mut diagnostic = Diagnostic::new(
                                             WhitespaceBeforePunctuation { symbol },
                                             TextRange::at(token.start() - offset, offset),
-                                            checker.source_file(),
+                                            source_file.clone(),
                                         );
                                         diagnostic.set_fix(Fix::safe_edits(
                                             Edit::range_deletion(diagnostic.range()),
@@ -270,7 +275,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                         let mut diagnostic = Diagnostic::new(
                                             WhitespaceBeforePunctuation { symbol },
                                             TextRange::at(token.start() - offset, offset),
-                                            checker.source_file(),
+                                            source_file.clone(),
                                         );
                                         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(
                                             diagnostic.range(),
@@ -289,7 +294,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                 let mut diagnostic = Diagnostic::new(
                                     WhitespaceBeforePunctuation { symbol },
                                     TextRange::at(token.start() - offset, offset),
-                                    checker.source_file(),
+                                    source_file.clone(),
                                 );
                                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(
                                     diagnostic.range(),

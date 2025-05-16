@@ -2,7 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::PythonWhitespace;
-use ruff_source_file::LineRanges;
+use ruff_source_file::{LineRanges, SourceFile};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -168,6 +168,7 @@ pub(crate) fn whitespace_before_comment(
     line: &LogicalLine,
     locator: &Locator,
     context: &mut LogicalLinesContext,
+    source_file: &SourceFile,
 ) {
     let mut prev_end = TextSize::default();
     for token in line.tokens() {
@@ -188,7 +189,7 @@ pub(crate) fn whitespace_before_comment(
                     let mut diagnostic = Diagnostic::new(
                         TooFewSpacesBeforeInlineComment,
                         TextRange::new(prev_end, range.start()),
-                        checker.source_file(),
+                        source_file.clone(),
                     );
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         "  ".to_string(),
@@ -212,7 +213,7 @@ pub(crate) fn whitespace_before_comment(
             if is_inline_comment {
                 if bad_prefix.is_some() || comment.chars().next().is_some_and(char::is_whitespace) {
                     let mut diagnostic =
-                        Diagnostic::new(NoSpaceAfterInlineComment, range, checker.source_file());
+                        Diagnostic::new(NoSpaceAfterInlineComment, range, source_file.clone());
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         format_leading_space(token_text),
                         range,
@@ -223,7 +224,7 @@ pub(crate) fn whitespace_before_comment(
                 if bad_prefix != '!' || !line.is_start_of_file() {
                     if bad_prefix != '#' {
                         let mut diagnostic =
-                            Diagnostic::new(NoSpaceAfterBlockComment, range, checker.source_file());
+                            Diagnostic::new(NoSpaceAfterBlockComment, range, source_file.clone());
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                             format_leading_space(token_text),
                             range,
@@ -233,7 +234,7 @@ pub(crate) fn whitespace_before_comment(
                         let mut diagnostic = Diagnostic::new(
                             MultipleLeadingHashesForBlockComment,
                             range,
-                            checker.source_file(),
+                            source_file.clone(),
                         );
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                             format_leading_hashes(token_text),

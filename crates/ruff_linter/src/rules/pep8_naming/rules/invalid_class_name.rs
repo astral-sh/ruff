@@ -4,7 +4,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 
-use crate::rules::pep8_naming::settings::IgnoreNames;
+use crate::{checkers::ast::Checker, rules::pep8_naming::settings::IgnoreNames};
 
 /// ## What it does
 /// Checks for class names that do not follow the `CamelCase` convention.
@@ -54,6 +54,7 @@ impl Violation for InvalidClassName {
 
 /// N801
 pub(crate) fn invalid_class_name(
+    checker: &Checker,
     class_def: &Stmt,
     name: &str,
     ignore_names: &IgnoreNames,

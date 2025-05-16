@@ -1253,14 +1253,9 @@ mod tests {
     }
 
     /// Create a [`Message`] with a placeholder filename and rule code from `diagnostic`.
-    fn message_from_diagnostic(
-        diagnostic: Diagnostic,
-        path: impl AsRef<Path>,
-        source: &str,
-    ) -> Message {
+    fn message_from_diagnostic(diagnostic: Diagnostic) -> Message {
         let noqa_offset = diagnostic.start();
-        let file = SourceFileBuilder::new(path.as_ref().to_string_lossy(), source).finish();
-        Message::from_diagnostic(diagnostic, file, noqa_offset)
+        Message::from_diagnostic(diagnostic, noqa_offset)
     }
 
     #[test]
@@ -2830,6 +2825,7 @@ mod tests {
         let path = Path::new("/tmp/foo.txt");
 
         let contents = "x = 1";
+        let file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
         let noqa_line_for = NoqaMapping::default();
         let (count, output) = add_noqa_inner(
             path,
@@ -2848,11 +2844,12 @@ mod tests {
                 name: "x".to_string(),
             },
             TextRange::new(TextSize::from(0), TextSize::from(0)),
-            checker.source_file(),
+            file,
         )]
-        .map(|d| message_from_diagnostic(d, path, contents));
+        .map(message_from_diagnostic);
 
         let contents = "x = 1";
+        let file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
         let noqa_line_for = NoqaMapping::default();
         let (count, output) = add_noqa_inner(
             path,
@@ -2870,18 +2867,19 @@ mod tests {
             Diagnostic::new(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
-                checker.source_file(),
+                file.clone(),
             ),
             Diagnostic::new(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
-                checker.source_file(),
+                file,
             ),
         ]
-        .map(|d| message_from_diagnostic(d, path, contents));
+        .map(message_from_diagnostic);
         let contents = "x = 1  # noqa: E741\n";
+        let file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
             CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(19))]);
@@ -2901,17 +2899,17 @@ mod tests {
             Diagnostic::new(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
-                checker.source_file(),
+                file.clone(),
             ),
             Diagnostic::new(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
-                checker.source_file(),
+                file,
             ),
         ]
-        .map(|d| message_from_diagnostic(d, path, contents));
+        .map(message_from_diagnostic);
         let contents = "x = 1  # noqa";
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
@@ -2941,13 +2939,14 @@ print(
     % name
 )
 "#;
+        let file = SourceFileBuilder::new(path.to_string_lossy(), source).finish();
         let noqa_line_for = [TextRange::new(8.into(), 68.into())].into_iter().collect();
         let messages = [Diagnostic::new(
             PrintfStringFormatting,
             TextRange::new(12.into(), 79.into()),
-            checker.source_file(),
+            file,
         )]
-        .map(|d| message_from_diagnostic(d, path, source));
+        .map(message_from_diagnostic);
         let comment_ranges = CommentRanges::default();
         let edits = generate_noqa_edits(
             path,
@@ -2975,12 +2974,13 @@ print(
 foo;
 bar =
 ";
+        let file = SourceFileBuilder::new(path.to_string_lossy(), source).finish();
         let messages = [Diagnostic::new(
             UselessSemicolon,
             TextRange::new(4.into(), 5.into()),
-            checker.source_file(),
+            file,
         )]
-        .map(|d| message_from_diagnostic(d, path, source));
+        .map(message_from_diagnostic);
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges = CommentRanges::default();
         let edits = generate_noqa_edits(

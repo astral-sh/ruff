@@ -4,6 +4,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::{Visitor, walk_f_string};
 use ruff_python_ast::{self as ast, AnyStringFlags, PythonVersion, StringFlags, StringLike};
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
@@ -65,6 +66,7 @@ pub(crate) fn avoidable_escaped_quote(checker: &Checker, string_like: StringLike
         checker.locator(),
         checker.settings,
         checker.target_version(),
+        checker.source_file(),
     );
 
     for part in string_like.parts() {
@@ -89,6 +91,7 @@ struct AvoidableEscapedQuoteChecker<'a> {
     quotes_settings: &'a flake8_quotes::settings::Settings,
     supports_pep701: bool,
     diagnostics: Vec<Diagnostic>,
+    source_file: SourceFile,
 }
 
 impl<'a> AvoidableEscapedQuoteChecker<'a> {
@@ -96,12 +99,14 @@ impl<'a> AvoidableEscapedQuoteChecker<'a> {
         locator: &'a Locator<'a>,
         settings: &'a LinterSettings,
         target_version: PythonVersion,
+        source_file: SourceFile,
     ) -> Self {
         Self {
             locator,
             quotes_settings: &settings.flake8_quotes,
             supports_pep701: target_version.supports_pep_701(),
             diagnostics: vec![],
+            source_file,
         }
     }
 
@@ -112,29 +117,31 @@ impl<'a> AvoidableEscapedQuoteChecker<'a> {
 }
 
 impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_> {
-    fn visit_string_literal(&mut self, string_literal: &'_ ast::StringLiteral) {
+    fn visit_string_literal(&mut self, string_literal: &ast::StringLiteral) {
         if let Some(diagnostic) = check_string_or_bytes(
             self.locator,
             self.quotes_settings,
             string_literal.range(),
             AnyStringFlags::from(string_literal.flags),
+            self.source_file.clone(),
         ) {
             self.diagnostics.push(diagnostic);
         }
     }
 
-    fn visit_bytes_literal(&mut self, bytes_literal: &'_ ast::BytesLiteral) {
+    fn visit_bytes_literal(&mut self, bytes_literal: &ast::BytesLiteral) {
         if let Some(diagnostic) = check_string_or_bytes(
             self.locator,
             self.quotes_settings,
             bytes_literal.range(),
             AnyStringFlags::from(bytes_literal.flags),
+            self.source_file.clone(),
         ) {
             self.diagnostics.push(diagnostic);
         }
     }
 
-    fn visit_f_string(&mut self, f_string: &'_ ast::FString) {
+    fn visit_f_string(&mut self, f_string: &ast::FString) {
         // If the target version doesn't support PEP 701, skip this entire f-string if it contains
         // any string literal in any of the expression element. For example:
         //
@@ -203,7 +210,12 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_> {
             .literals()
             .any(|literal| contains_quote(literal, opposite_quote_char))
         {
-            if let Some(diagnostic) = check_f_string(self.locator, self.quotes_settings, f_string) {
+            if let Some(diagnostic) = check_f_string(
+                self.locator,
+                self.quotes_settings,
+                f_string,
+                self.source_file.clone(),
+            ) {
                 self.diagnostics.push(diagnostic);
             }
         }
@@ -222,6 +234,7 @@ fn check_string_or_bytes(
     quotes_settings: &flake8_quotes::settings::Settings,
     range: TextRange,
     flags: AnyStringFlags,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     assert!(!flags.is_f_string());
 
@@ -242,7 +255,7 @@ fn check_string_or_bytes(
         return None;
     }
 
-    let mut diagnostic = Diagnostic::new(AvoidableEscapedQuote, range, checker.source_file());
+    let mut diagnostic = Diagnostic::new(AvoidableEscapedQuote, range, source_file);
     let fixed_contents = format!(
         "{prefix}{quote}{value}{quote}",
         prefix = flags.prefix(),
@@ -261,6 +274,7 @@ fn check_f_string(
     locator: &Locator,
     quotes_settings: &flake8_quotes::settings::Settings,
     f_string: &ast::FString,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     let ast::FString { flags, range, .. } = f_string;
 
@@ -321,7 +335,7 @@ fn check_f_string(
     ));
 
     Some(
-        Diagnostic::new(AvoidableEscapedQuote, *range, checker.source_file())
+        Diagnostic::new(AvoidableEscapedQuote, *range, source_file)
             .with_fix(Fix::safe_edits(start_edit, edits)),
     )
 }

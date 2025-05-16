@@ -3,6 +3,7 @@
 use std::path::Path;
 
 use itertools::Itertools;
+use ruff_source_file::SourceFile;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -32,6 +33,7 @@ pub(crate) fn check_noqa(
     analyze_directives: bool,
     per_file_ignores: &RuleSet,
     settings: &LinterSettings,
+    file: &SourceFile,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
     let file_noqa_directives =
@@ -134,7 +136,7 @@ pub(crate) fn check_noqa(
                         let mut diagnostic = Diagnostic::new(
                             UnusedNOQA { codes: None },
                             directive.range(),
-                            checker.source_file(),
+                            file.clone(),
                         );
                         diagnostic.set_fix(Fix::safe_edit(edit));
 
@@ -233,7 +235,7 @@ pub(crate) fn check_noqa(
                                 }),
                             },
                             directive.range(),
-                            checker.source_file(),
+                            file.clone(),
                         );
                         diagnostic.set_fix(Fix::safe_edit(edit));
                         diagnostics.push(diagnostic);
@@ -247,8 +249,8 @@ pub(crate) fn check_noqa(
         && !per_file_ignores.contains(Rule::RedirectedNOQA)
         && !exemption.includes(Rule::RedirectedNOQA)
     {
-        ruff::rules::redirected_noqa(diagnostics, &noqa_directives);
-        ruff::rules::redirected_file_noqa(diagnostics, &file_noqa_directives);
+        ruff::rules::redirected_noqa(diagnostics, &noqa_directives, file);
+        ruff::rules::redirected_file_noqa(diagnostics, &file_noqa_directives, file);
     }
 
     if settings.rules.enabled(Rule::BlanketNOQA)
@@ -260,6 +262,7 @@ pub(crate) fn check_noqa(
             &noqa_directives,
             locator,
             &file_noqa_directives,
+            file,
         );
     }
 
@@ -267,7 +270,13 @@ pub(crate) fn check_noqa(
         && !per_file_ignores.contains(Rule::InvalidRuleCode)
         && !exemption.enumerates(Rule::InvalidRuleCode)
     {
-        ruff::rules::invalid_noqa_code(diagnostics, &noqa_directives, locator, &settings.external);
+        ruff::rules::invalid_noqa_code(
+            diagnostics,
+            &noqa_directives,
+            locator,
+            &settings.external,
+            file,
+        );
     }
 
     ignored_diagnostics.sort_unstable();

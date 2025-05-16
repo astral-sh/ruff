@@ -5,6 +5,7 @@ use regex::Regex;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
+use ruff_source_file::SourceFile;
 
 use crate::Locator;
 
@@ -41,6 +42,7 @@ pub(crate) fn type_comment_in_stub(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
     comment_ranges: &CommentRanges,
+    source_file: &SourceFile,
 ) {
     for range in comment_ranges {
         let comment = locator.slice(range);
@@ -49,7 +51,7 @@ pub(crate) fn type_comment_in_stub(
             diagnostics.push(Diagnostic::new(
                 TypeCommentInStub,
                 range,
-                checker.source_file(),
+                source_file.clone(),
             ));
         }
     }

@@ -2,6 +2,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
+use ruff_source_file::SourceFile;
 use ruff_text_size::TextRange;
 
 use super::LogicalLine;
@@ -255,6 +256,7 @@ impl Violation for OverIndented {
 }
 
 /// E111, E112, E113, E114, E115, E116, E117
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn indentation(
     logical_line: &LogicalLine,
     prev_logical_line: Option<&LogicalLine>,
@@ -263,6 +265,7 @@ pub(crate) fn indentation(
     prev_indent_level: Option<usize>,
     indent_size: usize,
     range: TextRange,
+    source_file: SourceFile,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
@@ -273,7 +276,7 @@ pub(crate) fn indentation(
                     indent_width: indent_size,
                 },
                 range,
-                checker.source_file(),
+                source_file.clone(),
             )
         } else {
             Diagnostic::new(
@@ -281,7 +284,7 @@ pub(crate) fn indentation(
                     indent_width: indent_size,
                 },
                 range,
-                checker.source_file(),
+                source_file.clone(),
             )
         });
     }
@@ -291,17 +294,17 @@ pub(crate) fn indentation(
 
     if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
         diagnostics.push(if logical_line.is_comment_only() {
-            Diagnostic::new(NoIndentedBlockComment, range, checker.source_file())
+            Diagnostic::new(NoIndentedBlockComment, range, source_file.clone())
         } else {
-            Diagnostic::new(NoIndentedBlock, range, checker.source_file())
+            Diagnostic::new(NoIndentedBlock, range, source_file.clone())
         });
     } else if !indent_expect
         && prev_indent_level.is_some_and(|prev_indent_level| indent_level > prev_indent_level)
     {
         diagnostics.push(if logical_line.is_comment_only() {
-            Diagnostic::new(UnexpectedIndentationComment, range, checker.source_file())
+            Diagnostic::new(UnexpectedIndentationComment, range, source_file.clone())
         } else {
-            Diagnostic::new(UnexpectedIndentation, range, checker.source_file())
+            Diagnostic::new(UnexpectedIndentation, range, source_file.clone())
         });
     }
     if indent_expect {
@@ -313,7 +316,7 @@ pub(crate) fn indentation(
                     is_comment: logical_line.is_comment_only(),
                 },
                 range,
-                checker.source_file(),
+                source_file,
             ));
         }
     }

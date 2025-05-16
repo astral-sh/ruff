@@ -6,6 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_source_file::SourceFile;
 
 use crate::registry::AsRule;
 #[cfg(target_family = "unix")]
@@ -49,7 +50,10 @@ impl Violation for ShebangMissingExecutableFile {
 
 /// EXE002
 #[cfg(target_family = "unix")]
-pub(crate) fn shebang_missing_executable_file(filepath: &Path) -> Option<Diagnostic> {
+pub(crate) fn shebang_missing_executable_file(
+    filepath: &Path,
+    source_file: SourceFile,
+) -> Option<Diagnostic> {
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
     if is_wsl::is_wsl() {
@@ -59,13 +63,16 @@ pub(crate) fn shebang_missing_executable_file(filepath: &Path) -> Option<Diagnos
         return Some(Diagnostic::new(
             ShebangMissingExecutableFile,
             TextRange::default(),
-            checker.source_file(),
+            source_file,
         ));
     }
     None
 }
 
 #[cfg(not(target_family = "unix"))]
-pub(crate) fn shebang_missing_executable_file(_filepath: &Path) -> Option<Diagnostic> {
+pub(crate) fn shebang_missing_executable_file(
+    _filepath: &Path,
+    _source_file: SourceFile,
+) -> Option<Diagnostic> {
     None
 }

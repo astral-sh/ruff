@@ -175,9 +175,9 @@ mod tests {
         // The choice of rule here is arbitrary.
         edit.into_iter()
             .map(|edit| {
+                let file = SourceFileBuilder::new(filename, source).finish();
                 let range = edit.range();
-                let diagnostic =
-                    Diagnostic::new(MissingNewlineAtEndOfFile, range, checker.source_file());
+                let diagnostic = Diagnostic::new(MissingNewlineAtEndOfFile, range, file.clone());
                 DiagnosticMessage {
                     name: diagnostic.name,
                     body: diagnostic.body,
@@ -185,7 +185,7 @@ mod tests {
                     range,
                     fix: Some(Fix::safe_edit(edit)),
                     parent: None,
-                    file: SourceFileBuilder::new(filename, source).finish(),
+                    file,
                     noqa_offset: TextSize::default(),
                 }
             })

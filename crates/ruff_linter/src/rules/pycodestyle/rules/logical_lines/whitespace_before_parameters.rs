@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
@@ -54,7 +55,11 @@ impl AlwaysFixableViolation for WhitespaceBeforeParameters {
 }
 
 /// E211
-pub(crate) fn whitespace_before_parameters(line: &LogicalLine, context: &mut LogicalLinesContext) {
+pub(crate) fn whitespace_before_parameters(
+    line: &LogicalLine,
+    context: &mut LogicalLinesContext,
+    source_file: &SourceFile,
+) {
     let previous = line.tokens().first().unwrap();
 
     let mut pre_pre_kind: Option<TokenKind> = None;
@@ -77,7 +82,7 @@ pub(crate) fn whitespace_before_parameters(line: &LogicalLine, context: &mut Log
             let kind: WhitespaceBeforeParameters = WhitespaceBeforeParameters { bracket: kind };
 
             let mut diagnostic =
-                Diagnostic::new(kind, TextRange::new(start, end), checker.source_file());
+                Diagnostic::new(kind, TextRange::new(start, end), source_file.clone());
             diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
             context.push_diagnostic(diagnostic);
         }

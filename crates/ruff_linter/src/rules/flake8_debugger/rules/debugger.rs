@@ -69,7 +69,12 @@ pub(crate) fn debugger_call(checker: &Checker, expr: &Expr, func: &Expr) {
 }
 
 /// Checks for the presence of a debugger import.
-pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Diagnostic> {
+pub(crate) fn debugger_import(
+    checker: &Checker,
+    stmt: &Stmt,
+    module: Option<&str>,
+    name: &str,
+) -> Option<Diagnostic> {
     if let Some(module) = module {
         let qualified_name = QualifiedName::user_defined(module).append_member(name);
 

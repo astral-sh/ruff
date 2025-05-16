@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_index::Indexer;
-use ruff_source_file::Line;
+use ruff_source_file::{Line, SourceFile};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -78,6 +78,7 @@ pub(crate) fn trailing_whitespace(
     locator: &Locator,
     indexer: &Indexer,
     settings: &LinterSettings,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     let whitespace_len: TextSize = line
         .chars()
@@ -95,8 +96,7 @@ pub(crate) fn trailing_whitespace(
         };
         if range == line.range() {
             if settings.rules.enabled(Rule::BlankLineWithWhitespace) {
-                let mut diagnostic =
-                    Diagnostic::new(BlankLineWithWhitespace, range, checker.source_file());
+                let mut diagnostic = Diagnostic::new(BlankLineWithWhitespace, range, source_file);
                 // Remove any preceding continuations, to avoid introducing a potential
                 // syntax error.
                 diagnostic.set_fix(Fix::applicable_edit(
@@ -111,7 +111,7 @@ pub(crate) fn trailing_whitespace(
                 return Some(diagnostic);
             }
         } else if settings.rules.enabled(Rule::TrailingWhitespace) {
-            let mut diagnostic = Diagnostic::new(TrailingWhitespace, range, checker.source_file());
+            let mut diagnostic = Diagnostic::new(TrailingWhitespace, range, source_file);
             diagnostic.set_fix(Fix::applicable_edit(
                 Edit::range_deletion(range),
                 applicability,

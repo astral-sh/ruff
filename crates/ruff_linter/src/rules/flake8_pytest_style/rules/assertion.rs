@@ -19,7 +19,7 @@ use ruff_python_ast::{
 use ruff_python_ast::{visitor, whitespace};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::{Binding, BindingKind};
-use ruff_source_file::LineRanges;
+use ruff_source_file::{LineRanges, SourceFile};
 use ruff_text_size::Ranged;
 
 use crate::Locator;
@@ -212,14 +212,16 @@ impl Violation for PytestUnittestAssertion {
 /// the exception name.
 struct ExceptionHandlerVisitor<'a> {
     exception_name: &'a str,
+    source_file: SourceFile,
     current_assert: Option<&'a Stmt>,
     errors: Vec<Diagnostic>,
 }
 
 impl<'a> ExceptionHandlerVisitor<'a> {
-    const fn new(exception_name: &'a str) -> Self {
+    const fn new(exception_name: &'a str, source_file: SourceFile) -> Self {
         Self {
             exception_name,
+            source_file,
             current_assert: None,
             errors: Vec::new(),
         }
@@ -248,7 +250,7 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
                                 name: id.to_string(),
                             },
                             current_assert.range(),
-                            checker.source_file(),
+                            self.source_file.clone(),
                         ));
                     }
                 }
@@ -258,9 +260,9 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
     }
 }
 
-fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Diagnostic> {
+fn check_assert_in_except(name: &str, body: &[Stmt], source_file: SourceFile) -> Vec<Diagnostic> {
     // Walk body to find assert statements that reference the exception name
-    let mut visitor = ExceptionHandlerVisitor::new(name);
+    let mut visitor = ExceptionHandlerVisitor::new(name, source_file);
     for stmt in body {
         visitor.visit_stmt(stmt);
     }
@@ -606,7 +608,7 @@ pub(crate) fn assert_in_exception_handler(checker: &Checker, handlers: &[ExceptH
     checker.report_diagnostics(handlers.iter().flat_map(|handler| match handler {
         ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, body, .. }) => {
             if let Some(name) = name {
-                check_assert_in_except(name, body)
+                check_assert_in_except(name, body, checker.source_file())
             } else {
                 Vec::new()
             }

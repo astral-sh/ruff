@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::Cursor;
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
@@ -78,6 +79,7 @@ pub(crate) fn blanket_noqa(
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
     file_noqa_directives: &FileNoqaDirectives,
+    source_file: &SourceFile,
 ) {
     for line in file_noqa_directives.lines() {
         if let Directive::All(_) = line.parsed_file_exemption {
@@ -87,7 +89,7 @@ pub(crate) fn blanket_noqa(
                     file_exemption: true,
                 },
                 line.range(),
-                checker.source_file(),
+                source_file.clone(),
             ));
         }
     }
@@ -112,7 +114,7 @@ pub(crate) fn blanket_noqa(
                         file_exemption: false,
                     },
                     TextRange::new(all.start(), end),
-                    checker.source_file(),
+                    source_file.clone(),
                 );
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(':'.to_string(), start)));
                 diagnostics.push(diagnostic);
@@ -124,7 +126,7 @@ pub(crate) fn blanket_noqa(
                         file_exemption: false,
                     },
                     all.range(),
-                    checker.source_file(),
+                    source_file.clone(),
                 ));
             }
         }

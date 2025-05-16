@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_index::Indexer;
-use ruff_source_file::LineRanges;
+use ruff_source_file::{LineRanges, SourceFile};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
@@ -37,6 +37,7 @@ pub(crate) fn tab_indentation(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
     indexer: &Indexer,
+    source_file: &SourceFile,
 ) {
     let contents = locator.contents().as_bytes();
     let mut offset = 0;
@@ -46,11 +47,7 @@ pub(crate) fn tab_indentation(
 
         // Determine whether the tab is part of the line's indentation.
         if let Some(indent) = tab_indentation_at_line_start(range.start(), locator, indexer) {
-            diagnostics.push(Diagnostic::new(
-                TabIndentation,
-                indent,
-                checker.source_file(),
-            ));
+            diagnostics.push(Diagnostic::new(TabIndentation, indent, source_file.clone()));
         }
 
         // Advance to the next line.

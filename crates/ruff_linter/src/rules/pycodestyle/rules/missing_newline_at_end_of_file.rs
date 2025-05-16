@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_codegen::Stylist;
+use ruff_source_file::SourceFile;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::Locator;
@@ -40,6 +41,7 @@ impl AlwaysFixableViolation for MissingNewlineAtEndOfFile {
 pub(crate) fn no_newline_at_end_of_file(
     locator: &Locator,
     stylist: &Stylist,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     let source = locator.contents();
 
@@ -51,8 +53,7 @@ pub(crate) fn no_newline_at_end_of_file(
     if !source.ends_with(['\n', '\r']) {
         let range = TextRange::empty(locator.contents().text_len());
 
-        let mut diagnostic =
-            Diagnostic::new(MissingNewlineAtEndOfFile, range, checker.source_file());
+        let mut diagnostic = Diagnostic::new(MissingNewlineAtEndOfFile, range, source_file);
         diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
             stylist.line_ending().to_string(),
             range.start(),

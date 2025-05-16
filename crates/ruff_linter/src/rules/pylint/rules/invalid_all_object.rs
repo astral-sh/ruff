@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Binding;
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -36,12 +37,12 @@ impl Violation for InvalidAllObject {
 }
 
 /// PLE0604
-pub(crate) fn invalid_all_object(binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn invalid_all_object(binding: &Binding, source_file: SourceFile) -> Option<Diagnostic> {
     if binding.is_invalid_all_object() {
         Some(Diagnostic::new(
             InvalidAllObject,
             binding.range(),
-            checker.source_file(),
+            source_file,
         ))
     } else {
         None

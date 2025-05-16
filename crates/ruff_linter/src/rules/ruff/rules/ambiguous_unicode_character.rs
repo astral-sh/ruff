@@ -5,6 +5,7 @@ use bitflags::bitflags;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, StringLike};
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -180,9 +181,17 @@ pub(crate) fn ambiguous_unicode_character_comment(
     locator: &Locator,
     range: TextRange,
     settings: &LinterSettings,
+    source_file: &SourceFile,
 ) {
     let text = locator.slice(range);
-    ambiguous_unicode_character(diagnostics, text, range, Context::Comment, settings);
+    ambiguous_unicode_character(
+        diagnostics,
+        text,
+        range,
+        Context::Comment,
+        settings,
+        source_file,
+    );
 }
 
 /// RUF001, RUF002
@@ -210,6 +219,7 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like:
                     string_literal.range(),
                     context,
                     checker.settings,
+                    &checker.source_file(),
                 );
                 checker.report_diagnostics(diagnostics);
             }
@@ -224,6 +234,7 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like:
                         literal.range(),
                         context,
                         checker.settings,
+                        &checker.source_file(),
                     );
                     checker.report_diagnostics(diagnostics);
                 }
@@ -238,6 +249,7 @@ fn ambiguous_unicode_character(
     range: TextRange,
     context: Context,
     settings: &LinterSettings,
+    source_file: &SourceFile,
 ) {
     // Most of the time, we don't need to check for ambiguous unicode characters at all.
     if text.is_ascii() {
@@ -253,7 +265,9 @@ fn ambiguous_unicode_character(
             if !word_candidates.is_empty() {
                 if word_flags.is_candidate_word() {
                     for candidate in word_candidates.drain(..) {
-                        if let Some(diagnostic) = candidate.into_diagnostic(context, settings) {
+                        if let Some(diagnostic) =
+                            candidate.into_diagnostic(context, settings, source_file.clone())
+                        {
                             diagnostics.push(diagnostic);
                         }
                     }
@@ -273,7 +287,9 @@ fn ambiguous_unicode_character(
                         current_char,
                         representant,
                     );
-                    if let Some(diagnostic) = candidate.into_diagnostic(context, settings) {
+                    if let Some(diagnostic) =
+                        candidate.into_diagnostic(context, settings, source_file.clone())
+                    {
                         diagnostics.push(diagnostic);
                     }
                 }
@@ -300,7 +316,9 @@ fn ambiguous_unicode_character(
     if !word_candidates.is_empty() {
         if word_flags.is_candidate_word() {
             for candidate in word_candidates.drain(..) {
-                if let Some(diagnostic) = candidate.into_diagnostic(context, settings) {
+                if let Some(diagnostic) =
+                    candidate.into_diagnostic(context, settings, source_file.clone())
+                {
                     diagnostics.push(diagnostic);
                 }
             }
@@ -352,7 +370,12 @@ impl Candidate {
         }
     }
 
-    fn into_diagnostic(self, context: Context, settings: &LinterSettings) -> Option<Diagnostic> {
+    fn into_diagnostic(
+        self,
+        context: Context,
+        settings: &LinterSettings,
+        source_file: SourceFile,
+    ) -> Option<Diagnostic> {
         if !settings.allowed_confusables.contains(&self.confusable) {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());
             let diagnostic = match context {
@@ -362,7 +385,7 @@ impl Candidate {
                         representant: self.representant,
                     },
                     char_range,
-                    checker.source_file(),
+                    source_file,
                 ),
                 Context::Docstring => Diagnostic::new(
                     AmbiguousUnicodeCharacterDocstring {
@@ -370,7 +393,7 @@ impl Candidate {
                         representant: self.representant,
                     },
                     char_range,
-                    checker.source_file(),
+                    source_file,
                 ),
                 Context::Comment => Diagnostic::new(
                     AmbiguousUnicodeCharacterComment {
@@ -378,7 +401,7 @@ impl Candidate {
                         representant: self.representant,
                     },
                     char_range,
-                    checker.source_file(),
+                    source_file,
                 ),
             };
             if settings.rules.enabled(diagnostic.rule()) {

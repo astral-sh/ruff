@@ -4,6 +4,8 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 
+use crate::checkers::ast::Checker;
+
 /// ## What it does
 /// Checks for functions or methods with too many branches, including (nested)
 /// `if`, `elif`, and `else` branches, `for` loops, `try`-`except` clauses, and
@@ -233,6 +235,7 @@ fn num_branches(stmts: &[Stmt]) -> usize {
 
 /// PLR0912
 pub(crate) fn too_many_branches(
+    checker: &Checker,
     stmt: &Stmt,
     body: &[Stmt],
     max_branches: usize,

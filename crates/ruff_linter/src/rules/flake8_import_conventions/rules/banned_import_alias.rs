@@ -5,7 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
-use crate::rules::flake8_import_conventions::settings::BannedAliases;
+use crate::{checkers::ast::Checker, rules::flake8_import_conventions::settings::BannedAliases};
 
 /// ## What it does
 /// Checks for imports that use non-standard naming conventions, like
@@ -48,6 +48,7 @@ impl Violation for BannedImportAlias {
 
 /// ICN002
 pub(crate) fn banned_import_alias(
+    checker: &Checker,
     stmt: &Stmt,
     name: &str,
     asname: &str,
