@@ -5,6 +5,7 @@ from typing import TypeVar
 
 x: "int" | str  # TC010
 x: ("int" | str) | "bool"  # TC010
+x: b"int" | str  # TC010 (unfixable)
 
 
 def func():
