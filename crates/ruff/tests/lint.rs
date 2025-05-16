@@ -2333,7 +2333,7 @@ requires-python = ">= 3.11"
         ]
         linter.flake8_type_checking.runtime_required_base_classes = []
         linter.flake8_type_checking.runtime_required_decorators = []
-        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_type_checking.quote_type_expressions = "none"
         linter.flake8_unused_arguments.ignore_variadic_names = false
         linter.isort.required_imports = []
         linter.isort.combine_as_imports = false
@@ -2645,7 +2645,7 @@ requires-python = ">= 3.11"
         ]
         linter.flake8_type_checking.runtime_required_base_classes = []
         linter.flake8_type_checking.runtime_required_decorators = []
-        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_type_checking.quote_type_expressions = "none"
         linter.flake8_unused_arguments.ignore_variadic_names = false
         linter.isort.required_imports = []
         linter.isort.combine_as_imports = false
@@ -3009,7 +3009,7 @@ from typing import Union;foo: Union[int, str] = 1
         ]
         linter.flake8_type_checking.runtime_required_base_classes = []
         linter.flake8_type_checking.runtime_required_decorators = []
-        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_type_checking.quote_type_expressions = "none"
         linter.flake8_unused_arguments.ignore_variadic_names = false
         linter.isort.required_imports = []
         linter.isort.combine_as_imports = false
@@ -3389,7 +3389,7 @@ from typing import Union;foo: Union[int, str] = 1
         ]
         linter.flake8_type_checking.runtime_required_base_classes = []
         linter.flake8_type_checking.runtime_required_decorators = []
-        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_type_checking.quote_type_expressions = "none"
         linter.flake8_unused_arguments.ignore_variadic_names = false
         linter.isort.required_imports = []
         linter.isort.combine_as_imports = false
@@ -3717,7 +3717,7 @@ from typing import Union;foo: Union[int, str] = 1
         ]
         linter.flake8_type_checking.runtime_required_base_classes = []
         linter.flake8_type_checking.runtime_required_decorators = []
-        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_type_checking.quote_type_expressions = "none"
         linter.flake8_unused_arguments.ignore_variadic_names = false
         linter.isort.required_imports = []
         linter.isort.combine_as_imports = false
@@ -4045,7 +4045,7 @@ from typing import Union;foo: Union[int, str] = 1
         ]
         linter.flake8_type_checking.runtime_required_base_classes = []
         linter.flake8_type_checking.runtime_required_decorators = []
-        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_type_checking.quote_type_expressions = "none"
         linter.flake8_unused_arguments.ignore_variadic_names = false
         linter.isort.required_imports = []
         linter.isort.combine_as_imports = false
@@ -4330,7 +4330,7 @@ from typing import Union;foo: Union[int, str] = 1
         ]
         linter.flake8_type_checking.runtime_required_base_classes = []
         linter.flake8_type_checking.runtime_required_decorators = []
-        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_type_checking.quote_type_expressions = "none"
         linter.flake8_unused_arguments.ignore_variadic_names = false
         linter.isort.required_imports = []
         linter.isort.combine_as_imports = false
@@ -4668,7 +4668,7 @@ from typing import Union;foo: Union[int, str] = 1
         ]
         linter.flake8_type_checking.runtime_required_base_classes = []
         linter.flake8_type_checking.runtime_required_decorators = []
-        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_type_checking.quote_type_expressions = "none"
         linter.flake8_unused_arguments.ignore_variadic_names = false
         linter.isort.required_imports = []
         linter.isort.combine_as_imports = false
