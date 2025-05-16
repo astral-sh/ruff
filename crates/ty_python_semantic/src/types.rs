@@ -5034,7 +5034,6 @@ impl<'db> Type<'db> {
     /// Note that this does not specialize generic classes, functions, or type aliases! That is a
     /// different operation that is performed explicitly (via a subscript operation), or implicitly
     /// via a call to the generic object.
-    #[must_use]
     #[salsa::tracked]
     pub fn apply_specialization(
         self,

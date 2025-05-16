@@ -413,7 +413,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                 soft_block_indent(&format_args![flat, inline_comments]),
                                 token(")"),
                             ])
-                            .with_group_id(Some(group_id))
+                            .with_id(Some(group_id))
                             .should_expand(true)
                             .fmt(f)
                         });
@@ -433,7 +433,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                 token(")"),
                                 inline_comments,
                             ])
-                            .with_group_id(Some(group_id))
+                            .with_id(Some(group_id))
                             .should_expand(true)
                             .fmt(f)
                         });
@@ -501,7 +501,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                 soft_block_indent(&format_args![f_string_flat, inline_comments]),
                                 token(")"),
                             ])
-                            .with_group_id(Some(group_id))
+                            .with_id(Some(group_id))
                             .should_expand(true)
                             .fmt(f)
                         });
@@ -817,7 +817,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                 space(),
                                 token("("),
                                 group(&soft_block_indent(&format_expanded))
-                                    .with_group_id(Some(group_id))
+                                    .with_id(Some(group_id))
                                     .should_expand(true),
                                 token(")"),
                                 inline_comments
@@ -875,7 +875,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                 space(),
                                 token("("),
                                 group(&soft_block_indent(&format_expanded))
-                                    .with_group_id(Some(group_id))
+                                    .with_id(Some(group_id))
                                     .should_expand(true),
                                 token(")"),
                                 inline_comments

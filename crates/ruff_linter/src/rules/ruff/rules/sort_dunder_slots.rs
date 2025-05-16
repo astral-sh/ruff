@@ -174,7 +174,7 @@ struct StringLiteralDisplay<'a> {
     /// The elts from the original AST node representing the display.
     /// Each elt is the AST representation of a single string literal
     /// element in the display
-    elts: Cow<'a, Vec<ast::Expr>>,
+    elts: Cow<'a, [ast::Expr]>,
     /// The source-code range of the display as a whole
     range: TextRange,
     /// What kind of a display is it? A dict, set, list or tuple?

@@ -255,7 +255,7 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatOptionalParentheses<'_, 'ast>
                 soft_line_break(),
                 if_group_breaks(&token(")"))
             ])
-            .with_group_id(Some(parens_id))]
+            .with_id(Some(parens_id))]
         )
     }
 }

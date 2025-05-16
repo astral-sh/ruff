@@ -462,7 +462,7 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
                     tracing::debug!(
                         "Combining settings from editor-specified inline configuration"
                     );
-                    match Configuration::from_options(options, None, project_root) {
+                    match Configuration::from_options(*options, None, project_root) {
                         Ok(configuration) => editor_configuration.combine(configuration),
                         Err(err) => {
                             tracing::error!(
@@ -516,10 +516,10 @@ mod tests {
     #[test]
     fn inline_settings() {
         let editor_settings = ResolvedEditorSettings {
-            configuration: Some(ResolvedConfiguration::Inline(Options {
+            configuration: Some(ResolvedConfiguration::Inline(Box::new(Options {
                 line_length: Some(LineLength::try_from(120).unwrap()),
                 ..Default::default()
-            })),
+            }))),
             ..Default::default()
         };
 
@@ -534,10 +534,10 @@ mod tests {
     #[test]
     fn inline_and_specific_settings_resolution_order() {
         let editor_settings = ResolvedEditorSettings {
-            configuration: Some(ResolvedConfiguration::Inline(Options {
+            configuration: Some(ResolvedConfiguration::Inline(Box::new(Options {
                 line_length: Some(LineLength::try_from(120).unwrap()),
                 ..Default::default()
-            })),
+            }))),
             line_length: Some(LineLength::try_from(100).unwrap()),
             ..Default::default()
         };

@@ -52,7 +52,7 @@ pub(crate) struct ResolvedEditorSettings {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) enum ResolvedConfiguration {
     FilePath(PathBuf),
-    Inline(Options),
+    Inline(Box<Options>),
 }
 
 impl TryFrom<&ClientConfiguration> for ResolvedConfiguration {
@@ -68,7 +68,7 @@ impl TryFrom<&ClientConfiguration> for ResolvedConfiguration {
                 if options.extend.is_some() {
                     Err(ResolvedConfigurationError::ExtendNotSupported)
                 } else {
-                    Ok(ResolvedConfiguration::Inline(options))
+                    Ok(ResolvedConfiguration::Inline(Box::new(options)))
                 }
             }
         }
@@ -991,7 +991,7 @@ mod tests {
                 fix_violation_enable: true,
                 show_syntax_errors: true,
                 editor_settings: ResolvedEditorSettings {
-                    configuration: Some(ResolvedConfiguration::Inline(Options {
+                    configuration: Some(ResolvedConfiguration::Inline(Box::new(Options {
                         line_length: Some(LineLength::try_from(100).unwrap()),
                         lint: Some(LintOptions {
                             common: LintCommonOptions {
@@ -1005,7 +1005,7 @@ mod tests {
                             ..Default::default()
                         }),
                         ..Default::default()
-                    })),
+                    }))),
                     extend_select: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
                     ..Default::default()
                 }

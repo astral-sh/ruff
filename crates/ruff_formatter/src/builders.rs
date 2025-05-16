@@ -1388,7 +1388,7 @@ pub fn soft_space_or_block_indent<Context>(content: &impl Format<Context>) -> Bl
 pub fn group<Context>(content: &impl Format<Context>) -> Group<Context> {
     Group {
         content: Argument::new(content),
-        group_id: None,
+        id: None,
         should_expand: false,
     }
 }
@@ -1396,14 +1396,14 @@ pub fn group<Context>(content: &impl Format<Context>) -> Group<Context> {
 #[derive(Copy, Clone)]
 pub struct Group<'a, Context> {
     content: Argument<'a, Context>,
-    group_id: Option<GroupId>,
+    id: Option<GroupId>,
     should_expand: bool,
 }
 
 impl<Context> Group<'_, Context> {
     #[must_use]
-    pub fn with_group_id(mut self, group_id: Option<GroupId>) -> Self {
-        self.group_id = group_id;
+    pub fn with_id(mut self, group_id: Option<GroupId>) -> Self {
+        self.id = group_id;
         self
     }
 
@@ -1429,7 +1429,7 @@ impl<Context> Format<Context> for Group<'_, Context> {
         };
 
         f.write_element(FormatElement::Tag(StartGroup(
-            tag::Group::new().with_id(self.group_id).with_mode(mode),
+            tag::Group::new().with_id(self.id).with_mode(mode),
         )));
 
         Arguments::from(&self.content).fmt(f)?;
@@ -1443,7 +1443,7 @@ impl<Context> Format<Context> for Group<'_, Context> {
 impl<Context> std::fmt::Debug for Group<'_, Context> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Group")
-            .field("group_id", &self.group_id)
+            .field("id", &self.id)
             .field("should_expand", &self.should_expand)
             .field("content", &"{{content}}")
             .finish()
@@ -1642,7 +1642,7 @@ impl<Context> std::fmt::Debug for BestFitParenthesize<'_, Context> {
 ///         soft_line_break(),
 ///         if_group_breaks(&token(")"))
 ///     ])
-///     .with_group_id(Some(parentheses_id))
+///     .with_id(Some(parentheses_id))
 ///     .fmt(f)
 /// });
 ///
@@ -1991,7 +1991,7 @@ impl<Context> IfGroupBreaks<'_, Context> {
     ///                 })),
     ///                 token("]")
     ///             ],
-    ///         ).with_group_id(Some(group_id))
+    ///         ).with_id(Some(group_id))
     ///     ])
     /// })])?;
     ///
@@ -2046,7 +2046,7 @@ impl<Context> std::fmt::Debug for IfGroupBreaks<'_, Context> {
 /// let id = f.group_id("head");
 ///
 /// write!(f, [
-///     group(&token("Head")).with_group_id(Some(id)),
+///     group(&token("Head")).with_id(Some(id)),
 ///     if_group_breaks(&indent(&token("indented"))).with_group_id(Some(id)),
 ///     if_group_fits_on_line(&token("indented")).with_group_id(Some(id))
 /// ])
@@ -2071,7 +2071,7 @@ impl<Context> std::fmt::Debug for IfGroupBreaks<'_, Context> {
 ///     let group_id = f.group_id("header");
 ///
 ///     write!(f, [
-///         group(&token("(aLongHeaderThatBreaksForSomeReason) =>")).with_group_id(Some(group_id)),
+///         group(&token("(aLongHeaderThatBreaksForSomeReason) =>")).with_id(Some(group_id)),
 ///         indent_if_group_breaks(&format_args![hard_line_break(), token("a => b")], group_id)
 ///     ])
 /// });
@@ -2101,7 +2101,7 @@ impl<Context> std::fmt::Debug for IfGroupBreaks<'_, Context> {
 ///     let group_id = f.group_id("header");
 ///
 ///     write!(f, [
-///         group(&token("(aLongHeaderThatBreaksForSomeReason) =>")).with_group_id(Some(group_id)),
+///         group(&token("(aLongHeaderThatBreaksForSomeReason) =>")).with_id(Some(group_id)),
 ///         indent_if_group_breaks(&format_args![hard_line_break(), token("a => b")], group_id)
 ///     ])
 /// });

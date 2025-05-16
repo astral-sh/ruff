@@ -198,7 +198,7 @@ fn is_explicit_concatenation(expr: &Expr) -> Option<bool> {
                 .iter()
                 .map(is_explicit_concatenation)
                 .collect::<Vec<_>>();
-            if values.iter().any(|v| *v == Some(true)) {
+            if values.contains(&Some(true)) {
                 Some(true)
             } else if values.iter().all(|v| *v == Some(false)) {
                 Some(false)

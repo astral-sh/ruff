@@ -463,17 +463,17 @@ fn not_found() -> std::io::Error {
 fn is_a_directory() -> std::io::Error {
     // Note: Rust returns `ErrorKind::IsADirectory` for this error but this is a nightly only variant :(.
     //   So we have to use other for now.
-    std::io::Error::new(std::io::ErrorKind::Other, "Is a directory")
+    std::io::Error::other("Is a directory")
 }
 
 fn not_a_directory() -> std::io::Error {
     // Note: Rust returns `ErrorKind::NotADirectory` for this error but this is a nightly only variant :(.
     //   So we have to use `Other` for now.
-    std::io::Error::new(std::io::ErrorKind::Other, "Not a directory")
+    std::io::Error::other("Not a directory")
 }
 
 fn directory_not_empty() -> std::io::Error {
-    std::io::Error::new(std::io::ErrorKind::Other, "directory not empty")
+    std::io::Error::other("directory not empty")
 }
 
 fn create_dir_all(

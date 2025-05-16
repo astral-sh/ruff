@@ -594,7 +594,7 @@ impl PythonHomePath {
         system
             .is_directory(&canonicalized)
             .then_some(Self(canonicalized))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "not a directory"))
+            .ok_or_else(|| io::Error::other("not a directory"))
     }
 }
 

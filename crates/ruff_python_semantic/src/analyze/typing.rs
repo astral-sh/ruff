@@ -252,9 +252,7 @@ pub fn is_immutable_annotation(
                 .is_some_and(|qualified_name| {
                     is_immutable_non_generic_type(qualified_name.segments())
                         || is_immutable_generic_type(qualified_name.segments())
-                        || extend_immutable_calls
-                            .iter()
-                            .any(|target| qualified_name == *target)
+                        || extend_immutable_calls.contains(&qualified_name)
                 })
         }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => semantic
@@ -308,9 +306,7 @@ pub fn is_immutable_func(
         .resolve_qualified_name(map_subscript(func))
         .is_some_and(|qualified_name| {
             is_immutable_return_type(qualified_name.segments())
-                || extend_immutable_calls
-                    .iter()
-                    .any(|target| qualified_name == *target)
+                || extend_immutable_calls.contains(&qualified_name)
         })
 }
 
