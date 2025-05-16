@@ -8,6 +8,9 @@ use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
 use crate::rules::fastapi::rules::is_fastapi_route;
+use crate::rules::ruff::rules::helpers::{
+    class_def_visit_preorder_except_body, function_def_visit_preorder_except_body,
+};
 
 /// ## What it does
 /// Checks for functions declared `async` that do not await or otherwise use features requiring the
@@ -92,63 +95,6 @@ impl<'a> source_order::SourceOrderVisitor<'a> for AsyncExprVisitor {
         } else {
             source_order::walk_comprehension(self, comprehension);
         }
-    }
-}
-
-/// Very nearly `crate::node::StmtFunctionDef.visit_preorder`, except it is specialized and,
-/// crucially, doesn't traverse the body.
-fn function_def_visit_preorder_except_body<'a, V>(
-    function_def: &'a ast::StmtFunctionDef,
-    visitor: &mut V,
-) where
-    V: source_order::SourceOrderVisitor<'a>,
-{
-    let ast::StmtFunctionDef {
-        parameters,
-        decorator_list,
-        returns,
-        type_params,
-        ..
-    } = function_def;
-
-    for decorator in decorator_list {
-        visitor.visit_decorator(decorator);
-    }
-
-    if let Some(type_params) = type_params {
-        visitor.visit_type_params(type_params);
-    }
-
-    visitor.visit_parameters(parameters);
-
-    if let Some(expr) = returns {
-        visitor.visit_annotation(expr);
-    }
-}
-
-/// Very nearly `crate::node::StmtClassDef.visit_preorder`, except it is specialized and,
-/// crucially, doesn't traverse the body.
-fn class_def_visit_preorder_except_body<'a, V>(class_def: &'a ast::StmtClassDef, visitor: &mut V)
-where
-    V: source_order::SourceOrderVisitor<'a>,
-{
-    let ast::StmtClassDef {
-        arguments,
-        decorator_list,
-        type_params,
-        ..
-    } = class_def;
-
-    for decorator in decorator_list {
-        visitor.visit_decorator(decorator);
-    }
-
-    if let Some(type_params) = type_params {
-        visitor.visit_type_params(type_params);
-    }
-
-    if let Some(arguments) = arguments {
-        visitor.visit_arguments(arguments);
     }
 }
 
