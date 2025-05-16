@@ -81,6 +81,7 @@ def _(flag: bool, number: int):
         # x must be defined here
         reveal_type(x)  # revealed: int & ~AlwaysFalsy
     else:
+        # TODO: could be int & AlwaysFalsy
         # error: [possibly-unresolved-reference]
         reveal_type(x)  # revealed: int
 
@@ -93,6 +94,7 @@ def _(flag: bool, number: int):
 ```py
 def _(flag: bool, number: int):
     if flag or (x := number):
+        # TODO: could be int & AlwaysTruthy
         # error: [possibly-unresolved-reference]
         reveal_type(x)  # revealed: int
     else:
@@ -151,7 +153,7 @@ def _(flag: bool, flag2: bool, number: int):
         reveal_type(y)  # revealed: int & ~AlwaysTruthy
 ```
 
-### Recursive boolean expression
+### Nested boolean expression
 
 ```py
 def _(flag: bool, number: int):

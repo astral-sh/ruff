@@ -73,8 +73,8 @@ struct ScopeInfo {
 
 enum TestFlowSnapshots {
     BooleanExprTest {
-        might_short_circuited: FlowSnapshot,
-        never_short_circuited: FlowSnapshot,
+        maybe_short_circuit: FlowSnapshot,
+        no_short_circuit: FlowSnapshot,
         op: BoolOp,
     },
     Default(FlowSnapshot),
@@ -85,9 +85,9 @@ impl TestFlowSnapshots {
         match self {
             TestFlowSnapshots::Default(snapshot) => snapshot,
             TestFlowSnapshots::BooleanExprTest {
-                might_short_circuited: might_short_circuit,
+                maybe_short_circuit,
                 ..
-            } => might_short_circuit,
+            } => maybe_short_circuit,
         }
     }
 
@@ -95,11 +95,11 @@ impl TestFlowSnapshots {
         match self {
             TestFlowSnapshots::Default(flow_control) => flow_control,
             TestFlowSnapshots::BooleanExprTest {
-                might_short_circuited: might_short_circuit,
-                never_short_circuited: no_short_circuit,
+                maybe_short_circuit,
+                no_short_circuit,
                 op,
             } => match op {
-                BoolOp::And => might_short_circuit,
+                BoolOp::And => maybe_short_circuit,
                 BoolOp::Or => no_short_circuit,
             },
         }
@@ -109,12 +109,12 @@ impl TestFlowSnapshots {
         match self {
             TestFlowSnapshots::Default(flow_control) => flow_control,
             TestFlowSnapshots::BooleanExprTest {
-                might_short_circuited: might_short_circuit,
-                never_short_circuited: no_short_circuit,
+                maybe_short_circuit,
+                no_short_circuit,
                 op,
             } => match op {
                 BoolOp::And => no_short_circuit,
-                BoolOp::Or => might_short_circuit,
+                BoolOp::Or => maybe_short_circuit,
             },
         }
     }
@@ -2490,16 +2490,16 @@ impl<'db> SemanticIndexBuilder<'db> {
                 visibility_constraints.push(visibility_constraint);
             }
         }
-        let never_short_circuited = self.flow_snapshot();
+        let no_short_circuit = self.flow_snapshot();
         for snapshot in short_circuits.clone() {
             self.flow_merge(snapshot);
         }
-        let might_short_circuited = self.flow_snapshot();
+        let maybe_short_circuit = self.flow_snapshot();
 
         self.simplify_visibility_constraints(pre_op);
         TestFlowSnapshots::BooleanExprTest {
-            might_short_circuited,
-            never_short_circuited,
+            maybe_short_circuit,
+            no_short_circuit,
             op,
         }
     }
