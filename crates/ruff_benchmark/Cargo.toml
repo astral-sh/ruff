@@ -16,6 +16,11 @@ bench = false
 test = false
 doctest = false
 
+# # Disabled due to general flakiness - enable temporarily if specifically needed
+# [[bench]]
+# name = "flake8_executable"
+# harness = false
+
 [[bench]]
 name = "linter"
 harness = false
