@@ -290,7 +290,6 @@ pub(crate) enum SitePackagesDiscoveryError {
 /// The various ways in which parsing a `pyvenv.cfg` file could fail
 #[derive(Debug)]
 pub(crate) enum PyvenvCfgParseErrorKind {
-    TooManyEquals { line_number: NonZeroUsize },
     MalformedKeyValuePair { line_number: NonZeroUsize },
     NoHomeKey,
     InvalidHomeValue(io::Error),
@@ -299,9 +298,6 @@ pub(crate) enum PyvenvCfgParseErrorKind {
 impl fmt::Display for PyvenvCfgParseErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::TooManyEquals { line_number } => {
-                write!(f, "line {line_number} has too many '=' characters")
-            }
             Self::MalformedKeyValuePair { line_number } => write!(
                 f,
                 "line {line_number} has a malformed `<key> = <value>` pair"
