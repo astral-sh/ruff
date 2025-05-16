@@ -58,6 +58,13 @@ target has not changed in all places where the function is called).
 ```py
 g: str | None = "a"
 
+class A:
+    x: str | None = None
+
+a = A()
+
+l: list[str | None] = [None]
+
 def f(x: str | None):
     def _():
         if x is not None:
@@ -69,6 +76,14 @@ def f(x: str | None):
         if g is not None:
             reveal_type(g)  # revealed: str
 
+        if a.x is not None:
+            # TODO(#17643): should be `Unknown | str`
+            reveal_type(a.x)  # revealed: Unknown | str | None
+
+        if l[0] is not None:
+            # TODO(#17643): should be `str`
+            reveal_type(l[0])  # revealed: str | None
+
     class C:
         if x is not None:
             reveal_type(x)  # revealed: str
@@ -79,6 +94,14 @@ def f(x: str | None):
         if g is not None:
             reveal_type(g)  # revealed: str
 
+        if a.x is not None:
+            # TODO(#17643): should be `Unknown | str`
+            reveal_type(a.x)  # revealed: Unknown | str | None
+
+        if l[0] is not None:
+            # TODO(#17643): should be `str`
+            reveal_type(l[0])  # revealed: str | None
+
     # TODO: should be str
     # This could be fixed if we supported narrowing with if clauses in comprehensions.
     [reveal_type(x) for _ in range(1) if x is not None]  # revealed: str | None
@@ -88,6 +111,13 @@ def f(x: str | None):
 
 ```py
 g: str | None = "a"
+
+class A:
+    x: str | None = None
+
+a = A()
+
+l: list[str | None] = [None]
 
 def f(x: str | None):
     if x is not None:
@@ -109,6 +139,28 @@ def f(x: str | None):
             reveal_type(g)  # revealed: str
 
         [reveal_type(g) for _ in range(1)]  # revealed: str
+
+    if a.x is not None:
+        def _():
+            reveal_type(a.x)  # revealed: Unknown | str | None
+
+        class D:
+            # TODO(#17643): should be `Unknown | str`
+            reveal_type(a.x)  # revealed: Unknown | str | None
+
+        # TODO(#17643): should be `Unknown | str`
+        [reveal_type(a.x) for _ in range(1)]  # revealed: Unknown | str | None
+
+    if l[0] is not None:
+        def _():
+            reveal_type(l[0])  # revealed: str | None
+
+        class D:
+            # TODO(#17643): should be `str`
+            reveal_type(l[0])  # revealed: str | None
+
+        # TODO(#17643): should be `str`
+        [reveal_type(l[0]) for _ in range(1)]  # revealed: str | None
 ```
 
 ### Narrowing constraints introduced in multiple scopes
@@ -117,6 +169,13 @@ def f(x: str | None):
 from typing import Literal
 
 g: str | Literal[1] | None = "a"
+
+class A:
+    x: str | Literal[1] | None = None
+
+a = A()
+
+l: list[str | Literal[1] | None] = [None]
 
 def f(x: str | Literal[1] | None):
     class C:
@@ -140,6 +199,28 @@ def f(x: str | Literal[1] | None):
             class D:
                 if g != 1:
                     reveal_type(g)  # revealed: str
+
+        if a.x is not None:
+            def _():
+                if a.x != 1:
+                    # TODO(#17643): should be `Unknown | str | None`
+                    reveal_type(a.x)  # revealed: Unknown | str | Literal[1] | None
+
+            class D:
+                if a.x != 1:
+                    # TODO(#17643): should be `Unknown | str`
+                    reveal_type(a.x)  # revealed: Unknown | str | Literal[1] | None
+
+        if l[0] is not None:
+            def _():
+                if l[0] != 1:
+                    # TODO(#17643): should be `str | None`
+                    reveal_type(l[0])  # revealed: str | Literal[1] | None
+
+            class D:
+                if l[0] != 1:
+                    # TODO(#17643): should be `str`
+                    reveal_type(l[0])  # revealed: str | Literal[1] | None
 ```
 
 ### Narrowing constraints with bindings in class scope, and nested scopes
