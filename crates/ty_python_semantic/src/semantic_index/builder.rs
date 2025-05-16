@@ -2017,8 +2017,8 @@ where
                                 first,
                             }) => {
                                 if !comprehension_scopes.is_empty() {
-                                    // self.scopes_by_expression
-                                    //     .insert(expr.into(), self.current_scope());
+                                    self.scopes_by_expression
+                                        .insert(expr.into(), self.current_scope());
                                     self.current_ast_ids().record_expression(expr);
                                 }
                                 self.add_definition(

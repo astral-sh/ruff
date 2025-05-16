@@ -14,6 +14,8 @@ reveal_type(a.x)  # revealed: Literal[0]
 class C:
     reveal_type(a.x)  # revealed: Literal[0]
 
+[reveal_type(a.x) for _ in range(1)]  # revealed: Literal[0]
+
 def _():
     reveal_type(a.x)  # revealed: Unknown | int | None
 ```
@@ -28,6 +30,8 @@ reveal_type(l[0])  # revealed: Literal[0]
 
 class C:
     reveal_type(l[0])  # revealed: Literal[0]
+
+[reveal_type(l[0]) for _ in range(1)]  # revealed: Literal[0]
 
 def _():
     reveal_type(l[0])  # revealed: int | None

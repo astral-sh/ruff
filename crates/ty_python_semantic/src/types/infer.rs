@@ -4618,8 +4618,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .to_scope_id(self.db(), self.file());
             result.expression_type(iterable.scoped_expression_id(self.db(), lookup_scope))
         } else {
+            let scope = self.types.scope;
+            self.types.scope = result.scope;
             self.extend(result);
-            result.expression_type(iterable.scoped_expression_id(self.db(), self.scope()))
+            self.types.scope = scope;
+            result.expression_type(
+                iterable.scoped_expression_id(self.db(), expression.scope(self.db())),
+            )
         };
 
         let target_type = if comprehension.is_async() {
