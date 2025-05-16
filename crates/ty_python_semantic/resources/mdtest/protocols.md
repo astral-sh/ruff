@@ -67,12 +67,10 @@ It's an error to include both bare `Protocol` and subscripted `Protocol[]` in th
 simultaneously:
 
 ```py
-# TODO: should emit a `[duplicate-bases]` error here:
-class DuplicateBases(Protocol, Protocol[T]):
+class DuplicateBases(Protocol, Protocol[T]):  # error: [duplicate-base]
     x: T
 
-# TODO: should not have `Protocol` or `Generic` multiple times
-# revealed: tuple[<class 'DuplicateBases[Unknown]'>, typing.Protocol, typing.Generic, typing.Protocol[T], typing.Generic[T], <class 'object'>]
+# revealed: tuple[<class 'DuplicateBases[Unknown]'>, Unknown, <class 'object'>]
 reveal_type(DuplicateBases.__mro__)
 ```
 
