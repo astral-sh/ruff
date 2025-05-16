@@ -12,7 +12,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{default_lint_registry, Db as SemanticDb, Program};
+use ty_python_semantic::{Db as SemanticDb, Program, default_lint_registry};
 
 #[salsa::db]
 #[derive(Clone)]
@@ -255,7 +255,7 @@ impl System for MdtestSystem {
         &self,
         pattern: &str,
     ) -> Result<
-        Box<dyn Iterator<Item = Result<SystemPathBuf, ruff_db::system::GlobError>>>,
+        Box<dyn Iterator<Item = Result<SystemPathBuf, ruff_db::system::GlobError>> + '_>,
         ruff_db::system::PatternError,
     > {
         self.as_system()

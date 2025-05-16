@@ -1,5 +1,5 @@
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 /// ## Removed
 /// This rule is identical to [S307] which should be used instead.

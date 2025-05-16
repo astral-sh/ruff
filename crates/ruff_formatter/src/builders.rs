@@ -2,14 +2,14 @@ use std::cell::Cell;
 use std::marker::PhantomData;
 use std::num::NonZeroU8;
 
-use ruff_text_size::TextRange;
 #[allow(clippy::enum_glob_use)]
 use Tag::*;
+use ruff_text_size::TextRange;
 
 use crate::format_element::tag::{Condition, Tag};
 use crate::prelude::tag::{DedentMode, GroupMode, LabelId};
 use crate::prelude::*;
-use crate::{write, Argument, Arguments, FormatContext, FormatOptions, GroupId, TextSize};
+use crate::{Argument, Arguments, FormatContext, FormatOptions, GroupId, TextSize, write};
 use crate::{Buffer, VecBuffer};
 
 /// A line break that only gets printed if the enclosing `Group` doesn't fit on a single line.
@@ -402,7 +402,10 @@ where
 }
 
 fn debug_assert_no_newlines(text: &str) {
-    debug_assert!(!text.contains('\r'), "The content '{text}' contains an unsupported '\\r' line terminator character but text must only use line feeds '\\n' as line separator. Use '\\n' instead of '\\r' and '\\r\\n' to insert a line break in strings.");
+    debug_assert!(
+        !text.contains('\r'),
+        "The content '{text}' contains an unsupported '\\r' line terminator character but text must only use line feeds '\\n' as line separator. Use '\\n' instead of '\\r' and '\\r\\n' to insert a line break in strings."
+    );
 }
 
 /// Pushes some content to the end of the current line.
@@ -2564,7 +2567,7 @@ impl<'a, Context> BestFitting<'a, Context> {
     /// # Panics
     ///
     /// When the slice contains less than two variants.
-    pub fn from_arguments_unchecked(variants: Arguments<'a, Context>) -> Self {
+    pub const fn from_arguments_unchecked(variants: Arguments<'a, Context>) -> Self {
         assert!(
             variants.0.len() >= 2,
             "Requires at least the least expanded and most expanded variants"
@@ -2572,7 +2575,7 @@ impl<'a, Context> BestFitting<'a, Context> {
 
         Self {
             variants,
-            mode: BestFittingMode::default(),
+            mode: BestFittingMode::FirstLine,
         }
     }
 

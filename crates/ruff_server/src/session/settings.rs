@@ -6,9 +6,9 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 use thiserror::Error;
 
+use ruff_linter::RuleSelector;
 use ruff_linter::line_width::LineLength;
 use ruff_linter::rule_selector::ParseError;
-use ruff_linter::RuleSelector;
 use ruff_workspace::options::Options;
 
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
@@ -441,11 +441,7 @@ impl ResolvedClientSettings {
             *contains_invalid_settings = true;
             tracing::error!("Unknown rule selectors found in `{key}`: {unknown:?}");
         }
-        if known.is_empty() {
-            None
-        } else {
-            Some(known)
-        }
+        if known.is_empty() { None } else { Some(known) }
     }
 
     /// Attempts to resolve a setting using a list of available client settings as sources.

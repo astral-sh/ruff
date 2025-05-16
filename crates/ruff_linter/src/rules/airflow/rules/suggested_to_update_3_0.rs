@@ -1,11 +1,11 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::airflow::helpers::{
-    is_airflow_builtin_or_provider, is_guarded_by_try_except, Replacement,
+    Replacement, is_airflow_builtin_or_provider, is_guarded_by_try_except,
 };
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall, ExprName};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall, ExprName, name::QualifiedName};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
@@ -220,12 +220,14 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.decorators
-        ["airflow", "decorators", rest @ ("dag" | "task" | "task_group" | "setup" | "teardown")] => {
-            Replacement::SourceModuleMoved {
-                module: "airflow.sdk",
-                name: (*rest).to_string(),
-            }
-        }
+        [
+            "airflow",
+            "decorators",
+            rest @ ("dag" | "task" | "task_group" | "setup" | "teardown"),
+        ] => Replacement::SourceModuleMoved {
+            module: "airflow.sdk",
+            name: (*rest).to_string(),
+        },
 
         // airflow.io
         ["airflow", "io", "path", "ObjectStoragePath"] => Replacement::SourceModuleMoved {
@@ -268,12 +270,15 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             name: "AssetOrTimeSchedule",
         },
         // airflow.utils
-        ["airflow", "utils", "dag_parsing_context", "get_parsing_context"] => {
-            Replacement::AutoImport {
-                module: "airflow.sdk",
-                name: "get_parsing_context",
-            }
-        }
+        [
+            "airflow",
+            "utils",
+            "dag_parsing_context",
+            "get_parsing_context",
+        ] => Replacement::AutoImport {
+            module: "airflow.sdk",
+            name: "get_parsing_context",
+        },
 
         _ => return,
     };

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::{Scope, SemanticModel};
@@ -405,11 +405,7 @@ fn extract_typeddict_name<'a>(stmt: &'a Stmt, semantic: &SemanticModel) -> Optio
             };
             let ast::ExprName { id, .. } = target.as_name_expr()?;
             let ast::ExprCall { func, .. } = value.as_call_expr()?;
-            if is_typeddict(func) {
-                Some(id)
-            } else {
-                None
-            }
+            if is_typeddict(func) { Some(id) } else { None }
         }
         _ => None,
     }

@@ -1,9 +1,9 @@
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::StringLiteral;
 
-use crate::prelude::*;
-use crate::string::{docstring, StringNormalizer};
 use crate::QuoteStyle;
+use crate::prelude::*;
+use crate::string::{StringNormalizer, docstring};
 
 #[derive(Default)]
 pub struct FormatStringLiteral {

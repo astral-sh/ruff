@@ -1,8 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -130,14 +130,18 @@ pub(crate) fn blocking_process_invocation(checker: &Checker, call: &ast::ExprCal
             Diagnostic::new(CreateSubprocessInAsyncFunction, range)
         }
         ["os", "system" | "posix_spawn" | "posix_spawnp"]
-        | ["subprocess", "run" | "call" | "check_call" | "check_output" | "getoutput" | "getstatusoutput"] => {
-            Diagnostic::new(RunProcessInAsyncFunction, range)
-        }
+        | [
+            "subprocess",
+            "run" | "call" | "check_call" | "check_output" | "getoutput" | "getstatusoutput",
+        ] => Diagnostic::new(RunProcessInAsyncFunction, range),
         ["os", "wait" | "wait3" | "wait4" | "waitid" | "waitpid"] => {
             Diagnostic::new(WaitForProcessInAsyncFunction, range)
         }
-        ["os", "spawnl" | "spawnle" | "spawnlp" | "spawnlpe" | "spawnv" | "spawnve" | "spawnvp"
-        | "spawnvpe"] => {
+        [
+            "os",
+            "spawnl" | "spawnle" | "spawnlp" | "spawnlpe" | "spawnv" | "spawnve" | "spawnvp"
+            | "spawnvpe",
+        ] => {
             if is_p_wait(call, checker.semantic()) {
                 Diagnostic::new(RunProcessInAsyncFunction, range)
             } else {

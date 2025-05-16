@@ -6,11 +6,10 @@
 use std::fmt::Display;
 
 use ruff_python_ast::{
-    self as ast,
-    comparable::ComparableExpr,
-    visitor::{walk_expr, Visitor},
-    Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
+    self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtImportFrom,
+    comparable::ComparableExpr,
+    visitor::{Visitor, walk_expr},
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::{FxBuildHasher, FxHashSet};
@@ -845,7 +844,7 @@ impl SemanticSyntaxChecker {
         if !ctx.in_sync_comprehension() {
             return;
         }
-        for generator in generators.iter().filter(|gen| gen.is_async) {
+        for generator in generators.iter().filter(|generator| generator.is_async) {
             // test_ok nested_async_comprehension_py311
             // # parse_options: {"target-version": "3.11"}
             // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
@@ -921,7 +920,10 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::WriteToDebug(kind) => match kind {
                 WriteToDebugKind::Store => f.write_str("cannot assign to `__debug__`"),
                 WriteToDebugKind::Delete(python_version) => {
-                    write!(f, "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)")
+                    write!(
+                        f,
+                        "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)"
+                    )
                 }
             },
             SemanticSyntaxErrorKind::InvalidExpression(kind, position) => {

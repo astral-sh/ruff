@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::{Modules, SemanticModel};
@@ -75,7 +75,9 @@ impl Violation for DjangoUnorderedBodyContentInModel {
             element_type,
             prev_element_type,
         } = self;
-        format!("Order of model's inner classes, methods, and fields does not follow the Django Style Guide: {element_type} should come before {prev_element_type}")
+        format!(
+            "Order of model's inner classes, methods, and fields does not follow the Django Style Guide: {element_type} should come before {prev_element_type}"
+        )
     }
 }
 

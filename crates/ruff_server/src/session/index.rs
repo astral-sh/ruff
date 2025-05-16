@@ -13,11 +13,11 @@ pub(crate) use ruff_settings::RuffSettings;
 use crate::edit::LanguageId;
 use crate::workspace::{Workspace, Workspaces};
 use crate::{
-    edit::{DocumentKey, DocumentVersion, NotebookDocument},
     PositionEncoding, TextDocument,
+    edit::{DocumentKey, DocumentVersion, NotebookDocument},
 };
 
-use super::{settings::ResolvedClientSettings, ClientSettings};
+use super::{ClientSettings, settings::ResolvedClientSettings};
 
 mod ruff_settings;
 

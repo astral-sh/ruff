@@ -1,5 +1,5 @@
 use ast::{ExprAttribute, ExprName, Identifier};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::Ranged;
 
@@ -67,9 +67,11 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
     } = expr;
     match &keywords[..] {
         [] => {}
-        [ast::Keyword {
-            arg: Some(name), ..
-        }] if name.as_str() == "strict" => {}
+        [
+            ast::Keyword {
+                arg: Some(name), ..
+            },
+        ] if name.as_str() == "strict" => {}
         _ => return,
     }
     let [arg1, arg2] = &args[..] else {

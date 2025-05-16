@@ -3,18 +3,18 @@ use std::borrow::Cow;
 use itertools::izip;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Binding;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::sequence_sorting::{
-    sort_single_line_elements_sequence, CommentComplexity, MultilineStringSequenceValue,
-    SequenceKind, SortClassification, SortingStyle,
+    CommentComplexity, MultilineStringSequenceValue, SequenceKind, SortClassification,
+    SortingStyle, sort_single_line_elements_sequence,
 };
-use crate::Locator;
 
 /// ## What it does
 /// Checks for `__slots__` definitions that are not ordered according to a

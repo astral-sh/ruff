@@ -3,13 +3,13 @@ use ruff_benchmark::criterion;
 
 use std::ops::Range;
 
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use rayon::ThreadPoolBuilder;
 use rustc_hash::FxHashSet;
 
 use ruff_benchmark::TestFile;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
-use ruff_db::files::{system_path_to_file, File};
+use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::PythonVersion;

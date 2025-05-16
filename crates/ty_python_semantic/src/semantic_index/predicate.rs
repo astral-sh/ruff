@@ -8,7 +8,7 @@
 //!   static visibility of a binding, and the reachability of a statement.
 
 use ruff_db::files::File;
-use ruff_index::{newtype_index, IndexVec};
+use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::Singleton;
 
 use crate::db::Db;

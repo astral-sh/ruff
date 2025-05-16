@@ -161,16 +161,16 @@ mod serde {
 #[cfg(feature = "schemars")]
 mod schemars {
     use super::PythonVersion;
-    use schemars::schema::{Metadata, Schema, SchemaObject, SubschemaValidation};
-    use schemars::JsonSchema;
     use schemars::_serde_json::Value;
+    use schemars::JsonSchema;
+    use schemars::schema::{Metadata, Schema, SchemaObject, SubschemaValidation};
 
     impl JsonSchema for PythonVersion {
         fn schema_name() -> String {
             "PythonVersion".to_string()
         }
 
-        fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
+        fn json_schema(_gen: &mut schemars::r#gen::SchemaGenerator) -> Schema {
             let sub_schemas = std::iter::once(Schema::Object(SchemaObject {
                 instance_type: Some(schemars::schema::InstanceType::String.into()),
                 string: Some(Box::new(schemars::schema::StringValidation {

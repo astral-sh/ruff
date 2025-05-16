@@ -17,12 +17,12 @@ use ruff_python_ast::{Int, IpyEscapeKind, StringFlags};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
+use crate::Mode;
 use crate::error::{FStringErrorType, LexicalError, LexicalErrorType};
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
 use crate::lexer::fstring::{FStringContext, FStrings, FStringsCheckpoint};
 use crate::lexer::indentation::{Indentation, Indentations, IndentationsCheckpoint};
 use crate::token::{TokenFlags, TokenKind, TokenValue};
-use crate::Mode;
 
 mod cursor;
 mod fstring;
@@ -281,7 +281,7 @@ impl<'src> Lexer<'src> {
     }
 
     fn handle_indentation(&mut self, indentation: Indentation) -> Option<TokenKind> {
-        let token = match self.indentations.current().try_compare(indentation) {
+        match self.indentations.current().try_compare(indentation) {
             // Dedent
             Ok(Ordering::Greater) => {
                 self.pending_indentation = Some(indentation);
@@ -318,15 +318,11 @@ impl<'src> Lexer<'src> {
                 self.indentations.indent(indentation);
                 Some(TokenKind::Indent)
             }
-            Err(_) => {
-                return Some(self.push_error(LexicalError::new(
-                    LexicalErrorType::IndentationError,
-                    self.token_range(),
-                )));
-            }
-        };
-
-        token
+            Err(_) => Some(self.push_error(LexicalError::new(
+                LexicalErrorType::IndentationError,
+                self.token_range(),
+            ))),
+        }
     }
 
     fn skip_whitespace(&mut self) -> Result<(), LexicalError> {
@@ -581,7 +577,7 @@ impl<'src> Lexer<'src> {
                         fstring.try_end_format_spec(self.nesting);
                     }
                     TokenKind::NonLogicalNewline
-                }
+                };
             }
             '\r' => {
                 self.cursor.eat_char('\n');
@@ -1156,7 +1152,7 @@ impl<'src> Lexer<'src> {
                         return self.push_error(LexicalError::new(
                             LexicalErrorType::OtherError(format!("{err:?}").into_boxed_str()),
                             self.token_range(),
-                        ))
+                        ));
                     }
                 };
                 self.current_value = TokenValue::Int(value);
@@ -1956,8 +1952,7 @@ def f(arg=%timeit a = b):
 
     #[test]
     fn test_numbers() {
-        let source =
-            "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j 000 0x995DC9BBDF1939FA 0x995DC9BBDF1939FA995DC9BBDF1939FA";
+        let source = "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j 000 0x995DC9BBDF1939FA 0x995DC9BBDF1939FA995DC9BBDF1939FA";
         assert_snapshot!(lex_source(source));
     }
 

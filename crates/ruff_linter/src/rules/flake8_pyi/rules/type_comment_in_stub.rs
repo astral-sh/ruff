@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
 
 use crate::Locator;

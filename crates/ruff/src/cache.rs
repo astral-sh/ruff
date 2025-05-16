@@ -3,8 +3,8 @@ use std::fs::{self, File};
 use std::hash::Hasher;
 use std::io::{self, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
@@ -22,13 +22,13 @@ use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::Fix;
 use ruff_linter::message::{DiagnosticMessage, Message};
 use ruff_linter::package::PackageRoot;
-use ruff_linter::{warn_user, VERSION};
+use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
-use ruff_workspace::resolver::Resolver;
 use ruff_workspace::Settings;
+use ruff_workspace::resolver::Resolver;
 
 use crate::diagnostics::Diagnostics;
 
@@ -597,7 +597,7 @@ mod tests {
     use std::time::SystemTime;
 
     use anyhow::Result;
-    use filetime::{set_file_mtime, FileTime};
+    use filetime::{FileTime, set_file_mtime};
     use itertools::Itertools;
     use ruff_linter::settings::LinterSettings;
     use test_case::test_case;
@@ -612,8 +612,8 @@ mod tests {
 
     use crate::cache::{self, FileCache, FileCacheData, FileCacheKey};
     use crate::cache::{Cache, RelativePathBuf};
-    use crate::commands::format::{format_path, FormatCommandError, FormatMode, FormatResult};
-    use crate::diagnostics::{lint_path, Diagnostics};
+    use crate::commands::format::{FormatCommandError, FormatMode, FormatResult, format_path};
+    use crate::diagnostics::{Diagnostics, lint_path};
 
     #[test_case("../ruff_linter/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_linter"; "ruff_linter_fixtures")]
     #[test_case("../ruff_notebook/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_notebook"; "ruff_notebook_fixtures")]

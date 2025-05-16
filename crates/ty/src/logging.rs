@@ -7,11 +7,11 @@ use std::fmt;
 use std::fs::File;
 use std::io::{BufWriter, IsTerminal};
 use tracing::{Event, Subscriber};
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::format::Writer;
 use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields};
 use tracing_subscriber::registry::LookupSpan;
-use tracing_subscriber::EnvFilter;
 
 /// Logging flags to `#[command(flatten)]` into your CLI
 #[derive(clap::Args, Debug, Clone, Default)]

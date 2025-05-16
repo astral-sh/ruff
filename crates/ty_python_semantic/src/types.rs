@@ -12,7 +12,7 @@ use diagnostic::{
     UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
 };
 use ruff_db::diagnostic::{
-    create_semantic_syntax_diagnostic, Annotation, Severity, Span, SubDiagnostic,
+    Annotation, Severity, Span, SubDiagnostic, create_semantic_syntax_diagnostic,
 };
 use ruff_db::files::{File, FileRange};
 use ruff_python_ast::name::Name;
@@ -21,8 +21,8 @@ use ruff_text_size::{Ranged, TextRange};
 use type_ordering::union_or_intersection_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
-pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::TypeCheckDiagnostics;
+pub(crate) use self::diagnostic::register_lints;
 pub(crate) use self::display::TypeArrayDisplay;
 pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_type, infer_expression_types,
@@ -32,14 +32,14 @@ pub(crate) use self::narrow::ClassInfoConstraintFunction;
 pub(crate) use self::signatures::{CallableSignature, Signature, Signatures};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
-use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
+use crate::module_resolver::{KnownModule, file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{
-    imported_symbol, symbol_from_bindings, Boundness, Symbol, SymbolAndQualifiers,
+    Boundness, Symbol, SymbolAndQualifiers, imported_symbol, symbol_from_bindings,
 };
 use crate::types::call::{Bindings, CallArgumentTypes, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
@@ -960,11 +960,7 @@ impl<'db> Type<'db> {
 
     #[must_use]
     pub fn negate_if(&self, db: &'db dyn Db, yes: bool) -> Type<'db> {
-        if yes {
-            self.negate(db)
-        } else {
-            *self
-        }
+        if yes { self.negate(db) } else { *self }
     }
 
     /// Return a "normalized" version of `self` that ensures that equivalent types have the same Salsa ID.
@@ -5614,12 +5610,12 @@ impl<'db> InvalidTypeExpression<'db> {
                         "`{ty}` requires at least two arguments when used in a type expression",
                         ty = ty.display(self.db)
                     ),
-                    InvalidTypeExpression::Protocol => f.write_str(
-                        "`typing.Protocol` is not allowed in type expressions"
-                    ),
-                    InvalidTypeExpression::Generic => f.write_str(
-                        "`typing.Generic` is not allowed in type expressions"
-                    ),
+                    InvalidTypeExpression::Protocol => {
+                        f.write_str("`typing.Protocol` is not allowed in type expressions")
+                    }
+                    InvalidTypeExpression::Generic => {
+                        f.write_str("`typing.Generic` is not allowed in type expressions")
+                    }
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,
                         "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions)",
@@ -6491,11 +6487,7 @@ impl Truthiness {
     }
 
     pub(crate) const fn negate_if(self, condition: bool) -> Self {
-        if condition {
-            self.negate()
-        } else {
-            self
-        }
+        if condition { self.negate() } else { self }
     }
 
     pub(crate) fn and(self, other: Self) -> Self {
@@ -8336,7 +8328,7 @@ impl<'db> BoundSuperType<'db> {
                 return owner
                     .into_type()
                     .find_name_in_mro_with_policy(db, name, policy)
-                    .expect("Calling `find_name_in_mro` on dynamic type should return `Some`")
+                    .expect("Calling `find_name_in_mro` on dynamic type should return `Some`");
             }
             SuperOwnerKind::Class(class) => class,
             SuperOwnerKind::Instance(instance) => instance.class,
@@ -8373,7 +8365,7 @@ static_assertions::assert_eq_size!(Type, [u8; 16]);
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::db::tests::{setup_db, TestDbBuilder};
+    use crate::db::tests::{TestDbBuilder, setup_db};
     use crate::symbol::{
         global_symbol, known_module_symbol, typing_extensions_symbol, typing_symbol,
     };
@@ -8510,16 +8502,20 @@ pub(crate) mod tests {
         assert!(UnionType::from_elements(&db, vec![todo1, todo2]).is_todo());
 
         // And similar for intersection types:
-        assert!(IntersectionBuilder::new(&db)
-            .add_positive(todo1)
-            .add_positive(todo2)
-            .build()
-            .is_todo());
-        assert!(IntersectionBuilder::new(&db)
-            .add_positive(todo1)
-            .add_negative(todo2)
-            .build()
-            .is_todo());
+        assert!(
+            IntersectionBuilder::new(&db)
+                .add_positive(todo1)
+                .add_positive(todo2)
+                .build()
+                .is_todo()
+        );
+        assert!(
+            IntersectionBuilder::new(&db)
+                .add_positive(todo1)
+                .add_negative(todo2)
+                .build()
+                .is_todo()
+        );
     }
 
     #[test]
@@ -8575,7 +8571,11 @@ pub(crate) mod tests {
                 .definition(&db);
 
             assert_eq!(
-                KnownFunction::try_from_definition_and_name(&db, function_definition, function_name),
+                KnownFunction::try_from_definition_and_name(
+                    &db,
+                    function_definition,
+                    function_name
+                ),
                 Some(function),
                 "The strum `EnumString` implementation appears to be incorrect for `{function_name}`"
             );

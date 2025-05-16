@@ -238,7 +238,9 @@ System site-packages will not be used for module resolution.",
             }
         }
 
-        tracing::debug!("Resolved site-packages directories for this virtual environment are: {site_packages_directories:?}");
+        tracing::debug!(
+            "Resolved site-packages directories for this virtual environment are: {site_packages_directories:?}"
+        );
         Ok(site_packages_directories)
     }
 }
@@ -275,7 +277,9 @@ impl SystemEnvironment {
             root_path, None, system,
         )?];
 
-        tracing::debug!("Resolved site-packages directories for this environment are: {site_packages_directories:?}");
+        tracing::debug!(
+            "Resolved site-packages directories for this environment are: {site_packages_directories:?}"
+        );
         Ok(site_packages_directories)
     }
 }
@@ -290,7 +294,9 @@ pub(crate) enum SitePackagesDiscoveryError {
     NoPyvenvCfgFile(SysPrefixPathOrigin, #[source] io::Error),
     #[error("Failed to parse the pyvenv.cfg file at {0} because {1}")]
     PyvenvCfgParseError(SystemPathBuf, PyvenvCfgParseErrorKind),
-    #[error("Failed to search the `lib` directory of the Python installation at {1} for `site-packages`")]
+    #[error(
+        "Failed to search the `lib` directory of the Python installation at {1} for `site-packages`"
+    )]
     CouldNotReadLibDirectory(#[source] io::Error, SysPrefixPath),
     #[error("Could not find the `site-packages` directory for the Python installation at {0}")]
     NoSitePackagesDirFound(SysPrefixPath),

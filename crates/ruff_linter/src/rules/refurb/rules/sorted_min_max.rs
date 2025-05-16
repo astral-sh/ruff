@@ -3,7 +3,7 @@ use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
 use ruff_diagnostics::FixAvailability;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Number;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;

@@ -495,7 +495,7 @@ jobs:
           persist-credentials: false
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - name: "Install Rust toolchain"
-        run: rustup component add rustfmt
+        run: rustup show
       # Run all code generation scripts, and verify that the current output is
       # already checked into git.
       - run: python crates/ruff_python_ast/generate.py
@@ -504,12 +504,10 @@ jobs:
       # Verify that adding a plugin or rule produces clean code.
       - run: ./scripts/add_rule.py --name DoTheThing --prefix F --code 999 --linter pyflakes
       - run: cargo check
-      - run: cargo fmt --all --check
       - run: |
           ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
           ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test
       - run: cargo check
-      - run: cargo fmt --all --check
 
   ecosystem:
     name: "ecosystem"

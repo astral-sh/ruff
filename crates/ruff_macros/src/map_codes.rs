@@ -2,10 +2,10 @@ use std::collections::{BTreeMap, HashMap};
 
 use itertools::Itertools;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::{
-    parenthesized, parse::Parse, spanned::Spanned, Attribute, Error, Expr, ExprCall, ExprMatch,
-    Ident, ItemFn, LitStr, Pat, Path, Stmt, Token,
+    Attribute, Error, Expr, ExprCall, ExprMatch, Ident, ItemFn, LitStr, Pat, Path, Stmt, Token,
+    parenthesized, parse::Parse, spanned::Spanned,
 };
 
 use crate::rule_code_prefix::{get_prefix_ident, intersection_all};

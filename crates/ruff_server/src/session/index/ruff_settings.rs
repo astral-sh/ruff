@@ -1,17 +1,17 @@
 use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::Context;
 use ignore::{WalkBuilder, WalkState};
 
 use ruff_linter::settings::types::GlobPath;
 use ruff_linter::{settings::types::FilePattern, settings::types::PreviewMode};
+use ruff_workspace::Settings;
 use ruff_workspace::pyproject::find_fallback_target_version;
 use ruff_workspace::resolver::match_exclusion;
-use ruff_workspace::Settings;
 use ruff_workspace::{
     configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
     pyproject::{find_user_settings_toml, settings_toml},

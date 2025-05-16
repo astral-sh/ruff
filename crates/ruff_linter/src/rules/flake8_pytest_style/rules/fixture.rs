@@ -1,14 +1,14 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Decorator;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::Decorator;
 use ruff_python_ast::{self as ast, Expr, Parameters, Stmt};
-use ruff_python_semantic::analyze::visibility::is_abstract;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::visibility::is_abstract;
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
@@ -19,8 +19,8 @@ use crate::fix::edits;
 use crate::registry::Rule;
 
 use super::helpers::{
-    get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture, keyword_is_literal,
-    Parentheses,
+    Parentheses, get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture,
+    keyword_is_literal,
 };
 
 /// ## What it does
@@ -837,7 +837,7 @@ fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorato
             Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })
                 if elts.iter().any(Expr::is_name_expr) =>
             {
-                return
+                return;
             }
             Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 named_parametrize.extend(

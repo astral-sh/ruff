@@ -5,11 +5,11 @@ use rustc_hash::FxHashMap;
 
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
+use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::symbol::ScopeId;
-use crate::types::{infer_expression_types, todo_type, Type, TypeCheckDiagnostics};
+use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types, todo_type};
 use crate::unpack::{UnpackKind, UnpackValue};
-use crate::Db;
 
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;

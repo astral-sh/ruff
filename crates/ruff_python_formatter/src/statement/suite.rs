@@ -1,5 +1,5 @@
 use ruff_formatter::{
-    write, FormatContext, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
+    FormatContext, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions, write,
 };
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt, Suite};
@@ -8,7 +8,7 @@ use ruff_python_trivia::{lines_after, lines_after_ignoring_end_of_line_trivia, l
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
-    leading_comments, trailing_comments, Comments, LeadingDanglingTrailingComments,
+    Comments, LeadingDanglingTrailingComments, leading_comments, trailing_comments,
 };
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
 use crate::other::string_literal::StringLiteralKind;
@@ -916,10 +916,10 @@ mod tests {
     use ruff_python_parser::parse_module;
     use ruff_python_trivia::CommentRanges;
 
+    use crate::PyFormatOptions;
     use crate::comments::Comments;
     use crate::prelude::*;
     use crate::statement::suite::SuiteKind;
-    use crate::PyFormatOptions;
 
     fn format_suite(level: SuiteKind) -> String {
         let source = r"
