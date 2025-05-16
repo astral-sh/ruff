@@ -1,16 +1,16 @@
 use ruff_python_ast::{self as ast, Expr, Parameters};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
+use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::{
     is_immutable_annotation, is_immutable_func, is_immutable_newtype_call, is_mutable_func,
 };
-use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 
@@ -73,7 +73,9 @@ impl Violation for FunctionCallInDefaultArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         if let Some(name) = &self.name {
-            format!("Do not perform function call `{name}` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable")
+            format!(
+                "Do not perform function call `{name}` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable"
+            )
         } else {
             "Do not perform function call in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable".to_string()
         }
@@ -83,7 +85,7 @@ impl Violation for FunctionCallInDefaultArgument {
 struct ArgumentDefaultVisitor<'a, 'b> {
     semantic: &'a SemanticModel<'b>,
     extend_immutable_calls: &'a [QualifiedName<'b>],
-    diagnostics: Vec<(DiagnosticKind, TextRange)>,
+    diagnostics: Vec<Diagnostic>,
 }
 
 impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
@@ -109,11 +111,10 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
                         is_immutable_newtype_call(name, self.semantic, self.extend_immutable_calls)
                     })
                 {
-                    self.diagnostics.push((
+                    self.diagnostics.push(Diagnostic::new(
                         FunctionCallInDefaultArgument {
                             name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
-                        }
-                        .into(),
+                        },
                         expr.range(),
                     ));
                 }
@@ -149,7 +150,5 @@ pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: &
         }
     }
 
-    for (check, range) in visitor.diagnostics {
-        checker.report_diagnostic(Diagnostic::new(check, range));
-    }
+    checker.report_diagnostics(visitor.diagnostics);
 }

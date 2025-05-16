@@ -1,24 +1,24 @@
 use std::any::Any;
 
 use js_sys::{Error, JsString};
+use ruff_db::Upcast;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
-use ruff_db::files::{system_path_to_file, File, FileRange};
+use ruff_db::files::{File, FileRange, system_path_to_file};
 use ruff_db::source::{line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
     SystemPath, SystemPathBuf, SystemVirtualPath,
 };
-use ruff_db::Upcast;
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
-use ty_ide::{goto_type_definition, hover, inlay_hints, MarkupKind};
+use ty_ide::{MarkupKind, goto_type_definition, hover, inlay_hints};
+use ty_project::ProjectMetadata;
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
-use ty_project::ProjectMetadata;
 use ty_project::{Db, ProjectDatabase};
 use ty_python_semantic::Program;
 use wasm_bindgen::prelude::*;
@@ -673,7 +673,7 @@ impl System for WasmSystem {
     fn glob(
         &self,
         pattern: &str,
-    ) -> Result<Box<dyn Iterator<Item = Result<SystemPathBuf, GlobError>>>, PatternError> {
+    ) -> Result<Box<dyn Iterator<Item = Result<SystemPathBuf, GlobError>> + '_>, PatternError> {
         Ok(Box::new(self.fs.glob(pattern)?))
     }
 

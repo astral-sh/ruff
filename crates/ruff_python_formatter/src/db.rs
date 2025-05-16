@@ -1,4 +1,4 @@
-use ruff_db::{files::File, Db as SourceDb, Upcast};
+use ruff_db::{Db as SourceDb, Upcast, files::File};
 
 use crate::PyFormatOptions;
 

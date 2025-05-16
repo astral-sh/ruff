@@ -1,6 +1,6 @@
 use ruff_python_ast::{
-    str::{Quote, TripleQuotes},
     BytesLiteralFlags, StringFlags, StringLiteralFlags,
+    str::{Quote, TripleQuotes},
 };
 
 pub struct EscapeLayout {

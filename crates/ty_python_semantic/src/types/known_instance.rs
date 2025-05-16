@@ -11,9 +11,9 @@
 use std::fmt::Display;
 
 use super::generics::GenericContext;
-use super::{class::KnownClass, ClassType, Truthiness, Type, TypeAliasType, TypeVarInstance};
+use super::{ClassType, Truthiness, Type, TypeAliasType, TypeVarInstance, class::KnownClass};
 use crate::db::Db;
-use crate::module_resolver::{file_to_module, KnownModule};
+use crate::module_resolver::{KnownModule, file_to_module};
 use ruff_db::files::File;
 
 /// Enumeration of specific runtime symbols that are special enough

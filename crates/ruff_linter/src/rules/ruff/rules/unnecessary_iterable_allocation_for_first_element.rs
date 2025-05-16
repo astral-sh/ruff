@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, Int};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::builtins::is_iterator;
@@ -263,9 +263,11 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
 /// Returns the [`Expr`] target for a comprehension, if the comprehension is "simple"
 /// (e.g., `x` for `[i for i in x]`).
 fn match_simple_comprehension(elt: &Expr, generators: &[Comprehension]) -> Option<TextRange> {
-    let [generator @ Comprehension {
-        is_async: false, ..
-    }] = generators
+    let [
+        generator @ Comprehension {
+            is_async: false, ..
+        },
+    ] = generators
     else {
         return None;
     };

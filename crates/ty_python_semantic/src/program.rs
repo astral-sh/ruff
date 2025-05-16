@@ -1,7 +1,7 @@
+use crate::Db;
 use crate::module_resolver::SearchPaths;
 use crate::python_platform::PythonPlatform;
 use crate::site_packages::SysPrefixPathOrigin;
-use crate::Db;
 
 use anyhow::Context;
 use ruff_db::system::{SystemPath, SystemPathBuf};

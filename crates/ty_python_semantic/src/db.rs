@@ -17,7 +17,7 @@ pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::program::{Program, SearchPathSettings};
-    use crate::{default_lint_registry, ProgramSettings, PythonPlatform};
+    use crate::{ProgramSettings, PythonPlatform, default_lint_registry};
 
     use super::Db;
     use crate::lint::{LintRegistry, RuleSelection};

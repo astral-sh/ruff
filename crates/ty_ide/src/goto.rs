@@ -1,7 +1,7 @@
 use crate::find_node::covering_node;
 use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::{parsed_module, ParsedModule};
+use ruff_db::parsed::{ParsedModule, parsed_module};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -253,8 +253,8 @@ pub(crate) fn find_goto_target(parsed: &ParsedModule, offset: TextSize) -> Optio
 
 #[cfg(test)]
 mod tests {
-    use crate::tests::{cursor_test, CursorTest, IntoDiagnostic};
-    use crate::{goto_type_definition, NavigationTarget};
+    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
+    use crate::{NavigationTarget, goto_type_definition};
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, SubDiagnostic,

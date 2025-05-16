@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::{Diagnostic, Fix, Violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
 use ruff_python_codegen::Stylist;
-use ruff_python_semantic::analyze::class::{is_metaclass, IsMetaclass};
+use ruff_python_semantic::analyze::class::{IsMetaclass, is_metaclass};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -167,14 +167,18 @@ enum FunctionType {
 }
 
 impl FunctionType {
-    fn diagnostic_kind(self, argument_name: String) -> DiagnosticKind {
+    fn diagnostic_kind(self, argument_name: String, range: TextRange) -> Diagnostic {
         match self {
-            Self::Method => InvalidFirstArgumentNameForMethod { argument_name }.into(),
-            Self::ClassMethod => InvalidFirstArgumentNameForClassMethod {
-                argument_name,
-                is_new: false,
+            Self::Method => {
+                Diagnostic::new(InvalidFirstArgumentNameForMethod { argument_name }, range)
             }
-            .into(),
+            Self::ClassMethod => Diagnostic::new(
+                InvalidFirstArgumentNameForClassMethod {
+                    argument_name,
+                    is_new: false,
+                },
+                range,
+            ),
         }
     }
 
@@ -262,10 +266,8 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
-        function_type.diagnostic_kind(self_or_cls.name.to_string()),
-        self_or_cls.range(),
-    );
+    let mut diagnostic =
+        function_type.diagnostic_kind(self_or_cls.name.to_string(), self_or_cls.range());
     diagnostic.try_set_optional_fix(|| {
         rename_parameter(
             scope,

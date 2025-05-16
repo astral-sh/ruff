@@ -3,8 +3,8 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-edition = "2021"
-rust-version = "1.84"
+edition = "2024"
+rust-version = "1.85"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -85,6 +85,7 @@ hashbrown = { version = "0.15.0", default-features = false, features = [
     "equivalent",
     "inline-more",
 ] }
+heck = "0.5.0"
 ignore = { version = "0.4.22" }
 imara-diff = { version = "0.1.5" }
 imperative = { version = "1.0.4" }
@@ -162,8 +163,9 @@ tracing-log = { version = "0.2.0" }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = [
     "env-filter",
     "fmt",
+    "ansi",
+    "smallvec"
 ] }
-tracing-tree = { version = "0.4.0" }
 tryfn = { version = "0.2.1" }
 typed-arena = { version = "2.0.2" }
 unic-ucd-category = { version = "0.9" }
@@ -213,6 +215,7 @@ similar_names = "allow"
 single_match_else = "allow"
 too_many_lines = "allow"
 needless_continue = "allow"       # An explicit continue can be more readable, especially if the alternative is an empty block.
+unnecessary_debug_formatting = "allow"  # too many instances, the display also doesn't quote the path which is often desired in logs where we use them the most often.
 # Without the hashes we run into a `rustfmt` bug in some snapshot tests, see #13250
 needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
@@ -255,6 +258,9 @@ codegen-units = 1
 opt-level = 3
 
 [profile.dev.package.similar]
+opt-level = 3
+
+[profile.dev.package.salsa]
 opt-level = 3
 
 # Reduce complexity of a parser function that would trigger a locals limit in a wasm tool.

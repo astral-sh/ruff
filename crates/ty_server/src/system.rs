@@ -13,8 +13,8 @@ use ruff_db::system::{
 use ruff_notebook::{Notebook, NotebookError};
 use ty_python_semantic::Db;
 
-use crate::session::index::Index;
 use crate::DocumentQuery;
+use crate::session::index::Index;
 
 /// Converts the given [`Url`] to an [`AnySystemPath`].
 ///
@@ -221,7 +221,7 @@ impl System for LSPSystem {
         &self,
         pattern: &str,
     ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
         PatternError,
     > {
         self.os_system.glob(pattern)

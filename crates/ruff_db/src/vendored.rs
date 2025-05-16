@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use crate::file_revision::FileRevision;
 use zip::result::ZipResult;
 use zip::write::FileOptions;
-use zip::{read::ZipFile, CompressionMethod, ZipArchive, ZipWriter};
+use zip::{CompressionMethod, ZipArchive, ZipWriter, read::ZipFile};
 
 pub use self::path::{VendoredPath, VendoredPathBuf};
 
@@ -503,9 +503,11 @@ pub(crate) mod tests {
         let path = VendoredPath::new(path);
         assert!(!mock_typeshed.exists(path));
         assert!(mock_typeshed.metadata(path).is_err());
-        assert!(mock_typeshed
-            .read_to_string(path)
-            .is_err_and(|err| err.to_string().contains("file not found")));
+        assert!(
+            mock_typeshed
+                .read_to_string(path)
+                .is_err_and(|err| err.to_string().contains("file not found"))
+        );
     }
 
     #[test]

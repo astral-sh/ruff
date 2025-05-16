@@ -1,3 +1,4 @@
+use crate::Db;
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::predicate::{
@@ -7,10 +8,9 @@ use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    infer_expression_types, IntersectionBuilder, KnownClass, SubclassOfType, Truthiness, Type,
-    UnionBuilder,
+    IntersectionBuilder, KnownClass, SubclassOfType, Truthiness, Type, UnionBuilder,
+    infer_expression_types,
 };
-use crate::Db;
 
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -860,7 +860,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             }
             (BoolOp::Or, true) | (BoolOp::And, false) => {
                 let (first, rest) = sub_constraints.split_first_mut()?;
-                if let Some(ref mut first) = first {
+                if let Some(first) = first {
                     for rest_constraint in rest {
                         if let Some(rest_constraint) = rest_constraint {
                             merge_constraints_or(first, rest_constraint, self.db);

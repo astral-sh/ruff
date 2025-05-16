@@ -364,9 +364,9 @@ impl<'db> Protocol<'db> {
 }
 
 mod synthesized_protocol {
+    use crate::types::TypeVarInstance;
     use crate::types::generics::TypeMapping;
     use crate::types::protocol_class::ProtocolInterface;
-    use crate::types::TypeVarInstance;
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.

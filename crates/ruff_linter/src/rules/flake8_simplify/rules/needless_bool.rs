@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
 use ruff_python_ast::{self as ast, Arguments, ElifElseClause, Expr, ExprContext, Stmt};
@@ -107,11 +107,13 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         // else:
         //     return False
         // ```
-        [ElifElseClause {
-            body: else_body,
-            test: None,
-            ..
-        }] => (
+        [
+            ElifElseClause {
+                body: else_body,
+                test: None,
+                ..
+            },
+        ] => (
             if_test.as_ref(),
             if_body,
             else_body.as_slice(),
@@ -124,15 +126,19 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         // elif x < 0:
         //     return False
         // ```
-        [.., ElifElseClause {
-            body: elif_body,
-            test: Some(elif_test),
-            range: elif_range,
-        }, ElifElseClause {
-            body: else_body,
-            test: None,
-            range: else_range,
-        }] => (
+        [
+            ..,
+            ElifElseClause {
+                body: elif_body,
+                test: Some(elif_test),
+                range: elif_range,
+            },
+            ElifElseClause {
+                body: else_body,
+                test: None,
+                range: else_range,
+            },
+        ] => (
             elif_test,
             elif_body,
             else_body.as_slice(),
@@ -323,11 +329,7 @@ enum Bool {
 
 impl From<bool> for Bool {
     fn from(value: bool) -> Self {
-        if value {
-            Bool::True
-        } else {
-            Bool::False
-        }
+        if value { Bool::True } else { Bool::False }
     }
 }
 

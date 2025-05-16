@@ -9,8 +9,8 @@ use ruff_db::{Db as SourceDb, Upcast};
 use ruff_python_ast::PythonVersion;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    default_lint_registry, Db, Program, ProgramSettings, PythonPath, PythonPlatform,
-    SearchPathSettings,
+    Db, Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
+    default_lint_registry,
 };
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {

@@ -1,6 +1,6 @@
 use std::iter;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use itertools::Itertools;
 use libcst_native::{
     Arg, AssignEqual, AssignTargetExpression, Call, Comma, Comment, CompFor, Dict, DictComp,
@@ -16,11 +16,11 @@ use ruff_python_codegen::Stylist;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::cst::helpers::{negate, space};
 use crate::fix::codemods::CodegenStylist;
 use crate::fix::edits::pad;
 use crate::rules::flake8_comprehensions::rules::ObjectType;
-use crate::Locator;
 use crate::{
     checkers::ast::Checker,
     cst::matchers::{
@@ -43,7 +43,10 @@ pub(crate) fn fix_unnecessary_generator_dict(expr: &Expr, checker: &Checker) -> 
     // Extract the (k, v) from `(k, v) for ...`.
     let generator_exp = match_generator_exp(&arg.value)?;
     let tuple = match_tuple(&generator_exp.elt)?;
-    let [Element::Simple { value: key, .. }, Element::Simple { value, .. }] = &tuple.elements[..]
+    let [
+        Element::Simple { value: key, .. },
+        Element::Simple { value, .. },
+    ] = &tuple.elements[..]
     else {
         bail!("Expected tuple to contain two elements");
     };
@@ -103,7 +106,10 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
 
     let tuple = match_tuple(&list_comp.elt)?;
 
-    let [Element::Simple { value: key, .. }, Element::Simple { value, .. }] = &tuple.elements[..]
+    let [
+        Element::Simple { value: key, .. },
+        Element::Simple { value, .. },
+    ] = &tuple.elements[..]
     else {
         bail!("Expected tuple with two elements");
     };
