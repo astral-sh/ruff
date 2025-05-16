@@ -4049,7 +4049,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // (e.g. `from parent import submodule` inside the `parent` module).
         let import_is_self_referential = module_ty
             .into_module_literal()
-            .is_some_and(|module| self.file() == module.module(self.db()).file());
+            .is_some_and(|module| Some(self.file()) == module.module(self.db()).file());
 
         // First try loading the requested attribute from the module.
         if !import_is_self_referential {

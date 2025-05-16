@@ -7846,7 +7846,11 @@ impl<'db> ModuleLiteralType<'db> {
             }
         }
 
-        imported_symbol(db, self.module(db).file(), name, None).symbol
+        self.module(db)
+            .file()
+            .map(|file| imported_symbol(db, file, name, None))
+            .unwrap_or_default()
+            .symbol
     }
 }
 

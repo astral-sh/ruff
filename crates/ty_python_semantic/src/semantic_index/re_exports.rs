@@ -244,7 +244,12 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                                     .ok()
                                     .and_then(|module_name| resolve_module(self.db, &module_name))
                                     .iter()
-                                    .flat_map(|module| exported_names(self.db, module.file()))
+                                    .flat_map(|module| {
+                                        module
+                                            .file()
+                                            .map(|file| exported_names(self.db, file))
+                                            .unwrap_or_default()
+                                    })
                             {
                                 self.possibly_add_export(export, PossibleExportKind::Normal);
                             }
