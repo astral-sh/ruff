@@ -331,12 +331,6 @@ fn benchmark_many_tuple_assignments(criterion: &mut Criterion) {
                         t += (7,)
                     if flag():
                         t += (8,)
-                    if flag():
-                        t += (9,)
-                    if flag():
-                        t += (10,)
-                    if flag():
-                        t += (11,)
 
                     # Perform some kind of operation on the union type
                     print(1 in t)
