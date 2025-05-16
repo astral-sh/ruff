@@ -40,7 +40,7 @@ from parent.child import one, two  # error: [unresolved-import]
 python = "/.venv"
 ```
 
-Adopted test case from the
+An adapted test case from the
 [PEP420 examples](https://peps.python.org/pep-0420/#nested-namespace-packages). The
 `src/parent/child` package is a regular package. Therefore, `site_packages/parent/child/two.py`
 should not be resolved.
@@ -51,7 +51,7 @@ src
     child
       __init__.py
       one.py
-.venv/site_packages
+.venv/site-packages
   parent
     child
       two.py
@@ -102,4 +102,6 @@ x = "namespace"
 from foo import x
 
 reveal_type(x)  # revealed: Unknown | Literal["module"]
+
+import foo.bar  # error: [unresolved-import]
 ```
