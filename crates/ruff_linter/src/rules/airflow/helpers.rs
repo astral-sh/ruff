@@ -2,7 +2,7 @@ use crate::rules::numpy::helpers::{AttributeSearcher, ImportSearcher};
 use ruff_python_ast::name::QualifiedNameBuilder;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{Expr, ExprName, StmtTry};
+use ruff_python_ast::{Expr, ExprAttribute, ExprName, StmtTry};
 use ruff_python_semantic::Exceptions;
 use ruff_python_semantic::SemanticModel;
 
@@ -168,5 +168,14 @@ pub(crate) fn is_airflow_builtin_or_provider(
         }
 
         _ => false,
+    }
+}
+
+/// Return the [`ast::ExprName`] at the head of the expression, if any.
+pub(crate) fn match_head(value: &Expr) -> Option<&ExprName> {
+    match value {
+        Expr::Attribute(ExprAttribute { value, .. }) => match_head(value),
+        Expr::Name(name) => Some(name),
+        _ => None,
     }
 }

@@ -1,13 +1,14 @@
+use crate::checkers::ast::Checker;
+use crate::fix::edits::remove_unused_imports;
 use crate::importer::ImportRequest;
-use crate::rules::airflow::helpers::{is_guarded_by_try_except, ProviderReplacement};
+use crate::rules::airflow::helpers::{is_guarded_by_try_except, match_head, ProviderReplacement};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
+use ruff_python_semantic::{MemberNameImport, NameImport};
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for uses of Airflow functions and values that have been moved to it providers.
@@ -865,6 +866,14 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         },
 
         // apache-airflow-providers-standard
+        ["airflow", "hooks", "subprocess", rest @ ("SubprocessResult" | "working_directory")] => {
+            ProviderReplacement::SourceModuleMovedToProvider {
+                name: (*rest).to_string(),
+                module: "airflow.providers.standard.hooks.subprocess",
+                provider: "standard",
+                version: "0.0.3",
+            }
+        }
         ["airflow", "operators", "bash_operator", "BashOperator"] => {
             ProviderReplacement::AutoImport {
                 module: "airflow.providers.standard.operators.bash",
@@ -879,6 +888,22 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
                 module: "airflow.providers.standard.operators.trigger_dagrun",
                 provider: "standard",
                 version: "0.0.2",
+            }
+        }
+        ["airflow", "operators", "trigger_dagrun", "TriggerDagRunLink"] => {
+            ProviderReplacement::AutoImport {
+                module: "airflow.providers.standard.operators.trigger_dagrun",
+                name: "TriggerDagRunLink",
+                provider: "standard",
+                version: "0.0.2",
+            }
+        }
+        ["airflow", "operators", "datetime", "target_times_as_dates"] => {
+            ProviderReplacement::AutoImport {
+                module: "airflow.providers.standard.operators.datetime",
+                name: "target_times_as_dates",
+                provider: "standard",
+                version: "0.0.1",
             }
         }
         ["airflow", "operators", "dummy" | "dummy_operator", "EmptyOperator" | "DummyOperator"] => {
@@ -906,14 +931,28 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1",
         },
-        ["airflow", "sensors", "external_task_sensor", rest @ ("ExternalTaskMarker" | "ExternalTaskSensor" | "ExternalTaskSensorLink")] => {
-            ProviderReplacement::SourceModuleMovedToProvider {
-                name: (*rest).to_string(),
+        ["airflow", "sensors", "external_task", "ExternalTaskSensorLink"] => {
+            ProviderReplacement::AutoImport {
                 module: "airflow.providers.standard.sensors.external_task",
+                name: "ExternalDagLink",
                 provider: "standard",
                 version: "0.0.3",
             }
         }
+        ["airflow", "sensors", "external_task_sensor", rest @ ("ExternalTaskMarker" | "ExternalTaskSensor" | "ExternalTaskSensorLink")] => {
+            ProviderReplacement::SourceModuleMovedToProvider {
+                module: "airflow.providers.standard.sensors.external_task",
+                name: (*rest).to_string(),
+                provider: "standard",
+                version: "0.0.3",
+            }
+        }
+        ["airflow", "sensors", "time_delta", "WaitSensor"] => ProviderReplacement::AutoImport {
+            module: "airflow.providers.standard.sensors.time_delta",
+            name: "WaitSensor",
+            provider: "standard",
+            version: "0.0.1",
+        },
 
         _ => return,
     };
@@ -927,6 +966,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
     );
 
     let semantic = checker.semantic();
+
     if let Some((module, name)) = match &replacement {
         ProviderReplacement::AutoImport { module, name, .. } => Some((module, *name)),
         ProviderReplacement::SourceModuleMovedToProvider { module, name, .. } => {
@@ -937,15 +977,65 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         if is_guarded_by_try_except(expr, module, name, semantic) {
             return;
         }
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(module, name),
-                expr.start(),
-                checker.semantic(),
-            )?;
-            let replacement_edit = Edit::range_replacement(binding, ranged.range());
-            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
-        });
+
+        if let Some(fix) = generate_name_changed_fix(expr, checker, module, name, ranged) {
+            diagnostic.try_set_fix(|| Ok(fix));
+        } else if let Some(fix) = generate_module_change_only_fix(expr, checker, module, name) {
+            diagnostic.try_set_fix(|| Ok(fix));
+        }
+
+        checker.report_diagnostic(diagnostic);
     }
-    checker.report_diagnostic(diagnostic);
+}
+
+fn generate_name_changed_fix(
+    expr: &Expr,
+    checker: &Checker,
+    module: &str,
+    name: &str,
+    ranged: TextRange,
+) -> Option<Fix> {
+    let (import_edit, binding) = checker
+        .importer()
+        .get_or_import_symbol(
+            &ImportRequest::import_from(module, name),
+            expr.start(),
+            checker.semantic(),
+        )
+        .ok()?;
+    let replacement_edit = Edit::range_replacement(binding, ranged.range());
+    Some(Fix::safe_edits(import_edit, [replacement_edit]))
+}
+
+fn generate_module_change_only_fix(
+    expr: &Expr,
+    checker: &Checker,
+    module: &str,
+    name: &str,
+) -> Option<Fix> {
+    let head = match_head(expr)?;
+    let semantic = checker.semantic();
+    let binding = semantic
+        .resolve_name(head)
+        .or_else(|| checker.semantic().lookup_symbol(&head.id))
+        .map(|id| checker.semantic().binding(id))?;
+    let stmt = binding.statement(semantic)?;
+    let remove_edit = remove_unused_imports(
+        std::iter::once(name),
+        stmt,
+        None,
+        checker.locator(),
+        checker.stylist(),
+        checker.indexer(),
+    )
+    .ok()?;
+    let import_edit = checker.importer().add_import(
+        &NameImport::ImportFrom(MemberNameImport::member(
+            (*module).to_string(),
+            name.to_string(),
+        )),
+        expr.start(),
+    );
+
+    Some(Fix::unsafe_edits(remove_edit, [import_edit]))
 }
