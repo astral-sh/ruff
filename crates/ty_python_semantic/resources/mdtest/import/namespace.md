@@ -26,6 +26,13 @@ import parent.child.one
 import parent.child.two
 ```
 
+`from.py`
+
+```py
+# TODO: This should not be an error
+from parent.child import one, two  # error: [unresolved-import]
+```
+
 ## Regular package in namespace package
 
 ```toml
