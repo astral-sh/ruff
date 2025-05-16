@@ -21,9 +21,8 @@ use crate::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
 };
 use crate::{
-    Expr, Expr, ExprRef, ExprRef, FStringElement, FStringElement, LiteralExpressionRef,
-    LiteralExpressionRef, OperatorPrecedence, OperatorPrecedence, Pattern, Pattern, Stmt, Stmt,
-    TStringElement, TypeParam, TypeParam, int,
+    Expr, ExprRef, FStringElement, LiteralExpressionRef, OperatorPrecedence, Pattern, Stmt,
+    TStringElement, TypeParam, int,
     name::Name,
     str::{Quote, TripleQuotes},
 };

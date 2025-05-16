@@ -4397,7 +4397,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 } = expression;
                                 self.infer_expression(expression);
 
-                                if let Some(ref format_spec) = format_spec {
+                                if let Some(format_spec) = format_spec {
                                     for element in format_spec.elements.expressions() {
                                         self.infer_expression(&element.expression);
                                     }
@@ -4417,7 +4417,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     ..
                                 } = tstring_interpolation_element;
                                 self.infer_expression(interpolation);
-                                if let Some(ref format_spec) = format_spec {
+                                if let Some(format_spec) = format_spec {
                                     for element in format_spec.elements.interpolations() {
                                         self.infer_expression(&element.interpolation);
                                     }

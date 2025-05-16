@@ -505,7 +505,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                 soft_block_indent(&format_args![t_string_flat, inline_comments]),
                                 token(")"),
                             ])
-                            .with_group_id(Some(group_id))
+                            .with_id(Some(group_id))
                             .should_expand(true)
                             .fmt(f)
                         });
