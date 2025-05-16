@@ -132,15 +132,6 @@ impl VirtualEnvironment {
                     ));
                 }
 
-                if value.contains('=') {
-                    return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
-                        pyvenv_cfg_path,
-                        PyvenvCfgParseErrorKind::TooManyEquals {
-                            line_number: pyvenv_cfg_line_number(index),
-                        },
-                    ));
-                }
-
                 match key {
                     "include-system-site-packages" => {
                         include_system_site_packages = value.eq_ignore_ascii_case("true");
