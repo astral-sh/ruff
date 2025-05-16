@@ -133,7 +133,7 @@ struct SourceTextInner {
 #[derive(Eq, PartialEq)]
 enum SourceTextKind {
     Text(String),
-    Notebook(Notebook),
+    Notebook(Box<Notebook>),
 }
 
 impl From<String> for SourceTextKind {
@@ -144,7 +144,7 @@ impl From<String> for SourceTextKind {
 
 impl From<Notebook> for SourceTextKind {
     fn from(notebook: Notebook) -> Self {
-        SourceTextKind::Notebook(notebook)
+        SourceTextKind::Notebook(Box::new(notebook))
     }
 }
 

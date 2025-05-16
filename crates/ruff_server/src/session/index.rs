@@ -559,7 +559,7 @@ impl DocumentQuery {
                 ruff_linter::source_kind::SourceKind::Python(document.contents().to_string())
             }
             Self::Notebook { notebook, .. } => {
-                ruff_linter::source_kind::SourceKind::IpyNotebook(notebook.make_ruff_notebook())
+                ruff_linter::source_kind::SourceKind::ipy_notebook(notebook.make_ruff_notebook())
             }
         }
     }

@@ -60,7 +60,7 @@ pub(crate) fn assert_notebook_path(
 ) -> Result<TestedNotebook, NotebookError> {
     let source_notebook = Notebook::from_path(path.as_ref())?;
 
-    let source_kind = SourceKind::IpyNotebook(source_notebook);
+    let source_kind = SourceKind::ipy_notebook(source_notebook);
     let (messages, transformed) = test_contents(&source_kind, path.as_ref(), settings);
     let expected_notebook = Notebook::from_path(expected.as_ref())?;
     let linted_notebook = transformed.into_owned().expect_ipy_notebook();

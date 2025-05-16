@@ -940,7 +940,7 @@ mod tests {
     #[test_case(Path::new("add_missing_cell_id.ipynb"), true; "add_missing_cell_id")]
     fn test_cell_id(path: &Path, has_id: bool) -> Result<()> {
         let source_notebook = Notebook::from_path(&notebook_path(path))?;
-        let source_kind = SourceKind::IpyNotebook(source_notebook);
+        let source_kind = SourceKind::ipy_notebook(source_notebook);
         let (_, transformed) = test_contents(
             &source_kind,
             path,
@@ -1231,7 +1231,7 @@ mod tests {
             format!("async_comprehension_in_sync_comprehension_notebook_{python_version}");
         let path = Path::new("resources/test/fixtures/syntax_errors/async_comprehension.ipynb");
         let messages = test_contents_syntax_errors(
-            &SourceKind::IpyNotebook(Notebook::from_path(path)?),
+            &SourceKind::ipy_notebook(Notebook::from_path(path)?),
             path,
             &LinterSettings {
                 unresolved_target_version: python_version.into(),

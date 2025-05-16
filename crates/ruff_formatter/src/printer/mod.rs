@@ -2002,7 +2002,7 @@ two lines`,
                         token("The referenced group breaks."),
                         hard_line_break()
                     ])
-                    .with_group_id(Some(group_id)),
+                    .with_id(Some(group_id)),
                     group(&format_args![
                         token("This group breaks because:"),
                         soft_line_break_or_space(),
@@ -2027,7 +2027,7 @@ two lines`,
             write!(
                 f,
                 [
-                    group(&token("Group with id-2")).with_group_id(Some(id_2)),
+                    group(&token("Group with id-2")).with_id(Some(id_2)),
                     hard_line_break()
                 ]
             )?;
@@ -2035,7 +2035,7 @@ two lines`,
             write!(
                 f,
                 [
-                    group(&token("Group with id-1 does not fit on the line because it exceeds the line width of 80 characters by")).with_group_id(Some(id_1)),
+                    group(&token("Group with id-1 does not fit on the line because it exceeds the line width of 80 characters by")).with_id(Some(id_1)),
                     hard_line_break()
                 ]
             )?;
