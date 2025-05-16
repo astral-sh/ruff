@@ -105,12 +105,20 @@ fn to_lsp_diagnostic(
         })
         .filter(|mapped_tags| !mapped_tags.is_empty());
 
+    let code = Some(NumberOrString::String(diagnostic.id().to_string()));
     Diagnostic {
         range,
         severity: Some(severity),
         tags,
-        code: Some(NumberOrString::String(diagnostic.id().to_string())),
-        code_description: None,
+        code: code.clone(),
+        code_description: code.and_then(|_| {
+            Some(lsp_types::CodeDescription {
+                href: lsp_types::Url::parse(
+                    format!("https://ty.dev/rules#{}", diagnostic.id()).as_ref(),
+                )
+                .ok()?,
+            })
+        }),
         source: Some("ty".into()),
         message: diagnostic.concise_message().to_string(),
         related_information: None,
