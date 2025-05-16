@@ -569,9 +569,7 @@ mod tests {
     use ruff_python_ast::Suite;
 
     use crate::error::LexicalErrorType;
-    use crate::{
-        FStringErrorType, ParseError, ParseErrorType, Parsed, TStringErrorType, parse_module,
-    };
+    use crate::{FTStringErrorType, ParseError, ParseErrorType, Parsed, parse_module};
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
@@ -653,7 +651,7 @@ mod tests {
         insta::assert_debug_snapshot!(suite);
     }
 
-    fn parse_fstring_error(source: &str) -> FStringErrorType {
+    fn parse_fstring_error(source: &str) -> FTStringErrorType {
         parse_suite(source)
             .map_err(|e| match e.error {
                 ParseErrorType::Lexical(LexicalErrorType::FStringError(e)) => e,
@@ -665,7 +663,7 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_fstring() {
-        use FStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
+        use FTStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
 
         assert_eq!(parse_fstring_error(r#"f"{5!x}""#), InvalidConversionFlag);
         assert_eq!(
@@ -765,7 +763,7 @@ mod tests {
         insta::assert_debug_snapshot!(suite);
     }
 
-    fn parse_tstring_error(source: &str) -> TStringErrorType {
+    fn parse_tstring_error(source: &str) -> FTStringErrorType {
         parse_suite(source)
             .map_err(|e| match e.error {
                 ParseErrorType::Lexical(LexicalErrorType::TStringError(e)) => e,
@@ -777,7 +775,7 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_tstring() {
-        use TStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
+        use FTStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
 
         assert_eq!(parse_tstring_error(r#"t"{5!x}""#), InvalidConversionFlag);
         assert_eq!(

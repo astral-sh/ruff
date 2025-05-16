@@ -48,9 +48,9 @@ impl ParseError {
     }
 }
 
-/// Represents the different types of errors that can occur during parsing of an f-string.
+/// Represents the different types of errors that can occur during parsing of an f-string or t-string.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FStringErrorType {
+pub enum FTStringErrorType {
     /// Expected a right brace after an opened left brace.
     UnclosedLbrace,
     /// An invalid conversion flag was encountered.
@@ -65,45 +65,9 @@ pub enum FStringErrorType {
     LambdaWithoutParentheses,
 }
 
-impl std::fmt::Display for FStringErrorType {
+impl std::fmt::Display for FTStringErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use FStringErrorType::{
-            InvalidConversionFlag, LambdaWithoutParentheses, SingleRbrace, UnclosedLbrace,
-            UnterminatedString, UnterminatedTripleQuotedString,
-        };
-        match self {
-            UnclosedLbrace => write!(f, "expecting '}}'"),
-            InvalidConversionFlag => write!(f, "invalid conversion character"),
-            SingleRbrace => write!(f, "single '}}' is not allowed"),
-            UnterminatedString => write!(f, "unterminated string"),
-            UnterminatedTripleQuotedString => write!(f, "unterminated triple-quoted string"),
-            LambdaWithoutParentheses => {
-                write!(f, "lambda expressions are not allowed without parentheses")
-            }
-        }
-    }
-}
-
-/// Represents the different types of errors that can occur during parsing of a t-string.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TStringErrorType {
-    /// Expected a right brace after an opened left brace.
-    UnclosedLbrace,
-    /// An invalid conversion flag was encountered.
-    InvalidConversionFlag,
-    /// A single right brace was encountered.
-    SingleRbrace,
-    /// Unterminated string.
-    UnterminatedString,
-    /// Unterminated triple-quoted string.
-    UnterminatedTripleQuotedString,
-    /// A lambda expression without parentheses was encountered.
-    LambdaWithoutParentheses,
-}
-
-impl std::fmt::Display for TStringErrorType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use TStringErrorType::{
+        use FTStringErrorType::{
             InvalidConversionFlag, LambdaWithoutParentheses, SingleRbrace, UnclosedLbrace,
             UnterminatedString, UnterminatedTripleQuotedString,
         };
@@ -213,10 +177,10 @@ pub enum ParseErrorType {
     /// An unexpected token was found at the end of an expression parsing
     UnexpectedExpressionToken,
 
-    /// An f-string error containing the [`FStringErrorType`].
-    FStringError(FStringErrorType),
-    /// A t-string error containing the [`TStringErrorType`].
-    TStringError(TStringErrorType),
+    /// An f-string error containing the [`FTStringErrorType`].
+    FStringError(FTStringErrorType),
+    /// A t-string error containing the [`FTStringErrorType`].
+    TStringError(FTStringErrorType),
     /// Parser encountered an error during lexing.
     Lexical(LexicalErrorType),
 }
@@ -416,10 +380,10 @@ pub enum LexicalErrorType {
     IndentationError,
     /// An unrecognized token was encountered.
     UnrecognizedToken { tok: char },
-    /// An f-string error containing the [`FStringErrorType`].
-    FStringError(FStringErrorType),
-    /// A t-string error containing the [`TStringErrorType`].
-    TStringError(TStringErrorType),
+    /// An f-string error containing the [`FTStringErrorType`].
+    FStringError(FTStringErrorType),
+    /// A t-string error containing the [`FTStringErrorType`].
+    TStringError(FTStringErrorType),
     /// Invalid character encountered in a byte literal.
     InvalidByteLiteral,
     /// An unexpected character was encountered after a line continuation.
