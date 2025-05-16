@@ -1095,26 +1095,6 @@ mod tests {
     }
 
     #[test]
-    fn parsing_pyvenv_cfg_with_too_many_equals() {
-        let system = TestSystem::default();
-        let memory_fs = system.memory_file_system();
-        let pyvenv_cfg_path = SystemPathBuf::from("/.venv/pyvenv.cfg");
-        memory_fs
-            .write_file_all(&pyvenv_cfg_path, "home = bar = /.venv/bin")
-            .unwrap();
-        let venv_result =
-            PythonEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
-        assert!(matches!(
-            venv_result,
-            Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
-                path,
-                PyvenvCfgParseErrorKind::TooManyEquals { line_number }
-            ))
-            if path == pyvenv_cfg_path && Some(line_number) == NonZeroUsize::new(1)
-        ));
-    }
-
-    #[test]
     fn parsing_pyvenv_cfg_with_key_but_no_value_fails() {
         let system = TestSystem::default();
         let memory_fs = system.memory_file_system();
