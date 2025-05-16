@@ -21,8 +21,7 @@ use crate::string::{
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
 use crate::{
-    FStringErrorType, Mode, ParseErrorType, TStringErrorType, UnsupportedSyntaxError,
-    UnsupportedSyntaxErrorKind,
+    FTStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxError, UnsupportedSyntaxErrorKind,
 };
 
 use super::{FStringElementsKind, Parenthesized, RecoveryContextKind, TStringElementsKind};
@@ -1628,7 +1627,7 @@ impl<'src> Parser<'src> {
             // test_err f_string_lambda_without_parentheses
             // f"{lambda x: x}"
             self.add_error(
-                ParseErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
+                ParseErrorType::FStringError(FTStringErrorType::LambdaWithoutParentheses),
                 value.range(),
             );
         }
@@ -1657,7 +1656,7 @@ impl<'src> Parser<'src> {
                         // test_err f_string_invalid_conversion_flag_name_tok
                         // f"{x!z}"
                         self.add_error(
-                            ParseErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
+                            ParseErrorType::FStringError(FTStringErrorType::InvalidConversionFlag),
                             conversion_flag_range,
                         );
                         ConversionFlag::None
@@ -1668,7 +1667,7 @@ impl<'src> Parser<'src> {
                 // f"{x!123}"
                 // f"{x!'a'}"
                 self.add_error(
-                    ParseErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
+                    ParseErrorType::FStringError(FTStringErrorType::InvalidConversionFlag),
                     conversion_flag_range,
                 );
                 // TODO(dhruvmanila): Avoid dropping this token
@@ -1709,7 +1708,7 @@ impl<'src> Parser<'src> {
             // f"hello {x:"
             // f"hello {x:.3f"
             self.add_error(
-                ParseErrorType::FStringError(FStringErrorType::UnclosedLbrace),
+                ParseErrorType::FStringError(FTStringErrorType::UnclosedLbrace),
                 self.current_token_range(),
             );
         }
@@ -1873,7 +1872,7 @@ impl<'src> Parser<'src> {
             // # parse_options: { "target-version": "3.14" }
             // t"{lambda x: x}"
             self.add_error(
-                ParseErrorType::TStringError(TStringErrorType::LambdaWithoutParentheses),
+                ParseErrorType::TStringError(FTStringErrorType::LambdaWithoutParentheses),
                 value.range(),
             );
         }
@@ -1903,7 +1902,7 @@ impl<'src> Parser<'src> {
                         // # parse_options: { "target-version": "3.14" }
                         // t"{x!z}"
                         self.add_error(
-                            ParseErrorType::TStringError(TStringErrorType::InvalidConversionFlag),
+                            ParseErrorType::TStringError(FTStringErrorType::InvalidConversionFlag),
                             conversion_flag_range,
                         );
                         ConversionFlag::None
@@ -1915,7 +1914,7 @@ impl<'src> Parser<'src> {
                 // t"{x!123}"
                 // t"{x!'a'}"
                 self.add_error(
-                    ParseErrorType::TStringError(TStringErrorType::InvalidConversionFlag),
+                    ParseErrorType::TStringError(FTStringErrorType::InvalidConversionFlag),
                     conversion_flag_range,
                 );
                 // TODO(dhruvmanila): Avoid dropping this token
@@ -1958,7 +1957,7 @@ impl<'src> Parser<'src> {
             // t"hello {x:"
             // t"hello {x:.3f"
             self.add_error(
-                ParseErrorType::TStringError(TStringErrorType::UnclosedLbrace),
+                ParseErrorType::TStringError(FTStringErrorType::UnclosedLbrace),
                 self.current_token_range(),
             );
         }
