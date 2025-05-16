@@ -164,6 +164,10 @@ pub struct GenericAlias<'db> {
 }
 
 impl<'db> GenericAlias<'db> {
+    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
+        Self::new(db, self.origin(db), self.specialization(db).normalized(db))
+    }
+
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.origin(db).definition(db)
     }
@@ -207,6 +211,13 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
+    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::NonGeneric(_) => self,
+            Self::Generic(generic) => Self::Generic(generic.normalized(db)),
+        }
+    }
+
     /// Returns the class literal and specialization for this class. For a non-generic class, this
     /// is the class itself. For a generic alias, this is the alias's origin.
     pub(crate) fn class_literal(

@@ -75,6 +75,10 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
+        Self::from_class(self.class.normalized(db))
+    }
+
     pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
         // N.B. The subclass relation is fully static
         self.class.is_subclass_of(db, other.class)
@@ -237,9 +241,13 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    /// Return `true` if any of the members of this protocol type contain any `Todo` types.
-    pub(super) fn contains_todo(self, db: &'db dyn Db) -> bool {
-        self.inner.interface(db).contains_todo(db)
+    /// Return `true` if the types of any of the members match the closure passed in.
+    pub(super) fn any_over_type(
+        self,
+        db: &'db dyn Db,
+        type_fn: &dyn Fn(Type<'db>) -> bool,
+    ) -> bool {
+        self.inner.interface(db).any_over_type(db, type_fn)
     }
 
     /// Return `true` if this protocol type is fully static.

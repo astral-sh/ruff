@@ -657,25 +657,26 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub fn contains_todo(&self, db: &'db dyn Db) -> bool {
-        match self {
-            Self::Dynamic(DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec) => true,
+    /// Return `true` if `self`, or any of the types contained in `self`, match the closure passed in.
+    pub fn any_over_type(self, db: &'db dyn Db, type_fn: &dyn Fn(Type<'db>) -> bool) -> bool {
+        if type_fn(self) {
+            return true;
+        }
 
+        match self {
             Self::AlwaysFalsy
             | Self::AlwaysTruthy
             | Self::Never
             | Self::BooleanLiteral(_)
             | Self::BytesLiteral(_)
-            | Self::FunctionLiteral(_)
-            | Self::NominalInstance(_)
             | Self::ModuleLiteral(_)
+            | Self::FunctionLiteral(_)
             | Self::ClassLiteral(_)
             | Self::KnownInstance(_)
-            | Self::PropertyInstance(_)
             | Self::StringLiteral(_)
             | Self::IntLiteral(_)
             | Self::LiteralString
-            | Self::Dynamic(DynamicType::Unknown | DynamicType::Any)
+            | Self::Dynamic(_)
             | Self::BoundMethod(_)
             | Self::WrapperDescriptor(_)
             | Self::MethodWrapper(_)
@@ -686,7 +687,8 @@ impl<'db> Type<'db> {
                 .specialization(db)
                 .types(db)
                 .iter()
-                .any(|ty| ty.contains_todo(db)),
+                .copied()
+                .any(|ty| ty.any_over_type(db, type_fn)),
 
             Self::Callable(callable) => {
                 let signatures = callable.signatures(db);
@@ -694,54 +696,73 @@ impl<'db> Type<'db> {
                     signature.parameters().iter().any(|param| {
                         param
                             .annotated_type()
-                            .is_some_and(|ty| ty.contains_todo(db))
-                    }) || signature.return_ty.is_some_and(|ty| ty.contains_todo(db))
+                            .is_some_and(|ty| ty.any_over_type(db, type_fn))
+                    }) || signature
+                        .return_ty
+                        .is_some_and(|ty| ty.any_over_type(db, type_fn))
                 })
             }
 
-            Self::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
-                SubclassOfInner::Dynamic(
-                    DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec,
-                ) => true,
-                SubclassOfInner::Dynamic(DynamicType::Unknown | DynamicType::Any) => false,
-                SubclassOfInner::Class(_) => false,
-            },
+            Self::SubclassOf(subclass_of) => {
+                Type::from(subclass_of.subclass_of()).any_over_type(db, type_fn)
+            }
 
             Self::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
                 None => false,
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.contains_todo(db),
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    bound.any_over_type(db, type_fn)
+                }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
                     .elements(db)
                     .iter()
-                    .any(|constraint| constraint.contains_todo(db)),
+                    .any(|constraint| constraint.any_over_type(db, type_fn)),
             },
 
             Self::BoundSuper(bound_super) => {
-                matches!(
-                    bound_super.pivot_class(db),
-                    ClassBase::Dynamic(DynamicType::Todo(_))
-                ) || matches!(
-                    bound_super.owner(db),
-                    SuperOwnerKind::Dynamic(DynamicType::Todo(_))
-                )
+                Type::from(bound_super.pivot_class(db)).any_over_type(db, type_fn)
+                    || Type::from(bound_super.owner(db)).any_over_type(db, type_fn)
             }
 
-            Self::Tuple(tuple) => tuple.elements(db).iter().any(|ty| ty.contains_todo(db)),
+            Self::Tuple(tuple) => tuple
+                .elements(db)
+                .iter()
+                .any(|ty| ty.any_over_type(db, type_fn)),
 
-            Self::Union(union) => union.elements(db).iter().any(|ty| ty.contains_todo(db)),
+            Self::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|ty| ty.any_over_type(db, type_fn)),
 
             Self::Intersection(intersection) => {
                 intersection
                     .positive(db)
                     .iter()
-                    .any(|ty| ty.contains_todo(db))
+                    .any(|ty| ty.any_over_type(db, type_fn))
                     || intersection
                         .negative(db)
                         .iter()
-                        .any(|ty| ty.contains_todo(db))
+                        .any(|ty| ty.any_over_type(db, type_fn))
             }
 
-            Self::ProtocolInstance(protocol) => protocol.contains_todo(db),
+            Self::ProtocolInstance(protocol) => protocol.any_over_type(db, type_fn),
+
+            Self::PropertyInstance(property) => {
+                property
+                    .getter(db)
+                    .is_some_and(|ty| ty.any_over_type(db, type_fn))
+                    || property
+                        .setter(db)
+                        .is_some_and(|ty| ty.any_over_type(db, type_fn))
+            }
+
+            Self::NominalInstance(instance) => match instance.class {
+                ClassType::NonGeneric(_) => false,
+                ClassType::Generic(generic) => generic
+                    .specialization(db)
+                    .types(db)
+                    .iter()
+                    .any(|ty| ty.any_over_type(db, type_fn)),
+            },
         }
     }
 
@@ -964,15 +985,15 @@ impl<'db> Type<'db> {
             Type::Tuple(tuple) => Type::Tuple(tuple.normalized(db)),
             Type::Callable(callable) => Type::Callable(callable.normalized(db)),
             Type::ProtocolInstance(protocol) => protocol.normalized(db),
+            Type::NominalInstance(instance) => Type::NominalInstance(instance.normalized(db)),
+            Type::Dynamic(_) => Type::any(),
             Type::LiteralString
-            | Type::NominalInstance(_)
             | Type::PropertyInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
             | Type::StringLiteral(_)
-            | Type::Dynamic(_)
             | Type::Never
             | Type::FunctionLiteral(_)
             | Type::MethodWrapper(_)
@@ -986,10 +1007,7 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(_)
             | Type::BoundSuper(_)
             | Type::SubclassOf(_) => self,
-            Type::GenericAlias(generic) => {
-                let specialization = generic.specialization(db).normalized(db);
-                Type::GenericAlias(GenericAlias::new(db, generic.origin(db), specialization))
-            }
+            Type::GenericAlias(generic) => Type::GenericAlias(generic.normalized(db)),
             Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     Type::TypeVar(TypeVarInstance::new(
@@ -8168,6 +8186,16 @@ impl<'db> SuperOwnerKind<'db> {
                 SuperOwnerKind::try_from_type(db, known_instance.instance_fallback(db))
             }
             _ => None,
+        }
+    }
+}
+
+impl<'db> From<SuperOwnerKind<'db>> for Type<'db> {
+    fn from(owner: SuperOwnerKind<'db>) -> Self {
+        match owner {
+            SuperOwnerKind::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            SuperOwnerKind::Class(class) => class.into(),
+            SuperOwnerKind::Instance(instance) => instance.into(),
         }
     }
 }

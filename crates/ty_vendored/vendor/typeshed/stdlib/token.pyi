@@ -78,6 +78,9 @@ if sys.version_info >= (3, 10):
 if sys.version_info >= (3, 12):
     __all__ += ["EXCLAMATION", "FSTRING_END", "FSTRING_MIDDLE", "FSTRING_START", "EXACT_TOKEN_TYPES"]
 
+if sys.version_info >= (3, 14):
+    __all__ += ["TSTRING_START", "TSTRING_MIDDLE", "TSTRING_END"]
+
 ENDMARKER: int
 NAME: int
 NUMBER: int
@@ -154,6 +157,11 @@ if sys.version_info >= (3, 12):
     FSTRING_END: int
     FSTRING_MIDDLE: int
     FSTRING_START: int
+
+if sys.version_info >= (3, 14):
+    TSTRING_START: int
+    TSTRING_MIDDLE: int
+    TSTRING_END: int
 
 def ISTERMINAL(x: int) -> bool: ...
 def ISNONTERMINAL(x: int) -> bool: ...
