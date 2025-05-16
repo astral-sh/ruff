@@ -3456,14 +3456,7 @@ impl<'db> Type<'db> {
                 let signature = bound_method.function(db).signature(db);
                 Signatures::single(match signature {
                     FunctionSignature::Single(signature) => {
-                        let mut params = signature.parameters().clone();
-                        params = params.set_first_type(
-                            Self::KnownInstance(KnownInstanceType::TypingSelf)
-                                .in_type_expression(db, bound_method.function(db).body_scope(db))
-                                .unwrap(),
-                        );
-                        let new_sig = Signature::new(params, signature.return_ty.clone());
-                        CallableSignature::single(self, new_sig)
+                        CallableSignature::single(self, signature.clone())
                             .with_bound_type(bound_method.self_instance(db))
                     }
                     FunctionSignature::Overloaded(signatures, _) => {
