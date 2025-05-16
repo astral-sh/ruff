@@ -2,9 +2,9 @@ use ruff_python_ast::{Alias, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
@@ -51,12 +51,12 @@ impl Violation for CamelcaseImportedAsLowercase {
 
 /// N813
 pub(crate) fn camelcase_imported_as_lowercase(
-    checker: &Checker,
     name: &str,
     asname: &str,
     alias: &Alias,
     stmt: &Stmt,
     ignore_names: &IgnoreNames,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     if helpers::is_camelcase(name) && ruff_python_stdlib::str::is_cased_lowercase(asname) {
         // Ignore any explicitly-allowed names.
@@ -69,7 +69,7 @@ pub(crate) fn camelcase_imported_as_lowercase(
                 asname: asname.to_string(),
             },
             alias.range(),
-            checker.source_file(),
+            source_file,
         );
         diagnostic.set_parent(stmt.start());
         return Some(diagnostic);

@@ -5,8 +5,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Scope, ScopeKind};
+use ruff_source_file::SourceFile;
 
-use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
@@ -49,11 +49,11 @@ impl Violation for DunderFunctionName {
 
 /// N807
 pub(crate) fn dunder_function_name(
-    checker: &Checker,
     scope: &Scope,
     stmt: &Stmt,
     name: &str,
     ignore_names: &IgnoreNames,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     if matches!(scope.kind, ScopeKind::Class(_)) {
         return None;
@@ -72,6 +72,6 @@ pub(crate) fn dunder_function_name(
     Some(Diagnostic::new(
         DunderFunctionName,
         stmt.identifier(),
-        checker.source_file(),
+        source_file,
     ))
 }

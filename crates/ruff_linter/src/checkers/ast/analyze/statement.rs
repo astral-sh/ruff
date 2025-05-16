@@ -57,9 +57,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
         Stmt::Break(_) => {
             if checker.enabled(Rule::BreakOutsideLoop) {
                 if let Some(diagnostic) = pyflakes::rules::break_outside_loop(
-                    checker,
                     stmt,
                     &mut checker.semantic.current_statements().skip(1),
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }
@@ -68,9 +68,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
         Stmt::Continue(_) => {
             if checker.enabled(Rule::ContinueOutsideLoop) {
                 if let Some(diagnostic) = pyflakes::rules::continue_outside_loop(
-                    checker,
                     stmt,
                     &mut checker.semantic.current_statements().skip(1),
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }
@@ -101,7 +101,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 fastapi::rules::fastapi_unused_path_parameter(checker, function_def);
             }
             if checker.enabled(Rule::AmbiguousFunctionName) {
-                if let Some(diagnostic) = pycodestyle::rules::ambiguous_function_name(checker, name)
+                if let Some(diagnostic) =
+                    pycodestyle::rules::ambiguous_function_name(name, checker.source_file())
                 {
                     checker.report_diagnostic(diagnostic);
                 }
@@ -126,12 +127,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::InvalidFunctionName) {
                 if let Some(diagnostic) = pep8_naming::rules::invalid_function_name(
-                    checker,
                     stmt,
                     name,
                     decorator_list,
                     &checker.settings.pep8_naming.ignore_names,
                     &checker.semantic,
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }
@@ -185,11 +186,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::DunderFunctionName) {
                 if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
-                    checker,
                     checker.semantic.current_scope(),
                     stmt,
                     name,
                     &checker.settings.pep8_naming.ignore_names,
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }
@@ -238,11 +239,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ComplexStructure) {
                 if let Some(diagnostic) = mccabe::rules::function_is_too_complex(
-                    checker,
                     stmt,
                     name,
                     body,
                     checker.settings.mccabe.max_complexity,
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }
@@ -266,30 +267,30 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::TooManyReturnStatements) {
                 if let Some(diagnostic) = pylint::rules::too_many_return_statements(
-                    checker,
                     stmt,
                     body,
                     checker.settings.pylint.max_returns,
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }
             }
             if checker.enabled(Rule::TooManyBranches) {
                 if let Some(diagnostic) = pylint::rules::too_many_branches(
-                    checker,
                     stmt,
                     body,
                     checker.settings.pylint.max_branches,
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }
             }
             if checker.enabled(Rule::TooManyStatements) {
                 if let Some(diagnostic) = pylint::rules::too_many_statements(
-                    checker,
                     stmt,
                     body,
                     checker.settings.pylint.max_statements,
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }
@@ -458,27 +459,29 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pyupgrade::rules::unnecessary_class_parentheses(checker, class_def);
             }
             if checker.enabled(Rule::AmbiguousClassName) {
-                if let Some(diagnostic) = pycodestyle::rules::ambiguous_class_name(checker, name) {
+                if let Some(diagnostic) =
+                    pycodestyle::rules::ambiguous_class_name(name, checker.source_file())
+                {
                     checker.report_diagnostic(diagnostic);
                 }
             }
             if checker.enabled(Rule::InvalidClassName) {
                 if let Some(diagnostic) = pep8_naming::rules::invalid_class_name(
-                    checker,
                     stmt,
                     name,
                     &checker.settings.pep8_naming.ignore_names,
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }
             }
             if checker.enabled(Rule::ErrorSuffixOnExceptionName) {
                 if let Some(diagnostic) = pep8_naming::rules::error_suffix_on_exception_name(
-                    checker,
                     stmt,
                     arguments.as_deref(),
                     name,
                     &checker.settings.pep8_naming.ignore_names,
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }
@@ -620,9 +623,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
 
                 if checker.enabled(Rule::Debugger) {
-                    if let Some(diagnostic) =
-                        flake8_debugger::rules::debugger_import(checker, stmt, None, &alias.name)
-                    {
+                    if let Some(diagnostic) = flake8_debugger::rules::debugger_import(
+                        stmt,
+                        None,
+                        &alias.name,
+                        checker.source_file(),
+                    ) {
                         checker.report_diagnostic(diagnostic);
                     }
                 }
@@ -647,9 +653,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pylint::rules::manual_from_import(checker, stmt, alias, names);
                 }
                 if checker.enabled(Rule::ImportSelf) {
-                    if let Some(diagnostic) =
-                        pylint::rules::import_self(checker, alias, checker.module.qualified_name())
-                    {
+                    if let Some(diagnostic) = pylint::rules::import_self(
+                        alias,
+                        checker.module.qualified_name(),
+                        checker.source_file(),
+                    ) {
                         checker.report_diagnostic(diagnostic);
                     }
                 }
@@ -658,12 +666,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     if checker.enabled(Rule::ConstantImportedAsNonConstant) {
                         if let Some(diagnostic) =
                             pep8_naming::rules::constant_imported_as_non_constant(
-                                checker,
                                 name,
                                 asname,
                                 alias,
                                 stmt,
                                 &checker.settings.pep8_naming.ignore_names,
+                                checker.source_file(),
                             )
                         {
                             checker.report_diagnostic(diagnostic);
@@ -672,12 +680,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     if checker.enabled(Rule::LowercaseImportedAsNonLowercase) {
                         if let Some(diagnostic) =
                             pep8_naming::rules::lowercase_imported_as_non_lowercase(
-                                checker,
                                 name,
                                 asname,
                                 alias,
                                 stmt,
                                 &checker.settings.pep8_naming.ignore_names,
+                                checker.source_file(),
                             )
                         {
                             checker.report_diagnostic(diagnostic);
@@ -686,12 +694,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     if checker.enabled(Rule::CamelcaseImportedAsLowercase) {
                         if let Some(diagnostic) =
                             pep8_naming::rules::camelcase_imported_as_lowercase(
-                                checker,
                                 name,
                                 asname,
                                 alias,
                                 stmt,
                                 &checker.settings.pep8_naming.ignore_names,
+                                checker.source_file(),
                             )
                         {
                             checker.report_diagnostic(diagnostic);
@@ -699,12 +707,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                     if checker.enabled(Rule::CamelcaseImportedAsConstant) {
                         if let Some(diagnostic) = pep8_naming::rules::camelcase_imported_as_constant(
-                            checker,
                             name,
                             asname,
                             alias,
                             stmt,
                             &checker.settings.pep8_naming.ignore_names,
+                            checker.source_file(),
                         ) {
                             checker.report_diagnostic(diagnostic);
                         }
@@ -721,11 +729,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     if let Some(asname) = &alias.asname {
                         if let Some(diagnostic) =
                             flake8_import_conventions::rules::banned_import_alias(
-                                checker,
                                 stmt,
                                 &alias.name,
                                 asname,
                                 &checker.settings.flake8_import_conventions.banned_aliases,
+                                checker.source_file(),
                             )
                         {
                             checker.report_diagnostic(diagnostic);
@@ -734,10 +742,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
                 if checker.enabled(Rule::PytestIncorrectPytestImport) {
                     if let Some(diagnostic) = flake8_pytest_style::rules::import(
-                        checker,
                         stmt,
                         &alias.name,
                         alias.asname.as_deref(),
+                        checker.source_file(),
                     ) {
                         checker.report_diagnostic(diagnostic);
                     }
@@ -852,9 +860,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
 
             if checker.enabled(Rule::PytestIncorrectPytestImport) {
-                if let Some(diagnostic) =
-                    flake8_pytest_style::rules::import_from(checker, stmt, module, level)
-                {
+                if let Some(diagnostic) = flake8_pytest_style::rules::import_from(
+                    stmt,
+                    module,
+                    level,
+                    checker.source_file(),
+                ) {
                     checker.report_diagnostic(diagnostic);
                 }
             }
@@ -903,9 +914,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
                 if checker.enabled(Rule::Debugger) {
-                    if let Some(diagnostic) =
-                        flake8_debugger::rules::debugger_import(checker, stmt, module, &alias.name)
-                    {
+                    if let Some(diagnostic) = flake8_debugger::rules::debugger_import(
+                        stmt,
+                        module,
+                        &alias.name,
+                        checker.source_file(),
+                    ) {
                         checker.report_diagnostic(diagnostic);
                     }
                 }
@@ -915,11 +929,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             helpers::format_import_from_member(level, module, &alias.name);
                         if let Some(diagnostic) =
                             flake8_import_conventions::rules::banned_import_alias(
-                                checker,
                                 stmt,
                                 &qualified_name,
                                 asname,
                                 &checker.settings.flake8_import_conventions.banned_aliases,
+                                checker.source_file(),
                             )
                         {
                             checker.report_diagnostic(diagnostic);
@@ -930,12 +944,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     if checker.enabled(Rule::ConstantImportedAsNonConstant) {
                         if let Some(diagnostic) =
                             pep8_naming::rules::constant_imported_as_non_constant(
-                                checker,
                                 &alias.name,
                                 asname,
                                 alias,
                                 stmt,
                                 &checker.settings.pep8_naming.ignore_names,
+                                checker.source_file(),
                             )
                         {
                             checker.report_diagnostic(diagnostic);
@@ -944,12 +958,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     if checker.enabled(Rule::LowercaseImportedAsNonLowercase) {
                         if let Some(diagnostic) =
                             pep8_naming::rules::lowercase_imported_as_non_lowercase(
-                                checker,
                                 &alias.name,
                                 asname,
                                 alias,
                                 stmt,
                                 &checker.settings.pep8_naming.ignore_names,
+                                checker.source_file(),
                             )
                         {
                             checker.report_diagnostic(diagnostic);
@@ -958,12 +972,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     if checker.enabled(Rule::CamelcaseImportedAsLowercase) {
                         if let Some(diagnostic) =
                             pep8_naming::rules::camelcase_imported_as_lowercase(
-                                checker,
                                 &alias.name,
                                 asname,
                                 alias,
                                 stmt,
                                 &checker.settings.pep8_naming.ignore_names,
+                                checker.source_file(),
                             )
                         {
                             checker.report_diagnostic(diagnostic);
@@ -971,12 +985,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                     if checker.enabled(Rule::CamelcaseImportedAsConstant) {
                         if let Some(diagnostic) = pep8_naming::rules::camelcase_imported_as_constant(
-                            checker,
                             &alias.name,
                             asname,
                             alias,
                             stmt,
                             &checker.settings.pep8_naming.ignore_names,
+                            checker.source_file(),
                         ) {
                             checker.report_diagnostic(diagnostic);
                         }
@@ -1004,21 +1018,21 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ImportSelf) {
                 if let Some(diagnostic) = pylint::rules::import_from_self(
-                    checker,
                     level,
                     module,
                     names,
                     checker.module.qualified_name(),
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }
             }
             if checker.enabled(Rule::BannedImportFrom) {
                 if let Some(diagnostic) = flake8_import_conventions::rules::banned_import_from(
-                    checker,
                     stmt,
                     &helpers::format_import_from(level, module),
                     &checker.settings.flake8_import_conventions.banned_from,
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }
@@ -1236,7 +1250,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
         ) => {
             if !checker.semantic.in_type_checking_block() {
                 if checker.enabled(Rule::Assert) {
-                    checker.report_diagnostic(flake8_bandit::rules::assert_used(checker, stmt));
+                    checker.report_diagnostic(flake8_bandit::rules::assert_used(
+                        stmt,
+                        checker.source_file(),
+                    ));
                 }
             }
             if checker.enabled(Rule::AssertTuple) {
@@ -1433,9 +1450,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::DefaultExceptNotLast) {
-                if let Some(diagnostic) =
-                    pyflakes::rules::default_except_not_last(checker, handlers, checker.locator)
-                {
+                if let Some(diagnostic) = pyflakes::rules::default_except_not_last(
+                    handlers,
+                    checker.locator,
+                    checker.source_file(),
+                ) {
                     checker.report_diagnostic(diagnostic);
                 }
             }
@@ -1532,7 +1551,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::PandasDfVariableName) {
-                if let Some(diagnostic) = pandas_vet::rules::assignment_to_df(checker, targets) {
+                if let Some(diagnostic) =
+                    pandas_vet::rules::assignment_to_df(targets, checker.source_file())
+                {
                     checker.report_diagnostic(diagnostic);
                 }
             }
@@ -1728,9 +1749,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::named_expr_without_context(checker, value);
             }
             if checker.enabled(Rule::AsyncioDanglingTask) {
-                if let Some(diagnostic) =
-                    ruff::rules::asyncio_dangling_task(checker, value, checker.semantic())
-                {
+                if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(
+                    value,
+                    checker.semantic(),
+                    checker.source_file(),
+                ) {
                     checker.report_diagnostic(diagnostic);
                 }
             }

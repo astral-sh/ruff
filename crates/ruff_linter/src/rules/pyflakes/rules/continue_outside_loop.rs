@@ -2,9 +2,8 @@ use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for `continue` statements outside of loops.
@@ -33,9 +32,9 @@ impl Violation for ContinueOutsideLoop {
 
 /// F702
 pub(crate) fn continue_outside_loop<'a>(
-    checker: &Checker,
     stmt: &'a Stmt,
     parents: &mut impl Iterator<Item = &'a Stmt>,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     let mut child = stmt;
     for parent in parents {
@@ -56,6 +55,6 @@ pub(crate) fn continue_outside_loop<'a>(
     Some(Diagnostic::new(
         ContinueOutsideLoop,
         stmt.range(),
-        checker.source_file(),
+        source_file,
     ))
 }

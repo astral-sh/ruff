@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -51,7 +52,7 @@ pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssign) {
         .chain(std::iter::once(assign.value.as_ref()))
         .tuple_combinations()
     {
-        visit_assignments(checker, left, right, &mut diagnostics);
+        visit_assignments(left, right, &mut diagnostics, checker.source_file());
     }
     checker.report_diagnostics(diagnostics);
 }
@@ -69,20 +70,25 @@ pub(crate) fn self_annotated_assignment(checker: &Checker, assign: &ast::StmtAnn
     }
     let mut diagnostics = Vec::new();
 
-    visit_assignments(checker, &assign.target, value, &mut diagnostics);
+    visit_assignments(
+        &assign.target,
+        value,
+        &mut diagnostics,
+        checker.source_file(),
+    );
     checker.report_diagnostics(diagnostics);
 }
 
 fn visit_assignments(
-    checker: &Checker,
     left: &Expr,
     right: &Expr,
     diagnostics: &mut Vec<Diagnostic>,
+    source_file: SourceFile,
 ) {
     match (left, right) {
         (Expr::Tuple(lhs), Expr::Tuple(rhs)) if lhs.len() == rhs.len() => {
             lhs.iter().zip(rhs).for_each(|(lhs_elem, rhs_elem)| {
-                visit_assignments(checker, lhs_elem, rhs_elem, diagnostics);
+                visit_assignments(lhs_elem, rhs_elem, diagnostics, source_file.clone());
             });
         }
         (
@@ -94,7 +100,7 @@ fn visit_assignments(
                     name: lhs_name.to_string(),
                 },
                 left.range(),
-                checker.source_file(),
+                source_file,
             ));
         }
         _ => {}

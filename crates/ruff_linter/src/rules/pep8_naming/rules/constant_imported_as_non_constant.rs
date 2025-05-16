@@ -2,12 +2,10 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str;
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
-use crate::{
-    checkers::ast::Checker,
-    rules::pep8_naming::{helpers, settings::IgnoreNames},
-};
+use crate::rules::pep8_naming::{helpers, settings::IgnoreNames};
 
 /// ## What it does
 /// Checks for constant imports that are aliased to non-constant-style
@@ -66,12 +64,12 @@ impl Violation for ConstantImportedAsNonConstant {
 
 /// N811
 pub(crate) fn constant_imported_as_non_constant(
-    checker: &Checker,
     name: &str,
     asname: &str,
     alias: &Alias,
     stmt: &Stmt,
     ignore_names: &IgnoreNames,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     if str::is_cased_uppercase(name)
         && !(str::is_cased_uppercase(asname)
@@ -90,7 +88,7 @@ pub(crate) fn constant_imported_as_non_constant(
                 asname: asname.to_string(),
             },
             alias.range(),
-            checker.source_file(),
+            source_file,
         );
         diagnostic.set_parent(stmt.start());
         return Some(diagnostic);

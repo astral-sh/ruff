@@ -1,11 +1,10 @@
 use ruff_python_ast::Stmt;
+use ruff_source_file::SourceFile;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for member imports that should instead be accessed by importing the
@@ -48,10 +47,10 @@ impl Violation for BannedImportFrom {
 
 /// ICN003
 pub(crate) fn banned_import_from(
-    checker: &Checker,
     stmt: &Stmt,
     name: &str,
     banned_conventions: &FxHashSet<String>,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     if banned_conventions.contains(name) {
         return Some(Diagnostic::new(
@@ -59,7 +58,7 @@ pub(crate) fn banned_import_from(
                 name: name.to_string(),
             },
             stmt.range(),
-            checker.source_file(),
+            source_file,
         ));
     }
     None

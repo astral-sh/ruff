@@ -1,6 +1,7 @@
 use std::hash::Hash;
 
 use ruff_python_semantic::{SemanticModel, analyze::class::iter_super_class};
+use ruff_source_file::SourceFile;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -69,7 +70,7 @@ pub(crate) fn redefined_slots_in_subclass(checker: &Checker, class_def: &ast::St
     let semantic = checker.semantic();
     let diagnostics = class_slots
         .iter()
-        .filter_map(|slot| check_super_slots(checker, class_def, semantic, slot));
+        .filter_map(|slot| check_super_slots(class_def, semantic, slot, &checker.source_file()));
     checker.report_diagnostics(diagnostics);
 }
 
@@ -104,10 +105,10 @@ impl Ranged for Slot<'_> {
 }
 
 fn check_super_slots(
-    checker: &Checker,
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
     slot: &Slot,
+    source_file: &SourceFile,
 ) -> Option<Diagnostic> {
     iter_super_class(class_def, semantic)
         .skip(1)
@@ -119,7 +120,7 @@ fn check_super_slots(
                         slot_name: slot.name.to_string(),
                     },
                     slot.range(),
-                    checker.source_file(),
+                    source_file.clone(),
                 ));
             }
             None

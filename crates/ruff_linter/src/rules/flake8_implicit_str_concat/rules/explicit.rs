@@ -1,11 +1,10 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Operator};
-use ruff_source_file::LineRanges;
+use ruff_source_file::{LineRanges, SourceFile};
 use ruff_text_size::Ranged;
 
 use crate::Locator;
-use crate::checkers::ast::Checker;
 use crate::settings::LinterSettings;
 
 /// ## What it does
@@ -44,10 +43,10 @@ impl Violation for ExplicitStringConcatenation {
 
 /// ISC003
 pub(crate) fn explicit(
-    checker: &Checker,
     expr: &Expr,
     locator: &Locator,
     settings: &LinterSettings,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     // If the user sets `allow-multiline` to `false`, then we should allow explicitly concatenated
     // strings that span multiple lines even if this rule is enabled. Otherwise, there's no way
@@ -76,7 +75,7 @@ pub(crate) fn explicit(
                 return Some(Diagnostic::new(
                     ExplicitStringConcatenation,
                     expr.range(),
-                    checker.source_file(),
+                    source_file,
                 ));
             }
         }

@@ -196,11 +196,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 let check_two_starred_expressions =
                     checker.enabled(Rule::MultipleStarredExpressions);
                 if let Some(diagnostic) = pyflakes::rules::starred_expressions(
-                    checker,
                     elts,
                     check_too_many_expressions,
                     check_two_starred_expressions,
                     expr.range(),
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }
@@ -1371,10 +1371,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
         }) => {
             if checker.enabled(Rule::ExplicitStringConcatenation) {
                 if let Some(diagnostic) = flake8_implicit_str_concat::rules::explicit(
-                    checker,
                     expr,
                     checker.locator,
                     checker.settings,
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }

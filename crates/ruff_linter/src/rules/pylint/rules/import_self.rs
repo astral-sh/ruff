@@ -3,9 +3,8 @@ use ruff_python_ast::Alias;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::resolve_imported_module_path;
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for import statements that import the current module.
@@ -38,9 +37,9 @@ impl Violation for ImportSelf {
 
 /// PLW0406
 pub(crate) fn import_self(
-    checker: &Checker,
     alias: &Alias,
     module_path: Option<&[String]>,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     let module_path = module_path?;
 
@@ -50,7 +49,7 @@ pub(crate) fn import_self(
                 name: alias.name.to_string(),
             },
             alias.range(),
-            checker.source_file(),
+            source_file,
         ));
     }
 
@@ -59,11 +58,11 @@ pub(crate) fn import_self(
 
 /// PLW0406
 pub(crate) fn import_from_self(
-    checker: &Checker,
     level: u32,
     module: Option<&str>,
     names: &[Alias],
     module_path: Option<&[String]>,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     let module_path = module_path?;
     let imported_module_path = resolve_imported_module_path(level, module, Some(module_path))?;
@@ -81,7 +80,7 @@ pub(crate) fn import_from_self(
                     name: format!("{}.{}", imported_module_path, alias.name),
                 },
                 alias.range(),
-                checker.source_file(),
+                source_file,
             ));
         }
     }

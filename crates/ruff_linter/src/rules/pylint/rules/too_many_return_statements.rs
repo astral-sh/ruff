@@ -5,8 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
-
-use crate::checkers::ast::Checker;
+use ruff_source_file::SourceFile;
 
 /// ## What it does
 /// Checks for functions or methods with too many return statements.
@@ -79,10 +78,10 @@ fn num_returns(body: &[Stmt]) -> usize {
 
 /// PLR0911
 pub(crate) fn too_many_return_statements(
-    checker: &Checker,
     stmt: &Stmt,
     body: &[Stmt],
     max_returns: usize,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     let returns = num_returns(body);
     if returns > max_returns {
@@ -92,7 +91,7 @@ pub(crate) fn too_many_return_statements(
                 max_returns,
             },
             stmt.identifier(),
-            checker.source_file(),
+            source_file,
         ))
     } else {
         None

@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use anyhow::Result;
+use ruff_source_file::SourceFile;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
@@ -394,10 +395,10 @@ pub(crate) fn typing_only_runtime_import(
         } in imports
         {
             let mut diagnostic = diagnostic_for(
-                checker,
                 import_type,
                 import.qualified_name().to_string(),
                 range,
+                checker.source_file(),
             );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
@@ -420,10 +421,10 @@ pub(crate) fn typing_only_runtime_import(
         } in imports
         {
             let mut diagnostic = diagnostic_for(
-                checker,
                 import_type,
                 import.qualified_name().to_string(),
                 range,
+                checker.source_file(),
             );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
@@ -445,26 +446,26 @@ fn rule_for(import_type: ImportType) -> Rule {
 
 /// Return the [`Diagnostic`] for the given import type.
 fn diagnostic_for(
-    checker: &Checker,
     import_type: ImportType,
     qualified_name: String,
     range: TextRange,
+    source_file: SourceFile,
 ) -> Diagnostic {
     match import_type {
         ImportType::StandardLibrary => Diagnostic::new(
             TypingOnlyStandardLibraryImport { qualified_name },
             range,
-            checker.source_file(),
+            source_file,
         ),
         ImportType::ThirdParty => Diagnostic::new(
             TypingOnlyThirdPartyImport { qualified_name },
             range,
-            checker.source_file(),
+            source_file,
         ),
         ImportType::FirstParty => Diagnostic::new(
             TypingOnlyFirstPartyImport { qualified_name },
             range,
-            checker.source_file(),
+            source_file,
         ),
         _ => unreachable!("Unexpected import type"),
     }

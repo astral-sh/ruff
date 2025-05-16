@@ -18,11 +18,11 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &Checker) 
         }) => {
             if checker.enabled(Rule::BareExcept) {
                 if let Some(diagnostic) = pycodestyle::rules::bare_except(
-                    checker,
                     type_.as_deref(),
                     body,
                     except_handler,
                     checker.locator,
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }

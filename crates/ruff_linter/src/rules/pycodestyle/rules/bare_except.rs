@@ -2,9 +2,9 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::except;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, Stmt};
+use ruff_source_file::SourceFile;
 
 use crate::Locator;
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for bare `except` catches in `try`-`except` statements.
@@ -57,11 +57,11 @@ impl Violation for BareExcept {
 
 /// E722
 pub(crate) fn bare_except(
-    checker: &Checker,
     type_: Option<&Expr>,
     body: &[Stmt],
     handler: &ExceptHandler,
     locator: &Locator,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     if type_.is_none()
         && !body
@@ -71,7 +71,7 @@ pub(crate) fn bare_except(
         Some(Diagnostic::new(
             BareExcept,
             except(handler, locator.contents()),
-            checker.source_file(),
+            source_file,
         ))
     } else {
         None
