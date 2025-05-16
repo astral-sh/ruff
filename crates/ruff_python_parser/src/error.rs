@@ -978,9 +978,7 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes => {
                 "Multiple exception types must be parenthesized"
             }
-            UnsupportedSyntaxErrorKind::TemplateStrings => {
-                "Cannot use t-strings"
-            }
+            UnsupportedSyntaxErrorKind::TemplateStrings => "Cannot use t-strings",
         };
 
         write!(
