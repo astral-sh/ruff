@@ -123,7 +123,32 @@ impl<'db> ClassBase<'db> {
                     Some(valid_element)
                 }
             }
-            Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
+            Type::Union(union) => {
+                // We do not support full unions of MROs (yet). Until we do,
+                // support the cases where one of the types in the union is
+                // a dynamic type such as `Any` or `Unknown`, and all other
+                // types *would be* valid class bases. In this case, we can
+                // "fold" the other potential bases into the dynamic type,
+                // and return `Any`/`Unknown` as the class base to prevent
+                // invalid-base diagnostics and further downstream errors.
+                let Some(Type::Dynamic(dynamic)) = union
+                    .elements(db)
+                    .iter()
+                    .find(|elem| matches!(elem, Type::Dynamic(_)))
+                else {
+                    return None;
+                };
+
+                if union
+                    .elements(db)
+                    .iter()
+                    .all(|elem| ClassBase::try_from_type(db, *elem).is_some())
+                {
+                    Some(ClassBase::Dynamic(*dynamic))
+                } else {
+                    None
+                }
+            }
             Type::NominalInstance(_) => None, // TODO -- handle `__mro_entries__`?
             Type::PropertyInstance(_) => None,
             Type::Never

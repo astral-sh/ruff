@@ -215,8 +215,18 @@ fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
                         return false;
                     }
                 }
+
+                let encoding_param_pos = match qualified_name.segments() {
+                    // The `encoding` parameter position for `codecs.open`
+                    ["codecs", _] => 2,
+                    // The `encoding` parameter position for `_io.open` and the builtin `open`
+                    _ => 3,
+                };
+
                 // else mode not specified, defaults to text mode
-                call.arguments.find_argument_value("encoding", 3).is_none()
+                call.arguments
+                    .find_argument_value("encoding", encoding_param_pos)
+                    .is_none()
             }
             ["tempfile", tempfile_class @ ("TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile")] =>
             {

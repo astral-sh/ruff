@@ -278,3 +278,29 @@ def f(
 
 f(b"foo")  # error: [no-matching-overload]
 ```
+
+## A method call with unmatched overloads
+
+```py
+from typing import overload
+
+class Foo:
+    @overload
+    def bar(self, x: int) -> int: ...
+    @overload
+    def bar(self, x: str) -> str: ...
+    def bar(self, x: int | str) -> int | str:
+        return x
+
+foo = Foo()
+foo.bar(b"wat")  # error: [no-matching-overload]
+```
+
+## A class constructor with unmatched overloads
+
+TODO: At time of writing (2025-05-15), this has non-ideal diagnostics that doesn't show the
+unmatched overloads.
+
+```py
+type()  # error: [no-matching-overload]
+```
