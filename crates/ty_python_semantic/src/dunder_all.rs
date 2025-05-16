@@ -3,14 +3,14 @@ use rustc_hash::FxHashSet;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast};
 
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::place::ScopeId;
-use crate::semantic_index::{global_scope, semantic_index, SemanticIndex};
-use crate::types::{infer_expression_types, Truthiness, Type};
-use crate::{resolve_module, Db, ModuleName};
+use crate::semantic_index::{SemanticIndex, global_scope, semantic_index};
+use crate::types::{Truthiness, Type, infer_expression_types};
+use crate::{Db, ModuleName, resolve_module};
 
 #[allow(clippy::ref_option)]
 fn dunder_all_names_cycle_recover(

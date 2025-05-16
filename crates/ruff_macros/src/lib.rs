@@ -4,7 +4,7 @@ use crate::cache_key::derive_cache_key;
 use crate::newtype_index::generate_newtype_index;
 use crate::violation_metadata::violation_metadata;
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput, Error, ItemFn, ItemStruct};
+use syn::{DeriveInput, Error, ItemFn, ItemStruct, parse_macro_input};
 
 mod cache_key;
 mod combine;

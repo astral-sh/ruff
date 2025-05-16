@@ -178,15 +178,15 @@ use std::cmp::Ordering;
 use ruff_index::{Idx, IndexVec};
 use rustc_hash::FxHashMap;
 
+use crate::Db;
 use crate::dunder_all::dunder_all_names;
-use crate::place::{imported_symbol, RequiresExplicitReExport};
+use crate::place::{RequiresExplicitReExport, imported_symbol};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
 };
-use crate::types::{infer_expression_type, Truthiness, Type};
-use crate::Db;
+use crate::types::{Truthiness, Type, infer_expression_type};
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
 /// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the

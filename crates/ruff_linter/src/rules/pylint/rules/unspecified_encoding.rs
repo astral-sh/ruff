@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -141,9 +141,10 @@ impl<'a> Callee<'a> {
         match self {
             Callee::Qualified(qualified_name) => match qualified_name.segments() {
                 ["" | "codecs" | "_io", "open"] => ModeArgument::Supported,
-                ["tempfile", "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"] => {
-                    ModeArgument::Supported
-                }
+                [
+                    "tempfile",
+                    "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile",
+                ] => ModeArgument::Supported,
                 ["io" | "_io", "TextIOWrapper"] => ModeArgument::Unsupported,
                 _ => ModeArgument::Unsupported,
             },
@@ -228,8 +229,10 @@ fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
                     .find_argument_value("encoding", encoding_param_pos)
                     .is_none()
             }
-            ["tempfile", tempfile_class @ ("TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile")] =>
-            {
+            [
+                "tempfile",
+                tempfile_class @ ("TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"),
+            ] => {
                 let mode_pos = usize::from(*tempfile_class == "SpooledTemporaryFile");
                 if let Some(mode_arg) = call.arguments.find_argument_value("mode", mode_pos) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {

@@ -4,12 +4,12 @@ use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, ExprRef};
 use ruff_source_file::LineIndex;
 
+use crate::Db;
 use crate::module_name::ModuleName;
-use crate::module_resolver::{resolve_module, Module};
+use crate::module_resolver::{Module, resolve_module};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::semantic_index;
-use crate::types::{binding_type, infer_scope_types, Type};
-use crate::Db;
+use crate::types::{Type, binding_type, infer_scope_types};
 
 pub struct SemanticModel<'db> {
     db: &'db dyn Db,

@@ -16,8 +16,8 @@ use lsp_types::{
 
 use self::connection::{Connection, ConnectionInitializer};
 use self::schedule::event_loop_thread;
-use crate::session::{AllSettings, ClientSettings, Experimental, Session};
 use crate::PositionEncoding;
+use crate::session::{AllSettings, ClientSettings, Experimental, Session};
 
 mod api;
 mod client;
@@ -240,7 +240,9 @@ impl Server {
                 },
                 response_handler,
             ) {
-                tracing::error!("An error occurred when trying to register the configuration file watcher: {err}");
+                tracing::error!(
+                    "An error occurred when trying to register the configuration file watcher: {err}"
+                );
             }
         } else {
             tracing::warn!("The client does not support file system watching.");

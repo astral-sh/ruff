@@ -262,7 +262,7 @@
 //! [`SemanticIndexBuilder`](crate::semantic_index::builder::SemanticIndexBuilder), e.g. where it
 //! visits a `StmtIf` node.
 
-use ruff_index::{newtype_index, IndexVec};
+use ruff_index::{IndexVec, newtype_index};
 use rustc_hash::FxHashMap;
 
 use self::place_state::{
@@ -270,6 +270,7 @@ use self::place_state::{
     LiveDeclarationsIterator, PlaceState, ScopedDefinitionId,
 };
 use crate::node_key::NodeKey;
+use crate::semantic_index::EagerSnapshotResult;
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::narrowing_constraints::{
@@ -282,8 +283,7 @@ use crate::semantic_index::predicate::{
 use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
 };
-use crate::semantic_index::EagerSnapshotResult;
-use crate::types::{infer_narrowing_constraint, IntersectionBuilder, Truthiness, Type};
+use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
 
 mod place_state;
 
@@ -600,15 +600,14 @@ impl<'db> ConstraintsIterator<'_, 'db> {
         if constraint_tys.is_empty() {
             base_ty
         } else {
-            let intersection_ty = constraint_tys
+            constraint_tys
                 .into_iter()
                 .rev()
                 .fold(
                     IntersectionBuilder::new(db).add_positive(base_ty),
                     IntersectionBuilder::add_positive,
                 )
-                .build();
-            intersection_ty
+                .build()
         }
     }
 }

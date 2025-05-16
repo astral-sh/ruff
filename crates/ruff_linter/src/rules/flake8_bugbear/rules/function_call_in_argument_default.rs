@@ -3,14 +3,14 @@ use ruff_text_size::Ranged;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::{
     is_immutable_annotation, is_immutable_func, is_immutable_newtype_call, is_mutable_func,
 };
-use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 
@@ -73,7 +73,9 @@ impl Violation for FunctionCallInDefaultArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         if let Some(name) = &self.name {
-            format!("Do not perform function call `{name}` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable")
+            format!(
+                "Do not perform function call `{name}` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable"
+            )
         } else {
             "Do not perform function call in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable".to_string()
         }

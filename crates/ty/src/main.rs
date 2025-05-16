@@ -1,6 +1,6 @@
 use colored::Colorize;
 use std::io;
-use ty::{run, ExitStatus};
+use ty::{ExitStatus, run};
 
 pub fn main() -> ExitStatus {
     run().unwrap_or_else(|error| {

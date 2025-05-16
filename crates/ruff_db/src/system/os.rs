@@ -256,7 +256,9 @@ impl OsSystem {
         let Ok(canonicalized) = SystemPathBuf::from_path_buf(canonicalized) else {
             // The original path is valid UTF8 but the canonicalized path isn't. This definitely suggests
             // that a symlink is involved. Fall back to the slow path.
-            tracing::debug!("Falling back to the slow case-sensitive path existence check because the canonicalized path of `{simplified}` is not valid UTF-8");
+            tracing::debug!(
+                "Falling back to the slow case-sensitive path existence check because the canonicalized path of `{simplified}` is not valid UTF-8"
+            );
             return None;
         };
 
@@ -266,7 +268,9 @@ impl OsSystem {
         // `path` pointed to a symlink (or some other none reversible path normalization happened).
         // In this case, fall back to the slow path.
         if simplified_canonicalized.as_str().to_lowercase() != simplified.as_str().to_lowercase() {
-            tracing::debug!("Falling back to the slow case-sensitive path existence check for `{simplified}` because the canonicalized path `{simplified_canonicalized}` differs not only by casing");
+            tracing::debug!(
+                "Falling back to the slow case-sensitive path existence check for `{simplified}` because the canonicalized path `{simplified_canonicalized}` differs not only by casing"
+            );
             return None;
         }
 
@@ -662,8 +666,8 @@ fn detect_case_sensitivity(path: &SystemPath) -> CaseSensitivity {
 mod tests {
     use tempfile::TempDir;
 
-    use crate::system::walk_directory::tests::DirectoryEntryToString;
     use crate::system::DirectoryEntry;
+    use crate::system::walk_directory::tests::DirectoryEntryToString;
 
     use super::*;
 

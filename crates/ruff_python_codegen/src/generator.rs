@@ -1070,12 +1070,14 @@ impl<'a> Generator<'a> {
                 self.unparse_expr(func, precedence::MAX);
                 self.p("(");
                 if let (
-                    [Expr::Generator(ast::ExprGenerator {
-                        elt,
-                        generators,
-                        range: _,
-                        parenthesized: _,
-                    })],
+                    [
+                        Expr::Generator(ast::ExprGenerator {
+                            elt,
+                            generators,
+                            range: _,
+                            parenthesized: _,
+                        }),
+                    ],
                     [],
                 ) = (arguments.args.as_ref(), arguments.keywords.as_ref())
                 {
@@ -1435,7 +1437,7 @@ impl<'a> Generator<'a> {
 #[cfg(test)]
 mod tests {
     use ruff_python_ast::{Mod, ModModule};
-    use ruff_python_parser::{self, parse_module, Mode, ParseOptions};
+    use ruff_python_parser::{self, Mode, ParseOptions, parse_module};
     use ruff_source_file::LineEnding;
 
     use crate::stylist::Indentation;

@@ -4,14 +4,15 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    DIAGNOSTIC_NAME, PositionEncoding,
     edit::{NotebookRange, ToRangeExt},
     resolve::is_document_excluded_for_linting,
     session::DocumentQuery,
-    PositionEncoding, DIAGNOSTIC_NAME,
 };
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
-    directives::{extract_directives, Flags},
+    Locator,
+    directives::{Flags, extract_directives},
     generate_noqa_edits,
     linter::check_path,
     message::{DiagnosticMessage, Message},
@@ -20,7 +21,6 @@ use ruff_linter::{
     registry::AsRule,
     settings::flags,
     source_kind::SourceKind,
-    Locator,
 };
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;

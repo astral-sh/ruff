@@ -9,6 +9,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
+use crate::Locator;
 use crate::fix::edits::delete_comment;
 use crate::noqa::{
     Code, Directive, FileExemption, FileNoqaDirectives, NoqaDirectives, NoqaMapping,
@@ -20,7 +21,6 @@ use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
-use crate::Locator;
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(

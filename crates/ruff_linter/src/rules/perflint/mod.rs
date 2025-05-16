@@ -11,8 +11,8 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::settings::types::PreviewMode;
     use crate::settings::LinterSettings;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
 
     #[test_case(Rule::UnnecessaryListCast, Path::new("PERF101.py"))]

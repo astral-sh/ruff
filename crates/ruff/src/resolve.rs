@@ -1,14 +1,14 @@
 use std::path::Path;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use log::debug;
 use path_absolutize::path_dedot;
 
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::pyproject::{self, find_fallback_target_version};
 use ruff_workspace::resolver::{
-    resolve_root_settings, ConfigurationOrigin, ConfigurationTransformer, PyprojectConfig,
-    PyprojectDiscoveryStrategy,
+    ConfigurationOrigin, ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy,
+    resolve_root_settings,
 };
 
 use ruff_python_ast as ast;

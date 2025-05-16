@@ -6,11 +6,11 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ruff_diagnostics::{Edit, Fix, IsolationLevel, SourceMap};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Locator;
 use crate::linter::FixTable;
 use crate::message::{DiagnosticMessage, Message};
 use crate::registry::{AsRule, Rule};
 use crate::settings::types::UnsafeFixes;
-use crate::Locator;
 
 pub(crate) mod codemods;
 pub(crate) mod edits;
@@ -162,10 +162,10 @@ mod tests {
     use ruff_source_file::SourceFileBuilder;
     use ruff_text_size::{Ranged, TextSize};
 
-    use crate::fix::{apply_fixes, FixResult};
+    use crate::Locator;
+    use crate::fix::{FixResult, apply_fixes};
     use crate::message::DiagnosticMessage;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
-    use crate::Locator;
 
     fn create_diagnostics(
         filename: &str,

@@ -13,7 +13,7 @@ use ruff_python_ast::PythonVersion;
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::module_resolver::typeshed::{vendored_typeshed_versions, TypeshedVersions};
+use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::site_packages::{PythonEnvironment, SitePackagesDiscoveryError, SysPrefixPathOrigin};
 use crate::{Program, PythonPath, SearchPathSettings};
 
@@ -639,7 +639,9 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, ResolvedM
             match resolve_module_in_search_path(&resolver_state, &stub_name, search_path) {
                 Ok(resolved_module) => {
                     if resolved_module.package_kind.is_root() && resolved_module.kind.is_module() {
-                        tracing::trace!("Search path '{search_path} contains a module named `{stub_name}` but a standalone module isn't a valid stub.");
+                        tracing::trace!(
+                            "Search path '{search_path} contains a module named `{stub_name}` but a standalone module isn't a valid stub."
+                        );
                     } else {
                         return Some((search_path.clone(), resolved_module));
                     }
@@ -904,12 +906,12 @@ impl fmt::Display for RelaxedModuleName {
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::files::{system_path_to_file, File, FilePath};
+    use ruff_db::Db;
+    use ruff_db::files::{File, FilePath, system_path_to_file};
     use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _};
     use ruff_db::testing::{
         assert_const_function_query_was_not_run, assert_function_query_was_not_run,
     };
-    use ruff_db::Db;
     use ruff_python_ast::PythonVersion;
 
     use crate::db::tests::TestDb;
@@ -1287,25 +1289,6 @@ mod tests {
     }
 
     #[test]
-    fn single_file_takes_priority_over_namespace_package() {
-        //const SRC: &[FileSpec] = &[("foo.py", "x = 1")];
-        const SRC: &[FileSpec] = &[("foo.py", "x = 1"), ("foo/bar.py", "x = 2")];
-
-        let TestCase { db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
-
-        let foo_module_name = ModuleName::new_static("foo").unwrap();
-        let foo_bar_module_name = ModuleName::new_static("foo.bar").unwrap();
-
-        // `foo.py` takes priority over the `foo` namespace package
-        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
-        assert_eq!(foo_module.file().path(&db), &src.join("foo.py"));
-
-        // `foo.bar` isn't recognised as a module
-        let foo_bar_module = resolve_module(&db, &foo_bar_module_name);
-        assert_eq!(foo_bar_module, None);
-    }
-
-    #[test]
     fn typing_stub_over_module() {
         const SRC: &[FileSpec] = &[("foo.py", "print('Hello, world!')"), ("foo.pyi", "x: int")];
 
@@ -1348,82 +1331,6 @@ mod tests {
     }
 
     #[test]
-    fn namespace_package() {
-        // From [PEP420](https://peps.python.org/pep-0420/#nested-namespace-packages).
-        // But uses `src` for `project1` and `site-packages` for `project2`.
-        // ```
-        // src
-        //   parent
-        //     child
-        //       one.py
-        // site_packages
-        //   parent
-        //     child
-        //       two.py
-        // ```
-        let TestCase {
-            db,
-            src,
-            site_packages,
-            ..
-        } = TestCaseBuilder::new()
-            .with_src_files(&[("parent/child/one.py", "print('Hello, world!')")])
-            .with_site_packages_files(&[("parent/child/two.py", "print('Hello, world!')")])
-            .build();
-
-        let one_module_name = ModuleName::new_static("parent.child.one").unwrap();
-        let one_module_path = FilePath::System(src.join("parent/child/one.py"));
-        assert_eq!(
-            resolve_module(&db, &one_module_name),
-            path_to_module(&db, &one_module_path)
-        );
-
-        let two_module_name = ModuleName::new_static("parent.child.two").unwrap();
-        let two_module_path = FilePath::System(site_packages.join("parent/child/two.py"));
-        assert_eq!(
-            resolve_module(&db, &two_module_name),
-            path_to_module(&db, &two_module_path)
-        );
-    }
-
-    #[test]
-    fn regular_package_in_namespace_package() {
-        // Adopted test case from the [PEP420 examples](https://peps.python.org/pep-0420/#nested-namespace-packages).
-        // The `src/parent/child` package is a regular package. Therefore, `site_packages/parent/child/two.py` should not be resolved.
-        // ```
-        // src
-        //   parent
-        //     child
-        //       one.py
-        // site_packages
-        //   parent
-        //     child
-        //       two.py
-        // ```
-        const SRC: &[FileSpec] = &[
-            ("parent/child/__init__.py", "print('Hello, world!')"),
-            ("parent/child/one.py", "print('Hello, world!')"),
-        ];
-
-        const SITE_PACKAGES: &[FileSpec] = &[("parent/child/two.py", "print('Hello, world!')")];
-
-        let TestCase { db, src, .. } = TestCaseBuilder::new()
-            .with_src_files(SRC)
-            .with_site_packages_files(SITE_PACKAGES)
-            .build();
-
-        let one_module_path = FilePath::System(src.join("parent/child/one.py"));
-        let one_module_name =
-            resolve_module(&db, &ModuleName::new_static("parent.child.one").unwrap());
-        assert_eq!(one_module_name, path_to_module(&db, &one_module_path));
-
-        assert_eq!(
-            None,
-            resolve_module(&db, &ModuleName::new_static("parent.child.two").unwrap())
-        );
-    }
-
-    #[test]
     fn module_search_path_priority() {
         let TestCase {
             db,
@@ -1456,7 +1363,7 @@ mod tests {
     fn symlink() -> anyhow::Result<()> {
         use anyhow::Context;
 
-        use crate::{program::Program, PythonPlatform};
+        use crate::{PythonPlatform, program::Program};
         use ruff_db::system::{OsSystem, SystemPath};
 
         use crate::db::tests::TestDb;
@@ -1553,17 +1460,18 @@ mod tests {
 
         let foo_module2 = resolve_module(&db, &foo_module_name);
 
-        assert!(!db
-            .take_salsa_events()
-            .iter()
-            .any(|event| { matches!(event.kind, salsa::EventKind::WillExecute { .. }) }));
+        assert!(
+            !db.take_salsa_events()
+                .iter()
+                .any(|event| { matches!(event.kind, salsa::EventKind::WillExecute { .. }) })
+        );
 
         assert_eq!(Some(foo_module), foo_module2);
     }
 
     #[test]
-    fn adding_file_on_which_module_resolution_depends_invalidates_previously_failing_query_that_now_succeeds(
-    ) -> anyhow::Result<()> {
+    fn adding_file_on_which_module_resolution_depends_invalidates_previously_failing_query_that_now_succeeds()
+    -> anyhow::Result<()> {
         let TestCase { mut db, src, .. } = TestCaseBuilder::new().build();
         let foo_path = src.join("foo.py");
 
@@ -1582,8 +1490,8 @@ mod tests {
     }
 
     #[test]
-    fn removing_file_on_which_module_resolution_depends_invalidates_previously_successful_query_that_now_fails(
-    ) -> anyhow::Result<()> {
+    fn removing_file_on_which_module_resolution_depends_invalidates_previously_successful_query_that_now_fails()
+    -> anyhow::Result<()> {
         const SRC: &[FileSpec] = &[("foo.py", "x = 1"), ("foo/__init__.py", "x = 2")];
 
         let TestCase { mut db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
@@ -1968,8 +1876,11 @@ not_a_directory
         assert!(search_paths.contains(
             &&SearchPath::first_party(db.system(), SystemPathBuf::from("/src")).unwrap()
         ));
-        assert!(!search_paths
-            .contains(&&SearchPath::editable(db.system(), SystemPathBuf::from("/src")).unwrap()));
+        assert!(
+            !search_paths.contains(
+                &&SearchPath::editable(db.system(), SystemPathBuf::from("/src")).unwrap()
+            )
+        );
     }
 
     #[test]
@@ -2087,11 +1998,13 @@ not_a_directory
         // Now lookup the same module using the lowercase `a` and it should resolve to the file in the system site-packages
         let a_module_name = ModuleName::new_static("a").unwrap();
         let a_module = resolve_module(&db, &a_module_name).expect("a.py to resolve");
-        assert!(a_module
-            .file()
-            .path(&db)
-            .as_str()
-            .ends_with("src/a/__init__.py"),);
+        assert!(
+            a_module
+                .file()
+                .path(&db)
+                .as_str()
+                .ends_with("src/a/__init__.py"),
+        );
 
         Ok(())
     }

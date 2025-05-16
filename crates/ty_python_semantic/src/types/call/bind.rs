@@ -20,9 +20,9 @@ use crate::types::diagnostic::{
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    todo_type, BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators,
-    FunctionType, KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind,
-    PropertyInstanceType, TupleType, UnionType, WrapperDescriptorKind,
+    BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators, FunctionType,
+    KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType,
+    TupleType, UnionType, WrapperDescriptorKind, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -305,24 +305,33 @@ impl<'db> Bindings<'db> {
 
                     Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderGet) => {
                         match overload.parameter_types() {
-                            [Some(property @ Type::PropertyInstance(_)), Some(instance), ..]
-                                if instance.is_none(db) =>
-                            {
+                            [
+                                Some(property @ Type::PropertyInstance(_)),
+                                Some(instance),
+                                ..,
+                            ] if instance.is_none(db) => {
                                 overload.set_return_type(*property);
                             }
-                            [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                                type_alias,
-                            ))), ..]
-                                if property.getter(db).is_some_and(|getter| {
-                                    getter
-                                        .into_function_literal()
-                                        .is_some_and(|f| f.name(db) == "__name__")
-                                }) =>
+                            [
+                                Some(Type::PropertyInstance(property)),
+                                Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                                    type_alias,
+                                ))),
+                                ..,
+                            ] if property.getter(db).is_some_and(|getter| {
+                                getter
+                                    .into_function_literal()
+                                    .is_some_and(|f| f.name(db) == "__name__")
+                            }) =>
                             {
                                 overload
                                     .set_return_type(Type::string_literal(db, type_alias.name(db)));
                             }
-                            [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))), ..] => {
+                            [
+                                Some(Type::PropertyInstance(property)),
+                                Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))),
+                                ..,
+                            ] => {
                                 match property
                                     .getter(db)
                                     .and_then(Type::into_function_literal)
@@ -411,8 +420,12 @@ impl<'db> Bindings<'db> {
                     }
 
                     Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderSet) => {
-                        if let [Some(Type::PropertyInstance(property)), Some(instance), Some(value), ..] =
-                            overload.parameter_types()
+                        if let [
+                            Some(Type::PropertyInstance(property)),
+                            Some(instance),
+                            Some(value),
+                            ..,
+                        ] = overload.parameter_types()
                         {
                             if let Some(setter) = property.setter(db) {
                                 if let Err(_call_error) = setter.try_call(
@@ -739,8 +752,18 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownFunction::Dataclass) => {
-                            if let [init, repr, eq, order, unsafe_hash, frozen, match_args, kw_only, slots, weakref_slot] =
-                                overload.parameter_types()
+                            if let [
+                                init,
+                                repr,
+                                eq,
+                                order,
+                                unsafe_hash,
+                                frozen,
+                                match_args,
+                                kw_only,
+                                slots,
+                                weakref_slot,
+                            ] = overload.parameter_types()
                             {
                                 let mut params = DataclassParams::empty();
 
@@ -780,8 +803,14 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownFunction::DataclassTransform) => {
-                            if let [eq_default, order_default, kw_only_default, frozen_default, _field_specifiers, _kwargs] =
-                                overload.parameter_types()
+                            if let [
+                                eq_default,
+                                order_default,
+                                kw_only_default,
+                                frozen_default,
+                                _field_specifiers,
+                                _kwargs,
+                            ] = overload.parameter_types()
                             {
                                 let mut params = DataclassTransformerParams::empty();
 

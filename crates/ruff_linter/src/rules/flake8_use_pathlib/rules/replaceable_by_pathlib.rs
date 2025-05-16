@@ -1,7 +1,7 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::{self as ast, Expr, ExprBooleanLiteral, ExprCall};
-use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;

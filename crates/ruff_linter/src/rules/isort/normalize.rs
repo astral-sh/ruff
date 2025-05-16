@@ -1,6 +1,6 @@
+use super::AnnotatedImport;
 use super::settings::Settings;
 use super::types::{AliasData, ImportBlock, ImportFromData, TrailingComma};
-use super::AnnotatedImport;
 
 pub(crate) fn normalize_imports<'a>(
     imports: Vec<AnnotatedImport<'a>>,

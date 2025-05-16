@@ -4,15 +4,15 @@ use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::{PlaceExpr, PlaceExprSubSegment, ScopeId, ScopedPlaceId};
-use crate::semantic_index::{global_scope, use_def_map, DeclarationWithConstraint};
 use crate::semantic_index::{
-    place_table, BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, place_table,
 };
+use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
-    binding_type, declaration_type, todo_type, KnownClass, Truthiness, Type, TypeAndQualifiers,
-    TypeQualifiers, UnionBuilder, UnionType,
+    KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
+    binding_type, declaration_type, todo_type,
 };
-use crate::{resolve_module, Db, KnownModule, Program};
+use crate::{Db, KnownModule, Program, resolve_module};
 
 pub(crate) use implicit_globals::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol,
@@ -916,7 +916,9 @@ fn place_from_bindings_impl<'db>(
     if let Some(first) = types.next() {
         let boundness = match unbound_visibility() {
             Truthiness::AlwaysTrue => {
-                unreachable!("If we have at least one binding, the scope-start should not be definitely visible")
+                unreachable!(
+                    "If we have at least one binding, the scope-start should not be definitely visible"
+                )
             }
             Truthiness::AlwaysFalse => Boundness::Bound,
             Truthiness::Ambiguous => Boundness::PossiblyUnbound,
@@ -1007,7 +1009,9 @@ fn place_from_declarations_impl<'db>(
         if conflicting.is_empty() {
             let boundness = match undeclared_visibility {
                 Truthiness::AlwaysTrue => {
-                    unreachable!("If we have at least one declaration, the scope-start should not be definitely visible")
+                    unreachable!(
+                        "If we have at least one declaration, the scope-start should not be definitely visible"
+                    )
                 }
                 Truthiness::AlwaysFalse => Boundness::Bound,
                 Truthiness::Ambiguous => Boundness::PossiblyUnbound,
@@ -1060,7 +1064,7 @@ mod implicit_globals {
     use crate::semantic_index::{self, place_table, use_def_map};
     use crate::types::{KnownClass, Type};
 
-    use super::{place_from_declarations, Place, PlaceFromDeclarationsResult};
+    use super::{Place, PlaceFromDeclarationsResult, place_from_declarations};
 
     pub(crate) fn module_type_implicit_global_declaration<'db>(
         db: &'db dyn Db,

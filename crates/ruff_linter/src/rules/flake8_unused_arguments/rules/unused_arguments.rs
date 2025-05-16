@@ -2,7 +2,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::{Parameter, Parameters, Stmt, StmtExpr, StmtFunctionDef, StmtRaise};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
@@ -342,10 +342,13 @@ pub(crate) fn is_not_implemented_stub_with_variable(
         _ => &function_def.body,
     };
 
-    let [Stmt::Assign(ast::StmtAssign { targets, value, .. }), Stmt::Raise(StmtRaise {
-        exc: Some(exception),
-        ..
-    })] = statements
+    let [
+        Stmt::Assign(ast::StmtAssign { targets, value, .. }),
+        Stmt::Raise(StmtRaise {
+            exc: Some(exception),
+            ..
+        }),
+    ] = statements
     else {
         return false;
     };

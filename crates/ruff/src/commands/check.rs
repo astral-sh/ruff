@@ -17,12 +17,12 @@ use ruff_linter::message::Message;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::UnsafeFixes;
-use ruff_linter::settings::{flags, LinterSettings};
-use ruff_linter::{fs, warn_user_once, IOError};
+use ruff_linter::settings::{LinterSettings, flags};
+use ruff_linter::{IOError, fs, warn_user_once};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::resolver::{
-    match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile,
+    PyprojectConfig, ResolvedFile, match_exclusion, python_files_in_path,
 };
 
 use crate::args::ConfigArguments;
@@ -228,9 +228,9 @@ mod test {
     use ruff_linter::message::{Emitter, EmitterContext, TextEmitter};
     use ruff_linter::registry::Rule;
     use ruff_linter::settings::types::UnsafeFixes;
-    use ruff_linter::settings::{flags, LinterSettings};
-    use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
+    use ruff_linter::settings::{LinterSettings, flags};
     use ruff_workspace::Settings;
+    use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
 
     use crate::args::ConfigArguments;
 

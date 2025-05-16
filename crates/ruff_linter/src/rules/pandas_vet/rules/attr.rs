@@ -1,11 +1,11 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
+use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 
 /// ## What it does
 /// Checks for uses of `.values` on Pandas Series and Index objects.

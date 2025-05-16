@@ -1,17 +1,16 @@
 use memchr::memchr2;
-pub(crate) use normalize::{normalize_string, NormalizedString, StringNormalizer};
-use ruff_python_ast::str::{Quote, TripleQuotes};
+pub(crate) use normalize::{NormalizedString, StringNormalizer, normalize_string};
 use ruff_python_ast::StringLikePart;
+use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::{
-    self as ast,
+    self as ast, AnyStringFlags, StringFlags,
     str_prefix::{AnyStringPrefix, StringLiteralPrefix},
-    AnyStringFlags, StringFlags,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
-use crate::prelude::*;
 use crate::QuoteStyle;
+use crate::prelude::*;
 
 pub(crate) mod docstring;
 pub(crate) mod implicit;

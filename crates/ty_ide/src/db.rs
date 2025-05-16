@@ -14,7 +14,7 @@ pub(crate) mod tests {
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Upcast};
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-    use ty_python_semantic::{default_lint_registry, Db as SemanticDb, Program};
+    use ty_python_semantic::{Db as SemanticDb, Program, default_lint_registry};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
 
