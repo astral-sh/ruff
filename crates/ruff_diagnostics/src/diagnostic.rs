@@ -1,5 +1,6 @@
 use anyhow::Result;
 use log::debug;
+use ruff_source_file::SourceFile;
 
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -16,10 +17,11 @@ pub struct Diagnostic {
     pub range: TextRange,
     pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
+    pub source_file: SourceFile,
 }
 
 impl Diagnostic {
-    pub fn new<T: Violation>(kind: T, range: TextRange) -> Self {
+    pub fn new<T: Violation>(kind: T, range: TextRange, source_file: SourceFile) -> Self {
         Self {
             name: T::rule_name(),
             body: Violation::message(&kind),
@@ -27,6 +29,7 @@ impl Diagnostic {
             range,
             fix: None,
             parent: None,
+            source_file,
         }
     }
 
