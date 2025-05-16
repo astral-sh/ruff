@@ -46,7 +46,11 @@ pub(crate) fn tab_indentation(
 
         // Determine whether the tab is part of the line's indentation.
         if let Some(indent) = tab_indentation_at_line_start(range.start(), locator, indexer) {
-            diagnostics.push(Diagnostic::new(TabIndentation, indent));
+            diagnostics.push(Diagnostic::new(
+                TabIndentation,
+                indent,
+                checker.source_file(),
+            ));
         }
 
         // Advance to the next line.

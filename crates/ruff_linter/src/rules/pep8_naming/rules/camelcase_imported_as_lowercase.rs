@@ -67,6 +67,7 @@ pub(crate) fn camelcase_imported_as_lowercase(
                 asname: asname.to_string(),
             },
             alias.range(),
+            checker.source_file(),
         );
         diagnostic.set_parent(stmt.start());
         return Some(diagnostic);

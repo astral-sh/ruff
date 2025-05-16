@@ -337,6 +337,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             comprehension_type: Some(comprehension_type),
         },
         *range,
+        checker.source_file(),
     );
 
     // TODO: once this fix is stabilized, change the rule to always fixable

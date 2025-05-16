@@ -176,7 +176,8 @@ mod tests {
         edit.into_iter()
             .map(|edit| {
                 let range = edit.range();
-                let diagnostic = Diagnostic::new(MissingNewlineAtEndOfFile, range);
+                let diagnostic =
+                    Diagnostic::new(MissingNewlineAtEndOfFile, range, checker.source_file());
                 DiagnosticMessage {
                     name: diagnostic.name,
                     body: diagnostic.body,

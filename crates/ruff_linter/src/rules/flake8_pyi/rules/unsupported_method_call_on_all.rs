@@ -74,6 +74,7 @@ pub(crate) fn unsupported_method_call_on_all(checker: &Checker, func: &Expr) {
             name: attr.to_string(),
         },
         func.range(),
+        checker.source_file(),
     ));
 }
 

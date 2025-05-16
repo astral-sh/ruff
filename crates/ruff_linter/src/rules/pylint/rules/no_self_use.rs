@@ -131,6 +131,7 @@ pub(crate) fn no_self_use(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
                 method_name: name.to_string(),
             },
             func.identifier(),
+            checker.source_file(),
         ));
     }
 }

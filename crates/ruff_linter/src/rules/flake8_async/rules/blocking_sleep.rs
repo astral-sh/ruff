@@ -54,6 +54,7 @@ pub(crate) fn blocking_sleep(checker: &Checker, call: &ExprCall) {
             checker.report_diagnostic(Diagnostic::new(
                 BlockingSleepInAsyncFunction,
                 call.func.range(),
+                checker.source_file(),
             ));
         }
     }

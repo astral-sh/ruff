@@ -216,6 +216,7 @@ pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, che
             method,
         },
         function_def.identifier(),
+        checker.source_file(),
     );
 
     diagnostic.try_set_fix(|| {

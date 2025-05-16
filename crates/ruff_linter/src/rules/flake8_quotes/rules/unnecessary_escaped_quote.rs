@@ -106,7 +106,7 @@ fn check_string_or_bytes(
         return None;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, range);
+    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, range, checker.source_file());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         flags
             .display_contents(&unescape_string(contents, opposite_quote_char))
@@ -140,7 +140,7 @@ fn check_f_string(locator: &Locator, f_string: &ast::FString) -> Option<Diagnost
     let mut edits_iter = edits.into_iter();
     let first = edits_iter.next()?;
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, *range);
+    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, *range, checker.source_file());
     diagnostic.set_fix(Fix::safe_edits(first, edits_iter));
     Some(diagnostic)
 }

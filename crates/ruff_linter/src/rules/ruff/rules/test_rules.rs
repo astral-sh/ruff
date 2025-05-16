@@ -83,6 +83,7 @@ impl TestRule for StableTestRule {
         Some(Diagnostic::new(
             StableTestRule,
             ruff_text_size::TextRange::default(),
+            checker.source_file(),
         ))
     }
 }
@@ -121,8 +122,12 @@ impl TestRule for StableTestRuleSafeFix {
             None
         } else {
             Some(
-                Diagnostic::new(StableTestRuleSafeFix, ruff_text_size::TextRange::default())
-                    .with_fix(Fix::safe_edit(Edit::insertion(comment, TextSize::new(0)))),
+                Diagnostic::new(
+                    StableTestRuleSafeFix,
+                    ruff_text_size::TextRange::default(),
+                    checker.source_file(),
+                )
+                .with_fix(Fix::safe_edit(Edit::insertion(comment, TextSize::new(0)))),
             )
         }
     }
@@ -165,6 +170,7 @@ impl TestRule for StableTestRuleUnsafeFix {
                 Diagnostic::new(
                     StableTestRuleUnsafeFix,
                     ruff_text_size::TextRange::default(),
+                    checker.source_file(),
                 )
                 .with_fix(Fix::unsafe_edit(Edit::insertion(comment, TextSize::new(0)))),
             )
@@ -209,6 +215,7 @@ impl TestRule for StableTestRuleDisplayOnlyFix {
                 Diagnostic::new(
                     StableTestRuleDisplayOnlyFix,
                     ruff_text_size::TextRange::default(),
+                    checker.source_file(),
                 )
                 .with_fix(Fix::display_only_edit(Edit::insertion(
                     comment,
@@ -251,6 +258,7 @@ impl TestRule for PreviewTestRule {
         Some(Diagnostic::new(
             PreviewTestRule,
             ruff_text_size::TextRange::default(),
+            checker.source_file(),
         ))
     }
 }
@@ -287,6 +295,7 @@ impl TestRule for DeprecatedTestRule {
         Some(Diagnostic::new(
             DeprecatedTestRule,
             ruff_text_size::TextRange::default(),
+            checker.source_file(),
         ))
     }
 }
@@ -323,6 +332,7 @@ impl TestRule for AnotherDeprecatedTestRule {
         Some(Diagnostic::new(
             AnotherDeprecatedTestRule,
             ruff_text_size::TextRange::default(),
+            checker.source_file(),
         ))
     }
 }
@@ -359,6 +369,7 @@ impl TestRule for RemovedTestRule {
         Some(Diagnostic::new(
             RemovedTestRule,
             ruff_text_size::TextRange::default(),
+            checker.source_file(),
         ))
     }
 }
@@ -395,6 +406,7 @@ impl TestRule for AnotherRemovedTestRule {
         Some(Diagnostic::new(
             AnotherRemovedTestRule,
             ruff_text_size::TextRange::default(),
+            checker.source_file(),
         ))
     }
 }
@@ -431,6 +443,7 @@ impl TestRule for RedirectedFromTestRule {
         Some(Diagnostic::new(
             RedirectedFromTestRule,
             ruff_text_size::TextRange::default(),
+            checker.source_file(),
         ))
     }
 }
@@ -467,6 +480,7 @@ impl TestRule for RedirectedToTestRule {
         Some(Diagnostic::new(
             RedirectedToTestRule,
             ruff_text_size::TextRange::default(),
+            checker.source_file(),
         ))
     }
 }
@@ -503,6 +517,7 @@ impl TestRule for RedirectedFromPrefixTestRule {
         Some(Diagnostic::new(
             RedirectedFromPrefixTestRule,
             ruff_text_size::TextRange::default(),
+            checker.source_file(),
         ))
     }
 }

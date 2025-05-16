@@ -99,6 +99,7 @@ fn invalid_argument_name(checker: &Checker, parameters: &Parameters) {
                 name: name.to_string(),
             },
             parameter.range(),
+            checker.source_file(),
         );
 
         checker.report_diagnostic(diagnostic);

@@ -239,6 +239,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
             kind: assignment_kind,
         },
         stmt_if.range(),
+        checker.source_file(),
     );
     if !checker
         .comment_ranges()

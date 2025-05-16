@@ -55,7 +55,11 @@ pub(crate) fn django_raw_sql(checker: &Checker, call: &ast::ExprCall) {
             .find_argument_value("sql", 0)
             .is_some_and(Expr::is_string_literal_expr)
         {
-            checker.report_diagnostic(Diagnostic::new(DjangoRawSql, call.func.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                DjangoRawSql,
+                call.func.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

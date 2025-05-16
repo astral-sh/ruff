@@ -84,6 +84,7 @@ pub(crate) fn redundant_tuple_in_exception_handler(checker: &Checker, handlers: 
                 name: checker.generator().expr(elt),
             },
             type_.range(),
+            checker.source_file(),
         );
         // If there's no space between the `except` and the tuple, we need to insert a space,
         // as in:

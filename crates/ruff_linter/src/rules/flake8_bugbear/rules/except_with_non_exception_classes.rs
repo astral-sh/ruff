@@ -72,6 +72,7 @@ pub(crate) fn except_with_non_exception_classes(checker: &Checker, except_handle
             checker.report_diagnostic(Diagnostic::new(
                 ExceptWithNonExceptionClasses { is_star },
                 expr.range(),
+                checker.source_file(),
             ));
         }
     }

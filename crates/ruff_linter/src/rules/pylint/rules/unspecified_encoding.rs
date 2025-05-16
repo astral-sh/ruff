@@ -97,6 +97,7 @@ pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCall) {
             mode,
         },
         call.func.range(),
+        checker.source_file(),
     );
     diagnostic.set_fix(generate_keyword_fix(checker, call));
     checker.report_diagnostic(diagnostic);

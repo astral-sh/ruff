@@ -102,7 +102,7 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryKeyCheck, expr.range());
+    let mut diagnostic = Diagnostic::new(UnnecessaryKeyCheck, expr.range(), checker.source_file());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         format!(
             "{}.get({})",

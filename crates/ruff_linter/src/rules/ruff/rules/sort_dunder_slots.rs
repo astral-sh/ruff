@@ -146,6 +146,7 @@ pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) -> Option<
             class_name: enclosing_class.name.id.clone(),
         },
         display.range,
+        checker.source_file(),
     );
 
     if let SortClassification::UnsortedAndMaybeFixable { items } = sort_classification {

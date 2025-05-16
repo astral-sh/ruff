@@ -91,5 +91,6 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: &ast::Expr
             func: function_name.to_string(),
         },
         call.range(),
+        checker.source_file(),
     ));
 }

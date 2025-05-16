@@ -108,7 +108,11 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &Checker, expr: &Exp
             }
         }
 
-        let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, arguments.range());
+        let mut diagnostic = Diagnostic::new(
+            UnnecessaryParenOnRaiseException,
+            arguments.range(),
+            checker.source_file(),
+        );
 
         // If the arguments are immediately followed by a `from`, insert whitespace to avoid
         // a syntax error, as in:

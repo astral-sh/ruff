@@ -99,6 +99,7 @@ pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCall)
                         short_circuit: true,
                     },
                     call.range(),
+                    checker.source_file(),
                 );
                 let iterator = format!("set({})", checker.locator().slice(generator.iter.range()));
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
@@ -117,6 +118,7 @@ pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCall)
             short_circuit: false,
         },
         call.range(),
+        checker.source_file(),
     );
     let fix = {
         // Replace `set(` with `}`.

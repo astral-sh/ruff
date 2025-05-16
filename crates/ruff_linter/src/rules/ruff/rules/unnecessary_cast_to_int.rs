@@ -88,7 +88,7 @@ pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: &ExprCall) {
         checker.comment_ranges(),
         checker.source(),
     );
-    let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range());
+    let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range(), checker.source_file());
 
     checker.report_diagnostic(diagnostic.with_fix(fix));
 }

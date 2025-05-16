@@ -41,6 +41,7 @@ pub(crate) fn ambiguous_function_name(name: &Identifier) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             AmbiguousFunctionName(name.to_string()),
             name.range(),
+            checker.source_file(),
         ))
     } else {
         None

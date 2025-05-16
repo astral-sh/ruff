@@ -1367,6 +1367,7 @@ fn blanks_and_section_underline(
                             name: context.section_name().to_string(),
                         },
                         dashed_line,
+                        checker.source_file(),
                     );
 
                     // Delete any blank lines between the header and the underline.
@@ -1386,6 +1387,7 @@ fn blanks_and_section_underline(
                             name: context.section_name().to_string(),
                         },
                         dashed_line,
+                        checker.source_file(),
                     );
 
                     // Replace the existing underline with a line of the appropriate length.
@@ -1407,6 +1409,7 @@ fn blanks_and_section_underline(
                             name: context.section_name().to_string(),
                         },
                         dashed_line,
+                        checker.source_file(),
                     );
 
                     // Replace the existing indentation with whitespace of the appropriate length.
@@ -1446,6 +1449,7 @@ fn blanks_and_section_underline(
                                     name: context.section_name().to_string(),
                                 },
                                 context.section_name_range(),
+                                checker.source_file(),
                             ));
                         }
                     } else if checker.enabled(Rule::BlankLinesBetweenHeaderAndContent) {
@@ -1477,6 +1481,7 @@ fn blanks_and_section_underline(
                                         name: context.section_name().to_string(),
                                     },
                                     context.section_name_range(),
+                                    checker.source_file(),
                                 );
                                 // Preserve a single blank line between the header and content.
                                 diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
@@ -1492,6 +1497,7 @@ fn blanks_and_section_underline(
                                     name: context.section_name().to_string(),
                                 },
                                 context.section_name_range(),
+                                checker.source_file(),
                             );
                             // Delete any blank lines between the header and content.
                             diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
@@ -1509,6 +1515,7 @@ fn blanks_and_section_underline(
                             name: context.section_name().to_string(),
                         },
                         context.section_name_range(),
+                        checker.source_file(),
                     ));
                 }
             }
@@ -1520,6 +1527,7 @@ fn blanks_and_section_underline(
                             name: context.section_name().to_string(),
                         },
                         equal_line,
+                        checker.source_file(),
                     );
 
                     // If an existing underline is an equal sign line of the appropriate length,
@@ -1536,6 +1544,7 @@ fn blanks_and_section_underline(
                             name: context.section_name().to_string(),
                         },
                         context.section_name_range(),
+                        checker.source_file(),
                     );
 
                     // Add a dashed line (of the appropriate length) under the section header.
@@ -1582,6 +1591,7 @@ fn blanks_and_section_underline(
                                     name: context.section_name().to_string(),
                                 },
                                 context.section_name_range(),
+                                checker.source_file(),
                             );
 
                             // Preserve a single blank line between the header and content.
@@ -1598,6 +1608,7 @@ fn blanks_and_section_underline(
                                 name: context.section_name().to_string(),
                             },
                             context.section_name_range(),
+                            checker.source_file(),
                         );
 
                         let range =
@@ -1617,6 +1628,7 @@ fn blanks_and_section_underline(
                     name: context.section_name().to_string(),
                 },
                 context.section_name_range(),
+                checker.source_file(),
             );
 
             // Add a dashed line (of the appropriate length) under the section header.
@@ -1639,6 +1651,7 @@ fn blanks_and_section_underline(
                     name: context.section_name().to_string(),
                 },
                 context.section_name_range(),
+                checker.source_file(),
             ));
         }
     }
@@ -1660,6 +1673,7 @@ fn common_section(
                     name: context.section_name().to_string(),
                 },
                 section_range,
+                checker.source_file(),
             );
             // Replace the section title with the capitalized variant. This requires
             // locating the start and end of the section name.
@@ -1681,6 +1695,7 @@ fn common_section(
                     name: context.section_name().to_string(),
                 },
                 section_range,
+                checker.source_file(),
             );
 
             // Replace the existing indentation with whitespace of the appropriate length.
@@ -1711,6 +1726,7 @@ fn common_section(
                         name: context.section_name().to_string(),
                     },
                     section_range,
+                    checker.source_file(),
                 );
                 // Add a newline at the beginning of the next section.
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -1753,6 +1769,7 @@ fn common_section(
                         name: context.section_name().to_string(),
                     },
                     section_range,
+                    checker.source_file(),
                 );
                 diagnostic.set_fix(Fix::safe_edit(edit));
                 checker.report_diagnostic(diagnostic);
@@ -1771,6 +1788,7 @@ fn common_section(
                     name: context.section_name().to_string(),
                 },
                 section_range,
+                checker.source_file(),
             );
             // Add a blank line before the section.
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -1841,6 +1859,7 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
                     names,
                 },
                 function.identifier(),
+                checker.source_file(),
             ));
         }
     }
@@ -1960,6 +1979,7 @@ fn numpy_section(
                     name: context.section_name().to_string(),
                 },
                 context.section_name_range(),
+                checker.source_file(),
             );
             let section_range = context.section_name_range();
             diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(TextRange::at(
@@ -1994,6 +2014,7 @@ fn google_section(
                     name: context.section_name().to_string(),
                 },
                 context.section_name_range(),
+                checker.source_file(),
             );
             // Replace the suffix.
             let section_name_range = context.section_name_range();

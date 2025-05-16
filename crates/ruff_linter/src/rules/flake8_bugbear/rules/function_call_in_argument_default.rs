@@ -116,6 +116,7 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
                             name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
                         },
                         expr.range(),
+                        checker.source_file(),
                     ));
                 }
                 visitor::walk_expr(self, expr);

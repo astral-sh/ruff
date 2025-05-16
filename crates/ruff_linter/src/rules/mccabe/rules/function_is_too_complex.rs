@@ -167,6 +167,7 @@ pub(crate) fn function_is_too_complex(
                 max_complexity,
             },
             stmt.identifier(),
+            checker.source_file(),
         ))
     } else {
         None

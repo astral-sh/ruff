@@ -144,12 +144,20 @@ pub(crate) fn bad_version_info_comparison(checker: &Checker, test: &Expr, has_el
             && (checker.source_type.is_stub() || is_bad_version_info_in_non_stub_enabled(checker.settings))
         {
             if has_else_clause {
-                checker.report_diagnostic(Diagnostic::new(BadVersionInfoOrder, test.range()));
+                checker.report_diagnostic(Diagnostic::new(
+                    BadVersionInfoOrder,
+                    test.range(),
+                    checker.source_file(),
+                ));
             }
         }
     } else {
         if checker.enabled(Rule::BadVersionInfoComparison) {
-            checker.report_diagnostic(Diagnostic::new(BadVersionInfoComparison, test.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                BadVersionInfoComparison,
+                test.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

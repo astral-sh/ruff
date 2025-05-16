@@ -110,6 +110,7 @@ pub(crate) fn nested_if_statements(
     let mut diagnostic = Diagnostic::new(
         CollapsibleIf,
         TextRange::new(nested_if.start(), colon.end()),
+        checker.source_file(),
     );
     // The fixer preserves comments in the nested body, but removes comments between
     // the outer and inner if statements.

@@ -83,6 +83,7 @@ pub(crate) fn non_ascii_name(binding: &Binding, locator: &Locator) -> Option<Dia
             kind,
         },
         binding.range(),
+        checker.source_file(),
     ))
 }
 

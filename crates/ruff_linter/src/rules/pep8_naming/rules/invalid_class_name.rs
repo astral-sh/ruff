@@ -69,6 +69,7 @@ pub(crate) fn invalid_class_name(
                 name: name.to_string(),
             },
             class_def.identifier(),
+            checker.source_file(),
         ));
     }
     None

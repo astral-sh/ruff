@@ -112,6 +112,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                     replacement: contents.to_string(),
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
+                checker.source_file(),
             );
             if checker.semantic().has_builtin_binding("any") {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
@@ -204,6 +205,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                     replacement: contents.to_string(),
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
+                checker.source_file(),
             );
             if checker.semantic().has_builtin_binding("all") {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(

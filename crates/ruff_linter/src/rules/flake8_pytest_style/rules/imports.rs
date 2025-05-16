@@ -43,6 +43,7 @@ pub(crate) fn import(import_from: &Stmt, name: &str, asname: Option<&str>) -> Op
                 return Some(Diagnostic::new(
                     PytestIncorrectPytestImport,
                     import_from.range(),
+                    checker.source_file(),
                 ));
             }
         }
@@ -66,6 +67,7 @@ pub(crate) fn import_from(
             return Some(Diagnostic::new(
                 PytestIncorrectPytestImport,
                 import_from.range(),
+                checker.source_file(),
             ));
         }
     }

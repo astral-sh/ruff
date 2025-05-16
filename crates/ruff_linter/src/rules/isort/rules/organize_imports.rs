@@ -110,7 +110,11 @@ pub(crate) fn organize_imports(
         || indexer
             .followed_by_multi_statement_line(block.imports.last().unwrap(), locator.contents())
     {
-        return Some(Diagnostic::new(UnsortedImports, range));
+        return Some(Diagnostic::new(
+            UnsortedImports,
+            range,
+            checker.source_file(),
+        ));
     }
 
     // Extract comments. Take care to grab any inline comments from the last line.
@@ -155,7 +159,7 @@ pub(crate) fn organize_imports(
     if matches_ignoring_indentation(actual, &expected) {
         return None;
     }
-    let mut diagnostic = Diagnostic::new(UnsortedImports, range);
+    let mut diagnostic = Diagnostic::new(UnsortedImports, range, checker.source_file());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         indent(&expected, indentation).to_string(),
         fix_range,

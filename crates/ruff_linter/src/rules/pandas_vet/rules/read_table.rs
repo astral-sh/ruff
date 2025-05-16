@@ -62,8 +62,11 @@ pub(crate) fn use_of_read_table(checker: &Checker, call: &ast::ExprCall) {
             .map(|keyword| &keyword.value)
         {
             if value == "," {
-                checker
-                    .report_diagnostic(Diagnostic::new(PandasUseOfDotReadTable, call.func.range()));
+                checker.report_diagnostic(Diagnostic::new(
+                    PandasUseOfDotReadTable,
+                    call.func.range(),
+                    checker.source_file(),
+                ));
             }
         }
     }

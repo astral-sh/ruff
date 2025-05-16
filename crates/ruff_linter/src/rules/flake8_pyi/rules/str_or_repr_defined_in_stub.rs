@@ -87,6 +87,7 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
             name: name.to_string(),
         },
         stmt.identifier(),
+        checker.source_file(),
     );
     let stmt = checker.semantic().current_statement();
     let parent = checker.semantic().current_statement_parent();

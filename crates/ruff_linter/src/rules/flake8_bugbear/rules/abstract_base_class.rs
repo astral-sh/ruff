@@ -201,6 +201,7 @@ pub(crate) fn abstract_base_class(
                     name: format!("{name}.{method_name}"),
                 },
                 stmt.range(),
+                checker.source_file(),
             ));
         }
     }
@@ -211,6 +212,7 @@ pub(crate) fn abstract_base_class(
                     name: name.to_string(),
                 },
                 stmt.identifier(),
+                checker.source_file(),
             ));
         }
     }

@@ -63,7 +63,7 @@ pub(crate) fn shebang_leading_whitespace(
     }
 
     let prefix = TextRange::up_to(range.start());
-    let mut diagnostic = Diagnostic::new(ShebangLeadingWhitespace, prefix);
+    let mut diagnostic = Diagnostic::new(ShebangLeadingWhitespace, prefix, checker.source_file());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(prefix)));
     Some(diagnostic)
 }

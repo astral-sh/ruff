@@ -125,6 +125,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                     replacement: replacement.clone(),
                 },
                 value.range(),
+                checker.source_file(),
             );
 
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
@@ -189,6 +190,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                     replacement: replacement.clone(),
                 },
                 value.range(),
+                checker.source_file(),
             );
 
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(

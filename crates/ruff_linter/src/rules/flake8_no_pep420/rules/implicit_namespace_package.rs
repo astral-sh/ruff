@@ -89,6 +89,7 @@ pub(crate) fn implicit_namespace_package(
                 parent: None,
             },
             TextRange::default(),
+            checker.source_file(),
         ));
     }
 
@@ -106,6 +107,7 @@ pub(crate) fn implicit_namespace_package(
                             parent: Some(fs::relativize_path(parent)),
                         },
                         TextRange::default(),
+                        checker.source_file(),
                     ));
                 }
             }

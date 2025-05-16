@@ -55,13 +55,21 @@ pub(crate) fn useless_try_except(checker: &Checker, handlers: &[ExceptHandler]) 
                 // E.g., `except ... as e: raise e`
                 if let Expr::Name(ast::ExprName { id, .. }) = expr.as_ref() {
                     if name.as_ref().is_some_and(|name| name.as_str() == id) {
-                        return Some(Diagnostic::new(UselessTryExcept, handler.range()));
+                        return Some(Diagnostic::new(
+                            UselessTryExcept,
+                            handler.range(),
+                            checker.source_file(),
+                        ));
                     }
                 }
                 None
             } else {
                 // E.g., `except ...: raise`
-                Some(Diagnostic::new(UselessTryExcept, handler.range()))
+                Some(Diagnostic::new(
+                    UselessTryExcept,
+                    handler.range(),
+                    checker.source_file(),
+                ))
             }
         })
         .collect::<Option<Vec<_>>>()

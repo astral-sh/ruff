@@ -72,6 +72,7 @@ pub(crate) fn return_in_try_except_finally(
             checker.report_diagnostic(Diagnostic::new(
                 ReturnInTryExceptFinally,
                 finally_return.range(),
+                checker.source_file(),
             ));
         }
     }

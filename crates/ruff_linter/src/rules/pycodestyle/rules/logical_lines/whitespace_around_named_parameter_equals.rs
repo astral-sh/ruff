@@ -125,8 +125,11 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                 if definition_state.in_type_params() || (annotated_func_arg && parens == 1) {
                     let start = token.start();
                     if start == prev_end && prev_end != TextSize::new(0) {
-                        let mut diagnostic =
-                            Diagnostic::new(MissingWhitespaceAroundParameterEquals, token.range);
+                        let mut diagnostic = Diagnostic::new(
+                            MissingWhitespaceAroundParameterEquals,
+                            token.range,
+                            checker.source_file(),
+                        );
                         diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                             " ".to_string(),
                             token.start(),
@@ -144,6 +147,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                                 let mut diagnostic = Diagnostic::new(
                                     MissingWhitespaceAroundParameterEquals,
                                     token.range,
+                                    checker.source_file(),
                                 );
                                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                                     " ".to_string(),
@@ -160,6 +164,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                         let mut diagnostic = Diagnostic::new(
                             UnexpectedSpacesAroundKeywordParameterEquals,
                             TextRange::new(prev_end, token.start()),
+                            checker.source_file(),
                         );
                         diagnostic.set_fix(Fix::safe_edit(Edit::deletion(prev_end, token.start())));
                         context.push_diagnostic(diagnostic);
@@ -174,6 +179,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                                 let mut diagnostic = Diagnostic::new(
                                     UnexpectedSpacesAroundKeywordParameterEquals,
                                     TextRange::new(token.end(), next.start()),
+                                    checker.source_file(),
                                 );
                                 diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                                     token.end(),

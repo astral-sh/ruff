@@ -76,6 +76,7 @@ pub(crate) fn invalid_length_return(checker: &Checker, function_def: &ast::StmtF
         checker.report_diagnostic(Diagnostic::new(
             InvalidLengthReturnType,
             function_def.identifier(),
+            checker.source_file(),
         ));
         return;
     }
@@ -95,11 +96,19 @@ pub(crate) fn invalid_length_return(checker: &Checker, function_def: &ast::StmtF
                         | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
                 )
             {
-                checker.report_diagnostic(Diagnostic::new(InvalidLengthReturnType, value.range()));
+                checker.report_diagnostic(Diagnostic::new(
+                    InvalidLengthReturnType,
+                    value.range(),
+                    checker.source_file(),
+                ));
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidLengthReturnType, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                InvalidLengthReturnType,
+                stmt.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

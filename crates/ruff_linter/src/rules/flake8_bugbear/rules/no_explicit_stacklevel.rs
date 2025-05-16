@@ -85,7 +85,11 @@ pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
     {
         return;
     }
-    let mut diagnostic = Diagnostic::new(NoExplicitStacklevel, call.func.range());
+    let mut diagnostic = Diagnostic::new(
+        NoExplicitStacklevel,
+        call.func.range(),
+        checker.source_file(),
+    );
 
     let edit = add_argument(
         "stacklevel=2",

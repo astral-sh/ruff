@@ -137,6 +137,7 @@ pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
             replacement: SourceCodeSnippet::from_str(replacement.as_str()),
         },
         if_exp.range(),
+        checker.source_file(),
     );
 
     if checker.semantic().has_builtin_binding(min_max.as_str()) {

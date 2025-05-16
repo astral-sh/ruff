@@ -199,7 +199,7 @@ fn sort_dunder_all(checker: &Checker, target: &ast::Expr, node: &ast::Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnsortedDunderAll, range);
+    let mut diagnostic = Diagnostic::new(UnsortedDunderAll, range, checker.source_file());
 
     if let SortClassification::UnsortedAndMaybeFixable { items } = elts_analysis {
         if let Some(fix) = create_fix(range, elts, &items, kind, checker) {

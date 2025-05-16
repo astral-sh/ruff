@@ -258,6 +258,7 @@ fn check(
                     fix_title: FixTitle::AddBackslash,
                 },
                 invalid_escape_char.range(),
+                checker.source_file(),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 r"\".to_string(),
@@ -274,6 +275,7 @@ fn check(
                     fix_title: FixTitle::UseRawStringLiteral,
                 },
                 invalid_escape_char.range(),
+                checker.source_file(),
             );
 
             if flags.is_u_string() {

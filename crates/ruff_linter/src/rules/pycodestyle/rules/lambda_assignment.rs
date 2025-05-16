@@ -75,6 +75,7 @@ pub(crate) fn lambda_assignment(
             name: id.to_string(),
         },
         stmt.range(),
+        checker.source_file(),
     );
 
     if !has_leading_content(stmt.start(), checker.source())

@@ -67,6 +67,7 @@ pub(crate) fn model_without_dunder_str(checker: &Checker, class_def: &ast::StmtC
     checker.report_diagnostic(Diagnostic::new(
         DjangoModelWithoutDunderStr,
         class_def.identifier(),
+        checker.source_file(),
     ));
 }
 

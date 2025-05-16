@@ -181,6 +181,7 @@ pub(crate) fn use_capital_environment_variables(checker: &Checker, expr: &Expr) 
             actual: SourceCodeSnippet::new(env_var.to_string()),
         },
         arg.range(),
+        checker.source_file(),
     ));
 }
 
@@ -221,6 +222,7 @@ fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
             actual: SourceCodeSnippet::new(env_var.to_string()),
         },
         slice.range(),
+        checker.source_file(),
     );
     let node = ast::StringLiteral {
         value: capital_env_var.into_boxed_str(),
@@ -304,6 +306,7 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
             actual: SourceCodeSnippet::from_str(actual),
         },
         expr.range(),
+        checker.source_file(),
     );
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         expected,

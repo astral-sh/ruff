@@ -57,5 +57,6 @@ pub(crate) fn missing_copyright_notice(
     Some(Diagnostic::new(
         MissingCopyrightNotice,
         TextRange::default(),
+        checker.source_file(),
     ))
 }

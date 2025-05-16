@@ -224,11 +224,27 @@ enum Argumentable {
 impl Argumentable {
     fn check_for(self, name: String, range: TextRange) -> Diagnostic {
         match self {
-            Self::Function => Diagnostic::new(UnusedFunctionArgument { name }, range),
-            Self::Method => Diagnostic::new(UnusedMethodArgument { name }, range),
-            Self::ClassMethod => Diagnostic::new(UnusedClassMethodArgument { name }, range),
-            Self::StaticMethod => Diagnostic::new(UnusedStaticMethodArgument { name }, range),
-            Self::Lambda => Diagnostic::new(UnusedLambdaArgument { name }, range),
+            Self::Function => Diagnostic::new(
+                UnusedFunctionArgument { name },
+                range,
+                checker.source_file(),
+            ),
+            Self::Method => {
+                Diagnostic::new(UnusedMethodArgument { name }, range, checker.source_file())
+            }
+            Self::ClassMethod => Diagnostic::new(
+                UnusedClassMethodArgument { name },
+                range,
+                checker.source_file(),
+            ),
+            Self::StaticMethod => Diagnostic::new(
+                UnusedStaticMethodArgument { name },
+                range,
+                checker.source_file(),
+            ),
+            Self::Lambda => {
+                Diagnostic::new(UnusedLambdaArgument { name }, range, checker.source_file())
+            }
         }
     }
 

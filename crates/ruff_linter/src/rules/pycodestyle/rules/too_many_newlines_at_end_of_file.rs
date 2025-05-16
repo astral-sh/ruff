@@ -142,6 +142,7 @@ fn newline_diagnostic<'a>(
                 in_notebook,
             },
             diagnostic_range,
+            checker.source_file(),
         )
         .with_fix(Fix::safe_edit(Edit::range_deletion(diagnostic_range))),
     )

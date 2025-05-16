@@ -142,6 +142,7 @@ pub(crate) fn legacy_random(checker: &Checker, expr: &Expr) {
                 method_name: method_name.to_string(),
             },
             expr.range(),
+            checker.source_file(),
         ));
     }
 }

@@ -75,7 +75,11 @@ pub(crate) fn type_none_comparison(checker: &Checker, compare: &ast::ExprCompare
         _ => return,
     };
 
-    let diagnostic = Diagnostic::new(TypeNoneComparison { replacement }, compare.range);
+    let diagnostic = Diagnostic::new(
+        TypeNoneComparison { replacement },
+        compare.range,
+        checker.source_file(),
+    );
 
     let negate = replacement == IdentityCheck::IsNot;
     let fix = replace_with_identity_check(other_arg, compare.range, negate, checker);

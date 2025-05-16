@@ -99,7 +99,11 @@ fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<Diagnostic> {
         }
     }
 
-    Some(Diagnostic::new(PytestPatchWithLambda, call.func.range()))
+    Some(Diagnostic::new(
+        PytestPatchWithLambda,
+        call.func.range(),
+        checker.source_file(),
+    ))
 }
 
 /// PT008

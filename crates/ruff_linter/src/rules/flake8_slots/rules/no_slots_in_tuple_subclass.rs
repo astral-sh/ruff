@@ -66,7 +66,11 @@ pub(crate) fn no_slots_in_tuple_subclass(checker: &Checker, stmt: &Stmt, class: 
         semantic.match_builtin_expr(base, "tuple") || semantic.match_typing_expr(base, "Tuple")
     }) {
         if !has_slots(&class.body) {
-            checker.report_diagnostic(Diagnostic::new(NoSlotsInTupleSubclass, stmt.identifier()));
+            checker.report_diagnostic(Diagnostic::new(
+                NoSlotsInTupleSubclass,
+                stmt.identifier(),
+                checker.source_file(),
+            ));
         }
     }
 }

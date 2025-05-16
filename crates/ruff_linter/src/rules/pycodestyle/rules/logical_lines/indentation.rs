@@ -273,6 +273,7 @@ pub(crate) fn indentation(
                     indent_width: indent_size,
                 },
                 range,
+                checker.source_file(),
             )
         } else {
             Diagnostic::new(
@@ -280,6 +281,7 @@ pub(crate) fn indentation(
                     indent_width: indent_size,
                 },
                 range,
+                checker.source_file(),
             )
         });
     }
@@ -289,17 +291,17 @@ pub(crate) fn indentation(
 
     if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
         diagnostics.push(if logical_line.is_comment_only() {
-            Diagnostic::new(NoIndentedBlockComment, range)
+            Diagnostic::new(NoIndentedBlockComment, range, checker.source_file())
         } else {
-            Diagnostic::new(NoIndentedBlock, range)
+            Diagnostic::new(NoIndentedBlock, range, checker.source_file())
         });
     } else if !indent_expect
         && prev_indent_level.is_some_and(|prev_indent_level| indent_level > prev_indent_level)
     {
         diagnostics.push(if logical_line.is_comment_only() {
-            Diagnostic::new(UnexpectedIndentationComment, range)
+            Diagnostic::new(UnexpectedIndentationComment, range, checker.source_file())
         } else {
-            Diagnostic::new(UnexpectedIndentation, range)
+            Diagnostic::new(UnexpectedIndentation, range, checker.source_file())
         });
     }
     if indent_expect {
@@ -311,6 +313,7 @@ pub(crate) fn indentation(
                     is_comment: logical_line.is_comment_only(),
                 },
                 range,
+                checker.source_file(),
             ));
         }
     }

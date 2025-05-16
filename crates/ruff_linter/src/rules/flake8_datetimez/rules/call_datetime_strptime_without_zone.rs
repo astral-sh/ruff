@@ -142,6 +142,7 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &Checker, call: &ast:
         checker.report_diagnostic(Diagnostic::new(
             CallDatetimeStrptimeWithoutZone(antipattern),
             call.range,
+            checker.source_file(),
         ));
     }
 }

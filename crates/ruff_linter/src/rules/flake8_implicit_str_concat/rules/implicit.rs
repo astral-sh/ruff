@@ -148,11 +148,13 @@ pub(crate) fn implicit(
             diagnostics.push(Diagnostic::new(
                 MultiLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
+                checker.source_file(),
             ));
         } else {
             let mut diagnostic = Diagnostic::new(
                 SingleLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
+                checker.source_file(),
             );
 
             if let Some(fix) = concatenate_strings(a_range, b_range, locator) {

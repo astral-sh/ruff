@@ -86,7 +86,8 @@ pub(crate) fn unnecessary_list_cast(checker: &Checker, iter: &Expr, body: &[Stmt
             range: iterable_range,
             ..
         }) => {
-            let mut diagnostic = Diagnostic::new(UnnecessaryListCast, *list_range);
+            let mut diagnostic =
+                Diagnostic::new(UnnecessaryListCast, *list_range, checker.source_file());
             diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
             checker.report_diagnostic(diagnostic);
         }
@@ -114,7 +115,8 @@ pub(crate) fn unnecessary_list_cast(checker: &Checker, iter: &Expr, body: &[Stmt
                     return;
                 }
 
-                let mut diagnostic = Diagnostic::new(UnnecessaryListCast, *list_range);
+                let mut diagnostic =
+                    Diagnostic::new(UnnecessaryListCast, *list_range, checker.source_file());
                 diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
                 checker.report_diagnostic(diagnostic);
             }

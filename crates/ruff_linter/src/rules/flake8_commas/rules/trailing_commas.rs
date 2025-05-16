@@ -352,7 +352,8 @@ fn check_token(
     };
 
     if comma_prohibited {
-        let mut diagnostic = Diagnostic::new(ProhibitedTrailingComma, prev.range());
+        let mut diagnostic =
+            Diagnostic::new(ProhibitedTrailingComma, prev.range(), checker.source_file());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(diagnostic.range())));
         return Some(diagnostic);
     }
@@ -361,7 +362,11 @@ fn check_token(
     // Approximation: any comma followed by a statement-ending newline.
     let bare_comma_prohibited = prev.ty == TokenType::Comma && token.ty == TokenType::Newline;
     if bare_comma_prohibited {
-        return Some(Diagnostic::new(TrailingCommaOnBareTuple, prev.range()));
+        return Some(Diagnostic::new(
+            TrailingCommaOnBareTuple,
+            prev.range(),
+            checker.source_file(),
+        ));
     }
 
     if !comma_allowed {
@@ -382,8 +387,11 @@ fn check_token(
                 | TokenType::OpeningCurlyBracket
         );
     if comma_required {
-        let mut diagnostic =
-            Diagnostic::new(MissingTrailingComma, TextRange::empty(prev_prev.end()));
+        let mut diagnostic = Diagnostic::new(
+            MissingTrailingComma,
+            TextRange::empty(prev_prev.end()),
+            checker.source_file(),
+        );
         // Create a replacement that includes the final bracket (or other token),
         // rather than just inserting a comma at the end. This prevents the UP034 fix
         // removing any brackets in the same linter pass - doing both at the same time could

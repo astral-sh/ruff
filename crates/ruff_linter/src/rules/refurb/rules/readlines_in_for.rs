@@ -85,7 +85,7 @@ fn readlines_in_iter(checker: &Checker, iter_expr: &Expr) {
         }
     }
 
-    let mut diagnostic = Diagnostic::new(ReadlinesInFor, expr_call.range());
+    let mut diagnostic = Diagnostic::new(ReadlinesInFor, expr_call.range(), checker.source_file());
     diagnostic.set_fix(if is_readlines_in_for_fix_safe(checker.settings) {
         Fix::safe_edit(Edit::range_deletion(
             expr_call.range().add_start(expr_attr.value.range().len()),

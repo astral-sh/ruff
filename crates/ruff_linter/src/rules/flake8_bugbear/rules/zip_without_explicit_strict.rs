@@ -64,7 +64,12 @@ pub(crate) fn zip_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
             .any(|arg| is_infinite_iterable(arg, semantic))
     {
         checker.report_diagnostic(
-            Diagnostic::new(ZipWithoutExplicitStrict, call.range()).with_fix(Fix::applicable_edit(
+            Diagnostic::new(
+                ZipWithoutExplicitStrict,
+                call.range(),
+                checker.source_file(),
+            )
+            .with_fix(Fix::applicable_edit(
                 add_argument(
                     "strict=False",
                     &call.arguments,

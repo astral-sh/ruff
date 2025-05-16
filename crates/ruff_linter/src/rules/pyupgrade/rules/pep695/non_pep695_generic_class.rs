@@ -143,6 +143,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
             name: name.to_string(),
         },
         *range,
+        checker.source_file(),
     );
 
     // only handle the case where Generic is at the end of the argument list, in line with PYI059

@@ -69,6 +69,7 @@ pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) {
                     field_name: field_name.to_string(),
                 },
                 value.range(),
+                checker.source_file(),
             ));
         }
     }

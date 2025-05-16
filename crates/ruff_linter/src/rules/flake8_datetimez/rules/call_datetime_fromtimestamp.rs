@@ -100,5 +100,6 @@ pub(crate) fn call_datetime_fromtimestamp(checker: &Checker, call: &ast::ExprCal
     checker.report_diagnostic(Diagnostic::new(
         CallDatetimeFromtimestamp(antipattern),
         call.range,
+        checker.source_file(),
     ));
 }

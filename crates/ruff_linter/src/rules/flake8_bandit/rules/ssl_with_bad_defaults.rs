@@ -62,6 +62,7 @@ pub(crate) fn ssl_with_bad_defaults(checker: &Checker, function_def: &StmtFuncti
                             protocol: id.to_string(),
                         },
                         *range,
+                        checker.source_file(),
                     ));
                 }
             }
@@ -72,6 +73,7 @@ pub(crate) fn ssl_with_bad_defaults(checker: &Checker, function_def: &StmtFuncti
                             protocol: attr.to_string(),
                         },
                         *range,
+                        checker.source_file(),
                     ));
                 }
             }

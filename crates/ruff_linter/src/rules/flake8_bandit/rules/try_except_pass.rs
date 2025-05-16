@@ -60,7 +60,11 @@ pub(crate) fn try_except_pass(
 ) {
     if matches!(body, [Stmt::Pass(_)]) {
         if check_typed_exception || is_untyped_exception(type_, checker.semantic()) {
-            checker.report_diagnostic(Diagnostic::new(TryExceptPass, except_handler.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                TryExceptPass,
+                except_handler.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

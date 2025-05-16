@@ -134,6 +134,7 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
             batch_method_name,
         },
         for_stmt.range,
+        checker.source_file(),
     );
 
     checker.report_diagnostic(diagnostic.with_fix(fix));

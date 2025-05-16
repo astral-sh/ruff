@@ -69,6 +69,7 @@ pub(crate) fn bare_except(
         Some(Diagnostic::new(
             BareExcept,
             except(handler, locator.contents()),
+            checker.source_file(),
         ))
     } else {
         None

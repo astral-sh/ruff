@@ -75,8 +75,8 @@ pub(crate) fn repeated_global(checker: &Checker, mut suite: &[Stmt]) {
         if let [first, .., last] = globals_sequence {
             let range = first.range().cover(last.range());
             checker.report_diagnostic(
-                Diagnostic::new(RepeatedGlobal { global_kind }, range).with_fix(Fix::safe_edit(
-                    Edit::range_replacement(
+                Diagnostic::new(RepeatedGlobal { global_kind }, range, checker.source_file())
+                    .with_fix(Fix::safe_edit(Edit::range_replacement(
                         format!(
                             "{global_kind} {}",
                             globals_sequence
@@ -90,8 +90,7 @@ pub(crate) fn repeated_global(checker: &Checker, mut suite: &[Stmt]) {
                                 .format(", ")
                         ),
                         range,
-                    ),
-                )),
+                    ))),
             );
         }
 

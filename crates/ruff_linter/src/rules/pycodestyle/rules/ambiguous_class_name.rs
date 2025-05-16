@@ -41,6 +41,7 @@ pub(crate) fn ambiguous_class_name(name: &Identifier) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             AmbiguousClassName(name.to_string()),
             name.range(),
+            checker.source_file(),
         ))
     } else {
         None

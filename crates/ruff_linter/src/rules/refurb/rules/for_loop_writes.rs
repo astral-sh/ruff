@@ -196,6 +196,7 @@ fn for_loop_writes(
             name: io_object_name.id.to_string(),
         },
         for_stmt.range,
+        checker.source_file(),
     );
 
     Some(diagnostic.with_fix(fix))

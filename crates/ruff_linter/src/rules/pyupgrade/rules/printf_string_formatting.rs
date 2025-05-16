@@ -385,7 +385,11 @@ pub(crate) fn printf_string_formatting(
             return;
         };
         if !convertible(&format_string, right) {
-            checker.report_diagnostic(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                PrintfStringFormatting,
+                string_expr.range(),
+                checker.source_file(),
+            ));
             return;
         }
 
@@ -449,6 +453,7 @@ pub(crate) fn printf_string_formatting(
                 checker.report_diagnostic(Diagnostic::new(
                     PrintfStringFormatting,
                     string_expr.range(),
+                    checker.source_file(),
                 ));
                 return;
             };
@@ -504,7 +509,11 @@ pub(crate) fn printf_string_formatting(
     // Add the `.format` call.
     let _ = write!(&mut contents, ".format{params_string}");
 
-    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, bin_op.range());
+    let mut diagnostic = Diagnostic::new(
+        PrintfStringFormatting,
+        bin_op.range(),
+        checker.source_file(),
+    );
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         contents,
         bin_op.range(),

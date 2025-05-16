@@ -69,7 +69,7 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(MetaClassABCMeta, keyword.range);
+    let mut diagnostic = Diagnostic::new(MetaClassABCMeta, keyword.range, checker.source_file());
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(

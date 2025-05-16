@@ -302,6 +302,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 is_async: for_stmt.is_async,
             },
             *range,
+            checker.source_file(),
         );
         diagnostic.try_set_optional_fix(|| {
             Ok(convert_to_dict_comprehension(
@@ -323,6 +324,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 is_async: for_stmt.is_async,
             },
             *range,
+            checker.source_file(),
         ));
     }
 }

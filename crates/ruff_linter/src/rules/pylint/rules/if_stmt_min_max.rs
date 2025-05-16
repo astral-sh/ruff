@@ -182,6 +182,7 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
             replacement: SourceCodeSnippet::from_str(replacement.as_str()),
         },
         stmt_if.range(),
+        checker.source_file(),
     );
 
     let range_replacement = stmt_if.range();

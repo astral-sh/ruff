@@ -78,6 +78,7 @@ pub(crate) fn redundant_backslash(
                         let mut diagnostic = Diagnostic::new(
                             RedundantBackslash,
                             TextRange::new(backslash_start, backslash_end),
+                            checker.source_file(),
                         );
                         diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                             backslash_start,

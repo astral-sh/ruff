@@ -64,7 +64,11 @@ pub(crate) fn direct_logger_instantiation(checker: &Checker, call: &ast::ExprCal
         .resolve_qualified_name(call.func.as_ref())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["logging", "Logger"]))
     {
-        let mut diagnostic = Diagnostic::new(DirectLoggerInstantiation, call.func.range());
+        let mut diagnostic = Diagnostic::new(
+            DirectLoggerInstantiation,
+            call.func.range(),
+            checker.source_file(),
+        );
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import("logging", "getLogger"),

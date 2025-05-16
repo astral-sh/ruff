@@ -79,6 +79,7 @@ pub(crate) fn deprecated_type_alias(checker: &Checker, expr: &Expr) {
                 type_name: type_name.to_string(),
             },
             expr.range(),
+            checker.source_file(),
         );
         let type_name = match type_name {
             "unicode" => "str",

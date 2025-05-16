@@ -87,5 +87,6 @@ pub(crate) fn invalid_function_name(
             name: name.to_string(),
         },
         stmt.identifier(),
+        checker.source_file(),
     ))
 }

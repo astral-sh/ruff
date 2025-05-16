@@ -435,6 +435,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                     ignore_init_module_imports: !fix_init,
                 },
                 binding.range,
+                checker.source_file(),
             );
             if let Some(range) = binding.parent_range {
                 diagnostic.set_parent(range.start());
@@ -461,6 +462,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                 ignore_init_module_imports: !fix_init,
             },
             binding.range,
+            checker.source_file(),
         );
         if let Some(range) = binding.parent_range {
             diagnostic.set_parent(range.start());

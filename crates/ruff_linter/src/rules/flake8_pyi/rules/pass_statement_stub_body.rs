@@ -44,7 +44,8 @@ pub(crate) fn pass_statement_stub_body(checker: &Checker, body: &[Stmt]) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(PassStatementStubBody, pass.range());
+    let mut diagnostic =
+        Diagnostic::new(PassStatementStubBody, pass.range(), checker.source_file());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         pass.range(),

@@ -38,7 +38,11 @@ impl Violation for InvalidAllFormat {
 /// PLE0605
 pub(crate) fn invalid_all_format(binding: &Binding) -> Option<Diagnostic> {
     if binding.is_invalid_all_format() {
-        Some(Diagnostic::new(InvalidAllFormat, binding.range()))
+        Some(Diagnostic::new(
+            InvalidAllFormat,
+            binding.range(),
+            checker.source_file(),
+        ))
     } else {
         None
     }

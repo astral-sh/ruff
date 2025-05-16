@@ -73,6 +73,7 @@ pub(crate) fn blocking_http_call(checker: &Checker, call: &ExprCall) {
             checker.report_diagnostic(Diagnostic::new(
                 BlockingHttpCallInAsyncFunction,
                 call.func.range(),
+                checker.source_file(),
             ));
         }
     }

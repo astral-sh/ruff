@@ -53,7 +53,7 @@ pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(FutureAnnotationsInStub, *range);
+    let mut diagnostic = Diagnostic::new(FutureAnnotationsInStub, *range, checker.source_file());
 
     if is_fix_future_annotations_in_stub_enabled(checker.settings) {
         let stmt = checker.semantic().current_statement();

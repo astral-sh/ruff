@@ -57,5 +57,9 @@ pub(crate) fn shebang_not_first_line(range: TextRange, locator: &Locator) -> Opt
         return None;
     }
 
-    Some(Diagnostic::new(ShebangNotFirstLine, range))
+    Some(Diagnostic::new(
+        ShebangNotFirstLine,
+        range,
+        checker.source_file(),
+    ))
 }

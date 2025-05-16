@@ -56,7 +56,8 @@ pub(crate) fn typing_text_str_alias(checker: &Checker, expr: &Expr) {
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["typing", "Text"]))
     {
-        let mut diagnostic = Diagnostic::new(TypingTextStrAlias, expr.range());
+        let mut diagnostic =
+            Diagnostic::new(TypingTextStrAlias, expr.range(), checker.source_file());
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
                 "str",

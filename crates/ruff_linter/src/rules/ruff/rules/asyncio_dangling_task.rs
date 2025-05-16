@@ -87,6 +87,7 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
                 method,
             },
             expr.range(),
+            checker.source_file(),
         ));
     }
 
@@ -109,6 +110,7 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
                             method: Method::CreateTask,
                         },
                         expr.range(),
+                        checker.source_file(),
                     ));
                 }
             }

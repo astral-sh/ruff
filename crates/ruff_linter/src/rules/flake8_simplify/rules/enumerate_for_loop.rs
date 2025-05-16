@@ -144,6 +144,7 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
                     index: index.id.to_string(),
                 },
                 stmt.range(),
+                checker.source_file(),
             );
             checker.report_diagnostic(diagnostic);
         }

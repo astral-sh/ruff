@@ -66,7 +66,7 @@ pub(crate) fn delete_full_slice(checker: &Checker, delete: &ast::StmtDelete) {
             continue;
         };
 
-        let mut diagnostic = Diagnostic::new(DeleteFullSlice, delete.range);
+        let mut diagnostic = Diagnostic::new(DeleteFullSlice, delete.range, checker.source_file());
 
         // Fix is only supported for single-target deletions.
         if delete.targets.len() == 1 {

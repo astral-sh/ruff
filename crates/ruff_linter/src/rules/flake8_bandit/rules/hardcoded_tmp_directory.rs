@@ -107,5 +107,6 @@ fn check(checker: &Checker, value: &str, range: TextRange) {
             string: value.to_string(),
         },
         range,
+        checker.source_file(),
     ));
 }

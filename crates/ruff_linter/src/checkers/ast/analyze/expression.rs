@@ -532,6 +532,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                                 message: pyflakes::format::error_to_string(&e),
                                             },
                                             location,
+                                            checker.source_file(),
                                         ));
                                     }
                                 }
@@ -1290,6 +1291,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                         char: c,
                                     },
                                     location,
+                                    checker.source_file(),
                                 ));
                             }
                         }
@@ -1300,6 +1302,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                         message: e.to_string(),
                                     },
                                     location,
+                                    checker.source_file(),
                                 ));
                             }
                         }

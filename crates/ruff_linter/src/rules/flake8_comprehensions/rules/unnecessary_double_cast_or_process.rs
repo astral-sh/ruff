@@ -131,6 +131,7 @@ pub(crate) fn unnecessary_double_cast_or_process(
                 outer: outer_func_name.to_string(),
             },
             expr.range(),
+            checker.source_file(),
         );
         diagnostic.try_set_fix(|| {
             fixes::fix_unnecessary_double_cast_or_process(

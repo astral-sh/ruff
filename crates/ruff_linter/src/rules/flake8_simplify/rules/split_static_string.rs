@@ -102,7 +102,7 @@ pub(crate) fn split_static_string(
         split_default(str_value, maxsplit_value, direction)
     };
 
-    let mut diagnostic = Diagnostic::new(SplitStaticString, call.range());
+    let mut diagnostic = Diagnostic::new(SplitStaticString, call.range(), checker.source_file());
     if let Some(ref replacement_expr) = split_replacement {
         diagnostic.set_fix(Fix::applicable_edit(
             Edit::range_replacement(checker.generator().expr(replacement_expr), call.range()),

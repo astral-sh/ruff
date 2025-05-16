@@ -76,6 +76,7 @@ pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: &ast
             kind: argument_kind,
         },
         call.range(),
+        checker.source_file(),
     );
 
     // Convert `dict({"a": 1})` to `{"a": 1}`

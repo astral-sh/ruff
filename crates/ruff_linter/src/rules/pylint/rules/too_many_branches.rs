@@ -245,6 +245,7 @@ pub(crate) fn too_many_branches(
                 max_branches,
             },
             stmt.identifier(),
+            checker.source_file(),
         ))
     } else {
         None

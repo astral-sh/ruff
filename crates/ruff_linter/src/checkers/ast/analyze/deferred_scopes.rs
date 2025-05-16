@@ -117,6 +117,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                                 name: (*name).to_string(),
                             },
                             binding.range(),
+                            checker.source_file(),
                         ));
                     }
                 }
@@ -151,6 +152,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                             name: name.to_string(),
                         },
                         binding.range(),
+                        checker.source_file(),
                     ));
                 }
             }
@@ -192,6 +194,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                             row: checker.compute_source_row(shadowed.start()),
                         },
                         binding.range(),
+                        checker.source_file(),
                     ));
                 }
             }
@@ -337,6 +340,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                             row: checker.compute_source_row(shadowed.start()),
                         },
                         binding.range(),
+                        checker.source_file(),
                     );
 
                     if let Some(range) = binding.parent_range(&checker.semantic) {

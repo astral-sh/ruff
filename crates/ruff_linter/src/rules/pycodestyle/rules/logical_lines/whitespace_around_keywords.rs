@@ -136,6 +136,7 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
                         let mut diagnostic = Diagnostic::new(
                             TabBeforeKeyword,
                             TextRange::at(start - offset, offset),
+                            checker.source_file(),
                         );
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                             " ".to_string(),
@@ -148,6 +149,7 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
                         let mut diagnostic = Diagnostic::new(
                             MultipleSpacesBeforeKeyword,
                             TextRange::at(start - offset, offset),
+                            checker.source_file(),
                         );
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                             " ".to_string(),
@@ -161,8 +163,11 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
 
             match line.trailing_whitespace(token) {
                 (Whitespace::Tab, len) => {
-                    let mut diagnostic =
-                        Diagnostic::new(TabAfterKeyword, TextRange::at(token.end(), len));
+                    let mut diagnostic = Diagnostic::new(
+                        TabAfterKeyword,
+                        TextRange::at(token.end(), len),
+                        checker.source_file(),
+                    );
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         " ".to_string(),
                         TextRange::at(token.end(), len),
@@ -173,6 +178,7 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
                     let mut diagnostic = Diagnostic::new(
                         MultipleSpacesAfterKeyword,
                         TextRange::at(token.end(), len),
+                        checker.source_file(),
                     );
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         " ".to_string(),

@@ -197,13 +197,25 @@ pub(crate) fn invalid_string_characters(
         let c = match_.chars().next().unwrap();
         let range = TextRange::at(location, c.text_len());
         let (replacement, mut diagnostic) = match c {
-            '\x08' => ("\\b", Diagnostic::new(InvalidCharacterBackspace, range)),
-            '\x1A' => ("\\x1A", Diagnostic::new(InvalidCharacterSub, range)),
-            '\x1B' => ("\\x1B", Diagnostic::new(InvalidCharacterEsc, range)),
-            '\0' => ("\\0", Diagnostic::new(InvalidCharacterNul, range)),
+            '\x08' => (
+                "\\b",
+                Diagnostic::new(InvalidCharacterBackspace, range, checker.source_file()),
+            ),
+            '\x1A' => (
+                "\\x1A",
+                Diagnostic::new(InvalidCharacterSub, range, checker.source_file()),
+            ),
+            '\x1B' => (
+                "\\x1B",
+                Diagnostic::new(InvalidCharacterEsc, range, checker.source_file()),
+            ),
+            '\0' => (
+                "\\0",
+                Diagnostic::new(InvalidCharacterNul, range, checker.source_file()),
+            ),
             '\u{200b}' => (
                 "\\u200b",
-                Diagnostic::new(InvalidCharacterZeroWidthSpace, range),
+                Diagnostic::new(InvalidCharacterZeroWidthSpace, range, checker.source_file()),
             ),
             _ => {
                 continue;

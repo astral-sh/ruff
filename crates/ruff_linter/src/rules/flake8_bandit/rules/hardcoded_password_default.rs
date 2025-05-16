@@ -65,6 +65,7 @@ fn check_password_kwarg(parameter: &Parameter, default: &Expr) -> Option<Diagnos
             name: kwarg_name.to_string(),
         },
         default.range(),
+        checker.source_file(),
     ))
 }
 

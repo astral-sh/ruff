@@ -106,7 +106,11 @@ pub(crate) fn ends_with_period(checker: &Checker, docstring: &Docstring) {
         }
 
         if !trimmed.ends_with('.') {
-            let mut diagnostic = Diagnostic::new(MissingTrailingPeriod, docstring.range());
+            let mut diagnostic = Diagnostic::new(
+                MissingTrailingPeriod,
+                docstring.range(),
+                checker.source_file(),
+            );
             // Best-effort fix: avoid adding a period after other punctuation marks.
             if !trimmed.ends_with([':', ';', '?', '!']) {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(

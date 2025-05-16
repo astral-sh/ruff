@@ -102,6 +102,7 @@ pub(crate) fn line_too_long(
         Diagnostic::new(
             LineTooLong(overlong.width(), limit.value() as usize),
             overlong.range(),
+            checker.source_file(),
         )
     })
 }

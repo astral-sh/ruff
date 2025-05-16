@@ -65,7 +65,7 @@ pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: &StmtIf) {
 
     let fix = replace_with_dict_pop_fix(checker, stmt, test_dict, test_key);
 
-    let diagnostic = Diagnostic::new(IfKeyInDictDel, delete.range);
+    let diagnostic = Diagnostic::new(IfKeyInDictDel, delete.range, checker.source_file());
 
     checker.report_diagnostic(diagnostic.with_fix(fix));
 }

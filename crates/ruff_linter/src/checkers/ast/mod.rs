@@ -57,7 +57,7 @@ use ruff_python_semantic::{
 };
 use ruff_python_stdlib::builtins::{MAGIC_GLOBALS, python_builtins};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{OneIndexed, SourceRow};
+use ruff_source_file::{OneIndexed, SourceFile, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::annotation::AnnotationContext;
@@ -238,6 +238,7 @@ pub(crate) struct Checker<'a> {
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
+    source_file: SourceFile,
 }
 
 impl<'a> Checker<'a> {
@@ -260,6 +261,7 @@ impl<'a> Checker<'a> {
         target_version: TargetVersion,
     ) -> Checker<'a> {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
+        let builder = SourceFileBuilder::new(path.to_string_lossy(), locator.contents());
         Self {
             parsed,
             parsed_type_annotation: None,
@@ -287,6 +289,7 @@ impl<'a> Checker<'a> {
             target_version,
             semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
+            source_file: builder.finish(),
         }
     }
 }
@@ -567,6 +570,10 @@ impl<'a> Checker<'a> {
             member,
         })
     }
+
+    pub(crate) fn source_file(&self) -> SourceFile {
+        self.source_file.clone()
+    }
 }
 
 pub(crate) struct TypingImporter<'a, 'b> {
@@ -604,7 +611,11 @@ impl SemanticSyntaxContext for Checker<'_> {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
                 if self.settings.rules.enabled(Rule::LateFutureImport) {
-                    self.report_diagnostic(Diagnostic::new(LateFutureImport, error.range));
+                    self.report_diagnostic(Diagnostic::new(
+                        LateFutureImport,
+                        error.range,
+                        self.source_file(),
+                    ));
                 }
             }
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start } => {
@@ -619,6 +630,7 @@ impl SemanticSyntaxContext for Checker<'_> {
                             row: self.compute_source_row(start),
                         },
                         error.range,
+                        self.source_file(),
                     ));
                 }
             }
@@ -627,17 +639,26 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(Diagnostic::new(
                         YieldOutsideFunction::new(kind),
                         error.range,
+                        self.source_file(),
                     ));
                 }
             }
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {
                 if self.settings.rules.enabled(Rule::ReturnOutsideFunction) {
-                    self.report_diagnostic(Diagnostic::new(ReturnOutsideFunction, error.range));
+                    self.report_diagnostic(Diagnostic::new(
+                        ReturnOutsideFunction,
+                        error.range,
+                        self.source_file(),
+                    ));
                 }
             }
             SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(_) => {
                 if self.settings.rules.enabled(Rule::AwaitOutsideAsync) {
-                    self.report_diagnostic(Diagnostic::new(AwaitOutsideAsync, error.range));
+                    self.report_diagnostic(Diagnostic::new(
+                        AwaitOutsideAsync,
+                        error.range,
+                        self.source_file(),
+                    ));
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
@@ -2720,6 +2741,7 @@ impl<'a> Checker<'a> {
                                     parse_error: parse_error.error.to_string(),
                                 },
                                 string_expr.range(),
+                                self.source_file(),
                             ));
                         }
                     }
@@ -2867,6 +2889,7 @@ impl<'a> Checker<'a> {
                                         name: name.to_string(),
                                     },
                                     range,
+                                    self.source_file(),
                                 )
                                 .with_parent(definition.start()),
                             );
@@ -2882,6 +2905,7 @@ impl<'a> Checker<'a> {
                                             name: name.to_string(),
                                         },
                                         range,
+                                        self.source_file(),
                                     )
                                     .with_parent(definition.start()),
                                 );

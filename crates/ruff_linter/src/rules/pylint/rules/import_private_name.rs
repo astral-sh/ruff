@@ -139,6 +139,7 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
         checker.report_diagnostic(Diagnostic::new(
             ImportPrivateName { name, module },
             binding.range(),
+            checker.source_file(),
         ));
     }
 }

@@ -29,7 +29,8 @@ pub fn lint_pyproject_toml(source_file: SourceFile, settings: &LinterSettings) -
                     source_file.name(),
                 );
                 if settings.rules.enabled(Rule::IOError) {
-                    let diagnostic = Diagnostic::new(IOError { message }, TextRange::default());
+                    let diagnostic =
+                        Diagnostic::new(IOError { message }, TextRange::default(), source_file);
                     messages.push(Message::from_diagnostic(
                         diagnostic,
                         source_file,
@@ -55,7 +56,11 @@ pub fn lint_pyproject_toml(source_file: SourceFile, settings: &LinterSettings) -
 
     if settings.rules.enabled(Rule::InvalidPyprojectToml) {
         let toml_err = err.message().to_string();
-        let diagnostic = Diagnostic::new(InvalidPyprojectToml { message: toml_err }, range);
+        let diagnostic = Diagnostic::new(
+            InvalidPyprojectToml { message: toml_err },
+            range,
+            source_file,
+        );
         messages.push(Message::from_diagnostic(
             diagnostic,
             source_file,

@@ -50,5 +50,9 @@ pub(crate) fn break_outside_loop<'a>(
         child = parent;
     }
 
-    Some(Diagnostic::new(BreakOutsideLoop, stmt.range()))
+    Some(Diagnostic::new(
+        BreakOutsideLoop,
+        stmt.range(),
+        checker.source_file(),
+    ))
 }

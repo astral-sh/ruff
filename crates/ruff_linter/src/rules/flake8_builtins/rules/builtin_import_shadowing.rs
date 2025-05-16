@@ -68,6 +68,7 @@ pub(crate) fn builtin_import_shadowing(checker: &Checker, alias: &Alias) {
                 name: name.to_string(),
             },
             name.range,
+            checker.source_file(),
         ));
     }
 }

@@ -64,6 +64,7 @@ pub(crate) fn nonlocal_and_global(checker: &Checker, nonlocal: &ast::StmtNonloca
                     name: name.to_string(),
                 },
                 global,
+                checker.source_file(),
             ));
         }
     }

@@ -167,7 +167,8 @@ pub(crate) fn compound_statements(
                                 !has_non_trivia_tokens_till(token_iter.clone(), cell_range.end())
                             }))
                     {
-                        let mut diagnostic = Diagnostic::new(UselessSemicolon, range);
+                        let mut diagnostic =
+                            Diagnostic::new(UselessSemicolon, range, checker.source_file());
                         diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                             indexer
                                 .preceded_by_continuations(range.start(), locator.contents())
@@ -224,7 +225,11 @@ pub(crate) fn compound_statements(
             | TokenKind::NonLogicalNewline => {}
             _ => {
                 if let Some(range) = semi {
-                    diagnostics.push(Diagnostic::new(MultipleStatementsOnOneLineSemicolon, range));
+                    diagnostics.push(Diagnostic::new(
+                        MultipleStatementsOnOneLineSemicolon,
+                        range,
+                        checker.source_file(),
+                    ));
 
                     // Reset.
                     semi = None;
@@ -232,7 +237,11 @@ pub(crate) fn compound_statements(
                 }
 
                 if let Some(range) = colon {
-                    diagnostics.push(Diagnostic::new(MultipleStatementsOnOneLineColon, range));
+                    diagnostics.push(Diagnostic::new(
+                        MultipleStatementsOnOneLineColon,
+                        range,
+                        checker.source_file(),
+                    ));
 
                     // Reset.
                     colon = None;

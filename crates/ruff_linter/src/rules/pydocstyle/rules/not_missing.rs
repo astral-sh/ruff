@@ -555,6 +555,7 @@ pub(crate) fn not_missing(
                 checker.report_diagnostic(Diagnostic::new(
                     UndocumentedPublicModule,
                     TextRange::default(),
+                    checker.source_file(),
                 ));
             }
             false
@@ -567,6 +568,7 @@ pub(crate) fn not_missing(
                 checker.report_diagnostic(Diagnostic::new(
                     UndocumentedPublicPackage,
                     TextRange::default(),
+                    checker.source_file(),
                 ));
             }
             false
@@ -579,6 +581,7 @@ pub(crate) fn not_missing(
                 checker.report_diagnostic(Diagnostic::new(
                     UndocumentedPublicClass,
                     class.identifier(),
+                    checker.source_file(),
                 ));
             }
             false
@@ -591,6 +594,7 @@ pub(crate) fn not_missing(
                 checker.report_diagnostic(Diagnostic::new(
                     UndocumentedPublicNestedClass,
                     function.identifier(),
+                    checker.source_file(),
                 ));
             }
             false
@@ -606,6 +610,7 @@ pub(crate) fn not_missing(
                     checker.report_diagnostic(Diagnostic::new(
                         UndocumentedPublicFunction,
                         function.identifier(),
+                        checker.source_file(),
                     ));
                 }
                 false
@@ -624,6 +629,7 @@ pub(crate) fn not_missing(
                     checker.report_diagnostic(Diagnostic::new(
                         UndocumentedPublicInit,
                         function.identifier(),
+                        checker.source_file(),
                     ));
                 }
                 true
@@ -632,6 +638,7 @@ pub(crate) fn not_missing(
                     checker.report_diagnostic(Diagnostic::new(
                         UndocumentedPublicMethod,
                         function.identifier(),
+                        checker.source_file(),
                     ));
                 }
                 true
@@ -640,6 +647,7 @@ pub(crate) fn not_missing(
                     checker.report_diagnostic(Diagnostic::new(
                         UndocumentedMagicMethod,
                         function.identifier(),
+                        checker.source_file(),
                     ));
                 }
                 true
@@ -648,6 +656,7 @@ pub(crate) fn not_missing(
                     checker.report_diagnostic(Diagnostic::new(
                         UndocumentedPublicMethod,
                         function.identifier(),
+                        checker.source_file(),
                     ));
                 }
                 true

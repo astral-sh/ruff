@@ -64,7 +64,11 @@ pub(crate) fn starred_expressions(
     for (index, elt) in elts.iter().enumerate() {
         if elt.is_starred_expr() {
             if has_starred && check_two_starred_expressions {
-                return Some(Diagnostic::new(MultipleStarredExpressions, location));
+                return Some(Diagnostic::new(
+                    MultipleStarredExpressions,
+                    location,
+                    checker.source_file(),
+                ));
             }
             has_starred = true;
             starred_index = Some(index);
@@ -74,7 +78,11 @@ pub(crate) fn starred_expressions(
     if check_too_many_expressions {
         if let Some(starred_index) = starred_index {
             if starred_index >= 1 << 8 || elts.len() - starred_index > 1 << 24 {
-                return Some(Diagnostic::new(ExpressionsInStarAssignment, location));
+                return Some(Diagnostic::new(
+                    ExpressionsInStarAssignment,
+                    location,
+                    checker.source_file(),
+                ));
             }
         }
     }

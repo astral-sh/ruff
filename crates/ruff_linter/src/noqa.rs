@@ -2848,6 +2848,7 @@ mod tests {
                 name: "x".to_string(),
             },
             TextRange::new(TextSize::from(0), TextSize::from(0)),
+            checker.source_file(),
         )]
         .map(|d| message_from_diagnostic(d, path, contents));
 
@@ -2869,12 +2870,14 @@ mod tests {
             Diagnostic::new(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
+                checker.source_file(),
             ),
             Diagnostic::new(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
+                checker.source_file(),
             ),
         ]
         .map(|d| message_from_diagnostic(d, path, contents));
@@ -2898,12 +2901,14 @@ mod tests {
             Diagnostic::new(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
+                checker.source_file(),
             ),
             Diagnostic::new(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
+                checker.source_file(),
             ),
         ]
         .map(|d| message_from_diagnostic(d, path, contents));
@@ -2940,6 +2945,7 @@ print(
         let messages = [Diagnostic::new(
             PrintfStringFormatting,
             TextRange::new(12.into(), 79.into()),
+            checker.source_file(),
         )]
         .map(|d| message_from_diagnostic(d, path, source));
         let comment_ranges = CommentRanges::default();
@@ -2972,6 +2978,7 @@ bar =
         let messages = [Diagnostic::new(
             UselessSemicolon,
             TextRange::new(4.into(), 5.into()),
+            checker.source_file(),
         )]
         .map(|d| message_from_diagnostic(d, path, source));
         let noqa_line_for = NoqaMapping::default();

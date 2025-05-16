@@ -355,6 +355,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                                 expected: names_type,
                             },
                             name_range,
+                            checker.source_file(),
                         );
                         let node = Expr::Tuple(ast::ExprTuple {
                             elts: names
@@ -391,6 +392,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                                 expected: names_type,
                             },
                             name_range,
+                            checker.source_file(),
                         );
                         let node = Expr::List(ast::ExprList {
                             elts: names
@@ -429,6 +431,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                                 expected: names_type,
                             },
                             expr.range(),
+                            checker.source_file(),
                         );
                         let node = Expr::List(ast::ExprList {
                             elts: elts.clone(),
@@ -448,6 +451,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                                 expected: names_type,
                             },
                             expr.range(),
+                            checker.source_file(),
                         );
                         if let Some(content) =
                             elts_to_csv(elts, checker.generator(), checker.default_string_flags())
@@ -475,6 +479,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                                 expected: names_type,
                             },
                             expr.range(),
+                            checker.source_file(),
                         );
                         let node = Expr::Tuple(ast::ExprTuple {
                             elts: elts.clone(),
@@ -495,6 +500,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                                 expected: names_type,
                             },
                             expr.range(),
+                            checker.source_file(),
                         );
                         if let Some(content) =
                             elts_to_csv(elts, checker.generator(), checker.default_string_flags())
@@ -537,6 +543,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                         row: values_row_type,
                     },
                     values.range(),
+                    checker.source_file(),
                 );
                 diagnostic.set_fix({
                     // Determine whether the last element has a trailing comma. Single-element
@@ -585,6 +592,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                         row: values_row_type,
                     },
                     values.range(),
+                    checker.source_file(),
                 );
                 diagnostic.set_fix({
                     // Determine whether a trailing comma is present due to the _requirement_
@@ -667,6 +675,7 @@ fn check_duplicates(checker: &Checker, values: &Expr) {
                 let mut diagnostic = Diagnostic::new(
                     PytestDuplicateParametrizeTestCases { index: *index },
                     element.range(),
+                    checker.source_file(),
                 );
                 if let Some(prev) = prev {
                     let values_end = values.end() - TextSize::new(1);
@@ -693,6 +702,7 @@ fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalue
             expected: types::ParametrizeNameType::Csv,
         },
         argnames.range(),
+        checker.source_file(),
     );
     // If `argnames` and all items in `argvalues` are single-element sequences,
     // they all should be unpacked. Here's an example:
@@ -781,6 +791,7 @@ fn handle_value_rows(
                             row: values_row_type,
                         },
                         elt.range(),
+                        checker.source_file(),
                     );
                     diagnostic.set_fix({
                         // Determine whether a trailing comma is present due to the _requirement_
@@ -824,6 +835,7 @@ fn handle_value_rows(
                             row: values_row_type,
                         },
                         elt.range(),
+                        checker.source_file(),
                     );
                     diagnostic.set_fix({
                         // Determine whether the last element has a trailing comma. Single-element

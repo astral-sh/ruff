@@ -242,6 +242,7 @@ fn create_diagnostic(
             py_version: checker.target_version(),
         },
         parameter.range,
+        checker.source_file(),
     );
 
     let try_generate_fix = || {

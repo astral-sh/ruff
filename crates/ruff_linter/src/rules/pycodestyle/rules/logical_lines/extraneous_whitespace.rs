@@ -168,6 +168,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                         let mut diagnostic = Diagnostic::new(
                             WhitespaceAfterOpenBracket { symbol },
                             TextRange::at(token.end(), trailing_len),
+                            checker.source_file(),
                         );
                         diagnostic
                             .set_fix(Fix::safe_edit(Edit::range_deletion(diagnostic.range())));
@@ -182,6 +183,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                             let mut diagnostic = Diagnostic::new(
                                 WhitespaceBeforeCloseBracket { symbol },
                                 TextRange::at(token.start() - offset, offset),
+                                checker.source_file(),
                             );
                             diagnostic
                                 .set_fix(Fix::safe_edit(Edit::range_deletion(diagnostic.range())));
@@ -208,6 +210,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                     let mut diagnostic = Diagnostic::new(
                                         WhitespaceBeforePunctuation { symbol },
                                         TextRange::at(token.start() - offset, offset),
+                                        checker.source_file(),
                                     );
                                     diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(
                                         diagnostic.range(),
@@ -223,6 +226,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                         let mut diagnostic = Diagnostic::new(
                                             WhitespaceBeforePunctuation { symbol },
                                             TextRange::at(token.start() - offset, offset),
+                                            checker.source_file(),
                                         );
                                         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(
                                             diagnostic.range(),
@@ -248,6 +252,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                         let mut diagnostic = Diagnostic::new(
                                             WhitespaceBeforePunctuation { symbol },
                                             TextRange::at(token.start() - offset, offset),
+                                            checker.source_file(),
                                         );
                                         diagnostic.set_fix(Fix::safe_edits(
                                             Edit::range_deletion(diagnostic.range()),
@@ -265,6 +270,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                         let mut diagnostic = Diagnostic::new(
                                             WhitespaceBeforePunctuation { symbol },
                                             TextRange::at(token.start() - offset, offset),
+                                            checker.source_file(),
                                         );
                                         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(
                                             diagnostic.range(),
@@ -283,6 +289,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                 let mut diagnostic = Diagnostic::new(
                                     WhitespaceBeforePunctuation { symbol },
                                     TextRange::at(token.start() - offset, offset),
+                                    checker.source_file(),
                                 );
                                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(
                                     diagnostic.range(),

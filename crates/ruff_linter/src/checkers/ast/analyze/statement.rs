@@ -44,6 +44,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                                     name: name.to_string(),
                                 },
                                 name.range(),
+                                checker.source_file(),
                             ));
                         }
                     }
@@ -858,6 +859,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                                     name: helpers::format_import_from(level, module).to_string(),
                                 },
                                 stmt.range(),
+                                checker.source_file(),
                             ));
                         }
                     }
@@ -867,6 +869,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                                 name: helpers::format_import_from(level, module).to_string(),
                             },
                             stmt.range(),
+                            checker.source_file(),
                         ));
                     }
                 }

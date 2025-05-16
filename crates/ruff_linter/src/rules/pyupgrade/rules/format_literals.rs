@@ -112,7 +112,7 @@ pub(crate) fn format_literals(checker: &Checker, call: &ast::ExprCall, summary: 
         Arguments::Reorder(&summary.indices)
     };
 
-    let mut diagnostic = Diagnostic::new(FormatLiterals, call.range());
+    let mut diagnostic = Diagnostic::new(FormatLiterals, call.range(), checker.source_file());
     diagnostic.try_set_fix(|| {
         generate_call(call, arguments, checker.locator(), checker.stylist())
             .map(|suggestion| Fix::unsafe_edit(Edit::range_replacement(suggestion, call.range())))

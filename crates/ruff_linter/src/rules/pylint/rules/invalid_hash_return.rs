@@ -75,6 +75,7 @@ pub(crate) fn invalid_hash_return(checker: &Checker, function_def: &ast::StmtFun
         checker.report_diagnostic(Diagnostic::new(
             InvalidHashReturnType,
             function_def.identifier(),
+            checker.source_file(),
         ));
         return;
     }
@@ -92,11 +93,19 @@ pub(crate) fn invalid_hash_return(checker: &Checker, function_def: &ast::StmtFun
                 ResolvedPythonType::Unknown
                     | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
             ) {
-                checker.report_diagnostic(Diagnostic::new(InvalidHashReturnType, value.range()));
+                checker.report_diagnostic(Diagnostic::new(
+                    InvalidHashReturnType,
+                    value.range(),
+                    checker.source_file(),
+                ));
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidHashReturnType, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                InvalidHashReturnType,
+                stmt.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

@@ -67,7 +67,11 @@ pub(crate) fn one_liner(checker: &Checker, docstring: &Docstring) {
     }
 
     if non_empty_line_count == 1 && line_count > 1 {
-        let mut diagnostic = Diagnostic::new(UnnecessaryMultilineDocstring, docstring.range());
+        let mut diagnostic = Diagnostic::new(
+            UnnecessaryMultilineDocstring,
+            docstring.range(),
+            checker.source_file(),
+        );
 
         // If removing whitespace would lead to an invalid string of quote
         // characters, avoid applying the fix.

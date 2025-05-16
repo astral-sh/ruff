@@ -128,6 +128,7 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
                 certainty,
             },
             expr.range(),
+            checker.source_file(),
         );
         if let Some(rename) = rename {
             if certainty == Certainty::Certain {

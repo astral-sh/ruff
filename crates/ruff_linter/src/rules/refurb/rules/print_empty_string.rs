@@ -84,7 +84,11 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                 Reason::EmptyArgument
             };
 
-            let mut diagnostic = Diagnostic::new(PrintEmptyString { reason }, call.range());
+            let mut diagnostic = Diagnostic::new(
+                PrintEmptyString { reason },
+                call.range(),
+                checker.source_file(),
+            );
 
             diagnostic.set_fix(
                 EmptyStringFix::from_call(
@@ -112,6 +116,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                         reason: Reason::UselessSeparator,
                     },
                     call.range(),
+                    checker.source_file(),
                 );
 
                 diagnostic.set_fix(
@@ -179,6 +184,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                     },
                 },
                 call.range(),
+                checker.source_file(),
             );
 
             diagnostic.set_fix(

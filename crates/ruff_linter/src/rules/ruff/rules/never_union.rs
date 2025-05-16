@@ -83,6 +83,7 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                         union_like: UnionLike::PEP604,
                     },
                     left.range(),
+                    checker.source_file(),
                 );
                 // Avoid producing code that would raise an exception when
                 // `Never | None` would be fixed to `None | None`.
@@ -106,6 +107,7 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                         union_like: UnionLike::PEP604,
                     },
                     right.range(),
+                    checker.source_file(),
                 );
                 if !is_pep604_union_with_bare_none(checker.semantic()) {
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
@@ -149,6 +151,7 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                             union_like: UnionLike::TypingUnion,
                         },
                         elt.range(),
+                        checker.source_file(),
                     );
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         if let [only] = rest.as_slice() {

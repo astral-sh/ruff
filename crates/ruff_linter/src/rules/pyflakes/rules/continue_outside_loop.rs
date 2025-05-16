@@ -50,5 +50,9 @@ pub(crate) fn continue_outside_loop<'a>(
         child = parent;
     }
 
-    Some(Diagnostic::new(ContinueOutsideLoop, stmt.range()))
+    Some(Diagnostic::new(
+        ContinueOutsideLoop,
+        stmt.range(),
+        checker.source_file(),
+    ))
 }

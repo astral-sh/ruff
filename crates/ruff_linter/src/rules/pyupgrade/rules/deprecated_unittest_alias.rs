@@ -97,6 +97,7 @@ pub(crate) fn deprecated_unittest_alias(checker: &Checker, expr: &Expr) {
             target: (*target).to_string(),
         },
         expr.range(),
+        checker.source_file(),
     );
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         format!("self.{target}"),

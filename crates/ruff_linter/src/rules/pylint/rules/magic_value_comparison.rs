@@ -116,6 +116,7 @@ pub(crate) fn magic_value_comparison(checker: &Checker, left: &Expr, comparators
                         value: checker.locator().slice(comparison_expr).to_string(),
                     },
                     comparison_expr.range(),
+                    checker.source_file(),
                 ));
             }
         }

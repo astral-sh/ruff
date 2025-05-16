@@ -51,7 +51,8 @@ pub(crate) fn no_newline_at_end_of_file(
     if !source.ends_with(['\n', '\r']) {
         let range = TextRange::empty(locator.contents().text_len());
 
-        let mut diagnostic = Diagnostic::new(MissingNewlineAtEndOfFile, range);
+        let mut diagnostic =
+            Diagnostic::new(MissingNewlineAtEndOfFile, range, checker.source_file());
         diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
             stylist.line_ending().to_string(),
             range.start(),

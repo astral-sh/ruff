@@ -58,7 +58,8 @@ pub(crate) fn datetime_utc_alias(checker: &Checker, expr: &Expr) {
             matches!(qualified_name.segments(), ["datetime", "timezone", "utc"])
         })
     {
-        let mut diagnostic = Diagnostic::new(DatetimeTimezoneUTC, expr.range());
+        let mut diagnostic =
+            Diagnostic::new(DatetimeTimezoneUTC, expr.range(), checker.source_file());
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from("datetime", "UTC"),

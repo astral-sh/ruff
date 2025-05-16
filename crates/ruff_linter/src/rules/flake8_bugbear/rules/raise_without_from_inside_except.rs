@@ -109,6 +109,7 @@ pub(crate) fn raise_without_from_inside_except(
                 checker.report_diagnostic(Diagnostic::new(
                     RaiseWithoutFromInsideExcept { is_star },
                     range,
+                    checker.source_file(),
                 ));
             }
         }

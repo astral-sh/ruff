@@ -60,7 +60,11 @@ pub(crate) fn debugger_call(checker: &Checker, expr: &Expr, func: &Expr) {
                 }
             })
     {
-        checker.report_diagnostic(Diagnostic::new(Debugger { using_type }, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(
+            Debugger { using_type },
+            expr.range(),
+            checker.source_file(),
+        ));
     }
 }
 
@@ -75,6 +79,7 @@ pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> 
                     using_type: DebuggerUsingType::Import(qualified_name.to_string()),
                 },
                 stmt.range(),
+                checker.source_file(),
             ));
         }
     } else {
@@ -86,6 +91,7 @@ pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> 
                     using_type: DebuggerUsingType::Import(name.to_string()),
                 },
                 stmt.range(),
+                checker.source_file(),
             ));
         }
     }

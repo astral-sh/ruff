@@ -101,7 +101,11 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
 
     // Match, e.g., `x = x + 1`.
     if ComparableExpr::from(target) == ComparableExpr::from(&value.left) {
-        let mut diagnostic = Diagnostic::new(NonAugmentedAssignment { operator }, assign.range());
+        let mut diagnostic = Diagnostic::new(
+            NonAugmentedAssignment { operator },
+            assign.range(),
+            checker.source_file(),
+        );
         diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
             checker,
             target,
@@ -120,7 +124,11 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
         && (value.left.is_number_literal_expr() || value.left.is_boolean_literal_expr())
         && ComparableExpr::from(target) == ComparableExpr::from(&value.right)
     {
-        let mut diagnostic = Diagnostic::new(NonAugmentedAssignment { operator }, assign.range());
+        let mut diagnostic = Diagnostic::new(
+            NonAugmentedAssignment { operator },
+            assign.range(),
+            checker.source_file(),
+        );
         diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
             checker,
             target,

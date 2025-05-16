@@ -56,6 +56,7 @@ pub(crate) fn banned_import_from(
                 name: name.to_string(),
             },
             stmt.range(),
+            checker.source_file(),
         ));
     }
     None

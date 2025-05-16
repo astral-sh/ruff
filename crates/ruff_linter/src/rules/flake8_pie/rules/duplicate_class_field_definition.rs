@@ -99,6 +99,7 @@ pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: &[Stmt])
                     name: target.id.to_string(),
                 },
                 stmt.range(),
+                checker.source_file(),
             );
             let edit =
                 fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());

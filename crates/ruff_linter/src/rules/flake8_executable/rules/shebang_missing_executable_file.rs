@@ -59,6 +59,7 @@ pub(crate) fn shebang_missing_executable_file(filepath: &Path) -> Option<Diagnos
         return Some(Diagnostic::new(
             ShebangMissingExecutableFile,
             TextRange::default(),
+            checker.source_file(),
         ));
     }
     None

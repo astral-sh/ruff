@@ -106,5 +106,6 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
             argument_name: self_or_cls.name.to_string(),
         },
         self_or_cls.range(),
+        checker.source_file(),
     ));
 }

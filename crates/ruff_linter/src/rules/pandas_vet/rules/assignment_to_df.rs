@@ -48,5 +48,9 @@ pub(crate) fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
     if id != "df" {
         return None;
     }
-    Some(Diagnostic::new(PandasDfVariableName, target.range()))
+    Some(Diagnostic::new(
+        PandasDfVariableName,
+        target.range(),
+        checker.source_file(),
+    ))
 }

@@ -438,15 +438,21 @@ fn rule_for(import_type: ImportType) -> Rule {
 /// Return the [`Diagnostic`] for the given import type.
 fn diagnostic_for(import_type: ImportType, qualified_name: String, range: TextRange) -> Diagnostic {
     match import_type {
-        ImportType::StandardLibrary => {
-            Diagnostic::new(TypingOnlyStandardLibraryImport { qualified_name }, range)
-        }
-        ImportType::ThirdParty => {
-            Diagnostic::new(TypingOnlyThirdPartyImport { qualified_name }, range)
-        }
-        ImportType::FirstParty => {
-            Diagnostic::new(TypingOnlyFirstPartyImport { qualified_name }, range)
-        }
+        ImportType::StandardLibrary => Diagnostic::new(
+            TypingOnlyStandardLibraryImport { qualified_name },
+            range,
+            checker.source_file(),
+        ),
+        ImportType::ThirdParty => Diagnostic::new(
+            TypingOnlyThirdPartyImport { qualified_name },
+            range,
+            checker.source_file(),
+        ),
+        ImportType::FirstParty => Diagnostic::new(
+            TypingOnlyFirstPartyImport { qualified_name },
+            range,
+            checker.source_file(),
+        ),
         _ => unreachable!("Unexpected import type"),
     }
 }

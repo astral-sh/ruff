@@ -96,6 +96,7 @@ pub(crate) fn len_test(checker: &Checker, call: &ExprCall) {
                 expression: SourceCodeSnippet::new(replacement.clone()),
             },
             call.range(),
+            checker.source_file(),
         )
         .with_fix(Fix::safe_edit(Edit::range_replacement(
             replacement,

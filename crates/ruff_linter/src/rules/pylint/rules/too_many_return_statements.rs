@@ -89,6 +89,7 @@ pub(crate) fn too_many_return_statements(
                 max_returns,
             },
             stmt.identifier(),
+            checker.source_file(),
         ))
     } else {
         None

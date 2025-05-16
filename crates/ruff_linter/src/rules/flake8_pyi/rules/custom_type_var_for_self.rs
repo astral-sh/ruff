@@ -184,6 +184,7 @@ pub(crate) fn custom_type_var_instead_of_self(
             typevar_name: custom_typevar.name(checker.source()).to_string(),
         },
         TextRange::new(function_name.end(), function_header_end),
+        checker.source_file(),
     );
 
     diagnostic.try_set_fix(|| {

@@ -122,6 +122,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
             union_kind,
         },
         union.range(),
+        checker.source_file(),
     );
 
     if semantic.has_builtin_binding("type") {

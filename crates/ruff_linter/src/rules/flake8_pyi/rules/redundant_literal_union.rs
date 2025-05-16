@@ -98,6 +98,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
                     builtin_type: literal_type,
                 },
                 typing_literal_expr.range(),
+                checker.source_file(),
             ));
         }
     }

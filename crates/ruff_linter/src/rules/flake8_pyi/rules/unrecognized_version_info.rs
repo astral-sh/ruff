@@ -148,7 +148,11 @@ pub(crate) fn unrecognized_version_info(checker: &Checker, test: &Expr) {
         version_check(checker, expected, test, *op, comparator);
     } else {
         if checker.enabled(Rule::UnrecognizedVersionInfoCheck) {
-            checker.report_diagnostic(Diagnostic::new(UnrecognizedVersionInfoCheck, test.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                UnrecognizedVersionInfoCheck,
+                test.range(),
+                checker.source_file(),
+            ));
         }
     }
 }
@@ -164,8 +168,11 @@ fn version_check(
     if expected == ExpectedComparator::MajorDigit {
         if !is_int_constant(comparator) {
             if checker.enabled(Rule::UnrecognizedVersionInfoCheck) {
-                checker
-                    .report_diagnostic(Diagnostic::new(UnrecognizedVersionInfoCheck, test.range()));
+                checker.report_diagnostic(Diagnostic::new(
+                    UnrecognizedVersionInfoCheck,
+                    test.range(),
+                    checker.source_file(),
+                ));
             }
         }
         return;
@@ -174,7 +181,11 @@ fn version_check(
     // Tuple comparison, e.g., `sys.version_info == (3, 4)`.
     let Expr::Tuple(tuple) = comparator else {
         if checker.enabled(Rule::UnrecognizedVersionInfoCheck) {
-            checker.report_diagnostic(Diagnostic::new(UnrecognizedVersionInfoCheck, test.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                UnrecognizedVersionInfoCheck,
+                test.range(),
+                checker.source_file(),
+            ));
         }
         return;
     };
@@ -183,13 +194,21 @@ fn version_check(
         // All tuple elements must be integers, e.g., `sys.version_info == (3, 4)` instead of
         // `sys.version_info == (3.0, 4)`.
         if checker.enabled(Rule::UnrecognizedVersionInfoCheck) {
-            checker.report_diagnostic(Diagnostic::new(UnrecognizedVersionInfoCheck, test.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                UnrecognizedVersionInfoCheck,
+                test.range(),
+                checker.source_file(),
+            ));
         }
     } else if tuple.len() > 2 {
         // Must compare against major and minor version only, e.g., `sys.version_info == (3, 4)`
         // instead of `sys.version_info == (3, 4, 0)`.
         if checker.enabled(Rule::PatchVersionComparison) {
-            checker.report_diagnostic(Diagnostic::new(PatchVersionComparison, test.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                PatchVersionComparison,
+                test.range(),
+                checker.source_file(),
+            ));
         }
     }
 
@@ -205,6 +224,7 @@ fn version_check(
                 checker.report_diagnostic(Diagnostic::new(
                     WrongTupleLengthVersionComparison { expected_length },
                     test.range(),
+                    checker.source_file(),
                 ));
             }
         }

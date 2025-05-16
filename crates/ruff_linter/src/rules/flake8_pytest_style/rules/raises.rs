@@ -181,6 +181,7 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
                 checker.report_diagnostic(Diagnostic::new(
                     PytestRaisesWithoutException,
                     call.func.range(),
+                    checker.source_file(),
                 ));
             }
         }
@@ -237,6 +238,7 @@ pub(crate) fn complex_raises(checker: &Checker, stmt: &Stmt, items: &[WithItem],
             checker.report_diagnostic(Diagnostic::new(
                 PytestRaisesWithMultipleStatements,
                 stmt.range(),
+                checker.source_file(),
             ));
         }
     }
@@ -269,6 +271,7 @@ fn exception_needs_match(checker: &Checker, exception: &Expr) {
                 exception: qualified_name,
             },
             exception.range(),
+            checker.source_file(),
         ));
     }
 }

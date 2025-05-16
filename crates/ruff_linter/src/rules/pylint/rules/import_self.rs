@@ -44,6 +44,7 @@ pub(crate) fn import_self(alias: &Alias, module_path: Option<&[String]>) -> Opti
                 name: alias.name.to_string(),
             },
             alias.range(),
+            checker.source_file(),
         ));
     }
 
@@ -73,6 +74,7 @@ pub(crate) fn import_from_self(
                     name: format!("{}.{}", imported_module_path, alias.name),
                 },
                 alias.range(),
+                checker.source_file(),
             ));
         }
     }

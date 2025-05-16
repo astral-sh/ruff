@@ -64,6 +64,7 @@ pub(crate) fn banned_import_alias(
                     asname: asname.to_string(),
                 },
                 stmt.range(),
+                checker.source_file(),
             ));
         }
     }

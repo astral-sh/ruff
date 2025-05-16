@@ -70,7 +70,7 @@ pub(crate) fn needless_else(checker: &Checker, stmt: AnyNodeWithOrElse) {
     let edit = Edit::range_deletion(remove_range);
     let fix = Fix::safe_edit(edit);
 
-    let diagnostic = Diagnostic::new(NeedlessElse, else_range);
+    let diagnostic = Diagnostic::new(NeedlessElse, else_range, checker.source_file());
 
     checker.report_diagnostic(diagnostic.with_fix(fix));
 }

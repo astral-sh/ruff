@@ -129,6 +129,7 @@ fn diagnostic_for_argument(
             .arg
             .as_ref()
             .map_or_else(|| keyword.range(), Ranged::range),
+        checker.source_file(),
     );
 
     if let Some(replacement) = replacement {
@@ -289,6 +290,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             replacement: replacement.clone(),
         },
         range,
+        checker.source_file(),
     );
 
     let semantic = checker.semantic();

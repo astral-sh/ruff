@@ -230,6 +230,7 @@ pub(crate) fn unused_private_type_var(checker: &Checker, scope: &Scope) {
                 type_var_like_kind: type_var_like_kind.to_string(),
             },
             binding.range(),
+            checker.source_file(),
         )
         .with_fix(Fix::unsafe_edit(fix::edits::delete_stmt(
             stmt,
@@ -276,6 +277,7 @@ pub(crate) fn unused_private_protocol(checker: &Checker, scope: &Scope) {
                 name: class_def.name.to_string(),
             },
             binding.range(),
+            checker.source_file(),
         ));
     }
 }
@@ -308,6 +310,7 @@ pub(crate) fn unused_private_type_alias(checker: &Checker, scope: &Scope) {
                 name: alias_name.to_string(),
             },
             binding.range(),
+            checker.source_file(),
         ));
     }
 }
@@ -363,6 +366,7 @@ pub(crate) fn unused_private_typed_dict(checker: &Checker, scope: &Scope) {
                 name: class_name.to_string(),
             },
             binding.range(),
+            checker.source_file(),
         ));
     }
 }

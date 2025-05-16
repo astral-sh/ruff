@@ -54,7 +54,11 @@ pub(crate) fn django_extra(checker: &Checker, call: &ast::ExprCall) {
     }
 
     if is_call_insecure(call) {
-        checker.report_diagnostic(Diagnostic::new(DjangoExtra, call.arguments.range()));
+        checker.report_diagnostic(Diagnostic::new(
+            DjangoExtra,
+            call.arguments.range(),
+            checker.source_file(),
+        ));
     }
 }
 

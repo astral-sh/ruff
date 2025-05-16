@@ -193,6 +193,7 @@ pub(crate) fn unused_async(
                 name: name.to_string(),
             },
             function_def.identifier(),
+            checker.source_file(),
         ));
     }
 }

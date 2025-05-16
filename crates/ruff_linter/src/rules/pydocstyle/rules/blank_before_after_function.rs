@@ -131,6 +131,7 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
                     num_lines: blank_lines_before,
                 },
                 docstring.range(),
+                checker.source_file(),
             );
             // Delete the blank line before the docstring.
             diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
@@ -185,6 +186,7 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
                     num_lines: blank_lines_after,
                 },
                 docstring.range(),
+                checker.source_file(),
             );
             // Delete the blank line after the docstring.
             diagnostic.set_fix(Fix::safe_edit(Edit::deletion(

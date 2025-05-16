@@ -76,6 +76,7 @@ pub(crate) fn request_without_timeout(checker: &Checker, call: &ast::ExprCall) {
                         module: module.to_string(),
                     },
                     keyword.range(),
+                    checker.source_file(),
                 ));
             }
         } else if module == "requests" {
@@ -85,6 +86,7 @@ pub(crate) fn request_without_timeout(checker: &Checker, call: &ast::ExprCall) {
                     module: module.to_string(),
                 },
                 call.func.range(),
+                checker.source_file(),
             ));
         }
     }

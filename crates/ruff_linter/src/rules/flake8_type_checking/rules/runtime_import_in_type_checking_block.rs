@@ -204,6 +204,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                             strategy: Strategy::MoveImport,
                         },
                         range,
+                        checker.source_file(),
                     );
                     if let Some(range) = parent_range {
                         diagnostic.set_parent(range.start());
@@ -233,6 +234,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                             strategy: Strategy::QuoteUsages,
                         },
                         range,
+                        checker.source_file(),
                     );
                     if let Some(range) = parent_range {
                         diagnostic.set_parent(range.start());
@@ -258,6 +260,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                             strategy: Strategy::MoveImport,
                         },
                         range,
+                        checker.source_file(),
                     );
                     if let Some(range) = parent_range {
                         diagnostic.set_parent(range.start());

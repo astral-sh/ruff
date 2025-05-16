@@ -72,6 +72,7 @@ pub(crate) fn comparison_with_itself(
                         actual: SourceCodeSnippet::new(actual),
                     },
                     left_name.range(),
+                    checker.source_file(),
                 ));
             }
             // Ex) `id(foo) == id(foo)`
@@ -120,6 +121,7 @@ pub(crate) fn comparison_with_itself(
                             actual: SourceCodeSnippet::new(actual),
                         },
                         left_call.range(),
+                        checker.source_file(),
                     ));
                 }
             }

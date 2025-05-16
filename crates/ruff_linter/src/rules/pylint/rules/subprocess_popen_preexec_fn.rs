@@ -65,7 +65,11 @@ pub(crate) fn subprocess_popen_preexec_fn(checker: &Checker, call: &ast::ExprCal
             .find_keyword("preexec_fn")
             .filter(|keyword| !keyword.value.is_none_literal_expr())
         {
-            checker.report_diagnostic(Diagnostic::new(SubprocessPopenPreexecFn, keyword.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                SubprocessPopenPreexecFn,
+                keyword.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

@@ -187,8 +187,11 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                 Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. }) => {
                     if checker.enabled(Rule::RawStringInException) {
                         if string.len() >= checker.settings.flake8_errmsg.max_string_length {
-                            let mut diagnostic =
-                                Diagnostic::new(RawStringInException, first.range());
+                            let mut diagnostic = Diagnostic::new(
+                                RawStringInException,
+                                first.range(),
+                                checker.source_file(),
+                            );
                             if let Some(indentation) =
                                 whitespace::indentation(checker.source(), stmt)
                             {
@@ -207,7 +210,11 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                 // Check for f-strings.
                 Expr::FString(_) => {
                     if checker.enabled(Rule::FStringInException) {
-                        let mut diagnostic = Diagnostic::new(FStringInException, first.range());
+                        let mut diagnostic = Diagnostic::new(
+                            FStringInException,
+                            first.range(),
+                            checker.source_file(),
+                        );
                         if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
                             diagnostic.set_fix(generate_fix(
                                 stmt,
@@ -227,8 +234,11 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                             func.as_ref()
                         {
                             if attr == "format" && value.is_literal_expr() {
-                                let mut diagnostic =
-                                    Diagnostic::new(DotFormatInException, first.range());
+                                let mut diagnostic = Diagnostic::new(
+                                    DotFormatInException,
+                                    first.range(),
+                                    checker.source_file(),
+                                );
                                 if let Some(indentation) =
                                     whitespace::indentation(checker.source(), stmt)
                                 {

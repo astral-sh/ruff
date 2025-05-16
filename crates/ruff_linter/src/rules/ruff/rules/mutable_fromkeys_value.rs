@@ -87,7 +87,7 @@ pub(crate) fn mutable_fromkeys_value(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(MutableFromkeysValue, call.range());
+    let mut diagnostic = Diagnostic::new(MutableFromkeysValue, call.range(), checker.source_file());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         generate_dict_comprehension(keys, value, checker.generator()),
         call.range(),

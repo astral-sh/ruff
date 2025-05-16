@@ -103,6 +103,7 @@ pub(crate) fn doc_line_too_long(
         Diagnostic::new(
             DocLineTooLong(overlong.width(), limit.value() as usize),
             overlong.range(),
+            checker.source_file(),
         )
     })
 }

@@ -73,7 +73,11 @@ pub(crate) fn try_consider_else(
                         return;
                     }
                 }
-                checker.report_diagnostic(Diagnostic::new(TryConsiderElse, stmt.range()));
+                checker.report_diagnostic(Diagnostic::new(
+                    TryConsiderElse,
+                    stmt.range(),
+                    checker.source_file(),
+                ));
             }
         }
     }

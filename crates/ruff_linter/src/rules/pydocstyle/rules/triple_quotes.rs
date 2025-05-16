@@ -79,8 +79,11 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
     match expected_quote {
         Quote::Single => {
             if !opener.ends_with("'''") {
-                let mut diagnostic =
-                    Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
+                let mut diagnostic = Diagnostic::new(
+                    TripleSingleQuotes { expected_quote },
+                    docstring.range(),
+                    checker.source_file(),
+                );
 
                 let body = docstring.body().as_str();
                 if !body.ends_with('\'') {
@@ -95,8 +98,11 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
         }
         Quote::Double => {
             if !opener.ends_with("\"\"\"") {
-                let mut diagnostic =
-                    Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
+                let mut diagnostic = Diagnostic::new(
+                    TripleSingleQuotes { expected_quote },
+                    docstring.range(),
+                    checker.source_file(),
+                );
 
                 let body = docstring.body().as_str();
                 if !body.ends_with('"') {

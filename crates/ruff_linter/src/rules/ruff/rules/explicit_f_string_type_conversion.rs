@@ -108,7 +108,11 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(ExplicitFStringTypeConversion, expression.range());
+        let mut diagnostic = Diagnostic::new(
+            ExplicitFStringTypeConversion,
+            expression.range(),
+            checker.source_file(),
+        );
         diagnostic.try_set_fix(|| {
             convert_call_to_conversion_flag(f_string, index, checker.locator(), checker.stylist())
         });

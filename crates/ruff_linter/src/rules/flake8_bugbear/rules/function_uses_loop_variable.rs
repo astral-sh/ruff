@@ -310,6 +310,7 @@ pub(crate) fn function_uses_loop_variable(checker: &Checker, node: &Node) {
                             name: name.id.to_string(),
                         },
                         name.range(),
+                        checker.source_file(),
                     ));
                 }
             }

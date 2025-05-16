@@ -43,6 +43,7 @@ pub(crate) fn mixed_spaces_and_tabs(line: &Line) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             MixedSpacesAndTabs,
             TextRange::at(line.start(), indent.text_len()),
+            checker.source_file(),
         ))
     } else {
         None

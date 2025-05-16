@@ -79,6 +79,7 @@ pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr) {
                 replacement: replacement.to_string(),
             },
             expr.range(),
+            checker.source_file(),
         );
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(

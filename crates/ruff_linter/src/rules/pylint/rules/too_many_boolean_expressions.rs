@@ -53,6 +53,7 @@ pub(crate) fn too_many_boolean_expressions(checker: &Checker, stmt: &StmtIf) {
                     max_expressions: checker.settings.pylint.max_bool_expr,
                 },
                 bool_op.range(),
+                checker.source_file(),
             ));
         }
     }
@@ -67,6 +68,7 @@ pub(crate) fn too_many_boolean_expressions(checker: &Checker, stmt: &StmtIf) {
                         max_expressions: checker.settings.pylint.max_bool_expr,
                     },
                     bool_op.range(),
+                    checker.source_file(),
                 ));
             }
         }

@@ -74,7 +74,8 @@ pub(crate) fn regex_flag_alias(checker: &Checker, expr: &Expr) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(RegexFlagAlias { flag }, expr.range());
+    let mut diagnostic =
+        Diagnostic::new(RegexFlagAlias { flag }, expr.range(), checker.source_file());
     diagnostic.try_set_fix(|| {
         let (edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("re", flag.full_name()),

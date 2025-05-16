@@ -120,13 +120,21 @@ pub(crate) fn todos(diagnostics: &mut Vec<Diagnostic>, directive_ranges: &[TodoC
             .iter()
             .map(|TodoComment { directive, .. }| match directive.kind {
                 // FIX001
-                TodoDirectiveKind::Fixme => Diagnostic::new(LineContainsFixme, directive.range),
+                TodoDirectiveKind::Fixme => {
+                    Diagnostic::new(LineContainsFixme, directive.range, checker.source_file())
+                }
                 // FIX002
-                TodoDirectiveKind::Hack => Diagnostic::new(LineContainsHack, directive.range),
+                TodoDirectiveKind::Hack => {
+                    Diagnostic::new(LineContainsHack, directive.range, checker.source_file())
+                }
                 // FIX003
-                TodoDirectiveKind::Todo => Diagnostic::new(LineContainsTodo, directive.range),
+                TodoDirectiveKind::Todo => {
+                    Diagnostic::new(LineContainsTodo, directive.range, checker.source_file())
+                }
                 // FIX004
-                TodoDirectiveKind::Xxx => Diagnostic::new(LineContainsXxx, directive.range),
+                TodoDirectiveKind::Xxx => {
+                    Diagnostic::new(LineContainsXxx, directive.range, checker.source_file())
+                }
             }),
     );
 }

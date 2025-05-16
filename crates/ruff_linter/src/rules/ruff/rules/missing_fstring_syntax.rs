@@ -116,8 +116,9 @@ pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLit
     }
 
     if should_be_fstring(literal, checker.locator(), semantic) {
-        let diagnostic = Diagnostic::new(MissingFStringSyntax, literal.range())
-            .with_fix(fix_fstring_syntax(literal.range()));
+        let diagnostic =
+            Diagnostic::new(MissingFStringSyntax, literal.range(), checker.source_file())
+                .with_fix(fix_fstring_syntax(literal.range()));
         checker.report_diagnostic(diagnostic);
     }
 }

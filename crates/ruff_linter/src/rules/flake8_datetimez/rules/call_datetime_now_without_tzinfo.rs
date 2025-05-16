@@ -95,5 +95,6 @@ pub(crate) fn call_datetime_now_without_tzinfo(checker: &Checker, call: &ast::Ex
     checker.report_diagnostic(Diagnostic::new(
         CallDatetimeNowWithoutTzinfo(antipattern),
         call.range,
+        checker.source_file(),
     ));
 }

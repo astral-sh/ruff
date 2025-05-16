@@ -80,6 +80,7 @@ pub(crate) fn too_many_nested_blocks(checker: &Checker, stmt: &Stmt) {
             max_nested_blocks,
         },
         checker.semantic().statement(root_id).range(),
+        checker.source_file(),
     ));
 }
 

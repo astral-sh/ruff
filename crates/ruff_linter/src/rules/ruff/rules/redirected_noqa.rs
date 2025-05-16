@@ -77,6 +77,7 @@ fn build_diagnostics(diagnostics: &mut Vec<Diagnostic>, codes: &Codes<'_>) {
                     target: redirected.to_string(),
                 },
                 code.range(),
+                checker.source_file(),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 redirected.to_string(),

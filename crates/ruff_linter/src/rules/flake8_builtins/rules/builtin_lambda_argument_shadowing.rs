@@ -51,6 +51,7 @@ pub(crate) fn builtin_lambda_argument_shadowing(checker: &Checker, lambda: &Expr
                     name: name.to_string(),
                 },
                 name.range(),
+                checker.source_file(),
             ));
         }
     }

@@ -88,6 +88,7 @@ fn visit_assignments(left: &Expr, right: &Expr, diagnostics: &mut Vec<Diagnostic
                     name: lhs_name.to_string(),
                 },
                 left.range(),
+                checker.source_file(),
             ));
         }
         _ => {}

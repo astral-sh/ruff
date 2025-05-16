@@ -95,7 +95,7 @@ pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(QuadraticListSummation, *range);
+    let mut diagnostic = Diagnostic::new(QuadraticListSummation, *range, checker.source_file());
     diagnostic.try_set_fix(|| convert_to_reduce(iterable, call, checker));
     checker.report_diagnostic(diagnostic);
 }

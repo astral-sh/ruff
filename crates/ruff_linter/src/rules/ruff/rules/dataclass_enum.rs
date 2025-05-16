@@ -70,7 +70,7 @@ pub(crate) fn dataclass_enum(checker: &Checker, class_def: &StmtClassDef) {
         return;
     }
 
-    let diagnostic = Diagnostic::new(DataclassEnum, decorator.range);
+    let diagnostic = Diagnostic::new(DataclassEnum, decorator.range, checker.source_file());
 
     checker.report_diagnostic(diagnostic);
 }

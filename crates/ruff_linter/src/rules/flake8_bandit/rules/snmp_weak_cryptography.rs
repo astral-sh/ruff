@@ -52,7 +52,11 @@ pub(crate) fn snmp_weak_cryptography(checker: &Checker, call: &ast::ExprCall) {
                 )
             })
         {
-            checker.report_diagnostic(Diagnostic::new(SnmpWeakCryptography, call.func.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                SnmpWeakCryptography,
+                call.func.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

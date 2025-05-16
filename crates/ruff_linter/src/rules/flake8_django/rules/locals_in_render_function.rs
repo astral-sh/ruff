@@ -64,6 +64,7 @@ pub(crate) fn locals_in_render_function(checker: &Checker, call: &ast::ExprCall)
             checker.report_diagnostic(Diagnostic::new(
                 DjangoLocalsInRenderFunction,
                 argument.range(),
+                checker.source_file(),
             ));
         }
     }

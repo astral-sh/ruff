@@ -68,6 +68,7 @@ fn check_expr(checker: &Checker, expr: &Expr, names: &mut Vec<Name>) {
                         name: id.to_string(),
                     },
                     expr.range(),
+                    checker.source_file(),
                 ));
             }
             names.push(id.clone());

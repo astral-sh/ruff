@@ -96,6 +96,7 @@ fn create_diagnostic(
             replacement: mode.to_string(),
         },
         mode_arg.range(),
+        checker.source_file(),
     );
 
     if mode.is_empty() {

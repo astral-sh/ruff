@@ -307,7 +307,11 @@ pub(crate) fn todos(
 
         if !has_issue_link {
             // TD003
-            diagnostics.push(Diagnostic::new(MissingTodoLink, directive.range));
+            diagnostics.push(Diagnostic::new(
+                MissingTodoLink,
+                directive.range,
+                checker.source_file(),
+            ));
         }
     }
 }
@@ -325,6 +329,7 @@ fn directive_errors(diagnostics: &mut Vec<Diagnostic>, directive: &TodoDirective
                 tag: directive.content.to_string(),
             },
             directive.range,
+            checker.source_file(),
         );
 
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
@@ -340,6 +345,7 @@ fn directive_errors(diagnostics: &mut Vec<Diagnostic>, directive: &TodoDirective
                 tag: directive.content.to_string(),
             },
             directive.range,
+            checker.source_file(),
         ));
     }
 }
@@ -367,13 +373,21 @@ fn static_errors(
                 TextSize::try_from(end_index).unwrap()
             } else {
                 // TD002
-                diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
+                diagnostics.push(Diagnostic::new(
+                    MissingTodoAuthor,
+                    directive.range,
+                    checker.source_file(),
+                ));
 
                 TextSize::new(0)
             }
         } else {
             // TD002
-            diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
+            diagnostics.push(Diagnostic::new(
+                MissingTodoAuthor,
+                directive.range,
+                checker.source_file(),
+            ));
 
             TextSize::new(0)
         };
@@ -382,18 +396,34 @@ fn static_errors(
     if let Some(after_colon) = after_author.strip_prefix(':') {
         if after_colon.is_empty() {
             // TD005
-            diagnostics.push(Diagnostic::new(MissingTodoDescription, directive.range));
+            diagnostics.push(Diagnostic::new(
+                MissingTodoDescription,
+                directive.range,
+                checker.source_file(),
+            ));
         } else if !after_colon.starts_with(char::is_whitespace) {
             // TD007
-            diagnostics.push(Diagnostic::new(MissingSpaceAfterTodoColon, directive.range));
+            diagnostics.push(Diagnostic::new(
+                MissingSpaceAfterTodoColon,
+                directive.range,
+                checker.source_file(),
+            ));
         }
     } else {
         // TD004
-        diagnostics.push(Diagnostic::new(MissingTodoColon, directive.range));
+        diagnostics.push(Diagnostic::new(
+            MissingTodoColon,
+            directive.range,
+            checker.source_file(),
+        ));
 
         if after_author.is_empty() {
             // TD005
-            diagnostics.push(Diagnostic::new(MissingTodoDescription, directive.range));
+            diagnostics.push(Diagnostic::new(
+                MissingTodoDescription,
+                directive.range,
+                checker.source_file(),
+            ));
         }
     }
 }

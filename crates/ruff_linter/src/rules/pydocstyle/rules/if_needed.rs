@@ -85,6 +85,7 @@ pub(crate) fn if_needed(checker: &Checker, docstring: &Docstring) {
         checker.report_diagnostic(Diagnostic::new(
             OverloadWithDocstring,
             function.identifier(),
+            checker.source_file(),
         ));
     }
 }

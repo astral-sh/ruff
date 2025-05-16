@@ -76,7 +76,8 @@ pub(crate) fn whitespace_before_parameters(line: &LogicalLine, context: &mut Log
             let end = token.end() - TextSize::from(1);
             let kind: WhitespaceBeforeParameters = WhitespaceBeforeParameters { bracket: kind };
 
-            let mut diagnostic = Diagnostic::new(kind, TextRange::new(start, end));
+            let mut diagnostic =
+                Diagnostic::new(kind, TextRange::new(start, end), checker.source_file());
             diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
             context.push_diagnostic(diagnostic);
         }

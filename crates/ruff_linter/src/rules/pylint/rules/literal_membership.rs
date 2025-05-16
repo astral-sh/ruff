@@ -101,7 +101,7 @@ pub(crate) fn literal_membership(checker: &Checker, compare: &ast::ExprCompare) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(LiteralMembership, right.range());
+    let mut diagnostic = Diagnostic::new(LiteralMembership, right.range(), checker.source_file());
 
     let literal = checker.locator().slice(right);
     let set = format!("{{{}}}", &literal[1..literal.len() - 1]);

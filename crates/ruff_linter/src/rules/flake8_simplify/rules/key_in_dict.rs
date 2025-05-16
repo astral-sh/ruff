@@ -108,6 +108,7 @@ fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, pa
             operator: operator.as_str().to_string(),
         },
         TextRange::new(left_range.start(), right_range.end()),
+        checker.source_file(),
     );
     // Delete from the start of the dot to the end of the expression.
     if let Some(dot) = SimpleTokenizer::starts_at(value.end(), checker.locator().contents())

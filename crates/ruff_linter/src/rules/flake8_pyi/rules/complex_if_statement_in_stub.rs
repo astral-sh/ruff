@@ -48,12 +48,20 @@ pub(crate) fn complex_if_statement_in_stub(checker: &Checker, test: &Expr) {
         left, comparators, ..
     }) = test
     else {
-        checker.report_diagnostic(Diagnostic::new(ComplexIfStatementInStub, test.range()));
+        checker.report_diagnostic(Diagnostic::new(
+            ComplexIfStatementInStub,
+            test.range(),
+            checker.source_file(),
+        ));
         return;
     };
 
     if comparators.len() != 1 {
-        checker.report_diagnostic(Diagnostic::new(ComplexIfStatementInStub, test.range()));
+        checker.report_diagnostic(Diagnostic::new(
+            ComplexIfStatementInStub,
+            test.range(),
+            checker.source_file(),
+        ));
         return;
     }
 
@@ -74,5 +82,9 @@ pub(crate) fn complex_if_statement_in_stub(checker: &Checker, test: &Expr) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(ComplexIfStatementInStub, test.range()));
+    checker.report_diagnostic(Diagnostic::new(
+        ComplexIfStatementInStub,
+        test.range(),
+        checker.source_file(),
+    ));
 }

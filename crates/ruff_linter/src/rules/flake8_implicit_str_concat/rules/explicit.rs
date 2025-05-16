@@ -71,7 +71,11 @@ pub(crate) fn explicit(
                 Expr::FString(_) | Expr::StringLiteral(_) | Expr::BytesLiteral(_)
             ) && locator.contains_line_break(*range)
             {
-                return Some(Diagnostic::new(ExplicitStringConcatenation, expr.range()));
+                return Some(Diagnostic::new(
+                    ExplicitStringConcatenation,
+                    expr.range(),
+                    checker.source_file(),
+                ));
             }
         }
     }

@@ -78,6 +78,7 @@ pub(crate) fn re_sub_positional_args(checker: &Checker, call: &ast::ExprCall) {
         checker.report_diagnostic(Diagnostic::new(
             ReSubPositionalArgs { method },
             call.range(),
+            checker.source_file(),
         ));
     }
 }

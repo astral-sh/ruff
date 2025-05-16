@@ -58,6 +58,10 @@ pub(crate) fn invalid_envvar_value(checker: &Checker, call: &ast::ExprCall) {
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(InvalidEnvvarValue, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(
+            InvalidEnvvarValue,
+            expr.range(),
+            checker.source_file(),
+        ));
     }
 }

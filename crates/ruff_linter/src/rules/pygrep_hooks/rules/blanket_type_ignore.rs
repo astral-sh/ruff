@@ -95,6 +95,7 @@ pub(crate) fn blanket_type_ignore(
                     diagnostics.push(Diagnostic::new(
                         BlanketTypeIgnore,
                         range.add_start(TextSize::try_from(start).unwrap()),
+                        checker.source_file(),
                     ));
                 }
             }

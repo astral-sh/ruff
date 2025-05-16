@@ -55,7 +55,11 @@ impl Violation for BidirectionalUnicode {
 pub(crate) fn bidirectional_unicode(line: &Line) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     if line.contains(BIDI_UNICODE) {
-        diagnostics.push(Diagnostic::new(BidirectionalUnicode, line.full_range()));
+        diagnostics.push(Diagnostic::new(
+            BidirectionalUnicode,
+            line.full_range(),
+            checker.source_file(),
+        ));
     }
     diagnostics
 }

@@ -130,6 +130,7 @@ pub(crate) fn type_bivariance(checker: &Checker, value: &Expr) {
                 param_name: type_param_name(arguments).map(ToString::to_string),
             },
             func.range(),
+            checker.source_file(),
         ));
     }
 }

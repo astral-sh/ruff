@@ -61,7 +61,7 @@ pub(crate) fn parameter_with_default_argument(checker: &Checker, function_def: &
         };
         let parameter_name = parameter.name().to_string();
         let kind = PytestParameterWithDefaultArgument { parameter_name };
-        let diagnostic = Diagnostic::new(kind, default.range());
+        let diagnostic = Diagnostic::new(kind, default.range(), checker.source_file());
         let edit = Edit::deletion(parameter.parameter.end(), parameter.end());
         let fix = Fix::display_only_edit(edit);
         checker.report_diagnostic(diagnostic.with_fix(fix));

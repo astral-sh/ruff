@@ -131,6 +131,7 @@ pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDef)
             name: class_def.name.to_string(),
         },
         class_def.identifier(),
+        checker.source_file(),
     );
 
     // If the base classes are _exactly_ `str` and `enum.Enum`, apply a fix.

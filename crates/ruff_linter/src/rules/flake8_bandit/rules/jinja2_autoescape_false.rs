@@ -73,6 +73,7 @@ pub(crate) fn jinja2_autoescape_false(checker: &Checker, call: &ast::ExprCall) {
                             checker.report_diagnostic(Diagnostic::new(
                                 Jinja2AutoescapeFalse { value: true },
                                 keyword.range(),
+                                checker.source_file(),
                             ));
                         }
                     }
@@ -80,12 +81,14 @@ pub(crate) fn jinja2_autoescape_false(checker: &Checker, call: &ast::ExprCall) {
                 _ => checker.report_diagnostic(Diagnostic::new(
                     Jinja2AutoescapeFalse { value: true },
                     keyword.range(),
+                    checker.source_file(),
                 )),
             }
         } else {
             checker.report_diagnostic(Diagnostic::new(
                 Jinja2AutoescapeFalse { value: false },
                 call.func.range(),
+                checker.source_file(),
             ));
         }
     }

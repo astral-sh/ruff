@@ -89,6 +89,7 @@ pub(crate) fn blank_after_summary(checker: &Checker, docstring: &Docstring) {
                 num_lines: blanks_count,
             },
             docstring.range(),
+            checker.source_file(),
         );
         if blanks_count > 1 {
             let mut lines = UniversalNewlineIterator::with_offset(&body, body.start());

@@ -80,6 +80,7 @@ pub(crate) fn read_whole_file(checker: &Checker, with: &ast::StmtWith) {
                     suggestion: make_suggestion(open, checker.generator()),
                 },
                 open.item.range(),
+                checker.source_file(),
             )
         })
         .collect();

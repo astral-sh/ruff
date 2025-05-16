@@ -112,6 +112,7 @@ pub(crate) fn stdlib_module_shadowing(
             name: module_name.to_string(),
         },
         TextRange::default(),
+        checker.source_file(),
     ))
 }
 

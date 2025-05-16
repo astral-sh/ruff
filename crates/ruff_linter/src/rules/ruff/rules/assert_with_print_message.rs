@@ -62,7 +62,8 @@ pub(crate) fn assert_with_print_message(checker: &Checker, stmt: &ast::StmtAsser
 
         if semantic.match_builtin_expr(&call.func, "print") {
             // This is the confirmed rule condition
-            let mut diagnostic = Diagnostic::new(AssertWithPrintMessage, call.range());
+            let mut diagnostic =
+                Diagnostic::new(AssertWithPrintMessage, call.range(), checker.source_file());
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().stmt(&Stmt::Assert(ast::StmtAssert {
                     test: stmt.test.clone(),

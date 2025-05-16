@@ -118,6 +118,7 @@ fn check_super_slots(
                         slot_name: slot.name.to_string(),
                     },
                     slot.range(),
+                    checker.source_file(),
                 ));
             }
             None

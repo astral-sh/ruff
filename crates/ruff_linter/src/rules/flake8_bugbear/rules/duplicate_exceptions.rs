@@ -150,6 +150,7 @@ fn duplicate_handler_exceptions<'a>(
                         .collect::<Vec<String>>(),
                 },
                 expr.range(),
+                checker.source_file(),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 // Single exceptions don't require parentheses, but since we're _removing_
@@ -223,6 +224,7 @@ pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]
                         is_star,
                     },
                     expr.range(),
+                    checker.source_file(),
                 ));
             }
         }

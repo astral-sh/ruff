@@ -96,6 +96,7 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
             has_maxlen: maxlen.is_some(),
         },
         deque.range,
+        checker.source_file(),
     );
 
     diagnostic.set_fix(fix_unnecessary_literal_in_deque(checker, deque, maxlen));

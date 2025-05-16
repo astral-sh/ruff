@@ -118,9 +118,9 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
                     }
                 }
             }
-            Diagnostic::new(Print, call.func.range())
+            Diagnostic::new(Print, call.func.range(), checker.source_file())
         }
-        ["pprint", "pprint"] => Diagnostic::new(PPrint, call.func.range()),
+        ["pprint", "pprint"] => Diagnostic::new(PPrint, call.func.range(), checker.source_file()),
         _ => return,
     };
 

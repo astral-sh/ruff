@@ -110,7 +110,11 @@ pub(crate) fn loop_iterator_mutation(checker: &Checker, stmt_for: &StmtFor) {
         let name = UnqualifiedName::from_expr(iter)
             .map(|name| name.to_string())
             .map(SourceCodeSnippet::new);
-        checker.report_diagnostic(Diagnostic::new(LoopIteratorMutation { name }, *mutation));
+        checker.report_diagnostic(Diagnostic::new(
+            LoopIteratorMutation { name },
+            *mutation,
+            checker.source_file(),
+        ));
     }
 }
 

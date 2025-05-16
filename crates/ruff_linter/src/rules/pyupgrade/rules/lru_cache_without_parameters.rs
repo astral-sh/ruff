@@ -77,6 +77,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &Checker, decorator_list: &[
             let mut diagnostic = Diagnostic::new(
                 LRUCacheWithoutParameters,
                 TextRange::new(func.end(), decorator.end()),
+                checker.source_file(),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(arguments.range())));
             checker.report_diagnostic(diagnostic);

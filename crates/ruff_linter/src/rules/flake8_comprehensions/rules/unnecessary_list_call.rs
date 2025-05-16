@@ -74,7 +74,7 @@ pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprC
     if !checker.semantic().has_builtin_binding("list") {
         return;
     }
-    let mut diagnostic = Diagnostic::new(UnnecessaryListCall, expr.range());
+    let mut diagnostic = Diagnostic::new(UnnecessaryListCall, expr.range(), checker.source_file());
     diagnostic.try_set_fix(|| {
         fixes::fix_unnecessary_list_call(expr, checker.locator(), checker.stylist())
             .map(Fix::unsafe_edit)

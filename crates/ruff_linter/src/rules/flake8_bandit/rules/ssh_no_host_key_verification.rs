@@ -81,6 +81,7 @@ pub(crate) fn ssh_no_host_key_verification(checker: &Checker, call: &ExprCall) {
         checker.report_diagnostic(Diagnostic::new(
             SSHNoHostKeyVerification,
             policy_argument.range(),
+            checker.source_file(),
         ));
     }
 }

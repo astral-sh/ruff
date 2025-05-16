@@ -64,6 +64,7 @@ pub(crate) fn default_except_not_last(
             return Some(Diagnostic::new(
                 DefaultExceptNotLast,
                 except(handler, locator.contents()),
+                checker.source_file(),
             ));
         }
     }

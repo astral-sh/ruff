@@ -20,6 +20,7 @@ pub(crate) fn unresolved_references(checker: &Checker) {
                         name: reference.name(checker.source()).to_string(),
                     },
                     reference.range(),
+                    checker.source_file(),
                 ));
             }
         } else {
@@ -48,6 +49,7 @@ pub(crate) fn unresolved_references(checker: &Checker) {
                         minor_version_builtin_added: version_builtin_was_added(symbol_name),
                     },
                     reference.range(),
+                    checker.source_file(),
                 ));
             }
         }

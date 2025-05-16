@@ -166,6 +166,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             reason: Reason::BytesLiteral,
                         },
                         call.range(),
+                        checker.source_file(),
                     );
                     diagnostic.set_fix(replace_with_bytes_literal(
                         checker.locator(),
@@ -181,6 +182,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             reason: Reason::DefaultArgument,
                         },
                         call.range(),
+                        checker.source_file(),
                     );
                     diagnostic.try_set_fix(|| {
                         remove_argument(
@@ -199,6 +201,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             reason: Reason::DefaultArgument,
                         },
                         call.range(),
+                        checker.source_file(),
                     );
                     diagnostic.try_set_fix(|| {
                         remove_argument(
@@ -224,6 +227,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             reason: Reason::DefaultArgument,
                         },
                         call.range(),
+                        checker.source_file(),
                     );
                     diagnostic.try_set_fix(|| {
                         remove_argument(
@@ -242,6 +246,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             reason: Reason::DefaultArgument,
                         },
                         call.range(),
+                        checker.source_file(),
                     );
                     diagnostic.try_set_fix(|| {
                         remove_argument(

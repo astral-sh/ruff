@@ -87,6 +87,7 @@ pub(crate) fn blanket_noqa(
                     file_exemption: true,
                 },
                 line.range(),
+                checker.source_file(),
             ));
         }
     }
@@ -111,6 +112,7 @@ pub(crate) fn blanket_noqa(
                         file_exemption: false,
                     },
                     TextRange::new(all.start(), end),
+                    checker.source_file(),
                 );
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(':'.to_string(), start)));
                 diagnostics.push(diagnostic);
@@ -122,6 +124,7 @@ pub(crate) fn blanket_noqa(
                         file_exemption: false,
                     },
                     all.range(),
+                    checker.source_file(),
                 ));
             }
         }

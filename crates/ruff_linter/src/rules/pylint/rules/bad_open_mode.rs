@@ -71,6 +71,7 @@ pub(crate) fn bad_open_mode(checker: &Checker, call: &ast::ExprCall) {
             mode: value.to_string(),
         },
         mode.range(),
+        checker.source_file(),
     ));
 }
 

@@ -84,7 +84,11 @@ pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCal
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(InvalidGetLoggerArgument, expr.range());
+    let mut diagnostic = Diagnostic::new(
+        InvalidGetLoggerArgument,
+        expr.range(),
+        checker.source_file(),
+    );
     if checker.semantic().has_builtin_binding("__name__") {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             "__name__".to_string(),

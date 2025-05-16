@@ -731,6 +731,7 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
                 deprecation: Deprecation::WithoutRename(operation),
             },
             import_from_stmt.range(),
+            checker.source_file(),
         );
         if let Some(content) = fix {
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
@@ -747,6 +748,7 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
                 deprecation: Deprecation::WithRename(operation),
             },
             import_from_stmt.range(),
+            checker.source_file(),
         );
         checker.report_diagnostic(diagnostic);
     }

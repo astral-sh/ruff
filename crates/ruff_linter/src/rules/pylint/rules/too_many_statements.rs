@@ -149,6 +149,7 @@ pub(crate) fn too_many_statements(
                 max_statements,
             },
             stmt.identifier(),
+            checker.source_file(),
         ))
     } else {
         None

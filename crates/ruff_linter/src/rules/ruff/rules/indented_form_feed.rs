@@ -67,5 +67,9 @@ pub(crate) fn indented_form_feed(line: &Line) -> Option<Diagnostic> {
     let absolute_index = line.start() + TextSize::new(relative_index);
     let range = TextRange::at(absolute_index, 1.into());
 
-    Some(Diagnostic::new(IndentedFormFeed, range))
+    Some(Diagnostic::new(
+        IndentedFormFeed,
+        range,
+        checker.source_file(),
+    ))
 }

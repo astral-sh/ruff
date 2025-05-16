@@ -126,7 +126,11 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
         return None;
     }
 
-    let mut diagnostic = Diagnostic::new(PrivateTypeParameter { kind }, binding.range);
+    let mut diagnostic = Diagnostic::new(
+        PrivateTypeParameter { kind },
+        binding.range,
+        checker.source_file(),
+    );
 
     let new_name = old_name.trim_start_matches('_');
 

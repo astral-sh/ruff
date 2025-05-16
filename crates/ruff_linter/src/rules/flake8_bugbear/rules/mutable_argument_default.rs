@@ -111,7 +111,11 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
                 is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
             })
         {
-            let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
+            let mut diagnostic = Diagnostic::new(
+                MutableArgumentDefault,
+                default.range(),
+                checker.source_file(),
+            );
 
             // If the function body is on the same line as the function def, do not fix
             if let Some(fix) = move_initialization(

@@ -115,6 +115,7 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &Checker, subscript: &
         Diagnostic::new(
             IncorrectlyParenthesizedTupleInSubscript { prefer_parentheses },
             source_range,
+            checker.source_file(),
         )
         .with_fix(Fix::safe_edit(edit)),
     );

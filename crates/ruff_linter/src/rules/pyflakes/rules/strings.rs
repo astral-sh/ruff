@@ -539,7 +539,11 @@ pub(crate) fn percent_format_expected_mapping(
             | Expr::ListComp(_)
             | Expr::SetComp(_)
             | Expr::Generator(_) => {
-                checker.report_diagnostic(Diagnostic::new(PercentFormatExpectedMapping, location));
+                checker.report_diagnostic(Diagnostic::new(
+                    PercentFormatExpectedMapping,
+                    location,
+                    checker.source_file(),
+                ));
             }
             _ => {}
         }
@@ -554,7 +558,11 @@ pub(crate) fn percent_format_expected_sequence(
     location: TextRange,
 ) {
     if summary.num_positional > 1 && matches!(right, Expr::Dict(_) | Expr::DictComp(_)) {
-        checker.report_diagnostic(Diagnostic::new(PercentFormatExpectedSequence, location));
+        checker.report_diagnostic(Diagnostic::new(
+            PercentFormatExpectedSequence,
+            location,
+            checker.source_file(),
+        ));
     }
 }
 
@@ -602,6 +610,7 @@ pub(crate) fn percent_format_extra_named_arguments(
     let mut diagnostic = Diagnostic::new(
         PercentFormatExtraNamedArguments { missing: names },
         location,
+        checker.source_file(),
     );
     let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
     diagnostic.try_set_fix(|| {
@@ -659,6 +668,7 @@ pub(crate) fn percent_format_missing_arguments(
                 missing: missing.iter().map(|&s| s.clone()).collect(),
             },
             location,
+            checker.source_file(),
         ));
     }
 }
@@ -673,6 +683,7 @@ pub(crate) fn percent_format_mixed_positional_and_named(
         checker.report_diagnostic(Diagnostic::new(
             PercentFormatMixedPositionalAndNamed,
             location,
+            checker.source_file(),
         ));
     }
 }
@@ -704,6 +715,7 @@ pub(crate) fn percent_format_positional_count_mismatch(
                     got: found,
                 },
                 location,
+                checker.source_file(),
             ));
         }
     }
@@ -718,8 +730,11 @@ pub(crate) fn percent_format_star_requires_sequence(
 ) {
     if summary.starred {
         match right {
-            Expr::Dict(_) | Expr::DictComp(_) => checker
-                .report_diagnostic(Diagnostic::new(PercentFormatStarRequiresSequence, location)),
+            Expr::Dict(_) | Expr::DictComp(_) => checker.report_diagnostic(Diagnostic::new(
+                PercentFormatStarRequiresSequence,
+                location,
+                checker.source_file(),
+            )),
             _ => {}
         }
     }
@@ -760,6 +775,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     let mut diagnostic = Diagnostic::new(
         StringDotFormatExtraNamedArguments { missing: names },
         call.range(),
+        checker.source_file(),
     );
     let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
     diagnostic.try_set_fix(|| {
@@ -827,6 +843,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
                 .collect::<Vec<String>>(),
         },
         call.range(),
+        checker.source_file(),
     );
 
     if is_contiguous_from_end(&missing, args) {
@@ -883,6 +900,7 @@ pub(crate) fn string_dot_format_missing_argument(
         checker.report_diagnostic(Diagnostic::new(
             StringDotFormatMissingArguments { missing },
             call.range(),
+            checker.source_file(),
         ));
     }
 }
@@ -897,6 +915,7 @@ pub(crate) fn string_dot_format_mixing_automatic(
         checker.report_diagnostic(Diagnostic::new(
             StringDotFormatMixingAutomatic,
             call.range(),
+            checker.source_file(),
         ));
     }
 }

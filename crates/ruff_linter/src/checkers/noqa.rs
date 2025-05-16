@@ -131,8 +131,11 @@ pub(crate) fn check_noqa(
                 Directive::All(directive) => {
                     if matches.is_empty() {
                         let edit = delete_comment(directive.range(), locator);
-                        let mut diagnostic =
-                            Diagnostic::new(UnusedNOQA { codes: None }, directive.range());
+                        let mut diagnostic = Diagnostic::new(
+                            UnusedNOQA { codes: None },
+                            directive.range(),
+                            checker.source_file(),
+                        );
                         diagnostic.set_fix(Fix::safe_edit(edit));
 
                         diagnostics.push(diagnostic);
@@ -230,6 +233,7 @@ pub(crate) fn check_noqa(
                                 }),
                             },
                             directive.range(),
+                            checker.source_file(),
                         );
                         diagnostic.set_fix(Fix::safe_edit(edit));
                         diagnostics.push(diagnostic);

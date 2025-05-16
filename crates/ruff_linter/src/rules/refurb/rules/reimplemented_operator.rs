@@ -118,6 +118,7 @@ pub(crate) fn reimplemented_operator(checker: &Checker, target: &FunctionLike) {
             target: target.kind(),
         },
         target.range(),
+        checker.source_file(),
     );
     diagnostic.try_set_optional_fix(|| fix);
     checker.report_diagnostic(diagnostic);

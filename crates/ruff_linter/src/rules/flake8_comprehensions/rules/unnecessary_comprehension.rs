@@ -90,6 +90,7 @@ fn add_diagnostic(checker: &Checker, expr: &Expr) {
             kind: comprehension_kind,
         },
         expr.range(),
+        checker.source_file(),
     );
     diagnostic.try_set_fix(|| {
         fixes::fix_unnecessary_comprehension(expr, checker.locator(), checker.stylist())

@@ -67,5 +67,9 @@ pub(crate) fn dunder_function_name(
     if ignore_names.matches(name) {
         return None;
     }
-    Some(Diagnostic::new(DunderFunctionName, stmt.identifier()))
+    Some(Diagnostic::new(
+        DunderFunctionName,
+        stmt.identifier(),
+        checker.source_file(),
+    ))
 }

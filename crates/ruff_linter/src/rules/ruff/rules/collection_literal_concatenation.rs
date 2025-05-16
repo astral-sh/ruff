@@ -215,6 +215,7 @@ pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
             expression: SourceCodeSnippet::new(contents.clone()),
         },
         expr.range(),
+        checker.source_file(),
     );
     if !checker
         .comment_ranges()

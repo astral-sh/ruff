@@ -185,6 +185,7 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                                     ),
                                 },
                                 key.range(),
+                                checker.source_file(),
                             );
                             if !seen_values.insert(comparable_value) {
                                 diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
@@ -216,6 +217,7 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                                     name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
                                 },
                                 key.range(),
+                                checker.source_file(),
                             );
                             let comparable_value: ComparableExpr = dict.value(i).into();
                             if !seen_values.insert(comparable_value) {

@@ -70,7 +70,7 @@ pub(crate) fn useless_else_on_loop(checker: &Checker, stmt: &Stmt, body: &[Stmt]
 
     let else_range = identifier::else_(stmt, checker.locator().contents()).expect("else clause");
 
-    let mut diagnostic = Diagnostic::new(UselessElseOnLoop, else_range);
+    let mut diagnostic = Diagnostic::new(UselessElseOnLoop, else_range, checker.source_file());
     diagnostic.try_set_fix(|| {
         remove_else(
             stmt,

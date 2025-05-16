@@ -79,5 +79,6 @@ pub(crate) fn error_suffix_on_exception_name(
             name: name.to_string(),
         },
         class_def.identifier(),
+        checker.source_file(),
     ))
 }

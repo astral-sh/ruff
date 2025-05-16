@@ -90,7 +90,8 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     }) = checker.semantic().current_statement()
     {
         if expr == child.as_ref() {
-            let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());
+            let mut diagnostic =
+                Diagnostic::new(SetAttrWithConstant, expr.range(), checker.source_file());
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 assignment(obj, name.to_str(), value, checker.generator()),
                 expr.range(),

@@ -157,7 +157,11 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(SuperCallWithParameters, call.arguments.range());
+    let mut diagnostic = Diagnostic::new(
+        SuperCallWithParameters,
+        call.arguments.range(),
+        checker.source_file(),
+    );
     diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
         call.arguments.start() + TextSize::new(1),
         call.arguments.end() - TextSize::new(1),

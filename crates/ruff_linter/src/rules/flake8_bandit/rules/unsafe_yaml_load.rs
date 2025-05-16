@@ -85,12 +85,14 @@ pub(crate) fn unsafe_yaml_load(checker: &Checker, call: &ast::ExprCall) {
                 checker.report_diagnostic(Diagnostic::new(
                     UnsafeYAMLLoad { loader },
                     loader_arg.range(),
+                    checker.source_file(),
                 ));
             }
         } else {
             checker.report_diagnostic(Diagnostic::new(
                 UnsafeYAMLLoad { loader: None },
                 call.func.range(),
+                checker.source_file(),
             ));
         }
     }

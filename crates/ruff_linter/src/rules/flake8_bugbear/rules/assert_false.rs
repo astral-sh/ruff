@@ -79,7 +79,7 @@ pub(crate) fn assert_false(checker: &Checker, stmt: &Stmt, test: &Expr, msg: Opt
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(AssertFalse, test.range());
+    let mut diagnostic = Diagnostic::new(AssertFalse, test.range(), checker.source_file());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().stmt(&assertion_error(msg)),
         stmt.range(),

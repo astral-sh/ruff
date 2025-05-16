@@ -89,7 +89,7 @@ pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(StarmapZip, call.range);
+    let mut diagnostic = Diagnostic::new(StarmapZip, call.range, checker.source_file());
 
     if let Some(fix) = replace_with_map(call, iterable_call, checker) {
         diagnostic.set_fix(fix);

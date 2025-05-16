@@ -105,6 +105,7 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
                     kind: Kind::Attribute,
                 },
                 value.range(),
+                checker.source_file(),
             ));
         }
         return;
@@ -115,6 +116,7 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
             kind: Kind::Expression,
         },
         value.range(),
+        checker.source_file(),
     ));
 }
 

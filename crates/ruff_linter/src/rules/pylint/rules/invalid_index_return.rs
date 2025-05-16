@@ -77,6 +77,7 @@ pub(crate) fn invalid_index_return(checker: &Checker, function_def: &ast::StmtFu
         checker.report_diagnostic(Diagnostic::new(
             InvalidIndexReturnType,
             function_def.identifier(),
+            checker.source_file(),
         ));
         return;
     }
@@ -94,11 +95,19 @@ pub(crate) fn invalid_index_return(checker: &Checker, function_def: &ast::StmtFu
                 ResolvedPythonType::Unknown
                     | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
             ) {
-                checker.report_diagnostic(Diagnostic::new(InvalidIndexReturnType, value.range()));
+                checker.report_diagnostic(Diagnostic::new(
+                    InvalidIndexReturnType,
+                    value.range(),
+                    checker.source_file(),
+                ));
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidIndexReturnType, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                InvalidIndexReturnType,
+                stmt.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

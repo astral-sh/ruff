@@ -65,7 +65,7 @@ pub(crate) fn commented_out_code(
 
         // Verify that the comment is on its own line, and that it contains code.
         if is_own_line_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
-            let mut diagnostic = Diagnostic::new(CommentedOutCode, range);
+            let mut diagnostic = Diagnostic::new(CommentedOutCode, range, checker.source_file());
             diagnostic.set_fix(Fix::display_only_edit(Edit::range_deletion(
                 locator.full_lines_range(range),
             )));

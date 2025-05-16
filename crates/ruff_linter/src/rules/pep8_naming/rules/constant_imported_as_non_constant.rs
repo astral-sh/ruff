@@ -86,6 +86,7 @@ pub(crate) fn constant_imported_as_non_constant(
                 asname: asname.to_string(),
             },
             alias.range(),
+            checker.source_file(),
         );
         diagnostic.set_parent(stmt.start());
         return Some(diagnostic);

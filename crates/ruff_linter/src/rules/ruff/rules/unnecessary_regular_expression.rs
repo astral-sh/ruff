@@ -121,6 +121,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
             replacement: repl.clone(),
         },
         re_func.range,
+        checker.source_file(),
     );
 
     if let Some(repl) = repl {

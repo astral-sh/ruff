@@ -43,6 +43,7 @@ pub(crate) fn bindings(checker: &Checker) {
                         name: binding.name(checker.source()).to_string(),
                     },
                     binding.range(),
+                    checker.source_file(),
                 );
                 diagnostic.try_set_fix(|| {
                     pyflakes::fixes::remove_exception_handler_assignment(binding, checker.locator)

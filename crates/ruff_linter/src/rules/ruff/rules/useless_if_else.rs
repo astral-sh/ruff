@@ -44,5 +44,9 @@ pub(crate) fn useless_if_else(checker: &Checker, if_expr: &ast::ExprIf) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(UselessIfElse, *range));
+    checker.report_diagnostic(Diagnostic::new(
+        UselessIfElse,
+        *range,
+        checker.source_file(),
+    ));
 }

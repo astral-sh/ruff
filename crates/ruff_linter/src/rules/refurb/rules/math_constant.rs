@@ -61,6 +61,7 @@ pub(crate) fn math_constant(checker: &Checker, literal: &ast::ExprNumberLiteral)
                 constant: constant.name(),
             },
             literal.range(),
+            checker.source_file(),
         );
         diagnostic.try_set_fix(|| convert_to_constant(literal, constant.name(), checker));
         checker.report_diagnostic(diagnostic);

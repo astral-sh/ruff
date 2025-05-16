@@ -84,6 +84,7 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
                     stmt_or_expression: StmtOrExpr::Expression,
                 },
                 if_expr.range,
+                checker.source_file(),
             );
             let replacement =
                 generate_removeaffix_expr(text, &removal_data.affix_query, checker.locator());
@@ -114,6 +115,7 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
                     stmt_or_expression: StmtOrExpr::Statement,
                 },
                 if_stmt.range,
+                checker.source_file(),
             );
 
             let replacement = generate_assignment_with_removeaffix(

@@ -41,8 +41,11 @@ pub(crate) fn hardcoded_bind_all_interfaces(checker: &Checker, string: StringLik
     match string {
         StringLike::String(ast::ExprStringLiteral { value, .. }) => {
             if value == "0.0.0.0" {
-                checker
-                    .report_diagnostic(Diagnostic::new(HardcodedBindAllInterfaces, string.range()));
+                checker.report_diagnostic(Diagnostic::new(
+                    HardcodedBindAllInterfaces,
+                    string.range(),
+                    checker.source_file(),
+                ));
             }
         }
         StringLike::FString(ast::ExprFString { value, .. }) => {
@@ -53,6 +56,7 @@ pub(crate) fn hardcoded_bind_all_interfaces(checker: &Checker, string: StringLik
                             checker.report_diagnostic(Diagnostic::new(
                                 HardcodedBindAllInterfaces,
                                 literal.range(),
+                                checker.source_file(),
                             ));
                         }
                     }
@@ -62,6 +66,7 @@ pub(crate) fn hardcoded_bind_all_interfaces(checker: &Checker, string: StringLik
                                 checker.report_diagnostic(Diagnostic::new(
                                     HardcodedBindAllInterfaces,
                                     literal.range(),
+                                    checker.source_file(),
                                 ));
                             }
                         }

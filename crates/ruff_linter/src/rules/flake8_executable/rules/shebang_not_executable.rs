@@ -59,7 +59,11 @@ pub(crate) fn shebang_not_executable(filepath: &Path, range: TextRange) -> Optio
     }
 
     if let Ok(false) = is_executable(filepath) {
-        return Some(Diagnostic::new(ShebangNotExecutable, range));
+        return Some(Diagnostic::new(
+            ShebangNotExecutable,
+            range,
+            checker.source_file(),
+        ));
     }
 
     None

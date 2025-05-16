@@ -86,6 +86,10 @@ pub(crate) fn batched_without_explicit_strict(checker: &Checker, call: &ExprCall
         return;
     }
 
-    let diagnostic = Diagnostic::new(BatchedWithoutExplicitStrict, call.range);
+    let diagnostic = Diagnostic::new(
+        BatchedWithoutExplicitStrict,
+        call.range,
+        checker.source_file(),
+    );
     checker.report_diagnostic(diagnostic);
 }

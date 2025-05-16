@@ -172,6 +172,7 @@ fn check_function_parameters(checker: &Checker, function_def: &StmtFunctionDef) 
                     replacement: Replacement::None,
                 },
                 param_name.range(),
+                checker.source_file(),
             ));
         }
     }
@@ -220,6 +221,7 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                             ),
                         },
                         arguments.range(),
+                        checker.source_file(),
                     ));
                 }
             } else if is_airflow_task_handler(segments) {
@@ -323,6 +325,7 @@ fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
             replacement,
         },
         attr.range(),
+        checker.source_file(),
     );
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);
@@ -400,6 +403,7 @@ fn check_context_key_usage_in_call(checker: &Checker, call_expr: &ExprCall) {
                     replacement: Replacement::None,
                 },
                 *range,
+                checker.source_file(),
             ));
         }
     }
@@ -441,6 +445,7 @@ fn check_context_key_usage_in_subscript(checker: &Checker, subscript: &ExprSubsc
                 replacement: Replacement::None,
             },
             slice.range(),
+            checker.source_file(),
         ));
     }
 }
@@ -560,6 +565,7 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
             replacement,
         },
         attr.range(),
+        checker.source_file(),
     );
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);
@@ -1006,6 +1012,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             replacement: replacement.clone(),
         },
         range,
+        checker.source_file(),
     );
     let semantic = checker.semantic();
     if let Some((module, name)) = match &replacement {
@@ -1067,6 +1074,7 @@ fn check_airflow_plugin_extension(
                     ),
                 },
                 expr.range(),
+                checker.source_file(),
             ));
         }
     }
@@ -1092,6 +1100,7 @@ fn diagnostic_for_argument(
             .arg
             .as_ref()
             .map_or_else(|| keyword.range(), Ranged::range),
+        checker.source_file(),
     );
 
     if let Some(replacement) = replacement {

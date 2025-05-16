@@ -84,6 +84,7 @@ pub(crate) fn compare_to_hardcoded_password_string(
                 name: name.to_string(),
             },
             comp.range(),
+            checker.source_file(),
         ))
     }));
 }
@@ -101,6 +102,7 @@ pub(crate) fn assign_hardcoded_password_string(checker: &Checker, value: &Expr, 
                         name: name.to_string(),
                     },
                     value.range(),
+                    checker.source_file(),
                 ));
                 return;
             }

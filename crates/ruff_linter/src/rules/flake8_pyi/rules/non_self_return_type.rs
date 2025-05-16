@@ -214,6 +214,7 @@ fn add_diagnostic(
             method_name: method_name.to_string(),
         },
         stmt.identifier(),
+        checker.source_file(),
     );
 
     diagnostic.try_set_fix(|| {

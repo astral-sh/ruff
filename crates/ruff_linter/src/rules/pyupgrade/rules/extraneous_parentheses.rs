@@ -132,6 +132,7 @@ pub(crate) fn extraneous_parentheses(
         let mut diagnostic = Diagnostic::new(
             ExtraneousParentheses,
             TextRange::new(start_range.start(), end_range.end()),
+            checker.source_file(),
         );
         let contents = locator.slice(TextRange::new(start_range.start(), end_range.end()));
         diagnostic.set_fix(Fix::safe_edit(Edit::replacement(

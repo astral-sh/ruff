@@ -316,13 +316,29 @@ impl From<bool> for NeedsSpace {
 
 fn diagnostic_kind_for_operator(operator: TokenKind, range: TextRange) -> Diagnostic {
     if operator == TokenKind::Percent {
-        Diagnostic::new(MissingWhitespaceAroundModuloOperator, range)
+        Diagnostic::new(
+            MissingWhitespaceAroundModuloOperator,
+            range,
+            checker.source_file(),
+        )
     } else if operator.is_bitwise_or_shift() {
-        Diagnostic::new(MissingWhitespaceAroundBitwiseOrShiftOperator, range)
+        Diagnostic::new(
+            MissingWhitespaceAroundBitwiseOrShiftOperator,
+            range,
+            checker.source_file(),
+        )
     } else if operator.is_arithmetic() {
-        Diagnostic::new(MissingWhitespaceAroundArithmeticOperator, range)
+        Diagnostic::new(
+            MissingWhitespaceAroundArithmeticOperator,
+            range,
+            checker.source_file(),
+        )
     } else {
-        Diagnostic::new(MissingWhitespaceAroundOperator, range)
+        Diagnostic::new(
+            MissingWhitespaceAroundOperator,
+            range,
+            checker.source_file(),
+        )
     }
 }
 

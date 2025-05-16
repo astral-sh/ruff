@@ -842,7 +842,11 @@ impl<'a> BlankLinesChecker<'a> {
             && !self.source_type.is_stub()
         {
             // E301
-            let mut diagnostic = Diagnostic::new(BlankLineBetweenMethods, line.first_token_range);
+            let mut diagnostic = Diagnostic::new(
+                BlankLineBetweenMethods,
+                line.first_token_range,
+                checker.source_file(),
+            );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 self.stylist.line_ending().to_string(),
                 self.locator.line_start(state.last_non_comment_line_end),
@@ -902,6 +906,7 @@ impl<'a> BlankLinesChecker<'a> {
                     expected_blank_lines: expected_blank_lines_before_definition,
                 },
                 line.first_token_range,
+                checker.source_file(),
             );
 
             if let Some(blank_lines_range) = line.blank_lines.range() {
@@ -945,6 +950,7 @@ impl<'a> BlankLinesChecker<'a> {
                     actual_blank_lines: line.blank_lines.count(),
                 },
                 line.first_token_range,
+                checker.source_file(),
             );
 
             if let Some(blank_lines_range) = line.blank_lines.range() {
@@ -971,6 +977,7 @@ impl<'a> BlankLinesChecker<'a> {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                 },
                 line.first_token_range,
+                checker.source_file(),
             );
 
             // Get all the lines between the last decorator line (included) and the current line (included).
@@ -1018,6 +1025,7 @@ impl<'a> BlankLinesChecker<'a> {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                 },
                 line.first_token_range,
+                checker.source_file(),
             );
 
             if let Some(blank_lines_range) = line.blank_lines.range() {
@@ -1056,8 +1064,11 @@ impl<'a> BlankLinesChecker<'a> {
             && !self.source_type.is_stub()
         {
             // E306
-            let mut diagnostic =
-                Diagnostic::new(BlankLinesBeforeNestedDefinition, line.first_token_range);
+            let mut diagnostic = Diagnostic::new(
+                BlankLinesBeforeNestedDefinition,
+                line.first_token_range,
+                checker.source_file(),
+            );
 
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 self.stylist.line_ending().to_string(),

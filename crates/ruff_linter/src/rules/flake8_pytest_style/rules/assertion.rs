@@ -248,6 +248,7 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
                                 name: id.to_string(),
                             },
                             current_assert.range(),
+                            checker.source_file(),
                         ));
                     }
                 }
@@ -287,6 +288,7 @@ pub(crate) fn unittest_assertion(
             assertion: unittest_assert.to_string(),
         },
         func.range(),
+        checker.source_file(),
     );
 
     // We're converting an expression to a statement, so avoid applying the fix if
@@ -474,6 +476,7 @@ fn unittest_raises_assertion(
             assertion: attr.to_string(),
         },
         call.func.range(),
+        checker.source_file(),
     );
 
     if !checker
@@ -590,7 +593,11 @@ fn to_pytest_raises_args<'a>(
 pub(crate) fn assert_falsy(checker: &Checker, stmt: &Stmt, test: &Expr) {
     let truthiness = Truthiness::from_expr(test, |id| checker.semantic().has_builtin_binding(id));
     if truthiness.into_bool() == Some(false) {
-        checker.report_diagnostic(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));
+        checker.report_diagnostic(Diagnostic::new(
+            PytestAssertAlwaysFalse,
+            stmt.range(),
+            checker.source_file(),
+        ));
     }
 }
 
@@ -827,7 +834,11 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 pub(crate) fn composite_condition(checker: &Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
-        let mut diagnostic = Diagnostic::new(PytestCompositeAssertion, stmt.range());
+        let mut diagnostic = Diagnostic::new(
+            PytestCompositeAssertion,
+            stmt.range(),
+            checker.source_file(),
+        );
         if matches!(composite, CompositionKind::Simple)
             && msg.is_none()
             && !checker.comment_ranges().intersects(stmt.range())

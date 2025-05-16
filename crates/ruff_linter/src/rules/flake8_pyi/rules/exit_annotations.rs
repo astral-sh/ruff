@@ -187,6 +187,7 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
                 error_kind: ErrorKind::ArgsAfterFirstFourMustHaveDefault,
             },
             parameter.range(),
+            checker.source_file(),
         ));
     }
 
@@ -202,6 +203,7 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
                 error_kind: ErrorKind::AllKwargsMustHaveDefault,
             },
             parameter.range(),
+            checker.source_file(),
         ));
     }
 
@@ -222,6 +224,7 @@ fn check_short_args_list(checker: &Checker, parameters: &Parameters, func_kind: 
                     error_kind: ErrorKind::StarArgsNotAnnotated,
                 },
                 annotation.range(),
+                checker.source_file(),
             );
 
             diagnostic.try_set_fix(|| {
@@ -243,6 +246,7 @@ fn check_short_args_list(checker: &Checker, parameters: &Parameters, func_kind: 
                 error_kind: ErrorKind::MissingArgs,
             },
             parameters.range(),
+            checker.source_file(),
         ));
     }
 }
@@ -290,6 +294,7 @@ fn check_positional_args_for_non_overloaded_method(
                 error_kind: error_info,
             },
             annotation.range(),
+            checker.source_file(),
         ));
     }
 }
@@ -429,6 +434,7 @@ fn check_positional_args_for_overloaded_method(
             error_kind: ErrorKind::UnrecognizedExitOverload,
         },
         parameters_range,
+        checker.source_file(),
     ));
 }
 

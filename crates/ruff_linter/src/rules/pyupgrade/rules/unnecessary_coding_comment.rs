@@ -106,7 +106,11 @@ pub(crate) fn unnecessary_coding_comment(
     }
 
     let fix = Fix::safe_edit(Edit::range_deletion(range.line));
-    let diagnostic = Diagnostic::new(UTF8EncodingDeclaration, range.comment);
+    let diagnostic = Diagnostic::new(
+        UTF8EncodingDeclaration,
+        range.comment,
+        checker.source_file(),
+    );
 
     diagnostics.push(diagnostic.with_fix(fix));
 }

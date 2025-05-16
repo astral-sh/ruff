@@ -115,6 +115,7 @@ fn add_required_import(
     let mut diagnostic = Diagnostic::new(
         MissingRequiredImport(required_import.to_string()),
         TextRange::default(),
+        checker.source_file(),
     );
     diagnostic.set_fix(Fix::safe_edit(
         Importer::new(parsed, locator, stylist).add_import(required_import, TextSize::default()),

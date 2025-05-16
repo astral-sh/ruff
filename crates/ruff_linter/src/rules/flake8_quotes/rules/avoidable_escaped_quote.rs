@@ -242,7 +242,7 @@ fn check_string_or_bytes(
         return None;
     }
 
-    let mut diagnostic = Diagnostic::new(AvoidableEscapedQuote, range);
+    let mut diagnostic = Diagnostic::new(AvoidableEscapedQuote, range, checker.source_file());
     let fixed_contents = format!(
         "{prefix}{quote}{value}{quote}",
         prefix = flags.prefix(),
@@ -321,7 +321,8 @@ fn check_f_string(
     ));
 
     Some(
-        Diagnostic::new(AvoidableEscapedQuote, *range).with_fix(Fix::safe_edits(start_edit, edits)),
+        Diagnostic::new(AvoidableEscapedQuote, *range, checker.source_file())
+            .with_fix(Fix::safe_edits(start_edit, edits)),
     )
 }
 

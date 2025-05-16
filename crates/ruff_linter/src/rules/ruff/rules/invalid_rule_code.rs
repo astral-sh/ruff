@@ -96,6 +96,7 @@ fn all_codes_invalid_diagnostic(
                 .join(", "),
         },
         directive.range(),
+        checker.source_file(),
     )
     .with_fix(Fix::safe_edit(Edit::range_deletion(directive.range())))
 }
@@ -110,6 +111,7 @@ fn some_codes_are_invalid_diagnostic(
             rule_code: invalid_code.to_string(),
         },
         invalid_code.range(),
+        checker.source_file(),
     );
     diagnostic.with_fix(Fix::safe_edit(remove_invalid_noqa(
         codes,

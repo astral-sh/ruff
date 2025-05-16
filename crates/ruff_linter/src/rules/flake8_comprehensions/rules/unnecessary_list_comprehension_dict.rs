@@ -68,7 +68,11 @@ pub(crate) fn unnecessary_list_comprehension_dict(
     if !checker.semantic().has_builtin_binding("dict") {
         return;
     }
-    let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionDict, expr.range());
+    let mut diagnostic = Diagnostic::new(
+        UnnecessaryListComprehensionDict,
+        expr.range(),
+        checker.source_file(),
+    );
     diagnostic.try_set_fix(|| {
         fixes::fix_unnecessary_list_comprehension_dict(expr, checker).map(Fix::unsafe_edit)
     });

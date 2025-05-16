@@ -62,7 +62,8 @@ pub(crate) fn whitespace_after_decorator(checker: &Checker, decorator_list: &[De
                 let end = start + TextSize::try_from(end).unwrap();
                 let range = TextRange::new(start, end);
 
-                let mut diagnostic = Diagnostic::new(WhitespaceAfterDecorator, range);
+                let mut diagnostic =
+                    Diagnostic::new(WhitespaceAfterDecorator, range, checker.source_file());
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                 checker.report_diagnostic(diagnostic);
             }

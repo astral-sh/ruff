@@ -183,9 +183,17 @@ pub(crate) fn subscript(checker: &Checker, value: &Expr, slice: &Expr) {
                 }) = upper.as_ref()
                 {
                     if *i == 1 && checker.enabled(Rule::SysVersionSlice1) {
-                        checker.report_diagnostic(Diagnostic::new(SysVersionSlice1, value.range()));
+                        checker.report_diagnostic(Diagnostic::new(
+                            SysVersionSlice1,
+                            value.range(),
+                            checker.source_file(),
+                        ));
                     } else if *i == 3 && checker.enabled(Rule::SysVersionSlice3) {
-                        checker.report_diagnostic(Diagnostic::new(SysVersionSlice3, value.range()));
+                        checker.report_diagnostic(Diagnostic::new(
+                            SysVersionSlice3,
+                            value.range(),
+                            checker.source_file(),
+                        ));
                     }
                 }
             }
@@ -195,9 +203,17 @@ pub(crate) fn subscript(checker: &Checker, value: &Expr, slice: &Expr) {
                 ..
             }) => {
                 if *i == 2 && checker.enabled(Rule::SysVersion2) {
-                    checker.report_diagnostic(Diagnostic::new(SysVersion2, value.range()));
+                    checker.report_diagnostic(Diagnostic::new(
+                        SysVersion2,
+                        value.range(),
+                        checker.source_file(),
+                    ));
                 } else if *i == 0 && checker.enabled(Rule::SysVersion0) {
-                    checker.report_diagnostic(Diagnostic::new(SysVersion0, value.range()));
+                    checker.report_diagnostic(Diagnostic::new(
+                        SysVersion0,
+                        value.range(),
+                        checker.source_file(),
+                    ));
                 }
             }
 

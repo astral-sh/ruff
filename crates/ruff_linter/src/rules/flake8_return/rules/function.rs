@@ -385,7 +385,8 @@ fn unnecessary_return_none(checker: &Checker, decorator_list: &[Decorator], stac
             return;
         }
 
-        let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range());
+        let mut diagnostic =
+            Diagnostic::new(UnnecessaryReturnNone, stmt.range(), checker.source_file());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "return".to_string(),
             stmt.range(),
@@ -400,7 +401,8 @@ fn implicit_return_value(checker: &Checker, stack: &Stack) {
         if stmt.value.is_some() {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(ImplicitReturnValue, stmt.range());
+        let mut diagnostic =
+            Diagnostic::new(ImplicitReturnValue, stmt.range(), checker.source_file());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "return None".to_string(),
             stmt.range(),
@@ -455,7 +457,7 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 fn add_return_none(checker: &Checker, stmt: &Stmt, range: TextRange) {
-    let mut diagnostic = Diagnostic::new(ImplicitReturn, range);
+    let mut diagnostic = Diagnostic::new(ImplicitReturn, range, checker.source_file());
     if let Some(indent) = indentation(checker.source(), stmt) {
         let mut content = String::new();
         content.push_str(checker.stylist().line_ending().as_str());
@@ -612,6 +614,7 @@ fn unnecessary_assign(checker: &Checker, stack: &Stack) {
                 name: assigned_id.to_string(),
             },
             value.range(),
+            checker.source_file(),
         );
         diagnostic.try_set_fix(|| {
             // Delete the `return` statement. There's no need to treat this as an isolated
@@ -673,6 +676,7 @@ fn superfluous_else_node(
                 SuperfluousElseReturn { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
+                checker.source_file(),
             );
             if checker.enabled(diagnostic.rule()) {
                 diagnostic.try_set_fix(|| {
@@ -691,6 +695,7 @@ fn superfluous_else_node(
                 SuperfluousElseBreak { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
+                checker.source_file(),
             );
             if checker.enabled(diagnostic.rule()) {
                 diagnostic.try_set_fix(|| {
@@ -710,6 +715,7 @@ fn superfluous_else_node(
                 SuperfluousElseRaise { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
+                checker.source_file(),
             );
             if checker.enabled(diagnostic.rule()) {
                 diagnostic.try_set_fix(|| {
@@ -729,6 +735,7 @@ fn superfluous_else_node(
                 SuperfluousElseContinue { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
+                checker.source_file(),
             );
             if checker.enabled(diagnostic.rule()) {
                 diagnostic.try_set_fix(|| {

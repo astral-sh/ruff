@@ -84,6 +84,7 @@ pub(crate) fn invalid_module_name(
                     name: module_name.to_string(),
                 },
                 TextRange::default(),
+                checker.source_file(),
             ));
         }
     }

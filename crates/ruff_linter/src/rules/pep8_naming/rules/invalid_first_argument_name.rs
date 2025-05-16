@@ -169,15 +169,18 @@ enum FunctionType {
 impl FunctionType {
     fn diagnostic_kind(self, argument_name: String, range: TextRange) -> Diagnostic {
         match self {
-            Self::Method => {
-                Diagnostic::new(InvalidFirstArgumentNameForMethod { argument_name }, range)
-            }
+            Self::Method => Diagnostic::new(
+                InvalidFirstArgumentNameForMethod { argument_name },
+                range,
+                checker.source_file(),
+            ),
             Self::ClassMethod => Diagnostic::new(
                 InvalidFirstArgumentNameForClassMethod {
                     argument_name,
                     is_new: false,
                 },
                 range,
+                checker.source_file(),
             ),
         }
     }

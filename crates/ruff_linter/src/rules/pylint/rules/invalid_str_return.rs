@@ -71,6 +71,7 @@ pub(crate) fn invalid_str_return(checker: &Checker, function_def: &ast::StmtFunc
         checker.report_diagnostic(Diagnostic::new(
             InvalidStrReturnType,
             function_def.identifier(),
+            checker.source_file(),
         ));
         return;
     }
@@ -87,11 +88,19 @@ pub(crate) fn invalid_str_return(checker: &Checker, function_def: &ast::StmtFunc
                 ResolvedPythonType::from(value),
                 ResolvedPythonType::Unknown | ResolvedPythonType::Atom(PythonType::String)
             ) {
-                checker.report_diagnostic(Diagnostic::new(InvalidStrReturnType, value.range()));
+                checker.report_diagnostic(Diagnostic::new(
+                    InvalidStrReturnType,
+                    value.range(),
+                    checker.source_file(),
+                ));
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidStrReturnType, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                InvalidStrReturnType,
+                stmt.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

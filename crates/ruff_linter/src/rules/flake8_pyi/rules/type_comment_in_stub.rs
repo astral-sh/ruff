@@ -46,7 +46,11 @@ pub(crate) fn type_comment_in_stub(
         let comment = locator.slice(range);
 
         if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
-            diagnostics.push(Diagnostic::new(TypeCommentInStub, range));
+            diagnostics.push(Diagnostic::new(
+                TypeCommentInStub,
+                range,
+                checker.source_file(),
+            ));
         }
     }
 }

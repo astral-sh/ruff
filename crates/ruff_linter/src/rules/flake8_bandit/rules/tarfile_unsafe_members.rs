@@ -70,5 +70,9 @@ pub(crate) fn tarfile_unsafe_members(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(TarfileUnsafeMembers, call.func.range()));
+    checker.report_diagnostic(Diagnostic::new(
+        TarfileUnsafeMembers,
+        call.func.range(),
+        checker.source_file(),
+    ));
 }

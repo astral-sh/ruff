@@ -54,6 +54,7 @@ pub(crate) fn logging_config_insecure_listen(checker: &Checker, call: &ast::Expr
         checker.report_diagnostic(Diagnostic::new(
             LoggingConfigInsecureListen,
             call.func.range(),
+            checker.source_file(),
         ));
     }
 }

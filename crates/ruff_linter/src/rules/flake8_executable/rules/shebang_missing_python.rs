@@ -49,5 +49,9 @@ pub(crate) fn shebang_missing_python(
         return None;
     }
 
-    Some(Diagnostic::new(ShebangMissingPython, range))
+    Some(Diagnostic::new(
+        ShebangMissingPython,
+        range,
+        checker.source_file(),
+    ))
 }

@@ -134,6 +134,7 @@ pub(crate) fn boolean_default_value_positional_argument(
             checker.report_diagnostic(Diagnostic::new(
                 BooleanDefaultValuePositionalArgument,
                 param.identifier(),
+                checker.source_file(),
             ));
         }
     }

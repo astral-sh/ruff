@@ -98,7 +98,11 @@ pub(crate) fn pytest_raises_ambiguous_pattern(checker: &Checker, call: &ast::Exp
         return;
     }
 
-    let diagnostic = Diagnostic::new(PytestRaisesAmbiguousPattern, string.range);
+    let diagnostic = Diagnostic::new(
+        PytestRaisesAmbiguousPattern,
+        string.range,
+        checker.source_file(),
+    );
 
     checker.report_diagnostic(diagnostic);
 }

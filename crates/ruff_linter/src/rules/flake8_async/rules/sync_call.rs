@@ -80,7 +80,11 @@ pub(crate) fn sync_call(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(TrioSyncCall { method_name }, call.range);
+    let mut diagnostic = Diagnostic::new(
+        TrioSyncCall { method_name },
+        call.range,
+        checker.source_file(),
+    );
     if checker.semantic().in_async_context() {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
             pad(

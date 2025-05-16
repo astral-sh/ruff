@@ -102,6 +102,7 @@ pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
         checker.report_diagnostic(Diagnostic::new(
             AssertRaisesException { exception },
             item.range(),
+            checker.source_file(),
         ));
     }
 }

@@ -118,6 +118,7 @@ pub(crate) fn unordered_body_content_in_model(checker: &Checker, class_def: &ast
                     prev_element_type,
                 },
                 element.range(),
+                checker.source_file(),
             );
             checker.report_diagnostic(diagnostic);
         } else {

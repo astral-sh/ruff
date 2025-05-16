@@ -80,6 +80,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
                     duplicate_name: checker.generator().expr(expr),
                 },
                 expr.range(),
+                checker.source_file(),
             ));
         }
     };

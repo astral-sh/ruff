@@ -123,7 +123,11 @@ pub(crate) fn banned_relative_import(
         Strictness::Parents => 1,
     };
     if level > strictness_level {
-        let mut diagnostic = Diagnostic::new(RelativeImports { strictness }, stmt.range());
+        let mut diagnostic = Diagnostic::new(
+            RelativeImports { strictness },
+            stmt.range(),
+            checker.source_file(),
+        );
         if let Some(fix) =
             fix_banned_relative_import(stmt, level, module, module_path, checker.generator())
         {

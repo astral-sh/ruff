@@ -64,5 +64,9 @@ pub(crate) fn misplaced_bare_raise(checker: &Checker, raise: &ast::StmtRaise) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(MisplacedBareRaise, raise.range()));
+    checker.report_diagnostic(Diagnostic::new(
+        MisplacedBareRaise,
+        raise.range(),
+        checker.source_file(),
+    ));
 }

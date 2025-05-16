@@ -114,6 +114,7 @@ pub(crate) fn snake_case_type_alias(checker: &Checker, target: &Expr) {
                 name: id.to_string(),
             },
             *range,
+            checker.source_file(),
         ));
     }
 }
@@ -130,6 +131,7 @@ pub(crate) fn t_suffixed_type_alias(checker: &Checker, target: &Expr) {
                 name: id.to_string(),
             },
             *range,
+            checker.source_file(),
         ));
     }
 }

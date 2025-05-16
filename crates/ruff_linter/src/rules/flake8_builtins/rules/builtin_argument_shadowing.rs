@@ -97,6 +97,7 @@ pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Paramete
                 name: parameter.name.to_string(),
             },
             parameter.name.range(),
+            checker.source_file(),
         ));
     }
 }

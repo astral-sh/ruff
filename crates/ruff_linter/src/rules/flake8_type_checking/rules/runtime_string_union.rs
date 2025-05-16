@@ -66,7 +66,11 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
     traverse_op(expr, &mut strings);
 
     for string in strings {
-        checker.report_diagnostic(Diagnostic::new(RuntimeStringUnion, string.range()));
+        checker.report_diagnostic(Diagnostic::new(
+            RuntimeStringUnion,
+            string.range(),
+            checker.source_file(),
+        ));
     }
 }
 

@@ -84,5 +84,6 @@ pub(crate) fn mixed_case_variable_in_global_scope(checker: &Checker, expr: &Expr
             name: name.to_string(),
         },
         expr.range(),
+        checker.source_file(),
     ));
 }

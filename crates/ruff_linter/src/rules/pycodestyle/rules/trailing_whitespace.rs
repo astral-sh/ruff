@@ -95,7 +95,8 @@ pub(crate) fn trailing_whitespace(
         };
         if range == line.range() {
             if settings.rules.enabled(Rule::BlankLineWithWhitespace) {
-                let mut diagnostic = Diagnostic::new(BlankLineWithWhitespace, range);
+                let mut diagnostic =
+                    Diagnostic::new(BlankLineWithWhitespace, range, checker.source_file());
                 // Remove any preceding continuations, to avoid introducing a potential
                 // syntax error.
                 diagnostic.set_fix(Fix::applicable_edit(
@@ -110,7 +111,7 @@ pub(crate) fn trailing_whitespace(
                 return Some(diagnostic);
             }
         } else if settings.rules.enabled(Rule::TrailingWhitespace) {
-            let mut diagnostic = Diagnostic::new(TrailingWhitespace, range);
+            let mut diagnostic = Diagnostic::new(TrailingWhitespace, range, checker.source_file());
             diagnostic.set_fix(Fix::applicable_edit(
                 Edit::range_deletion(range),
                 applicability,

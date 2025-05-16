@@ -67,6 +67,7 @@ pub(crate) fn undefined_local(checker: &Checker, scope_id: ScopeId, scope: &Scop
                             name: name.to_string(),
                         },
                         range,
+                        checker.source_file(),
                     ));
                 }
             }

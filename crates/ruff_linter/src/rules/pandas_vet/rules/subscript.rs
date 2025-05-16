@@ -156,13 +156,13 @@ pub(crate) fn subscript(checker: &Checker, value: &Expr, expr: &Expr) {
 
     let diagnostic = match attr.as_str() {
         "ix" if checker.settings.rules.enabled(Rule::PandasUseOfDotIx) => {
-            Diagnostic::new(PandasUseOfDotIx, range)
+            Diagnostic::new(PandasUseOfDotIx, range, checker.source_file())
         }
         "at" if checker.settings.rules.enabled(Rule::PandasUseOfDotAt) => {
-            Diagnostic::new(PandasUseOfDotAt, range)
+            Diagnostic::new(PandasUseOfDotAt, range, checker.source_file())
         }
         "iat" if checker.settings.rules.enabled(Rule::PandasUseOfDotIat) => {
-            Diagnostic::new(PandasUseOfDotIat, range)
+            Diagnostic::new(PandasUseOfDotIat, range, checker.source_file())
         }
         _ => return,
     };

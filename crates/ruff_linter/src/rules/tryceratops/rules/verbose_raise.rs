@@ -72,7 +72,8 @@ pub(crate) fn verbose_raise(checker: &Checker, handlers: &[ExceptHandler]) {
                     // ...and the raised object is bound to the same name...
                     if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
                         if id == exception_name.as_str() {
-                            let mut diagnostic = Diagnostic::new(VerboseRaise, exc.range());
+                            let mut diagnostic =
+                                Diagnostic::new(VerboseRaise, exc.range(), checker.source_file());
                             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                 "raise".to_string(),
                                 raise.range(),

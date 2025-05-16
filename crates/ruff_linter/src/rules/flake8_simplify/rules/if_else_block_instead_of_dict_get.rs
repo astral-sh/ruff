@@ -221,6 +221,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
             contents: contents.clone(),
         },
         stmt_if.range(),
+        checker.source_file(),
     );
     if !checker
         .comment_ranges()
@@ -310,6 +311,7 @@ pub(crate) fn if_exp_instead_of_dict_get(
             contents: contents.clone(),
         },
         expr.range(),
+        checker.source_file(),
     );
     if !checker
         .comment_ranges()

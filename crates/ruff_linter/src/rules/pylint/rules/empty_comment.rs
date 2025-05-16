@@ -97,12 +97,17 @@ fn empty_comment(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
         });
 
     Some(
-        Diagnostic::new(EmptyComment, TextRange::new(first_hash_col, line.end())).with_fix(
-            Fix::safe_edit(if let Some(deletion_start_col) = deletion_start_col {
+        Diagnostic::new(
+            EmptyComment,
+            TextRange::new(first_hash_col, line.end()),
+            checker.source_file(),
+        )
+        .with_fix(Fix::safe_edit(
+            if let Some(deletion_start_col) = deletion_start_col {
                 Edit::deletion(line.start() + deletion_start_col, line.end())
             } else {
                 Edit::range_deletion(locator.full_line_range(first_hash_col))
-            }),
-        ),
+            },
+        )),
     )
 }

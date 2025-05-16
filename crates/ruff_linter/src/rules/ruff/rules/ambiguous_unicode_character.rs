@@ -362,6 +362,7 @@ impl Candidate {
                         representant: self.representant,
                     },
                     char_range,
+                    checker.source_file(),
                 ),
                 Context::Docstring => Diagnostic::new(
                     AmbiguousUnicodeCharacterDocstring {
@@ -369,6 +370,7 @@ impl Candidate {
                         representant: self.representant,
                     },
                     char_range,
+                    checker.source_file(),
                 ),
                 Context::Comment => Diagnostic::new(
                     AmbiguousUnicodeCharacterComment {
@@ -376,6 +378,7 @@ impl Candidate {
                         representant: self.representant,
                     },
                     char_range,
+                    checker.source_file(),
                 ),
             };
             if settings.rules.enabled(diagnostic.rule()) {
