@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use ruff_formatter::{Buffer, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{
     AnyStringFlags, ConversionFlag, Expr, FStringElement, FStringExpressionElement,
-    FStringLiteralElement, StringFlags,
+    FTStringLiteralElement, StringFlags,
 };
 use ruff_text_size::{Ranged, TextSlice};
 
@@ -45,13 +45,13 @@ impl Format<PyFormatContext<'_>> for FormatFStringElement<'_> {
 
 /// Formats an f-string literal element.
 pub(crate) struct FormatFStringLiteralElement<'a> {
-    element: &'a FStringLiteralElement,
+    element: &'a FTStringLiteralElement,
     /// Flags of the enclosing F-string part
     fstring_flags: AnyStringFlags,
 }
 
 impl<'a> FormatFStringLiteralElement<'a> {
-    pub(crate) fn new(element: &'a FStringLiteralElement, fstring_flags: AnyStringFlags) -> Self {
+    pub(crate) fn new(element: &'a FTStringLiteralElement, fstring_flags: AnyStringFlags) -> Self {
         Self {
             element,
             fstring_flags,

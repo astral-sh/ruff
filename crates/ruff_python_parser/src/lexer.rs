@@ -735,7 +735,6 @@ impl<'src> Lexer<'src> {
             'R' => self.current_flags |= TokenFlags::RAW_STRING_UPPERCASE,
             _ => return false,
         }
-        dbg!(self.current_flags);
         true
     }
 

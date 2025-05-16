@@ -116,12 +116,12 @@ impl ast::FStringExpressionElement {
     }
 }
 
-impl ast::FStringLiteralElement {
+impl ast::FTStringLiteralElement {
     pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::FStringLiteralElement { range: _, value: _ } = self;
+        let ast::FTStringLiteralElement { range: _, value: _ } = self;
     }
 }
 
@@ -173,15 +173,6 @@ impl ast::TStringInterpolationElement {
                 visitor.visit_t_string_element(spec_part);
             }
         }
-    }
-}
-
-impl ast::TStringLiteralElement {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::TStringLiteralElement { range: _, value: _ } = self;
     }
 }
 

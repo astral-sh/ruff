@@ -553,11 +553,11 @@ ExceptHandlerExceptHandler = {}
 
 [FStringElement.nodes]
 FStringExpressionElement = { variant = "Expression" }
-FStringLiteralElement = { variant = "Literal" }
+FTStringLiteralElement = { variant = "Literal" }
 
 [TStringElement.nodes]
 TStringInterpolationElement = { variant = "Interpolation" }
-TStringLiteralElement = { variant = "Literal" }
+FTStringLiteralElement = { variant = "Literal" }
 
 [Pattern]
 doc = "See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)"

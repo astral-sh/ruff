@@ -16,7 +16,7 @@ expression: suite
                                     range: 0..11,
                                     elements: [
                                         Literal(
-                                            TStringLiteralElement {
+                                            FTStringLiteralElement {
                                                 range: 4..5,
                                                 value: "\n",
                                             },

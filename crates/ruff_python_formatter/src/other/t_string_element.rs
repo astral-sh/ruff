@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use ruff_formatter::{Buffer, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{
-    AnyStringFlags, ConversionFlag, Expr, StringFlags, TStringElement, TStringInterpolationElement,
-    TStringLiteralElement,
+    AnyStringFlags, ConversionFlag, Expr, FTStringLiteralElement, StringFlags, TStringElement,
+    TStringInterpolationElement,
 };
 use ruff_text_size::{Ranged, TextSlice};
 
@@ -46,13 +46,13 @@ impl Format<PyFormatContext<'_>> for FormatTStringElement<'_> {
 
 /// Formats a t-string literal element.
 pub(crate) struct FormatTStringLiteralElement<'a> {
-    element: &'a TStringLiteralElement,
+    element: &'a FTStringLiteralElement,
     /// Flags of the enclosing t-string part
     fstring_flags: AnyStringFlags,
 }
 
 impl<'a> FormatTStringLiteralElement<'a> {
-    pub(crate) fn new(element: &'a TStringLiteralElement, fstring_flags: AnyStringFlags) -> Self {
+    pub(crate) fn new(element: &'a FTStringLiteralElement, fstring_flags: AnyStringFlags) -> Self {
         Self {
             element,
             fstring_flags,

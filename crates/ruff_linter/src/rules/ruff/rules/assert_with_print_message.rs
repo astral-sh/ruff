@@ -90,8 +90,8 @@ mod print_arguments {
     use itertools::Itertools;
     use ruff_python_ast::{
         Arguments, ConversionFlag, Expr, ExprFString, FString, FStringElement, FStringElements,
-        FStringExpressionElement, FStringFlags, FStringLiteralElement, FStringValue, StringLiteral,
-        StringLiteralFlags,
+        FStringExpressionElement, FStringFlags, FStringValue, FTStringLiteralElement,
+        StringLiteral, StringLiteralFlags,
     };
     use ruff_text_size::TextRange;
 
@@ -111,7 +111,7 @@ mod print_arguments {
                 .value
                 .iter()
                 .map(|part| {
-                    FStringElement::Literal(FStringLiteralElement {
+                    FStringElement::Literal(FTStringLiteralElement {
                         value: part.value.clone(),
                         range: TextRange::default(),
                     })
@@ -274,7 +274,7 @@ mod print_arguments {
             )
             .map(expr_to_fstring_elements)
             .unwrap_or_else(|| {
-                vec![FStringElement::Literal(FStringLiteralElement {
+                vec![FStringElement::Literal(FTStringLiteralElement {
                     range: TextRange::default(),
                     value: " ".into(),
                 })]

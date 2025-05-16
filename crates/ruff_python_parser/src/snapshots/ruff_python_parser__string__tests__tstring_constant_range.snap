@@ -16,7 +16,7 @@ expression: suite
                                     range: 0..22,
                                     elements: [
                                         Literal(
-                                            TStringLiteralElement {
+                                            FTStringLiteralElement {
                                                 range: 2..5,
                                                 value: "aaa",
                                             },
@@ -37,7 +37,7 @@ expression: suite
                                             },
                                         ),
                                         Literal(
-                                            TStringLiteralElement {
+                                            FTStringLiteralElement {
                                                 range: 10..13,
                                                 value: "ccc",
                                             },
@@ -58,7 +58,7 @@ expression: suite
                                             },
                                         ),
                                         Literal(
-                                            TStringLiteralElement {
+                                            FTStringLiteralElement {
                                                 range: 18..21,
                                                 value: "eee",
                                             },

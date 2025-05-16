@@ -16,7 +16,7 @@ expression: suite
                                     range: 0..38,
                                     elements: [
                                         Literal(
-                                            TStringLiteralElement {
+                                            FTStringLiteralElement {
                                                 range: 2..6,
                                                 value: "mix ",
                                             },
@@ -42,7 +42,7 @@ expression: suite
                                             },
                                         ),
                                         Literal(
-                                            TStringLiteralElement {
+                                            FTStringLiteralElement {
                                                 range: 13..28,
                                                 value: " with text and ",
                                             },
