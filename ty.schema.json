@@ -839,7 +839,7 @@
       "type": "object",
       "properties": {
         "root": {
-          "description": "The root of the project, used for finding first-party modules.",
+          "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will default to the current working directory and: * `./src` if it exists * `./<project-name>` if the folder `./<project-name>/<project-name>` exists",
           "type": [
             "string",
             "null"

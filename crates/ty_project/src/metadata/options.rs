@@ -87,6 +87,7 @@ impl Options {
     pub(crate) fn to_program_settings(
         &self,
         project_root: &SystemPath,
+        project_name: &str,
         system: &dyn System,
     ) -> ProgramSettings {
         let python_version = self
@@ -106,13 +107,14 @@ impl Options {
         ProgramSettings {
             python_version,
             python_platform,
-            search_paths: self.to_search_path_settings(project_root, system),
+            search_paths: self.to_search_path_settings(project_root, project_name, system),
         }
     }
 
     fn to_search_path_settings(
         &self,
         project_root: &SystemPath,
+        project_name: &str,
         system: &dyn System,
     ) -> SearchPathSettings {
         let src_roots = if let Some(src_root) = self.src.as_ref().and_then(|src| src.root.as_ref())
@@ -124,6 +126,8 @@ impl Options {
             // Default to `src` and the project root if `src` exists and the root hasn't been specified.
             if system.is_directory(&src) {
                 vec![project_root.to_path_buf(), src]
+            } else if system.is_directory(&project_root.join(project_name).join(project_name)) {
+                vec![project_root.to_path_buf(), project_root.join(project_name)]
             } else {
                 vec![project_root.to_path_buf()]
             }
@@ -353,9 +357,13 @@ pub struct EnvironmentOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SrcOptions {
     /// The root of the project, used for finding first-party modules.
+    ///
+    /// If left unspecified, ty will default to the current working directory and:
+    /// * `./src` if it exists
+    /// * `./<project-name>` if the folder `./<project-name>/<project-name>` exists
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
-        default = r#"[".", "./src"]"#,
+        default = r#"null"#,
         value_type = "str",
         example = r#"
             root = "./app"

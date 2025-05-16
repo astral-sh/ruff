@@ -244,7 +244,8 @@ impl ProjectMetadata {
     }
 
     pub fn to_program_settings(&self, system: &dyn System) -> ProgramSettings {
-        self.options.to_program_settings(self.root(), system)
+        self.options
+            .to_program_settings(self.root(), self.name(), system)
     }
 
     /// Combine the project options with the CLI options where the CLI options take precedence.

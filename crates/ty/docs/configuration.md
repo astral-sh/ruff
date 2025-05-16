@@ -164,7 +164,11 @@ typeshed = "/path/to/custom/typeshed"
 
 The root of the project, used for finding first-party modules.
 
-**Default value**: `[".", "./src"]`
+If left unspecified, ty will default to the current working directory and:
+* `./src` if it exists
+* `./<project-name>` if the folder `./<project-name>/<project-name>` exists
+
+**Default value**: `null`
 
 **Type**: `str`
 
