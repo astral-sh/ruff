@@ -408,6 +408,11 @@ class C:
         [... for self.a in IntIterable()]
         [... for (self.b, self.c) in TupleIterable()]
         [... for self.d in IntIterable() for self.e in IntIterable()]
+        [[... for self.f in IntIterable()] for _ in IntIterable()]
+        [[... for self.g in IntIterable()] for self in [D()]]
+
+class D:
+    g: int
 
 c_instance = C()
 
@@ -416,6 +421,9 @@ reveal_type(c_instance.b)  # revealed: Unknown | int
 reveal_type(c_instance.c)  # revealed: Unknown | str
 reveal_type(c_instance.d)  # revealed: Unknown | int
 reveal_type(c_instance.e)  # revealed: Unknown | int
+reveal_type(c_instance.f)  # revealed: Unknown | int
+# TODO: This should be an unresolved attribute
+reveal_type(c_instance.g)  # revealed: Unknown | int
 ```
 
 #### Conditionally declared / bound attributes

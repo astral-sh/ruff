@@ -1921,18 +1921,21 @@ where
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
                 if let Ok(mut target) = Target::try_from(expr) {
-                    let comprehension_scope = if matches!(
+                    let mut comprehension_scopes = vec![];
+                    if matches!(
                         self.current_assignment(),
                         Some(CurrentAssignment::Comprehension { .. })
-                    ) && (expr.is_attribute_expr()
-                        || expr.is_subscript_expr())
+                    ) && (expr.is_attribute_expr() || expr.is_subscript_expr())
                     {
-                        // Temporarily move to the scope of the method to which the attribute / subscript value is defined.
-                        // SAFETY: `self.scope_stack` is not empty because the targets in comprehensions should always introduce a new scope.
-                        Some(self.scope_stack.pop().expect("The popped scope must be a comprehension, which must have a parent scope"))
-                    } else {
-                        None
-                    };
+                        while self.scopes[self.current_scope()].kind() == ScopeKind::Comprehension {
+                            // Temporarily move to the scope of the method to which the attribute / subscript value is defined.
+                            // TODO: The current implementation assumes that the definition belongs to the scope just outside the comprehension,
+                            // but this is not correct, since it may be in a more outer scope,
+                            // or it may be assigning to an attribute / subscript of a variable introduced in the outer comprehension.
+                            // SAFETY: `self.scope_stack` is not empty because the targets in comprehensions should always introduce a new scope.
+                            comprehension_scopes.insert(0, self.scope_stack.pop().expect("The popped scope must be a comprehension, which must have a parent scope"));
+                        }
+                    }
                     if self.is_method_of_class().is_some() {
                         // We specifically mark attribute assignments to the first parameter of a method,
                         // i.e. typically `self` or `cls`.
@@ -2013,6 +2016,11 @@ where
                                 node,
                                 first,
                             }) => {
+                                if !comprehension_scopes.is_empty() {
+                                    // self.scopes_by_expression
+                                    //     .insert(expr.into(), self.current_scope());
+                                    self.current_ast_ids().record_expression(expr);
+                                }
                                 self.add_definition(
                                     target_id,
                                     ComprehensionDefinitionNodeRef {
@@ -2023,9 +2031,7 @@ where
                                         is_async: node.is_async,
                                     },
                                 );
-                                if let Some(scope) = comprehension_scope {
-                                    self.scope_stack.push(scope);
-                                }
+                                self.scope_stack.extend(comprehension_scopes);
                             }
                             Some(CurrentAssignment::WithItem {
                                 item,

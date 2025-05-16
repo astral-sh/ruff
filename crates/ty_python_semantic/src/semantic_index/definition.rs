@@ -760,13 +760,18 @@ impl MatchPatternDefinitionKind {
     }
 }
 
+/// Note that the elements of a comprehension can be in different scopes.
+/// If the definition target of a comprehension is a name, it is in the comprehension's scope.
+/// But if the target is an attribute or subscript, its definition is not in the comprehension's scope;
+/// it is in the scope which the root variable is bound.
+/// TODO: currently we don't model this correctly and simply assume that it is in a scope outside the comprehension.
 #[derive(Clone, Debug)]
 pub struct ComprehensionDefinitionKind<'db> {
-    pub(super) target_kind: TargetKind<'db>,
-    pub(super) iterable: AstNodeRef<ast::Expr>,
-    pub(super) target: AstNodeRef<ast::Expr>,
-    pub(super) first: bool,
-    pub(super) is_async: bool,
+    target_kind: TargetKind<'db>,
+    iterable: AstNodeRef<ast::Expr>,
+    target: AstNodeRef<ast::Expr>,
+    first: bool,
+    is_async: bool,
 }
 
 impl<'db> ComprehensionDefinitionKind<'db> {
