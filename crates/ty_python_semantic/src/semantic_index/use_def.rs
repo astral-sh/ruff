@@ -156,7 +156,7 @@
 //! `bindings_by_use` vector of [`Bindings`] indexed by [`ScopedUseId`], a
 //! `declarations_by_binding` vector of [`Declarations`] indexed by [`ScopedDefinitionId`], a
 //! `bindings_by_declaration` vector of [`Bindings`] indexed by [`ScopedDefinitionId`], and
-//! `public_bindings` and `public_definitions` vectors indexed by [`ScopedTargetId`]. The values in
+//! `public_bindings` and `public_definitions` vectors indexed by [`ScopedPlaceId`]. The values in
 //! each of these vectors are (in principle) a list of live bindings at that use/definition, or at
 //! the end of the scope for that symbol, with a list of the dominating constraints for each
 //! binding.
@@ -178,14 +178,14 @@
 //! To build a [`UseDefMap`], the [`UseDefMapBuilder`] is notified of each new use, definition, and
 //! constraint as they are encountered by the
 //! [`SemanticIndexBuilder`](crate::semantic_index::builder::SemanticIndexBuilder) AST visit. For
-//! each target, the builder tracks the `TargetState` (`Bindings` and `Declarations`)
+//! each place, the builder tracks the `PlaceState` (`Bindings` and `Declarations`)
 //! for that symbol. When we hit a use or definition of a symbol, we record the necessary parts of
 //! the current state for that symbol that we need for that use or definition. When we reach the
 //! end of the scope, it records the state for each symbol as the public definitions of that
 //! symbol.
 //!
 //! Let's walk through the above example. Initially we do not have any record of `x`. When we add
-//! the new symbol (before we process the first binding), we create a new undefined `TargetState`
+//! the new symbol (before we process the first binding), we create a new undefined `PlaceState`
 //! which has a single live binding (the "unbound" definition) and a single live declaration (the
 //! "undeclared" definition). When we see `x = 1`, we record that as the sole live binding of `x`.
 //! The "unbound" binding is no longer visible. Then we see `x = 2`, and we replace `x = 1` as the
@@ -259,9 +259,9 @@
 use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
 
-use self::symbol_state::{
+use self::place_state::{
     Bindings, Declarations, EagerSnapshot, LiveBindingsIterator, LiveDeclaration,
-    LiveDeclarationsIterator, ScopedDefinitionId, TargetState,
+    LiveDeclarationsIterator, PlaceState, ScopedDefinitionId,
 };
 use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::ScopedUseId;
@@ -269,17 +269,17 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
 };
+use crate::semantic_index::place::{FileScopeId, ScopeKind, ScopedPlaceId};
 use crate::semantic_index::predicate::{
     Predicate, Predicates, PredicatesBuilder, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
-use crate::semantic_index::target::{FileScopeId, ScopeKind, ScopedTargetId};
 use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
 };
 use crate::semantic_index::EagerSnapshotResult;
 use crate::types::{infer_narrowing_constraint, IntersectionBuilder, Truthiness, Type};
 
-mod symbol_state;
+mod place_state;
 
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
@@ -320,8 +320,8 @@ pub(crate) struct UseDefMap<'db> {
     /// valid assignment to our own annotation.
     bindings_by_declaration: FxHashMap<Definition<'db>, Bindings>,
 
-    /// [`TargetState`] visible at end of scope for each target.
-    public_targets: IndexVec<ScopedTargetId, TargetState>,
+    /// [`PlaceState`] visible at end of scope for each place.
+    public_places: IndexVec<ScopedPlaceId, PlaceState>,
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// eager scope.
@@ -399,9 +399,9 @@ impl<'db> UseDefMap<'db> {
 
     pub(crate) fn public_bindings(
         &self,
-        target: ScopedTargetId,
+        place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        self.bindings_iterator(self.public_targets[target].bindings())
+        self.bindings_iterator(self.public_places[place].bindings())
     }
 
     pub(crate) fn eager_snapshot(
@@ -435,27 +435,27 @@ impl<'db> UseDefMap<'db> {
 
     pub(crate) fn public_declarations<'map>(
         &'map self,
-        target: ScopedTargetId,
+        place: ScopedPlaceId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let declarations = self.public_targets[target].declarations();
+        let declarations = self.public_places[place].declarations();
         self.declarations_iterator(declarations)
     }
 
     pub(crate) fn all_public_declarations<'map>(
         &'map self,
-    ) -> impl Iterator<Item = (ScopedTargetId, DeclarationsIterator<'map, 'db>)> + 'map {
-        (0..self.public_targets.len())
-            .map(ScopedTargetId::from_usize)
-            .map(|target_id| (target_id, self.public_declarations(target_id)))
+    ) -> impl Iterator<Item = (ScopedPlaceId, DeclarationsIterator<'map, 'db>)> + 'map {
+        (0..self.public_places.len())
+            .map(ScopedPlaceId::from_usize)
+            .map(|place_id| (place_id, self.public_declarations(place_id)))
     }
 
     pub(crate) fn all_public_bindings<'map>(
         &'map self,
-    ) -> impl Iterator<Item = (ScopedTargetId, BindingWithConstraintsIterator<'map, 'db>)> + 'map
+    ) -> impl Iterator<Item = (ScopedPlaceId, BindingWithConstraintsIterator<'map, 'db>)> + 'map
     {
-        (0..self.public_targets.len())
-            .map(ScopedTargetId::from_usize)
-            .map(|target_id| (target_id, self.public_bindings(target_id)))
+        (0..self.public_places.len())
+            .map(ScopedPlaceId::from_usize)
+            .map(|place_id| (place_id, self.public_bindings(place_id)))
     }
 
     /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
@@ -501,7 +501,7 @@ impl<'db> UseDefMap<'db> {
     }
 }
 
-/// Uniquely identifies a snapshot of a target state that can be used to resolve a reference in a
+/// Uniquely identifies a snapshot of a place state that can be used to resolve a reference in a
 /// nested eager scope.
 ///
 /// An eager scope has its entire body executed immediately at the location where it is defined.
@@ -516,13 +516,13 @@ pub(crate) struct ScopedEagerSnapshotId;
 pub(crate) struct EagerSnapshotKey {
     /// The enclosing scope containing the bindings
     pub(crate) enclosing_scope: FileScopeId,
-    /// The referenced target (in the enclosing scope)
-    pub(crate) enclosing_target: ScopedTargetId,
+    /// The referenced place (in the enclosing scope)
+    pub(crate) enclosing_place: ScopedPlaceId,
     /// The nested eager scope containing the reference
     pub(crate) nested_scope: FileScopeId,
 }
 
-/// A snapshot of target states that can be used to resolve a reference in a nested eager scope.
+/// A snapshot of place states that can be used to resolve a reference in a nested eager scope.
 type EagerSnapshots = IndexVec<ScopedEagerSnapshotId, EagerSnapshot>;
 
 #[derive(Debug)]
@@ -585,10 +585,10 @@ impl<'db> ConstraintsIterator<'_, 'db> {
         self,
         db: &'db dyn crate::Db,
         base_ty: Type<'db>,
-        target: ScopedTargetId,
+        place: ScopedPlaceId,
     ) -> Type<'db> {
         let constraint_tys: Vec<_> = self
-            .filter_map(|constraint| infer_narrowing_constraint(db, constraint, target))
+            .filter_map(|constraint| infer_narrowing_constraint(db, constraint, place))
             .collect();
 
         if constraint_tys.is_empty() {
@@ -643,7 +643,7 @@ impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 /// A snapshot of the definitions and constraints state at a particular point in control flow.
 #[derive(Clone, Debug)]
 pub(super) struct FlowSnapshot {
-    target_states: IndexVec<ScopedTargetId, TargetState>,
+    place_states: IndexVec<ScopedPlaceId, PlaceState>,
     scope_start_visibility: ScopedVisibilityConstraintId,
     reachability: ScopedVisibilityConstraintId,
 }
@@ -720,10 +720,10 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Live bindings for each so-far-recorded declaration.
     bindings_by_declaration: FxHashMap<Definition<'db>, Bindings>,
 
-    /// Currently live bindings and declarations for each target.
-    target_states: IndexVec<ScopedTargetId, TargetState>,
+    /// Currently live bindings and declarations for each place.
+    place_states: IndexVec<ScopedPlaceId, PlaceState>,
 
-    /// Snapshots of target states in this scope that can be used to resolve a reference in a
+    /// Snapshots of place states in this scope that can be used to resolve a reference in a
     /// nested eager scope.
     eager_snapshots: EagerSnapshots,
 
@@ -744,7 +744,7 @@ impl<'db> UseDefMapBuilder<'db> {
             node_reachability: FxHashMap::default(),
             declarations_by_binding: FxHashMap::default(),
             bindings_by_declaration: FxHashMap::default(),
-            target_states: IndexVec::new(),
+            place_states: IndexVec::new(),
             eager_snapshots: EagerSnapshots::default(),
             is_class_scope,
         }
@@ -754,19 +754,19 @@ impl<'db> UseDefMapBuilder<'db> {
         self.reachability = ScopedVisibilityConstraintId::ALWAYS_FALSE;
     }
 
-    pub(super) fn add_target(&mut self, target: ScopedTargetId) {
-        let new_target = self
-            .target_states
-            .push(TargetState::undefined(self.scope_start_visibility));
-        debug_assert_eq!(target, new_target);
+    pub(super) fn add_place(&mut self, place: ScopedPlaceId) {
+        let new_place = self
+            .place_states
+            .push(PlaceState::undefined(self.scope_start_visibility));
+        debug_assert_eq!(place, new_place);
     }
 
-    pub(super) fn record_binding(&mut self, symbol: ScopedTargetId, binding: Definition<'db>) {
+    pub(super) fn record_binding(&mut self, symbol: ScopedPlaceId, binding: Definition<'db>) {
         let def_id = self.all_definitions.push(Some(binding));
-        let target_state = &mut self.target_states[symbol];
+        let place_state = &mut self.place_states[symbol];
         self.declarations_by_binding
-            .insert(binding, target_state.declarations().clone());
-        target_state.record_binding(def_id, self.scope_start_visibility, self.is_class_scope);
+            .insert(binding, place_state.declarations().clone());
+        place_state.record_binding(def_id, self.scope_start_visibility, self.is_class_scope);
     }
 
     pub(super) fn add_predicate(&mut self, predicate: Predicate<'db>) -> ScopedPredicateId {
@@ -775,7 +775,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn record_narrowing_constraint(&mut self, predicate: ScopedPredicateId) {
         let narrowing_constraint = predicate.into();
-        for state in &mut self.target_states {
+        for state in &mut self.place_states {
             state
                 .record_narrowing_constraint(&mut self.narrowing_constraints, narrowing_constraint);
         }
@@ -785,7 +785,7 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         constraint: ScopedVisibilityConstraintId,
     ) {
-        for state in &mut self.target_states {
+        for state in &mut self.place_states {
             state.record_visibility_constraint(&mut self.visibility_constraints, constraint);
         }
         self.scope_start_visibility = self
@@ -793,13 +793,13 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_and_constraint(self.scope_start_visibility, constraint);
     }
 
-    /// Snapshot the state of a single target at the current point in control flow.
+    /// Snapshot the state of a single place at the current point in control flow.
     ///
     /// This is only used for `*`-import visibility constraints, which are handled differently
     /// to most other visibility constraints. See the doc-comment for
     /// [`Self::record_and_negate_star_import_visibility_constraint`] for more details.
-    pub(super) fn single_target_snapshot(&self, target: ScopedTargetId) -> TargetState {
-        self.target_states[target].clone()
+    pub(super) fn single_place_snapshot(&self, place: ScopedPlaceId) -> PlaceState {
+        self.place_states[place].clone()
     }
 
     /// This method exists solely for handling `*`-import visibility constraints.
@@ -823,10 +823,10 @@ impl<'db> UseDefMapBuilder<'db> {
     ///   Doing things this way is cheaper in and of itself. However, it also allows us to avoid
     ///   calling [`Self::simplify_visibility_constraints`] after the constraint has been applied to
     ///   the "if-predicate-true" branch and negated for the "if-predicate-false" branch. Simplifying
-    ///   the visibility constraints is only important for targets that did not have any new
+    ///   the visibility constraints is only important for places that did not have any new
     ///   definitions inside either the "if-predicate-true" branch or the "if-predicate-false" branch.
     ///
-    /// - We only snapshot the state for a single target prior to the definition, rather than doing
+    /// - We only snapshot the state for a single place prior to the definition, rather than doing
     ///   expensive calls to [`Self::snapshot`]. Again, this is possible because we know
     ///   that only a single definition occurs inside the "if-predicate-true" predicate branch.
     ///
@@ -840,8 +840,8 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn record_and_negate_star_import_visibility_constraint(
         &mut self,
         star_import: StarImportPlaceholderPredicate<'db>,
-        symbol: ScopedTargetId,
-        pre_definition_state: TargetState,
+        symbol: ScopedPlaceId,
+        pre_definition_state: PlaceState,
     ) {
         let predicate_id = self.add_predicate(star_import.into());
         let visibility_id = self.visibility_constraints.add_atom(predicate_id);
@@ -850,15 +850,15 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_not_constraint(visibility_id);
 
         let mut post_definition_state =
-            std::mem::replace(&mut self.target_states[symbol], pre_definition_state);
+            std::mem::replace(&mut self.place_states[symbol], pre_definition_state);
 
         post_definition_state
             .record_visibility_constraint(&mut self.visibility_constraints, visibility_id);
 
-        self.target_states[symbol]
+        self.place_states[symbol]
             .record_visibility_constraint(&mut self.visibility_constraints, negated_visibility_id);
 
-        self.target_states[symbol].merge(
+        self.place_states[symbol].merge(
             post_definition_state,
             &mut self.narrowing_constraints,
             &mut self.visibility_constraints,
@@ -884,7 +884,7 @@ impl<'db> UseDefMapBuilder<'db> {
     /// constraint for the `x = 0` binding as well, but at the `RESET` point, we can get rid
     /// of it, as the `if`-`elif`-`elif` chain doesn't include any new bindings of `x`.
     pub(super) fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
-        debug_assert!(self.target_states.len() >= snapshot.target_states.len());
+        debug_assert!(self.place_states.len() >= snapshot.place_states.len());
 
         // If there are any control flow paths that have become unreachable between `snapshot` and
         // now, then it's not valid to simplify any visibility constraints to `snapshot`.
@@ -892,13 +892,13 @@ impl<'db> UseDefMapBuilder<'db> {
             return;
         }
 
-        // Note that this loop terminates when we reach a target not present in the snapshot.
-        // This means we keep visibility constraints for all new targets, which is intended,
-        // since these targets have been introduced in the corresponding branch, which might
+        // Note that this loop terminates when we reach a place not present in the snapshot.
+        // This means we keep visibility constraints for all new places, which is intended,
+        // since these places have been introduced in the corresponding branch, which might
         // be subject to visibility constraints. We only simplify/reset visibility constraints
-        // for targets that have the same bindings and declarations present compared to the
+        // for places that have the same bindings and declarations present compared to the
         // snapshot.
-        for (current, snapshot) in self.target_states.iter_mut().zip(snapshot.target_states) {
+        for (current, snapshot) in self.place_states.iter_mut().zip(snapshot.place_states) {
             current.simplify_visibility_constraints(snapshot);
         }
     }
@@ -915,43 +915,43 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn record_declaration(
         &mut self,
-        target: ScopedTargetId,
+        place: ScopedPlaceId,
         declaration: Definition<'db>,
     ) {
         let def_id = self.all_definitions.push(Some(declaration));
-        let target_state = &mut self.target_states[target];
+        let place_state = &mut self.place_states[place];
         self.bindings_by_declaration
-            .insert(declaration, target_state.bindings().clone());
-        target_state.record_declaration(def_id);
+            .insert(declaration, place_state.bindings().clone());
+        place_state.record_declaration(def_id);
     }
 
     pub(super) fn record_declaration_and_binding(
         &mut self,
-        target: ScopedTargetId,
+        place: ScopedPlaceId,
         definition: Definition<'db>,
     ) {
         // We don't need to store anything in self.bindings_by_declaration or
         // self.declarations_by_binding.
         let def_id = self.all_definitions.push(Some(definition));
-        let target_state = &mut self.target_states[target];
-        target_state.record_declaration(def_id);
-        target_state.record_binding(def_id, self.scope_start_visibility, self.is_class_scope);
+        let place_state = &mut self.place_states[place];
+        place_state.record_declaration(def_id);
+        place_state.record_binding(def_id, self.scope_start_visibility, self.is_class_scope);
     }
 
     pub(super) fn record_use(
         &mut self,
-        target: ScopedTargetId,
+        place: ScopedPlaceId,
         use_id: ScopedUseId,
         node_key: NodeKey,
     ) {
-        // We have a use of a target; clone the current bindings for that target, and record them
+        // We have a use of a place; clone the current bindings for that place, and record them
         // as the live bindings for this use.
         let new_use = self
             .bindings_by_use
-            .push(self.target_states[target].bindings().clone());
+            .push(self.place_states[place].bindings().clone());
         debug_assert_eq!(use_id, new_use);
 
-        // Track reachability of all uses of targets to silence `unresolved-reference`
+        // Track reachability of all uses of places to silence `unresolved-reference`
         // diagnostics in unreachable code.
         self.record_node_reachability(node_key);
     }
@@ -962,7 +962,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn snapshot_eager_state(
         &mut self,
-        enclosing_target: ScopedTargetId,
+        enclosing_place: ScopedPlaceId,
         scope: ScopeKind,
         is_bound: bool,
     ) -> ScopedEagerSnapshotId {
@@ -970,50 +970,50 @@ impl<'db> UseDefMapBuilder<'db> {
         // save eager scope bindings in a class scope.
         if scope.is_class() || !is_bound {
             self.eager_snapshots.push(EagerSnapshot::Constraint(
-                self.target_states[enclosing_target]
+                self.place_states[enclosing_place]
                     .bindings()
                     .unbound_narrowing_constraint(),
             ))
         } else {
             self.eager_snapshots.push(EagerSnapshot::Bindings(
-                self.target_states[enclosing_target].bindings().clone(),
+                self.place_states[enclosing_place].bindings().clone(),
             ))
         }
     }
 
-    /// Take a snapshot of the current visible-targets state.
+    /// Take a snapshot of the current visible-places state.
     pub(super) fn snapshot(&self) -> FlowSnapshot {
         FlowSnapshot {
-            target_states: self.target_states.clone(),
+            place_states: self.place_states.clone(),
             scope_start_visibility: self.scope_start_visibility,
             reachability: self.reachability,
         }
     }
 
-    /// Restore the current builder targets state to the given snapshot.
+    /// Restore the current builder places state to the given snapshot.
     pub(super) fn restore(&mut self, snapshot: FlowSnapshot) {
-        // We never remove targets from `target_states` (it's an IndexVec, and the target
-        // IDs must line up), so the current number of known targets must always be equal to or
-        // greater than the number of known targets in a previously-taken snapshot.
-        let num_targets = self.target_states.len();
-        debug_assert!(num_targets >= snapshot.target_states.len());
+        // We never remove places from `place_states` (it's an IndexVec, and the place
+        // IDs must line up), so the current number of known places must always be equal to or
+        // greater than the number of known places in a previously-taken snapshot.
+        let num_places = self.place_states.len();
+        debug_assert!(num_places >= snapshot.place_states.len());
 
         // Restore the current visible-definitions state to the given snapshot.
-        self.target_states = snapshot.target_states;
+        self.place_states = snapshot.place_states;
         self.scope_start_visibility = snapshot.scope_start_visibility;
         self.reachability = snapshot.reachability;
 
-        // If the snapshot we are restoring is missing some targets we've recorded since, we need
-        // to fill them in so the target IDs continue to line up. Since they don't exist in the
+        // If the snapshot we are restoring is missing some places we've recorded since, we need
+        // to fill them in so the place IDs continue to line up. Since they don't exist in the
         // snapshot, the correct state to fill them in with is "undefined".
-        self.target_states.resize(
-            num_targets,
-            TargetState::undefined(self.scope_start_visibility),
+        self.place_states.resize(
+            num_places,
+            PlaceState::undefined(self.scope_start_visibility),
         );
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
-    /// path to get here. The new state for each target should include definitions from both the
+    /// path to get here. The new state for each place should include definitions from both the
     /// prior state and the snapshot.
     pub(super) fn merge(&mut self, snapshot: FlowSnapshot) {
         // As an optimization, if we know statically that either of the snapshots is always
@@ -1031,13 +1031,13 @@ impl<'db> UseDefMapBuilder<'db> {
             return;
         }
 
-        // We never remove targets from `target_states` (it's an IndexVec, and the target
-        // IDs must line up), so the current number of known targets must always be equal to or
-        // greater than the number of known targets in a previously-taken snapshot.
-        debug_assert!(self.target_states.len() >= snapshot.target_states.len());
+        // We never remove places from `place_states` (it's an IndexVec, and the place
+        // IDs must line up), so the current number of known places must always be equal to or
+        // greater than the number of known places in a previously-taken snapshot.
+        debug_assert!(self.place_states.len() >= snapshot.place_states.len());
 
-        let mut snapshot_definitions_iter = snapshot.target_states.into_iter();
-        for current in &mut self.target_states {
+        let mut snapshot_definitions_iter = snapshot.place_states.into_iter();
+        for current in &mut self.place_states {
             if let Some(snapshot) = snapshot_definitions_iter.next() {
                 current.merge(
                     snapshot,
@@ -1046,11 +1046,11 @@ impl<'db> UseDefMapBuilder<'db> {
                 );
             } else {
                 current.merge(
-                    TargetState::undefined(snapshot.scope_start_visibility),
+                    PlaceState::undefined(snapshot.scope_start_visibility),
                     &mut self.narrowing_constraints,
                     &mut self.visibility_constraints,
                 );
-                // Target not present in snapshot, so it's unbound/undeclared from that path.
+                // Place not present in snapshot, so it's unbound/undeclared from that path.
             }
         }
 
@@ -1065,7 +1065,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
         self.all_definitions.shrink_to_fit();
-        self.target_states.shrink_to_fit();
+        self.place_states.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
         self.node_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
@@ -1079,7 +1079,7 @@ impl<'db> UseDefMapBuilder<'db> {
             visibility_constraints: self.visibility_constraints.build(),
             bindings_by_use: self.bindings_by_use,
             node_reachability: self.node_reachability,
-            public_targets: self.target_states,
+            public_places: self.place_states,
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,
             eager_snapshots: self.eager_snapshots,

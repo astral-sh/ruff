@@ -3,10 +3,10 @@ use ruff_db::files::File;
 use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::target::{ScopeId, ScopedTargetId, Target, TargetSubSegment};
+use crate::semantic_index::place::{PlaceExpr, PlaceExprSubSegment, ScopeId, ScopedPlaceId};
 use crate::semantic_index::{global_scope, use_def_map, DeclarationWithConstraint};
 use crate::semantic_index::{
-    target_table, BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
+    place_table, BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
 };
 use crate::types::{
     binding_type, declaration_type, todo_type, KnownClass, Truthiness, Type, TypeAndQualifiers,
@@ -33,8 +33,8 @@ impl Boundness {
     }
 }
 
-/// The result of a target lookup, which can either be a (possibly unbound) type
-/// or a completely unbound target.
+/// The result of a place lookup, which can either be a (possibly unbound) type
+/// or a completely unbound place.
 ///
 /// Consider this example:
 /// ```py
@@ -46,35 +46,35 @@ impl Boundness {
 ///
 /// If we look up symbols in this scope, we would get the following results:
 /// ```rs
-/// bound:             ResolvedTarget::Type(Type::IntLiteral(1), Boundness::Bound),
-/// possibly_unbound:  ResolvedTarget::Type(Type::IntLiteral(2), Boundness::PossiblyUnbound),
-/// non_existent:      ResolvedTarget::Unbound,
+/// bound:             Place::Type(Type::IntLiteral(1), Boundness::Bound),
+/// possibly_unbound:  Place::Type(Type::IntLiteral(2), Boundness::PossiblyUnbound),
+/// non_existent:      Place::Unbound,
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
-pub(crate) enum ResolvedTarget<'db> {
+pub(crate) enum Place<'db> {
     Type(Type<'db>, Boundness),
     Unbound,
 }
 
-impl<'db> ResolvedTarget<'db> {
-    /// Constructor that creates a `ResolvedTarget` with boundness [`Boundness::Bound`].
+impl<'db> Place<'db> {
+    /// Constructor that creates a `Place` with boundness [`Boundness::Bound`].
     pub(crate) fn bound(ty: impl Into<Type<'db>>) -> Self {
-        ResolvedTarget::Type(ty.into(), Boundness::Bound)
+        Place::Type(ty.into(), Boundness::Bound)
     }
 
     pub(crate) fn possibly_unbound(ty: impl Into<Type<'db>>) -> Self {
-        ResolvedTarget::Type(ty.into(), Boundness::PossiblyUnbound)
+        Place::Type(ty.into(), Boundness::PossiblyUnbound)
     }
 
-    /// Constructor that creates a [`ResolvedTarget`] with a [`crate::types::TodoType`] type
+    /// Constructor that creates a [`Place`] with a [`crate::types::TodoType`] type
     /// and boundness [`Boundness::Bound`].
     #[allow(unused_variables)] // Only unused in release builds
     pub(crate) fn todo(message: &'static str) -> Self {
-        ResolvedTarget::Type(todo_type!(message), Boundness::Bound)
+        Place::Type(todo_type!(message), Boundness::Bound)
     }
 
     pub(crate) fn is_unbound(&self) -> bool {
-        matches!(self, ResolvedTarget::Unbound)
+        matches!(self, Place::Unbound)
     }
 
     /// Returns the type of the symbol, ignoring possible unboundness.
@@ -83,8 +83,8 @@ impl<'db> ResolvedTarget<'db> {
     /// if there is at least one control-flow path where the symbol is bound, return the type.
     pub(crate) fn ignore_possibly_unbound(&self) -> Option<Type<'db>> {
         match self {
-            ResolvedTarget::Type(ty, _) => Some(*ty),
-            ResolvedTarget::Unbound => None,
+            Place::Type(ty, _) => Some(*ty),
+            Place::Unbound => None,
         }
     }
 
@@ -96,17 +96,17 @@ impl<'db> ResolvedTarget<'db> {
     }
 
     #[must_use]
-    pub(crate) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> ResolvedTarget<'db> {
+    pub(crate) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Place<'db> {
         match self {
-            ResolvedTarget::Type(ty, boundness) => ResolvedTarget::Type(f(ty), boundness),
-            ResolvedTarget::Unbound => ResolvedTarget::Unbound,
+            Place::Type(ty, boundness) => Place::Type(f(ty), boundness),
+            Place::Unbound => Place::Unbound,
         }
     }
 
     #[must_use]
-    pub(crate) fn with_qualifiers(self, qualifiers: TypeQualifiers) -> TargetAndQualifiers<'db> {
-        TargetAndQualifiers {
-            target: self,
+    pub(crate) fn with_qualifiers(self, qualifiers: TypeQualifiers) -> PlaceAndQualifiers<'db> {
+        PlaceAndQualifiers {
+            place: self,
             qualifiers,
         }
     }
@@ -114,49 +114,42 @@ impl<'db> ResolvedTarget<'db> {
     /// Try to call `__get__(None, owner)` on the type of this symbol (not on the meta type).
     /// If it succeeds, return the `__get__` return type. Otherwise, returns the original symbol.
     /// This is used to resolve (potential) descriptor attributes.
-    pub(crate) fn try_call_dunder_get(
-        self,
-        db: &'db dyn Db,
-        owner: Type<'db>,
-    ) -> ResolvedTarget<'db> {
+    pub(crate) fn try_call_dunder_get(self, db: &'db dyn Db, owner: Type<'db>) -> Place<'db> {
         match self {
-            ResolvedTarget::Type(Type::Union(union), boundness) => union
+            Place::Type(Type::Union(union), boundness) => union.map_with_boundness(db, |elem| {
+                Place::Type(*elem, boundness).try_call_dunder_get(db, owner)
+            }),
+
+            Place::Type(Type::Intersection(intersection), boundness) => intersection
                 .map_with_boundness(db, |elem| {
-                    ResolvedTarget::Type(*elem, boundness).try_call_dunder_get(db, owner)
+                    Place::Type(*elem, boundness).try_call_dunder_get(db, owner)
                 }),
 
-            ResolvedTarget::Type(Type::Intersection(intersection), boundness) => intersection
-                .map_with_boundness(db, |elem| {
-                    ResolvedTarget::Type(*elem, boundness).try_call_dunder_get(db, owner)
-                }),
-
-            ResolvedTarget::Type(self_ty, boundness) => {
+            Place::Type(self_ty, boundness) => {
                 if let Some((dunder_get_return_ty, _)) =
                     self_ty.try_call_dunder_get(db, Type::none(db), owner)
                 {
-                    ResolvedTarget::Type(dunder_get_return_ty, boundness)
+                    Place::Type(dunder_get_return_ty, boundness)
                 } else {
                     self
                 }
             }
 
-            ResolvedTarget::Unbound => ResolvedTarget::Unbound,
+            Place::Unbound => Place::Unbound,
         }
     }
 }
 
-impl<'db> From<LookupResult<'db>> for TargetAndQualifiers<'db> {
+impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {
     fn from(value: LookupResult<'db>) -> Self {
         match value {
             Ok(type_and_qualifiers) => {
-                ResolvedTarget::Type(type_and_qualifiers.inner_type(), Boundness::Bound)
+                Place::Type(type_and_qualifiers.inner_type(), Boundness::Bound)
                     .with_qualifiers(type_and_qualifiers.qualifiers())
             }
-            Err(LookupError::Unbound(qualifiers)) => {
-                ResolvedTarget::Unbound.with_qualifiers(qualifiers)
-            }
+            Err(LookupError::Unbound(qualifiers)) => Place::Unbound.with_qualifiers(qualifiers),
             Err(LookupError::PossiblyUnbound(type_and_qualifiers)) => {
-                ResolvedTarget::Type(type_and_qualifiers.inner_type(), Boundness::PossiblyUnbound)
+                Place::Type(type_and_qualifiers.inner_type(), Boundness::PossiblyUnbound)
                     .with_qualifiers(type_and_qualifiers.qualifiers())
             }
         }
@@ -175,7 +168,7 @@ impl<'db> LookupError<'db> {
     pub(crate) fn or_fall_back_to(
         self,
         db: &'db dyn Db,
-        fallback: TargetAndQualifiers<'db>,
+        fallback: PlaceAndQualifiers<'db>,
     ) -> LookupResult<'db> {
         let fallback = fallback.into_lookup_result();
         match (&self, &fallback) {
@@ -198,8 +191,8 @@ impl<'db> LookupError<'db> {
 /// A [`Result`] type in which the `Ok` variant represents a definitely bound symbol
 /// and the `Err` variant represents a symbol that is either definitely or possibly unbound.
 ///
-/// Note that this type is exactly isomorphic to [`ResolvedTarget`].
-/// In the future, we could possibly consider removing `ResolvedTarget` and using this type everywhere instead.
+/// Note that this type is exactly isomorphic to [`Place`].
+/// In the future, we could possibly consider removing `Place` and using this type everywhere instead.
 pub(crate) type LookupResult<'db> = Result<TypeAndQualifiers<'db>, LookupError<'db>>;
 
 /// Infer the public type of a symbol (its type as seen from outside its scope) in the given
@@ -209,16 +202,16 @@ pub(crate) fn symbol<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     name: &str,
-) -> TargetAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     symbol_impl(db, scope, name, RequiresExplicitReExport::No)
 }
 
-pub(crate) fn target<'db>(
+pub(crate) fn place<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
-    target: &Target,
-) -> TargetAndQualifiers<'db> {
-    target_impl(db, scope, target, RequiresExplicitReExport::No)
+    expr: &PlaceExpr,
+) -> PlaceAndQualifiers<'db> {
+    place_impl(db, scope, expr, RequiresExplicitReExport::No)
 }
 
 /// Infer the public type of a class symbol (its type as seen from outside its scope) in the given
@@ -227,11 +220,11 @@ pub(crate) fn class_symbol<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     name: &str,
-) -> TargetAndQualifiers<'db> {
-    target_table(db, scope)
-        .target_id_by_name(name)
+) -> PlaceAndQualifiers<'db> {
+    place_table(db, scope)
+        .place_id_by_name(name)
         .map(|symbol| {
-            let symbol_and_quals = target_by_id(db, scope, symbol, RequiresExplicitReExport::No);
+            let symbol_and_quals = place_by_id(db, scope, symbol, RequiresExplicitReExport::No);
 
             if symbol_and_quals.is_class_var() {
                 // For declared class vars we do not need to check if they have bindings,
@@ -239,27 +232,26 @@ pub(crate) fn class_symbol<'db>(
                 return symbol_and_quals;
             }
 
-            if let TargetAndQualifiers {
-                target: ResolvedTarget::Type(ty, _),
+            if let PlaceAndQualifiers {
+                place: Place::Type(ty, _),
                 qualifiers,
             } = symbol_and_quals
             {
                 // Otherwise, we need to check if the symbol has bindings
                 let use_def = use_def_map(db, scope);
                 let bindings = use_def.public_bindings(symbol);
-                let inferred =
-                    target_from_bindings_impl(db, bindings, RequiresExplicitReExport::No);
+                let inferred = place_from_bindings_impl(db, bindings, RequiresExplicitReExport::No);
 
                 // TODO: we should not need to calculate inferred type second time. This is a temporary
                 // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
                 match inferred {
-                    ResolvedTarget::Unbound => ResolvedTarget::Unbound.with_qualifiers(qualifiers),
-                    ResolvedTarget::Type(_, boundness) => {
-                        ResolvedTarget::Type(ty, boundness).with_qualifiers(qualifiers)
+                    Place::Unbound => Place::Unbound.with_qualifiers(qualifiers),
+                    Place::Type(_, boundness) => {
+                        Place::Type(ty, boundness).with_qualifiers(qualifiers)
                     }
                 }
             } else {
-                ResolvedTarget::Unbound.into()
+                Place::Unbound.into()
             }
         })
         .unwrap_or_default()
@@ -269,19 +261,19 @@ pub(crate) fn class_symbol<'db>(
 ///
 /// Note that all global scopes also include various "implicit globals" such as `__name__`,
 /// `__doc__` and `__file__`. This function **does not** consider those symbols; it will return
-/// `ResolvedTarget::Unbound` for them. Use the (currently test-only) `global_symbol` query to also include
+/// `Place::Unbound` for them. Use the (currently test-only) `global_symbol` query to also include
 /// those additional symbols.
 ///
 /// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
-pub(crate) fn explicit_global_target<'db>(
+pub(crate) fn explicit_global_place<'db>(
     db: &'db dyn Db,
     file: File,
-    target: &Target,
-) -> TargetAndQualifiers<'db> {
-    target_impl(
+    expr: &PlaceExpr,
+) -> PlaceAndQualifiers<'db> {
+    place_impl(
         db,
         global_scope(db, file),
-        target,
+        expr,
         RequiresExplicitReExport::No,
     )
 }
@@ -293,16 +285,16 @@ pub(crate) fn explicit_global_target<'db>(
 /// rather than being looked up as symbols explicitly defined/declared in the global scope.
 ///
 /// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
-pub(crate) fn global_target<'db>(
+pub(crate) fn global_place<'db>(
     db: &'db dyn Db,
     file: File,
-    target: &Target,
-) -> TargetAndQualifiers<'db> {
-    explicit_global_target(db, file, target).or_fall_back_to(db, || {
-        if let Some(name) = target.as_name() {
+    expr: &PlaceExpr,
+) -> PlaceAndQualifiers<'db> {
+    explicit_global_place(db, file, expr).or_fall_back_to(db, || {
+        if let Some(name) = expr.as_name() {
             module_type_implicit_global_symbol(db, name)
         } else {
-            ResolvedTarget::Unbound.into()
+            Place::Unbound.into()
         }
     })
 }
@@ -311,7 +303,7 @@ pub(crate) fn global_target<'db>(
 ///
 /// Note that all global scopes also include various "implicit globals" such as `__name__`,
 /// `__doc__` and `__file__`. This function **does not** consider those symbols; it will return
-/// `ResolvedTarget::Unbound` for them. Use the (currently test-only) `global_symbol` query to also include
+/// `Place::Unbound` for them. Use the (currently test-only) `global_symbol` query to also include
 /// those additional symbols.
 ///
 /// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
@@ -319,7 +311,7 @@ pub(crate) fn explicit_global_symbol<'db>(
     db: &'db dyn Db,
     file: File,
     name: &str,
-) -> TargetAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     symbol_impl(
         db,
         global_scope(db, file),
@@ -340,7 +332,7 @@ pub(crate) fn global_symbol<'db>(
     db: &'db dyn Db,
     file: File,
     name: &str,
-) -> TargetAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     explicit_global_symbol(db, file, name)
         .or_fall_back_to(db, || module_type_implicit_global_symbol(db, name))
 }
@@ -354,7 +346,7 @@ pub(crate) fn imported_symbol<'db>(
     file: File,
     name: &str,
     requires_explicit_reexport: Option<RequiresExplicitReExport>,
-) -> TargetAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
         if file.is_stub(db.upcast()) {
             RequiresExplicitReExport::Yes
@@ -382,9 +374,9 @@ pub(crate) fn imported_symbol<'db>(
         db,
         || {
             if name == "__getattr__" {
-                ResolvedTarget::Unbound.into()
+                Place::Unbound.into()
             } else if name == "__builtins__" {
-                ResolvedTarget::bound(Type::any()).into()
+                Place::bound(Type::any()).into()
             } else {
                 KnownClass::ModuleType.to_instance(db).member(db, name)
             }
@@ -394,12 +386,12 @@ pub(crate) fn imported_symbol<'db>(
 
 /// Lookup the type of `symbol` in the builtins namespace.
 ///
-/// Returns `ResolvedTarget::Unbound` if the `builtins` module isn't available for some reason.
+/// Returns `Place::Unbound` if the `builtins` module isn't available for some reason.
 ///
 /// Note that this function is only intended for use in the context of the builtins *namespace*
 /// and should not be used when a symbol is being explicitly imported from the `builtins` module
 /// (e.g. `from builtins import int`).
-pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> TargetAndQualifiers<'db> {
+pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQualifiers<'db> {
     resolve_module(db, &KnownModule::Builtins.name())
         .map(|module| {
             symbol_impl(
@@ -420,12 +412,12 @@ pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> TargetAndQu
 
 /// Lookup the type of `symbol` in a given known module.
 ///
-/// Returns `ResolvedTarget::Unbound` if the given known module cannot be resolved for some reason.
+/// Returns `Place::Unbound` if the given known module cannot be resolved for some reason.
 pub(crate) fn known_module_symbol<'db>(
     db: &'db dyn Db,
     known_module: KnownModule,
     symbol: &str,
-) -> TargetAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     resolve_module(db, &known_module.name())
         .map(|module| imported_symbol(db, module.file(), symbol, None))
         .unwrap_or_default()
@@ -433,21 +425,21 @@ pub(crate) fn known_module_symbol<'db>(
 
 /// Lookup the type of `symbol` in the `typing` module namespace.
 ///
-/// Returns `ResolvedTarget::Unbound` if the `typing` module isn't available for some reason.
+/// Returns `Place::Unbound` if the `typing` module isn't available for some reason.
 #[inline]
 #[cfg(test)]
-pub(crate) fn typing_symbol<'db>(db: &'db dyn Db, symbol: &str) -> TargetAndQualifiers<'db> {
+pub(crate) fn typing_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQualifiers<'db> {
     known_module_symbol(db, KnownModule::Typing, symbol)
 }
 
 /// Lookup the type of `symbol` in the `typing_extensions` module namespace.
 ///
-/// Returns `ResolvedTarget::Unbound` if the `typing_extensions` module isn't available for some reason.
+/// Returns `Place::Unbound` if the `typing_extensions` module isn't available for some reason.
 #[inline]
 pub(crate) fn typing_extensions_symbol<'db>(
     db: &'db dyn Db,
     symbol: &str,
-) -> TargetAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     known_module_symbol(db, KnownModule::TypingExtensions, symbol)
 }
 
@@ -466,14 +458,14 @@ fn core_module_scope(db: &dyn Db, core_module: KnownModule) -> Option<ScopeId<'_
 }
 
 /// Infer the combined type from an iterator of bindings, and return it
-/// together with boundness information in a [`ResolvedTarget`].
+/// together with boundness information in a [`Place`].
 ///
 /// The type will be a union if there are multiple bindings with different types.
-pub(super) fn target_from_bindings<'db>(
+pub(super) fn place_from_bindings<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
-) -> ResolvedTarget<'db> {
-    target_from_bindings_impl(db, bindings_with_constraints, RequiresExplicitReExport::No)
+) -> Place<'db> {
+    place_from_bindings_impl(db, bindings_with_constraints, RequiresExplicitReExport::No)
 }
 
 /// Build a declared type from a [`DeclarationsIterator`].
@@ -482,18 +474,18 @@ pub(super) fn target_from_bindings<'db>(
 /// `Ok(..)`. If there are conflicting declarations, returns an `Err(..)` variant with
 /// a union of the declared types as well as a list of all conflicting types.
 ///
-/// This function also returns declaredness information (see [`ResolvedTarget`]) and a set of
+/// This function also returns declaredness information (see [`Place`]) and a set of
 /// [`TypeQualifiers`] that have been specified on the declaration(s).
-pub(crate) fn target_from_declarations<'db>(
+pub(crate) fn place_from_declarations<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
-) -> TargetFromDeclarationsResult<'db> {
-    target_from_declarations_impl(db, declarations, RequiresExplicitReExport::No)
+) -> PlaceFromDeclarationsResult<'db> {
+    place_from_declarations_impl(db, declarations, RequiresExplicitReExport::No)
 }
 
-/// The result of looking up a declared type from declarations; see [`target_from_declarations`].
-pub(crate) type TargetFromDeclarationsResult<'db> =
-    Result<TargetAndQualifiers<'db>, (TypeAndQualifiers<'db>, Box<[Type<'db>]>)>;
+/// The result of looking up a declared type from declarations; see [`place_from_declarations`].
+pub(crate) type PlaceFromDeclarationsResult<'db> =
+    Result<PlaceAndQualifiers<'db>, (TypeAndQualifiers<'db>, Box<[Type<'db>]>)>;
 
 /// A type with declaredness information, and a set of type qualifiers.
 ///
@@ -510,28 +502,28 @@ pub(crate) type TargetFromDeclarationsResult<'db> =
 ///
 /// [`CLASS_VAR`]: crate::types::TypeQualifiers::CLASS_VAR
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
-pub(crate) struct TargetAndQualifiers<'db> {
-    pub(crate) target: ResolvedTarget<'db>,
+pub(crate) struct PlaceAndQualifiers<'db> {
+    pub(crate) place: Place<'db>,
     pub(crate) qualifiers: TypeQualifiers,
 }
 
-impl Default for TargetAndQualifiers<'_> {
+impl Default for PlaceAndQualifiers<'_> {
     fn default() -> Self {
-        TargetAndQualifiers {
-            target: ResolvedTarget::Unbound,
+        PlaceAndQualifiers {
+            place: Place::Unbound,
             qualifiers: TypeQualifiers::empty(),
         }
     }
 }
 
-impl<'db> TargetAndQualifiers<'db> {
-    /// Constructor that creates a [`TargetAndQualifiers`] instance with a [`TodoType`] type
+impl<'db> PlaceAndQualifiers<'db> {
+    /// Constructor that creates a [`PlaceAndQualifiers`] instance with a [`TodoType`] type
     /// and no qualifiers.
     ///
     /// [`TodoType`]: crate::types::TodoType
     pub(crate) fn todo(message: &'static str) -> Self {
         Self {
-            target: ResolvedTarget::todo(message),
+            place: Place::todo(message),
             qualifiers: TypeQualifiers::empty(),
         }
     }
@@ -545,9 +537,9 @@ impl<'db> TargetAndQualifiers<'db> {
     pub(crate) fn map_type(
         self,
         f: impl FnOnce(Type<'db>) -> Type<'db>,
-    ) -> TargetAndQualifiers<'db> {
-        TargetAndQualifiers {
-            target: self.target.map_type(f),
+    ) -> PlaceAndQualifiers<'db> {
+        PlaceAndQualifiers {
+            place: self.place.map_type(f),
             qualifiers: self.qualifiers,
         }
     }
@@ -557,18 +549,18 @@ impl<'db> TargetAndQualifiers<'db> {
     /// and the `Err` variant represents a symbol that is either definitely or possibly unbound.
     pub(crate) fn into_lookup_result(self) -> LookupResult<'db> {
         match self {
-            TargetAndQualifiers {
-                target: ResolvedTarget::Type(ty, Boundness::Bound),
+            PlaceAndQualifiers {
+                place: Place::Type(ty, Boundness::Bound),
                 qualifiers,
             } => Ok(TypeAndQualifiers::new(ty, qualifiers)),
-            TargetAndQualifiers {
-                target: ResolvedTarget::Type(ty, Boundness::PossiblyUnbound),
+            PlaceAndQualifiers {
+                place: Place::Type(ty, Boundness::PossiblyUnbound),
                 qualifiers,
             } => Err(LookupError::PossiblyUnbound(TypeAndQualifiers::new(
                 ty, qualifiers,
             ))),
-            TargetAndQualifiers {
-                target: ResolvedTarget::Unbound,
+            PlaceAndQualifiers {
+                place: Place::Unbound,
                 qualifiers,
             } => Err(LookupError::Unbound(qualifiers)),
         }
@@ -594,14 +586,14 @@ impl<'db> TargetAndQualifiers<'db> {
     ///    1. If `self` is definitely unbound, return the result of `fallback_fn()`.
     ///    2. Else, if `fallback` is definitely unbound, return `self`.
     ///    3. Else, if `self` is possibly unbound and `fallback` is definitely bound,
-    ///       return `ResolvedTarget(<union of self-type and fallback-type>, Boundness::Bound)`
+    ///       return `Place(<union of self-type and fallback-type>, Boundness::Bound)`
     ///    4. Else, if `self` is possibly unbound and `fallback` is possibly unbound,
-    ///       return `ResolvedTarget(<union of self-type and fallback-type>, Boundness::PossiblyUnbound)`
+    ///       return `Place(<union of self-type and fallback-type>, Boundness::PossiblyUnbound)`
     #[must_use]
     pub(crate) fn or_fall_back_to(
         self,
         db: &'db dyn Db,
-        fallback_fn: impl FnOnce() -> TargetAndQualifiers<'db>,
+        fallback_fn: impl FnOnce() -> PlaceAndQualifiers<'db>,
     ) -> Self {
         self.into_lookup_result()
             .or_else(|lookup_error| lookup_error.or_fall_back_to(db, fallback_fn()))
@@ -609,87 +601,87 @@ impl<'db> TargetAndQualifiers<'db> {
     }
 }
 
-impl<'db> From<ResolvedTarget<'db>> for TargetAndQualifiers<'db> {
-    fn from(target: ResolvedTarget<'db>) -> Self {
-        target.with_qualifiers(TypeQualifiers::empty())
+impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
+    fn from(place: Place<'db>) -> Self {
+        place.with_qualifiers(TypeQualifiers::empty())
     }
 }
 
-fn target_cycle_recover<'db>(
+fn place_cycle_recover<'db>(
     _db: &'db dyn Db,
-    _value: &TargetAndQualifiers<'db>,
+    _value: &PlaceAndQualifiers<'db>,
     _count: u32,
     _scope: ScopeId<'db>,
-    _target_id: ScopedTargetId,
+    _place_id: ScopedPlaceId,
     _requires_explicit_reexport: RequiresExplicitReExport,
-) -> salsa::CycleRecoveryAction<TargetAndQualifiers<'db>> {
+) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
     salsa::CycleRecoveryAction::Iterate
 }
 
-fn target_cycle_initial<'db>(
+fn place_cycle_initial<'db>(
     _db: &'db dyn Db,
     _scope: ScopeId<'db>,
-    _target_id: ScopedTargetId,
+    _place_id: ScopedPlaceId,
     _requires_explicit_reexport: RequiresExplicitReExport,
-) -> TargetAndQualifiers<'db> {
-    ResolvedTarget::bound(Type::Never).into()
+) -> PlaceAndQualifiers<'db> {
+    Place::bound(Type::Never).into()
 }
 
-#[salsa::tracked(cycle_fn=target_cycle_recover, cycle_initial=target_cycle_initial)]
-fn target_by_id<'db>(
+#[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial)]
+fn place_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
-    target_id: ScopedTargetId,
+    place_id: ScopedPlaceId,
     requires_explicit_reexport: RequiresExplicitReExport,
-) -> TargetAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     let use_def = use_def_map(db, scope);
 
-    // If the target is declared, the public type is based on declarations; otherwise, it's based
+    // If the place is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
 
-    let declarations = use_def.public_declarations(target_id);
-    let declared = target_from_declarations_impl(db, declarations, requires_explicit_reexport);
+    let declarations = use_def.public_declarations(place_id);
+    let declared = place_from_declarations_impl(db, declarations, requires_explicit_reexport);
 
     match declared {
-        // Target is declared, trust the declared type
+        // Place is declared, trust the declared type
         Ok(
-            symbol_and_quals @ TargetAndQualifiers {
-                target: ResolvedTarget::Type(_, Boundness::Bound),
+            place_and_quals @ PlaceAndQualifiers {
+                place: Place::Type(_, Boundness::Bound),
                 qualifiers: _,
             },
-        ) => symbol_and_quals,
-        // Target is possibly declared
-        Ok(TargetAndQualifiers {
-            target: ResolvedTarget::Type(declared_ty, Boundness::PossiblyUnbound),
+        ) => place_and_quals,
+        // Place is possibly declared
+        Ok(PlaceAndQualifiers {
+            place: Place::Type(declared_ty, Boundness::PossiblyUnbound),
             qualifiers,
         }) => {
-            let bindings = use_def.public_bindings(target_id);
-            let inferred = target_from_bindings_impl(db, bindings, requires_explicit_reexport);
+            let bindings = use_def.public_bindings(place_id);
+            let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
-            let target = match inferred {
-                // Target is possibly undeclared and definitely unbound
-                ResolvedTarget::Unbound => {
+            let place = match inferred {
+                // Place is possibly undeclared and definitely unbound
+                Place::Unbound => {
                     // TODO: We probably don't want to report `Bound` here. This requires a bit of
                     // design work though as we might want a different behavior for stubs and for
                     // normal modules.
-                    ResolvedTarget::Type(declared_ty, Boundness::Bound)
+                    Place::Type(declared_ty, Boundness::Bound)
                 }
-                // Target is possibly undeclared and (possibly) bound
-                ResolvedTarget::Type(inferred_ty, boundness) => ResolvedTarget::Type(
+                // Place is possibly undeclared and (possibly) bound
+                Place::Type(inferred_ty, boundness) => Place::Type(
                     UnionType::from_elements(db, [inferred_ty, declared_ty]),
                     boundness,
                 ),
             };
 
-            TargetAndQualifiers { target, qualifiers }
+            PlaceAndQualifiers { place, qualifiers }
         }
-        // Target is undeclared, return the union of `Unknown` with the inferred type
-        Ok(TargetAndQualifiers {
-            target: ResolvedTarget::Unbound,
+        // Place is undeclared, return the union of `Unknown` with the inferred type
+        Ok(PlaceAndQualifiers {
+            place: Place::Unbound,
             qualifiers: _,
         }) => {
-            let bindings = use_def.public_bindings(target_id);
-            let inferred = target_from_bindings_impl(db, bindings, requires_explicit_reexport);
+            let bindings = use_def.public_bindings(place_id);
+            let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
             // `__slots__` is a symbol with special behavior in Python's runtime. It can be
             // modified externally, but those changes do not take effect. We therefore issue
@@ -700,14 +692,15 @@ fn target_by_id<'db>(
             // `TYPE_CHECKING` is a special variable that should only be assigned `False`
             // at runtime, but is always considered `True` in type checking.
             // See mdtest/known_constants.md#user-defined-type_checking for details.
-            let is_considered_non_modifiable = target_table(db, scope).target(target_id).is_name()
-                && matches!(
-                    target_table(db, scope)
-                        .target(target_id)
-                        .expect_name()
-                        .as_str(),
-                    "__slots__" | "TYPE_CHECKING"
-                );
+            let is_considered_non_modifiable =
+                place_table(db, scope).place_expr(place_id).is_name()
+                    && matches!(
+                        place_table(db, scope)
+                            .place_expr(place_id)
+                            .expect_name()
+                            .as_str(),
+                        "__slots__" | "TYPE_CHECKING"
+                    );
 
             if scope.file(db).is_stub(db.upcast()) {
                 // We generally trust module-level undeclared symbols in stubs and do not union
@@ -722,11 +715,11 @@ fn target_by_id<'db>(
                     .into()
             }
         }
-        // Target has conflicting declared types
+        // Place has conflicting declared types
         Err((declared, _)) => {
             // Intentionally ignore conflicting declared types; that's not our problem,
             // it's the problem of the module we are importing from.
-            ResolvedTarget::bound(declared.inner_type()).with_qualifiers(declared.qualifiers())
+            Place::bound(declared.inner_type()).with_qualifiers(declared.qualifiers())
         }
     }
 
@@ -752,7 +745,7 @@ fn symbol_impl<'db>(
     scope: ScopeId<'db>,
     name: &str,
     requires_explicit_reexport: RequiresExplicitReExport,
-) -> TargetAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     let _span = tracing::trace_span!("symbol", ?name).entered();
 
     if name == "platform"
@@ -761,7 +754,7 @@ fn symbol_impl<'db>(
     {
         match Program::get(db).python_platform(db) {
             crate::PythonPlatform::Identifier(platform) => {
-                return ResolvedTarget::bound(Type::string_literal(db, platform.as_str())).into();
+                return Place::bound(Type::string_literal(db, platform.as_str())).into();
             }
             crate::PythonPlatform::All => {
                 // Fall through to the looked up type
@@ -769,41 +762,41 @@ fn symbol_impl<'db>(
         }
     }
 
-    target_table(db, scope)
-        .target_id_by_name(name)
-        .map(|symbol| target_by_id(db, scope, symbol, requires_explicit_reexport))
+    place_table(db, scope)
+        .place_id_by_name(name)
+        .map(|symbol| place_by_id(db, scope, symbol, requires_explicit_reexport))
         .unwrap_or_default()
 }
 
-/// Implementation of [`target`].
-fn target_impl<'db>(
+/// Implementation of [`place`].
+fn place_impl<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
-    target: &Target,
+    expr: &PlaceExpr,
     requires_explicit_reexport: RequiresExplicitReExport,
-) -> TargetAndQualifiers<'db> {
-    let _span = tracing::trace_span!("target", ?target).entered();
+) -> PlaceAndQualifiers<'db> {
+    let _span = tracing::trace_span!("place", ?expr).entered();
 
-    let mut result = target_table(db, scope)
-        .target_id_by_name(target.root_name())
-        .map(|symbol| target_by_id(db, scope, symbol, requires_explicit_reexport))
+    let mut result = place_table(db, scope)
+        .place_id_by_name(expr.root_name())
+        .map(|symbol| place_by_id(db, scope, symbol, requires_explicit_reexport))
         .unwrap_or_default();
 
-    for segment in target.sub_segments() {
-        let ResolvedTarget::Type(ty, Boundness::Bound) = result.target else {
-            return TargetAndQualifiers::default();
+    for segment in expr.sub_segments() {
+        let Place::Type(ty, Boundness::Bound) = result.place else {
+            return PlaceAndQualifiers::default();
         };
 
         match segment {
-            TargetSubSegment::Member(member) => {
+            PlaceExprSubSegment::Member(member) => {
                 result = ty.member(db, member);
             }
             // TODO:
-            TargetSubSegment::IntSubscript(_) => {
-                return TargetAndQualifiers::default();
+            PlaceExprSubSegment::IntSubscript(_) => {
+                return PlaceAndQualifiers::default();
             }
-            TargetSubSegment::StringSubscript(_) => {
-                return TargetAndQualifiers::default();
+            PlaceExprSubSegment::StringSubscript(_) => {
+                return PlaceAndQualifiers::default();
             }
         }
     }
@@ -811,16 +804,16 @@ fn target_impl<'db>(
     result
 }
 
-/// Implementation of [`target_from_bindings`].
+/// Implementation of [`place_from_bindings`].
 ///
 /// ## Implementation Note
 /// This function gets called cross-module. It, therefore, shouldn't
 /// access any AST nodes from the file containing the declarations.
-fn target_from_bindings_impl<'db>(
+fn place_from_bindings_impl<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
-) -> ResolvedTarget<'db> {
+) -> Place<'db> {
     let predicates = bindings_with_constraints.predicates;
     let visibility_constraints = bindings_with_constraints.visibility_constraints;
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
@@ -916,7 +909,7 @@ fn target_from_bindings_impl<'db>(
             }
 
             let binding_ty = binding_type(db, binding);
-            Some(narrowing_constraint.narrow(db, binding_ty, binding.target(db)))
+            Some(narrowing_constraint.narrow(db, binding_ty, binding.place(db)))
         },
     );
 
@@ -930,28 +923,28 @@ fn target_from_bindings_impl<'db>(
         };
 
         if let Some(second) = types.next() {
-            ResolvedTarget::Type(
+            Place::Type(
                 UnionType::from_elements(db, [first, second].into_iter().chain(types)),
                 boundness,
             )
         } else {
-            ResolvedTarget::Type(first, boundness)
+            Place::Type(first, boundness)
         }
     } else {
-        ResolvedTarget::Unbound
+        Place::Unbound
     }
 }
 
-/// Implementation of [`target_from_declarations`].
+/// Implementation of [`place_from_declarations`].
 ///
 /// ## Implementation Note
 /// This function gets called cross-module. It, therefore, shouldn't
 /// access any AST nodes from the file containing the declarations.
-fn target_from_declarations_impl<'db>(
+fn place_from_declarations_impl<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
-) -> TargetFromDeclarationsResult<'db> {
+) -> PlaceFromDeclarationsResult<'db> {
     let predicates = declarations.predicates;
     let visibility_constraints = declarations.visibility_constraints;
     let mut declarations = declarations.peekable();
@@ -1020,8 +1013,10 @@ fn target_from_declarations_impl<'db>(
                 Truthiness::Ambiguous => Boundness::PossiblyUnbound,
             };
 
-            Ok(ResolvedTarget::Type(declared.inner_type(), boundness)
-                .with_qualifiers(declared.qualifiers()))
+            Ok(
+                Place::Type(declared.inner_type(), boundness)
+                    .with_qualifiers(declared.qualifiers()),
+            )
         } else {
             Err((
                 declared,
@@ -1031,7 +1026,7 @@ fn target_from_declarations_impl<'db>(
             ))
         }
     } else {
-        Ok(ResolvedTarget::Unbound.into())
+        Ok(Place::Unbound.into())
     }
 }
 
@@ -1051,8 +1046,8 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
     let Some(all_names) = dunder_all_names(db, definition.file(db)) else {
         return false;
     };
-    let table = target_table(db, definition.scope(db));
-    let symbol_name = table.target(definition.target(db)).expect_name();
+    let table = place_table(db, definition.scope(db));
+    let symbol_name = table.place_expr(definition.place(db)).expect_name();
     all_names.contains(symbol_name)
 }
 
@@ -1060,39 +1055,39 @@ mod implicit_globals {
     use ruff_python_ast as ast;
 
     use crate::db::Db;
-    use crate::semantic_index::target::Target;
-    use crate::semantic_index::{self, target_table, use_def_map};
-    use crate::target::TargetAndQualifiers;
+    use crate::place::PlaceAndQualifiers;
+    use crate::semantic_index::place::PlaceExpr;
+    use crate::semantic_index::{self, place_table, use_def_map};
     use crate::types::{KnownClass, Type};
 
-    use super::{target_from_declarations, ResolvedTarget, TargetFromDeclarationsResult};
+    use super::{place_from_declarations, Place, PlaceFromDeclarationsResult};
 
     pub(crate) fn module_type_implicit_global_declaration<'db>(
         db: &'db dyn Db,
-        target: &Target,
-    ) -> TargetFromDeclarationsResult<'db> {
+        expr: &PlaceExpr,
+    ) -> PlaceFromDeclarationsResult<'db> {
         if !module_type_symbols(db)
             .iter()
-            .any(|module_type_member| Some(module_type_member) == target.as_name())
+            .any(|module_type_member| Some(module_type_member) == expr.as_name())
         {
-            return Ok(ResolvedTarget::Unbound.into());
+            return Ok(Place::Unbound.into());
         }
         let Type::ClassLiteral(module_type_class) = KnownClass::ModuleType.to_class_literal(db)
         else {
-            return Ok(ResolvedTarget::Unbound.into());
+            return Ok(Place::Unbound.into());
         };
         let module_type_scope = module_type_class.body_scope(db);
-        let symbol_table = target_table(db, module_type_scope);
-        let Some(symbol_id) = symbol_table.target_id_by_target(target) else {
-            return Ok(ResolvedTarget::Unbound.into());
+        let place_table = place_table(db, module_type_scope);
+        let Some(place_id) = place_table.place_id_by_expr(expr) else {
+            return Ok(Place::Unbound.into());
         };
-        target_from_declarations(
+        place_from_declarations(
             db,
-            use_def_map(db, module_type_scope).public_declarations(symbol_id),
+            use_def_map(db, module_type_scope).public_declarations(place_id),
         )
     }
 
-    /// Looks up the type of an "implicit global symbol". Returns [`ResolvedTarget::Unbound`] if
+    /// Looks up the type of an "implicit global symbol". Returns [`Place::Unbound`] if
     /// `name` is not present as an implicit symbol in module-global namespaces.
     ///
     /// Implicit global symbols are symbols such as `__doc__`, `__name__`, and `__file__`
@@ -1103,20 +1098,20 @@ mod implicit_globals {
     /// up in the global scope **from within the same file**. If the symbol is being looked up
     /// from outside the file (e.g. via imports), use [`super::imported_symbol`] (or fallback logic
     /// like the logic used in that function) instead. The reason is that this function returns
-    /// [`ResolvedTarget::Unbound`] for `__init__` and `__dict__` (which cannot be found in globals if
+    /// [`Place::Unbound`] for `__init__` and `__dict__` (which cannot be found in globals if
     /// the lookup is being done from the same file) -- but these symbols *are* available in the
     /// global scope if they're being imported **from a different file**.
     pub(crate) fn module_type_implicit_global_symbol<'db>(
         db: &'db dyn Db,
         name: &str,
-    ) -> TargetAndQualifiers<'db> {
+    ) -> PlaceAndQualifiers<'db> {
         // We special-case `__file__` here because we know that for an internal implicit global
         // lookup in a Python module, it is always a string, even though typeshed says `str |
         // None`.
         if name == "__file__" {
-            ResolvedTarget::bound(KnownClass::Str.to_instance(db)).into()
+            Place::bound(KnownClass::Str.to_instance(db)).into()
         } else if name == "__builtins__" {
-            ResolvedTarget::bound(Type::any()).into()
+            Place::bound(Type::any()).into()
         }
         // In general we wouldn't check to see whether a symbol exists on a class before doing the
         // `.member()` call on the instance type -- we'd just do the `.member`() call on the instance
@@ -1129,7 +1124,7 @@ mod implicit_globals {
         {
             KnownClass::ModuleType.to_instance(db).member(db, name)
         } else {
-            ResolvedTarget::Unbound.into()
+            Place::Unbound.into()
         }
     }
 
@@ -1162,12 +1157,12 @@ mod implicit_globals {
         };
 
         let module_type_scope = module_type.body_scope(db);
-        let module_type_symbol_table = target_table(db, module_type_scope);
+        let module_type_symbol_table = place_table(db, module_type_scope);
 
         module_type_symbol_table
-            .targets()
+            .places()
             .filter(|symbol| symbol.is_declared() && symbol.is_name())
-            .map(semantic_index::target::Target::expect_name)
+            .map(semantic_index::place::PlaceExpr::expect_name)
             .filter(|symbol_name| {
                 !matches!(&***symbol_name, "__dict__" | "__getattr__" | "__init__")
             })
@@ -1212,9 +1207,9 @@ impl RequiresExplicitReExport {
 /// of symbols that have no declared type.
 fn widen_type_for_undeclared_public_symbol<'db>(
     db: &'db dyn Db,
-    inferred: ResolvedTarget<'db>,
+    inferred: Place<'db>,
     is_considered_non_modifiable: bool,
-) -> ResolvedTarget<'db> {
+) -> Place<'db> {
     // We special-case known-instance types here since symbols like `typing.Any` are typically
     // not declared in the stubs (e.g. `Any = object()`), but we still want to treat them as
     // such.
@@ -1242,17 +1237,15 @@ mod tests {
         let ty1 = Type::IntLiteral(1);
         let ty2 = Type::IntLiteral(2);
 
-        let unbound = || ResolvedTarget::Unbound.with_qualifiers(TypeQualifiers::empty());
+        let unbound = || Place::Unbound.with_qualifiers(TypeQualifiers::empty());
 
         let possibly_unbound_ty1 =
-            || ResolvedTarget::Type(ty1, PossiblyUnbound).with_qualifiers(TypeQualifiers::empty());
+            || Place::Type(ty1, PossiblyUnbound).with_qualifiers(TypeQualifiers::empty());
         let possibly_unbound_ty2 =
-            || ResolvedTarget::Type(ty2, PossiblyUnbound).with_qualifiers(TypeQualifiers::empty());
+            || Place::Type(ty2, PossiblyUnbound).with_qualifiers(TypeQualifiers::empty());
 
-        let bound_ty1 =
-            || ResolvedTarget::Type(ty1, Bound).with_qualifiers(TypeQualifiers::empty());
-        let bound_ty2 =
-            || ResolvedTarget::Type(ty2, Bound).with_qualifiers(TypeQualifiers::empty());
+        let bound_ty1 = || Place::Type(ty1, Bound).with_qualifiers(TypeQualifiers::empty());
+        let bound_ty2 = || Place::Type(ty2, Bound).with_qualifiers(TypeQualifiers::empty());
 
         // Start from an unbound symbol
         assert_eq!(unbound().or_fall_back_to(&db, unbound), unbound());
@@ -1269,11 +1262,11 @@ mod tests {
         );
         assert_eq!(
             possibly_unbound_ty1().or_fall_back_to(&db, possibly_unbound_ty2),
-            ResolvedTarget::Type(UnionType::from_elements(&db, [ty1, ty2]), PossiblyUnbound).into()
+            Place::Type(UnionType::from_elements(&db, [ty1, ty2]), PossiblyUnbound).into()
         );
         assert_eq!(
             possibly_unbound_ty1().or_fall_back_to(&db, bound_ty2),
-            ResolvedTarget::Type(UnionType::from_elements(&db, [ty1, ty2]), Bound).into()
+            Place::Type(UnionType::from_elements(&db, [ty1, ty2]), Bound).into()
         );
 
         // Start from a definitely bound symbol
@@ -1286,10 +1279,10 @@ mod tests {
     }
 
     #[track_caller]
-    fn assert_bound_string_symbol<'db>(db: &'db dyn Db, symbol: ResolvedTarget<'db>) {
+    fn assert_bound_string_symbol<'db>(db: &'db dyn Db, symbol: Place<'db>) {
         assert!(matches!(
             symbol,
-            ResolvedTarget::Type(Type::NominalInstance(_), Boundness::Bound)
+            Place::Type(Type::NominalInstance(_), Boundness::Bound)
         ));
         assert_eq!(symbol.expect_type(), KnownClass::Str.to_instance(db));
     }
@@ -1297,19 +1290,19 @@ mod tests {
     #[test]
     fn implicit_builtin_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, builtins_symbol(&db, "__name__").target);
+        assert_bound_string_symbol(&db, builtins_symbol(&db, "__name__").place);
     }
 
     #[test]
     fn implicit_typing_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, typing_symbol(&db, "__name__").target);
+        assert_bound_string_symbol(&db, typing_symbol(&db, "__name__").place);
     }
 
     #[test]
     fn implicit_typing_extensions_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, typing_extensions_symbol(&db, "__name__").target);
+        assert_bound_string_symbol(&db, typing_extensions_symbol(&db, "__name__").place);
     }
 
     #[test]
@@ -1317,7 +1310,7 @@ mod tests {
         let db = setup_db();
         assert_bound_string_symbol(
             &db,
-            known_module_symbol(&db, KnownModule::Sys, "__name__").target,
+            known_module_symbol(&db, KnownModule::Sys, "__name__").place,
         );
     }
 }

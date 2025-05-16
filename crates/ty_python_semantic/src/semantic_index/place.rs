@@ -14,11 +14,11 @@ use rustc_hash::FxHasher;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
 use crate::semantic_index::visibility_constraints::ScopedVisibilityConstraintId;
-use crate::semantic_index::{semantic_index, SemanticIndex, TargetSet};
+use crate::semantic_index::{semantic_index, PlaceSet, SemanticIndex};
 use crate::Db;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update)]
-pub(crate) enum TargetSubSegment {
+pub(crate) enum PlaceExprSubSegment {
     /// A member access, e.g. `y` in `x.y`.
     Member(ast::name::Name),
     /// An integer index access, e.g. `1` in `x[1]`.
@@ -27,145 +27,147 @@ pub(crate) enum TargetSubSegment {
     StringSubscript(String),
 }
 
-impl TargetSubSegment {
+impl PlaceExprSubSegment {
     fn as_member(&self) -> Option<&ast::name::Name> {
         match self {
-            TargetSubSegment::Member(name) => Some(name),
+            PlaceExprSubSegment::Member(name) => Some(name),
             _ => None,
         }
     }
 }
 
-/// A single target value that can be the left side of a `Definition`.
-/// If you want to perform a comparison based on the equality of segments (without including flags), use [`TargetSegments`].
+/// An expression that can be the left side of a `Definition`.
+/// If you want to perform a comparison based on the equality of segments (without including flags), use [`PlaceSegments`].
 #[derive(Eq, PartialEq, Debug)]
-pub struct Target {
+pub struct PlaceExpr {
     root_name: Name,
-    sub_segments: Vec<TargetSubSegment>,
-    flags: TargetFlags,
+    sub_segments: Vec<PlaceExprSubSegment>,
+    flags: PlaceFlags,
 }
 
-impl std::fmt::Display for Target {
+impl std::fmt::Display for PlaceExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.root_name)?;
         for segment in &self.sub_segments {
             match segment {
-                TargetSubSegment::Member(name) => write!(f, ".{name}")?,
-                TargetSubSegment::IntSubscript(int) => write!(f, "[{int}]")?,
-                TargetSubSegment::StringSubscript(string) => write!(f, "[\"{string}\"]")?,
+                PlaceExprSubSegment::Member(name) => write!(f, ".{name}")?,
+                PlaceExprSubSegment::IntSubscript(int) => write!(f, "[{int}]")?,
+                PlaceExprSubSegment::StringSubscript(string) => write!(f, "[\"{string}\"]")?,
             }
         }
         Ok(())
     }
 }
 
-impl TryFrom<&ast::name::Name> for Target {
+impl TryFrom<&ast::name::Name> for PlaceExpr {
     type Error = Infallible;
 
     fn try_from(name: &ast::name::Name) -> Result<Self, Infallible> {
-        Ok(Target::name(name.clone()))
+        Ok(PlaceExpr::name(name.clone()))
     }
 }
 
-impl TryFrom<ast::name::Name> for Target {
+impl TryFrom<ast::name::Name> for PlaceExpr {
     type Error = Infallible;
 
     fn try_from(name: ast::name::Name) -> Result<Self, Infallible> {
-        Ok(Target::name(name))
+        Ok(PlaceExpr::name(name))
     }
 }
 
-impl TryFrom<&ast::ExprAttribute> for Target {
+impl TryFrom<&ast::ExprAttribute> for PlaceExpr {
     type Error = ();
 
     fn try_from(attr: &ast::ExprAttribute) -> Result<Self, ()> {
-        let mut target = Target::try_from(&*attr.value)?;
-        target
+        let mut place = PlaceExpr::try_from(&*attr.value)?;
+        place
             .sub_segments
-            .push(TargetSubSegment::Member(attr.attr.id.clone()));
-        Ok(target)
+            .push(PlaceExprSubSegment::Member(attr.attr.id.clone()));
+        Ok(place)
     }
 }
 
-impl TryFrom<ast::ExprAttribute> for Target {
+impl TryFrom<ast::ExprAttribute> for PlaceExpr {
     type Error = ();
 
     fn try_from(attr: ast::ExprAttribute) -> Result<Self, ()> {
-        let mut target = Target::try_from(&*attr.value)?;
-        target
+        let mut place = PlaceExpr::try_from(&*attr.value)?;
+        place
             .sub_segments
-            .push(TargetSubSegment::Member(attr.attr.id));
-        Ok(target)
+            .push(PlaceExprSubSegment::Member(attr.attr.id));
+        Ok(place)
     }
 }
 
-impl TryFrom<&ast::ExprSubscript> for Target {
+impl TryFrom<&ast::ExprSubscript> for PlaceExpr {
     type Error = ();
 
     fn try_from(subscript: &ast::ExprSubscript) -> Result<Self, ()> {
-        let mut target = Target::try_from(&*subscript.value)?;
+        let mut place = PlaceExpr::try_from(&*subscript.value)?;
         match &*subscript.slice {
             ast::Expr::NumberLiteral(number) if number.value.is_int() => {
-                target.sub_segments.push(TargetSubSegment::IntSubscript(
+                place.sub_segments.push(PlaceExprSubSegment::IntSubscript(
                     number.value.as_int().unwrap().clone(),
                 ));
             }
             ast::Expr::StringLiteral(string) => {
-                target
+                place
                     .sub_segments
-                    .push(TargetSubSegment::StringSubscript(string.value.to_string()));
+                    .push(PlaceExprSubSegment::StringSubscript(
+                        string.value.to_string(),
+                    ));
             }
             _ => {
                 return Err(());
             }
         }
-        Ok(target)
+        Ok(place)
     }
 }
 
-impl TryFrom<ast::ExprSubscript> for Target {
+impl TryFrom<ast::ExprSubscript> for PlaceExpr {
     type Error = ();
 
     fn try_from(subscript: ast::ExprSubscript) -> Result<Self, ()> {
-        Target::try_from(&subscript)
+        PlaceExpr::try_from(&subscript)
     }
 }
 
-impl TryFrom<&ast::Expr> for Target {
+impl TryFrom<&ast::Expr> for PlaceExpr {
     type Error = ();
 
     fn try_from(expr: &ast::Expr) -> Result<Self, ()> {
         match expr {
-            ast::Expr::Name(name) => Ok(Target::name(name.id.clone())),
-            ast::Expr::Attribute(attr) => Target::try_from(attr),
-            ast::Expr::Subscript(subscript) => Target::try_from(subscript),
+            ast::Expr::Name(name) => Ok(PlaceExpr::name(name.id.clone())),
+            ast::Expr::Attribute(attr) => PlaceExpr::try_from(attr),
+            ast::Expr::Subscript(subscript) => PlaceExpr::try_from(subscript),
             _ => Err(()),
         }
     }
 }
 
-impl Target {
+impl PlaceExpr {
     pub(super) fn name(name: Name) -> Self {
         Self {
             root_name: name,
             sub_segments: Vec::new(),
-            flags: TargetFlags::empty(),
+            flags: PlaceFlags::empty(),
         }
     }
 
-    fn insert_flags(&mut self, flags: TargetFlags) {
+    fn insert_flags(&mut self, flags: PlaceFlags) {
         self.flags.insert(flags);
     }
 
     pub(super) fn mark_instance_attribute(&mut self) {
-        self.flags.insert(TargetFlags::IS_INSTANCE_ATTRIBUTE);
+        self.flags.insert(PlaceFlags::IS_INSTANCE_ATTRIBUTE);
     }
 
     pub(crate) fn root_name(&self) -> &Name {
         &self.root_name
     }
 
-    pub(crate) fn sub_segments(&self) -> &[TargetSubSegment] {
+    pub(crate) fn sub_segments(&self) -> &[PlaceExprSubSegment] {
         &self.sub_segments
     }
 
@@ -177,7 +179,7 @@ impl Target {
         }
     }
 
-    /// The target's name.
+    /// Assumes that the place expression is a name.
     #[track_caller]
     pub(crate) fn expect_name(&self) -> &Name {
         debug_assert_eq!(self.sub_segments, vec![]);
@@ -185,28 +187,28 @@ impl Target {
     }
 
     pub(super) fn is_instance_attribute_named(&self, name: &str) -> bool {
-        self.flags.contains(TargetFlags::IS_INSTANCE_ATTRIBUTE)
+        self.flags.contains(PlaceFlags::IS_INSTANCE_ATTRIBUTE)
             && self.sub_segments.len() == 1
             && self.sub_segments[0].as_member().unwrap().as_str() == name
     }
 
     pub fn is_instance_attribute(&self) -> bool {
-        self.flags.contains(TargetFlags::IS_INSTANCE_ATTRIBUTE)
+        self.flags.contains(PlaceFlags::IS_INSTANCE_ATTRIBUTE)
     }
 
-    /// Is the target used in its containing scope?
+    /// Is the place used in its containing scope?
     pub fn is_used(&self) -> bool {
-        self.flags.contains(TargetFlags::IS_USED)
+        self.flags.contains(PlaceFlags::IS_USED)
     }
 
-    /// Is the target defined in its containing scope?
+    /// Is the place defined in its containing scope?
     pub fn is_bound(&self) -> bool {
-        self.flags.contains(TargetFlags::IS_BOUND)
+        self.flags.contains(PlaceFlags::IS_BOUND)
     }
 
-    /// Is the target declared in its containing scope?
+    /// Is the place declared in its containing scope?
     pub fn is_declared(&self) -> bool {
-        self.flags.contains(TargetFlags::IS_DECLARED)
+        self.flags.contains(PlaceFlags::IS_DECLARED)
     }
 
     pub fn is_name(&self) -> bool {
@@ -219,8 +221,8 @@ impl Target {
             .is_some_and(|last| last.as_member().is_some())
     }
 
-    pub(crate) fn segments(&self) -> TargetSegments {
-        TargetSegments {
+    pub(crate) fn segments(&self) -> PlaceSegments {
+        PlaceSegments {
             root_name: Some(&self.root_name),
             sub_segments: &self.sub_segments,
         }
@@ -228,12 +230,12 @@ impl Target {
 }
 
 bitflags! {
-    /// Flags that can be queried to obtain information about a target in a given scope.
+    /// Flags that can be queried to obtain information about a place in a given scope.
     ///
     /// See the doc-comment at the top of [`super::use_def`] for explanations of what it
-    /// means for a target to be *bound* as opposed to *declared*.
+    /// means for a place to be *bound* as opposed to *declared*.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-    struct TargetFlags: u8 {
+    struct PlaceFlags: u8 {
         const IS_USED               = 1 << 0;
         const IS_BOUND              = 1 << 1;
         const IS_DECLARED           = 1 << 2;
@@ -246,7 +248,7 @@ bitflags! {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TargetSegment<'db> {
+pub enum PlaceSegment<'db> {
     Name(&'db ast::name::Name),
     Member(&'db ast::name::Name),
     IntSubscript(&'db ast::Int),
@@ -254,17 +256,17 @@ pub enum TargetSegment<'db> {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct TargetSegments<'db> {
+pub struct PlaceSegments<'db> {
     root_name: Option<&'db ast::name::Name>,
-    sub_segments: &'db [TargetSubSegment],
+    sub_segments: &'db [PlaceExprSubSegment],
 }
 
-impl<'db> Iterator for TargetSegments<'db> {
-    type Item = TargetSegment<'db>;
+impl<'db> Iterator for PlaceSegments<'db> {
+    type Item = PlaceSegment<'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(name) = self.root_name.take() {
-            return Some(TargetSegment::Name(name));
+            return Some(PlaceSegment::Name(name));
         }
         if self.sub_segments.is_empty() {
             return None;
@@ -272,40 +274,40 @@ impl<'db> Iterator for TargetSegments<'db> {
         let segment = &self.sub_segments[0];
         self.sub_segments = &self.sub_segments[1..];
         Some(match segment {
-            TargetSubSegment::Member(name) => TargetSegment::Member(name),
-            TargetSubSegment::IntSubscript(int) => TargetSegment::IntSubscript(int),
-            TargetSubSegment::StringSubscript(string) => TargetSegment::StringSubscript(string),
+            PlaceExprSubSegment::Member(name) => PlaceSegment::Member(name),
+            PlaceExprSubSegment::IntSubscript(int) => PlaceSegment::IntSubscript(int),
+            PlaceExprSubSegment::StringSubscript(string) => PlaceSegment::StringSubscript(string),
         })
     }
 }
 
-/// ID that uniquely identifies a symbol in a file.
+/// ID that uniquely identifies a place in a file.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct FileTargetId {
+pub struct FilePlaceId {
     scope: FileScopeId,
-    scoped_target_id: ScopedTargetId,
+    scoped_place_id: ScopedPlaceId,
 }
 
-impl FileTargetId {
+impl FilePlaceId {
     pub fn scope(self) -> FileScopeId {
         self.scope
     }
 
-    pub(crate) fn scoped_target_id(self) -> ScopedTargetId {
-        self.scoped_target_id
+    pub(crate) fn scoped_place_id(self) -> ScopedPlaceId {
+        self.scoped_place_id
     }
 }
 
-impl From<FileTargetId> for ScopedTargetId {
-    fn from(val: FileTargetId) -> Self {
-        val.scoped_target_id()
+impl From<FilePlaceId> for ScopedPlaceId {
+    fn from(val: FilePlaceId) -> Self {
+        val.scoped_place_id()
     }
 }
 
-/// ID that uniquely identifies a target inside a [`Scope`].
+/// ID that uniquely identifies a place inside a [`Scope`].
 #[newtype_index]
 #[derive(salsa::Update)]
-pub struct ScopedTargetId;
+pub struct ScopedPlaceId;
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
 #[salsa::tracked(debug)]
@@ -479,81 +481,78 @@ impl ScopeKind {
     }
 }
 
-/// [`Target`] table for a specific [`Scope`].
+/// [`PlaceExpr`] table for a specific [`Scope`].
 #[derive(Default, salsa::Update)]
-pub struct TargetTable {
-    /// The targets in this scope.
-    targets: IndexVec<ScopedTargetId, Target>,
+pub struct PlaceTable {
+    /// The place expressions in this scope.
+    places: IndexVec<ScopedPlaceId, PlaceExpr>,
 
-    /// The set of targets.
-    target_set: TargetSet,
+    /// The set of places.
+    place_set: PlaceSet,
 }
 
-impl TargetTable {
+impl PlaceTable {
     fn shrink_to_fit(&mut self) {
-        self.targets.shrink_to_fit();
+        self.places.shrink_to_fit();
     }
 
-    pub(crate) fn target(&self, target_id: impl Into<ScopedTargetId>) -> &Target {
-        &self.targets[target_id.into()]
+    pub(crate) fn place_expr(&self, place_id: impl Into<ScopedPlaceId>) -> &PlaceExpr {
+        &self.places[place_id.into()]
     }
 
     #[expect(unused)]
-    pub(crate) fn target_ids(&self) -> impl Iterator<Item = ScopedTargetId> {
-        self.targets.indices()
+    pub(crate) fn place_ids(&self) -> impl Iterator<Item = ScopedPlaceId> {
+        self.places.indices()
     }
 
-    pub fn targets(&self) -> impl Iterator<Item = &Target> {
-        self.targets.iter()
+    pub fn places(&self) -> impl Iterator<Item = &PlaceExpr> {
+        self.places.iter()
     }
 
-    pub fn symbols(&self) -> impl Iterator<Item = &Target> {
-        self.targets().filter(|target| target.is_name())
+    pub fn symbols(&self) -> impl Iterator<Item = &PlaceExpr> {
+        self.places().filter(|place_expr| place_expr.is_name())
     }
 
     /// Returns the symbol named `name`.
     #[allow(unused)]
-    pub(crate) fn target_by_name(&self, name: &str) -> Option<&Target> {
-        let id = self.target_id_by_name(name)?;
-        Some(self.target(id))
+    pub(crate) fn place_by_name(&self, name: &str) -> Option<&PlaceExpr> {
+        let id = self.place_id_by_name(name)?;
+        Some(self.place_expr(id))
     }
 
-    pub(crate) fn marked_target(&self, target: &Target) -> Option<&Target> {
-        let id = self.target_id_by_target(target)?;
-        Some(self.target(id))
+    pub(crate) fn place_by_expr(&self, place_expr: &PlaceExpr) -> Option<&PlaceExpr> {
+        let id = self.place_id_by_expr(place_expr)?;
+        Some(self.place_expr(id))
     }
 
-    /// Returns the [`ScopedTargetId`] of the target named `name`.
-    pub(crate) fn target_id_by_name(&self, name: &str) -> Option<ScopedTargetId> {
+    /// Returns the [`ScopedPlaceId`] of the place named `name`.
+    pub(crate) fn place_id_by_name(&self, name: &str) -> Option<ScopedPlaceId> {
         let (id, ()) = self
-            .target_set
+            .place_set
             .raw_entry()
             .from_hash(Self::hash_name(name), |id| {
-                self.target(*id).as_name().map(Name::as_str) == Some(name)
+                self.place_expr(*id).as_name().map(Name::as_str) == Some(name)
             })?;
 
         Some(*id)
     }
 
-    /// Returns the [`ScopedTargetId`] of the target.
-    pub(crate) fn target_id_by_target(&self, target: &Target) -> Option<ScopedTargetId> {
+    /// Returns the [`ScopedPlaceId`] of the place expression.
+    pub(crate) fn place_id_by_expr(&self, place_expr: &PlaceExpr) -> Option<ScopedPlaceId> {
         let (id, ()) = self
-            .target_set
+            .place_set
             .raw_entry()
-            .from_hash(Self::hash_target(target), |id| {
-                self.target(*id).segments() == target.segments()
+            .from_hash(Self::hash_place_expr(place_expr), |id| {
+                self.place_expr(*id).segments() == place_expr.segments()
             })?;
 
         Some(*id)
     }
 
-    pub(crate) fn target_id_by_instance_attribute_name(
-        &self,
-        name: &str,
-    ) -> Option<ScopedTargetId> {
-        self.targets
+    pub(crate) fn place_id_by_instance_attribute_name(&self, name: &str) -> Option<ScopedPlaceId> {
+        self.places
             .indices()
-            .find(|id| self.targets[*id].is_instance_attribute_named(name))
+            .find(|id| self.places[*id].is_instance_attribute_named(name))
     }
 
     fn hash_name(name: &str) -> u64 {
@@ -562,110 +561,110 @@ impl TargetTable {
         hasher.finish()
     }
 
-    fn hash_target(target: &Target) -> u64 {
+    fn hash_place_expr(place_expr: &PlaceExpr) -> u64 {
         let mut hasher = FxHasher::default();
-        target.root_name().as_str().hash(&mut hasher);
-        for segment in &target.sub_segments {
+        place_expr.root_name().as_str().hash(&mut hasher);
+        for segment in &place_expr.sub_segments {
             match segment {
-                TargetSubSegment::Member(name) => name.hash(&mut hasher),
-                TargetSubSegment::IntSubscript(int) => int.hash(&mut hasher),
-                TargetSubSegment::StringSubscript(string) => string.hash(&mut hasher),
+                PlaceExprSubSegment::Member(name) => name.hash(&mut hasher),
+                PlaceExprSubSegment::IntSubscript(int) => int.hash(&mut hasher),
+                PlaceExprSubSegment::StringSubscript(string) => string.hash(&mut hasher),
             }
         }
         hasher.finish()
     }
 }
 
-impl PartialEq for TargetTable {
+impl PartialEq for PlaceTable {
     fn eq(&self, other: &Self) -> bool {
-        // We don't need to compare the target_set because the target is already captured in `Target`.
-        self.targets == other.targets
+        // We don't need to compare the place_set because the place is already captured in `PlaceExpr`.
+        self.places == other.places
     }
 }
 
-impl Eq for TargetTable {}
+impl Eq for PlaceTable {}
 
-impl std::fmt::Debug for TargetTable {
-    /// Exclude the `target_set` field from the debug output.
+impl std::fmt::Debug for PlaceTable {
+    /// Exclude the `place_set` field from the debug output.
     /// It's very noisy and not useful for debugging.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("TargetTable")
-            .field(&self.targets)
+        f.debug_tuple("PlaceTable")
+            .field(&self.places)
             .finish_non_exhaustive()
     }
 }
 
 #[derive(Debug, Default)]
-pub(super) struct TargetTableBuilder {
-    table: TargetTable,
+pub(super) struct PlaceTableBuilder {
+    table: PlaceTable,
 }
 
-impl TargetTableBuilder {
-    pub(super) fn add_symbol(&mut self, name: Name) -> (ScopedTargetId, bool) {
-        let hash = TargetTable::hash_name(&name);
+impl PlaceTableBuilder {
+    pub(super) fn add_symbol(&mut self, name: Name) -> (ScopedPlaceId, bool) {
+        let hash = PlaceTable::hash_name(&name);
         let entry = self
             .table
-            .target_set
+            .place_set
             .raw_entry_mut()
-            .from_hash(hash, |id| self.table.targets[*id].as_name() == Some(&name));
+            .from_hash(hash, |id| self.table.places[*id].as_name() == Some(&name));
 
         match entry {
             RawEntryMut::Occupied(entry) => (*entry.key(), false),
             RawEntryMut::Vacant(entry) => {
-                let symbol = Target::name(name);
+                let symbol = PlaceExpr::name(name);
 
-                let id = self.table.targets.push(symbol);
+                let id = self.table.places.push(symbol);
                 entry.insert_with_hasher(hash, id, (), |id| {
-                    TargetTable::hash_target(&self.table.targets[*id])
+                    PlaceTable::hash_place_expr(&self.table.places[*id])
                 });
                 (id, true)
             }
         }
     }
 
-    pub(super) fn add_target(&mut self, target: Target) -> (ScopedTargetId, bool) {
-        let hash = TargetTable::hash_target(&target);
-        let entry = self.table.target_set.raw_entry_mut().from_hash(hash, |id| {
-            self.table.targets[*id].segments() == target.segments()
+    pub(super) fn add_place(&mut self, place_expr: PlaceExpr) -> (ScopedPlaceId, bool) {
+        let hash = PlaceTable::hash_place_expr(&place_expr);
+        let entry = self.table.place_set.raw_entry_mut().from_hash(hash, |id| {
+            self.table.places[*id].segments() == place_expr.segments()
         });
 
         match entry {
             RawEntryMut::Occupied(entry) => (*entry.key(), false),
             RawEntryMut::Vacant(entry) => {
-                let id = self.table.targets.push(target);
+                let id = self.table.places.push(place_expr);
                 entry.insert_with_hasher(hash, id, (), |id| {
-                    TargetTable::hash_target(&self.table.targets[*id])
+                    PlaceTable::hash_place_expr(&self.table.places[*id])
                 });
                 (id, true)
             }
         }
     }
 
-    pub(super) fn mark_target_bound(&mut self, id: ScopedTargetId) {
-        self.table.targets[id].insert_flags(TargetFlags::IS_BOUND);
+    pub(super) fn mark_place_bound(&mut self, id: ScopedPlaceId) {
+        self.table.places[id].insert_flags(PlaceFlags::IS_BOUND);
     }
 
-    pub(super) fn mark_target_declared(&mut self, id: ScopedTargetId) {
-        self.table.targets[id].insert_flags(TargetFlags::IS_DECLARED);
+    pub(super) fn mark_place_declared(&mut self, id: ScopedPlaceId) {
+        self.table.places[id].insert_flags(PlaceFlags::IS_DECLARED);
     }
 
-    pub(super) fn mark_target_used(&mut self, id: ScopedTargetId) {
-        self.table.targets[id].insert_flags(TargetFlags::IS_USED);
+    pub(super) fn mark_place_used(&mut self, id: ScopedPlaceId) {
+        self.table.places[id].insert_flags(PlaceFlags::IS_USED);
     }
 
-    pub(super) fn targets(&self) -> impl Iterator<Item = &Target> {
-        self.table.targets()
+    pub(super) fn places(&self) -> impl Iterator<Item = &PlaceExpr> {
+        self.table.places()
     }
 
-    pub(super) fn target_id_by_target(&self, target: &Target) -> Option<ScopedTargetId> {
-        self.table.target_id_by_target(target)
+    pub(super) fn place_id_by_expr(&self, place_expr: &PlaceExpr) -> Option<ScopedPlaceId> {
+        self.table.place_id_by_expr(place_expr)
     }
 
-    pub(super) fn target(&self, target_id: impl Into<ScopedTargetId>) -> &Target {
-        self.table.target(target_id)
+    pub(super) fn place_expr(&self, place_id: impl Into<ScopedPlaceId>) -> &PlaceExpr {
+        self.table.place_expr(place_id)
     }
 
-    pub(super) fn finish(mut self) -> TargetTable {
+    pub(super) fn finish(mut self) -> PlaceTable {
         self.table.shrink_to_fit();
         self.table
     }

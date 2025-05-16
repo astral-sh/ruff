@@ -1,10 +1,10 @@
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::expression::Expression;
+use crate::semantic_index::place::{PlaceTable, ScopeId, ScopedPlaceId};
+use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
 };
-use crate::semantic_index::target::{ScopeId, ScopedTargetId, TargetTable};
-use crate::semantic_index::target_table;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
     infer_expression_types, IntersectionBuilder, KnownClass, SubclassOfType, Truthiness, Type,
@@ -41,7 +41,7 @@ use super::{KnownFunction, UnionType};
 pub(crate) fn infer_narrowing_constraint<'db>(
     db: &'db dyn Db,
     predicate: Predicate<'db>,
-    target: ScopedTargetId,
+    place: ScopedPlaceId,
 ) -> Option<Type<'db>> {
     let constraints = match predicate.node {
         PredicateNode::Expression(expression) => {
@@ -61,7 +61,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
     if let Some(constraints) = constraints {
-        constraints.get(&target).copied()
+        constraints.get(&place).copied()
     } else {
         None
     }
@@ -189,7 +189,7 @@ impl ClassInfoConstraintFunction {
     }
 }
 
-type NarrowingConstraints<'db> = FxHashMap<ScopedTargetId, Type<'db>>;
+type NarrowingConstraints<'db> = FxHashMap<ScopedPlaceId, Type<'db>>;
 
 fn merge_constraints_and<'db>(
     into: &mut NarrowingConstraints<'db>,
@@ -346,8 +346,8 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             })
     }
 
-    fn targets(&self) -> &'db TargetTable {
-        target_table(self.db, self.scope())
+    fn places(&self) -> &'db PlaceTable {
+        place_table(self.db, self.scope())
     }
 
     fn scope(&self) -> ScopeId<'db> {
@@ -359,9 +359,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     #[track_caller]
-    fn expect_expr_name_symbol(&self, symbol: &str) -> ScopedTargetId {
-        self.targets()
-            .target_id_by_name(symbol)
+    fn expect_expr_name_symbol(&self, symbol: &str) -> ScopedPlaceId {
+        self.places()
+            .place_id_by_name(symbol)
             .expect("We should always have a symbol for every `Name` node")
     }
 

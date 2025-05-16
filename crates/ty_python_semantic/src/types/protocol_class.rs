@@ -5,8 +5,8 @@ use itertools::{Either, Itertools};
 use ruff_python_ast::name::Name;
 
 use crate::{
-    semantic_index::{target_table, use_def_map},
-    target::{target_from_bindings, target_from_declarations},
+    place::{place_from_bindings, place_from_declarations},
+    semantic_index::{place_table, use_def_map},
     types::{
         ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
     },
@@ -318,19 +318,19 @@ fn cached_protocol_interface<'db>(
     {
         let parent_scope = parent_protocol.body_scope(db);
         let use_def_map = use_def_map(db, parent_scope);
-        let target_table = target_table(db, parent_scope);
+        let place_table = place_table(db, parent_scope);
 
         members.extend(
             use_def_map
                 .all_public_declarations()
-                .flat_map(|(target_id, declarations)| {
-                    target_from_declarations(db, declarations).map(|symbol| (target_id, symbol))
+                .flat_map(|(place_id, declarations)| {
+                    place_from_declarations(db, declarations).map(|symbol| (place_id, symbol))
                 })
-                .filter_map(|(target_id, symbol)| {
+                .filter_map(|(place_id, symbol)| {
                     symbol
-                        .target
+                        .place
                         .ignore_possibly_unbound()
-                        .map(|ty| (target_id, ty, symbol.qualifiers))
+                        .map(|ty| (place_id, ty, symbol.qualifiers))
                 })
                 // Bindings in the class body that are not declared in the class body
                 // are not valid protocol members, and we plan to emit diagnostics for them
@@ -343,15 +343,15 @@ fn cached_protocol_interface<'db>(
                 .chain(
                     use_def_map
                         .all_public_bindings()
-                        .filter_map(|(target_id, bindings)| {
-                            target_from_bindings(db, bindings)
+                        .filter_map(|(place_id, bindings)| {
+                            place_from_bindings(db, bindings)
                                 .ignore_possibly_unbound()
-                                .map(|ty| (target_id, ty, TypeQualifiers::default()))
+                                .map(|ty| (place_id, ty, TypeQualifiers::default()))
                         }),
                 )
-                .filter_map(|(target_id, member, qualifiers)| {
+                .filter_map(|(place_id, member, qualifiers)| {
                     Some((
-                        target_table.target(target_id).as_name()?,
+                        place_table.place_expr(place_id).as_name()?,
                         member,
                         qualifiers,
                     ))

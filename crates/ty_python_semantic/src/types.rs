@@ -33,14 +33,12 @@ pub(crate) use self::signatures::{CallableSignature, Signature, Signatures};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
+use crate::place::{imported_symbol, place_from_bindings, Boundness, Place, PlaceAndQualifiers};
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId};
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::target::ScopeId;
+use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
-use crate::target::{
-    imported_symbol, target_from_bindings, Boundness, ResolvedTarget, TargetAndQualifiers,
-};
 use crate::types::call::{Bindings, CallArgumentTypes, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
@@ -240,12 +238,12 @@ impl Default for MemberLookupPolicy {
 
 fn member_lookup_cycle_recover<'db>(
     _db: &'db dyn Db,
-    _value: &TargetAndQualifiers<'db>,
+    _value: &PlaceAndQualifiers<'db>,
     _count: u32,
     _self: Type<'db>,
     _name: Name,
     _policy: MemberLookupPolicy,
-) -> salsa::CycleRecoveryAction<TargetAndQualifiers<'db>> {
+) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
     salsa::CycleRecoveryAction::Iterate
 }
 
@@ -254,8 +252,8 @@ fn member_lookup_cycle_initial<'db>(
     _self: Type<'db>,
     _name: Name,
     _policy: MemberLookupPolicy,
-) -> TargetAndQualifiers<'db> {
-    ResolvedTarget::bound(Type::Never).into()
+) -> PlaceAndQualifiers<'db> {
+    Place::bound(Type::Never).into()
 }
 
 /// Meta data for `Type::Todo`, which represents a known limitation in ty.
@@ -1250,9 +1248,9 @@ impl<'db> Type<'db> {
             }
 
             (Type::NominalInstance(_) | Type::ProtocolInstance(_), Type::Callable(_)) => {
-                let call_symbol = self.member(db, "__call__").target;
+                let call_symbol = self.member(db, "__call__").place;
                 match call_symbol {
-                    ResolvedTarget::Type(Type::BoundMethod(call_function), _) => call_function
+                    Place::Type(Type::BoundMethod(call_function), _) => call_function
                         .into_callable_type(db)
                         .is_subtype_of(db, target),
                     _ => false,
@@ -1577,9 +1575,9 @@ impl<'db> Type<'db> {
             }
 
             (Type::NominalInstance(_) | Type::ProtocolInstance(_), Type::Callable(_)) => {
-                let call_symbol = self.member(db, "__call__").target;
+                let call_symbol = self.member(db, "__call__").place;
                 match call_symbol {
-                    ResolvedTarget::Type(Type::BoundMethod(call_function), _) => call_function
+                    Place::Type(Type::BoundMethod(call_function), _) => call_function
                         .into_callable_type(db)
                         .is_assignable_to(db, target),
                     _ => false,
@@ -2388,7 +2386,7 @@ impl<'db> Type<'db> {
     ///
     /// [descriptor guide]: https://docs.python.org/3/howto/descriptor.html#invocation-from-an-instance
     /// [`_PyType_Lookup`]: https://github.com/python/cpython/blob/e285232c76606e3be7bf216efb1be1e742423e4b/Objects/typeobject.c#L5223
-    fn find_name_in_mro(&self, db: &'db dyn Db, name: &str) -> Option<TargetAndQualifiers<'db>> {
+    fn find_name_in_mro(&self, db: &'db dyn Db, name: &str) -> Option<PlaceAndQualifiers<'db>> {
         self.find_name_in_mro_with_policy(db, name, MemberLookupPolicy::default())
     }
 
@@ -2397,7 +2395,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         name: &str,
         policy: MemberLookupPolicy,
-    ) -> Option<TargetAndQualifiers<'db>> {
+    ) -> Option<PlaceAndQualifiers<'db>> {
         match self {
             Type::Union(union) => Some(union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.find_name_in_mro_with_policy(db, name, policy)
@@ -2415,28 +2413,28 @@ impl<'db> Type<'db> {
                 }))
             }
 
-            Type::Dynamic(_) | Type::Never => Some(ResolvedTarget::bound(self).into()),
+            Type::Dynamic(_) | Type::Never => Some(Place::bound(self).into()),
 
             Type::ClassLiteral(class) => {
                 match (class.known(db), name) {
                     (Some(KnownClass::FunctionType), "__get__") => Some(
-                        ResolvedTarget::bound(Type::WrapperDescriptor(
+                        Place::bound(Type::WrapperDescriptor(
                             WrapperDescriptorKind::FunctionTypeDunderGet,
                         ))
                         .into(),
                     ),
                     (Some(KnownClass::FunctionType), "__set__" | "__delete__") => {
                         // Hard code this knowledge, as we look up `__set__` and `__delete__` on `FunctionType` often.
-                        Some(ResolvedTarget::Unbound.into())
+                        Some(Place::Unbound.into())
                     }
                     (Some(KnownClass::Property), "__get__") => Some(
-                        ResolvedTarget::bound(Type::WrapperDescriptor(
+                        Place::bound(Type::WrapperDescriptor(
                             WrapperDescriptorKind::PropertyDunderGet,
                         ))
                         .into(),
                     ),
                     (Some(KnownClass::Property), "__set__") => Some(
-                        ResolvedTarget::bound(Type::WrapperDescriptor(
+                        Place::bound(Type::WrapperDescriptor(
                             WrapperDescriptorKind::PropertyDunderSet,
                         ))
                         .into(),
@@ -2499,7 +2497,7 @@ impl<'db> Type<'db> {
     ///
     /// Basically corresponds to `self.to_meta_type().find_name_in_mro(name)`, except for the handling
     /// of union and intersection types.
-    fn class_member(self, db: &'db dyn Db, name: Name) -> TargetAndQualifiers<'db> {
+    fn class_member(self, db: &'db dyn Db, name: Name) -> PlaceAndQualifiers<'db> {
         self.class_member_with_policy(db, name, MemberLookupPolicy::default())
     }
 
@@ -2509,7 +2507,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         name: Name,
         policy: MemberLookupPolicy,
-    ) -> TargetAndQualifiers<'db> {
+    ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("class_member: {}.{}", self.display(db), name);
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
@@ -2543,7 +2541,7 @@ impl<'db> Type<'db> {
     ///     def __init__(self):
     ///         self.b: str = "a"
     /// ```
-    fn instance_member(&self, db: &'db dyn Db, name: &str) -> TargetAndQualifiers<'db> {
+    fn instance_member(&self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         match self {
             Type::Union(union) => {
                 union.map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name))
@@ -2552,7 +2550,7 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => intersection
                 .map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name)),
 
-            Type::Dynamic(_) | Type::Never => ResolvedTarget::bound(self).into(),
+            Type::Dynamic(_) | Type::Never => Place::bound(self).into(),
 
             Type::NominalInstance(instance) => instance.class.instance_member(db, name),
 
@@ -2602,7 +2600,7 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .instance_member(db, name),
 
-            Type::KnownInstance(_) => ResolvedTarget::Unbound.into(),
+            Type::KnownInstance(_) => Place::Unbound.into(),
 
             Type::PropertyInstance(_) => KnownClass::Property
                 .to_instance(db)
@@ -2620,7 +2618,7 @@ impl<'db> Type<'db> {
             // required, as `instance_member` is only called for instance-like types through `member`,
             // but we might want to add this in the future.
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                ResolvedTarget::Unbound.into()
+                Place::Unbound.into()
             }
         }
     }
@@ -2629,19 +2627,17 @@ impl<'db> Type<'db> {
     /// method corresponds to `inspect.getattr_static(<object of type 'self'>, name)`.
     ///
     /// See also: [`Type::member`]
-    fn static_member(&self, db: &'db dyn Db, name: &str) -> ResolvedTarget<'db> {
+    fn static_member(&self, db: &'db dyn Db, name: &str) -> Place<'db> {
         if let Type::ModuleLiteral(module) = self {
             module.static_member(db, name)
-        } else if let symbol @ ResolvedTarget::Type(_, _) =
-            self.class_member(db, name.into()).target
-        {
+        } else if let symbol @ Place::Type(_, _) = self.class_member(db, name.into()).place {
             symbol
-        } else if let Some(symbol @ ResolvedTarget::Type(_, _)) =
-            self.find_name_in_mro(db, name).map(|inner| inner.target)
+        } else if let Some(symbol @ Place::Type(_, _)) =
+            self.find_name_in_mro(db, name).map(|inner| inner.place)
         {
             symbol
         } else {
-            self.instance_member(db, name).target
+            self.instance_member(db, name).place
         }
     }
 
@@ -2666,9 +2662,9 @@ impl<'db> Type<'db> {
             instance.display(db),
             owner.display(db)
         );
-        let descr_get = self.class_member(db, "__get__".into()).target;
+        let descr_get = self.class_member(db, "__get__".into()).place;
 
-        if let ResolvedTarget::Type(descr_get, descr_get_boundness) = descr_get {
+        if let Place::Type(descr_get, descr_get_boundness) = descr_get {
             let return_ty = descr_get
                 .try_call(db, &CallArgumentTypes::positional([self, instance, owner]))
                 .map(|bindings| {
@@ -2680,10 +2676,10 @@ impl<'db> Type<'db> {
                 })
                 .ok()?;
 
-            let descriptor_kind = if self.class_member(db, "__set__".into()).target.is_unbound()
+            let descriptor_kind = if self.class_member(db, "__set__".into()).place.is_unbound()
                 && self
                     .class_member(db, "__delete__".into())
-                    .target
+                    .place
                     .is_unbound()
             {
                 AttributeKind::NormalOrNonDataDescriptor
@@ -2702,10 +2698,10 @@ impl<'db> Type<'db> {
     /// and intersections explicitly.
     fn try_call_dunder_get_on_attribute(
         db: &'db dyn Db,
-        attribute: TargetAndQualifiers<'db>,
+        attribute: PlaceAndQualifiers<'db>,
         instance: Type<'db>,
         owner: Type<'db>,
-    ) -> (TargetAndQualifiers<'db>, AttributeKind) {
+    ) -> (PlaceAndQualifiers<'db>, AttributeKind) {
         match attribute {
             // This branch is not strictly needed, but it short-circuits the lookup of various dunder
             // methods and calls that would otherwise be made.
@@ -2715,18 +2711,18 @@ impl<'db> Type<'db> {
             // data descriptors.
             //
             // The same is true for `Never`.
-            TargetAndQualifiers {
-                target: ResolvedTarget::Type(Type::Dynamic(_) | Type::Never, _),
+            PlaceAndQualifiers {
+                place: Place::Type(Type::Dynamic(_) | Type::Never, _),
                 qualifiers: _,
             } => (attribute, AttributeKind::DataDescriptor),
 
-            TargetAndQualifiers {
-                target: ResolvedTarget::Type(Type::Union(union), boundness),
+            PlaceAndQualifiers {
+                place: Place::Type(Type::Union(union), boundness),
                 qualifiers,
             } => (
                 union
                     .map_with_boundness(db, |elem| {
-                        ResolvedTarget::Type(
+                        Place::Type(
                             elem.try_call_dunder_get(db, instance, owner)
                                 .map_or(*elem, |(ty, _)| ty),
                             boundness,
@@ -2744,13 +2740,13 @@ impl<'db> Type<'db> {
                 },
             ),
 
-            TargetAndQualifiers {
-                target: ResolvedTarget::Type(Type::Intersection(intersection), boundness),
+            PlaceAndQualifiers {
+                place: Place::Type(Type::Intersection(intersection), boundness),
                 qualifiers,
             } => (
                 intersection
                     .map_with_boundness(db, |elem| {
-                        ResolvedTarget::Type(
+                        Place::Type(
                             elem.try_call_dunder_get(db, instance, owner)
                                 .map_or(*elem, |(ty, _)| ty),
                             boundness,
@@ -2761,17 +2757,14 @@ impl<'db> Type<'db> {
                 AttributeKind::NormalOrNonDataDescriptor,
             ),
 
-            TargetAndQualifiers {
-                target: ResolvedTarget::Type(attribute_ty, boundness),
+            PlaceAndQualifiers {
+                place: Place::Type(attribute_ty, boundness),
                 qualifiers: _,
             } => {
                 if let Some((return_ty, attribute_kind)) =
                     attribute_ty.try_call_dunder_get(db, instance, owner)
                 {
-                    (
-                        ResolvedTarget::Type(return_ty, boundness).into(),
-                        attribute_kind,
-                    )
+                    (Place::Type(return_ty, boundness).into(), attribute_kind)
                 } else {
                     (attribute, AttributeKind::NormalOrNonDataDescriptor)
                 }
@@ -2799,13 +2792,13 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-        fallback: TargetAndQualifiers<'db>,
+        fallback: PlaceAndQualifiers<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
-    ) -> TargetAndQualifiers<'db> {
+    ) -> PlaceAndQualifiers<'db> {
         let (
-            TargetAndQualifiers {
-                target: meta_attr,
+            PlaceAndQualifiers {
+                place: meta_attr,
                 qualifiers: meta_attr_qualifiers,
             },
             meta_attr_kind,
@@ -2816,34 +2809,32 @@ impl<'db> Type<'db> {
             self.to_meta_type(db),
         );
 
-        let TargetAndQualifiers {
-            target: fallback,
+        let PlaceAndQualifiers {
+            place: fallback,
             qualifiers: fallback_qualifiers,
         } = fallback;
 
         match (meta_attr, meta_attr_kind, fallback) {
             // The fallback type is unbound, so we can just return `meta_attr` unconditionally,
             // no matter if it's data descriptor, a non-data descriptor, or a normal attribute.
-            (meta_attr @ ResolvedTarget::Type(_, _), _, ResolvedTarget::Unbound) => {
+            (meta_attr @ Place::Type(_, _), _, Place::Unbound) => {
                 meta_attr.with_qualifiers(meta_attr_qualifiers)
             }
 
             // `meta_attr` is the return type of a data descriptor and definitely bound, so we
             // return it.
-            (
-                meta_attr @ ResolvedTarget::Type(_, Boundness::Bound),
-                AttributeKind::DataDescriptor,
-                _,
-            ) => meta_attr.with_qualifiers(meta_attr_qualifiers),
+            (meta_attr @ Place::Type(_, Boundness::Bound), AttributeKind::DataDescriptor, _) => {
+                meta_attr.with_qualifiers(meta_attr_qualifiers)
+            }
 
             // `meta_attr` is the return type of a data descriptor, but the attribute on the
             // meta-type is possibly-unbound. This means that we "fall through" to the next
             // stage of the descriptor protocol and union with the fallback type.
             (
-                ResolvedTarget::Type(meta_attr_ty, Boundness::PossiblyUnbound),
+                Place::Type(meta_attr_ty, Boundness::PossiblyUnbound),
                 AttributeKind::DataDescriptor,
-                ResolvedTarget::Type(fallback_ty, fallback_boundness),
-            ) => ResolvedTarget::Type(
+                Place::Type(fallback_ty, fallback_boundness),
+            ) => Place::Type(
                 UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
                 fallback_boundness,
             )
@@ -2858,9 +2849,9 @@ impl<'db> Type<'db> {
             // would require us to statically infer if an instance attribute is always set, which
             // is something we currently don't attempt to do.
             (
-                ResolvedTarget::Type(_, _),
+                Place::Type(_, _),
                 AttributeKind::NormalOrNonDataDescriptor,
-                fallback @ ResolvedTarget::Type(_, Boundness::Bound),
+                fallback @ Place::Type(_, Boundness::Bound),
             ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => {
                 fallback.with_qualifiers(fallback_qualifiers)
             }
@@ -2869,17 +2860,17 @@ impl<'db> Type<'db> {
             // unbound or the policy argument is `No`. In both cases, the `fallback` type does
             // not completely shadow the non-data descriptor, so we build a union of the two.
             (
-                ResolvedTarget::Type(meta_attr_ty, meta_attr_boundness),
+                Place::Type(meta_attr_ty, meta_attr_boundness),
                 AttributeKind::NormalOrNonDataDescriptor,
-                ResolvedTarget::Type(fallback_ty, fallback_boundness),
-            ) => ResolvedTarget::Type(
+                Place::Type(fallback_ty, fallback_boundness),
+            ) => Place::Type(
                 UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
                 meta_attr_boundness.max(fallback_boundness),
             )
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
             // If the attribute is not found on the meta-type, we simply return the fallback.
-            (ResolvedTarget::Unbound, _, fallback) => fallback.with_qualifiers(fallback_qualifiers),
+            (Place::Unbound, _, fallback) => fallback.with_qualifiers(fallback_qualifiers),
         }
     }
 
@@ -2891,7 +2882,7 @@ impl<'db> Type<'db> {
     /// TODO: We should return a `Result` here to handle errors that can appear during attribute
     /// lookup, like a failed `__get__` call on a descriptor.
     #[must_use]
-    pub(crate) fn member(self, db: &'db dyn Db, name: &str) -> TargetAndQualifiers<'db> {
+    pub(crate) fn member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         self.member_lookup_with_policy(db, name.into(), MemberLookupPolicy::default())
     }
 
@@ -2903,10 +2894,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         name: Name,
         policy: MemberLookupPolicy,
-    ) -> TargetAndQualifiers<'db> {
+    ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("member_lookup_with_policy: {}.{}", self.display(db), name);
         if name == "__class__" {
-            return ResolvedTarget::bound(self.to_meta_type(db)).into();
+            return Place::bound(self.to_meta_type(db)).into();
         }
 
         let name_str = name.as_str();
@@ -2915,36 +2906,36 @@ impl<'db> Type<'db> {
             Type::Union(union) => union
                 .map_with_boundness(db, |elem| {
                     elem.member_lookup_with_policy(db, name_str.into(), policy)
-                        .target
+                        .place
                 })
                 .into(),
 
             Type::Intersection(intersection) => intersection
                 .map_with_boundness(db, |elem| {
                     elem.member_lookup_with_policy(db, name_str.into(), policy)
-                        .target
+                        .place
                 })
                 .into(),
 
-            Type::Dynamic(..) | Type::Never => ResolvedTarget::bound(self).into(),
+            Type::Dynamic(..) | Type::Never => Place::bound(self).into(),
 
-            Type::FunctionLiteral(function) if name == "__get__" => ResolvedTarget::bound(
+            Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)),
             )
             .into(),
-            Type::FunctionLiteral(function) if name == "__call__" => ResolvedTarget::bound(
+            Type::FunctionLiteral(function) if name == "__call__" => Place::bound(
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)),
             )
             .into(),
-            Type::PropertyInstance(property) if name == "__get__" => ResolvedTarget::bound(
+            Type::PropertyInstance(property) if name == "__get__" => Place::bound(
                 Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)),
             )
             .into(),
-            Type::PropertyInstance(property) if name == "__set__" => ResolvedTarget::bound(
+            Type::PropertyInstance(property) if name == "__set__" => Place::bound(
                 Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)),
             )
             .into(),
-            Type::StringLiteral(literal) if name == "startswith" => ResolvedTarget::bound(
+            Type::StringLiteral(literal) if name == "startswith" => Place::bound(
                 Type::MethodWrapper(MethodWrapperKind::StrStartswith(literal)),
             )
             .into(),
@@ -2952,7 +2943,7 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
             {
-                ResolvedTarget::bound(Type::WrapperDescriptor(
+                Place::bound(Type::WrapperDescriptor(
                     WrapperDescriptorKind::FunctionTypeDunderGet,
                 ))
                 .into()
@@ -2960,7 +2951,7 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::Property) =>
             {
-                ResolvedTarget::bound(Type::WrapperDescriptor(
+                Place::bound(Type::WrapperDescriptor(
                     WrapperDescriptorKind::PropertyDunderGet,
                 ))
                 .into()
@@ -2968,16 +2959,14 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(class)
                 if name == "__set__" && class.is_known(db, KnownClass::Property) =>
             {
-                ResolvedTarget::bound(Type::WrapperDescriptor(
+                Place::bound(Type::WrapperDescriptor(
                     WrapperDescriptorKind::PropertyDunderSet,
                 ))
                 .into()
             }
             Type::BoundMethod(bound_method) => match name_str {
-                "__self__" => ResolvedTarget::bound(bound_method.self_instance(db)).into(),
-                "__func__" => {
-                    ResolvedTarget::bound(Type::FunctionLiteral(bound_method.function(db))).into()
-                }
+                "__self__" => Place::bound(bound_method.self_instance(db)).into(),
+                "__func__" => Place::bound(Type::FunctionLiteral(bound_method.function(db))).into(),
                 _ => {
                     KnownClass::MethodType
                         .to_instance(db)
@@ -3001,7 +2990,7 @@ impl<'db> Type<'db> {
                 .member_lookup_with_policy(db, name, policy),
 
             Type::Callable(_) | Type::DataclassTransformer(_) if name_str == "__call__" => {
-                ResolvedTarget::bound(self).into()
+                Place::bound(self).into()
             }
             Type::Callable(_) | Type::DataclassTransformer(_) => KnownClass::Object
                 .to_instance(db)
@@ -3017,22 +3006,22 @@ impl<'db> Type<'db> {
                 } else {
                     python_version.minor
                 };
-                ResolvedTarget::bound(Type::IntLiteral(segment.into())).into()
+                Place::bound(Type::IntLiteral(segment.into())).into()
             }
 
             Type::PropertyInstance(property) if name == "fget" => {
-                ResolvedTarget::bound(property.getter(db).unwrap_or(Type::none(db))).into()
+                Place::bound(property.getter(db).unwrap_or(Type::none(db))).into()
             }
             Type::PropertyInstance(property) if name == "fset" => {
-                ResolvedTarget::bound(property.setter(db).unwrap_or(Type::none(db))).into()
+                Place::bound(property.setter(db).unwrap_or(Type::none(db))).into()
             }
 
             Type::IntLiteral(_) if matches!(name_str, "real" | "numerator") => {
-                ResolvedTarget::bound(self).into()
+                Place::bound(self).into()
             }
 
             Type::BooleanLiteral(bool_value) if matches!(name_str, "real" | "numerator") => {
-                ResolvedTarget::bound(Type::IntLiteral(i64::from(bool_value))).into()
+                Place::bound(Type::IntLiteral(i64::from(bool_value))).into()
             }
 
             Type::ModuleLiteral(module) => module.static_member(db, name_str).into(),
@@ -3044,7 +3033,7 @@ impl<'db> Type<'db> {
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
                 name_str,
-                ResolvedTarget::Unbound.into(),
+                Place::Unbound.into(),
                 InstanceFallbackShadowsNonDataDescriptor::No,
                 policy,
             ),
@@ -3084,7 +3073,7 @@ impl<'db> Type<'db> {
                             .and_then(|instance| instance.class.known(db)),
                         Some(KnownClass::ModuleType | KnownClass::GenericAlias)
                     ) {
-                        return ResolvedTarget::Unbound.into();
+                        return Place::Unbound.into();
                     }
 
                     self.try_call_dunder(
@@ -3094,23 +3083,23 @@ impl<'db> Type<'db> {
                             StringLiteralType::new(db, Box::from(name.as_str())),
                         )]),
                     )
-                    .map(|outcome| ResolvedTarget::bound(outcome.return_type(db)))
+                    .map(|outcome| Place::bound(outcome.return_type(db)))
                     // TODO: Handle call errors here.
-                    .unwrap_or(ResolvedTarget::Unbound)
+                    .unwrap_or(Place::Unbound)
                     .into()
                 };
 
                 match result {
-                    member @ TargetAndQualifiers {
-                        target: ResolvedTarget::Type(_, Boundness::Bound),
+                    member @ PlaceAndQualifiers {
+                        place: Place::Type(_, Boundness::Bound),
                         qualifiers: _,
                     } => member,
-                    member @ TargetAndQualifiers {
-                        target: ResolvedTarget::Type(_, Boundness::PossiblyUnbound),
+                    member @ PlaceAndQualifiers {
+                        place: Place::Type(_, Boundness::PossiblyUnbound),
                         qualifiers: _,
                     } => member.or_fall_back_to(db, custom_getattr_result),
-                    TargetAndQualifiers {
-                        target: ResolvedTarget::Unbound,
+                    PlaceAndQualifiers {
+                        place: Place::Unbound,
                         qualifiers: _,
                     } => custom_getattr_result(),
                 }
@@ -3126,7 +3115,7 @@ impl<'db> Type<'db> {
                 }
 
                 if self.is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) {
-                    return TargetAndQualifiers::todo("Attribute access on enum classes");
+                    return PlaceAndQualifiers::todo("Attribute access on enum classes");
                 }
 
                 let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
@@ -4170,9 +4159,9 @@ impl<'db> Type<'db> {
                         Name::new_static("__call__"),
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     )
-                    .target
+                    .place
                 {
-                    ResolvedTarget::Type(dunder_callable, boundness) => {
+                    Place::Type(dunder_callable, boundness) => {
                         let mut signatures = dunder_callable.signatures(db).clone();
                         signatures.replace_callable_type(dunder_callable, self);
                         if boundness == Boundness::PossiblyUnbound {
@@ -4180,7 +4169,7 @@ impl<'db> Type<'db> {
                         }
                         signatures
                     }
-                    ResolvedTarget::Unbound => Signatures::not_callable(self),
+                    Place::Unbound => Signatures::not_callable(self),
                 }
             }
 
@@ -4268,9 +4257,9 @@ impl<'db> Type<'db> {
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match self
             .member_lookup_with_policy(db, name.into(), policy)
-            .target
+            .place
         {
-            ResolvedTarget::Type(dunder_callable, boundness) => {
+            Place::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db);
                 let bindings = Bindings::match_parameters(signatures, argument_types)
                     .check_types(db, argument_types)?;
@@ -4279,7 +4268,7 @@ impl<'db> Type<'db> {
                 }
                 Ok(bindings)
             }
-            ResolvedTarget::Unbound => Err(CallDunderError::MethodNotAvailable),
+            Place::Unbound => Err(CallDunderError::MethodNotAvailable),
         }
     }
 
@@ -4511,8 +4500,8 @@ impl<'db> Type<'db> {
                 | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
         );
         let new_call_outcome = new_method.and_then(|new_method| {
-            match new_method.target.try_call_dunder_get(db, self_type) {
-                ResolvedTarget::Type(new_method, boundness) => {
+            match new_method.place.try_call_dunder_get(db, self_type) {
+                Place::Type(new_method, boundness) => {
                     let result =
                         new_method.try_call(db, argument_types.with_self(Some(self_type)).as_ref());
                     if boundness == Boundness::PossiblyUnbound {
@@ -4521,7 +4510,7 @@ impl<'db> Type<'db> {
                         Some(result.map_err(DunderNewCallError::CallError))
                     }
                 }
-                ResolvedTarget::Unbound => None,
+                Place::Unbound => None,
             }
         });
 
@@ -4540,7 +4529,7 @@ impl<'db> Type<'db> {
                     MemberLookupPolicy::NO_INSTANCE_FALLBACK
                         | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 )
-                .target
+                .place
                 .is_unbound()
         {
             Some(init_ty.try_call_dunder(db, "__init__", argument_types))
@@ -6876,8 +6865,8 @@ impl<'db> FunctionType<'db> {
                 .name
                 .scoped_use_id(db, scope);
 
-            let ResolvedTarget::Type(Type::FunctionLiteral(previous), Boundness::Bound) =
-                target_from_bindings(db, use_def.bindings_at_use(use_id))
+            let Place::Type(Type::FunctionLiteral(previous), Boundness::Bound) =
+                place_from_bindings(db, use_def.bindings_at_use(use_id))
             else {
                 break;
             };
@@ -7446,7 +7435,7 @@ pub struct ModuleLiteralType<'db> {
 }
 
 impl<'db> ModuleLiteralType<'db> {
-    fn static_member(self, db: &'db dyn Db, name: &str) -> ResolvedTarget<'db> {
+    fn static_member(self, db: &'db dyn Db, name: &str) -> Place<'db> {
         // `__dict__` is a very special member that is never overridden by module globals;
         // we should always look it up directly as an attribute on `types.ModuleType`,
         // never in the global scope of the module.
@@ -7454,7 +7443,7 @@ impl<'db> ModuleLiteralType<'db> {
             return KnownClass::ModuleType
                 .to_instance(db)
                 .member(db, "__dict__")
-                .target;
+                .place;
         }
 
         // If the file that originally imported the module has also imported a submodule
@@ -7473,16 +7462,12 @@ impl<'db> ModuleLiteralType<'db> {
             full_submodule_name.extend(&submodule_name);
             if imported_submodules.contains(&full_submodule_name) {
                 if let Some(submodule) = resolve_module(db, &full_submodule_name) {
-                    return ResolvedTarget::bound(Type::module_literal(
-                        db,
-                        importing_file,
-                        submodule,
-                    ));
+                    return Place::bound(Type::module_literal(db, importing_file, submodule));
                 }
             }
         }
 
-        imported_symbol(db, self.module(db).file(), name, None).target
+        imported_symbol(db, self.module(db).file(), name, None).place
     }
 }
 
@@ -7567,8 +7552,8 @@ impl<'db> UnionType<'db> {
     pub(crate) fn map_with_boundness(
         self,
         db: &'db dyn Db,
-        mut transform_fn: impl FnMut(&Type<'db>) -> ResolvedTarget<'db>,
-    ) -> ResolvedTarget<'db> {
+        mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
+    ) -> Place<'db> {
         let mut builder = UnionBuilder::new(db);
 
         let mut all_unbound = true;
@@ -7576,10 +7561,10 @@ impl<'db> UnionType<'db> {
         for ty in self.elements(db) {
             let ty_member = transform_fn(ty);
             match ty_member {
-                ResolvedTarget::Unbound => {
+                Place::Unbound => {
                     possibly_unbound = true;
                 }
-                ResolvedTarget::Type(ty_member, member_boundness) => {
+                Place::Type(ty_member, member_boundness) => {
                     if member_boundness == Boundness::PossiblyUnbound {
                         possibly_unbound = true;
                     }
@@ -7591,9 +7576,9 @@ impl<'db> UnionType<'db> {
         }
 
         if all_unbound {
-            ResolvedTarget::Unbound
+            Place::Unbound
         } else {
-            ResolvedTarget::Type(
+            Place::Type(
                 builder.build(),
                 if possibly_unbound {
                     Boundness::PossiblyUnbound
@@ -7607,24 +7592,24 @@ impl<'db> UnionType<'db> {
     pub(crate) fn map_with_boundness_and_qualifiers(
         self,
         db: &'db dyn Db,
-        mut transform_fn: impl FnMut(&Type<'db>) -> TargetAndQualifiers<'db>,
-    ) -> TargetAndQualifiers<'db> {
+        mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
+    ) -> PlaceAndQualifiers<'db> {
         let mut builder = UnionBuilder::new(db);
         let mut qualifiers = TypeQualifiers::empty();
 
         let mut all_unbound = true;
         let mut possibly_unbound = false;
         for ty in self.elements(db) {
-            let TargetAndQualifiers {
-                target: ty_member,
+            let PlaceAndQualifiers {
+                place: ty_member,
                 qualifiers: new_qualifiers,
             } = transform_fn(ty);
             qualifiers |= new_qualifiers;
             match ty_member {
-                ResolvedTarget::Unbound => {
+                Place::Unbound => {
                     possibly_unbound = true;
                 }
-                ResolvedTarget::Type(ty_member, member_boundness) => {
+                Place::Type(ty_member, member_boundness) => {
                     if member_boundness == Boundness::PossiblyUnbound {
                         possibly_unbound = true;
                     }
@@ -7634,11 +7619,11 @@ impl<'db> UnionType<'db> {
                 }
             }
         }
-        TargetAndQualifiers {
-            target: if all_unbound {
-                ResolvedTarget::Unbound
+        PlaceAndQualifiers {
+            place: if all_unbound {
+                Place::Unbound
             } else {
-                ResolvedTarget::Type(
+                Place::Type(
                     builder.build(),
                     if possibly_unbound {
                         Boundness::PossiblyUnbound
@@ -7879,12 +7864,10 @@ impl<'db> IntersectionType<'db> {
     pub(crate) fn map_with_boundness(
         self,
         db: &'db dyn Db,
-        mut transform_fn: impl FnMut(&Type<'db>) -> ResolvedTarget<'db>,
-    ) -> ResolvedTarget<'db> {
+        mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
+    ) -> Place<'db> {
         if !self.negative(db).is_empty() {
-            return ResolvedTarget::todo(
-                "map_with_boundness: intersections with negative contributions",
-            );
+            return Place::todo("map_with_boundness: intersections with negative contributions");
         }
 
         let mut builder = IntersectionBuilder::new(db);
@@ -7894,8 +7877,8 @@ impl<'db> IntersectionType<'db> {
         for ty in self.positive(db) {
             let ty_member = transform_fn(ty);
             match ty_member {
-                ResolvedTarget::Unbound => {}
-                ResolvedTarget::Type(ty_member, member_boundness) => {
+                Place::Unbound => {}
+                Place::Type(ty_member, member_boundness) => {
                     all_unbound = false;
                     if member_boundness == Boundness::Bound {
                         any_definitely_bound = true;
@@ -7907,9 +7890,9 @@ impl<'db> IntersectionType<'db> {
         }
 
         if all_unbound {
-            ResolvedTarget::Unbound
+            Place::Unbound
         } else {
-            ResolvedTarget::Type(
+            Place::Type(
                 builder.build(),
                 if any_definitely_bound {
                     Boundness::Bound
@@ -7923,13 +7906,11 @@ impl<'db> IntersectionType<'db> {
     pub(crate) fn map_with_boundness_and_qualifiers(
         self,
         db: &'db dyn Db,
-        mut transform_fn: impl FnMut(&Type<'db>) -> TargetAndQualifiers<'db>,
-    ) -> TargetAndQualifiers<'db> {
+        mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
+    ) -> PlaceAndQualifiers<'db> {
         if !self.negative(db).is_empty() {
-            return ResolvedTarget::todo(
-                "map_with_boundness: intersections with negative contributions",
-            )
-            .into();
+            return Place::todo("map_with_boundness: intersections with negative contributions")
+                .into();
         }
 
         let mut builder = IntersectionBuilder::new(db);
@@ -7938,16 +7919,16 @@ impl<'db> IntersectionType<'db> {
         let mut any_unbound = false;
         let mut any_possibly_unbound = false;
         for ty in self.positive(db) {
-            let TargetAndQualifiers {
-                target: member,
+            let PlaceAndQualifiers {
+                place: member,
                 qualifiers: new_qualifiers,
             } = transform_fn(ty);
             qualifiers |= new_qualifiers;
             match member {
-                ResolvedTarget::Unbound => {
+                Place::Unbound => {
                     any_unbound = true;
                 }
-                ResolvedTarget::Type(ty_member, member_boundness) => {
+                Place::Type(ty_member, member_boundness) => {
                     if member_boundness == Boundness::PossiblyUnbound {
                         any_possibly_unbound = true;
                     }
@@ -7957,11 +7938,11 @@ impl<'db> IntersectionType<'db> {
             }
         }
 
-        TargetAndQualifiers {
-            target: if any_unbound {
-                ResolvedTarget::Unbound
+        PlaceAndQualifiers {
+            place: if any_unbound {
+                Place::Unbound
             } else {
-                ResolvedTarget::Type(
+                Place::Type(
                     builder.build(),
                     if any_possibly_unbound {
                         Boundness::PossiblyUnbound
@@ -8309,8 +8290,8 @@ impl<'db> BoundSuperType<'db> {
     fn try_call_dunder_get_on_attribute(
         self,
         db: &'db dyn Db,
-        attribute: TargetAndQualifiers<'db>,
-    ) -> Option<TargetAndQualifiers<'db>> {
+        attribute: PlaceAndQualifiers<'db>,
+    ) -> Option<PlaceAndQualifiers<'db>> {
         let owner = self.owner(db);
 
         match owner {
@@ -8345,7 +8326,7 @@ impl<'db> BoundSuperType<'db> {
         db: &'db dyn Db,
         name: &str,
         policy: MemberLookupPolicy,
-    ) -> TargetAndQualifiers<'db> {
+    ) -> PlaceAndQualifiers<'db> {
         let owner = self.owner(db);
         let class = match owner {
             SuperOwnerKind::Dynamic(_) => {
@@ -8370,7 +8351,7 @@ impl<'db> BoundSuperType<'db> {
         //  super(B[int], b_unknown)
         //  ```
         match class_literal.generic_context(db) {
-            Some(_) => ResolvedTarget::bound(todo_type!("super in generic class")).into(),
+            Some(_) => Place::bound(todo_type!("super in generic class")).into(),
             None => class_literal.class_member_from_mro(
                 db,
                 name,
@@ -8390,7 +8371,7 @@ static_assertions::assert_eq_size!(Type, [u8; 16]);
 pub(crate) mod tests {
     use super::*;
     use crate::db::tests::{setup_db, TestDbBuilder};
-    use crate::target::{
+    use crate::place::{
         global_symbol, known_module_symbol, typing_extensions_symbol, typing_symbol,
     };
     use ruff_db::files::system_path_to_file;
@@ -8424,9 +8405,9 @@ pub(crate) mod tests {
             .build()
             .unwrap();
 
-        let typing_no_default = typing_symbol(&db, "NoDefault").target.expect_type();
+        let typing_no_default = typing_symbol(&db, "NoDefault").place.expect_type();
         let typing_extensions_no_default = typing_extensions_symbol(&db, "NoDefault")
-            .target
+            .place
             .expect_type();
 
         assert_eq!(typing_no_default.display(&db).to_string(), "NoDefault");
@@ -8459,7 +8440,7 @@ pub(crate) mod tests {
         )?;
 
         let bar = system_path_to_file(&db, "src/bar.py")?;
-        let a = global_symbol(&db, bar, "a").target;
+        let a = global_symbol(&db, bar, "a").place;
 
         assert_eq!(
             a.expect_type(),
@@ -8478,7 +8459,7 @@ pub(crate) mod tests {
         )?;
         db.clear_salsa_events();
 
-        let a = global_symbol(&db, bar, "a").target;
+        let a = global_symbol(&db, bar, "a").place;
 
         assert_eq!(
             a.expect_type(),
@@ -8585,7 +8566,7 @@ pub(crate) mod tests {
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)
-                .target
+                .place
                 .expect_type()
                 .expect_function_literal()
                 .definition(&db);

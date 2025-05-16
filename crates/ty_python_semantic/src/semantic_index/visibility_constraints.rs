@@ -179,12 +179,12 @@ use ruff_index::{Idx, IndexVec};
 use rustc_hash::FxHashMap;
 
 use crate::dunder_all::dunder_all_names;
+use crate::place::{imported_symbol, RequiresExplicitReExport};
 use crate::semantic_index::expression::Expression;
+use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
 };
-use crate::semantic_index::target_table;
-use crate::target::{imported_symbol, RequiresExplicitReExport};
 use crate::types::{infer_expression_type, Truthiness, Type};
 use crate::Db;
 
@@ -654,8 +654,10 @@ impl VisibilityConstraints {
             }
             PredicateNode::Pattern(inner) => Self::analyze_single_pattern_predicate(db, inner),
             PredicateNode::StarImportPlaceholder(star_import) => {
-                let target_table = target_table(db, star_import.scope(db));
-                let symbol_name = target_table.target(star_import.symbol_id(db)).expect_name();
+                let place_table = place_table(db, star_import.scope(db));
+                let symbol_name = place_table
+                    .place_expr(star_import.symbol_id(db))
+                    .expect_name();
                 let referenced_file = star_import.referenced_file(db);
 
                 let requires_explicit_reexport = match dunder_all_names(db, referenced_file) {
@@ -675,16 +677,15 @@ impl VisibilityConstraints {
                 };
 
                 match imported_symbol(db, referenced_file, symbol_name, requires_explicit_reexport)
-                    .target
+                    .place
                 {
-                    crate::target::ResolvedTarget::Type(_, crate::target::Boundness::Bound) => {
+                    crate::place::Place::Type(_, crate::place::Boundness::Bound) => {
                         Truthiness::AlwaysTrue
                     }
-                    crate::target::ResolvedTarget::Type(
-                        _,
-                        crate::target::Boundness::PossiblyUnbound,
-                    ) => Truthiness::Ambiguous,
-                    crate::target::ResolvedTarget::Unbound => Truthiness::AlwaysFalse,
+                    crate::place::Place::Type(_, crate::place::Boundness::PossiblyUnbound) => {
+                        Truthiness::Ambiguous
+                    }
+                    crate::place::Place::Unbound => Truthiness::AlwaysFalse,
                 }
             }
         }

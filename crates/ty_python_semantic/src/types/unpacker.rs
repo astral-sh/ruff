@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
-use crate::semantic_index::target::ScopeId;
+use crate::semantic_index::place::ScopeId;
 use crate::types::{infer_expression_types, todo_type, Type, TypeCheckDiagnostics};
 use crate::unpack::{UnpackKind, UnpackValue};
 use crate::Db;

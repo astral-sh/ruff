@@ -11,7 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 use super::{binding_type, Type, TypeCheckDiagnostics};
 
 use crate::lint::LintSource;
-use crate::semantic_index::target::ScopeId;
+use crate::semantic_index::place::ScopeId;
 use crate::{
     lint::{LintId, LintMetadata},
     suppression::suppressions,

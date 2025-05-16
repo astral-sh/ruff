@@ -5,8 +5,8 @@ use ruff_python_ast as ast;
 use ruff_python_ast::ExprRef;
 
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
+use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::semantic_index;
-use crate::semantic_index::target::ScopeId;
 use crate::Db;
 
 /// AST ids for a single scope.
@@ -49,7 +49,7 @@ fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
     semantic_index(db, scope.file(db)).ast_ids(scope.file_scope_id(db))
 }
 
-/// Uniquely identifies a use of a name in a [`crate::semantic_index::target::FileScopeId`].
+/// Uniquely identifies a use of a name in a [`crate::semantic_index::place::FileScopeId`].
 #[newtype_index]
 pub struct ScopedUseId;
 
@@ -93,7 +93,7 @@ impl HasScopedUseId for ast::ExprRef<'_> {
     }
 }
 
-/// Uniquely identifies an [`ast::Expr`] in a [`crate::semantic_index::target::FileScopeId`].
+/// Uniquely identifies an [`ast::Expr`] in a [`crate::semantic_index::place::FileScopeId`].
 #[newtype_index]
 #[derive(salsa::Update)]
 pub struct ScopedExpressionId;

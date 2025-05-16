@@ -7,7 +7,7 @@ use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::{self as ast};
 
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
-use crate::semantic_index::target::ScopeId;
+use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{global_scope, semantic_index, SemanticIndex};
 use crate::types::{infer_expression_types, Truthiness, Type};
 use crate::{resolve_module, Db, ModuleName};
