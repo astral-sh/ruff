@@ -996,11 +996,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             return;
         }
 
-        let import_target = if name.contains('.') {
-            name.split('.').next().unwrap()
-        } else {
-            name
-        };
+        let import_target = name.split('.').next().unwrap_or(name);
 
         diagnostic.try_set_fix(|| {
             let (import_edit, _) = checker.importer().get_or_import_symbol(
