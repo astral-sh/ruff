@@ -173,6 +173,7 @@ pub(crate) fn used_dummy_variable(
                 shadowed_kind: None,
             },
             binding.range(),
+            checker.source_file(),
         ));
     }
 
@@ -187,6 +188,7 @@ pub(crate) fn used_dummy_variable(
             shadowed_kind: Some(shadowed_kind),
         },
         binding.range(),
+        checker.source_file(),
     );
 
     // Get the possible fix based on the scope

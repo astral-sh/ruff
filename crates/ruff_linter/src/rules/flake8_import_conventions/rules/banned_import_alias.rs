@@ -1,3 +1,4 @@
+use ruff_source_file::SourceFile;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -52,6 +53,7 @@ pub(crate) fn banned_import_alias(
     name: &str,
     asname: &str,
     banned_conventions: &FxHashMap<String, BannedAliases>,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     if let Some(banned_aliases) = banned_conventions.get(name) {
         if banned_aliases
@@ -64,6 +66,7 @@ pub(crate) fn banned_import_alias(
                     asname: asname.to_string(),
                 },
                 stmt.range(),
+                source_file,
             ));
         }
     }

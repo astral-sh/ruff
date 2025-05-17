@@ -78,6 +78,7 @@ pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
             required_import_conflict,
         },
         alias.range(),
+        checker.source_file(),
     );
     if !required_import_conflict {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
@@ -115,6 +116,7 @@ pub(crate) fn useless_import_from_alias(
             required_import_conflict,
         },
         alias.range(),
+        checker.source_file(),
     );
 
     if !required_import_conflict {

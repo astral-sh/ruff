@@ -79,6 +79,7 @@ pub(crate) fn async_busy_wait(checker: &Checker, while_stmt: &ast::StmtWhile) {
                 module: AsyncModule::try_from(&qualified_name).unwrap(),
             },
             while_stmt.range(),
+            checker.source_file(),
         ));
     }
 }

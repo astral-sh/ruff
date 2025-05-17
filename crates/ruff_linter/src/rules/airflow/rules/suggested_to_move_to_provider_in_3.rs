@@ -295,6 +295,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             replacement: replacement.clone(),
         },
         ranged.range(),
+        checker.source_file(),
     );
 
     let semantic = checker.semantic();

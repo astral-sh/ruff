@@ -2,6 +2,7 @@ use ruff_python_ast::Identifier;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;
@@ -36,11 +37,15 @@ impl Violation for AmbiguousClassName {
 }
 
 /// E742
-pub(crate) fn ambiguous_class_name(name: &Identifier) -> Option<Diagnostic> {
+pub(crate) fn ambiguous_class_name(
+    name: &Identifier,
+    source_file: SourceFile,
+) -> Option<Diagnostic> {
     if is_ambiguous_name(name) {
         Some(Diagnostic::new(
             AmbiguousClassName(name.to_string()),
             name.range(),
+            source_file,
         ))
     } else {
         None

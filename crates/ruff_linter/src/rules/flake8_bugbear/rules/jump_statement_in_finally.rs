@@ -67,6 +67,7 @@ fn walk_stmt(checker: &Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
                     .to_owned(),
                 },
                 stmt.range(),
+                checker.source_file(),
             ));
         }
         match stmt {

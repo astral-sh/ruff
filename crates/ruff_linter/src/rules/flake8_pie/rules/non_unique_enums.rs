@@ -96,6 +96,7 @@ pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) 
                     value: checker.generator().expr(value),
                 },
                 stmt.range(),
+                checker.source_file(),
             );
             checker.report_diagnostic(diagnostic);
         }

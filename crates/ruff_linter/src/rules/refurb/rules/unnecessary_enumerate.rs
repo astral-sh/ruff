@@ -129,6 +129,7 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) 
                     subset: EnumerateSubset::Values,
                 },
                 func.range(),
+                checker.source_file(),
             );
 
             // The index is unused, so replace with `for value in sequence`.
@@ -172,6 +173,7 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) 
                     subset: EnumerateSubset::Indices,
                 },
                 func.range(),
+                checker.source_file(),
             );
             if checker.semantic().has_builtin_binding("range")
                 && checker.semantic().has_builtin_binding("len")

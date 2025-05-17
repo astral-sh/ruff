@@ -102,7 +102,11 @@ pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryDefaultTypeArgs, expr.range());
+    let mut diagnostic = Diagnostic::new(
+        UnnecessaryDefaultTypeArgs,
+        expr.range(),
+        checker.source_file(),
+    );
 
     let applicability = if checker
         .comment_ranges()

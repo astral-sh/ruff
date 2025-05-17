@@ -1,4 +1,5 @@
 use ruff_python_ast::Stmt;
+use ruff_source_file::SourceFile;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -49,6 +50,7 @@ pub(crate) fn banned_import_from(
     stmt: &Stmt,
     name: &str,
     banned_conventions: &FxHashSet<String>,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     if banned_conventions.contains(name) {
         return Some(Diagnostic::new(
@@ -56,6 +58,7 @@ pub(crate) fn banned_import_from(
                 name: name.to_string(),
             },
             stmt.range(),
+            source_file,
         ));
     }
     None

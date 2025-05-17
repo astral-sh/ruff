@@ -73,6 +73,7 @@ pub(crate) fn banned_module_level_imports(checker: &Checker, stmt: &Stmt) {
                     name: banned_module,
                 },
                 node.range(),
+                checker.source_file(),
             ));
         }
     }

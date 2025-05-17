@@ -74,7 +74,11 @@ pub(crate) fn reimplemented_container_builtin(checker: &Checker, expr: &ExprLamb
         Expr::Dict(dict) if dict.is_empty() => Container::Dict,
         _ => return,
     };
-    let mut diagnostic = Diagnostic::new(ReimplementedContainerBuiltin { container }, expr.range());
+    let mut diagnostic = Diagnostic::new(
+        ReimplementedContainerBuiltin { container },
+        expr.range(),
+        checker.source_file(),
+    );
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
             container.as_str(),

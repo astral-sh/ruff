@@ -67,7 +67,8 @@ pub(crate) fn replace_universal_newlines(checker: &Checker, call: &ast::ExprCall
             return;
         };
 
-        let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, arg.range());
+        let mut diagnostic =
+            Diagnostic::new(ReplaceUniversalNewlines, arg.range(), checker.source_file());
 
         if call.arguments.find_keyword("text").is_some() {
             diagnostic.try_set_fix(|| {

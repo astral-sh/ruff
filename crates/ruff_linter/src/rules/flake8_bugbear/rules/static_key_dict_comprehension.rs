@@ -63,6 +63,7 @@ pub(crate) fn static_key_dict_comprehension(checker: &Checker, dict_comp: &ast::
                 key: SourceCodeSnippet::from_str(checker.locator().slice(dict_comp.key.as_ref())),
             },
             dict_comp.key.range(),
+            checker.source_file(),
         ));
     }
 }

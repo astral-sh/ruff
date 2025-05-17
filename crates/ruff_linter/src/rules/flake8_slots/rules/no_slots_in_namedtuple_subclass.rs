@@ -91,6 +91,7 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
             checker.report_diagnostic(Diagnostic::new(
                 NoSlotsInNamedtupleSubclass(namedtuple_kind),
                 stmt.identifier(),
+                checker.source_file(),
             ));
         }
     }

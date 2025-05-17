@@ -59,6 +59,7 @@ pub(crate) fn format_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
                     checker.report_diagnostic(Diagnostic::new(
                         FormatInGetTextFuncCall {},
                         first.range(),
+                        checker.source_file(),
                     ));
                 }
             }

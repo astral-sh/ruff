@@ -129,7 +129,11 @@ fn check_charset_exact(bytes: &[u8]) -> Option<&NamedCharset> {
 
 fn push_diagnostic(checker: &Checker, range: TextRange, charset: &NamedCharset) {
     let name = charset.name;
-    let mut diagnostic = Diagnostic::new(HardcodedStringCharset { name }, range);
+    let mut diagnostic = Diagnostic::new(
+        HardcodedStringCharset { name },
+        range,
+        checker.source_file(),
+    );
     diagnostic.try_set_fix(|| {
         let (edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("string", name),

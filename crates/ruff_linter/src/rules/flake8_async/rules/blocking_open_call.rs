@@ -55,6 +55,7 @@ pub(crate) fn blocking_open_call(checker: &Checker, call: &ast::ExprCall) {
         checker.report_diagnostic(Diagnostic::new(
             BlockingOpenCallInAsyncFunction,
             call.func.range(),
+            checker.source_file(),
         ));
     }
 }

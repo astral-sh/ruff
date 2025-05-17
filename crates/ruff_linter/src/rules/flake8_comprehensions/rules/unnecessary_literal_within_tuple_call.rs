@@ -115,6 +115,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
             literal_kind: argument_kind,
         },
         call.range(),
+        checker.source_file(),
     );
 
     match argument {

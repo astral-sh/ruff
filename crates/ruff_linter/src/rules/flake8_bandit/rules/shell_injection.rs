@@ -320,6 +320,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                                 is_exact: matches!(truthiness, Truthiness::True),
                             },
                             call.func.range(),
+                            checker.source_file(),
                         ));
                     }
                 }
@@ -332,6 +333,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                             checker.report_diagnostic(Diagnostic::new(
                                 SubprocessWithoutShellEqualsTrue,
                                 call.func.range(),
+                                checker.source_file(),
                             ));
                         }
                     }
@@ -349,6 +351,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                     is_exact: matches!(truthiness, Truthiness::True),
                 },
                 call.func.range(),
+                checker.source_file(),
             ));
         }
     }
@@ -362,6 +365,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                         safety: Safety::from(arg),
                     },
                     call.func.range(),
+                    checker.source_file(),
                 ));
             }
         }
@@ -370,7 +374,11 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     // S606
     if checker.enabled(Rule::StartProcessWithNoShell) {
         if matches!(call_kind, Some(CallKind::NoShell)) {
-            checker.report_diagnostic(Diagnostic::new(StartProcessWithNoShell, call.func.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                StartProcessWithNoShell,
+                call.func.range(),
+                checker.source_file(),
+            ));
         }
     }
 
@@ -382,6 +390,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                     checker.report_diagnostic(Diagnostic::new(
                         StartProcessWithPartialPath,
                         arg.range(),
+                        checker.source_file(),
                     ));
                 }
             }
@@ -406,6 +415,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                     checker.report_diagnostic(Diagnostic::new(
                         UnixCommandWildcardInjection,
                         arg.range(),
+                        checker.source_file(),
                     ));
                 }
             }

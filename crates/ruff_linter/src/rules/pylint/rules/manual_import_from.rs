@@ -64,6 +64,7 @@ pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, 
             name: name.to_string(),
         },
         alias.range(),
+        checker.source_file(),
     );
     if names.len() == 1 {
         let node = ast::StmtImportFrom {

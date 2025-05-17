@@ -2,6 +2,7 @@ use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -33,6 +34,7 @@ impl Violation for BreakOutsideLoop {
 pub(crate) fn break_outside_loop<'a>(
     stmt: &'a Stmt,
     parents: &mut impl Iterator<Item = &'a Stmt>,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     let mut child = stmt;
     for parent in parents {
@@ -50,5 +52,5 @@ pub(crate) fn break_outside_loop<'a>(
         child = parent;
     }
 
-    Some(Diagnostic::new(BreakOutsideLoop, stmt.range()))
+    Some(Diagnostic::new(BreakOutsideLoop, stmt.range(), source_file))
 }

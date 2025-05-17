@@ -87,5 +87,6 @@ pub(crate) fn bad_dunder_method_name(checker: &Checker, method: &ast::StmtFuncti
             name: method.name.to_string(),
         },
         method.identifier(),
+        checker.source_file(),
     ));
 }

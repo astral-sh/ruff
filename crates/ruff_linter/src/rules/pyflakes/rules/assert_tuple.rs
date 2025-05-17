@@ -41,7 +41,11 @@ impl Violation for AssertTuple {
 pub(crate) fn assert_tuple(checker: &Checker, stmt: &Stmt, test: &Expr) {
     if let Expr::Tuple(tuple) = &test {
         if !tuple.is_empty() {
-            checker.report_diagnostic(Diagnostic::new(AssertTuple, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                AssertTuple,
+                stmt.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

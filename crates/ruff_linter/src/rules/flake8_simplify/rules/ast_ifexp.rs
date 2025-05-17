@@ -162,6 +162,7 @@ pub(crate) fn if_expr_with_true_false(
             is_compare: test.is_compare_expr(),
         },
         expr.range(),
+        checker.source_file(),
     );
     if test.is_compare_expr() {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
@@ -218,7 +219,7 @@ pub(crate) fn if_expr_with_false_true(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(IfExprWithFalseTrue, expr.range());
+    let mut diagnostic = Diagnostic::new(IfExprWithFalseTrue, expr.range(), checker.source_file());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(
             &ast::ExprUnaryOp {
@@ -270,6 +271,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
             expr_else: checker.generator().expr(orelse),
         },
         expr.range(),
+        checker.source_file(),
     );
     let node = body.clone();
     let node1 = orelse.clone();

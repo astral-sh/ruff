@@ -91,7 +91,11 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
             return;
         }
 
-        let mut diagnostic = Diagnostic::new(AsyncZeroSleep { module }, call.range());
+        let mut diagnostic = Diagnostic::new(
+            AsyncZeroSleep { module },
+            call.range(),
+            checker.source_file(),
+        );
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from(&module.to_string(), "lowlevel"),

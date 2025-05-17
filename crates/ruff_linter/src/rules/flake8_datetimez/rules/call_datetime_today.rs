@@ -75,5 +75,9 @@ pub(crate) fn call_datetime_today(checker: &Checker, func: &Expr, location: Text
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(CallDatetimeToday, location));
+    checker.report_diagnostic(Diagnostic::new(
+        CallDatetimeToday,
+        location,
+        checker.source_file(),
+    ));
 }

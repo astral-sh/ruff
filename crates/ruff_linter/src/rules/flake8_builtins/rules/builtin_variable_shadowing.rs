@@ -79,6 +79,7 @@ pub(crate) fn builtin_variable_shadowing(checker: &Checker, name: &str, range: T
                 name: name.to_string(),
             },
             range,
+            checker.source_file(),
         ));
     }
 }

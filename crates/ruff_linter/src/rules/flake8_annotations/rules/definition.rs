@@ -548,6 +548,7 @@ fn check_dynamically_typed<F>(
                 diagnostics.push(Diagnostic::new(
                     AnyType { name: func() },
                     annotation.range(),
+                    checker.source_file(),
                 ));
             }
         }
@@ -556,6 +557,7 @@ fn check_dynamically_typed<F>(
             diagnostics.push(Diagnostic::new(
                 AnyType { name: func() },
                 annotation.range(),
+                checker.source_file(),
             ));
         }
     }
@@ -660,6 +662,7 @@ pub(crate) fn definition(
                             name: parameter.name().to_string(),
                         },
                         parameter.parameter.range(),
+                        checker.source_file(),
                     ));
                 }
             }
@@ -686,6 +689,7 @@ pub(crate) fn definition(
                             name: arg.name.to_string(),
                         },
                         arg.range(),
+                        checker.source_file(),
                     ));
                 }
             }
@@ -717,6 +721,7 @@ pub(crate) fn definition(
                             name: arg.name.to_string(),
                         },
                         arg.range(),
+                        checker.source_file(),
                     ));
                 }
             }
@@ -751,6 +756,7 @@ pub(crate) fn definition(
                         annotation: return_type.clone().map(|(return_type, ..)| return_type),
                     },
                     function.identifier(),
+                    checker.source_file(),
                 );
                 if let Some((return_type, edits)) = return_type {
                     diagnostic.set_fix(Fix::unsafe_edits(
@@ -777,6 +783,7 @@ pub(crate) fn definition(
                         annotation: return_type.clone().map(|(return_type, ..)| return_type),
                     },
                     function.identifier(),
+                    checker.source_file(),
                 );
                 if let Some((return_type, edits)) = return_type {
                     diagnostic.set_fix(Fix::unsafe_edits(
@@ -797,6 +804,7 @@ pub(crate) fn definition(
                             annotation: Some("None".to_string()),
                         },
                         function.identifier(),
+                        checker.source_file(),
                     );
                     diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                         " -> None".to_string(),
@@ -814,6 +822,7 @@ pub(crate) fn definition(
                         annotation: return_type.map(ToString::to_string),
                     },
                     function.identifier(),
+                    checker.source_file(),
                 );
                 if let Some(return_type) = return_type {
                     diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
@@ -847,6 +856,7 @@ pub(crate) fn definition(
                                     .map(|(return_type, ..)| return_type),
                             },
                             function.identifier(),
+                            checker.source_file(),
                         );
                         if let Some((return_type, edits)) = return_type {
                             diagnostic.set_fix(Fix::unsafe_edits(
@@ -882,6 +892,7 @@ pub(crate) fn definition(
                                     .map(|(return_type, ..)| return_type),
                             },
                             function.identifier(),
+                            checker.source_file(),
                         );
                         if let Some((return_type, edits)) = return_type {
                             diagnostic.set_fix(Fix::unsafe_edits(

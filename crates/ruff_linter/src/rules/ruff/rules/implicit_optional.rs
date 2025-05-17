@@ -186,8 +186,11 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
                 };
                 let conversion_type = checker.target_version().into();
 
-                let mut diagnostic =
-                    Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
+                let mut diagnostic = Diagnostic::new(
+                    ImplicitOptional { conversion_type },
+                    expr.range(),
+                    checker.source_file(),
+                );
                 if parsed_annotation.kind().is_simple() {
                     diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
                 }
@@ -202,8 +205,11 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
             };
             let conversion_type = checker.target_version().into();
 
-            let mut diagnostic =
-                Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
+            let mut diagnostic = Diagnostic::new(
+                ImplicitOptional { conversion_type },
+                expr.range(),
+                checker.source_file(),
+            );
             diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
             checker.report_diagnostic(diagnostic);
         }

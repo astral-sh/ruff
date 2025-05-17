@@ -82,6 +82,7 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
             name: builtin.to_string(),
         },
         call.func.range(),
+        checker.source_file(),
     );
 
     let has_star_kwargs = call

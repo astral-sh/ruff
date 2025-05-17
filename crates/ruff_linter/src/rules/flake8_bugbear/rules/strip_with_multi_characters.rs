@@ -73,6 +73,10 @@ pub(crate) fn strip_with_multi_characters(
     };
 
     if value.chars().count() > 1 && !value.chars().all_unique() {
-        checker.report_diagnostic(Diagnostic::new(StripWithMultiCharacters, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(
+            StripWithMultiCharacters,
+            expr.range(),
+            checker.source_file(),
+        ));
     }
 }

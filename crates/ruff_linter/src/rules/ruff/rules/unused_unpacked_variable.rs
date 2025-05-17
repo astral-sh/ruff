@@ -83,6 +83,7 @@ pub(crate) fn unused_unpacked_variable(checker: &Checker, name: &str, binding: &
             name: name.to_string(),
         },
         binding.range(),
+        checker.source_file(),
     );
     if let Some(fix) = remove_unused_variable(binding, checker) {
         diagnostic.set_fix(fix);

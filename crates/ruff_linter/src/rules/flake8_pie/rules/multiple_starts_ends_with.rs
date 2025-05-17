@@ -133,6 +133,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                     attr: attr_name.to_string(),
                 },
                 expr.range(),
+                checker.source_file(),
             );
             let words: Vec<&Expr> = indices
                 .iter()

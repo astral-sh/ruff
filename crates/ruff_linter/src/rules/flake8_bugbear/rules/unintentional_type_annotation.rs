@@ -46,8 +46,11 @@ pub(crate) fn unintentional_type_annotation(
     match target {
         Expr::Subscript(ast::ExprSubscript { value, .. }) => {
             if value.is_name_expr() {
-                checker
-                    .report_diagnostic(Diagnostic::new(UnintentionalTypeAnnotation, stmt.range()));
+                checker.report_diagnostic(Diagnostic::new(
+                    UnintentionalTypeAnnotation,
+                    stmt.range(),
+                    checker.source_file(),
+                ));
             }
         }
         Expr::Attribute(ast::ExprAttribute { value, .. }) => {
@@ -56,6 +59,7 @@ pub(crate) fn unintentional_type_annotation(
                     checker.report_diagnostic(Diagnostic::new(
                         UnintentionalTypeAnnotation,
                         stmt.range(),
+                        checker.source_file(),
                     ));
                 }
             }

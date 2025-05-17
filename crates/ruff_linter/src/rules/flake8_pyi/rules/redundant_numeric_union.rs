@@ -129,7 +129,11 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
     // Traverse the union a second time to construct a [`Fix`].
     traverse_union(&mut remove_numeric_type, checker.semantic(), annotation);
 
-    let mut diagnostic = Diagnostic::new(RedundantNumericUnion { redundancy }, annotation.range());
+    let mut diagnostic = Diagnostic::new(
+        RedundantNumericUnion { redundancy },
+        annotation.range(),
+        checker.source_file(),
+    );
 
     // Mark [`Fix`] as unsafe when comments are in range.
     let applicability = if checker.comment_ranges().intersects(annotation.range()) {

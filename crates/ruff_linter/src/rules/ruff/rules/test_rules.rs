@@ -16,6 +16,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
+use ruff_source_file::SourceFile;
 use ruff_text_size::TextSize;
 
 use crate::Locator;
@@ -48,7 +49,11 @@ pub(crate) const TEST_RULES: &[Rule] = &[
 ];
 
 pub(crate) trait TestRule {
-    fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<Diagnostic>;
+    fn diagnostic(
+        locator: &Locator,
+        comment_ranges: &CommentRanges,
+        source_file: SourceFile,
+    ) -> Option<Diagnostic>;
 }
 
 /// ## What it does
@@ -79,10 +84,15 @@ impl Violation for StableTestRule {
 }
 
 impl TestRule for StableTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
+    fn diagnostic(
+        _locator: &Locator,
+        _comment_ranges: &CommentRanges,
+        source_file: SourceFile,
+    ) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             StableTestRule,
             ruff_text_size::TextRange::default(),
+            source_file,
         ))
     }
 }
@@ -115,14 +125,22 @@ impl Violation for StableTestRuleSafeFix {
 }
 
 impl TestRule for StableTestRuleSafeFix {
-    fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<Diagnostic> {
+    fn diagnostic(
+        locator: &Locator,
+        comment_ranges: &CommentRanges,
+        source_file: SourceFile,
+    ) -> Option<Diagnostic> {
         let comment = "# fix from stable-test-rule-safe-fix\n".to_string();
         if comment_exists(&comment, locator, comment_ranges) {
             None
         } else {
             Some(
-                Diagnostic::new(StableTestRuleSafeFix, ruff_text_size::TextRange::default())
-                    .with_fix(Fix::safe_edit(Edit::insertion(comment, TextSize::new(0)))),
+                Diagnostic::new(
+                    StableTestRuleSafeFix,
+                    ruff_text_size::TextRange::default(),
+                    source_file,
+                )
+                .with_fix(Fix::safe_edit(Edit::insertion(comment, TextSize::new(0)))),
             )
         }
     }
@@ -156,7 +174,11 @@ impl Violation for StableTestRuleUnsafeFix {
 }
 
 impl TestRule for StableTestRuleUnsafeFix {
-    fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<Diagnostic> {
+    fn diagnostic(
+        locator: &Locator,
+        comment_ranges: &CommentRanges,
+        source_file: SourceFile,
+    ) -> Option<Diagnostic> {
         let comment = "# fix from stable-test-rule-unsafe-fix\n".to_string();
         if comment_exists(&comment, locator, comment_ranges) {
             None
@@ -165,6 +187,7 @@ impl TestRule for StableTestRuleUnsafeFix {
                 Diagnostic::new(
                     StableTestRuleUnsafeFix,
                     ruff_text_size::TextRange::default(),
+                    source_file,
                 )
                 .with_fix(Fix::unsafe_edit(Edit::insertion(comment, TextSize::new(0)))),
             )
@@ -200,7 +223,11 @@ impl Violation for StableTestRuleDisplayOnlyFix {
 }
 
 impl TestRule for StableTestRuleDisplayOnlyFix {
-    fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<Diagnostic> {
+    fn diagnostic(
+        locator: &Locator,
+        comment_ranges: &CommentRanges,
+        source_file: SourceFile,
+    ) -> Option<Diagnostic> {
         let comment = "# fix from stable-test-rule-display-only-fix\n".to_string();
         if comment_exists(&comment, locator, comment_ranges) {
             None
@@ -209,6 +236,7 @@ impl TestRule for StableTestRuleDisplayOnlyFix {
                 Diagnostic::new(
                     StableTestRuleDisplayOnlyFix,
                     ruff_text_size::TextRange::default(),
+                    source_file,
                 )
                 .with_fix(Fix::display_only_edit(Edit::insertion(
                     comment,
@@ -247,10 +275,15 @@ impl Violation for PreviewTestRule {
 }
 
 impl TestRule for PreviewTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
+    fn diagnostic(
+        _locator: &Locator,
+        _comment_ranges: &CommentRanges,
+        source_file: SourceFile,
+    ) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             PreviewTestRule,
             ruff_text_size::TextRange::default(),
+            source_file,
         ))
     }
 }
@@ -283,10 +316,15 @@ impl Violation for DeprecatedTestRule {
 }
 
 impl TestRule for DeprecatedTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
+    fn diagnostic(
+        _locator: &Locator,
+        _comment_ranges: &CommentRanges,
+        source_file: SourceFile,
+    ) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             DeprecatedTestRule,
             ruff_text_size::TextRange::default(),
+            source_file,
         ))
     }
 }
@@ -319,10 +357,15 @@ impl Violation for AnotherDeprecatedTestRule {
 }
 
 impl TestRule for AnotherDeprecatedTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
+    fn diagnostic(
+        _locator: &Locator,
+        _comment_ranges: &CommentRanges,
+        source_file: SourceFile,
+    ) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             AnotherDeprecatedTestRule,
             ruff_text_size::TextRange::default(),
+            source_file,
         ))
     }
 }
@@ -355,10 +398,15 @@ impl Violation for RemovedTestRule {
 }
 
 impl TestRule for RemovedTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
+    fn diagnostic(
+        _locator: &Locator,
+        _comment_ranges: &CommentRanges,
+        source_file: SourceFile,
+    ) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             RemovedTestRule,
             ruff_text_size::TextRange::default(),
+            source_file,
         ))
     }
 }
@@ -391,10 +439,15 @@ impl Violation for AnotherRemovedTestRule {
 }
 
 impl TestRule for AnotherRemovedTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
+    fn diagnostic(
+        _locator: &Locator,
+        _comment_ranges: &CommentRanges,
+        source_file: SourceFile,
+    ) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             AnotherRemovedTestRule,
             ruff_text_size::TextRange::default(),
+            source_file,
         ))
     }
 }
@@ -427,10 +480,15 @@ impl Violation for RedirectedFromTestRule {
 }
 
 impl TestRule for RedirectedFromTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
+    fn diagnostic(
+        _locator: &Locator,
+        _comment_ranges: &CommentRanges,
+        source_file: SourceFile,
+    ) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             RedirectedFromTestRule,
             ruff_text_size::TextRange::default(),
+            source_file,
         ))
     }
 }
@@ -463,10 +521,15 @@ impl Violation for RedirectedToTestRule {
 }
 
 impl TestRule for RedirectedToTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
+    fn diagnostic(
+        _locator: &Locator,
+        _comment_ranges: &CommentRanges,
+        source_file: SourceFile,
+    ) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             RedirectedToTestRule,
             ruff_text_size::TextRange::default(),
+            source_file,
         ))
     }
 }
@@ -499,10 +562,15 @@ impl Violation for RedirectedFromPrefixTestRule {
 }
 
 impl TestRule for RedirectedFromPrefixTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
+    fn diagnostic(
+        _locator: &Locator,
+        _comment_ranges: &CommentRanges,
+        source_file: SourceFile,
+    ) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             RedirectedFromPrefixTestRule,
             ruff_text_size::TextRange::default(),
+            source_file,
         ))
     }
 }

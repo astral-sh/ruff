@@ -94,7 +94,7 @@ pub(crate) fn useless_return(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UselessReturn, last_stmt.range());
+    let mut diagnostic = Diagnostic::new(UselessReturn, last_stmt.range(), checker.source_file());
     let edit = fix::edits::delete_stmt(last_stmt, Some(stmt), checker.locator(), checker.indexer());
     diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().current_statement_id(),

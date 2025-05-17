@@ -40,5 +40,6 @@ pub(crate) fn future_feature_not_defined(checker: &Checker, alias: &Alias) {
             name: alias.name.to_string(),
         },
         alias.range(),
+        checker.source_file(),
     ));
 }

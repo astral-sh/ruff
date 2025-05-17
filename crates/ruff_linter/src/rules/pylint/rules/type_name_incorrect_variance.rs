@@ -136,6 +136,7 @@ pub(crate) fn type_name_incorrect_variance(checker: &Checker, value: &Expr) {
             replacement_name,
         },
         func.range(),
+        checker.source_file(),
     ));
 }
 

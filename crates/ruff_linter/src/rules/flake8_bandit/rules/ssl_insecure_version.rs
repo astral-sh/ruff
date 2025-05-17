@@ -73,6 +73,7 @@ pub(crate) fn ssl_insecure_version(checker: &Checker, call: &ExprCall) {
                         protocol: id.to_string(),
                     },
                     keyword.range(),
+                    checker.source_file(),
                 ));
             }
         }
@@ -83,6 +84,7 @@ pub(crate) fn ssl_insecure_version(checker: &Checker, call: &ExprCall) {
                         protocol: attr.to_string(),
                     },
                     keyword.range(),
+                    checker.source_file(),
                 ));
             }
         }

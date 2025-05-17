@@ -248,6 +248,7 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                             checker.report_diagnostic(Diagnostic::new(
                                 SysVersionInfo0Eq3,
                                 left.range(),
+                                checker.source_file(),
                             ));
                         }
                     }
@@ -266,6 +267,7 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                             checker.report_diagnostic(Diagnostic::new(
                                 SysVersionInfo1CmpInt,
                                 left.range(),
+                                checker.source_file(),
                             ));
                         }
                     }
@@ -290,6 +292,7 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                     checker.report_diagnostic(Diagnostic::new(
                         SysVersionInfoMinorCmpInt,
                         left.range(),
+                        checker.source_file(),
                     ));
                 }
             }
@@ -306,10 +309,18 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
         {
             if value.len() == 1 {
                 if checker.enabled(Rule::SysVersionCmpStr10) {
-                    checker.report_diagnostic(Diagnostic::new(SysVersionCmpStr10, left.range()));
+                    checker.report_diagnostic(Diagnostic::new(
+                        SysVersionCmpStr10,
+                        left.range(),
+                        checker.source_file(),
+                    ));
                 }
             } else if checker.enabled(Rule::SysVersionCmpStr3) {
-                checker.report_diagnostic(Diagnostic::new(SysVersionCmpStr3, left.range()));
+                checker.report_diagnostic(Diagnostic::new(
+                    SysVersionCmpStr3,
+                    left.range(),
+                    checker.source_file(),
+                ));
             }
         }
     }

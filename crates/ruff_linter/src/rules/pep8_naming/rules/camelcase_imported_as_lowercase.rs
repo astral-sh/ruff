@@ -2,6 +2,7 @@ use ruff_python_ast::{Alias, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
 use crate::rules::pep8_naming::helpers;
@@ -55,6 +56,7 @@ pub(crate) fn camelcase_imported_as_lowercase(
     alias: &Alias,
     stmt: &Stmt,
     ignore_names: &IgnoreNames,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     if helpers::is_camelcase(name) && ruff_python_stdlib::str::is_cased_lowercase(asname) {
         // Ignore any explicitly-allowed names.
@@ -67,6 +69,7 @@ pub(crate) fn camelcase_imported_as_lowercase(
                 asname: asname.to_string(),
             },
             alias.range(),
+            source_file,
         );
         diagnostic.set_parent(stmt.start());
         return Some(diagnostic);

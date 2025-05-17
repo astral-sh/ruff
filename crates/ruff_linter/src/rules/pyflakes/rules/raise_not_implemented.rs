@@ -74,7 +74,7 @@ pub(crate) fn raise_not_implemented(checker: &Checker, expr: &Expr) {
     let Some(expr) = match_not_implemented(expr) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(RaiseNotImplemented, expr.range());
+    let mut diagnostic = Diagnostic::new(RaiseNotImplemented, expr.range(), checker.source_file());
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
             "NotImplementedError",

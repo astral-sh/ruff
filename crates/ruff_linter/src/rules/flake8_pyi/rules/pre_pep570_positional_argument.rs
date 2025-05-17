@@ -90,6 +90,7 @@ pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast
             checker.report_diagnostic(Diagnostic::new(
                 Pep484StylePositionalOnlyParameter,
                 arg.identifier(),
+                checker.source_file(),
             ));
         }
     }

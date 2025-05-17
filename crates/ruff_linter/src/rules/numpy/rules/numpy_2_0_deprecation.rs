@@ -674,6 +674,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
             code_action: replacement.details.code_action(),
         },
         expr.range(),
+        checker.source_file(),
     );
     match replacement.details {
         Details::AutoImport {

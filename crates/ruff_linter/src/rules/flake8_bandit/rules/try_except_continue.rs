@@ -64,7 +64,11 @@ pub(crate) fn try_except_continue(
 ) {
     if matches!(body, [Stmt::Continue(_)]) {
         if check_typed_exception || is_untyped_exception(type_, checker.semantic()) {
-            checker.report_diagnostic(Diagnostic::new(TryExceptContinue, except_handler.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                TryExceptContinue,
+                except_handler.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

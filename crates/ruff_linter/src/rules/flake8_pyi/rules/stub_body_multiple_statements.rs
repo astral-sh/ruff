@@ -44,6 +44,7 @@ pub(crate) fn stub_body_multiple_statements(checker: &Checker, stmt: &Stmt, body
         checker.report_diagnostic(Diagnostic::new(
             StubBodyMultipleStatements,
             stmt.identifier(),
+            checker.source_file(),
         ));
     }
 }

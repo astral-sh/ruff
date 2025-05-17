@@ -86,5 +86,6 @@ pub(crate) fn non_lowercase_variable_in_function(checker: &Checker, expr: &Expr,
             name: name.to_string(),
         },
         expr.range(),
+        checker.source_file(),
     ));
 }

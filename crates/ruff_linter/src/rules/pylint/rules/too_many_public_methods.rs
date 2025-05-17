@@ -127,6 +127,7 @@ pub(crate) fn too_many_public_methods(
                 max_methods,
             },
             class_def.range(),
+            checker.source_file(),
         ));
     }
 }

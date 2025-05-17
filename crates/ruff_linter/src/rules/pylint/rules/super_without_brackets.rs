@@ -108,7 +108,8 @@ pub(crate) fn super_without_brackets(checker: &Checker, func: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(SuperWithoutBrackets, value.range());
+    let mut diagnostic =
+        Diagnostic::new(SuperWithoutBrackets, value.range(), checker.source_file());
 
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "super()".to_string(),

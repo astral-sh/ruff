@@ -63,6 +63,7 @@ pub(crate) fn hardcoded_password_func_arg(checker: &Checker, keywords: &[Keyword
                 name: arg.to_string(),
             },
             keyword.range(),
+            checker.source_file(),
         ))
     }));
 }

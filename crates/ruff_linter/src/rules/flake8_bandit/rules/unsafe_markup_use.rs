@@ -117,6 +117,7 @@ pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCall) {
             name: qualified_name.to_string(),
         },
         call.range(),
+        checker.source_file(),
     ));
 }
 

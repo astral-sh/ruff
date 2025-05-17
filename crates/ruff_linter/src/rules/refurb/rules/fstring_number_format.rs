@@ -151,6 +151,7 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
             base,
         },
         subscript.range(),
+        checker.source_file(),
     );
 
     if let Some(replacement) = replacement {

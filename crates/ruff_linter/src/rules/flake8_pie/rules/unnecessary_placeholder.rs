@@ -143,6 +143,7 @@ fn add_diagnostic(
             kind: placeholder_kind,
         },
         stmt.range(),
+        checker.source_file(),
     );
 
     checker.report_diagnostic(diagnostic.with_fix(fix));

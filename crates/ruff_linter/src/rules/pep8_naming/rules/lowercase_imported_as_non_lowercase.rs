@@ -2,6 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str;
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
 use crate::rules::pep8_naming::settings::IgnoreNames;
@@ -54,6 +55,7 @@ pub(crate) fn lowercase_imported_as_non_lowercase(
     alias: &Alias,
     stmt: &Stmt,
     ignore_names: &IgnoreNames,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     if !str::is_cased_uppercase(name) && str::is_cased_lowercase(name) && !str::is_lowercase(asname)
     {
@@ -67,6 +69,7 @@ pub(crate) fn lowercase_imported_as_non_lowercase(
                 asname: asname.to_string(),
             },
             alias.range(),
+            source_file,
         );
         diagnostic.set_parent(stmt.start());
         return Some(diagnostic);

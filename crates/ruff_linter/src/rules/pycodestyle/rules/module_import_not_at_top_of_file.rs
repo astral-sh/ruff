@@ -63,6 +63,7 @@ pub(crate) fn module_import_not_at_top_of_file(checker: &Checker, stmt: &Stmt) {
                 source_type: checker.source_type,
             },
             stmt.range(),
+            checker.source_file(),
         ));
     }
 }

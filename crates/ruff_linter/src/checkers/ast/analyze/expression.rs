@@ -200,6 +200,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     check_too_many_expressions,
                     check_two_starred_expressions,
                     expr.range(),
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }
@@ -532,6 +533,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                                 message: pyflakes::format::error_to_string(&e),
                                             },
                                             location,
+                                            checker.source_file(),
                                         ));
                                     }
                                 }
@@ -936,7 +938,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 pylint::rules::repeated_keyword_argument(checker, call);
             }
             if checker.enabled(Rule::PytestPatchWithLambda) {
-                if let Some(diagnostic) = flake8_pytest_style::rules::patch_with_lambda(call) {
+                if let Some(diagnostic) =
+                    flake8_pytest_style::rules::patch_with_lambda(call, checker.source_file())
+                {
                     checker.report_diagnostic(diagnostic);
                 }
             }
@@ -1290,6 +1294,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                         char: c,
                                     },
                                     location,
+                                    checker.source_file(),
                                 ));
                             }
                         }
@@ -1300,6 +1305,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                         message: e.to_string(),
                                     },
                                     location,
+                                    checker.source_file(),
                                 ));
                             }
                         }
@@ -1368,6 +1374,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     expr,
                     checker.locator,
                     checker.settings,
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }

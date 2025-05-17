@@ -102,6 +102,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
             name: class_name.to_string(),
         },
         stmt.range(),
+        checker.source_file(),
     );
     // TODO(charlie): Preserve indentation, to remove the first-column requirement.
     if checker.locator().is_at_start_of_line(stmt.start()) {

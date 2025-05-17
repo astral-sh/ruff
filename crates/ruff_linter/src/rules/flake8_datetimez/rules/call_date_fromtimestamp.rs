@@ -73,6 +73,10 @@ pub(crate) fn call_date_fromtimestamp(checker: &Checker, func: &Expr, location: 
             )
         })
     {
-        checker.report_diagnostic(Diagnostic::new(CallDateFromtimestamp, location));
+        checker.report_diagnostic(Diagnostic::new(
+            CallDateFromtimestamp,
+            location,
+            checker.source_file(),
+        ));
     }
 }

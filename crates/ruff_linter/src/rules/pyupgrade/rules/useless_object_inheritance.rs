@@ -60,6 +60,7 @@ pub(crate) fn useless_object_inheritance(checker: &Checker, class_def: &ast::Stm
                 name: class_def.name.to_string(),
             },
             base.range(),
+            checker.source_file(),
         );
         diagnostic.try_set_fix(|| {
             remove_argument(

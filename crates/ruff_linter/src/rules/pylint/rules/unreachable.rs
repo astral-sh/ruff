@@ -69,6 +69,7 @@ pub(crate) fn in_function(checker: &Checker, name: &Identifier, body: &[Stmt]) {
                 name: name.to_string(),
             },
             TextRange::new(start, end),
+            checker.source_file(),
         ));
     }
 }

@@ -69,6 +69,7 @@ pub(crate) fn single_string_slots(checker: &Checker, class: &StmtClassDef) {
                                 checker.report_diagnostic(Diagnostic::new(
                                     SingleStringSlots,
                                     stmt.identifier(),
+                                    checker.source_file(),
                                 ));
                             }
                         }
@@ -86,6 +87,7 @@ pub(crate) fn single_string_slots(checker: &Checker, class: &StmtClassDef) {
                             checker.report_diagnostic(Diagnostic::new(
                                 SingleStringSlots,
                                 stmt.identifier(),
+                                checker.source_file(),
                             ));
                         }
                     }

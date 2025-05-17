@@ -84,6 +84,7 @@ pub(crate) fn unnecessary_call_around_sorted(
             func: unnecessary_function,
         },
         expr.range(),
+        checker.source_file(),
     );
     diagnostic.try_set_fix(|| {
         let edit =

@@ -66,6 +66,7 @@ pub(crate) fn uncalled_mock_method(checker: &Checker, expr: &Expr) {
                     reason: Reason::UncalledMethod(attr.to_string()),
                 },
                 expr.range(),
+                checker.source_file(),
             ));
         }
     }
@@ -95,6 +96,7 @@ pub(crate) fn non_existent_mock_method(checker: &Checker, test: &Expr) {
                 reason: Reason::NonExistentMethod(attr.to_string()),
             },
             test.range(),
+            checker.source_file(),
         ));
     }
 }

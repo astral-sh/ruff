@@ -126,7 +126,7 @@ pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: &ast::StmtFor) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(YieldInForLoop, stmt_for.range());
+    let mut diagnostic = Diagnostic::new(YieldInForLoop, stmt_for.range(), checker.source_file());
 
     let contents = checker.locator().slice(
         parenthesized_range(

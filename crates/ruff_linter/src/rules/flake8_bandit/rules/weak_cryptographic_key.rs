@@ -58,6 +58,7 @@ pub(crate) fn weak_cryptographic_key(checker: &Checker, call: &ExprCall) {
         checker.report_diagnostic(Diagnostic::new(
             WeakCryptographicKey { cryptographic_key },
             range,
+            checker.source_file(),
         ));
     }
 }

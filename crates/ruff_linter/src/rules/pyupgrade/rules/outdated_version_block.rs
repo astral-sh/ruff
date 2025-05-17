@@ -138,6 +138,7 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
                                     },
                                 },
                                 branch.test.range(),
+                                checker.source_file(),
                             );
                             if let Some(fix) = if op.is_lt() || op.is_lt_e() {
                                 fix_always_false_branch(checker, stmt_if, &branch)
@@ -154,6 +155,7 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
                                     reason: Reason::Invalid,
                                 },
                                 comparison.range(),
+                                checker.source_file(),
                             ));
                         }
                     }
@@ -182,16 +184,22 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
                 };
                 match reason {
                     Reason::AlwaysTrue => {
-                        let mut diagnostic =
-                            Diagnostic::new(OutdatedVersionBlock { reason }, branch.test.range());
+                        let mut diagnostic = Diagnostic::new(
+                            OutdatedVersionBlock { reason },
+                            branch.test.range(),
+                            checker.source_file(),
+                        );
                         if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
                             diagnostic.set_fix(fix);
                         }
                         checker.report_diagnostic(diagnostic);
                     }
                     Reason::AlwaysFalse => {
-                        let mut diagnostic =
-                            Diagnostic::new(OutdatedVersionBlock { reason }, branch.test.range());
+                        let mut diagnostic = Diagnostic::new(
+                            OutdatedVersionBlock { reason },
+                            branch.test.range(),
+                            checker.source_file(),
+                        );
                         if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
                             diagnostic.set_fix(fix);
                         }
@@ -203,6 +211,7 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
                                 reason: Reason::Invalid,
                             },
                             comparison.range(),
+                            checker.source_file(),
                         ));
                     }
                 }

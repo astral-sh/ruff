@@ -74,6 +74,7 @@ pub(crate) fn star_arg_unpacking_after_keyword_arg(
         checker.report_diagnostic(Diagnostic::new(
             StarArgUnpackingAfterKeywordArg,
             arg.range(),
+            checker.source_file(),
         ));
     }
 }

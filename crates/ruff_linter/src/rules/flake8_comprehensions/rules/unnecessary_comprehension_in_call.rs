@@ -141,12 +141,14 @@ pub(crate) fn unnecessary_comprehension_in_call(
                 comprehension_kind: ComprehensionKind::List,
             },
             arg.range(),
+            checker.source_file(),
         ),
         (Expr::SetComp(_), DuplicationVariance::Invariant) => Diagnostic::new(
             UnnecessaryComprehensionInCall {
                 comprehension_kind: ComprehensionKind::Set,
             },
             arg.range(),
+            checker.source_file(),
         ),
         _ => {
             return;

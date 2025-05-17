@@ -55,7 +55,11 @@ pub(crate) fn ellipsis_in_non_empty_class_body(checker: &Checker, body: &[Stmt])
         };
 
         if value.is_ellipsis_literal_expr() {
-            let mut diagnostic = Diagnostic::new(EllipsisInNonEmptyClassBody, stmt.range());
+            let mut diagnostic = Diagnostic::new(
+                EllipsisInNonEmptyClassBody,
+                stmt.range(),
+                checker.source_file(),
+            );
             let edit =
                 fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());
             diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(

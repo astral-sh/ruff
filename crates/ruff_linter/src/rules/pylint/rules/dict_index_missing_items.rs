@@ -86,7 +86,11 @@ pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &ast::StmtFo
     };
 
     if has_violation {
-        let diagnostic = Diagnostic::new(DictIndexMissingItems, stmt_for.range());
+        let diagnostic = Diagnostic::new(
+            DictIndexMissingItems,
+            stmt_for.range(),
+            checker.source_file(),
+        );
         checker.report_diagnostic(diagnostic);
     }
 }

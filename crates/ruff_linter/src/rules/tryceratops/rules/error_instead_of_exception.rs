@@ -80,7 +80,11 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
         for (expr, logging_level) in calls {
             if matches!(logging_level, LoggingLevel::Error) {
                 if exc_info(&expr.arguments, checker.semantic()).is_none() {
-                    let mut diagnostic = Diagnostic::new(ErrorInsteadOfException, expr.range());
+                    let mut diagnostic = Diagnostic::new(
+                        ErrorInsteadOfException,
+                        expr.range(),
+                        checker.source_file(),
+                    );
 
                     match expr.func.as_ref() {
                         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {

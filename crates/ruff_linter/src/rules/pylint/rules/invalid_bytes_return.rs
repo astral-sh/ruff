@@ -71,6 +71,7 @@ pub(crate) fn invalid_bytes_return(checker: &Checker, function_def: &ast::StmtFu
         checker.report_diagnostic(Diagnostic::new(
             InvalidBytesReturnType,
             function_def.identifier(),
+            checker.source_file(),
         ));
         return;
     }
@@ -87,11 +88,19 @@ pub(crate) fn invalid_bytes_return(checker: &Checker, function_def: &ast::StmtFu
                 ResolvedPythonType::from(value),
                 ResolvedPythonType::Unknown | ResolvedPythonType::Atom(PythonType::Bytes)
             ) {
-                checker.report_diagnostic(Diagnostic::new(InvalidBytesReturnType, value.range()));
+                checker.report_diagnostic(Diagnostic::new(
+                    InvalidBytesReturnType,
+                    value.range(),
+                    checker.source_file(),
+                ));
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidBytesReturnType, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                InvalidBytesReturnType,
+                stmt.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

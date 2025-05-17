@@ -76,6 +76,7 @@ pub(crate) fn unconventional_import_alias(
             asname: expected_alias.to_string(),
         },
         binding.range(),
+        checker.source_file(),
     );
     if !import.is_submodule_import() {
         if checker.semantic().is_available(expected_alias) {

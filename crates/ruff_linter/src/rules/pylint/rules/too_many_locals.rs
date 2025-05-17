@@ -53,6 +53,7 @@ pub(crate) fn too_many_locals(checker: &Checker, scope: &Scope) {
                     max_amount: checker.settings.pylint.max_locals,
                 },
                 func.identifier(),
+                checker.source_file(),
             ));
         }
     }

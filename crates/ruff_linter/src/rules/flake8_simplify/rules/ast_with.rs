@@ -167,6 +167,7 @@ pub(crate) fn multiple_with_statements(
         let mut diagnostic = Diagnostic::new(
             MultipleWithStatements,
             TextRange::new(with_stmt.start(), colon.end()),
+            checker.source_file(),
         );
         if !checker
             .comment_ranges()

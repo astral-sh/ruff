@@ -64,5 +64,9 @@ pub(crate) fn starts_with_this(checker: &Checker, docstring: &Docstring) {
     if normalize_word(first_word) != "this" {
         return;
     }
-    checker.report_diagnostic(Diagnostic::new(DocstringStartsWithThis, docstring.range()));
+    checker.report_diagnostic(Diagnostic::new(
+        DocstringStartsWithThis,
+        docstring.range(),
+        checker.source_file(),
+    ));
 }

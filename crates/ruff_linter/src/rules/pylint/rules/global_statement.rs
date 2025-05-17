@@ -61,6 +61,7 @@ pub(crate) fn global_statement(checker: &Checker, name: &str) {
             // Match Pylint's behavior by reporting on the `global` statement`, rather
             // than the variable usage.
             range,
+            checker.source_file(),
         ));
     }
 }

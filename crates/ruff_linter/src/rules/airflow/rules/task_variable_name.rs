@@ -115,6 +115,7 @@ pub(crate) fn variable_name_task_id(checker: &Checker, targets: &[Expr], value: 
             task_id: task_id.to_string(),
         },
         target.range(),
+        checker.source_file(),
     );
     checker.report_diagnostic(diagnostic);
 }

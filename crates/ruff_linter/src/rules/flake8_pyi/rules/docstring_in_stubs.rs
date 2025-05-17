@@ -64,7 +64,8 @@ pub(crate) fn docstring_in_stubs(
     };
 
     let fix = Fix::unsafe_edit(edit);
-    let diagnostic = Diagnostic::new(DocstringInStub, docstring_range).with_fix(fix);
+    let diagnostic =
+        Diagnostic::new(DocstringInStub, docstring_range, checker.source_file()).with_fix(fix);
 
     checker.report_diagnostic(diagnostic);
 }

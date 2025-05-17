@@ -58,6 +58,7 @@ pub(crate) fn call(checker: &Checker, string: &str, range: TextRange) {
                             format_char: format_spec.chars().last().unwrap(),
                         },
                         range,
+                        checker.source_file(),
                     ));
                 }
                 Err(_) => {}
@@ -78,6 +79,7 @@ pub(crate) fn call(checker: &Checker, string: &str, range: TextRange) {
                                     format_char: format_spec.chars().last().unwrap(),
                                 },
                                 range,
+                                checker.source_file(),
                             ));
                         }
                     }
@@ -106,6 +108,7 @@ pub(crate) fn percent(checker: &Checker, expr: &Expr, format_string: &ExprString
                 checker.report_diagnostic(Diagnostic::new(
                     BadStringFormatCharacter { format_char },
                     expr.range(),
+                    checker.source_file(),
                 ));
             }
         }

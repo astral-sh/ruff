@@ -77,5 +77,6 @@ pub(crate) fn assignment_in_assert(checker: &Checker, binding: &Binding) -> Opti
     Some(Diagnostic::new(
         AssignmentInAssert,
         parent_expression.range(),
+        checker.source_file(),
     ))
 }

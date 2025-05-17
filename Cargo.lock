@@ -2751,6 +2751,7 @@ dependencies = [
  "anyhow",
  "is-macro",
  "log",
+ "ruff_source_file",
  "ruff_text_size",
  "serde",
 ]

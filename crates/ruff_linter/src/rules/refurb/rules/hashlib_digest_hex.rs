@@ -109,7 +109,7 @@ pub(crate) fn hashlib_digest_hex(checker: &Checker, call: &ExprCall) {
             )
         })
     {
-        let mut diagnostic = Diagnostic::new(HashlibDigestHex, call.range());
+        let mut diagnostic = Diagnostic::new(HashlibDigestHex, call.range(), checker.source_file());
         if arguments.is_empty() {
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 ".hexdigest".to_string(),

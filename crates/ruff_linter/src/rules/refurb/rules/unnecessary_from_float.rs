@@ -98,6 +98,7 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
             constructor,
         },
         call.range(),
+        checker.source_file(),
     );
 
     let edit = Edit::range_replacement(

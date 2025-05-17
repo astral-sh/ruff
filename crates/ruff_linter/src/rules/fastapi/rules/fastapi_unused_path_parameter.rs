@@ -196,6 +196,7 @@ pub(crate) fn fastapi_unused_path_parameter(
             diagnostic_range
                 .add_start(TextSize::from(range.start as u32 + 1))
                 .sub_end(TextSize::from((path.len() - range.end + 1) as u32)),
+            checker.source_file(),
         );
         if !is_positional {
             diagnostic.set_fix(Fix::unsafe_edit(add_parameter(

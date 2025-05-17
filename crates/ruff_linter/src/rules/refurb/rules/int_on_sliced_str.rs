@@ -116,7 +116,11 @@ pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(IntOnSlicedStr { base: base_u8 }, call.range());
+    let mut diagnostic = Diagnostic::new(
+        IntOnSlicedStr { base: base_u8 },
+        call.range(),
+        checker.source_file(),
+    );
     diagnostic.set_fix(Fix::unsafe_edits(
         Edit::range_replacement(
             checker.locator().slice(&*expr_subscript.value).to_string(),

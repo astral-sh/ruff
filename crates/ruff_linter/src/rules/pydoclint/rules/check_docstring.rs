@@ -930,6 +930,7 @@ pub(crate) fn check_docstring(
                                 diagnostics.push(Diagnostic::new(
                                     DocstringMissingReturns,
                                     docstring.range(),
+                                    checker.source_file(),
                                 ));
                             }
                         }
@@ -938,8 +939,11 @@ pub(crate) fn check_docstring(
                             .iter()
                             .any(|entry| !entry.is_none_return()) =>
                         {
-                            diagnostics
-                                .push(Diagnostic::new(DocstringMissingReturns, docstring.range()));
+                            diagnostics.push(Diagnostic::new(
+                                DocstringMissingReturns,
+                                docstring.range(),
+                                checker.source_file(),
+                            ));
                         }
                         _ => {}
                     }
@@ -958,12 +962,18 @@ pub(crate) fn check_docstring(
                             |arguments| arguments.first().is_none_or(Expr::is_none_literal_expr),
                         ) =>
                     {
-                        diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
+                        diagnostics.push(Diagnostic::new(
+                            DocstringMissingYields,
+                            docstring.range(),
+                            checker.source_file(),
+                        ));
                     }
                     None if body_entries.yields.iter().any(|entry| !entry.is_none_yield) => {
-                        diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
+                        diagnostics.push(Diagnostic::new(
+                            DocstringMissingYields,
+                            docstring.range(),
+                            checker.source_file(),
+                        ));
                     }
                     _ => {}
                 }
@@ -995,6 +1005,7 @@ pub(crate) fn check_docstring(
                         id: (*name).to_string(),
                     },
                     docstring.range(),
+                    checker.source_file(),
                 );
                 diagnostics.push(diagnostic);
             }
@@ -1010,7 +1021,11 @@ pub(crate) fn check_docstring(
                 if body_entries.returns.is_empty()
                     || body_entries.returns.iter().all(ReturnEntry::is_implicit)
                 {
-                    let diagnostic = Diagnostic::new(DocstringExtraneousReturns, docstring.range());
+                    let diagnostic = Diagnostic::new(
+                        DocstringExtraneousReturns,
+                        docstring.range(),
+                        checker.source_file(),
+                    );
                     diagnostics.push(diagnostic);
                 }
             }
@@ -1020,7 +1035,11 @@ pub(crate) fn check_docstring(
         if checker.enabled(Rule::DocstringExtraneousYields) {
             if docstring_sections.yields.is_some() {
                 if body_entries.yields.is_empty() {
-                    let diagnostic = Diagnostic::new(DocstringExtraneousYields, docstring.range());
+                    let diagnostic = Diagnostic::new(
+                        DocstringExtraneousYields,
+                        docstring.range(),
+                        checker.source_file(),
+                    );
                     diagnostics.push(diagnostic);
                 }
             }
@@ -1046,6 +1065,7 @@ pub(crate) fn check_docstring(
                             ids: extraneous_exceptions,
                         },
                         docstring.range(),
+                        checker.source_file(),
                     );
                     diagnostics.push(diagnostic);
                 }

@@ -110,6 +110,7 @@ pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf
             set: check_set.id.to_string(),
         },
         if_stmt.range(),
+        checker.source_file(),
     );
     diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
         make_suggestion(check_set, check_element, checker.generator()),

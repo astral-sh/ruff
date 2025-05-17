@@ -69,6 +69,10 @@ pub(crate) fn call_date_today(checker: &Checker, func: &Expr, location: TextRang
             matches!(qualified_name.segments(), ["datetime", "date", "today"])
         })
     {
-        checker.report_diagnostic(Diagnostic::new(CallDateToday, location));
+        checker.report_diagnostic(Diagnostic::new(
+            CallDateToday,
+            location,
+            checker.source_file(),
+        ));
     }
 }

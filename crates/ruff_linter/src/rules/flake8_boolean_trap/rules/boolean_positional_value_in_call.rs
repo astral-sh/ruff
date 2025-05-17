@@ -61,6 +61,10 @@ pub(crate) fn boolean_positional_value_in_call(checker: &Checker, call: &ast::Ex
         .iter()
         .filter(|arg| arg.is_boolean_literal_expr())
     {
-        checker.report_diagnostic(Diagnostic::new(BooleanPositionalValueInCall, arg.range()));
+        checker.report_diagnostic(Diagnostic::new(
+            BooleanPositionalValueInCall,
+            arg.range(),
+            checker.source_file(),
+        ));
     }
 }

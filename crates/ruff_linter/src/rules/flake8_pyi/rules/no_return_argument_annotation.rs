@@ -74,6 +74,7 @@ pub(crate) fn no_return_argument_annotation(checker: &Checker, parameters: &ast:
                     },
                 },
                 annotation.range(),
+                checker.source_file(),
             ));
         }
     }

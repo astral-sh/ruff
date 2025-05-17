@@ -41,7 +41,8 @@ impl AlwaysFixableViolation for UnicodeKindPrefix {
 /// UP025
 pub(crate) fn unicode_kind_prefix(checker: &Checker, string: &StringLiteral) {
     if string.flags.prefix().is_unicode() {
-        let mut diagnostic = Diagnostic::new(UnicodeKindPrefix, string.range);
+        let mut diagnostic =
+            Diagnostic::new(UnicodeKindPrefix, string.range, checker.source_file());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(TextRange::at(
             string.start(),
             TextSize::from(1),

@@ -41,6 +41,10 @@ impl Violation for YieldInInit {
 /// PLE0100
 pub(crate) fn yield_in_init(checker: &Checker, expr: &Expr) {
     if in_dunder_method("__init__", checker.semantic(), checker.settings) {
-        checker.report_diagnostic(Diagnostic::new(YieldInInit, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(
+            YieldInInit,
+            expr.range(),
+            checker.source_file(),
+        ));
     }
 }

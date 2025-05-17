@@ -104,6 +104,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
                     subset: DictSubset::Values,
                 },
                 func.range(),
+                checker.source_file(),
             );
             let replace_attribute = Edit::range_replacement("values".to_string(), attr.range());
             let replace_target = Edit::range_replacement(
@@ -124,6 +125,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
                     subset: DictSubset::Keys,
                 },
                 func.range(),
+                checker.source_file(),
             );
             let replace_attribute = Edit::range_replacement("keys".to_string(), attr.range());
             let replace_target = Edit::range_replacement(

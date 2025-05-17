@@ -73,6 +73,7 @@ pub(crate) fn non_leading_receiver_decorator(checker: &Checker, decorator_list: 
             checker.report_diagnostic(Diagnostic::new(
                 DjangoNonLeadingReceiverDecorator,
                 decorator.range(),
+                checker.source_file(),
             ));
         }
         if !is_receiver && seen_receiver {

@@ -89,5 +89,6 @@ pub(crate) fn call_datetime_without_tzinfo(checker: &Checker, call: &ast::ExprCa
     checker.report_diagnostic(Diagnostic::new(
         CallDatetimeWithoutTzinfo(antipattern),
         call.range,
+        checker.source_file(),
     ));
 }

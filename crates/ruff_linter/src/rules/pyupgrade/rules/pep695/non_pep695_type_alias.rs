@@ -293,6 +293,7 @@ fn create_diagnostic(
             type_alias_kind,
         },
         stmt.range(),
+        checker.source_file(),
     )
     .with_fix(Fix::applicable_edit(edit, applicability))
 }

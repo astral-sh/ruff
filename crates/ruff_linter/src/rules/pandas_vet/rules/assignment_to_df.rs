@@ -2,6 +2,7 @@ use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -38,7 +39,7 @@ impl Violation for PandasDfVariableName {
 }
 
 /// PD901
-pub(crate) fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
+pub(crate) fn assignment_to_df(targets: &[Expr], source_file: SourceFile) -> Option<Diagnostic> {
     let [target] = targets else {
         return None;
     };
@@ -48,5 +49,9 @@ pub(crate) fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
     if id != "df" {
         return None;
     }
-    Some(Diagnostic::new(PandasDfVariableName, target.range()))
+    Some(Diagnostic::new(
+        PandasDfVariableName,
+        target.range(),
+        source_file,
+    ))
 }

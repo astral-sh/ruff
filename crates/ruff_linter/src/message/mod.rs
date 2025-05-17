@@ -91,11 +91,7 @@ impl Message {
     }
 
     /// Create a [`Message`] from the given [`Diagnostic`] corresponding to a rule violation.
-    pub fn from_diagnostic(
-        diagnostic: Diagnostic,
-        file: SourceFile,
-        noqa_offset: TextSize,
-    ) -> Message {
+    pub fn from_diagnostic(diagnostic: Diagnostic, noqa_offset: TextSize) -> Message {
         Message::Diagnostic(DiagnosticMessage {
             range: diagnostic.range(),
             name: diagnostic.name,
@@ -103,7 +99,7 @@ impl Message {
             suggestion: diagnostic.suggestion,
             fix: diagnostic.fix,
             parent: diagnostic.parent,
-            file,
+            file: diagnostic.source_file,
             noqa_offset,
         })
     }

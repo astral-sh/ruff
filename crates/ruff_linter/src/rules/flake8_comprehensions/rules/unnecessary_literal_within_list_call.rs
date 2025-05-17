@@ -87,6 +87,7 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: &ast
             kind: argument_kind,
         },
         call.range(),
+        checker.source_file(),
     );
 
     // Convert `list([1, 2])` to `[1, 2]`

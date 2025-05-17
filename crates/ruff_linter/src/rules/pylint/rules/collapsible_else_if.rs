@@ -85,6 +85,7 @@ pub(crate) fn collapsible_else_if(checker: &Checker, stmt: &Stmt) {
     let mut diagnostic = Diagnostic::new(
         CollapsibleElseIf,
         TextRange::new(else_clause.start(), first.start()),
+        checker.source_file(),
     );
     diagnostic.try_set_fix(|| {
         convert_to_elif(

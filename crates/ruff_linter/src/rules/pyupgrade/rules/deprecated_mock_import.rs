@@ -263,6 +263,7 @@ pub(crate) fn deprecated_mock_attribute(checker: &Checker, attribute: &ast::Expr
                 reference_type: MockReference::Attribute,
             },
             attribute.value.range(),
+            checker.source_file(),
         );
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "mock".to_string(),
@@ -302,6 +303,7 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
                                 reference_type: MockReference::Import,
                             },
                             name.range(),
+                            checker.source_file(),
                         );
                         if let Some(content) = content.as_ref() {
                             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
@@ -329,6 +331,7 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
                         reference_type: MockReference::Import,
                     },
                     stmt.range(),
+                    checker.source_file(),
                 );
                 if let Some(indent) = indentation(checker.source(), stmt) {
                     diagnostic.try_set_fix(|| {

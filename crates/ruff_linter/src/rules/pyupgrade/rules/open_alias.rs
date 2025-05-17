@@ -52,7 +52,7 @@ pub(crate) fn open_alias(checker: &Checker, expr: &Expr, func: &Expr) {
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["io", "open"]))
     {
-        let mut diagnostic = Diagnostic::new(OpenAlias, expr.range());
+        let mut diagnostic = Diagnostic::new(OpenAlias, expr.range(), checker.source_file());
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
                 "open",

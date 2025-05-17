@@ -62,7 +62,7 @@ pub(crate) fn useless_metaclass_type(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UselessMetaclassType, stmt.range());
+    let mut diagnostic = Diagnostic::new(UselessMetaclassType, stmt.range(), checker.source_file());
     let stmt = checker.semantic().current_statement();
     let parent = checker.semantic().current_statement_parent();
     let edit = fix::edits::delete_stmt(stmt, parent, checker.locator(), checker.indexer());

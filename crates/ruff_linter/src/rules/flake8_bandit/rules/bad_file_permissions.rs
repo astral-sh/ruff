@@ -83,6 +83,7 @@ pub(crate) fn bad_file_permissions(checker: &Checker, call: &ast::ExprCall) {
                                 reason: Reason::Permissive(mask),
                             },
                             mode_arg.range(),
+                            checker.source_file(),
                         ));
                     }
                 }
@@ -93,6 +94,7 @@ pub(crate) fn bad_file_permissions(checker: &Checker, call: &ast::ExprCall) {
                             reason: Reason::Invalid,
                         },
                         mode_arg.range(),
+                        checker.source_file(),
                     ));
                 }
             }

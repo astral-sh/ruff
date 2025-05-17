@@ -102,6 +102,7 @@ pub(crate) fn redundant_log_base(checker: &Checker, call: &ast::ExprCall) {
             arg: checker.locator().slice(arg).into(),
         },
         call.range(),
+        checker.source_file(),
     );
     diagnostic.try_set_fix(|| generate_fix(checker, call, base, arg));
     checker.report_diagnostic(diagnostic);

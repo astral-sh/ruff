@@ -207,7 +207,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
         }
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryLambda, lambda.range());
+    let mut diagnostic = Diagnostic::new(UnnecessaryLambda, lambda.range(), checker.source_file());
     diagnostic.set_fix(Fix::applicable_edit(
         Edit::range_replacement(
             checker.locator().slice(func.as_ref()).to_string(),

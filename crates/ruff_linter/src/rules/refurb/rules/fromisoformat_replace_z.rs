@@ -118,7 +118,11 @@ pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: &ExprCall) {
 
     let range_to_remove = TextRange::new(value_full_range.end(), argument.end());
 
-    let diagnostic = Diagnostic::new(FromisoformatReplaceZ, argument.range());
+    let diagnostic = Diagnostic::new(
+        FromisoformatReplaceZ,
+        argument.range(),
+        checker.source_file(),
+    );
     let fix = Fix::unsafe_edit(Edit::range_deletion(range_to_remove));
 
     checker.report_diagnostic(diagnostic.with_fix(fix));

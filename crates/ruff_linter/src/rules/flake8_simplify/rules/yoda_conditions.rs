@@ -230,6 +230,7 @@ pub(crate) fn yoda_conditions(
                 suggestion: Some(SourceCodeSnippet::new(suggestion.clone())),
             },
             expr.range(),
+            checker.source_file(),
         );
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             pad(suggestion, expr.range(), checker.locator()),
@@ -240,6 +241,7 @@ pub(crate) fn yoda_conditions(
         checker.report_diagnostic(Diagnostic::new(
             YodaConditions { suggestion: None },
             expr.range(),
+            checker.source_file(),
         ));
     }
 }

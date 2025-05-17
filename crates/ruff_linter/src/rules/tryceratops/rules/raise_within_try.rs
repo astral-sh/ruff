@@ -115,7 +115,11 @@ pub(crate) fn raise_within_try(checker: &Checker, body: &[Stmt], handlers: &[Exc
                     .is_some_and(|builtin| matches!(builtin, "Exception" | "BaseException"))
             })
         {
-            checker.report_diagnostic(Diagnostic::new(RaiseWithinTry, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                RaiseWithinTry,
+                stmt.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

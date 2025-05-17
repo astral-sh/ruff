@@ -193,6 +193,7 @@ pub(crate) fn unexpected_special_method_signature(
                 actual_params,
             },
             stmt.identifier(),
+            checker.source_file(),
         ));
     }
 }

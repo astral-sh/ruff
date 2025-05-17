@@ -100,7 +100,7 @@ pub(crate) fn unnecessary_round(checker: &Checker, call: &ExprCall) {
     let edit = unwrap_round_call(call, rounded, checker.semantic(), checker.locator());
     let fix = Fix::applicable_edit(edit, applicability);
 
-    let diagnostic = Diagnostic::new(UnnecessaryRound, call.range());
+    let diagnostic = Diagnostic::new(UnnecessaryRound, call.range(), checker.source_file());
 
     checker.report_diagnostic(diagnostic.with_fix(fix));
 }

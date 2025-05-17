@@ -114,7 +114,8 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
         let Some(default) = parameter.default() else {
             continue;
         };
-        let mut diagnostic = Diagnostic::new(PostInitDefault, default.range());
+        let mut diagnostic =
+            Diagnostic::new(PostInitDefault, default.range(), checker.source_file());
 
         if !stopped_fixes {
             diagnostic.try_set_fix(|| {

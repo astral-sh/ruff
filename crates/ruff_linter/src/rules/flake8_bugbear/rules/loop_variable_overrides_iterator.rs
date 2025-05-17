@@ -69,6 +69,7 @@ pub(crate) fn loop_variable_overrides_iterator(checker: &Checker, target: &Expr,
                     name: name.to_string(),
                 },
                 expr.range(),
+                checker.source_file(),
             ));
         }
     }

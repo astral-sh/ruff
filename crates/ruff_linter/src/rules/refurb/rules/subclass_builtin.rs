@@ -111,6 +111,7 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
             replacement: user_symbol.to_string(),
         },
         base_expr.range(),
+        checker.source_file(),
     );
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(

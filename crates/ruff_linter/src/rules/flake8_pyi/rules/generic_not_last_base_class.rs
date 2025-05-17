@@ -92,7 +92,11 @@ pub(crate) fn generic_not_last_base_class(checker: &Checker, class_def: &ast::St
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(GenericNotLastBaseClass, bases.range());
+    let mut diagnostic = Diagnostic::new(
+        GenericNotLastBaseClass,
+        bases.range(),
+        checker.source_file(),
+    );
 
     // No fix if multiple `Generic[]`s are seen in the class bases.
     if generic_base_iter.next().is_none() {

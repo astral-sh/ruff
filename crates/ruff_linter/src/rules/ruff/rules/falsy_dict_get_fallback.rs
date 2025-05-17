@@ -86,7 +86,11 @@ pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(FalsyDictGetFallback, fallback_arg.range());
+    let mut diagnostic = Diagnostic::new(
+        FalsyDictGetFallback,
+        fallback_arg.range(),
+        checker.source_file(),
+    );
 
     let comment_ranges = checker.comment_ranges();
 

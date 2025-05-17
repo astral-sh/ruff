@@ -189,6 +189,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
             replacement: SourceCodeSnippet::new(replacement.to_string()),
         },
         call.range(),
+        checker.source_file(),
     );
     diagnostic.set_fix(Fix::applicable_edit(
         Edit::range_replacement(replacement, call.range()),

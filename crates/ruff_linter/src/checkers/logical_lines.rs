@@ -2,7 +2,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_source_file::LineRanges;
+use ruff_source_file::{LineRanges, SourceFile};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
@@ -40,6 +40,7 @@ pub(crate) fn check_logical_lines(
     indexer: &Indexer,
     stylist: &Stylist,
     settings: &LinterSettings,
+    source_file: &SourceFile,
 ) -> Vec<Diagnostic> {
     let mut context = LogicalLinesContext::new(settings);
 
@@ -102,24 +103,24 @@ pub(crate) fn check_logical_lines(
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
             if enforce_space_around_operator {
-                space_around_operator(&line, &mut context);
+                space_around_operator(&line, &mut context, source_file);
             }
 
             if enforce_whitespace_around_named_parameter_equals {
-                whitespace_around_named_parameter_equals(&line, &mut context);
+                whitespace_around_named_parameter_equals(&line, &mut context, source_file);
             }
 
             if enforce_missing_whitespace_around_operator {
-                missing_whitespace_around_operator(&line, &mut context);
+                missing_whitespace_around_operator(&line, &mut context, source_file);
             }
 
             if enforce_missing_whitespace {
-                missing_whitespace(&line, &mut context);
+                missing_whitespace(&line, &mut context, source_file);
             }
         }
 
         if line.flags().contains(TokenFlags::PUNCTUATION) && enforce_space_after_comma {
-            space_after_comma(&line, &mut context);
+            space_after_comma(&line, &mut context, source_file);
         }
 
         if line
@@ -127,30 +128,30 @@ pub(crate) fn check_logical_lines(
             .intersects(TokenFlags::OPERATOR | TokenFlags::BRACKET | TokenFlags::PUNCTUATION)
             && enforce_extraneous_whitespace
         {
-            extraneous_whitespace(&line, &mut context);
+            extraneous_whitespace(&line, &mut context, source_file);
         }
 
         if line.flags().contains(TokenFlags::KEYWORD) {
             if enforce_whitespace_around_keywords {
-                whitespace_around_keywords(&line, &mut context);
+                whitespace_around_keywords(&line, &mut context, source_file);
             }
 
             if enforce_missing_whitespace_after_keyword {
-                missing_whitespace_after_keyword(&line, &mut context);
+                missing_whitespace_after_keyword(&line, &mut context, source_file);
             }
         }
 
         if line.flags().contains(TokenFlags::COMMENT) && enforce_whitespace_before_comment {
-            whitespace_before_comment(&line, locator, &mut context);
+            whitespace_before_comment(&line, locator, &mut context, source_file);
         }
 
         if line.flags().contains(TokenFlags::BRACKET) {
             if enforce_whitespace_before_parameters {
-                whitespace_before_parameters(&line, &mut context);
+                whitespace_before_parameters(&line, &mut context, source_file);
             }
 
             if enforce_redundant_backslash {
-                redundant_backslash(&line, locator, indexer, &mut context);
+                redundant_backslash(&line, locator, indexer, &mut context, source_file);
             }
         }
 
@@ -178,6 +179,7 @@ pub(crate) fn check_logical_lines(
                 prev_indent_level,
                 indent_size,
                 range,
+                source_file.clone(),
             ) {
                 if settings.rules.enabled(diagnostic.rule()) {
                     context.push_diagnostic(diagnostic);

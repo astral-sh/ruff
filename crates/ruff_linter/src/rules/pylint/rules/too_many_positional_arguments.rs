@@ -118,5 +118,6 @@ pub(crate) fn too_many_positional_arguments(
             max_pos: checker.settings.pylint.max_positional_args,
         },
         function_def.identifier(),
+        checker.source_file(),
     ));
 }

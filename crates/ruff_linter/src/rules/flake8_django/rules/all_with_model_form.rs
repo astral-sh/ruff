@@ -81,6 +81,7 @@ pub(crate) fn all_with_model_form(checker: &Checker, class_def: &ast::StmtClassD
                             checker.report_diagnostic(Diagnostic::new(
                                 DjangoAllWithModelForm,
                                 element.range(),
+                                checker.source_file(),
                             ));
                             return;
                         }
@@ -90,6 +91,7 @@ pub(crate) fn all_with_model_form(checker: &Checker, class_def: &ast::StmtClassD
                             checker.report_diagnostic(Diagnostic::new(
                                 DjangoAllWithModelForm,
                                 element.range(),
+                                checker.source_file(),
                             ));
                             return;
                         }

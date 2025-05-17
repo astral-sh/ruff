@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
+use ruff_source_file::SourceFile;
 
 /// ## What it does
 /// Checks for functions with a high `McCabe` complexity.
@@ -157,6 +158,7 @@ pub(crate) fn function_is_too_complex(
     name: &str,
     body: &[Stmt],
     max_complexity: usize,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     let complexity = get_complexity_number(body) + 1;
     if complexity > max_complexity {
@@ -167,6 +169,7 @@ pub(crate) fn function_is_too_complex(
                 max_complexity,
             },
             stmt.identifier(),
+            source_file,
         ))
     } else {
         None

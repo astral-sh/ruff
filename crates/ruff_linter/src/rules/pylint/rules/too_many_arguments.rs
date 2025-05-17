@@ -114,5 +114,6 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
             max_args: checker.settings.pylint.max_args,
         },
         function_def.identifier(),
+        checker.source_file(),
     ));
 }

@@ -179,6 +179,7 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
             right: checker.generator().expr(&comparators[0]),
         },
         expr.range(),
+        checker.source_file(),
     );
     let node = ast::ExprCompare {
         left: left.clone(),
@@ -234,6 +235,7 @@ pub(crate) fn negation_with_not_equal_op(
             right: checker.generator().expr(&comparators[0]),
         },
         expr.range(),
+        checker.source_file(),
     );
     let node = ast::ExprCompare {
         left: left.clone(),
@@ -270,6 +272,7 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
             expr: checker.generator().expr(operand),
         },
         expr.range(),
+        checker.source_file(),
     );
     if checker.semantic().in_boolean_test() {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(

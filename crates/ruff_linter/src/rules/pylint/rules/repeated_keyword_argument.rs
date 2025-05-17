@@ -49,6 +49,7 @@ pub(crate) fn repeated_keyword_argument(checker: &Checker, call: &ExprCall) {
                         duplicate_keyword: id.to_string(),
                     },
                     keyword.range(),
+                    checker.source_file(),
                 ));
             }
         } else if let Expr::Dict(dict) = &keyword.value {
@@ -61,6 +62,7 @@ pub(crate) fn repeated_keyword_argument(checker: &Checker, call: &ExprCall) {
                                 duplicate_keyword: value.to_string(),
                             },
                             key.range(),
+                            checker.source_file(),
                         ));
                     }
                 }

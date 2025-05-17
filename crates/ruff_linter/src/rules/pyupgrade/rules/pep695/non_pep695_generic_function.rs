@@ -169,6 +169,7 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
                 name: name.to_string(),
             },
             TextRange::new(name.start(), parameters.end()),
+            checker.source_file(),
         )
         .with_fix(Fix::unsafe_edit(Edit::insertion(
             type_params.to_string(),

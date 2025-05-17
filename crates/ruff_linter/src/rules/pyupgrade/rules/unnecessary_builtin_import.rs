@@ -119,6 +119,7 @@ pub(crate) fn unnecessary_builtin_import(
                 .collect(),
         },
         stmt.range(),
+        checker.source_file(),
     );
     diagnostic.try_set_fix(|| {
         let statement = checker.semantic().current_statement();

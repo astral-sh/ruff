@@ -110,11 +110,14 @@ pub(crate) fn use_pep604_isinstance(checker: &Checker, expr: &Expr, func: &Expr,
         return;
     };
     checker.report_diagnostic(
-        Diagnostic::new(NonPEP604Isinstance { kind }, expr.range()).with_fix(Fix::unsafe_edit(
-            Edit::range_replacement(
-                checker.generator().expr(&pep_604_union(&tuple.elts)),
-                types.range(),
-            ),
-        )),
+        Diagnostic::new(
+            NonPEP604Isinstance { kind },
+            expr.range(),
+            checker.source_file(),
+        )
+        .with_fix(Fix::unsafe_edit(Edit::range_replacement(
+            checker.generator().expr(&pep_604_union(&tuple.elts)),
+            types.range(),
+        ))),
     );
 }

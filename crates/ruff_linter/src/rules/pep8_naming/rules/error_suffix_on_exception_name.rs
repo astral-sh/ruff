@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
+use ruff_source_file::SourceFile;
 
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
@@ -52,6 +53,7 @@ pub(crate) fn error_suffix_on_exception_name(
     arguments: Option<&Arguments>,
     name: &str,
     ignore_names: &IgnoreNames,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     if name.ends_with("Error") {
         return None;
@@ -79,5 +81,6 @@ pub(crate) fn error_suffix_on_exception_name(
             name: name.to_string(),
         },
         class_def.identifier(),
+        source_file,
     ))
 }

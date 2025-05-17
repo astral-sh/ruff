@@ -157,6 +157,7 @@ pub(crate) fn static_join_to_fstring(checker: &Checker, expr: &Expr, joiner: &st
             expression: SourceCodeSnippet::new(contents.clone()),
         },
         expr.range(),
+        checker.source_file(),
     );
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         pad(contents, expr.range(), checker.locator()),

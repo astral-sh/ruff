@@ -5,6 +5,7 @@ use regex::RegexSet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
+use ruff_source_file::SourceFile;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -252,6 +253,7 @@ pub(crate) fn todos(
     todo_comments: &[TodoComment],
     locator: &Locator,
     comment_ranges: &CommentRanges,
+    source_file: &SourceFile,
 ) {
     for todo_comment in todo_comments {
         let TodoComment {
@@ -267,8 +269,8 @@ pub(crate) fn todos(
             continue;
         }
 
-        directive_errors(diagnostics, directive);
-        static_errors(diagnostics, content, range, directive);
+        directive_errors(diagnostics, directive, source_file.clone());
+        static_errors(diagnostics, content, range, directive, source_file.clone());
 
         let mut has_issue_link = false;
         // VSCode recommended links on same line are ok:
@@ -307,13 +309,21 @@ pub(crate) fn todos(
 
         if !has_issue_link {
             // TD003
-            diagnostics.push(Diagnostic::new(MissingTodoLink, directive.range));
+            diagnostics.push(Diagnostic::new(
+                MissingTodoLink,
+                directive.range,
+                source_file.clone(),
+            ));
         }
     }
 }
 
 /// Check that the directive itself is valid. This function modifies `diagnostics` in-place.
-fn directive_errors(diagnostics: &mut Vec<Diagnostic>, directive: &TodoDirective) {
+fn directive_errors(
+    diagnostics: &mut Vec<Diagnostic>,
+    directive: &TodoDirective,
+    source_file: SourceFile,
+) {
     if directive.content == "TODO" {
         return;
     }
@@ -325,6 +335,7 @@ fn directive_errors(diagnostics: &mut Vec<Diagnostic>, directive: &TodoDirective
                 tag: directive.content.to_string(),
             },
             directive.range,
+            source_file,
         );
 
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
@@ -340,6 +351,7 @@ fn directive_errors(diagnostics: &mut Vec<Diagnostic>, directive: &TodoDirective
                 tag: directive.content.to_string(),
             },
             directive.range,
+            source_file,
         ));
     }
 }
@@ -350,6 +362,7 @@ fn static_errors(
     comment: &str,
     comment_range: TextRange,
     directive: &TodoDirective,
+    source_file: SourceFile,
 ) {
     let post_directive = &comment[usize::from(directive.range.end() - comment_range.start())..];
     let trimmed = post_directive.trim_start();
@@ -367,13 +380,21 @@ fn static_errors(
                 TextSize::try_from(end_index).unwrap()
             } else {
                 // TD002
-                diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
+                diagnostics.push(Diagnostic::new(
+                    MissingTodoAuthor,
+                    directive.range,
+                    source_file.clone(),
+                ));
 
                 TextSize::new(0)
             }
         } else {
             // TD002
-            diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
+            diagnostics.push(Diagnostic::new(
+                MissingTodoAuthor,
+                directive.range,
+                source_file.clone(),
+            ));
 
             TextSize::new(0)
         };
@@ -382,18 +403,34 @@ fn static_errors(
     if let Some(after_colon) = after_author.strip_prefix(':') {
         if after_colon.is_empty() {
             // TD005
-            diagnostics.push(Diagnostic::new(MissingTodoDescription, directive.range));
+            diagnostics.push(Diagnostic::new(
+                MissingTodoDescription,
+                directive.range,
+                source_file,
+            ));
         } else if !after_colon.starts_with(char::is_whitespace) {
             // TD007
-            diagnostics.push(Diagnostic::new(MissingSpaceAfterTodoColon, directive.range));
+            diagnostics.push(Diagnostic::new(
+                MissingSpaceAfterTodoColon,
+                directive.range,
+                source_file,
+            ));
         }
     } else {
         // TD004
-        diagnostics.push(Diagnostic::new(MissingTodoColon, directive.range));
+        diagnostics.push(Diagnostic::new(
+            MissingTodoColon,
+            directive.range,
+            source_file.clone(),
+        ));
 
         if after_author.is_empty() {
             // TD005
-            diagnostics.push(Diagnostic::new(MissingTodoDescription, directive.range));
+            diagnostics.push(Diagnostic::new(
+                MissingTodoDescription,
+                directive.range,
+                source_file,
+            ));
         }
     }
 }

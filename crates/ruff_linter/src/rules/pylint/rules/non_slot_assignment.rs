@@ -79,6 +79,7 @@ pub(crate) fn non_slot_assignment(checker: &Checker, class_def: &ast::StmtClassD
                 name: attribute.name.to_string(),
             },
             attribute.range(),
+            checker.source_file(),
         ));
     }
 }

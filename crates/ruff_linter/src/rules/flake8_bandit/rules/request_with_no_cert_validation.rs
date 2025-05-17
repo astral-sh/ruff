@@ -70,6 +70,7 @@ pub(crate) fn request_with_no_cert_validation(checker: &Checker, call: &ast::Exp
                         string: target.to_string(),
                     },
                     keyword.range(),
+                    checker.source_file(),
                 ));
             }
         }

@@ -383,6 +383,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                     },
                 },
                 expr.range(),
+                checker.source_file(),
             );
             if !contains_effect(target, |id| checker.semantic().has_builtin_binding(id)) {
                 // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
@@ -562,6 +563,7 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
                 replacement: checker.generator().expr(&in_expr),
             },
             expr.range(),
+            checker.source_file(),
         );
         let unmatched: Vec<Expr> = values
             .iter()
@@ -634,6 +636,7 @@ pub(crate) fn expr_and_not_expr(checker: &Checker, expr: &Expr) {
                         name: id.to_string(),
                     },
                     expr.range(),
+                    checker.source_file(),
                 );
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     "False".to_string(),
@@ -691,6 +694,7 @@ pub(crate) fn expr_or_not_expr(checker: &Checker, expr: &Expr) {
                         name: id.to_string(),
                     },
                     expr.range(),
+                    checker.source_file(),
                 );
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     "True".to_string(),
@@ -844,6 +848,7 @@ pub(crate) fn expr_or_true(checker: &Checker, expr: &Expr) {
                 remove,
             },
             edit.range(),
+            checker.source_file(),
         );
         diagnostic.set_fix(Fix::unsafe_edit(edit));
         checker.report_diagnostic(diagnostic);
@@ -863,6 +868,7 @@ pub(crate) fn expr_and_false(checker: &Checker, expr: &Expr) {
                 remove,
             },
             edit.range(),
+            checker.source_file(),
         );
         diagnostic.set_fix(Fix::unsafe_edit(edit));
         checker.report_diagnostic(diagnostic);

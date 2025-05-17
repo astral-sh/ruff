@@ -66,6 +66,7 @@ pub(crate) fn unary_prefix_increment_decrement(
                     operator: UnaryPrefixOperatorType::Increment,
                 },
                 expr.range(),
+                checker.source_file(),
             ));
         }
         (UnaryOp::USub, UnaryOp::USub) => {
@@ -74,6 +75,7 @@ pub(crate) fn unary_prefix_increment_decrement(
                     operator: UnaryPrefixOperatorType::Decrement,
                 },
                 expr.range(),
+                checker.source_file(),
             ));
         }
         _ => {}

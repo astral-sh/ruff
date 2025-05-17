@@ -122,7 +122,7 @@ pub(crate) fn object_without_hash_method(checker: &Checker, class: &StmtClassDef
             hash: HasMethod::No
         }
     ) {
-        let diagnostic = Diagnostic::new(EqWithoutHash, class.name.range());
+        let diagnostic = Diagnostic::new(EqWithoutHash, class.name.range(), checker.source_file());
         checker.report_diagnostic(diagnostic);
     }
 }

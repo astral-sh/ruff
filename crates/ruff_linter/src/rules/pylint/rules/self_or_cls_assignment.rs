@@ -120,6 +120,7 @@ fn check_expr(checker: &Checker, target: &Expr, method_type: MethodType) {
                     checker.report_diagnostic(Diagnostic::new(
                         SelfOrClsAssignment { method_type },
                         target.range(),
+                        checker.source_file(),
                     ));
                 }
             }

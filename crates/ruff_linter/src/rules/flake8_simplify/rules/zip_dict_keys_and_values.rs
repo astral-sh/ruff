@@ -110,6 +110,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
             actual: SourceCodeSnippet::from_str(actual),
         },
         expr.range(),
+        checker.source_file(),
     );
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         expected,

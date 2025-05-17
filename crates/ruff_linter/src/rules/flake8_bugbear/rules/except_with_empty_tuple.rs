@@ -69,6 +69,7 @@ pub(crate) fn except_with_empty_tuple(checker: &Checker, except_handler: &Except
         checker.report_diagnostic(Diagnostic::new(
             ExceptWithEmptyTuple { is_star },
             except_handler.range(),
+            checker.source_file(),
         ));
     }
 }

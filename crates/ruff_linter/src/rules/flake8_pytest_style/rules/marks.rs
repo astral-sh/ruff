@@ -133,6 +133,7 @@ fn pytest_mark_parentheses(
             actual_parens: actual,
         },
         decorator.range(),
+        checker.source_file(),
     );
     diagnostic.set_fix(fix);
     checker.report_diagnostic(diagnostic);
@@ -204,7 +205,11 @@ fn check_useless_usefixtures(checker: &Checker, decorator: &Decorator, marker: &
         _ => return,
     }
 
-    let mut diagnostic = Diagnostic::new(PytestUseFixturesWithoutParameters, decorator.range());
+    let mut diagnostic = Diagnostic::new(
+        PytestUseFixturesWithoutParameters,
+        decorator.range(),
+        checker.source_file(),
+    );
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(decorator.range())));
     checker.report_diagnostic(diagnostic);
 }

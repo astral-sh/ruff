@@ -133,7 +133,8 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
         }
     }
 
-    let mut diagnostic = Diagnostic::new(ReimplementedStarmap, target.range());
+    let mut diagnostic =
+        Diagnostic::new(ReimplementedStarmap, target.range(), checker.source_file());
     diagnostic.try_set_fix(|| {
         // Import `starmap` from `itertools`.
         let (import_edit, starmap_name) = checker.importer().get_or_import_symbol(

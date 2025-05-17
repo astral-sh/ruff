@@ -161,6 +161,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
         checker.report_diagnostic(Diagnostic::new(
             BooleanTypeHintPositionalArgument,
             parameter.identifier(),
+            checker.source_file(),
         ));
     }
 }

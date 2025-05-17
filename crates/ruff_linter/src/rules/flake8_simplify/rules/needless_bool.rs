@@ -311,6 +311,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
             negate: inverted,
         },
         range,
+        checker.source_file(),
     );
     if let Some(replacement) = replacement {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

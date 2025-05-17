@@ -22,6 +22,7 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &Checker) 
                     body,
                     except_handler,
                     checker.locator,
+                    checker.source_file(),
                 ) {
                     checker.report_diagnostic(diagnostic);
                 }

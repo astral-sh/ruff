@@ -3,6 +3,7 @@ use std::path::Path;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::CommentRanges;
+use ruff_source_file::SourceFile;
 
 use crate::Locator;
 use crate::package::PackageRoot;
@@ -20,6 +21,7 @@ pub(crate) fn check_file_path(
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
     target_version: PythonVersion,
+    source_file: SourceFile,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
@@ -34,6 +36,7 @@ pub(crate) fn check_file_path(
             &settings.project_root,
             &settings.src,
             allow_nested_roots,
+            source_file.clone(),
         ) {
             diagnostics.push(diagnostic);
         }
@@ -41,16 +44,21 @@ pub(crate) fn check_file_path(
 
     // pep8-naming
     if settings.rules.enabled(Rule::InvalidModuleName) {
-        if let Some(diagnostic) =
-            invalid_module_name(path, package, &settings.pep8_naming.ignore_names)
-        {
+        if let Some(diagnostic) = invalid_module_name(
+            path,
+            package,
+            &settings.pep8_naming.ignore_names,
+            source_file.clone(),
+        ) {
             diagnostics.push(diagnostic);
         }
     }
 
     // flake8-builtins
     if settings.rules.enabled(Rule::StdlibModuleShadowing) {
-        if let Some(diagnostic) = stdlib_module_shadowing(path, settings, target_version) {
+        if let Some(diagnostic) =
+            stdlib_module_shadowing(path, settings, target_version, source_file)
+        {
             diagnostics.push(diagnostic);
         }
     }

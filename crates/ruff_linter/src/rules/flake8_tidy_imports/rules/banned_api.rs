@@ -49,6 +49,7 @@ pub(crate) fn banned_api<T: Ranged>(checker: &Checker, policy: &NameMatchPolicy,
                     message: reason.msg.to_string(),
                 },
                 node.range(),
+                checker.source_file(),
             ));
         }
     }
@@ -77,6 +78,7 @@ pub(crate) fn banned_attribute_access(checker: &Checker, expr: &Expr) {
                 message: ban.msg.to_string(),
             },
             expr.range(),
+            checker.source_file(),
         ));
     }
 }

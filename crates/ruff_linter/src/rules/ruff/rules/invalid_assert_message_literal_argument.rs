@@ -55,5 +55,6 @@ pub(crate) fn invalid_assert_message_literal_argument(checker: &Checker, stmt: &
     checker.report_diagnostic(Diagnostic::new(
         InvalidAssertMessageLiteralArgument,
         message.range(),
+        checker.source_file(),
     ));
 }

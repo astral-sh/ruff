@@ -47,6 +47,10 @@ pub(crate) fn if_tuple(checker: &Checker, stmt_if: &StmtIf) {
         if tuple.is_empty() {
             continue;
         }
-        checker.report_diagnostic(Diagnostic::new(IfTuple, branch.test.range()));
+        checker.report_diagnostic(Diagnostic::new(
+            IfTuple,
+            branch.test.range(),
+            checker.source_file(),
+        ));
     }
 }

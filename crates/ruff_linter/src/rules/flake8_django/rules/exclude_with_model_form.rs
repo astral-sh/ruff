@@ -74,6 +74,7 @@ pub(crate) fn exclude_with_model_form(checker: &Checker, class_def: &ast::StmtCl
                     checker.report_diagnostic(Diagnostic::new(
                         DjangoExcludeWithModelForm,
                         target.range(),
+                        checker.source_file(),
                     ));
                     return;
                 }

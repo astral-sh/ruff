@@ -103,6 +103,7 @@ pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
                     replacement: SourceCodeSnippet::new(replacement.clone()),
                 },
                 group.range(),
+                checker.source_file(),
             );
 
             // We only suggest a fix when all appends in a group are clumped together. If they're

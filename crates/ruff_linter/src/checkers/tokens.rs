@@ -8,6 +8,7 @@ use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Tokens;
+use ruff_source_file::SourceFile;
 
 use crate::Locator;
 use crate::directives::TodoComment;
@@ -29,6 +30,7 @@ pub(crate) fn check_tokens(
     settings: &LinterSettings,
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
+    source_file: SourceFile,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
     let comment_ranges = indexer.comment_ranges();
@@ -41,16 +43,24 @@ pub(crate) fn check_tokens(
         Rule::BlankLinesAfterFunctionOrClass,
         Rule::BlankLinesBeforeNestedDefinition,
     ]) {
-        BlankLinesChecker::new(locator, stylist, settings, source_type, cell_offsets)
-            .check_lines(tokens, &mut diagnostics);
+        BlankLinesChecker::new(locator, stylist, settings, source_type, cell_offsets).check_lines(
+            tokens,
+            &mut diagnostics,
+            &source_file,
+        );
     }
 
     if settings.rules.enabled(Rule::BlanketTypeIgnore) {
-        pygrep_hooks::rules::blanket_type_ignore(&mut diagnostics, comment_ranges, locator);
+        pygrep_hooks::rules::blanket_type_ignore(
+            &mut diagnostics,
+            comment_ranges,
+            locator,
+            &source_file,
+        );
     }
 
     if settings.rules.enabled(Rule::EmptyComment) {
-        pylint::rules::empty_comments(&mut diagnostics, comment_ranges, locator);
+        pylint::rules::empty_comments(&mut diagnostics, comment_ranges, locator, &source_file);
     }
 
     if settings
@@ -63,20 +73,32 @@ pub(crate) fn check_tokens(
                 locator,
                 range,
                 settings,
+                &source_file,
             );
         }
     }
 
     if settings.rules.enabled(Rule::CommentedOutCode) {
-        eradicate::rules::commented_out_code(&mut diagnostics, locator, comment_ranges, settings);
+        eradicate::rules::commented_out_code(
+            &mut diagnostics,
+            locator,
+            comment_ranges,
+            settings,
+            &source_file,
+        );
     }
 
     if settings.rules.enabled(Rule::UTF8EncodingDeclaration) {
-        pyupgrade::rules::unnecessary_coding_comment(&mut diagnostics, locator, comment_ranges);
+        pyupgrade::rules::unnecessary_coding_comment(
+            &mut diagnostics,
+            locator,
+            comment_ranges,
+            source_file.clone(),
+        );
     }
 
     if settings.rules.enabled(Rule::TabIndentation) {
-        pycodestyle::rules::tab_indentation(&mut diagnostics, locator, indexer);
+        pycodestyle::rules::tab_indentation(&mut diagnostics, locator, indexer, &source_file);
     }
 
     if settings.rules.any_enabled(&[
@@ -87,7 +109,12 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterZeroWidthSpace,
     ]) {
         for token in tokens {
-            pylint::rules::invalid_string_characters(&mut diagnostics, token, locator);
+            pylint::rules::invalid_string_characters(
+                &mut diagnostics,
+                token,
+                locator,
+                &source_file,
+            );
         }
     }
 
@@ -103,6 +130,7 @@ pub(crate) fn check_tokens(
             indexer,
             source_type,
             cell_offsets,
+            &source_file,
         );
     }
 
@@ -116,6 +144,7 @@ pub(crate) fn check_tokens(
             locator,
             indexer,
             settings,
+            &source_file,
         );
     }
 
@@ -124,15 +153,26 @@ pub(crate) fn check_tokens(
         Rule::TrailingCommaOnBareTuple,
         Rule::ProhibitedTrailingComma,
     ]) {
-        flake8_commas::rules::trailing_commas(&mut diagnostics, tokens, locator, indexer);
+        flake8_commas::rules::trailing_commas(
+            &mut diagnostics,
+            tokens,
+            locator,
+            indexer,
+            &source_file,
+        );
     }
 
     if settings.rules.enabled(Rule::ExtraneousParentheses) {
-        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens, locator);
+        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens, locator, &source_file);
     }
 
     if source_type.is_stub() && settings.rules.enabled(Rule::TypeCommentInStub) {
-        flake8_pyi::rules::type_comment_in_stub(&mut diagnostics, locator, comment_ranges);
+        flake8_pyi::rules::type_comment_in_stub(
+            &mut diagnostics,
+            locator,
+            comment_ranges,
+            &source_file,
+        );
     }
 
     if settings.rules.any_enabled(&[
@@ -148,6 +188,7 @@ pub(crate) fn check_tokens(
             locator,
             comment_ranges,
             settings,
+            source_file.clone(),
         );
     }
 
@@ -172,8 +213,14 @@ pub(crate) fn check_tokens(
                 TodoComment::from_comment(comment, *comment_range, i)
             })
             .collect();
-        flake8_todos::rules::todos(&mut diagnostics, &todo_comments, locator, comment_ranges);
-        flake8_fixme::rules::todos(&mut diagnostics, &todo_comments);
+        flake8_todos::rules::todos(
+            &mut diagnostics,
+            &todo_comments,
+            locator,
+            comment_ranges,
+            &source_file,
+        );
+        flake8_fixme::rules::todos(&mut diagnostics, &todo_comments, &source_file);
     }
 
     if settings.rules.enabled(Rule::TooManyNewlinesAtEndOfFile) {
@@ -181,6 +228,7 @@ pub(crate) fn check_tokens(
             &mut diagnostics,
             tokens,
             cell_offsets,
+            source_file,
         );
     }
 

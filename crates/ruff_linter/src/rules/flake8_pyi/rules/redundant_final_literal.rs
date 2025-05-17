@@ -102,6 +102,7 @@ pub(crate) fn redundant_final_literal(checker: &Checker, ann_assign: &ast::StmtA
             literal: SourceCodeSnippet::from_str(checker.locator().slice(literal.range())),
         },
         ann_assign.range(),
+        checker.source_file(),
     );
 
     // The literal value and the assignment value being different doesn't make sense, so we skip

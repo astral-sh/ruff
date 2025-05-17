@@ -504,7 +504,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(FString, call.range());
+    let mut diagnostic = Diagnostic::new(FString, call.range(), checker.source_file());
 
     // Avoid fix if there are comments within the call:
     // ```

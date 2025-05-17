@@ -509,7 +509,11 @@ pub(crate) fn typed_argument_simple_defaults(checker: &Checker, parameters: &Par
                 checker.locator(),
                 checker.semantic(),
             ) {
-                let mut diagnostic = Diagnostic::new(TypedArgumentDefaultInStub, default.range());
+                let mut diagnostic = Diagnostic::new(
+                    TypedArgumentDefaultInStub,
+                    default.range(),
+                    checker.source_file(),
+                );
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "...".to_string(),
@@ -535,7 +539,11 @@ pub(crate) fn argument_simple_defaults(checker: &Checker, parameters: &Parameter
                 checker.locator(),
                 checker.semantic(),
             ) {
-                let mut diagnostic = Diagnostic::new(ArgumentDefaultInStub, default.range());
+                let mut diagnostic = Diagnostic::new(
+                    ArgumentDefaultInStub,
+                    default.range(),
+                    checker.source_file(),
+                );
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "...".to_string(),
@@ -569,7 +577,11 @@ pub(crate) fn assignment_default_in_stub(checker: &Checker, targets: &[Expr], va
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
+    let mut diagnostic = Diagnostic::new(
+        AssignmentDefaultInStub,
+        value.range(),
+        checker.source_file(),
+    );
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         value.range(),
@@ -603,7 +615,11 @@ pub(crate) fn annotated_assignment_default_in_stub(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
+    let mut diagnostic = Diagnostic::new(
+        AssignmentDefaultInStub,
+        value.range(),
+        checker.source_file(),
+    );
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         value.range(),
@@ -643,6 +659,7 @@ pub(crate) fn unannotated_assignment_in_stub(checker: &Checker, targets: &[Expr]
             name: id.to_string(),
         },
         value.range(),
+        checker.source_file(),
     ));
 }
 
@@ -661,6 +678,7 @@ pub(crate) fn unassigned_special_variable_in_stub(checker: &Checker, target: &Ex
             name: id.to_string(),
         },
         stmt.range(),
+        checker.source_file(),
     ));
 }
 
@@ -695,6 +713,7 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
             value: checker.generator().expr(value),
         },
         target.range(),
+        checker.source_file(),
     );
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = importer.import(target.start())?;

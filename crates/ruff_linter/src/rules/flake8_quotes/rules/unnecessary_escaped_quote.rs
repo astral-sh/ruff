@@ -57,6 +57,7 @@ pub(crate) fn unnecessary_escaped_quote(checker: &Checker, string_like: StringLi
         match part {
             ast::StringLikePart::String(string_literal) => {
                 if let Some(diagnostic) = check_string_or_bytes(
+                    checker,
                     locator,
                     string_literal.range(),
                     AnyStringFlags::from(string_literal.flags),
@@ -66,6 +67,7 @@ pub(crate) fn unnecessary_escaped_quote(checker: &Checker, string_like: StringLi
             }
             ast::StringLikePart::Bytes(bytes_literal) => {
                 if let Some(diagnostic) = check_string_or_bytes(
+                    checker,
                     locator,
                     bytes_literal.range(),
                     AnyStringFlags::from(bytes_literal.flags),
@@ -74,7 +76,7 @@ pub(crate) fn unnecessary_escaped_quote(checker: &Checker, string_like: StringLi
                 }
             }
             ast::StringLikePart::FString(f_string) => {
-                if let Some(diagnostic) = check_f_string(locator, f_string) {
+                if let Some(diagnostic) = check_f_string(checker, locator, f_string) {
                     checker.report_diagnostic(diagnostic);
                 }
             }
@@ -88,6 +90,7 @@ pub(crate) fn unnecessary_escaped_quote(checker: &Checker, string_like: StringLi
 ///
 /// If the string kind is an f-string.
 fn check_string_or_bytes(
+    checker: &Checker,
     locator: &Locator,
     range: TextRange,
     flags: AnyStringFlags,
@@ -106,7 +109,7 @@ fn check_string_or_bytes(
         return None;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, range);
+    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, range, checker.source_file());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         flags
             .display_contents(&unescape_string(contents, opposite_quote_char))
@@ -117,7 +120,11 @@ fn check_string_or_bytes(
 }
 
 /// Checks for unnecessary escaped quotes in an f-string.
-fn check_f_string(locator: &Locator, f_string: &ast::FString) -> Option<Diagnostic> {
+fn check_f_string(
+    checker: &Checker,
+    locator: &Locator,
+    f_string: &ast::FString,
+) -> Option<Diagnostic> {
     let ast::FString { flags, range, .. } = f_string;
     if flags.is_triple_quoted() || flags.prefix().is_raw() {
         return None;
@@ -140,7 +147,7 @@ fn check_f_string(locator: &Locator, f_string: &ast::FString) -> Option<Diagnost
     let mut edits_iter = edits.into_iter();
     let first = edits_iter.next()?;
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, *range);
+    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, *range, checker.source_file());
     diagnostic.set_fix(Fix::safe_edits(first, edits_iter));
     Some(diagnostic)
 }

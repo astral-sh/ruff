@@ -107,6 +107,7 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, stmt: &Stmt, names: &
                 .collect(),
         },
         stmt.range(),
+        checker.source_file(),
     );
 
     diagnostic.try_set_fix(|| {

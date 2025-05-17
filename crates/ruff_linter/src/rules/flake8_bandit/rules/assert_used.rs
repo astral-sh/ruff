@@ -1,4 +1,5 @@
 use ruff_python_ast::Stmt;
+use ruff_source_file::SourceFile;
 use ruff_text_size::{TextLen, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -41,6 +42,10 @@ impl Violation for Assert {
 }
 
 /// S101
-pub(crate) fn assert_used(stmt: &Stmt) -> Diagnostic {
-    Diagnostic::new(Assert, TextRange::at(stmt.start(), "assert".text_len()))
+pub(crate) fn assert_used(stmt: &Stmt, source_file: SourceFile) -> Diagnostic {
+    Diagnostic::new(
+        Assert,
+        TextRange::at(stmt.start(), "assert".text_len()),
+        source_file,
+    )
 }

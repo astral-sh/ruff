@@ -132,6 +132,7 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
                 .collect(),
         },
         expr.range(),
+        checker.source_file(),
     );
 
     diagnostic.set_fix({

@@ -102,7 +102,11 @@ pub(crate) fn cached_instance_method(checker: &Checker, function_def: &ast::Stmt
                 return;
             }
 
-            checker.report_diagnostic(Diagnostic::new(CachedInstanceMethod, decorator.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                CachedInstanceMethod,
+                decorator.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

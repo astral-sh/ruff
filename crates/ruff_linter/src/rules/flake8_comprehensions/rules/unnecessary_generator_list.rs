@@ -99,6 +99,7 @@ pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCall
                         short_circuit: true,
                     },
                     call.range(),
+                    checker.source_file(),
                 );
                 let iterator = format!("list({})", checker.locator().slice(generator.iter.range()));
                 let fix = Fix::unsafe_edit(Edit::range_replacement(iterator, call.range()));
@@ -114,6 +115,7 @@ pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCall
             short_circuit: false,
         },
         call.range(),
+        checker.source_file(),
     );
     let fix = {
         // Replace `list(` with `[`.

@@ -118,6 +118,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
             is_value_none_literal: dict_comp.value.is_none_literal_expr(),
         },
         dict_comp.range(),
+        checker.source_file(),
     );
 
     if checker.semantic().has_builtin_binding("dict") {

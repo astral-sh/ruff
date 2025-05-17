@@ -71,6 +71,7 @@ pub(crate) fn invalid_bool_return(checker: &Checker, function_def: &ast::StmtFun
         checker.report_diagnostic(Diagnostic::new(
             InvalidBoolReturnType,
             function_def.identifier(),
+            checker.source_file(),
         ));
         return;
     }
@@ -88,11 +89,19 @@ pub(crate) fn invalid_bool_return(checker: &Checker, function_def: &ast::StmtFun
                 ResolvedPythonType::Unknown
                     | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool))
             ) {
-                checker.report_diagnostic(Diagnostic::new(InvalidBoolReturnType, value.range()));
+                checker.report_diagnostic(Diagnostic::new(
+                    InvalidBoolReturnType,
+                    value.range(),
+                    checker.source_file(),
+                ));
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidBoolReturnType, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                InvalidBoolReturnType,
+                stmt.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

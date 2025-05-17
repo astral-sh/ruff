@@ -52,7 +52,8 @@ pub(crate) fn unnecessary_spread(checker: &Checker, dict: &ast::ExprDict) {
             // We only care about when the key is None which indicates a spread `**`
             // inside a dict.
             if let Expr::Dict(inner) = value {
-                let mut diagnostic = Diagnostic::new(UnnecessarySpread, value.range());
+                let mut diagnostic =
+                    Diagnostic::new(UnnecessarySpread, value.range(), checker.source_file());
                 if let Some(fix) = unnecessary_spread_fix(inner, prev_end, checker.tokens()) {
                     diagnostic.set_fix(fix);
                 }

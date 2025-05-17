@@ -208,6 +208,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
             replacement: title,
         },
         call.range(),
+        checker.source_file(),
     );
 
     if let Some((mut fixed, precedence)) = fixed {

@@ -103,7 +103,11 @@ pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: &StmtClas
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(ClassWithMixedTypeVars, generic_base.range);
+    let mut diagnostic = Diagnostic::new(
+        ClassWithMixedTypeVars,
+        generic_base.range,
+        checker.source_file(),
+    );
 
     diagnostic.try_set_optional_fix(|| {
         convert_type_vars(

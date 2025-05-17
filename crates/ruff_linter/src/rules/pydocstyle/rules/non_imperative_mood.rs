@@ -104,6 +104,7 @@ pub(crate) fn non_imperative_mood(checker: &Checker, docstring: &Docstring, sett
                 first_line: first_line.to_string(),
             },
             docstring.range(),
+            checker.source_file(),
         ));
     }
 }

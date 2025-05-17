@@ -73,7 +73,11 @@ pub(crate) fn no_slots_in_str_subclass(checker: &Checker, stmt: &Stmt, class: &S
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(NoSlotsInStrSubclass, stmt.identifier()));
+    checker.report_diagnostic(Diagnostic::new(
+        NoSlotsInStrSubclass,
+        stmt.identifier(),
+        checker.source_file(),
+    ));
 }
 
 /// Return `true` if the class is a subclass of `str`.

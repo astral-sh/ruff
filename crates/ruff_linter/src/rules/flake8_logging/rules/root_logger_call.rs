@@ -63,7 +63,7 @@ pub(crate) fn root_logger_call(checker: &Checker, call: &ExprCall) {
     let kind = RootLoggerCall {
         attr: (*attr).to_string(),
     };
-    let diagnostic = Diagnostic::new(kind, call.range);
+    let diagnostic = Diagnostic::new(kind, call.range, checker.source_file());
 
     checker.report_diagnostic(diagnostic);
 }

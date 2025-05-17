@@ -175,10 +175,10 @@ pub(crate) fn call(checker: &Checker, func: &Expr) {
     let range = func.range();
     let diagnostic = match attr.as_str() {
         "isnull" if checker.settings.rules.enabled(Rule::PandasUseOfDotIsNull) => {
-            Diagnostic::new(PandasUseOfDotIsNull, range)
+            Diagnostic::new(PandasUseOfDotIsNull, range, checker.source_file())
         }
         "notnull" if checker.settings.rules.enabled(Rule::PandasUseOfDotNotNull) => {
-            Diagnostic::new(PandasUseOfDotNotNull, range)
+            Diagnostic::new(PandasUseOfDotNotNull, range, checker.source_file())
         }
         "pivot" | "unstack"
             if checker
@@ -186,10 +186,10 @@ pub(crate) fn call(checker: &Checker, func: &Expr) {
                 .rules
                 .enabled(Rule::PandasUseOfDotPivotOrUnstack) =>
         {
-            Diagnostic::new(PandasUseOfDotPivotOrUnstack, range)
+            Diagnostic::new(PandasUseOfDotPivotOrUnstack, range, checker.source_file())
         }
         "stack" if checker.settings.rules.enabled(Rule::PandasUseOfDotStack) => {
-            Diagnostic::new(PandasUseOfDotStack, range)
+            Diagnostic::new(PandasUseOfDotStack, range, checker.source_file())
         }
         _ => return,
     };

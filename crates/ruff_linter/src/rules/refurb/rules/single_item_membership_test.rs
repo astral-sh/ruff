@@ -83,7 +83,11 @@ pub(crate) fn single_item_membership_test(
         return;
     };
 
-    let diagnostic = Diagnostic::new(SingleItemMembershipTest { membership_test }, expr.range());
+    let diagnostic = Diagnostic::new(
+        SingleItemMembershipTest { membership_test },
+        expr.range(),
+        checker.source_file(),
+    );
 
     let edit = Edit::range_replacement(
         pad(

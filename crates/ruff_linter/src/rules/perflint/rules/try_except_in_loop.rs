@@ -107,7 +107,11 @@ pub(crate) fn try_except_in_loop(checker: &Checker, body: &[Stmt]) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(TryExceptInLoop, handler.range()));
+    checker.report_diagnostic(Diagnostic::new(
+        TryExceptInLoop,
+        handler.range(),
+        checker.source_file(),
+    ));
 }
 
 /// Returns `true` if a `break` or `continue` statement is present in `body`.

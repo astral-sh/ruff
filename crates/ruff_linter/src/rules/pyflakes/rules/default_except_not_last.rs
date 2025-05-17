@@ -2,6 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::except;
 use ruff_python_ast::{self as ast, ExceptHandler};
+use ruff_source_file::SourceFile;
 
 use crate::Locator;
 
@@ -57,6 +58,7 @@ impl Violation for DefaultExceptNotLast {
 pub(crate) fn default_except_not_last(
     handlers: &[ExceptHandler],
     locator: &Locator,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     for (idx, handler) in handlers.iter().enumerate() {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) = handler;
@@ -64,6 +66,7 @@ pub(crate) fn default_except_not_last(
             return Some(Diagnostic::new(
                 DefaultExceptNotLast,
                 except(handler, locator.contents()),
+                source_file,
             ));
         }
     }

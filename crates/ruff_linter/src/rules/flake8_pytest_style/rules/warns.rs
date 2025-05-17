@@ -177,6 +177,7 @@ pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall) {
                 checker.report_diagnostic(Diagnostic::new(
                     PytestWarnsWithoutWarning,
                     call.func.range(),
+                    checker.source_file(),
                 ));
             }
         }
@@ -225,6 +226,7 @@ pub(crate) fn complex_warns(checker: &Checker, stmt: &Stmt, items: &[WithItem], 
             checker.report_diagnostic(Diagnostic::new(
                 PytestWarnsWithMultipleStatements,
                 stmt.range(),
+                checker.source_file(),
             ));
         }
     }
@@ -258,6 +260,7 @@ fn warning_needs_match(checker: &Checker, warning: &Expr) {
                 warning: qualified_name,
             },
             warning.range(),
+            checker.source_file(),
         ));
     }
 }

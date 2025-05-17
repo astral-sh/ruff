@@ -52,7 +52,7 @@ pub(crate) fn pass_in_class_body(checker: &Checker, class_def: &ast::StmtClassDe
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(PassInClassBody, stmt.range());
+        let mut diagnostic = Diagnostic::new(PassInClassBody, stmt.range(), checker.source_file());
         let edit = fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());
         diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
             checker.semantic().current_statement_id(),

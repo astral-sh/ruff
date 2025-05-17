@@ -108,7 +108,11 @@ pub(crate) fn invalid_pathlib_with_suffix(checker: &Checker, call: &ast::ExprCal
     };
 
     let single_dot = string_value == ".";
-    let mut diagnostic = Diagnostic::new(InvalidPathlibWithSuffix { single_dot }, call.range);
+    let mut diagnostic = Diagnostic::new(
+        InvalidPathlibWithSuffix { single_dot },
+        call.range,
+        checker.source_file(),
+    );
     if !single_dot {
         let after_leading_quote = string.start() + first_part.flags.opener_len();
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(

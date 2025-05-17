@@ -95,6 +95,7 @@ pub(crate) fn compare_to_empty_string(
                                 replacement,
                             },
                             lhs.range(),
+                            checker.source_file(),
                         ));
                     }
                 }
@@ -113,6 +114,7 @@ pub(crate) fn compare_to_empty_string(
                             replacement,
                         },
                         rhs.range(),
+                        checker.source_file(),
                     ));
                 }
             }

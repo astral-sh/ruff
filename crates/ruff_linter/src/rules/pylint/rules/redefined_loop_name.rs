@@ -394,6 +394,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
                         inner_kind: inner_assignment_target.binding_kind,
                     },
                     inner_assignment_target.expr.range(),
+                    checker.source_file(),
                 ));
             }
         }

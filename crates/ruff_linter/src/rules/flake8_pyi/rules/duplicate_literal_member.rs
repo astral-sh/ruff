@@ -68,6 +68,7 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
                     duplicate_name: checker.generator().expr(expr),
                 },
                 expr.range(),
+                checker.source_file(),
             ));
         }
     };

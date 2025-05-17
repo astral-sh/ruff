@@ -58,6 +58,7 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
                     },
                 },
                 test.range(),
+                checker.source_file(),
             ));
         }
         Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
@@ -70,6 +71,7 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
                     },
                 },
                 test.range(),
+                checker.source_file(),
             ));
         }
         Expr::FString(ast::ExprFString { value, .. }) => {
@@ -103,6 +105,7 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
             checker.report_diagnostic(Diagnostic::new(
                 AssertOnStringLiteral { kind },
                 test.range(),
+                checker.source_file(),
             ));
         }
         _ => {}

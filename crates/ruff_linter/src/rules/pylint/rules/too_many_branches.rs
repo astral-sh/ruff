@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
+use ruff_source_file::SourceFile;
 
 /// ## What it does
 /// Checks for functions or methods with too many branches, including (nested)
@@ -236,6 +237,7 @@ pub(crate) fn too_many_branches(
     stmt: &Stmt,
     body: &[Stmt],
     max_branches: usize,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     let branches = num_branches(body);
     if branches > max_branches {
@@ -245,6 +247,7 @@ pub(crate) fn too_many_branches(
                 max_branches,
             },
             stmt.identifier(),
+            source_file,
         ))
     } else {
         None

@@ -2,6 +2,7 @@ use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -36,13 +37,19 @@ fn is_pytest_or_subpackage(imported_name: &str) -> bool {
 }
 
 /// PT013
-pub(crate) fn import(import_from: &Stmt, name: &str, asname: Option<&str>) -> Option<Diagnostic> {
+pub(crate) fn import(
+    import_from: &Stmt,
+    name: &str,
+    asname: Option<&str>,
+    source_file: SourceFile,
+) -> Option<Diagnostic> {
     if is_pytest_or_subpackage(name) {
         if let Some(alias) = asname {
             if alias != name {
                 return Some(Diagnostic::new(
                     PytestIncorrectPytestImport,
                     import_from.range(),
+                    source_file,
                 ));
             }
         }
@@ -55,6 +62,7 @@ pub(crate) fn import_from(
     import_from: &Stmt,
     module: Option<&str>,
     level: u32,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     // If level is not zero or module is none, return
     if level != 0 {
@@ -66,6 +74,7 @@ pub(crate) fn import_from(
             return Some(Diagnostic::new(
                 PytestIncorrectPytestImport,
                 import_from.range(),
+                source_file,
             ));
         }
     }

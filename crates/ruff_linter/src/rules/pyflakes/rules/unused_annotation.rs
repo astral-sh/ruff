@@ -46,6 +46,10 @@ pub(crate) fn unused_annotation(checker: &Checker, scope: &Scope) {
             None
         }
     }) {
-        checker.report_diagnostic(Diagnostic::new(UnusedAnnotation { name }, range));
+        checker.report_diagnostic(Diagnostic::new(
+            UnusedAnnotation { name },
+            range,
+            checker.source_file(),
+        ));
     }
 }

@@ -1041,10 +1041,14 @@ fn suspicious_function(
         | ["shelve", "open" | "DbfilenameShelf"]
         | ["jsonpickle", "decode"]
         | ["jsonpickle", "unpickler", "decode"]
-        | ["pandas", "read_pickle"] => Diagnostic::new(SuspiciousPickleUsage, range),
+        | ["pandas", "read_pickle"] => {
+            Diagnostic::new(SuspiciousPickleUsage, range, checker.source_file())
+        }
 
         // Marshal
-        ["marshal", "load" | "loads"] => Diagnostic::new(SuspiciousMarshalUsage, range),
+        ["marshal", "load" | "loads"] => {
+            Diagnostic::new(SuspiciousMarshalUsage, range, checker.source_file())
+        }
 
         // InsecureHash
         [
@@ -1059,7 +1063,7 @@ fn suspicious_function(
             "primitives",
             "hashes",
             "SHA1" | "MD5",
-        ] => Diagnostic::new(SuspiciousInsecureHashUsage, range),
+        ] => Diagnostic::new(SuspiciousInsecureHashUsage, range, checker.source_file()),
 
         // InsecureCipher
         [
@@ -1075,7 +1079,7 @@ fn suspicious_function(
             "ciphers",
             "algorithms",
             "ARC4" | "Blowfish" | "IDEA",
-        ] => Diagnostic::new(SuspiciousInsecureCipherUsage, range),
+        ] => Diagnostic::new(SuspiciousInsecureCipherUsage, range, checker.source_file()),
 
         // InsecureCipherMode
         [
@@ -1085,13 +1089,21 @@ fn suspicious_function(
             "ciphers",
             "modes",
             "ECB",
-        ] => Diagnostic::new(SuspiciousInsecureCipherModeUsage, range),
+        ] => Diagnostic::new(
+            SuspiciousInsecureCipherModeUsage,
+            range,
+            checker.source_file(),
+        ),
 
         // Mktemp
-        ["tempfile", "mktemp"] => Diagnostic::new(SuspiciousMktempUsage, range),
+        ["tempfile", "mktemp"] => {
+            Diagnostic::new(SuspiciousMktempUsage, range, checker.source_file())
+        }
 
         // Eval
-        ["" | "builtins", "eval"] => Diagnostic::new(SuspiciousEvalUsage, range),
+        ["" | "builtins", "eval"] => {
+            Diagnostic::new(SuspiciousEvalUsage, range, checker.source_file())
+        }
 
         // MarkSafe
         ["django", "utils", "safestring" | "html", "mark_safe"] => {
@@ -1102,7 +1114,7 @@ fn suspicious_function(
                     }
                 }
             }
-            Diagnostic::new(SuspiciousMarkSafeUsage, range)
+            Diagnostic::new(SuspiciousMarkSafeUsage, range, checker.source_file())
         }
 
         // URLOpen (`Request`)
@@ -1124,7 +1136,7 @@ fn suspicious_function(
                     }
                 }
             }
-            Diagnostic::new(SuspiciousURLOpenUsage, range)
+            Diagnostic::new(SuspiciousURLOpenUsage, range, checker.source_file())
         }
 
         // URLOpen (`urlopen`, `urlretrieve`)
@@ -1176,7 +1188,7 @@ fn suspicious_function(
                     }
                 }
             }
-            Diagnostic::new(SuspiciousURLOpenUsage, range)
+            Diagnostic::new(SuspiciousURLOpenUsage, range, checker.source_file())
         }
 
         // URLOpen (`URLopener`, `FancyURLopener`)
@@ -1187,19 +1199,25 @@ fn suspicious_function(
             "urllib",
             "request",
             "URLopener" | "FancyURLopener",
-        ] => Diagnostic::new(SuspiciousURLOpenUsage, range),
+        ] => Diagnostic::new(SuspiciousURLOpenUsage, range, checker.source_file()),
 
         // NonCryptographicRandom
         [
             "random",
             "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform"
             | "triangular" | "randbytes",
-        ] => Diagnostic::new(SuspiciousNonCryptographicRandomUsage, range),
+        ] => Diagnostic::new(
+            SuspiciousNonCryptographicRandomUsage,
+            range,
+            checker.source_file(),
+        ),
 
         // UnverifiedContext
-        ["ssl", "_create_unverified_context"] => {
-            Diagnostic::new(SuspiciousUnverifiedContextUsage, range)
-        }
+        ["ssl", "_create_unverified_context"] => Diagnostic::new(
+            SuspiciousUnverifiedContextUsage,
+            range,
+            checker.source_file(),
+        ),
 
         // XMLCElementTree
         [
@@ -1207,7 +1225,7 @@ fn suspicious_function(
             "etree",
             "cElementTree",
             "parse" | "iterparse" | "fromstring" | "XMLParser",
-        ] => Diagnostic::new(SuspiciousXMLCElementTreeUsage, range),
+        ] => Diagnostic::new(SuspiciousXMLCElementTreeUsage, range, checker.source_file()),
 
         // XMLElementTree
         [
@@ -1215,31 +1233,31 @@ fn suspicious_function(
             "etree",
             "ElementTree",
             "parse" | "iterparse" | "fromstring" | "XMLParser",
-        ] => Diagnostic::new(SuspiciousXMLElementTreeUsage, range),
+        ] => Diagnostic::new(SuspiciousXMLElementTreeUsage, range, checker.source_file()),
 
         // XMLExpatReader
         ["xml", "sax", "expatreader", "create_parser"] => {
-            Diagnostic::new(SuspiciousXMLExpatReaderUsage, range)
+            Diagnostic::new(SuspiciousXMLExpatReaderUsage, range, checker.source_file())
         }
 
         // XMLExpatBuilder
         ["xml", "dom", "expatbuilder", "parse" | "parseString"] => {
-            Diagnostic::new(SuspiciousXMLExpatBuilderUsage, range)
+            Diagnostic::new(SuspiciousXMLExpatBuilderUsage, range, checker.source_file())
         }
 
         // XMLSax
         ["xml", "sax", "parse" | "parseString" | "make_parser"] => {
-            Diagnostic::new(SuspiciousXMLSaxUsage, range)
+            Diagnostic::new(SuspiciousXMLSaxUsage, range, checker.source_file())
         }
 
         // XMLMiniDOM
         ["xml", "dom", "minidom", "parse" | "parseString"] => {
-            Diagnostic::new(SuspiciousXMLMiniDOMUsage, range)
+            Diagnostic::new(SuspiciousXMLMiniDOMUsage, range, checker.source_file())
         }
 
         // XMLPullDOM
         ["xml", "dom", "pulldom", "parse" | "parseString"] => {
-            Diagnostic::new(SuspiciousXMLPullDOMUsage, range)
+            Diagnostic::new(SuspiciousXMLPullDOMUsage, range, checker.source_file())
         }
 
         // XMLETree
@@ -1248,13 +1266,13 @@ fn suspicious_function(
             "etree",
             "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser"
             | "check_docinfo",
-        ] => Diagnostic::new(SuspiciousXMLETreeUsage, range),
+        ] => Diagnostic::new(SuspiciousXMLETreeUsage, range, checker.source_file()),
 
         // Telnet
-        ["telnetlib", ..] => Diagnostic::new(SuspiciousTelnetUsage, range),
+        ["telnetlib", ..] => Diagnostic::new(SuspiciousTelnetUsage, range, checker.source_file()),
 
         // FTPLib
-        ["ftplib", ..] => Diagnostic::new(SuspiciousFTPLibUsage, range),
+        ["ftplib", ..] => Diagnostic::new(SuspiciousFTPLibUsage, range, checker.source_file()),
 
         _ => return,
     };

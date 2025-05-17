@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_source_file::SourceFile;
 
 use crate::directives::{TodoComment, TodoDirectiveKind};
 
@@ -114,19 +115,31 @@ impl Violation for LineContainsHack {
     }
 }
 
-pub(crate) fn todos(diagnostics: &mut Vec<Diagnostic>, directive_ranges: &[TodoComment]) {
+pub(crate) fn todos(
+    diagnostics: &mut Vec<Diagnostic>,
+    directive_ranges: &[TodoComment],
+    source_file: &SourceFile,
+) {
     diagnostics.extend(
         directive_ranges
             .iter()
             .map(|TodoComment { directive, .. }| match directive.kind {
                 // FIX001
-                TodoDirectiveKind::Fixme => Diagnostic::new(LineContainsFixme, directive.range),
+                TodoDirectiveKind::Fixme => {
+                    Diagnostic::new(LineContainsFixme, directive.range, source_file.clone())
+                }
                 // FIX002
-                TodoDirectiveKind::Hack => Diagnostic::new(LineContainsHack, directive.range),
+                TodoDirectiveKind::Hack => {
+                    Diagnostic::new(LineContainsHack, directive.range, source_file.clone())
+                }
                 // FIX003
-                TodoDirectiveKind::Todo => Diagnostic::new(LineContainsTodo, directive.range),
+                TodoDirectiveKind::Todo => {
+                    Diagnostic::new(LineContainsTodo, directive.range, source_file.clone())
+                }
                 // FIX004
-                TodoDirectiveKind::Xxx => Diagnostic::new(LineContainsXxx, directive.range),
+                TodoDirectiveKind::Xxx => {
+                    Diagnostic::new(LineContainsXxx, directive.range, source_file.clone())
+                }
             }),
     );
 }

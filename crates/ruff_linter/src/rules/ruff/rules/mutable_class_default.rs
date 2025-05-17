@@ -118,7 +118,11 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                         return;
                     }
 
-                    checker.report_diagnostic(Diagnostic::new(MutableClassDefault, value.range()));
+                    checker.report_diagnostic(Diagnostic::new(
+                        MutableClassDefault,
+                        value.range(),
+                        checker.source_file(),
+                    ));
                 }
             }
             Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
@@ -130,7 +134,11 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                         return;
                     }
 
-                    checker.report_diagnostic(Diagnostic::new(MutableClassDefault, value.range()));
+                    checker.report_diagnostic(Diagnostic::new(
+                        MutableClassDefault,
+                        value.range(),
+                        checker.source_file(),
+                    ));
                 }
             }
             _ => (),

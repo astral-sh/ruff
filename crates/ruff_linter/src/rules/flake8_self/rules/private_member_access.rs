@@ -149,6 +149,7 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
             access: attr.to_string(),
         },
         expr.range(),
+        checker.source_file(),
     ));
 }
 

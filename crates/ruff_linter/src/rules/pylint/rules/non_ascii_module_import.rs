@@ -75,6 +75,7 @@ pub(crate) fn non_ascii_module_import(checker: &Checker, alias: &Alias) {
                 kind: Kind::Aliased,
             },
             asname.range(),
+            checker.source_file(),
         ));
     } else {
         if alias.name.as_str().is_ascii() {
@@ -87,6 +88,7 @@ pub(crate) fn non_ascii_module_import(checker: &Checker, alias: &Alias) {
                 kind: Kind::Unaliased,
             },
             alias.name.range(),
+            checker.source_file(),
         ));
     }
 }

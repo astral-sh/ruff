@@ -89,6 +89,7 @@ pub(crate) fn any_eq_ne_annotation(checker: &Checker, name: &str, parameters: &P
             method_name: name.to_string(),
         },
         annotation.range(),
+        checker.source_file(),
     );
     // Ex) `def __eq__(self, obj: Any): ...`
     diagnostic.try_set_fix(|| {

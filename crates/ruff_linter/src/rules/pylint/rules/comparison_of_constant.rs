@@ -69,6 +69,7 @@ pub(crate) fn comparison_of_constant(
                     right_constant: checker.generator().expr(right),
                 },
                 left.range(),
+                checker.source_file(),
             );
 
             checker.report_diagnostic(diagnostic);

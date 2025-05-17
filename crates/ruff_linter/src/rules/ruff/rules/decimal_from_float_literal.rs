@@ -60,9 +60,14 @@ pub(crate) fn decimal_from_float_literal_syntax(checker: &Checker, call: &ast::E
                 matches!(qualified_name.segments(), ["decimal", "Decimal"])
             })
         {
-            let diagnostic = Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(
-                fix_float_literal(arg.range(), float, checker.locator(), checker.stylist()),
-            );
+            let diagnostic =
+                Diagnostic::new(DecimalFromFloatLiteral, arg.range(), checker.source_file())
+                    .with_fix(fix_float_literal(
+                        arg.range(),
+                        float,
+                        checker.locator(),
+                        checker.stylist(),
+                    ));
             checker.report_diagnostic(diagnostic);
         }
     }

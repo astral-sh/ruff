@@ -76,7 +76,11 @@ pub(crate) fn type_comparison(checker: &Checker, compare: &ast::ExprCompare) {
             }
 
             // Disallow the comparison.
-            checker.report_diagnostic(Diagnostic::new(TypeComparison, compare.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                TypeComparison,
+                compare.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

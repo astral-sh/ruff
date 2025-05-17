@@ -83,6 +83,7 @@ pub(crate) fn useless_comparison(checker: &Checker, expr: &Expr) {
                         at: ComparisonLocationAt::EndOfFunction,
                     },
                     expr.range(),
+                    checker.source_file(),
                 ));
                 return;
             }
@@ -93,6 +94,7 @@ pub(crate) fn useless_comparison(checker: &Checker, expr: &Expr) {
                 at: ComparisonLocationAt::MiddleBody,
             },
             expr.range(),
+            checker.source_file(),
         ));
     }
 }

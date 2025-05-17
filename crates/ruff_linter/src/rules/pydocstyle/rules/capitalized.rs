@@ -96,6 +96,7 @@ pub(crate) fn capitalized(checker: &Checker, docstring: &Docstring) {
             capitalized_word: capitalized_word.to_string(),
         },
         docstring.range(),
+        checker.source_file(),
     );
 
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(

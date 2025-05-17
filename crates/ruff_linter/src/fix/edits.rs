@@ -737,9 +737,11 @@ x = 1 \
         let diag = {
             use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
             let mut iter = edits.into_iter();
+            let file = SourceFileBuilder::new("<filename>", "<code>").finish();
             let diag = Diagnostic::new(
                 MissingNewlineAtEndOfFile, // The choice of rule here is arbitrary.
                 TextRange::default(),
+                file.clone(),
             )
             .with_fix(Fix::safe_edits(
                 iter.next().ok_or(anyhow!("expected edits nonempty"))?,
@@ -752,7 +754,7 @@ x = 1 \
                 range: diag.range,
                 fix: diag.fix,
                 parent: diag.parent,
-                file: SourceFileBuilder::new("<filename>", "<code>").finish(),
+                file,
                 noqa_offset: TextSize::default(),
             }
         };

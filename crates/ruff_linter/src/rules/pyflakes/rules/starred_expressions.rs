@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_source_file::SourceFile;
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -58,13 +59,18 @@ pub(crate) fn starred_expressions(
     check_too_many_expressions: bool,
     check_two_starred_expressions: bool,
     location: TextRange,
+    source_file: SourceFile,
 ) -> Option<Diagnostic> {
     let mut has_starred: bool = false;
     let mut starred_index: Option<usize> = None;
     for (index, elt) in elts.iter().enumerate() {
         if elt.is_starred_expr() {
             if has_starred && check_two_starred_expressions {
-                return Some(Diagnostic::new(MultipleStarredExpressions, location));
+                return Some(Diagnostic::new(
+                    MultipleStarredExpressions,
+                    location,
+                    source_file,
+                ));
             }
             has_starred = true;
             starred_index = Some(index);
@@ -74,7 +80,11 @@ pub(crate) fn starred_expressions(
     if check_too_many_expressions {
         if let Some(starred_index) = starred_index {
             if starred_index >= 1 << 8 || elts.len() - starred_index > 1 << 24 {
-                return Some(Diagnostic::new(ExpressionsInStarAssignment, location));
+                return Some(Diagnostic::new(
+                    ExpressionsInStarAssignment,
+                    location,
+                    source_file,
+                ));
             }
         }
     }

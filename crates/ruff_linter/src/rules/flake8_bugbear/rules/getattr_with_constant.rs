@@ -68,7 +68,7 @@ pub(crate) fn getattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(GetAttrWithConstant, expr.range());
+    let mut diagnostic = Diagnostic::new(GetAttrWithConstant, expr.range(), checker.source_file());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         pad(
             if matches!(

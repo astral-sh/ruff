@@ -5,6 +5,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{Scope, SemanticModel, analyze::typing};
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -67,7 +68,11 @@ impl Violation for AsyncioDanglingTask {
 }
 
 /// RUF006
-pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Option<Diagnostic> {
+pub(crate) fn asyncio_dangling_task(
+    expr: &Expr,
+    semantic: &SemanticModel,
+    source_file: SourceFile,
+) -> Option<Diagnostic> {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return None;
     };
@@ -87,6 +92,7 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
                 method,
             },
             expr.range(),
+            source_file,
         ));
     }
 
@@ -109,6 +115,7 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
                             method: Method::CreateTask,
                         },
                         expr.range(),
+                        source_file,
                     ));
                 }
             }
@@ -155,11 +162,11 @@ pub(crate) fn asyncio_dangling_binding(scope: &Scope, checker: &Checker) {
 
             let diagnostic = match semantic.statement(source) {
                 Stmt::Assign(ast::StmtAssign { value, targets, .. }) if targets.len() == 1 => {
-                    asyncio_dangling_task(value, semantic)
+                    asyncio_dangling_task(value, semantic, checker.source_file())
                 }
                 Stmt::AnnAssign(ast::StmtAnnAssign {
                     value: Some(value), ..
-                }) => asyncio_dangling_task(value, semantic),
+                }) => asyncio_dangling_task(value, semantic, checker.source_file()),
                 _ => None,
             };
 

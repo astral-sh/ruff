@@ -125,6 +125,7 @@ pub(crate) fn suppressible_exception(
             exception: exception.clone(),
         },
         stmt.range(),
+        checker.source_file(),
     );
     if !checker
         .comment_ranges()

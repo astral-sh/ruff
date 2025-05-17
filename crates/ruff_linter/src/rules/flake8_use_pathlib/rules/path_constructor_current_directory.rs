@@ -83,7 +83,11 @@ pub(crate) fn path_constructor_current_directory(checker: &Checker, call: &ExprC
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(PathConstructorCurrentDirectory, arg.range());
+    let mut diagnostic = Diagnostic::new(
+        PathConstructorCurrentDirectory,
+        arg.range(),
+        checker.source_file(),
+    );
 
     match parent_and_next_path_fragment_range(
         checker.semantic(),

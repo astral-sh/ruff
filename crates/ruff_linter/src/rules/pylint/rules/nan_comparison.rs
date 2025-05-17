@@ -69,12 +69,14 @@ fn nan_comparison_impl<'a>(checker: &Checker, comparators: impl Iterator<Item = 
                     checker.report_diagnostic(Diagnostic::new(
                         NanComparison { nan: Nan::NumPy },
                         expr.range(),
+                        checker.source_file(),
                     ));
                 }
                 ["math", "nan"] => {
                     checker.report_diagnostic(Diagnostic::new(
                         NanComparison { nan: Nan::Math },
                         expr.range(),
+                        checker.source_file(),
                     ));
                 }
                 _ => continue,
@@ -85,6 +87,7 @@ fn nan_comparison_impl<'a>(checker: &Checker, comparators: impl Iterator<Item = 
             checker.report_diagnostic(Diagnostic::new(
                 NanComparison { nan: Nan::Math },
                 expr.range(),
+                checker.source_file(),
             ));
         }
     }

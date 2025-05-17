@@ -675,6 +675,7 @@ fn pytest_fixture_parentheses(
     let mut diagnostic = Diagnostic::new(
         PytestFixtureIncorrectParenthesesStyle { expected, actual },
         decorator.range(),
+        checker.source_file(),
     );
     diagnostic.set_fix(fix);
     checker.report_diagnostic(diagnostic);
@@ -711,6 +712,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
                             function: func_name.to_string(),
                         },
                         decorator.range(),
+                        checker.source_file(),
                     ));
                 }
             }
@@ -718,8 +720,11 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
             if checker.enabled(Rule::PytestExtraneousScopeFunction) {
                 if let Some(keyword) = arguments.find_keyword("scope") {
                     if keyword_is_literal(keyword, "function") {
-                        let mut diagnostic =
-                            Diagnostic::new(PytestExtraneousScopeFunction, keyword.range());
+                        let mut diagnostic = Diagnostic::new(
+                            PytestExtraneousScopeFunction,
+                            keyword.range(),
+                            checker.source_file(),
+                        );
                         diagnostic.try_set_fix(|| {
                             edits::remove_argument(
                                 keyword,
@@ -780,6 +785,7 @@ fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: 
                 name: name.to_string(),
             },
             stmt.range(),
+            checker.source_file(),
         );
         let yield_edit = Edit::range_replacement(
             "return".to_string(),
@@ -859,6 +865,7 @@ fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorato
                     name: name.to_string(),
                 },
                 parameter.range(),
+                checker.source_file(),
             ));
         }
     }
@@ -870,6 +877,7 @@ fn check_fixture_decorator_name(checker: &Checker, decorator: &Decorator) {
         checker.report_diagnostic(Diagnostic::new(
             PytestDeprecatedYieldFixture,
             decorator.range(),
+            checker.source_file(),
         ));
     }
 }
@@ -890,6 +898,7 @@ fn check_fixture_addfinalizer(checker: &Checker, parameters: &Parameters, body: 
         checker.report_diagnostic(Diagnostic::new(
             PytestFixtureFinalizerCallback,
             addfinalizer.range(),
+            checker.source_file(),
         ));
     }
 }
@@ -899,8 +908,11 @@ fn check_fixture_marks(checker: &Checker, decorators: &[Decorator]) {
     for (expr, marker) in get_mark_decorators(decorators) {
         if checker.enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture) {
             if marker == "asyncio" {
-                let mut diagnostic =
-                    Diagnostic::new(PytestUnnecessaryAsyncioMarkOnFixture, expr.range());
+                let mut diagnostic = Diagnostic::new(
+                    PytestUnnecessaryAsyncioMarkOnFixture,
+                    expr.range(),
+                    checker.source_file(),
+                );
                 let range = checker.locator().full_lines_range(expr.range());
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                 checker.report_diagnostic(diagnostic);
@@ -909,8 +921,11 @@ fn check_fixture_marks(checker: &Checker, decorators: &[Decorator]) {
 
         if checker.enabled(Rule::PytestErroneousUseFixturesOnFixture) {
             if marker == "usefixtures" {
-                let mut diagnostic =
-                    Diagnostic::new(PytestErroneousUseFixturesOnFixture, expr.range());
+                let mut diagnostic = Diagnostic::new(
+                    PytestErroneousUseFixturesOnFixture,
+                    expr.range(),
+                    checker.source_file(),
+                );
                 let line_range = checker.locator().full_lines_range(expr.range());
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(line_range)));
                 checker.report_diagnostic(diagnostic);

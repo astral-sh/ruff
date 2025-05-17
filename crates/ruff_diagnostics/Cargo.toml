@@ -15,6 +15,7 @@ doctest = false
 
 [dependencies]
 ruff_text_size = { workspace = true }
+ruff_source_file = { workspace = true }
 
 anyhow = { workspace = true }
 log = { workspace = true }

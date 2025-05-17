@@ -126,16 +126,18 @@ pub(crate) fn blocking_process_invocation(checker: &Checker, call: &ast::ExprCal
 
     let range = call.func.range();
     let diagnostic = match qualified_name.segments() {
-        ["subprocess", "Popen"] | ["os", "popen"] => {
-            Diagnostic::new(CreateSubprocessInAsyncFunction, range)
-        }
+        ["subprocess", "Popen"] | ["os", "popen"] => Diagnostic::new(
+            CreateSubprocessInAsyncFunction,
+            range,
+            checker.source_file(),
+        ),
         ["os", "system" | "posix_spawn" | "posix_spawnp"]
         | [
             "subprocess",
             "run" | "call" | "check_call" | "check_output" | "getoutput" | "getstatusoutput",
-        ] => Diagnostic::new(RunProcessInAsyncFunction, range),
+        ] => Diagnostic::new(RunProcessInAsyncFunction, range, checker.source_file()),
         ["os", "wait" | "wait3" | "wait4" | "waitid" | "waitpid"] => {
-            Diagnostic::new(WaitForProcessInAsyncFunction, range)
+            Diagnostic::new(WaitForProcessInAsyncFunction, range, checker.source_file())
         }
         [
             "os",
@@ -143,9 +145,13 @@ pub(crate) fn blocking_process_invocation(checker: &Checker, call: &ast::ExprCal
             | "spawnvpe",
         ] => {
             if is_p_wait(call, checker.semantic()) {
-                Diagnostic::new(RunProcessInAsyncFunction, range)
+                Diagnostic::new(RunProcessInAsyncFunction, range, checker.source_file())
             } else {
-                Diagnostic::new(CreateSubprocessInAsyncFunction, range)
+                Diagnostic::new(
+                    CreateSubprocessInAsyncFunction,
+                    range,
+                    checker.source_file(),
+                )
             }
         }
         _ => return,

@@ -90,6 +90,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &Checker, decorator_list: &[D
                 let mut diagnostic = Diagnostic::new(
                     LRUCacheWithMaxsizeNone,
                     TextRange::new(func.end(), decorator.end()),
+                    checker.source_file(),
                 );
                 diagnostic.try_set_fix(|| {
                     let (import_edit, binding) = checker.importer().get_or_import_symbol(

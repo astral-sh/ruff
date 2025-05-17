@@ -97,6 +97,7 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
                     is_slice: false,
                 },
                 index.range(),
+                checker.source_file(),
             ));
         }
     } else if let Expr::Slice(ExprSlice {
@@ -120,6 +121,7 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
                             is_slice: true,
                         },
                         is_slice.range(),
+                        checker.source_file(),
                     ));
                 }
             } else if let Some(is_slice_type) = CheckableExprType::try_from(is_slice.as_ref()) {
@@ -130,6 +132,7 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
                         is_slice: true,
                     },
                     is_slice.range(),
+                    checker.source_file(),
                 ));
             }
         }
@@ -142,6 +145,7 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
                 is_slice: false,
             },
             index.range(),
+            checker.source_file(),
         ));
     }
 }

@@ -61,7 +61,7 @@ pub(crate) fn slice_copy(checker: &Checker, subscript: &ast::ExprSubscript) {
     let Some(name) = match_list_full_slice(subscript, checker.semantic()) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(SliceCopy, subscript.range());
+    let mut diagnostic = Diagnostic::new(SliceCopy, subscript.range(), checker.source_file());
     let replacement = generate_method_call(name.clone(), "copy", checker.generator());
     diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
         replacement,

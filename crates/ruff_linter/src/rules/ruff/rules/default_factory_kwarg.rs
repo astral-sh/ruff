@@ -105,6 +105,7 @@ pub(crate) fn default_factory_kwarg(checker: &Checker, call: &ast::ExprCall) {
             default_factory: SourceCodeSnippet::from_str(checker.locator().slice(keyword)),
         },
         call.range(),
+        checker.source_file(),
     );
     diagnostic.try_set_fix(|| convert_to_positional(call, keyword, checker.locator()));
     checker.report_diagnostic(diagnostic);

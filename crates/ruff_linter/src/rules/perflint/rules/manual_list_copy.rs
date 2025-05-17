@@ -119,5 +119,9 @@ pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &ast::StmtFor) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(ManualListCopy, *range));
+    checker.report_diagnostic(Diagnostic::new(
+        ManualListCopy,
+        *range,
+        checker.source_file(),
+    ));
 }

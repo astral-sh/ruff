@@ -142,6 +142,7 @@ pub(crate) fn builtin_attribute_shadowing(
                         row: checker.compute_source_row(binding.start()),
                     },
                     reference.range(),
+                    checker.source_file(),
                 ));
             }
         }

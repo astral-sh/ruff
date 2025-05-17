@@ -151,12 +151,20 @@ pub(crate) fn non_pep604_annotation(
             let (rule, mut diagnostic) = if is_defer_optional_to_up045_enabled(checker.settings) {
                 (
                     Rule::NonPEP604AnnotationOptional,
-                    Diagnostic::new(NonPEP604AnnotationOptional, expr.range()),
+                    Diagnostic::new(
+                        NonPEP604AnnotationOptional,
+                        expr.range(),
+                        checker.source_file(),
+                    ),
                 )
             } else {
                 (
                     Rule::NonPEP604AnnotationUnion,
-                    Diagnostic::new(NonPEP604AnnotationUnion, expr.range()),
+                    Diagnostic::new(
+                        NonPEP604AnnotationUnion,
+                        expr.range(),
+                        checker.source_file(),
+                    ),
                 )
             };
 
@@ -191,7 +199,11 @@ pub(crate) fn non_pep604_annotation(
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(NonPEP604AnnotationUnion, expr.range());
+            let mut diagnostic = Diagnostic::new(
+                NonPEP604AnnotationUnion,
+                expr.range(),
+                checker.source_file(),
+            );
             if fixable {
                 match slice {
                     Expr::Slice(_) => {

@@ -86,6 +86,7 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
             to: replacement.to_string(),
         },
         expr.range(),
+        checker.source_file(),
     );
     if !checker.semantic().in_complex_string_type_definition() {
         match replacement {

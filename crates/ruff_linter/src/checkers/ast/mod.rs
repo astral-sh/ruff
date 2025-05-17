@@ -57,7 +57,7 @@ use ruff_python_semantic::{
 };
 use ruff_python_stdlib::builtins::{MAGIC_GLOBALS, python_builtins};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{OneIndexed, SourceRow};
+use ruff_source_file::{OneIndexed, SourceFile, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::annotation::AnnotationContext;
@@ -238,6 +238,7 @@ pub(crate) struct Checker<'a> {
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
+    source_file: SourceFile,
 }
 
 impl<'a> Checker<'a> {
@@ -258,6 +259,7 @@ impl<'a> Checker<'a> {
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
         target_version: TargetVersion,
+        source_file: SourceFile,
     ) -> Checker<'a> {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
@@ -287,6 +289,7 @@ impl<'a> Checker<'a> {
             target_version,
             semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
+            source_file,
         }
     }
 }
@@ -567,6 +570,10 @@ impl<'a> Checker<'a> {
             member,
         })
     }
+
+    pub(crate) fn source_file(&self) -> SourceFile {
+        self.source_file.clone()
+    }
 }
 
 pub(crate) struct TypingImporter<'a, 'b> {
@@ -604,7 +611,11 @@ impl SemanticSyntaxContext for Checker<'_> {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
                 if self.settings.rules.enabled(Rule::LateFutureImport) {
-                    self.report_diagnostic(Diagnostic::new(LateFutureImport, error.range));
+                    self.report_diagnostic(Diagnostic::new(
+                        LateFutureImport,
+                        error.range,
+                        self.source_file(),
+                    ));
                 }
             }
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start } => {
@@ -619,6 +630,7 @@ impl SemanticSyntaxContext for Checker<'_> {
                             row: self.compute_source_row(start),
                         },
                         error.range,
+                        self.source_file(),
                     ));
                 }
             }
@@ -627,17 +639,26 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(Diagnostic::new(
                         YieldOutsideFunction::new(kind),
                         error.range,
+                        self.source_file(),
                     ));
                 }
             }
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {
                 if self.settings.rules.enabled(Rule::ReturnOutsideFunction) {
-                    self.report_diagnostic(Diagnostic::new(ReturnOutsideFunction, error.range));
+                    self.report_diagnostic(Diagnostic::new(
+                        ReturnOutsideFunction,
+                        error.range,
+                        self.source_file(),
+                    ));
                 }
             }
             SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(_) => {
                 if self.settings.rules.enabled(Rule::AwaitOutsideAsync) {
-                    self.report_diagnostic(Diagnostic::new(AwaitOutsideAsync, error.range));
+                    self.report_diagnostic(Diagnostic::new(
+                        AwaitOutsideAsync,
+                        error.range,
+                        self.source_file(),
+                    ));
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
@@ -2720,6 +2741,7 @@ impl<'a> Checker<'a> {
                                     parse_error: parse_error.error.to_string(),
                                 },
                                 string_expr.range(),
+                                self.source_file(),
                             ));
                         }
                     }
@@ -2861,12 +2883,14 @@ impl<'a> Checker<'a> {
                 } else {
                     if self.semantic.global_scope().uses_star_imports() {
                         if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
+                            let source_file = self.source_file();
                             self.diagnostics.get_mut().push(
                                 Diagnostic::new(
                                     pyflakes::rules::UndefinedLocalWithImportStarUsage {
                                         name: name.to_string(),
                                     },
                                     range,
+                                    source_file,
                                 )
                                 .with_parent(definition.start()),
                             );
@@ -2876,12 +2900,14 @@ impl<'a> Checker<'a> {
                             if is_undefined_export_in_dunder_init_enabled(self.settings)
                                 || !self.path.ends_with("__init__.py")
                             {
+                                let source_file = self.source_file();
                                 self.diagnostics.get_mut().push(
                                     Diagnostic::new(
                                         pyflakes::rules::UndefinedExport {
                                             name: name.to_string(),
                                         },
                                         range,
+                                        source_file,
                                     )
                                     .with_parent(definition.start()),
                                 );
@@ -2945,6 +2971,7 @@ pub(crate) fn check_ast(
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
     target_version: TargetVersion,
+    source_file: SourceFile,
 ) -> (Vec<Diagnostic>, Vec<SemanticSyntaxError>) {
     let module_path = package
         .map(PackageRoot::path)
@@ -2985,6 +3012,7 @@ pub(crate) fn check_ast(
         cell_offsets,
         notebook_index,
         target_version,
+        source_file,
     );
     checker.bind_builtins();
 

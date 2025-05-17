@@ -115,7 +115,11 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
     // "in" might also make sense but we don't currently have one.
     if !matches!(op, CmpOp::Eq | CmpOp::NotEq) {
         if checker.enabled(Rule::UnrecognizedPlatformCheck) {
-            checker.report_diagnostic(Diagnostic::new(UnrecognizedPlatformCheck, test.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                UnrecognizedPlatformCheck,
+                test.range(),
+                checker.source_file(),
+            ));
         }
         return;
     }
@@ -130,12 +134,17 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
                         platform: value.to_string(),
                     },
                     right.range(),
+                    checker.source_file(),
                 ));
             }
         }
     } else {
         if checker.enabled(Rule::UnrecognizedPlatformCheck) {
-            checker.report_diagnostic(Diagnostic::new(UnrecognizedPlatformCheck, test.range()));
+            checker.report_diagnostic(Diagnostic::new(
+                UnrecognizedPlatformCheck,
+                test.range(),
+                checker.source_file(),
+            ));
         }
     }
 }

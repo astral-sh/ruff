@@ -561,7 +561,7 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
 }
 
 fn check_and_push_diagnostic<T: Violation>(checker: &Checker, diagnostic: T, range: TextRange) {
-    let diagnostic = Diagnostic::new(diagnostic, range);
+    let diagnostic = Diagnostic::new(diagnostic, range, checker.source_file());
     if checker.enabled(diagnostic.rule()) {
         checker.report_diagnostic(diagnostic);
     }

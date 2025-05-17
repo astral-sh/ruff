@@ -87,6 +87,7 @@ pub(crate) fn future_rewritable_type_annotation(checker: &Checker, expr: &Expr) 
         checker.report_diagnostic(Diagnostic::new(
             FutureRewritableTypeAnnotation { name },
             expr.range(),
+            checker.source_file(),
         ));
     }
 }

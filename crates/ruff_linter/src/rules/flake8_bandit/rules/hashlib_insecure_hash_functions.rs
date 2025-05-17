@@ -147,6 +147,7 @@ fn detect_insecure_hashlib_calls(
                         string: hash_func_name.to_string(),
                     },
                     name_arg.range(),
+                    checker.source_file(),
                 ));
             }
         }
@@ -157,6 +158,7 @@ fn detect_insecure_hashlib_calls(
                     string: (*func_name).to_string(),
                 },
                 call.func.range(),
+                checker.source_file(),
             ));
         }
     }
@@ -192,6 +194,7 @@ fn detect_insecure_crypt_calls(checker: &Checker, call: &ast::ExprCall) {
                 string: qualified_name.to_string(),
             },
             method.range(),
+            checker.source_file(),
         ));
     }
 }

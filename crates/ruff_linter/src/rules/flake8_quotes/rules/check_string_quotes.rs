@@ -266,6 +266,7 @@ fn docstring(checker: &Checker, range: TextRange) {
                 preferred_quote: quotes_settings.docstring_quotes,
             },
             range,
+            checker.source_file(),
         ));
         return;
     }
@@ -282,6 +283,7 @@ fn docstring(checker: &Checker, range: TextRange) {
             preferred_quote: quotes_settings.docstring_quotes,
         },
         range,
+        checker.source_file(),
     );
     let quote_count = if trivia.is_multiline { 3 } else { 1 };
     let string_contents = &trivia.raw_text[quote_count..trivia.raw_text.len() - quote_count];
@@ -358,6 +360,7 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
                     preferred_quote: quotes_settings.multiline_quotes,
                 },
                 *range,
+                checker.source_file(),
             );
 
             let string_contents = &trivia.raw_text[3..trivia.raw_text.len() - 3];
@@ -396,6 +399,7 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
                         preferred_quote: quotes_settings.inline_quotes,
                     },
                     *range,
+                    checker.source_file(),
                 ));
                 continue;
             }
@@ -411,6 +415,7 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
                         preferred_quote: quotes_settings.inline_quotes,
                     },
                     *range,
+                    checker.source_file(),
                 ));
                 continue;
             }
@@ -420,6 +425,7 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
                     preferred_quote: quotes_settings.inline_quotes,
                 },
                 *range,
+                checker.source_file(),
             );
             let quote = quotes_settings.inline_quotes.as_char();
             let string_contents = &trivia.raw_text[1..trivia.raw_text.len() - 1];

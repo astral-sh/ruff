@@ -229,12 +229,20 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
             if checker.enabled(Rule::NoneComparison) && comparator.is_none_literal_expr() {
                 match op {
                     EqCmpOp::Eq => {
-                        let diagnostic = Diagnostic::new(NoneComparison(op), comparator.range());
+                        let diagnostic = Diagnostic::new(
+                            NoneComparison(op),
+                            comparator.range(),
+                            checker.source_file(),
+                        );
                         bad_ops.insert(0, CmpOp::Is);
                         diagnostics.push(diagnostic);
                     }
                     EqCmpOp::NotEq => {
-                        let diagnostic = Diagnostic::new(NoneComparison(op), comparator.range());
+                        let diagnostic = Diagnostic::new(
+                            NoneComparison(op),
+                            comparator.range(),
+                            checker.source_file(),
+                        );
                         bad_ops.insert(0, CmpOp::IsNot);
                         diagnostics.push(diagnostic);
                     }
@@ -257,6 +265,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                                     cond,
                                 },
                                 compare.range(),
+                                checker.source_file(),
                             );
                             bad_ops.insert(0, CmpOp::Is);
                             diagnostics.push(diagnostic);
@@ -274,6 +283,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                                     cond,
                                 },
                                 compare.range(),
+                                checker.source_file(),
                             );
                             bad_ops.insert(0, CmpOp::IsNot);
                             diagnostics.push(diagnostic);
@@ -295,12 +305,20 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
             if checker.enabled(Rule::NoneComparison) && next.is_none_literal_expr() {
                 match op {
                     EqCmpOp::Eq => {
-                        let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
+                        let diagnostic = Diagnostic::new(
+                            NoneComparison(op),
+                            next.range(),
+                            checker.source_file(),
+                        );
                         bad_ops.insert(index, CmpOp::Is);
                         diagnostics.push(diagnostic);
                     }
                     EqCmpOp::NotEq => {
-                        let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
+                        let diagnostic = Diagnostic::new(
+                            NoneComparison(op),
+                            next.range(),
+                            checker.source_file(),
+                        );
                         bad_ops.insert(index, CmpOp::IsNot);
                         diagnostics.push(diagnostic);
                     }
@@ -335,6 +353,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                                     cond,
                                 },
                                 compare.range(),
+                                checker.source_file(),
                             );
                             bad_ops.insert(index, CmpOp::Is);
                             diagnostics.push(diagnostic);
@@ -354,6 +373,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                                     cond,
                                 },
                                 compare.range(),
+                                checker.source_file(),
                             );
                             bad_ops.insert(index, CmpOp::IsNot);
                             diagnostics.push(diagnostic);

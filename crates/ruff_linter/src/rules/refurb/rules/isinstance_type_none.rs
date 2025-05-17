@@ -69,7 +69,7 @@ pub(crate) fn isinstance_type_none(checker: &Checker, call: &ast::ExprCall) {
     }
 
     let fix = replace_with_identity_check(expr, call.range, false, checker);
-    let diagnostic = Diagnostic::new(IsinstanceTypeNone, call.range);
+    let diagnostic = Diagnostic::new(IsinstanceTypeNone, call.range, checker.source_file());
 
     checker.report_diagnostic(diagnostic.with_fix(fix));
 }

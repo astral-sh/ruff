@@ -112,6 +112,7 @@ pub(crate) fn blind_except(
             name: builtin_exception_type.to_string(),
         },
         type_.range(),
+        checker.source_file(),
     ));
 }
 

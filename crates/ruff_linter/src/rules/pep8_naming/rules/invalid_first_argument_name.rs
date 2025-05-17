@@ -167,17 +167,25 @@ enum FunctionType {
 }
 
 impl FunctionType {
-    fn diagnostic_kind(self, argument_name: String, range: TextRange) -> Diagnostic {
+    fn diagnostic_kind(
+        self,
+        checker: &Checker,
+        argument_name: String,
+        range: TextRange,
+    ) -> Diagnostic {
         match self {
-            Self::Method => {
-                Diagnostic::new(InvalidFirstArgumentNameForMethod { argument_name }, range)
-            }
+            Self::Method => Diagnostic::new(
+                InvalidFirstArgumentNameForMethod { argument_name },
+                range,
+                checker.source_file(),
+            ),
             Self::ClassMethod => Diagnostic::new(
                 InvalidFirstArgumentNameForClassMethod {
                     argument_name,
                     is_new: false,
                 },
                 range,
+                checker.source_file(),
             ),
         }
     }
@@ -267,7 +275,7 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
     }
 
     let mut diagnostic =
-        function_type.diagnostic_kind(self_or_cls.name.to_string(), self_or_cls.range());
+        function_type.diagnostic_kind(checker, self_or_cls.name.to_string(), self_or_cls.range());
     diagnostic.try_set_optional_fix(|| {
         rename_parameter(
             scope,

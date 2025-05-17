@@ -82,6 +82,7 @@ pub(crate) fn write_whole_file(checker: &Checker, with: &ast::StmtWith) {
                     suggestion: make_suggestion(open, content, checker.generator()),
                 },
                 open.item.range(),
+                checker.source_file(),
             )
         })
         .collect();

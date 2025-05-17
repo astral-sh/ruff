@@ -66,6 +66,7 @@ pub(crate) fn duplicate_value(checker: &Checker, set: &ast::ExprSet) {
                         existing: checker.generator().expr(existing),
                     },
                     value.range(),
+                    checker.source_file(),
                 );
 
                 diagnostic.try_set_fix(|| {

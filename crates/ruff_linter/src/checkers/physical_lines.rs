@@ -3,7 +3,7 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_source_file::UniversalNewlines;
+use ruff_source_file::{SourceFile, UniversalNewlines};
 use ruff_text_size::TextSize;
 
 use crate::Locator;
@@ -23,6 +23,7 @@ pub(crate) fn check_physical_lines(
     indexer: &Indexer,
     doc_lines: &[TextSize],
     settings: &LinterSettings,
+    source_file: SourceFile,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
@@ -45,49 +46,58 @@ pub(crate) fn check_physical_lines(
             .is_some()
         {
             if enforce_doc_line_too_long {
-                if let Some(diagnostic) = doc_line_too_long(&line, comment_ranges, settings) {
+                if let Some(diagnostic) =
+                    doc_line_too_long(&line, comment_ranges, settings, source_file.clone())
+                {
                     diagnostics.push(diagnostic);
                 }
             }
         }
 
         if enforce_mixed_spaces_and_tabs {
-            if let Some(diagnostic) = mixed_spaces_and_tabs(&line) {
+            if let Some(diagnostic) = mixed_spaces_and_tabs(&line, source_file.clone()) {
                 diagnostics.push(diagnostic);
             }
         }
 
         if enforce_line_too_long {
-            if let Some(diagnostic) = line_too_long(&line, comment_ranges, settings) {
+            if let Some(diagnostic) =
+                line_too_long(&line, comment_ranges, settings, source_file.clone())
+            {
                 diagnostics.push(diagnostic);
             }
         }
 
         if enforce_bidirectional_unicode {
-            diagnostics.extend(pylint::rules::bidirectional_unicode(&line));
+            diagnostics.extend(pylint::rules::bidirectional_unicode(
+                &line,
+                source_file.clone(),
+            ));
         }
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
-            if let Some(diagnostic) = trailing_whitespace(&line, locator, indexer, settings) {
+            if let Some(diagnostic) =
+                trailing_whitespace(&line, locator, indexer, settings, source_file.clone())
+            {
                 diagnostics.push(diagnostic);
             }
         }
 
         if settings.rules.enabled(Rule::IndentedFormFeed) {
-            if let Some(diagnostic) = indented_form_feed(&line) {
+            if let Some(diagnostic) = indented_form_feed(&line, source_file.clone()) {
                 diagnostics.push(diagnostic);
             }
         }
     }
 
     if enforce_no_newline_at_end_of_file {
-        if let Some(diagnostic) = no_newline_at_end_of_file(locator, stylist) {
+        if let Some(diagnostic) = no_newline_at_end_of_file(locator, stylist, source_file.clone()) {
             diagnostics.push(diagnostic);
         }
     }
 
     if enforce_copyright_notice {
-        if let Some(diagnostic) = missing_copyright_notice(locator, settings) {
+        if let Some(diagnostic) = missing_copyright_notice(locator, settings, source_file) {
             diagnostics.push(diagnostic);
         }
     }
@@ -100,6 +110,7 @@ mod tests {
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_parser::parse_module;
+    use ruff_source_file::SourceFileBuilder;
 
     use crate::Locator;
     use crate::line_width::LineLength;
@@ -117,6 +128,8 @@ mod tests {
         let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
         let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
 
+        let file = SourceFileBuilder::new("<filename>", line).finish();
+
         let check_with_max_line_length = |line_length: LineLength| {
             check_physical_lines(
                 &locator,
@@ -130,6 +143,7 @@ mod tests {
                     },
                     ..LinterSettings::for_rule(Rule::LineTooLong)
                 },
+                file.clone(),
             )
         };
         let line_length = LineLength::try_from(8).unwrap();

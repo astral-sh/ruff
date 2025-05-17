@@ -56,6 +56,6 @@ pub(crate) fn name_or_attribute(checker: &Checker, expr: &Expr) {
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["six", "PY3"]))
     {
-        checker.report_diagnostic(Diagnostic::new(SixPY3, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(SixPY3, expr.range(), checker.source_file()));
     }
 }

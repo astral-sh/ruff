@@ -211,7 +211,11 @@ pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
         None
     };
 
-    let diagnostic = Diagnostic::new(BadStrStripCall { strip, removal }, arg.range());
+    let diagnostic = Diagnostic::new(
+        BadStrStripCall { strip, removal },
+        arg.range(),
+        checker.source_file(),
+    );
 
     checker.report_diagnostic(diagnostic);
 }

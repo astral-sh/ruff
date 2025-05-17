@@ -90,6 +90,7 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
         let mut diagnostic = Diagnostic::new(
             IfWithSameArms,
             TextRange::new(current_branch.start(), following_branch.end()),
+            checker.source_file(),
         );
 
         diagnostic.try_set_fix(|| {

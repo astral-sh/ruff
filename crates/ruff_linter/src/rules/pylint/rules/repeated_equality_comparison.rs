@@ -151,6 +151,7 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                     all_hashable,
                 },
                 bool_op.range(),
+                checker.source_file(),
             );
 
             // Grab the remaining comparisons.

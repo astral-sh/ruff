@@ -76,6 +76,7 @@ fn atom_diagnostic(checker: &Checker, target: &Expr) {
             name: UnqualifiedName::from_expr(target).map(|name| name.to_string()),
         },
         target.range(),
+        checker.source_file(),
     );
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
@@ -93,7 +94,11 @@ fn atom_diagnostic(checker: &Checker, target: &Expr) {
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
 fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
-    let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, tuple.range());
+    let mut diagnostic = Diagnostic::new(
+        OSErrorAlias { name: None },
+        tuple.range(),
+        checker.source_file(),
+    );
     let semantic = checker.semantic();
     if semantic.has_builtin_binding("OSError") {
         // Filter out any `OSErrors` aliases.

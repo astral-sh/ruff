@@ -53,6 +53,7 @@ pub(crate) fn ambiguous_variable_name(checker: &Checker, name: &str, range: Text
         checker.report_diagnostic(Diagnostic::new(
             AmbiguousVariableName(name.to_string()),
             range,
+            checker.source_file(),
         ));
     }
 }

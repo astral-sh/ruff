@@ -95,6 +95,7 @@ pub(crate) fn list_assign_reversed(checker: &Checker, assign: &StmtAssign) {
                 name: target_expr.id.to_string(),
             },
             assign.range(),
+            checker.source_file(),
         )
         .with_fix(Fix::unsafe_edit(Edit::range_replacement(
             format!("{}.reverse()", target_expr.id),

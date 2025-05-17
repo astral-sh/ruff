@@ -51,7 +51,11 @@ pub(crate) fn in_empty_collection(checker: &Checker, compare: &ast::ExprCompare)
     let semantic = checker.semantic();
 
     if is_empty(right, semantic) {
-        checker.report_diagnostic(Diagnostic::new(InEmptyCollection, compare.range()));
+        checker.report_diagnostic(Diagnostic::new(
+            InEmptyCollection,
+            compare.range(),
+            checker.source_file(),
+        ));
     }
 }
 

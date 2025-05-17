@@ -76,7 +76,11 @@ pub(crate) fn unaliased_collections_abc_set_import(
         return None;
     }
 
-    let mut diagnostic = Diagnostic::new(UnaliasedCollectionsAbcSetImport, binding.range());
+    let mut diagnostic = Diagnostic::new(
+        UnaliasedCollectionsAbcSetImport,
+        binding.range(),
+        checker.source_file(),
+    );
     if checker.semantic().is_available("AbstractSet") {
         diagnostic.try_set_fix(|| {
             let semantic = checker.semantic();

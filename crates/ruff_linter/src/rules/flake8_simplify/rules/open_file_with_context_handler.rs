@@ -268,5 +268,6 @@ pub(crate) fn open_file_with_context_handler(checker: &Checker, call: &ast::Expr
     checker.report_diagnostic(Diagnostic::new(
         OpenFileWithContextHandler,
         call.func.range(),
+        checker.source_file(),
     ));
 }

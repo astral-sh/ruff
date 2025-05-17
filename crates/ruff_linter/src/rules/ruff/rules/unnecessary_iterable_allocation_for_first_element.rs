@@ -120,6 +120,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(checker: &Checke
             iterable: SourceCodeSnippet::new(iterable.to_string()),
         },
         expr.range(),
+        checker.source_file(),
     );
 
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
