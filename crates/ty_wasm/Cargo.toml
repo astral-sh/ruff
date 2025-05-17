@@ -40,6 +40,8 @@ log = { workspace = true }
 # See https://docs.rs/getrandom/latest/getrandom/#webassembly-support
 getrandom = { workspace = true, features = ["wasm_js"] }
 serde-wasm-bindgen = { workspace = true }
+# Not a direct dependency but required to compile for Wasm.
+uuid = { workspace = true, features = ["js"] }
 
 wasm-bindgen = { workspace = true }
 
