@@ -1426,7 +1426,7 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
 fn cli_config_args_overrides_knot_toml() -> anyhow::Result<()> {
     let case = TestCase::with_files(vec![
         (
-            "knot.toml",
+            "ty.toml",
             r#"
             [terminal]
             error-on-warning = true

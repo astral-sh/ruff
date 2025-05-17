@@ -27,6 +27,9 @@ pub struct ProjectMetadata {
     /// The raw options
     pub(super) options: Options,
 
+    /// Config file to override any discovered configuration
+    pub(super) config_file_override: Option<SystemPathBuf>,
+
     /// Paths of configurations other than the project's configuration that were combined into [`Self::options`].
     ///
     /// This field stores the paths of the configuration files, mainly for
@@ -45,7 +48,33 @@ impl ProjectMetadata {
             root,
             extra_configuration_paths: Vec::default(),
             options: Options::default(),
+            config_file_override: None,
         }
+    }
+
+    pub fn from_config_file(
+        path: SystemPathBuf,
+        root: SystemPathBuf,
+        system: &dyn System,
+    ) -> Result<Self, ProjectMetadataError> {
+        tracing::debug!("Using overridden configuration file at '{path}'");
+
+        let config_file = ConfigurationFile::from_path(path.clone(), system).map_err(|error| {
+            ProjectMetadataError::ConfigurationFileError {
+                source: Box::new(error),
+                path: path.clone(),
+            }
+        })?;
+
+        let options = config_file.into_options();
+
+        Ok(Self {
+            name: Name::new(root.file_name().unwrap_or("root")),
+            root,
+            options,
+            extra_configuration_paths: Vec::new(),
+            config_file_override: Some(path),
+        })
     }
 
     /// Loads a project from a `pyproject.toml` file.
@@ -92,6 +121,7 @@ impl ProjectMetadata {
             root,
             options,
             extra_configuration_paths: Vec::new(),
+            config_file_override: None,
         })
     }
 
@@ -106,11 +136,11 @@ impl ProjectMetadata {
     pub fn discover(
         path: &SystemPath,
         system: &dyn System,
-    ) -> Result<ProjectMetadata, ProjectDiscoveryError> {
+    ) -> Result<ProjectMetadata, ProjectMetadataError> {
         tracing::debug!("Searching for a project in '{path}'");
 
         if !system.is_directory(path) {
-            return Err(ProjectDiscoveryError::NotADirectory(path.to_path_buf()));
+            return Err(ProjectMetadataError::NotADirectory(path.to_path_buf()));
         }
 
         let mut closest_project: Option<ProjectMetadata> = None;
@@ -125,7 +155,7 @@ impl ProjectMetadata {
                 ) {
                     Ok(pyproject) => Some(pyproject),
                     Err(error) => {
-                        return Err(ProjectDiscoveryError::InvalidPyProject {
+                        return Err(ProjectMetadataError::InvalidPyProject {
                             path: pyproject_path,
                             source: Box::new(error),
                         });
@@ -144,7 +174,7 @@ impl ProjectMetadata {
                 ) {
                     Ok(options) => options,
                     Err(error) => {
-                        return Err(ProjectDiscoveryError::InvalidTyToml {
+                        return Err(ProjectMetadataError::InvalidTyToml {
                             path: ty_toml_path,
                             source: Box::new(error),
                         });
@@ -171,7 +201,7 @@ impl ProjectMetadata {
                         .and_then(|pyproject| pyproject.project.as_ref()),
                 )
                 .map_err(|err| {
-                    ProjectDiscoveryError::InvalidRequiresPythonConstraint {
+                    ProjectMetadataError::InvalidRequiresPythonConstraint {
                         source: err,
                         path: pyproject_path,
                     }
@@ -185,7 +215,7 @@ impl ProjectMetadata {
                 let metadata =
                     ProjectMetadata::from_pyproject(pyproject, project_root.to_path_buf())
                         .map_err(
-                            |err| ProjectDiscoveryError::InvalidRequiresPythonConstraint {
+                            |err| ProjectMetadataError::InvalidRequiresPythonConstraint {
                                 source: err,
                                 path: pyproject_path,
                             },
@@ -281,7 +311,7 @@ impl ProjectMetadata {
 }
 
 #[derive(Debug, Error)]
-pub enum ProjectDiscoveryError {
+pub enum ProjectMetadataError {
     #[error("project path '{0}' is not a directory")]
     NotADirectory(SystemPathBuf),
 
@@ -302,6 +332,12 @@ pub enum ProjectDiscoveryError {
         source: ResolveRequiresPythonError,
         path: SystemPathBuf,
     },
+
+    #[error("Error loading configuration file at {path}: {source}")]
+    ConfigurationFileError {
+        source: Box<ConfigurationFileError>,
+        path: SystemPathBuf,
+    },
 }
 
 #[cfg(test)]
@@ -313,7 +349,7 @@ mod tests {
     use ruff_db::system::{SystemPathBuf, TestSystem};
     use ruff_python_ast::PythonVersion;
 
-    use crate::{ProjectDiscoveryError, ProjectMetadata};
+    use crate::{ProjectMetadata, ProjectMetadataError};
 
     #[test]
     fn project_without_pyproject() -> anyhow::Result<()> {
@@ -336,6 +372,7 @@ mod tests {
                   name: Name("app"),
                   root: "/app",
                   options: Options(),
+                  config_file_override: None,
                 )
             "#);
         });
@@ -374,6 +411,7 @@ mod tests {
                   name: Name("backend"),
                   root: "/app",
                   options: Options(),
+                  config_file_override: None,
                 )
             "#);
         });
@@ -471,6 +509,7 @@ expected `.`, `]`
                   root: Some("src"),
                 )),
               ),
+              config_file_override: None,
             )
             "#);
         });
@@ -521,6 +560,7 @@ expected `.`, `]`
                                     root: Some("src"),
                                   )),
                                 ),
+                                config_file_override: None,
                               )
                               "#);
         });
@@ -561,6 +601,7 @@ expected `.`, `]`
               name: Name("nested-project"),
               root: "/app/packages/a",
               options: Options(),
+              config_file_override: None,
             )
             "#);
         });
@@ -608,6 +649,7 @@ expected `.`, `]`
                   r#python-version: Some("3.10"),
                 )),
               ),
+              config_file_override: None,
             )
             "#);
         });
@@ -663,6 +705,7 @@ expected `.`, `]`
                   root: Some("src"),
                 )),
               ),
+              config_file_override: None,
             )
             "#);
         });
@@ -948,7 +991,7 @@ expected `.`, `]`
     }
 
     #[track_caller]
-    fn assert_error_eq(error: &ProjectDiscoveryError, message: &str) {
+    fn assert_error_eq(error: &ProjectMetadataError, message: &str) {
         assert_eq!(error.to_string().replace('\\', "/"), message);
     }
 

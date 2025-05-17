@@ -1,5 +1,5 @@
 use crate::db::{Db, ProjectDatabase};
-use crate::metadata::options::Options;
+use crate::metadata::options::MetaOptions;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
 use crate::{Project, ProjectMetadata};
 use std::collections::BTreeSet;
@@ -12,10 +12,13 @@ use rustc_hash::FxHashSet;
 use ty_python_semantic::Program;
 
 impl ProjectDatabase {
-    #[tracing::instrument(level = "debug", skip(self, changes, cli_options))]
-    pub fn apply_changes(&mut self, changes: Vec<ChangeEvent>, cli_options: Option<&Options>) {
+    #[tracing::instrument(level = "debug", skip(self, changes, meta_options))]
+    pub fn apply_changes(&mut self, changes: Vec<ChangeEvent>, meta_options: Option<&MetaOptions>) {
         let mut project = self.project();
         let project_root = project.root(self).to_path_buf();
+        let config_file_override =
+            meta_options.and_then(|options| options.config_file_override.clone());
+        let cli_options = meta_options.map(|options| options.cli_options.clone());
         let program = Program::get(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
@@ -42,6 +45,14 @@ impl ProjectDatabase {
             tracing::trace!("Handle change: {:?}", change);
 
             if let Some(path) = change.system_path() {
+                if let Some(config_file) = &config_file_override {
+                    if path.eq(config_file.as_path()) {
+                        project_changed = true;
+
+                        continue;
+                    }
+                }
+
                 if matches!(
                     path.file_name(),
                     Some(".gitignore" | ".ignore" | "ty.toml" | "pyproject.toml")
@@ -170,10 +181,16 @@ impl ProjectDatabase {
         }
 
         if project_changed {
-            match ProjectMetadata::discover(&project_root, self.system()) {
+            let new_project_metadata = match config_file_override {
+                Some(config_file) => {
+                    ProjectMetadata::from_config_file(config_file, project_root, self.system())
+                }
+                None => ProjectMetadata::discover(&project_root, self.system()),
+            };
+            match new_project_metadata {
                 Ok(mut metadata) => {
                     if let Some(cli_options) = cli_options {
-                        metadata.apply_cli_options(cli_options.clone());
+                        metadata.apply_cli_options(cli_options);
                     }
 
                     if let Err(error) = metadata.apply_configuration_files(self.system()) {

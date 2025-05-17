@@ -75,6 +75,13 @@ impl ProjectWatcher {
             .iter()
             .map(SystemPathBuf::as_path);
 
+        let config_file_override = db
+            .project()
+            .metadata(db)
+            .config_file_override
+            .iter()
+            .map(SystemPathBuf::as_path);
+
         // Watch both the project root and any paths provided by the user on the CLI (removing any redundant nested paths).
         // This is necessary to observe changes to files that are outside the project root.
         // We always need to watch the project root to observe changes to its configuration.
@@ -98,6 +105,7 @@ impl ProjectWatcher {
         // Now add the new paths, first starting with the project path and then
         // adding the library search paths, and finally the paths for configurations.
         for path in included_paths
+            .chain(config_file_override)
             .chain(unique_module_paths)
             .chain(config_paths)
         {
