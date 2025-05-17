@@ -1,6 +1,6 @@
 # Configuring Ruff
 
-Ruff can be configured through a `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file.
+Ruff can be configured through a `.ruff.toml`, `ruff.toml`, or `pyproject.toml` file.
 
 Whether you're using Ruff as a linter, formatter, or both, the underlying configuration strategy and
 semantics are the same.
@@ -260,6 +260,8 @@ directory hierarchy is used for every individual file, with all paths in the con
 (e.g., `exclude` globs, `src` paths) being resolved relative to the directory containing that
 config file.
 
+Ruff only considers one config file per dicrectory, in decreasing precedence: `.ruff.toml`, `ruff.toml`, `pyproject.toml`.
+
 There are a few exceptions to these rules:
 
 1. In locating the "closest" `pyproject.toml` file for a given path, Ruff ignores any
@@ -301,11 +303,6 @@ config file, like so:
     # ...but use a different line length.
     line-length = 100
     ```
-
-All of the above rules apply equivalently to `pyproject.toml`, `ruff.toml`, and `.ruff.toml` files.
-If Ruff detects multiple configuration files in the same directory, the `.ruff.toml` file will take
-precedence over the `ruff.toml` file, and the `ruff.toml` file will take precedence over
-the `pyproject.toml` file.
 
 ### Inferring the Python version
 When no discovered configuration specifies a [`target-version`](settings.md#target-version), Ruff will attempt to fall back to the minimum version compatible with the `requires-python` field in a nearby `pyproject.toml`.
