@@ -9,6 +9,24 @@ if 1 in [1]:
 if 1 in {1}:
     print("Single-element set")
 
+if 1 in set([1]):
+    print("Single-element set")
+
+if 1 in set((1,)):
+    print("Single-element set")
+
+if 1 in set({1}):
+    print("Single-element set")
+
+if 1 in frozenset([1]):
+    print("Single-element set")
+
+if 1 in frozenset((1,)):
+    print("Single-element set")
+
+if 1 in frozenset({1}):
+    print("Single-element set")
+
 if "a" in "a":
     print("Single-element string")
 
@@ -17,6 +35,9 @@ if 1 not in (1,):
 
 if not 1 in (1,):
     print("Check the negated membership test")
+
+if 1 in set(set([1])):
+    print('Recursive solution')
 
 # Non-errors.
 
@@ -27,6 +48,24 @@ if 1 in [1, 2]:
     pass
 
 if 1 in {1, 2}:
+    pass
+
+if 1 in set((1, 2)):
+    pass
+
+if 1 in set([1, 2]):
+    pass
+
+if 1 in set({1, 2}):
+    pass
+
+if 1 in frozenset((1, 2)):
+    pass
+
+if 1 in frozenset([1, 2]):
+    pass
+
+if 1 in frozenset({1, 2}):
     pass
 
 if "a" in "ab":
@@ -47,6 +86,14 @@ if "a" == "a":
 if 1 in {*[1]}:
     pass
 
+if 1 in set(1,):
+    pass
+
+if 1 in set(1,2):
+    pass
+
+if 1 in set((x for x in range(2))):
+    pass
 
 # https://github.com/astral-sh/ruff/issues/10063
 _ = a in (
