@@ -922,13 +922,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.is_rule_enabled(Rule::ImportSelf) {
-                pylint::rules::import_from_self(
-                    checker,
-                    level,
-                    module,
-                    names,
-                    checker.module.qualified_name(),
-                );
+                pylint::rules::import_from_self(checker, level, module, names, &checker.module);
             }
             if checker.is_rule_enabled(Rule::BannedImportFrom) {
                 flake8_import_conventions::rules::banned_import_from(
