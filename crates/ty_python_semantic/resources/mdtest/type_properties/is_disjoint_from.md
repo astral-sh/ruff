@@ -439,3 +439,29 @@ static_assert(is_disjoint_from(Callable[[], None], Literal[b""]))
 static_assert(is_disjoint_from(Callable[[], None], Literal[1]))
 static_assert(is_disjoint_from(Callable[[], None], Literal[True]))
 ```
+
+## Bound Super
+
+If both `super` are fully static, they are disjoint when at least one of their parameters differs.
+On the other hand, if either `super` is not fully static, they should never be considered disjoint.
+
+```py
+from ty_extensions import TypeOf, is_disjoint_from, static_assert
+
+def f(x):
+    static_assert(is_disjoint_from(TypeOf[super(int, int())], TypeOf[super(str, str())]))
+    static_assert(is_disjoint_from(TypeOf[super(int, int())], TypeOf[super(int, bool())]))
+    static_assert(not is_disjoint_from(TypeOf[super(int, int)], TypeOf[super(int, int)]))
+    static_assert(
+        not is_disjoint_from(
+            TypeOf[super(int, int())],
+            TypeOf[super(int, int())],
+        )
+    )
+
+    # includes gradual types
+    static_assert(not is_disjoint_from(TypeOf[super(x, x)], TypeOf[super(x, x)]))
+    static_assert(not is_disjoint_from(TypeOf[super(x, int())], TypeOf[super(x, str())]))
+    static_assert(not is_disjoint_from(TypeOf[super(int, x)], TypeOf[super(str, x)]))
+    static_assert(not is_disjoint_from(TypeOf[super(int, x)], TypeOf[super(x, int())]))
+```
