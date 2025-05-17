@@ -4,7 +4,7 @@ use lsp_types::request::DocumentDiagnosticRequest;
 use lsp_types::{
     Diagnostic, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticParams,
     DocumentDiagnosticReport, DocumentDiagnosticReportResult, FullDocumentDiagnosticReport,
-    NumberOrString, Range, RelatedFullDocumentDiagnosticReport, Url,
+    NumberOrString, Range, RelatedFullDocumentDiagnosticReport,
 };
 
 use crate::document::ToRangeExt;
@@ -22,7 +22,7 @@ impl RequestHandler for DocumentDiagnosticRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
-    fn document_url(params: &DocumentDiagnosticParams) -> Cow<Url> {
+    fn document_url(params: &DocumentDiagnosticParams) -> Cow<lsp_types::Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -105,20 +105,23 @@ fn to_lsp_diagnostic(
         })
         .filter(|mapped_tags| !mapped_tags.is_empty());
 
-    let code = Some(NumberOrString::String(diagnostic.id().to_string()));
+    let code_description = diagnostic
+        .id()
+        .is_lint()
+        .then(|| {
+            Some(lsp_types::CodeDescription {
+                href: lsp_types::Url::parse(&format!("https://ty.dev/rules#{}", diagnostic.id()))
+                    .ok()?,
+            })
+        })
+        .flatten();
+
     Diagnostic {
         range,
         severity: Some(severity),
         tags,
-        code: code.clone(),
-        code_description: code.and_then(|_| {
-            Some(lsp_types::CodeDescription {
-                href: lsp_types::Url::parse(
-                    format!("https://ty.dev/rules#{}", diagnostic.id()).as_ref(),
-                )
-                .ok()?,
-            })
-        }),
+        code: Some(NumberOrString::String(diagnostic.id().to_string())),
+        code_description,
         source: Some("ty".into()),
         message: diagnostic.concise_message().to_string(),
         related_information: None,
