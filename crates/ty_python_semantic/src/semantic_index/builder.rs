@@ -10,7 +10,7 @@ use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
-use ruff_python_ast::{self as ast, BoolOp, Expr, PySourceType, PythonVersion};
+use ruff_python_ast::{self as ast, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
@@ -69,55 +69,6 @@ struct ScopeInfo {
     file_scope_id: FileScopeId,
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
-}
-
-enum TestFlowSnapshots {
-    BooleanExprTest {
-        maybe_short_circuit: FlowSnapshot,
-        no_short_circuit: FlowSnapshot,
-        op: BoolOp,
-    },
-    Default(FlowSnapshot),
-}
-
-impl TestFlowSnapshots {
-    fn flow(&self) -> &FlowSnapshot {
-        match self {
-            TestFlowSnapshots::Default(snapshot) => snapshot,
-            TestFlowSnapshots::BooleanExprTest {
-                maybe_short_circuit,
-                ..
-            } => maybe_short_circuit,
-        }
-    }
-
-    fn falsy_flow(&self) -> &FlowSnapshot {
-        match self {
-            TestFlowSnapshots::Default(flow_control) => flow_control,
-            TestFlowSnapshots::BooleanExprTest {
-                maybe_short_circuit,
-                no_short_circuit,
-                op,
-            } => match op {
-                BoolOp::And => maybe_short_circuit,
-                BoolOp::Or => no_short_circuit,
-            },
-        }
-    }
-
-    fn truthy_flow(&self) -> &FlowSnapshot {
-        match self {
-            TestFlowSnapshots::Default(flow_control) => flow_control,
-            TestFlowSnapshots::BooleanExprTest {
-                maybe_short_circuit,
-                no_short_circuit,
-                op,
-            } => match op {
-                BoolOp::And => no_short_circuit,
-                BoolOp::Or => maybe_short_circuit,
-            },
-        }
-    }
 }
 
 pub(super) struct SemanticIndexBuilder<'db> {
@@ -1089,97 +1040,6 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
     }
 
-    fn visit_test_expr(&mut self, test_expr: &'db Expr) -> TestFlowSnapshots {
-        match test_expr {
-            ast::Expr::BoolOp(ast::ExprBoolOp {
-                values,
-                range: _,
-                op,
-            }) => {
-                self.prepare_expr(test_expr);
-                self.visit_bool_op_expr(values, *op)
-            }
-            _ => {
-                self.visit_expr(test_expr);
-                TestFlowSnapshots::Default(self.flow_snapshot())
-            }
-        }
-    }
-
-    fn visit_bool_op_expr(&mut self, values: &'db [Expr], op: BoolOp) -> TestFlowSnapshots {
-        let pre_op = self.flow_snapshot();
-
-        let mut short_circuits = vec![];
-        let mut visibility_constraints = vec![];
-
-        for (index, value) in values.iter().enumerate() {
-            let after_test = self.visit_test_expr(value);
-            self.flow_restore(match op {
-                ast::BoolOp::And => after_test.truthy_flow().clone(),
-                ast::BoolOp::Or => after_test.falsy_flow().clone(),
-            });
-
-            for vid in &visibility_constraints {
-                self.record_visibility_constraint_id(*vid);
-            }
-
-            // For the last value, we don't need to model control flow. There is no short-circuiting
-            // anymore.
-            if index < values.len() - 1 {
-                let predicate = self.build_predicate(value);
-                let predicate_id = match op {
-                    ast::BoolOp::And => self.add_predicate(predicate),
-                    ast::BoolOp::Or => self.add_negated_predicate(predicate),
-                };
-                let visibility_constraint = self
-                    .current_visibility_constraints_mut()
-                    .add_atom(predicate_id);
-
-                let after_expr = self.flow_snapshot();
-
-                // We first model the short-circuiting behavior. We take the short-circuit
-                // path here if all of the previous short-circuit paths were not taken, so
-                // we record all previously existing visibility constraints, and negate the
-                // one for the current expression.
-                for vid in &visibility_constraints {
-                    self.record_visibility_constraint_id(*vid);
-                }
-                self.record_negated_visibility_constraint(visibility_constraint);
-                short_circuits.push(self.flow_snapshot());
-
-                // Then we model the non-short-circuiting behavior. Here, we need to delay
-                // the application of the visibility constraint until after the expression
-                // has been evaluated, so we only push it onto the stack here.
-                self.flow_restore(after_expr);
-                self.record_narrowing_constraint_id(predicate_id);
-                self.record_reachability_constraint_id(predicate_id);
-                visibility_constraints.push(visibility_constraint);
-            }
-        }
-        let no_short_circuit = self.flow_snapshot();
-        for snapshot in short_circuits.clone() {
-            self.flow_merge(snapshot);
-        }
-        let maybe_short_circuit = self.flow_snapshot();
-
-        self.simplify_visibility_constraints(pre_op);
-        TestFlowSnapshots::BooleanExprTest {
-            maybe_short_circuit,
-            no_short_circuit,
-            op,
-        }
-    }
-
-    fn prepare_expr(&mut self, expr: &Expr) -> NodeKey {
-        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
-
-        self.scopes_by_expression
-            .insert(expr.into(), self.current_scope());
-        self.current_ast_ids().record_expression(expr);
-
-        NodeKey::from_node(expr)
-    }
-
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
         let module = self.module;
         self.visit_body(module.suite());
@@ -1652,8 +1512,8 @@ where
                 }
             }
             ast::Stmt::If(node) => {
-                let mut after_test = self.visit_test_expr(&node.test);
-                self.flow_restore(after_test.truthy_flow().clone());
+                self.visit_expr(&node.test);
+                let mut no_branch_taken = self.flow_snapshot();
                 let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
                 let mut reachability_constraint =
                     self.record_reachability_constraint(last_predicate);
@@ -1684,13 +1544,14 @@ where
                     post_clauses.push(self.flow_snapshot());
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken
-                    self.flow_restore(after_test.falsy_flow().clone());
+                    self.flow_restore(no_branch_taken.clone());
                     self.record_negated_narrowing_constraint(last_predicate);
                     self.record_negated_reachability_constraint(reachability_constraint);
 
                     let elif_predicate = if let Some(elif_test) = clause_test {
-                        after_test = self.visit_test_expr(elif_test);
-                        self.flow_restore(after_test.truthy_flow().clone());
+                        self.visit_expr(elif_test);
+                        // A test expression is evaluated whether the branch is taken or not
+                        no_branch_taken = self.flow_snapshot();
                         reachability_constraint =
                             self.record_reachability_constraint(last_predicate);
                         let predicate = self.record_expression_narrowing_constraint(elif_test);
@@ -1715,7 +1576,7 @@ where
                     self.flow_merge(post_clause_state);
                 }
 
-                self.simplify_visibility_constraints(after_test.flow().clone());
+                self.simplify_visibility_constraints(no_branch_taken);
             }
             ast::Stmt::While(ast::StmtWhile {
                 test,
@@ -2099,7 +1960,13 @@ where
     }
 
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
-        let node_key = self.prepare_expr(expr);
+        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
+
+        self.scopes_by_expression
+            .insert(expr.into(), self.current_scope());
+        self.current_ast_ids().record_expression(expr);
+
+        let node_key = NodeKey::from_node(expr);
 
         match expr {
             ast::Expr::Name(ast::ExprName { id, ctx, .. }) => {
@@ -2318,7 +2185,57 @@ where
                 range: _,
                 op,
             }) => {
-                self.visit_bool_op_expr(values, *op);
+                let pre_op = self.flow_snapshot();
+
+                let mut snapshots = vec![];
+                let mut visibility_constraints = vec![];
+
+                for (index, value) in values.iter().enumerate() {
+                    self.visit_expr(value);
+
+                    for vid in &visibility_constraints {
+                        self.record_visibility_constraint_id(*vid);
+                    }
+
+                    // For the last value, we don't need to model control flow. There is no short-circuiting
+                    // anymore.
+                    if index < values.len() - 1 {
+                        let predicate = self.build_predicate(value);
+                        let predicate_id = match op {
+                            ast::BoolOp::And => self.add_predicate(predicate),
+                            ast::BoolOp::Or => self.add_negated_predicate(predicate),
+                        };
+                        let visibility_constraint = self
+                            .current_visibility_constraints_mut()
+                            .add_atom(predicate_id);
+
+                        let after_expr = self.flow_snapshot();
+
+                        // We first model the short-circuiting behavior. We take the short-circuit
+                        // path here if all of the previous short-circuit paths were not taken, so
+                        // we record all previously existing visibility constraints, and negate the
+                        // one for the current expression.
+                        for vid in &visibility_constraints {
+                            self.record_visibility_constraint_id(*vid);
+                        }
+                        self.record_negated_visibility_constraint(visibility_constraint);
+                        snapshots.push(self.flow_snapshot());
+
+                        // Then we model the non-short-circuiting behavior. Here, we need to delay
+                        // the application of the visibility constraint until after the expression
+                        // has been evaluated, so we only push it onto the stack here.
+                        self.flow_restore(after_expr);
+                        self.record_narrowing_constraint_id(predicate_id);
+                        self.record_reachability_constraint_id(predicate_id);
+                        visibility_constraints.push(visibility_constraint);
+                    }
+                }
+
+                for snapshot in snapshots {
+                    self.flow_merge(snapshot);
+                }
+
+                self.simplify_visibility_constraints(pre_op);
             }
             ast::Expr::Attribute(ast::ExprAttribute {
                 value: object,
