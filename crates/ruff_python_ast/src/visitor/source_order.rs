@@ -2,7 +2,7 @@ use crate::{
     Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator, ElifElseClause,
     ExceptHandler, Expr, FString, FStringElement, Keyword, MatchCase, Mod, Operator, Parameter,
     ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword, Singleton, Stmt,
-    StringLiteral, TypeParam, TypeParams, UnaryOp, WithItem,
+    StringLiteral, TString, TStringElement, TypeParam, TypeParams, UnaryOp, WithItem,
 };
 use crate::{AnyNodeRef, Identifier};
 
@@ -162,6 +162,16 @@ pub trait SourceOrderVisitor<'a> {
     }
 
     #[inline]
+    fn visit_t_string(&mut self, t_string: &'a TString) {
+        walk_t_string(self, t_string);
+    }
+
+    #[inline]
+    fn visit_t_string_element(&mut self, t_string_element: &'a TStringElement) {
+        walk_t_string_element(self, t_string_element);
+    }
+
+    #[inline]
     fn visit_string_literal(&mut self, string_literal: &'a StringLiteral) {
         walk_string_literal(self, string_literal);
     }
@@ -272,6 +282,7 @@ where
             Expr::Compare(expr) => expr.visit_source_order(visitor),
             Expr::Call(expr) => expr.visit_source_order(visitor),
             Expr::FString(expr) => expr.visit_source_order(visitor),
+            Expr::TString(expr) => expr.visit_source_order(visitor),
             Expr::StringLiteral(expr) => expr.visit_source_order(visitor),
             Expr::BytesLiteral(expr) => expr.visit_source_order(visitor),
             Expr::NumberLiteral(expr) => expr.visit_source_order(visitor),
@@ -511,6 +522,20 @@ pub fn walk_f_string_element<'a, V: SourceOrderVisitor<'a> + ?Sized>(
     visitor.leave_node(node);
 }
 
+pub fn walk_t_string_element<'a, V: SourceOrderVisitor<'a> + ?Sized>(
+    visitor: &mut V,
+    t_string_element: &'a TStringElement,
+) {
+    let node = AnyNodeRef::from(t_string_element);
+    if visitor.enter_node(node).is_traverse() {
+        match t_string_element {
+            TStringElement::Interpolation(element) => element.visit_source_order(visitor),
+            TStringElement::Literal(element) => element.visit_source_order(visitor),
+        }
+    }
+    visitor.leave_node(node);
+}
+
 pub fn walk_bool_op<'a, V>(_visitor: &mut V, _bool_op: &'a BoolOp)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
@@ -546,6 +571,18 @@ where
     let node = AnyNodeRef::from(f_string);
     if visitor.enter_node(node).is_traverse() {
         f_string.visit_source_order(visitor);
+    }
+    visitor.leave_node(node);
+}
+
+#[inline]
+pub fn walk_t_string<'a, V>(visitor: &mut V, t_string: &'a TString)
+where
+    V: SourceOrderVisitor<'a> + ?Sized,
+{
+    let node = AnyNodeRef::from(t_string);
+    if visitor.enter_node(node).is_traverse() {
+        t_string.visit_source_order(visitor);
     }
     visitor.leave_node(node);
 }

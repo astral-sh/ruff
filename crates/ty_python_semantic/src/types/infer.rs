@@ -4241,6 +4241,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_bytes_literal_expression(bytes_literal)
             }
             ast::Expr::FString(fstring) => self.infer_fstring_expression(fstring),
+            ast::Expr::TString(tstring) => self.infer_tstring_expression(tstring),
             ast::Expr::EllipsisLiteral(literal) => self.infer_ellipsis_literal_expression(literal),
             ast::Expr::Tuple(tuple) => self.infer_tuple_expression(tuple),
             ast::Expr::List(list) => self.infer_list_expression(list),
@@ -4378,6 +4379,57 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
         collector.string_type(self.db())
+    }
+
+    fn infer_tstring_expression(&mut self, tstring: &ast::ExprTString) -> Type<'db> {
+        let ast::ExprTString { value, .. } = tstring;
+        for part in value {
+            match part {
+                ast::TStringPart::Literal(_) => {}
+                ast::TStringPart::FString(fstring) => {
+                    for element in &fstring.elements {
+                        match element {
+                            ast::FStringElement::Expression(expression) => {
+                                let ast::FStringExpressionElement {
+                                    expression,
+                                    format_spec,
+                                    ..
+                                } = expression;
+                                self.infer_expression(expression);
+
+                                if let Some(format_spec) = format_spec {
+                                    for element in format_spec.elements.expressions() {
+                                        self.infer_expression(&element.expression);
+                                    }
+                                }
+                            }
+                            ast::FStringElement::Literal(_) => {}
+                        }
+                    }
+                }
+                ast::TStringPart::TString(tstring) => {
+                    for element in &tstring.elements {
+                        match element {
+                            ast::TStringElement::Interpolation(tstring_interpolation_element) => {
+                                let ast::TStringInterpolationElement {
+                                    interpolation,
+                                    format_spec,
+                                    ..
+                                } = tstring_interpolation_element;
+                                self.infer_expression(interpolation);
+                                if let Some(format_spec) = format_spec {
+                                    for element in format_spec.elements.interpolations() {
+                                        self.infer_expression(&element.interpolation);
+                                    }
+                                }
+                            }
+                            ast::TStringElement::Literal(_) => {}
+                        }
+                    }
+                }
+            }
+        }
+        todo_type!("Template")
     }
 
     fn infer_ellipsis_literal_expression(
@@ -8038,6 +8090,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("F-strings are not allowed in type expressions"),
+                )
+            }
+
+            ast::Expr::TString(tstring) => {
+                self.infer_tstring_expression(tstring);
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("T-strings are not allowed in type expressions"),
                 )
             }
 

@@ -115,7 +115,7 @@ pub(super) fn is_empty_or_null_string(expr: &Expr) -> bool {
 
 fn is_empty_or_null_fstring_element(element: &ast::FStringElement) -> bool {
     match element {
-        ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => value.is_empty(),
+        ast::FStringElement::Literal(ast::FTStringLiteralElement { value, .. }) => value.is_empty(),
         ast::FStringElement::Expression(ast::FStringExpressionElement { expression, .. }) => {
             is_empty_or_null_string(expression)
         }

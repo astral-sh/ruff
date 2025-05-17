@@ -1,0 +1,113 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/t_string_invalid_conversion_flag_other_tok.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..68,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 46..56,
+                    value: TString(
+                        ExprTString {
+                            range: 46..56,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 46..56,
+                                            elements: [
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 48..55,
+                                                        interpolation: Name(
+                                                            ExprName {
+                                                                range: 49..50,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 57..67,
+                    value: TString(
+                        ExprTString {
+                            range: 57..67,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 57..67,
+                                            elements: [
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 59..66,
+                                                        interpolation: Name(
+                                                            ExprName {
+                                                                range: 60..61,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | t"{x!123}"
+  |      ^^^ Syntax Error: t-string: invalid conversion character
+3 | t"{x!'a'}"
+  |
+
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | t"{x!123}"
+3 | t"{x!'a'}"
+  |      ^^^ Syntax Error: t-string: invalid conversion character
+  |

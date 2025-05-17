@@ -3,12 +3,12 @@ use std::borrow::Cow;
 use ruff_formatter::{Buffer, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{
     AnyStringFlags, ConversionFlag, Expr, FStringElement, FStringExpressionElement,
-    FStringLiteralElement, StringFlags,
+    FTStringLiteralElement, StringFlags,
 };
 use ruff_text_size::{Ranged, TextSlice};
 
 use crate::comments::{dangling_open_parenthesis_comments, trailing_comments};
-use crate::context::{FStringState, NodeLevel, WithFStringState, WithNodeLevel};
+use crate::context::{FTStringState, NodeLevel, WithFTStringState, WithNodeLevel};
 use crate::expression::left_most;
 use crate::prelude::*;
 use crate::string::normalize_string;
@@ -45,13 +45,13 @@ impl Format<PyFormatContext<'_>> for FormatFStringElement<'_> {
 
 /// Formats an f-string literal element.
 pub(crate) struct FormatFStringLiteralElement<'a> {
-    element: &'a FStringLiteralElement,
+    element: &'a FTStringLiteralElement,
     /// Flags of the enclosing F-string part
     fstring_flags: AnyStringFlags,
 }
 
 impl<'a> FormatFStringLiteralElement<'a> {
-    pub(crate) fn new(element: &'a FStringLiteralElement, fstring_flags: AnyStringFlags) -> Self {
+    pub(crate) fn new(element: &'a FTStringLiteralElement, fstring_flags: AnyStringFlags) -> Self {
         Self {
             element,
             fstring_flags,
@@ -214,8 +214,8 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
 
             let item = format_with(|f: &mut PyFormatter| {
                 // Update the context to be inside the f-string expression element.
-                let f = &mut WithFStringState::new(
-                    FStringState::InsideExpressionElement(self.context),
+                let f = &mut WithFTStringState::new(
+                    FTStringState::InsideExpressionElement(self.context),
                     f,
                 );
 

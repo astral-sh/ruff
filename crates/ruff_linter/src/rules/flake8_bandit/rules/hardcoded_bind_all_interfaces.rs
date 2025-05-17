@@ -69,6 +69,8 @@ pub(crate) fn hardcoded_bind_all_interfaces(checker: &Checker, string: StringLik
                 }
             }
         }
-        StringLike::Bytes(_) => (),
+
+        // These do not evaluate to `str` types so are not an issue here
+        StringLike::Bytes(_) | StringLike::TString(_) => (),
     }
 }

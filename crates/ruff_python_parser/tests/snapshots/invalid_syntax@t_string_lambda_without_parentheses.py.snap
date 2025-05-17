@@ -1,0 +1,118 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/t_string_lambda_without_parentheses.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..63,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 46..62,
+                    value: TString(
+                        ExprTString {
+                            range: 46..62,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 46..62,
+                                            elements: [
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 48..58,
+                                                        interpolation: Lambda(
+                                                            ExprLambda {
+                                                                range: 49..58,
+                                                                parameters: Some(
+                                                                    Parameters {
+                                                                        range: 56..57,
+                                                                        posonlyargs: [],
+                                                                        args: [
+                                                                            ParameterWithDefault {
+                                                                                range: 56..57,
+                                                                                parameter: Parameter {
+                                                                                    range: 56..57,
+                                                                                    name: Identifier {
+                                                                                        id: Name("x"),
+                                                                                        range: 56..57,
+                                                                                    },
+                                                                                    annotation: None,
+                                                                                },
+                                                                                default: None,
+                                                                            },
+                                                                        ],
+                                                                        vararg: None,
+                                                                        kwonlyargs: [],
+                                                                        kwarg: None,
+                                                                    },
+                                                                ),
+                                                                body: Name(
+                                                                    ExprName {
+                                                                        range: 58..58,
+                                                                        id: Name(""),
+                                                                        ctx: Invalid,
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                                Literal(
+                                                    TStringLiteralElement {
+                                                        range: 58..60,
+                                                        value: " x",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | t"{lambda x: x}"
+  |             ^^ Syntax Error: Expected an expression
+  |
+
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | t"{lambda x: x}"
+  |    ^^^^^^^^^ Syntax Error: t-string: lambda expressions are not allowed without parentheses
+  |
+
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | t"{lambda x: x}"
+  |             ^^ Syntax Error: t-string: expecting '}'
+  |
+
+
+  |
+1 | # parse_options: { "target-version": "3.14" }
+2 | t"{lambda x: x}"
+  |               ^ Syntax Error: Expected a t-string element or the end of the t-string
+  |

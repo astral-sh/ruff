@@ -67,7 +67,7 @@ use std::iter::FusedIterator;
 use std::ops::Deref;
 
 pub use crate::error::{
-    FStringErrorType, LexicalErrorType, ParseError, ParseErrorType, UnsupportedSyntaxError,
+    FTStringErrorType, LexicalErrorType, ParseError, ParseErrorType, UnsupportedSyntaxError,
     UnsupportedSyntaxErrorKind,
 };
 pub use crate::parser::ParseOptions;

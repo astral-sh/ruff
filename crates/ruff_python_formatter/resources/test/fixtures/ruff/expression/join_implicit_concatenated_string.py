@@ -101,6 +101,55 @@ f"{10 + len('bar')=}" f'{10 + len("bar")=}'
 
 
 ##############################################################################
+# T-strings
+##############################################################################
+
+# Escape `{` and `}` when merging a t-string with a string
+"a {not_a_variable}" t"b {10}" "c"
+
+# Join, and break expressions
+t"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa{
+expression
+}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" t"cccccccccccccccccccc {20999}" "more"
+
+# Join, but don't break the expressions
+t"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa{expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" t"cccccccccccccccccccc {20999}" "more"
+
+t"test{
+expression
+}flat" t"can be {
+joined
+} together"
+
+aaaaaaaaaaa = t"test{
+expression
+}flat" t"cean beeeeeeee {
+joined
+} eeeeeeeeeeeeeeeeeeeeeeeeeeeee" # inline
+
+
+t"single quoted '{x}'" t'double quoted "{x}"' # Same number of quotes => use preferred quote style
+t"single quote ' {x}" t'double quoted "{x}"'  # More double quotes => use single quotes
+t"single quoted '{x}'" t'double quote " {x}"'  # More single quotes => use double quotes
+
+# Different triple quoted strings
+t"{'''test'''}" t'{"""other"""}'
+
+# Now with inner quotes
+t"{'''test ' '''}" t'{"""other " """}'
+t"{some_where_nested('''test ' ''')}" t'{"""other " """ + "more"}'
+t"{b'''test ' '''}" t'{b"""other " """}'
+t"{t'''test ' '''}" t'{t"""other " """}'
+
+# debug expressions containing quotes
+t"{10 + len('bar')=}" t"{10 + len('bar')=}"
+t"{10 + len('bar')=}" t'no debug{10}' t"{10 + len('bar')=}"
+
+# We can't safely merge this pre Python 3.12 without altering the debug expression.
+t"{10 + len('bar')=}" t'{10 + len("bar")=}'
+
+
+##############################################################################
 # Don't join raw strings
 ##############################################################################
 
@@ -109,6 +158,9 @@ R"a" "normal"
 
 f"test" fr"test"
 f"test" fR"test"
+
+t"test" tr"test"
+t"test" tR"test"
 
 
 ##############################################################################
@@ -119,7 +171,20 @@ f"test" fR"test"
 
 "single" f""""single"""
 
+"single" t""""single"""
+
 b"single" b"""triple"""
+
+
+##############################################################################
+# Don't join t-strings and f-strings
+##############################################################################
+
+t"{interp}" f"{expr}"
+
+f"{expr}" t"{interp}"
+
+f"{expr}" "string" t"{interp}"
 
 
 ##############################################################################
