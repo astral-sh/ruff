@@ -672,6 +672,73 @@ def f(x: int, y: str) -> None: ...
 c1: Callable[[int], None] = partial(f, y="a")
 ```
 
+### Classes with `__call__` defined as attribute
+
+```py
+from typing import Callable, Any
+from ty_extensions import static_assert, is_assignable_to
+
+class A:
+    def method1(self, a: int) -> int:
+        return a
+
+    def __init__(self):
+        self.__call__ = self.method1
+
+class B:
+    def method1(self, b: int) -> int:
+        return b
+
+    __call__ = method1
+
+class C:
+    def method1(self, c: int) -> int:
+        return c
+
+    __call__: Callable[["C", int], int] = method1
+
+class D:
+    __call__: Callable[["D", int], int] = lambda self, d: d
+
+static_assert(is_assignable_to(A, Callable[[int], int]))
+
+# TODO these tests should fail, but for now A.__call__ is Dynamic thus always return True.
+static_assert(not is_assignable_to(A, Callable[[int, int], int]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(A, Callable[[int], str]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(A, Callable[[str], int]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(A, Callable[[str], str]))  # error: [static-assert-error]
+
+static_assert(is_assignable_to(B, Callable[[int], int]))
+static_assert(not is_assignable_to(B, Callable[[int, int], int]))
+static_assert(not is_assignable_to(B, Callable[[int], str]))
+static_assert(not is_assignable_to(B, Callable[[str], int]))
+static_assert(not is_assignable_to(B, Callable[[str], str]))
+
+static_assert(is_assignable_to(C, Callable[[int], int]))
+static_assert(not is_assignable_to(C, Callable[[C, int], int]))
+static_assert(not is_assignable_to(C, Callable[[int], str]))
+static_assert(not is_assignable_to(C, Callable[[str], int]))
+static_assert(not is_assignable_to(C, Callable[[str], str]))
+
+static_assert(is_assignable_to(D, Callable[[int], int]))
+static_assert(not is_assignable_to(D, Callable[[D, int], int]))
+static_assert(not is_assignable_to(D, Callable[[int], str]))
+static_assert(not is_assignable_to(D, Callable[[str], int]))
+static_assert(not is_assignable_to(D, Callable[[str], str]))
+
+a = A()
+b = B()
+c = C()
+d = D()
+
+def f(fn: Callable[[int], int]) -> None: ...
+
+f(a)
+f(b)
+f(c)
+f(d)
+```
+
 ## Generics
 
 ### Assignability of generic types parameterized by gradual types
