@@ -20,9 +20,10 @@ use crate::types::diagnostic::{
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators, FunctionType,
-    KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType,
-    TupleType, UnionType, WrapperDescriptorKind, todo_type,
+    BareTypeAliasType, BoundMethodType, DataclassParams, DataclassTransformerParams,
+    FunctionDecorators, FunctionType, KnownClass, KnownFunction, KnownInstanceType,
+    MethodWrapperKind, PropertyInstanceType, TupleType, TypeAliasType, UnionType,
+    WrapperDescriptorKind, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -905,6 +906,19 @@ impl<'db> Bindings<'db> {
                                 overload.set_return_type(Type::PropertyInstance(
                                     PropertyInstanceType::new(db, *getter, *setter),
                                 ));
+                            }
+                        }
+
+                        Some(KnownClass::TypeAliasType) => {
+                            if let [Some(name), Some(value), ..] = overload.parameter_types() {
+                                // TODO: emit a diagnostic if the name is not a string literal
+                                if let Some(name) = name.into_string_literal() {
+                                    overload.set_return_type(Type::KnownInstance(
+                                        KnownInstanceType::TypeAliasType(TypeAliasType::Bare(
+                                            BareTypeAliasType::new(db, name.value(db), value),
+                                        )),
+                                    ));
+                                }
                             }
                         }
 

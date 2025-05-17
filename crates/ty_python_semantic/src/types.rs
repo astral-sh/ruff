@@ -4012,6 +4012,45 @@ impl<'db> Type<'db> {
                     Signatures::single(signature)
                 }
 
+                Some(KnownClass::TypeAliasType) => {
+                    // ```py
+                    // def __new__(
+                    //     cls,
+                    //     name: str,
+                    //     value: Any,
+                    //     *,
+                    //     type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()
+                    // ) -> Self: ...
+                    // ```
+                    let signature = CallableSignature::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_or_keyword(Name::new_static("name"))
+                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                Parameter::positional_or_keyword(Name::new_static("value"))
+                                    .with_annotated_type(Type::any())
+                                    .type_form(),
+                                Parameter::keyword_only(Name::new_static("type_params"))
+                                    .with_annotated_type(KnownClass::Tuple.to_specialized_instance(
+                                        db,
+                                        [UnionType::from_elements(
+                                            db,
+                                            [
+                                                KnownClass::TypeVar.to_instance(db),
+                                                KnownClass::ParamSpec.to_instance(db),
+                                                KnownClass::TypeVarTuple.to_instance(db),
+                                            ],
+                                        )],
+                                    ))
+                                    .with_default_type(TupleType::empty(db)),
+                            ]),
+                            None,
+                        ),
+                    );
+                    Signatures::single(signature)
+                }
+
                 Some(KnownClass::Property) => {
                     let getter_signature = Signature::new(
                         Parameters::new([
@@ -5318,7 +5357,7 @@ impl<'db> Type<'db> {
                     Some(TypeDefinition::TypeVar(var.definition(db)))
                 }
                 KnownInstanceType::TypeAliasType(type_alias) => {
-                    Some(TypeDefinition::TypeAlias(type_alias.definition(db)))
+                    type_alias.definition(db).map(TypeDefinition::TypeAlias)
                 }
                 _ => None,
             },
@@ -7467,7 +7506,7 @@ impl<'db> ModuleLiteralType<'db> {
 }
 
 #[salsa::interned(debug)]
-pub struct TypeAliasType<'db> {
+pub struct PEP695TypeAliasType<'db> {
     #[returns(ref)]
     pub name: ast::name::Name,
 
@@ -7475,7 +7514,7 @@ pub struct TypeAliasType<'db> {
 }
 
 #[salsa::tracked]
-impl<'db> TypeAliasType<'db> {
+impl<'db> PEP695TypeAliasType<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let scope = self.rhs_scope(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
@@ -7489,6 +7528,42 @@ impl<'db> TypeAliasType<'db> {
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
         definition_expression_type(db, definition, &type_alias_stmt_node.value)
+    }
+}
+
+#[salsa::interned(debug)]
+pub struct BareTypeAliasType<'db> {
+    #[returns(ref)]
+    pub name: String,
+    pub value: Type<'db>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, salsa::Update)]
+pub enum TypeAliasType<'db> {
+    PEP695(PEP695TypeAliasType<'db>),
+    Bare(BareTypeAliasType<'db>),
+}
+
+impl<'db> TypeAliasType<'db> {
+    pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
+        match self {
+            TypeAliasType::PEP695(type_alias) => type_alias.name(db),
+            TypeAliasType::Bare(type_alias) => type_alias.name(db).as_str(),
+        }
+    }
+
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        match self {
+            TypeAliasType::PEP695(type_alias) => Some(type_alias.definition(db)),
+            TypeAliasType::Bare(_) => None,
+        }
+    }
+
+    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
+            TypeAliasType::Bare(type_alias) => type_alias.value(db),
+        }
     }
 }
 
@@ -8002,6 +8077,10 @@ impl<'db> TupleType<'db> {
     fn homogeneous_supertype(self, db: &'db dyn Db) -> Type<'db> {
         KnownClass::Tuple
             .to_specialized_instance(db, [UnionType::from_elements(db, self.elements(db))])
+    }
+
+    pub(crate) fn empty(db: &'db dyn Db) -> Type<'db> {
+        Type::Tuple(TupleType::new(db, Box::<[Type<'db>]>::from([])))
     }
 
     pub(crate) fn from_elements<T: Into<Type<'db>>>(

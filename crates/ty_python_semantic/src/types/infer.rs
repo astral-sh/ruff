@@ -86,11 +86,11 @@ use crate::types::{
     CallDunderError, CallableSignature, CallableType, ClassLiteral, ClassType, DataclassParams,
     DynamicType, FunctionDecorators, FunctionType, GenericAlias, IntersectionBuilder,
     IntersectionType, KnownClass, KnownFunction, KnownInstanceType, MemberLookupPolicy,
-    MetaclassCandidate, Parameter, ParameterForm, Parameters, Signature, Signatures,
-    StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type,
-    TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
-    todo_type,
+    MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, Signature,
+    Signatures, StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness,
+    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder,
+    UnionType, binding_type, todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -2374,12 +2374,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::TypeAlias(type_alias))
             .to_scope_id(self.db(), self.file());
 
-        let type_alias_ty =
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::new(
+        let type_alias_ty = Type::KnownInstance(KnownInstanceType::TypeAliasType(
+            TypeAliasType::PEP695(PEP695TypeAliasType::new(
                 self.db(),
                 &type_alias.name.as_name_expr().unwrap().id,
                 rhs_scope,
-            )));
+            )),
+        ));
 
         self.add_declaration_with_binding(
             type_alias.into(),
@@ -4860,6 +4861,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         | KnownClass::Super
                         | KnownClass::TypeVar
                         | KnownClass::NamedTuple
+                        | KnownClass::TypeAliasType
                 )
             )
             // temporary special-casing for all subclasses of `enum.Enum`
