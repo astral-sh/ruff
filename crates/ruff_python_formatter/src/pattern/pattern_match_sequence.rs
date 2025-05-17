@@ -80,7 +80,30 @@ pub(crate) enum SequenceType {
 impl SequenceType {
     pub(crate) fn from_pattern(pattern: &PatternMatchSequence, source: &str) -> SequenceType {
         if source[pattern.range()].starts_with('[') {
-            SequenceType::List
+            // Count top-level commata to distinguish between a list pattern `[...]`
+            // and a tuple pattern with a list element `[], ...`
+            let top_level_comma_count =
+                SimpleTokenizer::new(source, TextRange::new(pattern.start(), pattern.end()))
+                    .skip_trivia()
+                    .scan(0, |depth, token| match token.kind() {
+                        SimpleTokenKind::LBracket => {
+                            *depth += 1;
+                            Some((token, *depth))
+                        }
+                        SimpleTokenKind::RBracket => {
+                            *depth -= 1;
+                            Some((token, *depth))
+                        }
+                        _ => Some((token, *depth)),
+                    })
+                    .filter(|(token, depth)| *depth == 0 && token.kind() == SimpleTokenKind::Comma)
+                    .count();
+
+            if top_level_comma_count > 0 {
+                SequenceType::TupleNoParens
+            } else {
+                SequenceType::List
+            }
         } else if source[pattern.range()].starts_with('(') {
             // If the pattern is empty, it must be a parenthesized tuple with no members. (This
             // branch exists to differentiate between a tuple with and without its own parentheses,
