@@ -2,6 +2,7 @@ use ruff_python_ast::Alias;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::resolve_imported_module_path;
+use ruff_python_semantic::Module;
 use ruff_text_size::Ranged;
 
 use crate::{Violation, checkers::ast::Checker};
@@ -57,14 +58,23 @@ pub(crate) fn import_from_self(
     level: u32,
     module: Option<&str>,
     names: &[Alias],
-    module_path: Option<&[String]>,
+    inside_module: &Module,
 ) {
-    let Some(module_path) = module_path else {
+    let Some(module_path) = inside_module.qualified_name() else {
         return;
     };
     let Some(imported_module_path) = resolve_imported_module_path(level, module, Some(module_path))
     else {
         return;
+    };
+    let module_path = {
+        if inside_module.kind.is_package()
+            && module_path.iter().last().map(String::as_str) == Some("__init__")
+        {
+            &module_path[..module_path.len() - 1]
+        } else {
+            module_path
+        }
     };
 
     if imported_module_path
