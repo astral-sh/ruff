@@ -3157,6 +3157,7 @@ dependencies = [
  "ruff_workspace",
  "serde",
  "serde-wasm-bindgen",
+ "uuid",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]

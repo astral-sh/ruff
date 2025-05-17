@@ -178,7 +178,6 @@ uuid = { version = "1.6.1", features = [
     "v4",
     "fast-rng",
     "macro-diagnostics",
-    "js",
 ] }
 walkdir = { version = "2.3.2" }
 wasm-bindgen = { version = "0.2.92" }
