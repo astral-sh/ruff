@@ -643,7 +643,7 @@ fn symbol_by_id<'db>(
             // See mdtest/known_constants.md#user-defined-type_checking for details.
             let is_considered_non_modifiable = matches!(
                 symbol_table(db, scope).symbol(symbol_id).name().as_str(),
-                "__slots__" | "TYPE_CHECKING"
+                "__slots__" | "TYPE_CHECKING" | "__new__"
             );
 
             if scope.file(db).is_stub(db.upcast()) {
