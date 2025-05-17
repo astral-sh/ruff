@@ -31,6 +31,11 @@ use crate::importer::ImportRequest;
 ///     pass
 /// ```
 ///
+/// ## Fix safety
+/// The rule's fix is unsafe if the class has base classes. This is because the base classes might
+/// be validating the class's other base classes (e.g., `typing.Protocol` does this) or otherwise
+/// alter runtime behavior if more base classes are added.
+///
 /// ## References
 /// - [Python documentation: `abc.ABC`](https://docs.python.org/3/library/abc.html#abc.ABC)
 /// - [Python documentation: `abc.ABCMeta`](https://docs.python.org/3/library/abc.html#abc.ABCMeta)
@@ -69,6 +74,7 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         return;
     }
 
+    let has_bases = !class_def.bases().is_empty();
     let mut diagnostic = Diagnostic::new(MetaClassABCMeta, keyword.range);
 
     diagnostic.try_set_fix(|| {
@@ -80,7 +86,8 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         Ok(if position > 0 {
             // When the `abc.ABCMeta` is not the first keyword, put `abc.ABC` before the first
             // keyword.
-            Fix::safe_edits(
+            make_fix(
+                has_bases,
                 // Delete from the previous argument, to the end of the `metaclass` argument.
                 Edit::range_deletion(TextRange::new(
                     class_def.keywords()[position - 1].end(),
@@ -93,7 +100,8 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
                 ],
             )
         } else {
-            Fix::safe_edits(
+            make_fix(
+                has_bases,
                 Edit::range_replacement(binding, keyword.range),
                 [import_edit],
             )
@@ -101,4 +109,15 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
     });
 
     checker.report_diagnostic(diagnostic);
+}
+
+fn make_fix(has_bases: bool, edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Fix {
+    if has_bases {
+        // If the class has bases, the fix is not safe as the base class might be
+        // validating the class's other base classes (e.g., `typing.Protocol` does this).
+        Fix::unsafe_edits(edit, rest)
+    } else {
+        // If the class doesn't have bases, the fix is safe.
+        Fix::safe_edits(edit, rest)
+    }
 }
