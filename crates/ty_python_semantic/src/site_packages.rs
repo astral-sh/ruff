@@ -132,15 +132,6 @@ impl VirtualEnvironment {
                     ));
                 }
 
-                if value.contains('=') {
-                    return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
-                        pyvenv_cfg_path,
-                        PyvenvCfgParseErrorKind::TooManyEquals {
-                            line_number: pyvenv_cfg_line_number(index),
-                        },
-                    ));
-                }
-
                 match key {
                     "include-system-site-packages" => {
                         include_system_site_packages = value.eq_ignore_ascii_case("true");
@@ -305,7 +296,6 @@ pub(crate) enum SitePackagesDiscoveryError {
 /// The various ways in which parsing a `pyvenv.cfg` file could fail
 #[derive(Debug)]
 pub(crate) enum PyvenvCfgParseErrorKind {
-    TooManyEquals { line_number: NonZeroUsize },
     MalformedKeyValuePair { line_number: NonZeroUsize },
     NoHomeKey,
     InvalidHomeValue(io::Error),
@@ -314,9 +304,6 @@ pub(crate) enum PyvenvCfgParseErrorKind {
 impl fmt::Display for PyvenvCfgParseErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::TooManyEquals { line_number } => {
-                write!(f, "line {line_number} has too many '=' characters")
-            }
             Self::MalformedKeyValuePair { line_number } => write!(
                 f,
                 "line {line_number} has a malformed `<key> = <value>` pair"
@@ -1107,26 +1094,6 @@ mod tests {
             ),
             "Got {site_packages:?}",
         );
-    }
-
-    #[test]
-    fn parsing_pyvenv_cfg_with_too_many_equals() {
-        let system = TestSystem::default();
-        let memory_fs = system.memory_file_system();
-        let pyvenv_cfg_path = SystemPathBuf::from("/.venv/pyvenv.cfg");
-        memory_fs
-            .write_file_all(&pyvenv_cfg_path, "home = bar = /.venv/bin")
-            .unwrap();
-        let venv_result =
-            PythonEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
-        assert!(matches!(
-            venv_result,
-            Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
-                path,
-                PyvenvCfgParseErrorKind::TooManyEquals { line_number }
-            ))
-            if path == pyvenv_cfg_path && Some(line_number) == NonZeroUsize::new(1)
-        ));
     }
 
     #[test]
