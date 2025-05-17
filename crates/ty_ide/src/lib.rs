@@ -188,7 +188,10 @@ impl HasNavigationTargets for Type<'_> {
 
 impl HasNavigationTargets for TypeDefinition<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let full_range = self.full_range(db.upcast());
+        let Some(full_range) = self.full_range(db.upcast()) else {
+            return NavigationTargets::empty();
+        };
+
         NavigationTargets::single(NavigationTarget {
             file: full_range.file(),
             focus_range: self.focus_range(db.upcast()).unwrap_or(full_range).range(),
