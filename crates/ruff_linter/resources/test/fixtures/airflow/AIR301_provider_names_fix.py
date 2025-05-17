@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from airflow.providers.amazon.aws.auth_manager.avp.entities.AvpEntities import DATASET
+from airflow.providers.amazon.aws.auth_manager.avp.entities import AvpEntities
 from airflow.providers.amazon.aws.datasets.s3 import (
     convert_dataset_to_openlineage as s3_convert_dataset_to_openlineage,
 )
@@ -9,7 +9,7 @@ from airflow.providers.common.io.dataset.file import (
     convert_dataset_to_openlineage as io_convert_dataset_to_openlineage,
 )
 from airflow.providers.common.io.dataset.file import create_dataset as io_create_dataset
-from airflow.providers.fab.auth_manager.fab_auth_manager import is_authorized_dataset as fab_is_authorized_dataset
+
 from airflow.providers.google.datasets.bigquery import (
     create_dataset as bigquery_create_dataset,
 )
@@ -22,7 +22,7 @@ from airflow.providers.openlineage.utils.utils import (
     translate_airflow_dataset,
 )
 
-DATASET
+AvpEntities.DATASET
 
 s3_create_dataset()
 s3_convert_dataset_to_openlineage()
@@ -30,7 +30,7 @@ s3_convert_dataset_to_openlineage()
 io_create_dataset()
 io_convert_dataset_to_openlineage()
 
-fab_is_authorized_dataset()
+
 
 # airflow.providers.google.datasets.bigquery
 bigquery_create_dataset()

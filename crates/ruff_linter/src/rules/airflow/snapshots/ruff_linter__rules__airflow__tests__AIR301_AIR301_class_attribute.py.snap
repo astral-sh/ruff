@@ -310,7 +310,7 @@ AIR301_class_attribute.py:50:11: AIR301 [*] `airflow.lineage.hook.DatasetLineage
 11 11 | from airflow.datasets.manager import DatasetManager
 12    |-from airflow.lineage.hook import DatasetLineageInfo, HookLineageCollector
    12 |+from airflow.lineage.hook import DatasetLineageInfo, HookLineageCollector, AssetLineageInfo
-13 13 | from airflow.providers.amazon.auth_manager.aws_auth_manager import AwsAuthManager
+13 13 | from airflow.providers.amazon.aws.auth_manager.aws_auth_manager import AwsAuthManager
 14 14 | from airflow.providers.apache.beam.hooks import BeamHook, NotAir302HookError
 15 15 | from airflow.providers.google.cloud.secrets.secret_manager import (
 --------------------------------------------------------------------------------
@@ -529,142 +529,142 @@ AIR301_class_attribute.py:79:15: AIR301 [*] `get_connections` is removed in Airf
 81 81 | not_an_error = NotAir302SecretError()
 82 82 | not_an_error.get_conn_uri()
 
+AIR301_class_attribute.py:86:4: AIR301 [*] `initialize_providers_dataset_uri_resources` is removed in Airflow 3.0
+   |
+84 | # airflow.providers_manager
+85 | pm = ProvidersManager()
+86 | pm.initialize_providers_dataset_uri_resources()
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
+87 | pm.dataset_factories
+88 | pm.dataset_uri_handlers
+   |
+   = help: Use `initialize_providers_asset_uri_resources` instead
+
+ℹ Safe fix
+83 83 | 
+84 84 | # airflow.providers_manager
+85 85 | pm = ProvidersManager()
+86    |-pm.initialize_providers_dataset_uri_resources()
+   86 |+pm.initialize_providers_asset_uri_resources()
+87 87 | pm.dataset_factories
+88 88 | pm.dataset_uri_handlers
+89 89 | pm.dataset_to_openlineage_converters
+
 AIR301_class_attribute.py:87:4: AIR301 [*] `dataset_factories` is removed in Airflow 3.0
    |
 85 | pm = ProvidersManager()
-86 | pm.initialize_providers_asset_uri_resources()
+86 | pm.initialize_providers_dataset_uri_resources()
 87 | pm.dataset_factories
    |    ^^^^^^^^^^^^^^^^^ AIR301
-88 | pm.dataset_factories
-89 | pm.dataset_uri_handlers
+88 | pm.dataset_uri_handlers
+89 | pm.dataset_to_openlineage_converters
    |
    = help: Use `asset_factories` instead
 
 ℹ Safe fix
 84 84 | # airflow.providers_manager
 85 85 | pm = ProvidersManager()
-86 86 | pm.initialize_providers_asset_uri_resources()
+86 86 | pm.initialize_providers_dataset_uri_resources()
 87    |-pm.dataset_factories
    87 |+pm.asset_factories
-88 88 | pm.dataset_factories
-89 89 | pm.dataset_uri_handlers
-90 90 | pm.dataset_to_openlineage_converters
+88 88 | pm.dataset_uri_handlers
+89 89 | pm.dataset_to_openlineage_converters
+90 90 | 
 
-AIR301_class_attribute.py:88:4: AIR301 [*] `dataset_factories` is removed in Airflow 3.0
+AIR301_class_attribute.py:88:4: AIR301 [*] `dataset_uri_handlers` is removed in Airflow 3.0
    |
-86 | pm.initialize_providers_asset_uri_resources()
+86 | pm.initialize_providers_dataset_uri_resources()
 87 | pm.dataset_factories
-88 | pm.dataset_factories
-   |    ^^^^^^^^^^^^^^^^^ AIR301
-89 | pm.dataset_uri_handlers
-90 | pm.dataset_to_openlineage_converters
-   |
-   = help: Use `asset_factories` instead
-
-ℹ Safe fix
-85 85 | pm = ProvidersManager()
-86 86 | pm.initialize_providers_asset_uri_resources()
-87 87 | pm.dataset_factories
-88    |-pm.dataset_factories
-   88 |+pm.asset_factories
-89 89 | pm.dataset_uri_handlers
-90 90 | pm.dataset_to_openlineage_converters
-91 91 | 
-
-AIR301_class_attribute.py:89:4: AIR301 [*] `dataset_uri_handlers` is removed in Airflow 3.0
-   |
-87 | pm.dataset_factories
-88 | pm.dataset_factories
-89 | pm.dataset_uri_handlers
+88 | pm.dataset_uri_handlers
    |    ^^^^^^^^^^^^^^^^^^^^ AIR301
-90 | pm.dataset_to_openlineage_converters
+89 | pm.dataset_to_openlineage_converters
    |
    = help: Use `asset_uri_handlers` instead
 
 ℹ Safe fix
-86 86 | pm.initialize_providers_asset_uri_resources()
+85 85 | pm = ProvidersManager()
+86 86 | pm.initialize_providers_dataset_uri_resources()
 87 87 | pm.dataset_factories
-88 88 | pm.dataset_factories
-89    |-pm.dataset_uri_handlers
-   89 |+pm.asset_uri_handlers
-90 90 | pm.dataset_to_openlineage_converters
-91 91 | 
-92 92 | # airflow.secrets.base_secrets
+88    |-pm.dataset_uri_handlers
+   88 |+pm.asset_uri_handlers
+89 89 | pm.dataset_to_openlineage_converters
+90 90 | 
+91 91 | # airflow.secrets.base_secrets
 
-AIR301_class_attribute.py:90:4: AIR301 [*] `dataset_to_openlineage_converters` is removed in Airflow 3.0
+AIR301_class_attribute.py:89:4: AIR301 [*] `dataset_to_openlineage_converters` is removed in Airflow 3.0
    |
-88 | pm.dataset_factories
-89 | pm.dataset_uri_handlers
-90 | pm.dataset_to_openlineage_converters
+87 | pm.dataset_factories
+88 | pm.dataset_uri_handlers
+89 | pm.dataset_to_openlineage_converters
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
-91 |
-92 | # airflow.secrets.base_secrets
+90 |
+91 | # airflow.secrets.base_secrets
    |
    = help: Use `asset_to_openlineage_converters` instead
 
 ℹ Safe fix
+86 86 | pm.initialize_providers_dataset_uri_resources()
 87 87 | pm.dataset_factories
-88 88 | pm.dataset_factories
-89 89 | pm.dataset_uri_handlers
-90    |-pm.dataset_to_openlineage_converters
-   90 |+pm.asset_to_openlineage_converters
-91 91 | 
-92 92 | # airflow.secrets.base_secrets
-93 93 | base_secret_backend = BaseSecretsBackend()
+88 88 | pm.dataset_uri_handlers
+89    |-pm.dataset_to_openlineage_converters
+   89 |+pm.asset_to_openlineage_converters
+90 90 | 
+91 91 | # airflow.secrets.base_secrets
+92 92 | base_secret_backend = BaseSecretsBackend()
 
-AIR301_class_attribute.py:94:21: AIR301 [*] `get_conn_uri` is removed in Airflow 3.0
+AIR301_class_attribute.py:93:21: AIR301 [*] `get_conn_uri` is removed in Airflow 3.0
    |
-92 | # airflow.secrets.base_secrets
-93 | base_secret_backend = BaseSecretsBackend()
-94 | base_secret_backend.get_conn_uri()
+91 | # airflow.secrets.base_secrets
+92 | base_secret_backend = BaseSecretsBackend()
+93 | base_secret_backend.get_conn_uri()
    |                     ^^^^^^^^^^^^ AIR301
-95 | base_secret_backend.get_connections()
+94 | base_secret_backend.get_connections()
    |
    = help: Use `get_conn_value` instead
 
 ℹ Safe fix
-91 91 | 
-92 92 | # airflow.secrets.base_secrets
-93 93 | base_secret_backend = BaseSecretsBackend()
-94    |-base_secret_backend.get_conn_uri()
-   94 |+base_secret_backend.get_conn_value()
-95 95 | base_secret_backend.get_connections()
-96 96 | 
-97 97 | # airflow.secrets.local_filesystem
+90 90 | 
+91 91 | # airflow.secrets.base_secrets
+92 92 | base_secret_backend = BaseSecretsBackend()
+93    |-base_secret_backend.get_conn_uri()
+   93 |+base_secret_backend.get_conn_value()
+94 94 | base_secret_backend.get_connections()
+95 95 | 
+96 96 | # airflow.secrets.local_filesystem
 
-AIR301_class_attribute.py:95:21: AIR301 [*] `get_connections` is removed in Airflow 3.0
+AIR301_class_attribute.py:94:21: AIR301 [*] `get_connections` is removed in Airflow 3.0
    |
-93 | base_secret_backend = BaseSecretsBackend()
-94 | base_secret_backend.get_conn_uri()
-95 | base_secret_backend.get_connections()
+92 | base_secret_backend = BaseSecretsBackend()
+93 | base_secret_backend.get_conn_uri()
+94 | base_secret_backend.get_connections()
    |                     ^^^^^^^^^^^^^^^ AIR301
-96 |
-97 | # airflow.secrets.local_filesystem
+95 |
+96 | # airflow.secrets.local_filesystem
    |
    = help: Use `get_connection` instead
 
 ℹ Safe fix
-92 92 | # airflow.secrets.base_secrets
-93 93 | base_secret_backend = BaseSecretsBackend()
-94 94 | base_secret_backend.get_conn_uri()
-95    |-base_secret_backend.get_connections()
-   95 |+base_secret_backend.get_connection()
-96 96 | 
-97 97 | # airflow.secrets.local_filesystem
-98 98 | lfb = LocalFilesystemBackend()
+91 91 | # airflow.secrets.base_secrets
+92 92 | base_secret_backend = BaseSecretsBackend()
+93 93 | base_secret_backend.get_conn_uri()
+94    |-base_secret_backend.get_connections()
+   94 |+base_secret_backend.get_connection()
+95 95 | 
+96 96 | # airflow.secrets.local_filesystem
+97 97 | lfb = LocalFilesystemBackend()
 
-AIR301_class_attribute.py:99:5: AIR301 [*] `get_connections` is removed in Airflow 3.0
+AIR301_class_attribute.py:98:5: AIR301 [*] `get_connections` is removed in Airflow 3.0
    |
-97 | # airflow.secrets.local_filesystem
-98 | lfb = LocalFilesystemBackend()
-99 | lfb.get_connections()
+96 | # airflow.secrets.local_filesystem
+97 | lfb = LocalFilesystemBackend()
+98 | lfb.get_connections()
    |     ^^^^^^^^^^^^^^^ AIR301
    |
    = help: Use `get_connection` instead
 
 ℹ Safe fix
-96 96 | 
-97 97 | # airflow.secrets.local_filesystem
-98 98 | lfb = LocalFilesystemBackend()
-99    |-lfb.get_connections()
-   99 |+lfb.get_connection()
+95 95 | 
+96 96 | # airflow.secrets.local_filesystem
+97 97 | lfb = LocalFilesystemBackend()
+98    |-lfb.get_connections()
+   98 |+lfb.get_connection()
