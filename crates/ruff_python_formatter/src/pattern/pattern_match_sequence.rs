@@ -91,7 +91,7 @@ impl SequenceType {
                         _ => Ok(depth),
                     });
             match is_list {
-                Err(_) => SequenceType::TupleNoParens,
+                Err(()) => SequenceType::TupleNoParens,
                 Ok(_) => SequenceType::List,
             }
         } else if source[pattern.range()].starts_with('(') {
