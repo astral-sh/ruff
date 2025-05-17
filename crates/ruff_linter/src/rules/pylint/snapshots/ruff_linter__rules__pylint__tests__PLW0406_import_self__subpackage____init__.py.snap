@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+assertion_line: 249
+---
+__init__.py:1:16: PLW0406 Module `import_self.subpackage` imports itself
+  |
+1 | from .. import subpackage
+  |                ^^^^^^^^^^ PLW0406
+  |
