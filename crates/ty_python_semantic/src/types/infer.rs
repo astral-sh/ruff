@@ -7459,7 +7459,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             })
             .collect();
         typevars.map(|typevars| {
-            GenericContext::new(self.db(), typevars, GenericContextOrigin::from(origin))
+            GenericContext::new(
+                self.db(),
+                typevars,
+                GenericContextOrigin::from(origin),
+                None,
+            )
         })
     }
 
