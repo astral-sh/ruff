@@ -82,27 +82,18 @@ impl SequenceType {
         if source[pattern.range()].starts_with('[') {
             // Count top-level commata to distinguish between a list pattern `[...]`
             // and a tuple pattern with a list element `[], ...`
-            let top_level_comma_count =
+            let is_list =
                 SimpleTokenizer::new(source, TextRange::new(pattern.start(), pattern.end()))
                     .skip_trivia()
-                    .scan(0, |depth, token| match token.kind() {
-                        SimpleTokenKind::LBracket => {
-                            *depth += 1;
-                            Some((token, *depth))
-                        }
-                        SimpleTokenKind::RBracket => {
-                            *depth -= 1;
-                            Some((token, *depth))
-                        }
-                        _ => Some((token, *depth)),
-                    })
-                    .filter(|(token, depth)| *depth == 0 && token.kind() == SimpleTokenKind::Comma)
-                    .count();
-
-            if top_level_comma_count > 0 {
-                SequenceType::TupleNoParens
-            } else {
-                SequenceType::List
+                    .try_fold(0, |depth, token| match token.kind() {
+                        SimpleTokenKind::LBracket => Ok(depth + 1),
+                        SimpleTokenKind::RBracket => Ok(depth - 1),
+                        SimpleTokenKind::Comma if depth == 0 => Err(()),
+                        _ => Ok(depth),
+                    });
+            match is_list {
+                Err(_) => SequenceType::TupleNoParens,
+                Ok(_) => SequenceType::List,
             }
         } else if source[pattern.range()].starts_with('(') {
             // If the pattern is empty, it must be a parenthesized tuple with no members. (This
