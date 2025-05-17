@@ -80,8 +80,7 @@ pub(crate) enum SequenceType {
 impl SequenceType {
     pub(crate) fn from_pattern(pattern: &PatternMatchSequence, source: &str) -> SequenceType {
         if source[pattern.range()].starts_with('[') {
-            // Count top-level commata to distinguish between a list pattern `[...]`
-            // and a tuple pattern with a list element `[], ...`
+            // A top-level comma indicates a tuple with a leading list, not a list
             let is_list =
                 SimpleTokenizer::new(source, TextRange::new(pattern.start(), pattern.end()))
                     .skip_trivia()
