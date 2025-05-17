@@ -1170,6 +1170,16 @@ impl<'db> Type<'db> {
                 target.is_equivalent_to(db, Type::object(db))
             }
 
+            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
+                self_function.is_subtype_of(db, target_function)
+            }
+            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
+                self_method.is_subtype_of(db, target_method)
+            }
+            (Type::MethodWrapper(self_method), Type::MethodWrapper(target_method)) => {
+                self_method.is_subtype_of(db, target_method)
+            }
+
             // No literal type is a subtype of any other literal type, unless they are the same
             // type (which is handled above). This case is not necessary from a correctness
             // perspective (the fallback cases below will handle it correctly), but it is important
@@ -1502,6 +1512,16 @@ impl<'db> Type<'db> {
                 if tuple.homogeneous_supertype(db).is_assignable_to(db, target) =>
             {
                 true
+            }
+
+            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
+                self_function.is_assignable_to(db, target_function)
+            }
+            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
+                self_method.is_assignable_to(db, target_method)
+            }
+            (Type::MethodWrapper(self_method), Type::MethodWrapper(target_method)) => {
+                self_method.is_assignable_to(db, target_method)
             }
 
             // `type[Any]` is assignable to any `type[...]` type, because `type[Any]` can
@@ -6900,6 +6920,32 @@ impl<'db> FunctionType<'db> {
         }
     }
 
+    fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+        // A function literal is the subtype of itself, and not of any other function literal.
+        // However, our representation of a function literal includes any specialization that
+        // should be applied to the signature. Different specializations of the same function
+        // literal are only subtypes of each other if they result in the same signature. (Note that
+        // the equality check above will have already handled the case where `self` and `target`
+        // are the same function literal with the same specialization.)
+        self.body_scope(db) == other.body_scope(db)
+            && self
+                .into_callable_type(db)
+                .is_subtype_of(db, other.into_callable_type(db))
+    }
+
+    fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
+        // A function literal is assignable to itself, and not to any other function literal.
+        // However, our representation of a function literal includes any specialization that
+        // should be applied to the signature. Different specializations of the same function
+        // literal are only assignable to each other if they result in the same signature. (Note
+        // that the equality check above will have already handled the case where `self` and
+        // `target` are the same function literal with the same specialization.)
+        self.body_scope(db) == other.body_scope(db)
+            && self
+                .into_callable_type(db)
+                .is_assignable_to(db, other.into_callable_type(db))
+    }
+
     /// Returns a tuple of two spans. The first is
     /// the span for the identifier of the function
     /// definition for `self`. The second is
@@ -7181,6 +7227,28 @@ impl<'db> BoundMethodType<'db> {
                 .map(signatures::Signature::bind_self),
         ))
     }
+
+    fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+        // A bound method is a typically a subtype of itself. However, we must explicitly verify
+        // the subtyping of the underlying function signatures (since they might be specialized
+        // differently), and of the bound self parameter (taking care that parameters, including a
+        // bound self parameter, are contravariant.)
+        self.function(db).is_subtype_of(db, other.function(db))
+            && other
+                .self_instance(db)
+                .is_subtype_of(db, self.self_instance(db))
+    }
+
+    fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
+        // A bound method is a typically assignable to itself. However, we must explicitly verify
+        // the assignability of the underlying function signatures (since they might be specialized
+        // differently), and of the bound self parameter (taking care that parameters, including a
+        // bound self parameter, are contravariant.)
+        self.function(db).is_assignable_to(db, other.function(db))
+            && other
+                .self_instance(db)
+                .is_assignable_to(db, self.self_instance(db))
+    }
 }
 
 /// This type represents the set of all callable objects with a certain, possibly overloaded,
@@ -7409,6 +7477,74 @@ pub enum MethodWrapperKind<'db> {
     /// this allows us to understand statically known branches for common tests such as
     /// `if sys.platform.startswith("freebsd")`.
     StrStartswith(StringLiteralType<'db>),
+}
+
+impl<'db> MethodWrapperKind<'db> {
+    fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(self_function),
+                MethodWrapperKind::FunctionTypeDunderGet(other_function),
+            ) => self_function.is_subtype_of(db, other_function),
+
+            (
+                MethodWrapperKind::FunctionTypeDunderCall(self_function),
+                MethodWrapperKind::FunctionTypeDunderCall(other_function),
+            ) => self_function.is_subtype_of(db, other_function),
+
+            (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
+            | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
+            | (MethodWrapperKind::StrStartswith(_), MethodWrapperKind::StrStartswith(_)) => {
+                self == other
+            }
+
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+            ) => false,
+        }
+    }
+
+    fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(self_function),
+                MethodWrapperKind::FunctionTypeDunderGet(other_function),
+            ) => self_function.is_assignable_to(db, other_function),
+
+            (
+                MethodWrapperKind::FunctionTypeDunderCall(self_function),
+                MethodWrapperKind::FunctionTypeDunderCall(other_function),
+            ) => self_function.is_assignable_to(db, other_function),
+
+            (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
+            | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
+            | (MethodWrapperKind::StrStartswith(_), MethodWrapperKind::StrStartswith(_)) => {
+                self == other
+            }
+
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+            ) => false,
+        }
+    }
 }
 
 /// Represents a specific instance of `types.WrapperDescriptorType`

@@ -641,32 +641,33 @@ impl<'db> SpecializationBuilder<'db> {
         }
 
         match (formal, actual) {
-            (Type::TypeVar(typevar), _) => match typevar.bound_or_constraints(self.db) {
+            (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) => {
+                match typevar.bound_or_constraints(self.db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    if !actual.is_assignable_to(self.db, bound) {
+                    if !ty.is_assignable_to(self.db, bound) {
                         return Err(SpecializationError::MismatchedBound {
                             typevar,
-                            argument: actual,
+                            argument: ty,
                         });
                     }
-                    self.add_type_mapping(typevar, actual);
+                    self.add_type_mapping(typevar, ty);
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                     for constraint in constraints.iter(self.db) {
-                        if actual.is_assignable_to(self.db, *constraint) {
+                        if ty.is_assignable_to(self.db, *constraint) {
                             self.add_type_mapping(typevar, *constraint);
                             return Ok(());
                         }
                     }
                     return Err(SpecializationError::MismatchedConstraint {
                         typevar,
-                        argument: actual,
+                        argument: ty,
                     });
                 }
                 _ => {
-                    self.add_type_mapping(typevar, actual);
+                    self.add_type_mapping(typevar, ty);
                 }
-            },
+                }}
 
             (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
                 let formal_elements = formal_tuple.elements(self.db);
