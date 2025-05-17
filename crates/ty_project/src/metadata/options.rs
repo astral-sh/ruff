@@ -123,12 +123,24 @@ impl Options {
         } else {
             let src = project_root.join("src");
 
-            // Default to `src` and the project root if `src` exists and the root hasn't been specified.
             if system.is_directory(&src) {
+                // Default to `src` and the project root if `src` exists and the root hasn't been specified.
+                // This corresponds to the `src-layout`
+                tracing::debug!(
+                    "Including `./src` in `src.root` because a `./src` directory exists"
+                );
                 vec![project_root.to_path_buf(), src]
             } else if system.is_directory(&project_root.join(project_name).join(project_name)) {
+                // `src-layout` but when the folder isn't called `src` but has the same name as the project.
+                // For example, the "src" folder for `psycopg` is called `psycopg` and the python files are in `psycopg/psycopg/_adapters_map.py`
+                tracing::debug!(
+                    "Including `./{project_name}` in `src.root` because a `./{project_name}/{project_name}` directory exists"
+                );
+
                 vec![project_root.to_path_buf(), project_root.join(project_name)]
             } else {
+                // Default to a [flat project structure](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/).
+                tracing::debug!("Defaulting `src.root` to `.`");
                 vec![project_root.to_path_buf()]
             }
         };
@@ -358,9 +370,11 @@ pub struct EnvironmentOptions {
 pub struct SrcOptions {
     /// The root of the project, used for finding first-party modules.
     ///
-    /// If left unspecified, ty will default to the current working directory and:
-    /// * `./src` if it exists
-    /// * `./<project-name>` if the folder `./<project-name>/<project-name>` exists
+    /// If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:
+    ///
+    /// * if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
+    /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
+    /// * otherwise, default to `.` (flat layout)
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,

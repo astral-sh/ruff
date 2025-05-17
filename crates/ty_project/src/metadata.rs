@@ -948,6 +948,87 @@ expected `.`, `]`
         Ok(())
     }
 
+    #[test]
+    fn no_src_root_src_layout() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("src/main.py"),
+                r#"
+                print("Hello, world!")
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "my_package", &system);
+
+        assert_eq!(
+            settings.search_paths.src_roots,
+            vec![root.clone(), root.join("src")]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn no_src_root_package_layout() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("psycopg/psycopg/main.py"),
+                r#"
+                print("Hello, world!")
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "psycopg", &system);
+
+        assert_eq!(
+            settings.search_paths.src_roots,
+            vec![root.clone(), root.join("psycopg")]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn no_src_root_flat_layout() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("my_package/main.py"),
+                r#"
+                print("Hello, world!")
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "my_package", &system);
+
+        assert_eq!(settings.search_paths.src_roots, vec![root]);
+
+        Ok(())
+    }
+
     #[track_caller]
     fn assert_error_eq(error: &ProjectDiscoveryError, message: &str) {
         assert_eq!(error.to_string().replace('\\', "/"), message);
