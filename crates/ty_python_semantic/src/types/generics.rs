@@ -7,8 +7,8 @@ use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    KnownInstanceType, Type, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance,
-    UnionType, declaration_type, todo_type,
+    declaration_type, todo_type, KnownInstanceType, Type, TypeVarBoundOrConstraints,
+    TypeVarInstance, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxOrderSet};
 
@@ -643,31 +643,32 @@ impl<'db> SpecializationBuilder<'db> {
         match (formal, actual) {
             (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) => {
                 match typevar.bound_or_constraints(self.db) {
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    if !ty.is_assignable_to(self.db, bound) {
-                        return Err(SpecializationError::MismatchedBound {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        if !ty.is_assignable_to(self.db, bound) {
+                            return Err(SpecializationError::MismatchedBound {
+                                typevar,
+                                argument: ty,
+                            });
+                        }
+                        self.add_type_mapping(typevar, ty);
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        for constraint in constraints.iter(self.db) {
+                            if ty.is_assignable_to(self.db, *constraint) {
+                                self.add_type_mapping(typevar, *constraint);
+                                return Ok(());
+                            }
+                        }
+                        return Err(SpecializationError::MismatchedConstraint {
                             typevar,
                             argument: ty,
                         });
                     }
-                    self.add_type_mapping(typevar, ty);
-                }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    for constraint in constraints.iter(self.db) {
-                        if ty.is_assignable_to(self.db, *constraint) {
-                            self.add_type_mapping(typevar, *constraint);
-                            return Ok(());
-                        }
+                    _ => {
+                        self.add_type_mapping(typevar, ty);
                     }
-                    return Err(SpecializationError::MismatchedConstraint {
-                        typevar,
-                        argument: ty,
-                    });
                 }
-                _ => {
-                    self.add_type_mapping(typevar, ty);
-                }
-                }}
+            }
 
             (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
                 let formal_elements = formal_tuple.elements(self.db);
