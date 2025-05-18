@@ -2,21 +2,21 @@ use std::cmp::Ordering;
 use std::slice;
 
 use ruff_formatter::{
-    write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
+    FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions, write,
 };
 use ruff_python_ast::parenthesize::parentheses_iterator;
-use ruff_python_ast::visitor::source_order::{walk_expr, SourceOrderVisitor};
+use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, walk_expr};
 use ruff_python_ast::{self as ast};
 use ruff_python_ast::{AnyNodeRef, Expr, ExprRef, Operator};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
-use crate::comments::{leading_comments, trailing_comments, LeadingDanglingTrailingComments};
+use crate::comments::{LeadingDanglingTrailingComments, leading_comments, trailing_comments};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
-    is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
-    OptionalParentheses, Parentheses, Parenthesize,
+    NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize, is_expression_parenthesized,
+    optional_parentheses, parenthesized,
 };
 use crate::prelude::*;
 use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
@@ -391,7 +391,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                         .fmt(f)
                 } else {
                     expression.format().with_options(Parentheses::Never).fmt(f)
-                }
+                };
             }
             needs_parentheses => needs_parentheses,
         };
@@ -523,7 +523,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 /// * The expression contains at least one parenthesized sub expression (optimization to avoid unnecessary work)
 ///
 /// This mimics Black's [`_maybe_split_omitting_optional_parens`](https://github.com/psf/black/blob/d1248ca9beaf0ba526d265f4108836d89cf551b7/src/black/linegen.py#L746-L820)
-#[allow(clippy::if_same_then_else)]
 pub(crate) fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
     let mut visitor = CanOmitOptionalParenthesesVisitor::new(context);
     visitor.visit_subexpression(expr);
@@ -679,7 +678,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
 
             // It's impossible for a file smaller or equal to 4GB to contain more than 2^32 comparisons
             // because each comparison requires a left operand, and `n` `operands` and right sides.
-            #[allow(clippy::cast_possible_truncation)]
+            #[expect(clippy::cast_possible_truncation)]
             Expr::BoolOp(ast::ExprBoolOp {
                 range: _,
                 op: _,
@@ -702,7 +701,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
 
             // It's impossible for a file smaller or equal to 4GB to contain more than 2^32 comparisons
             // because each comparison requires a left operand, and `n` `operands` and right sides.
-            #[allow(clippy::cast_possible_truncation)]
+            #[expect(clippy::cast_possible_truncation)]
             Expr::Compare(ast::ExprCompare {
                 range: _,
                 left: _,

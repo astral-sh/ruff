@@ -1,6 +1,6 @@
 //! Code modification struct to support symbol renaming within a scope.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use itertools::Itertools;
 
 use ruff_diagnostics::Edit;
@@ -298,11 +298,15 @@ impl Renamer {
         let name_argument = match qualified_name.segments() {
             ["collections", "namedtuple"] => arguments.find_argument_value("typename", 0),
 
-            ["typing" | "typing_extensions", "TypeVar" | "ParamSpec" | "TypeVarTuple" | "NewType" | "TypeAliasType"] => {
-                arguments.find_argument_value("name", 0)
-            }
+            [
+                "typing" | "typing_extensions",
+                "TypeVar" | "ParamSpec" | "TypeVarTuple" | "NewType" | "TypeAliasType",
+            ] => arguments.find_argument_value("name", 0),
 
-            ["enum", "Enum" | "IntEnum" | "StrEnum" | "ReprEnum" | "Flag" | "IntFlag"]
+            [
+                "enum",
+                "Enum" | "IntEnum" | "StrEnum" | "ReprEnum" | "Flag" | "IntFlag",
+            ]
             | ["typing" | "typing_extensions", "NamedTuple" | "TypedDict"] => {
                 arguments.find_positional(0)
             }

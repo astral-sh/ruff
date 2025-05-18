@@ -2,7 +2,7 @@ use memchr::memchr2_iter;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::parse_expression;
@@ -10,9 +10,9 @@ use ruff_python_semantic::analyze::logging::is_logger_candidate;
 use ruff_python_semantic::{Modules, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::fastapi::rules::is_fastapi_route_call;
-use crate::Locator;
 
 /// ## What it does
 /// Searches for strings that look like they were meant to be f-strings, but are missing an `f` prefix.
@@ -52,6 +52,11 @@ use crate::Locator;
 /// day_of_week = "Tuesday"
 /// print(f"Hello {name}! It is {day_of_week} today!")
 /// ```
+///
+/// ## Fix safety
+///
+/// This fix will always change the behavior of the program and, despite the precautions detailed
+/// above, this may be undesired. As such the fix is always marked as unsafe.
 ///
 /// [logging]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
 /// [gettext]: https://docs.python.org/3/library/gettext.html

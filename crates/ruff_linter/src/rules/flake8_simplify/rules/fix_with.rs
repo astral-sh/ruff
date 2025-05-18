@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use libcst_native::{CompoundStatement, Statement, Suite, With};
 
 use ruff_diagnostics::Edit;
@@ -8,9 +8,9 @@ use ruff_python_codegen::Stylist;
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
+use crate::Locator;
 use crate::cst::matchers::{match_function_def, match_indented_block, match_statement, match_with};
 use crate::fix::codemods::CodegenStylist;
-use crate::Locator;
 
 /// (SIM117) Convert `with a: with b:` to `with a, b:`.
 pub(crate) fn fix_multiple_with_statements(
@@ -55,7 +55,7 @@ pub(crate) fn fix_multiple_with_statements(
     let outer_with = match_with(statement)?;
 
     let With {
-        body: Suite::IndentedBlock(ref mut outer_body),
+        body: Suite::IndentedBlock(outer_body),
         ..
     } = outer_with
     else {

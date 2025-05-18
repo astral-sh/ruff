@@ -95,7 +95,7 @@ Module(
 
   |
 1 | for _ in *x: ...
-  |          ^^ Syntax Error: can't use starred expression here
+  |          ^^ Syntax Error: Starred expression cannot be used here
 2 | for *x in xs: ...
   |
 
@@ -103,5 +103,5 @@ Module(
   |
 1 | for _ in *x: ...
 2 | for *x in xs: ...
-  |     ^^ Syntax Error: can't use starred expression here
+  |     ^^ Syntax Error: Starred expression cannot be used here
   |

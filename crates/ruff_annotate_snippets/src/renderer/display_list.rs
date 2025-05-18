@@ -32,7 +32,7 @@
 //!
 //! The above snippet has been built out of the following structure:
 use crate::snippet;
-use std::cmp::{max, min, Reverse};
+use std::cmp::{Reverse, max, min};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::Range;
@@ -41,7 +41,7 @@ use std::{cmp, fmt};
 use unicode_width::UnicodeWidthStr;
 
 use crate::renderer::styled_buffer::StyledBuffer;
-use crate::renderer::{stylesheet::Stylesheet, Margin, Style, DEFAULT_TERM_WIDTH};
+use crate::renderer::{DEFAULT_TERM_WIDTH, Margin, Style, stylesheet::Stylesheet};
 
 const ANONYMIZED_LINE_NUM: &str = "LL";
 const ERROR_TXT: &str = "error";
@@ -1273,10 +1273,7 @@ fn fold_body(body: Vec<DisplayLine<'_>>) -> Vec<DisplayLine<'_>> {
                             let inline_marks = lines
                                 .last()
                                 .and_then(|line| {
-                                    if let DisplayLine::Source {
-                                        ref inline_marks, ..
-                                    } = line
-                                    {
+                                    if let DisplayLine::Source { inline_marks, .. } = line {
                                         let inline_marks = inline_marks.clone();
                                         Some(inline_marks)
                                     } else {

@@ -16,8 +16,8 @@
 use std::{
     num::NonZeroUsize,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 
@@ -106,7 +106,7 @@ impl Pool {
         self.job_sender.send(job).unwrap();
     }
 
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub(super) fn len(&self) -> usize {
         self.extant_tasks.load(Ordering::SeqCst)
     }

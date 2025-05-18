@@ -3,8 +3,8 @@
 use wasm_bindgen_test::wasm_bindgen_test;
 
 use ruff_linter::registry::Rule;
-use ruff_source_file::{OneIndexed, SourceLocation};
-use ruff_wasm::{ExpandedMessage, Workspace};
+use ruff_source_file::OneIndexed;
+use ruff_wasm::{ExpandedMessage, Location, Workspace};
 
 macro_rules! check {
     ($source:expr, $config:expr, $expected:expr) => {{
@@ -27,11 +27,11 @@ fn empty_config() {
         [ExpandedMessage {
             code: Some(Rule::IfTuple.noqa_code().to_string()),
             message: "If test is a tuple, which is always `True`".to_string(),
-            start_location: SourceLocation {
+            start_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(3)
             },
-            end_location: SourceLocation {
+            end_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(9)
             },
@@ -48,11 +48,11 @@ fn syntax_error() {
         [ExpandedMessage {
             code: None,
             message: "SyntaxError: Expected an expression".to_string(),
-            start_location: SourceLocation {
+            start_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(3)
             },
-            end_location: SourceLocation {
+            end_location: Location {
                 row: OneIndexed::from_zero_indexed(1),
                 column: OneIndexed::from_zero_indexed(0)
             },
@@ -65,15 +65,15 @@ fn syntax_error() {
 fn unsupported_syntax_error() {
     check!(
         "match 2:\n    case 1: ...",
-        r#"{"preview": true}"#,
+        r#"{"preview": true, "target-version": "py39"}"#,
         [ExpandedMessage {
             code: None,
             message: "SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)".to_string(),
-            start_location: SourceLocation {
+            start_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(0)
             },
-            end_location: SourceLocation {
+            end_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(5)
             },

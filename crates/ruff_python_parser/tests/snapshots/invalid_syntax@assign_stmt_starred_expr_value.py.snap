@@ -1,0 +1,197 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/assign_stmt_starred_expr_value.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..45,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 0..9,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 0..1,
+                                id: Name("_"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Starred(
+                        ExprStarred {
+                            range: 4..9,
+                            value: List(
+                                ExprList {
+                                    range: 5..9,
+                                    elts: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 6..8,
+                                                value: Int(
+                                                    42,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 10..19,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 10..11,
+                                id: Name("_"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Starred(
+                        ExprStarred {
+                            range: 14..19,
+                            value: Set(
+                                ExprSet {
+                                    range: 15..19,
+                                    elts: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 16..18,
+                                                value: Int(
+                                                    42,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 20..31,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 20..21,
+                                id: Name("_"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Starred(
+                        ExprStarred {
+                            range: 24..31,
+                            value: Call(
+                                ExprCall {
+                                    range: 25..31,
+                                    func: Name(
+                                        ExprName {
+                                            range: 25..29,
+                                            id: Name("list"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 29..31,
+                                        args: [],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 32..44,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 32..33,
+                                id: Name("_"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Starred(
+                        ExprStarred {
+                            range: 36..44,
+                            value: BinOp(
+                                ExprBinOp {
+                                    range: 38..43,
+                                    left: Name(
+                                        ExprName {
+                                            range: 38..39,
+                                            id: Name("p"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    op: Add,
+                                    right: Name(
+                                        ExprName {
+                                            range: 42..43,
+                                            id: Name("q"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | _ = *[42]
+  |     ^^^^^ Syntax Error: Starred expression cannot be used here
+2 | _ = *{42}
+3 | _ = *list()
+  |
+
+
+  |
+1 | _ = *[42]
+2 | _ = *{42}
+  |     ^^^^^ Syntax Error: Starred expression cannot be used here
+3 | _ = *list()
+4 | _ = *(p + q)
+  |
+
+
+  |
+1 | _ = *[42]
+2 | _ = *{42}
+3 | _ = *list()
+  |     ^^^^^^^ Syntax Error: Starred expression cannot be used here
+4 | _ = *(p + q)
+  |
+
+
+  |
+2 | _ = *{42}
+3 | _ = *list()
+4 | _ = *(p + q)
+  |     ^^^^^^^^ Syntax Error: Starred expression cannot be used here
+  |

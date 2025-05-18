@@ -2,9 +2,9 @@ use ruff_formatter::write;
 use ruff_python_ast::ModModule;
 use ruff_python_trivia::lines_after;
 
+use crate::FormatNodeRule;
 use crate::prelude::*;
 use crate::statement::suite::SuiteKind;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatModModule;

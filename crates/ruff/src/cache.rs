@@ -3,8 +3,8 @@ use std::fs::{self, File};
 use std::hash::Hasher;
 use std::io::{self, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
@@ -13,21 +13,22 @@ use itertools::Itertools;
 use log::{debug, error};
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelBridge};
+use ruff_linter::{codes::Rule, registry::AsRule};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
-use ruff_diagnostics::{DiagnosticKind, Fix};
+use ruff_diagnostics::Fix;
 use ruff_linter::message::{DiagnosticMessage, Message};
 use ruff_linter::package::PackageRoot;
-use ruff_linter::{warn_user, VERSION};
+use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
-use ruff_workspace::resolver::Resolver;
 use ruff_workspace::Settings;
+use ruff_workspace::resolver::Resolver;
 
 use crate::diagnostics::Diagnostics;
 
@@ -86,7 +87,7 @@ pub(crate) struct Cache {
     changes: Mutex<Vec<Change>>,
     /// The "current" timestamp used as cache for the updates of
     /// [`FileCache::last_seen`]
-    #[allow(clippy::struct_field_names)]
+    #[expect(clippy::struct_field_names)]
     last_seen_cache: u64,
 }
 
@@ -146,7 +147,7 @@ impl Cache {
         Cache::new(path, package)
     }
 
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     fn new(path: PathBuf, package: PackageCache) -> Self {
         Cache {
             path,
@@ -204,7 +205,7 @@ impl Cache {
     }
 
     /// Applies the pending changes without storing the cache to disk.
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     pub(crate) fn save(&mut self) -> bool {
         /// Maximum duration for which we keep a file in cache that hasn't been seen.
         const MAX_LAST_SEEN: Duration = Duration::from_secs(30 * 24 * 60 * 60); // 30 days.
@@ -348,7 +349,9 @@ impl FileCache {
                     .iter()
                     .map(|msg| {
                         Message::Diagnostic(DiagnosticMessage {
-                            kind: msg.kind.clone(),
+                            name: msg.rule.into(),
+                            body: msg.body.clone(),
+                            suggestion: msg.suggestion.clone(),
                             range: msg.range,
                             fix: msg.fix.clone(),
                             file: file.clone(),
@@ -439,12 +442,14 @@ impl LintCacheData {
             .map(|msg| {
                 // Make sure that all message use the same source file.
                 assert_eq!(
-                    &msg.file,
+                    msg.file,
                     messages.first().unwrap().source_file(),
                     "message uses a different source file"
                 );
                 CacheMessage {
-                    kind: msg.kind.clone(),
+                    rule: msg.rule(),
+                    body: msg.body.clone(),
+                    suggestion: msg.suggestion.clone(),
                     range: msg.range,
                     parent: msg.parent,
                     fix: msg.fix.clone(),
@@ -464,7 +469,12 @@ impl LintCacheData {
 /// On disk representation of a diagnostic message.
 #[derive(Deserialize, Debug, Serialize, PartialEq)]
 pub(super) struct CacheMessage {
-    kind: DiagnosticKind,
+    /// The rule for the cached diagnostic.
+    rule: Rule,
+    /// The message body to display to the user, to explain the diagnostic.
+    body: String,
+    /// The message to display to the user, to explain the suggested fix.
+    suggestion: Option<String>,
     /// Range into the message's [`FileCache::source`].
     range: TextRange,
     parent: Option<TextSize>,
@@ -587,7 +597,7 @@ mod tests {
     use std::time::SystemTime;
 
     use anyhow::Result;
-    use filetime::{set_file_mtime, FileTime};
+    use filetime::{FileTime, set_file_mtime};
     use itertools::Itertools;
     use ruff_linter::settings::LinterSettings;
     use test_case::test_case;
@@ -602,8 +612,8 @@ mod tests {
 
     use crate::cache::{self, FileCache, FileCacheData, FileCacheKey};
     use crate::cache::{Cache, RelativePathBuf};
-    use crate::commands::format::{format_path, FormatCommandError, FormatMode, FormatResult};
-    use crate::diagnostics::{lint_path, Diagnostics};
+    use crate::commands::format::{FormatCommandError, FormatMode, FormatResult, format_path};
+    use crate::diagnostics::{Diagnostics, lint_path};
 
     #[test_case("../ruff_linter/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_linter"; "ruff_linter_fixtures")]
     #[test_case("../ruff_notebook/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_notebook"; "ruff_notebook_fixtures")]
@@ -616,7 +626,7 @@ mod tests {
         let settings = Settings {
             cache_dir,
             linter: LinterSettings {
-                unresolved_target_version: PythonVersion::latest(),
+                unresolved_target_version: PythonVersion::latest().into(),
                 ..Default::default()
             },
             ..Settings::default()
@@ -834,7 +844,6 @@ mod tests {
         // Regression test for issue #3086.
 
         #[cfg(unix)]
-        #[allow(clippy::items_after_statements)]
         fn flip_execute_permission_bit(path: &Path) -> io::Result<()> {
             use std::os::unix::fs::PermissionsExt;
             let file = fs::OpenOptions::new().write(true).open(path)?;
@@ -843,7 +852,6 @@ mod tests {
         }
 
         #[cfg(windows)]
-        #[allow(clippy::items_after_statements)]
         fn flip_read_only_permission(path: &Path) -> io::Result<()> {
             let file = fs::OpenOptions::new().write(true).open(path)?;
             let mut perms = file.metadata()?.permissions();

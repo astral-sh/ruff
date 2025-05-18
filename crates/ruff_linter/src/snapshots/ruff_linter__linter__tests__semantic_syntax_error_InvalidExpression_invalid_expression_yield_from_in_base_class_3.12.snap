@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+<filename>:2:13: SyntaxError: yield expression cannot be used within a generic definition
+  |
+2 | class C[T]((yield from [object])):
+  |             ^^^^^^^^^^^^^^^^^^^
+3 |     pass
+  |

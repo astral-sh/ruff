@@ -7,15 +7,15 @@ use colored::Colorize;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::{OneIndexed, SourceLocation};
+use ruff_source_file::{LineColumn, OneIndexed};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Locator;
 use crate::fs::relativize_path;
 use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::settings::types::UnsafeFixes;
-use crate::Locator;
 
 bitflags! {
     #[derive(Default)]
@@ -73,12 +73,12 @@ impl Emitter for TextEmitter {
             write!(
                 writer,
                 "{path}{sep}",
-                path = relativize_path(message.filename()).bold(),
+                path = relativize_path(&*message.filename()).bold(),
                 sep = ":".cyan(),
             )?;
 
             let start_location = message.compute_start_location();
-            let notebook_index = context.notebook_index(message.filename());
+            let notebook_index = context.notebook_index(&message.filename());
 
             // Check if we're working on a jupyter notebook and translate positions with cell accordingly
             let diagnostic_location = if let Some(notebook_index) = notebook_index {
@@ -86,14 +86,14 @@ impl Emitter for TextEmitter {
                     writer,
                     "cell {cell}{sep}",
                     cell = notebook_index
-                        .cell(start_location.row)
+                        .cell(start_location.line)
                         .unwrap_or(OneIndexed::MIN),
                     sep = ":".cyan(),
                 )?;
 
-                SourceLocation {
-                    row: notebook_index
-                        .cell_row(start_location.row)
+                LineColumn {
+                    line: notebook_index
+                        .cell_row(start_location.line)
                         .unwrap_or(OneIndexed::MIN),
                     column: start_location.column,
                 }
@@ -104,7 +104,7 @@ impl Emitter for TextEmitter {
             writeln!(
                 writer,
                 "{row}{sep}{col}{sep} {code_and_body}",
-                row = diagnostic_location.row,
+                row = diagnostic_location.line,
                 col = diagnostic_location.column,
                 sep = ":".cyan(),
                 code_and_body = RuleCodeAndBody {
@@ -191,7 +191,8 @@ impl Display for MessageCodeFrame<'_> {
             Vec::new()
         };
 
-        let source_code = self.message.source_file().to_source_code();
+        let source_file = self.message.source_file();
+        let source_code = source_file.to_source_code();
 
         let content_start_index = source_code.line_index(self.message.start());
         let mut start_index = content_start_index.saturating_sub(2);
@@ -406,11 +407,11 @@ impl<'a> SourceCode<'a> {
 mod tests {
     use insta::assert_snapshot;
 
+    use crate::message::TextEmitter;
     use crate::message::tests::{
         capture_emitter_notebook_output, capture_emitter_output, create_messages,
         create_notebook_messages, create_syntax_error_messages,
     };
-    use crate::message::TextEmitter;
     use crate::settings::types::UnsafeFixes;
 
     #[test]

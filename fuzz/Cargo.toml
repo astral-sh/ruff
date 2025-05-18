@@ -17,8 +17,6 @@ libfuzzer = ["libfuzzer-sys/link_libfuzzer"]
 cargo-fuzz = true
 
 [dependencies]
-red_knot_python_semantic = { path = "../crates/red_knot_python_semantic" }
-red_knot_vendored = { path = "../crates/red_knot_vendored" }
 ruff_db = { path = "../crates/ruff_db" }
 ruff_linter = { path = "../crates/ruff_linter" }
 ruff_python_ast = { path = "../crates/ruff_python_ast" }
@@ -28,8 +26,11 @@ ruff_source_file = { path = "../crates/ruff_source_file" }
 ruff_python_formatter = { path = "../crates/ruff_python_formatter" }
 ruff_text_size = { path = "../crates/ruff_text_size" }
 
+ty_python_semantic = { path = "../crates/ty_python_semantic" }
+ty_vendored = { path = "../crates/ty_vendored" }
+
 libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer", default-features = false }
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "87bf6b6c2d5f6479741271da73bd9d30c2580c26" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "7edce6e248f35c8114b4b021cdb474a3fb2813b3" }
 similar = { version = "2.5.0" }
 tracing = { version = "0.1.40" }
 
@@ -38,8 +39,8 @@ tracing = { version = "0.1.40" }
 members = ["."]
 
 [[bin]]
-name = "red_knot_check_invalid_syntax"
-path = "fuzz_targets/red_knot_check_invalid_syntax.rs"
+name = "ty_check_invalid_syntax"
+path = "fuzz_targets/ty_check_invalid_syntax.rs"
 
 [[bin]]
 name = "ruff_parse_simple"

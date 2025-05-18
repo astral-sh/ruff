@@ -1,8 +1,8 @@
-use red_knot_python_semantic::resolve_module;
 use ruff_db::files::FilePath;
+use ty_python_semantic::resolve_module;
 
-use crate::collector::CollectedImport;
 use crate::ModuleDb;
+use crate::collector::CollectedImport;
 
 /// Collect all imports for a given Python file.
 pub(crate) struct Resolver<'a> {

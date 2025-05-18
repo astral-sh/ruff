@@ -2,7 +2,7 @@ use anyhow::Result;
 use itertools::Itertools;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -45,6 +45,14 @@ use crate::importer::ImportRequest;
 /// lists = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
 /// functools.reduce(operator.iadd, lists, [])
 /// ```
+///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because `sum` uses the `__add__` magic method while
+/// `operator.iadd` uses the `__iadd__` magic method, and these behave differently on lists.
+/// The former requires the right summand to be a list, whereas the latter allows for any iterable.
+/// Therefore, the fix could inadvertently cause code that previously raised an error to silently
+/// succeed. Moreover, the fix could remove comments from the original code.
 ///
 /// ## References
 /// - [_How Not to Flatten a List of Lists in Python_](https://mathieularose.com/how-not-to-flatten-a-list-of-lists-in-python)

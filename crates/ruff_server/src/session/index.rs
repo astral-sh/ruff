@@ -13,11 +13,11 @@ pub(crate) use ruff_settings::RuffSettings;
 use crate::edit::LanguageId;
 use crate::workspace::{Workspace, Workspaces};
 use crate::{
-    edit::{DocumentKey, DocumentVersion, NotebookDocument},
     PositionEncoding, TextDocument,
+    edit::{DocumentKey, DocumentVersion, NotebookDocument},
 };
 
-use super::{settings::ResolvedClientSettings, ClientSettings};
+use super::{ClientSettings, settings::ResolvedClientSettings};
 
 mod ruff_settings;
 
@@ -517,7 +517,6 @@ impl DocumentController {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn as_text(&self) -> Option<&TextDocument> {
         match self {
             Self::Text(document) => Some(document),
@@ -560,7 +559,7 @@ impl DocumentQuery {
                 ruff_linter::source_kind::SourceKind::Python(document.contents().to_string())
             }
             Self::Notebook { notebook, .. } => {
-                ruff_linter::source_kind::SourceKind::IpyNotebook(notebook.make_ruff_notebook())
+                ruff_linter::source_kind::SourceKind::ipy_notebook(notebook.make_ruff_notebook())
             }
         }
     }

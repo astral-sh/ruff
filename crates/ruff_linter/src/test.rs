@@ -20,16 +20,16 @@ use ruff_python_parser::{ParseError, ParseOptions};
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::SourceFileBuilder;
 
-use crate::fix::{fix_file, FixResult};
+use crate::fix::{FixResult, fix_file};
 use crate::linter::check_path;
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
 use crate::settings::types::UnsafeFixes;
-use crate::settings::{flags, LinterSettings};
+use crate::settings::{LinterSettings, flags};
 use crate::source_kind::SourceKind;
-use crate::{directives, Locator};
+use crate::{Locator, directives};
 
 #[cfg(not(fuzzing))]
 pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
@@ -60,7 +60,7 @@ pub(crate) fn assert_notebook_path(
 ) -> Result<TestedNotebook, NotebookError> {
     let source_notebook = Notebook::from_path(path.as_ref())?;
 
-    let source_kind = SourceKind::IpyNotebook(source_notebook);
+    let source_kind = SourceKind::ipy_notebook(source_notebook);
     let (messages, transformed) = test_contents(&source_kind, path.as_ref(), settings);
     let expected_notebook = Notebook::from_path(expected.as_ref())?;
     let linted_notebook = transformed.into_owned().expect_ipy_notebook();
@@ -110,7 +110,8 @@ pub(crate) fn test_contents<'a>(
 ) -> (Vec<Message>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
     let target_version = settings.resolve_target_version(path);
-    let options = ParseOptions::from(source_type).with_target_version(target_version);
+    let options =
+        ParseOptions::from(source_type).with_target_version(target_version.parser_version());
     let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options.clone())
         .try_into_module()
         .expect("PySourceType always parses into a module");
@@ -234,7 +235,7 @@ Source with applied fixes:
         .into_iter()
         .filter_map(Message::into_diagnostic_message)
         .map(|mut diagnostic| {
-            let rule = diagnostic.kind.rule();
+            let rule = diagnostic.rule();
             let fixable = diagnostic.fix.as_ref().is_some_and(|fix| {
                 matches!(
                     fix.applicability(),
@@ -268,7 +269,7 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             }
 
             assert!(
-                !(fixable && diagnostic.kind.suggestion.is_none()),
+                !(fixable && diagnostic.suggestion.is_none()),
                 "Diagnostic emitted by {rule:?} is fixable but \
                 `Violation::fix_title` returns `None`"
             );

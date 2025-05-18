@@ -2,17 +2,18 @@ use std::fmt;
 
 use bitflags::bitflags;
 
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, StringLike};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
-use crate::rules::ruff::rules::confusables::confusable;
-use crate::rules::ruff::rules::Context;
-use crate::settings::LinterSettings;
 use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::preview::is_unicode_to_unicode_confusables_enabled;
+use crate::registry::AsRule;
+use crate::rules::ruff::rules::Context;
+use crate::rules::ruff::rules::confusables::confusable;
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for ambiguous Unicode characters in strings.
@@ -264,9 +265,9 @@ fn ambiguous_unicode_character(
             // Check if the boundary character is itself an ambiguous unicode character, in which
             // case, it's always included as a diagnostic.
             if !current_char.is_ascii() {
-                if let Some(representant) = confusable(current_char as u32)
-                    .filter(|representant| settings.preview.is_enabled() || representant.is_ascii())
-                {
+                if let Some(representant) = confusable(current_char as u32).filter(|representant| {
+                    is_unicode_to_unicode_confusables_enabled(settings) || representant.is_ascii()
+                }) {
                     let candidate = Candidate::new(
                         TextSize::try_from(relative_offset).unwrap() + range.start(),
                         current_char,
@@ -280,9 +281,9 @@ fn ambiguous_unicode_character(
         } else if current_char.is_ascii() {
             // The current word contains at least one ASCII character.
             word_flags |= WordFlags::ASCII;
-        } else if let Some(representant) = confusable(current_char as u32)
-            .filter(|representant| settings.preview.is_enabled() || representant.is_ascii())
-        {
+        } else if let Some(representant) = confusable(current_char as u32).filter(|representant| {
+            is_unicode_to_unicode_confusables_enabled(settings) || representant.is_ascii()
+        }) {
             // The current word contains an ambiguous unicode character.
             word_candidates.push(Candidate::new(
                 TextSize::try_from(relative_offset).unwrap() + range.start(),
@@ -354,27 +355,30 @@ impl Candidate {
     fn into_diagnostic(self, context: Context, settings: &LinterSettings) -> Option<Diagnostic> {
         if !settings.allowed_confusables.contains(&self.confusable) {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());
-            let diagnostic = Diagnostic::new::<DiagnosticKind>(
-                match context {
-                    Context::String => AmbiguousUnicodeCharacterString {
+            let diagnostic = match context {
+                Context::String => Diagnostic::new(
+                    AmbiguousUnicodeCharacterString {
                         confusable: self.confusable,
                         representant: self.representant,
-                    }
-                    .into(),
-                    Context::Docstring => AmbiguousUnicodeCharacterDocstring {
+                    },
+                    char_range,
+                ),
+                Context::Docstring => Diagnostic::new(
+                    AmbiguousUnicodeCharacterDocstring {
                         confusable: self.confusable,
                         representant: self.representant,
-                    }
-                    .into(),
-                    Context::Comment => AmbiguousUnicodeCharacterComment {
+                    },
+                    char_range,
+                ),
+                Context::Comment => Diagnostic::new(
+                    AmbiguousUnicodeCharacterComment {
                         confusable: self.confusable,
                         representant: self.representant,
-                    }
-                    .into(),
-                },
-                char_range,
-            );
-            if settings.rules.enabled(diagnostic.kind.rule()) {
+                    },
+                    char_range,
+                ),
+            };
+            if settings.rules.enabled(diagnostic.rule()) {
                 return Some(diagnostic);
             }
         }

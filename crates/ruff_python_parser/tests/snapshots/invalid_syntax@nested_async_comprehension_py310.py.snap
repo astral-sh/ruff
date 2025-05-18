@@ -780,7 +780,7 @@ Module(
   |
 1 | # parse_options: {"target-version": "3.10"}
 2 | async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
-  |                           ^^^^^^^^^^^^^^^^^^^^^ Syntax Error: cannot use an asynchronous comprehension outside of an asynchronous function on Python 3.10 (syntax was added in 3.11)
+  |                           ^^^^^^^^^^^^^^^^^^^^^ Syntax Error: cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
 3 | async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
 4 | async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
   |
@@ -790,7 +790,7 @@ Module(
 1 | # parse_options: {"target-version": "3.10"}
 2 | async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
 3 | async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
-  |                              ^^^^^^^^^^^^^^^^^^^^^ Syntax Error: cannot use an asynchronous comprehension outside of an asynchronous function on Python 3.10 (syntax was added in 3.11)
+  |                              ^^^^^^^^^^^^^^^^^^^^^ Syntax Error: cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
 4 | async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
 5 | async def i(): return [([y async for y in range(1)], [z for z in range(2)]) for x in range(5)]
   |
@@ -800,7 +800,7 @@ Module(
 2 | async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
 3 | async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
 4 | async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
-  |                           ^^^^^^^^^^^^^^^^^^^^^ Syntax Error: cannot use an asynchronous comprehension outside of an asynchronous function on Python 3.10 (syntax was added in 3.11)
+  |                           ^^^^^^^^^^^^^^^^^^^^^ Syntax Error: cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
 5 | async def i(): return [([y async for y in range(1)], [z for z in range(2)]) for x in range(5)]
 6 | async def j(): return [([y for y in range(1)], [z async for z in range(2)]) for x in range(5)]
   |
@@ -810,7 +810,7 @@ Module(
 3 | async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
 4 | async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
 5 | async def i(): return [([y async for y in range(1)], [z for z in range(2)]) for x in range(5)]
-  |                            ^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: cannot use an asynchronous comprehension outside of an asynchronous function on Python 3.10 (syntax was added in 3.11)
+  |                            ^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
 6 | async def j(): return [([y for y in range(1)], [z async for z in range(2)]) for x in range(5)]
   |
 
@@ -819,5 +819,5 @@ Module(
 4 | async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
 5 | async def i(): return [([y async for y in range(1)], [z for z in range(2)]) for x in range(5)]
 6 | async def j(): return [([y for y in range(1)], [z async for z in range(2)]) for x in range(5)]
-  |                                                   ^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: cannot use an asynchronous comprehension outside of an asynchronous function on Python 3.10 (syntax was added in 3.11)
+  |                                                   ^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
   |

@@ -1,7 +1,7 @@
-use crate::rules::numpy::helpers::ImportSearcher;
+use crate::rules::numpy::helpers::{AttributeSearcher, ImportSearcher};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedNameBuilder;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr};
@@ -269,13 +269,17 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         ["numpy", "deprecate"] => Replacement {
             existing: "deprecate",
             details: Details::Manual {
-                guideline: Some("Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`."),
+                guideline: Some(
+                    "Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`.",
+                ),
             },
         },
         ["numpy", "deprecate_with_doc"] => Replacement {
             existing: "deprecate_with_doc",
             details: Details::Manual {
-                guideline: Some("Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`."),
+                guideline: Some(
+                    "Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`.",
+                ),
             },
         },
         ["numpy", "disp"] => Replacement {
@@ -293,14 +297,14 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         ["numpy", "find_common_type"] => Replacement {
             existing: "find_common_type",
             details: Details::Manual {
-                guideline: Some("Use `numpy.promote_types` or `numpy.result_type` instead. To achieve semantics for the `scalar_types` argument, use `numpy.result_type` and pass the Python values `0`, `0.0`, or `0j`."),
+                guideline: Some(
+                    "Use `numpy.promote_types` or `numpy.result_type` instead. To achieve semantics for the `scalar_types` argument, use `numpy.result_type` and pass the Python values `0`, `0.0`, or `0j`.",
+                ),
             },
         },
         ["numpy", "get_array_wrap"] => Replacement {
             existing: "get_array_wrap",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", "float_"] => Replacement {
             existing: "float_",
@@ -358,9 +362,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         },
         ["numpy", "issctype"] => Replacement {
             existing: "issctype",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", "issubclass_"] => Replacement {
             existing: "issubclass_",
@@ -386,9 +388,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         },
         ["numpy", "maximum_sctype"] => Replacement {
             existing: "maximum_sctype",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", existing @ ("NaN" | "NAN")] => Replacement {
             existing,
@@ -440,9 +440,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         },
         ["numpy", "obj2sctype"] => Replacement {
             existing: "obj2sctype",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", "PINF"] => Replacement {
             existing: "PINF",
@@ -494,15 +492,11 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         },
         ["numpy", "sctype2char"] => Replacement {
             existing: "sctype2char",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", "sctypes"] => Replacement {
             existing: "sctypes",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", "seterrobj"] => Replacement {
             existing: "seterrobj",
@@ -821,57 +815,6 @@ fn try_block_contains_undeprecated_attribute(
     let mut attribute_searcher = AttributeSearcher::new(undeprecated_qualified_name, semantic);
     attribute_searcher.visit_body(&try_node.body);
     attribute_searcher.found_attribute
-}
-
-/// AST visitor that searches an AST tree for [`ast::ExprAttribute`] nodes
-/// that match a certain [`QualifiedName`].
-struct AttributeSearcher<'a> {
-    attribute_to_find: QualifiedName<'a>,
-    semantic: &'a SemanticModel<'a>,
-    found_attribute: bool,
-}
-
-impl<'a> AttributeSearcher<'a> {
-    fn new(attribute_to_find: QualifiedName<'a>, semantic: &'a SemanticModel<'a>) -> Self {
-        Self {
-            attribute_to_find,
-            semantic,
-            found_attribute: false,
-        }
-    }
-}
-
-impl Visitor<'_> for AttributeSearcher<'_> {
-    fn visit_expr(&mut self, expr: &'_ Expr) {
-        if self.found_attribute {
-            return;
-        }
-        if expr.is_attribute_expr()
-            && self
-                .semantic
-                .resolve_qualified_name(expr)
-                .is_some_and(|qualified_name| qualified_name == self.attribute_to_find)
-        {
-            self.found_attribute = true;
-            return;
-        }
-        ast::visitor::walk_expr(self, expr);
-    }
-
-    fn visit_stmt(&mut self, stmt: &ruff_python_ast::Stmt) {
-        if !self.found_attribute {
-            ast::visitor::walk_stmt(self, stmt);
-        }
-    }
-
-    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
-        for stmt in body {
-            self.visit_stmt(stmt);
-            if self.found_attribute {
-                return;
-            }
-        }
-    }
 }
 
 /// Given an [`ast::StmtTry`] node, does the `try` branch of that node

@@ -84,3 +84,9 @@ str(
     '''Lorem
     ipsum'''  # Comment
 ).foo
+
+# https://github.com/astral-sh/ruff/issues/17606
+bool(True)and None
+int(1)and None
+float(1.)and None
+bool(True)and()

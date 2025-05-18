@@ -1,31 +1,31 @@
 use std::path::Path;
 
 use js_sys::Error;
-use ruff_linter::message::{DiagnosticMessage, Message, SyntaxErrorMessage};
+use ruff_linter::message::{DiagnosticMessage, Message};
 use ruff_linter::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{FormatResult, Formatted, IndentStyle};
+use ruff_linter::Locator;
 use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::linter::check_path;
 use ruff_linter::registry::AsRule;
-use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
+use ruff_linter::settings::{DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, flags};
 use ruff_linter::source_kind::SourceKind;
-use ruff_linter::Locator;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
-use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
+use ruff_python_formatter::{PyFormatContext, QuoteStyle, format_module_ast, pretty_comments};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{parse, parse_unchecked, Mode, ParseOptions, Parsed};
+use ruff_python_parser::{Mode, ParseOptions, Parsed, parse, parse_unchecked};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::SourceLocation;
+use ruff_source_file::{LineColumn, OneIndexed};
 use ruff_text_size::Ranged;
+use ruff_workspace::Settings;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::options::{FormatOptions, LintCommonOptions, LintOptions, Options};
-use ruff_workspace::Settings;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
@@ -61,8 +61,8 @@ export interface Diagnostic {
 pub struct ExpandedMessage {
     pub code: Option<String>,
     pub message: String,
-    pub start_location: SourceLocation,
-    pub end_location: SourceLocation,
+    pub start_location: Location,
+    pub end_location: Location,
     pub fix: Option<ExpandedFix>,
 }
 
@@ -74,8 +74,8 @@ pub struct ExpandedFix {
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 struct ExpandedEdit {
-    location: SourceLocation,
-    end_location: SourceLocation,
+    location: Location,
+    end_location: Location,
     content: Option<String>,
 }
 
@@ -166,7 +166,8 @@ impl Workspace {
         let target_version = self.settings.linter.unresolved_target_version;
 
         // Parse once.
-        let options = ParseOptions::from(source_type).with_target_version(target_version);
+        let options =
+            ParseOptions::from(source_type).with_target_version(target_version.parser_version());
         let parsed = parse_unchecked(source_kind.source_code(), options)
             .try_into_module()
             .expect("`PySourceType` always parses to a `ModModule`.");
@@ -209,35 +210,41 @@ impl Workspace {
         let messages: Vec<ExpandedMessage> = messages
             .into_iter()
             .map(|message| match message {
-                Message::Diagnostic(DiagnosticMessage {
-                    kind, range, fix, ..
-                }) => ExpandedMessage {
-                    code: Some(kind.rule().noqa_code().to_string()),
-                    message: kind.body,
-                    start_location: source_code.source_location(range.start()),
-                    end_location: source_code.source_location(range.end()),
-                    fix: fix.map(|fix| ExpandedFix {
-                        message: kind.suggestion,
-                        edits: fix
-                            .edits()
-                            .iter()
-                            .map(|edit| ExpandedEdit {
-                                location: source_code.source_location(edit.start()),
-                                end_location: source_code.source_location(edit.end()),
-                                content: edit.content().map(ToString::to_string),
-                            })
-                            .collect(),
-                    }),
-                },
-                Message::SyntaxError(SyntaxErrorMessage { message, range, .. }) => {
+                Message::Diagnostic(m) => {
+                    let rule = m.rule();
+                    let DiagnosticMessage {
+                        body,
+                        suggestion,
+                        range,
+                        fix,
+                        ..
+                    } = m;
                     ExpandedMessage {
-                        code: None,
-                        message,
-                        start_location: source_code.source_location(range.start()),
-                        end_location: source_code.source_location(range.end()),
-                        fix: None,
+                        code: Some(rule.noqa_code().to_string()),
+                        message: body,
+                        start_location: source_code.line_column(range.start()).into(),
+                        end_location: source_code.line_column(range.end()).into(),
+                        fix: fix.map(|fix| ExpandedFix {
+                            message: suggestion,
+                            edits: fix
+                                .edits()
+                                .iter()
+                                .map(|edit| ExpandedEdit {
+                                    location: source_code.line_column(edit.start()).into(),
+                                    end_location: source_code.line_column(edit.end()).into(),
+                                    content: edit.content().map(ToString::to_string),
+                                })
+                                .collect(),
+                        }),
                     }
                 }
+                Message::SyntaxError(_) => ExpandedMessage {
+                    code: None,
+                    message: message.body().to_string(),
+                    start_location: source_code.line_column(message.range().start()).into(),
+                    end_location: source_code.line_column(message.range().end()).into(),
+                    fix: None,
+                },
             })
             .collect();
 
@@ -314,5 +321,20 @@ impl<'a> ParsedModule<'a> {
             self.source_code,
             options,
         )
+    }
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct Location {
+    pub row: OneIndexed,
+    pub column: OneIndexed,
+}
+
+impl From<LineColumn> for Location {
+    fn from(value: LineColumn) -> Self {
+        Self {
+            row: value.line,
+            column: value.column,
+        }
     }
 }

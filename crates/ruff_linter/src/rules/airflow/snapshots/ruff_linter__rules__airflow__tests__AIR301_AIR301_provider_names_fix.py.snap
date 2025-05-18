@@ -1,0 +1,254 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR301_provider_names_fix.py:25:1: AIR301 [*] `airflow.providers.amazon.aws.auth_manager.avp.entities.AvpEntities.DATASET` is removed in Airflow 3.0
+   |
+23 | )
+24 |
+25 | DATASET
+   | ^^^^^^^ AIR301
+26 |
+27 | s3_create_dataset()
+   |
+   = help: Use `airflow.providers.amazon.aws.auth_manager.avp.entities.AvpEntities.ASSET` instead
+
+ℹ Safe fix
+1  1  | from __future__ import annotations
+2  2  | 
+3     |-from airflow.providers.amazon.aws.auth_manager.avp.entities.AvpEntities import DATASET
+   3  |+from airflow.providers.amazon.aws.auth_manager.avp.entities.AvpEntities import DATASET, ASSET
+4  4  | from airflow.providers.amazon.aws.datasets.s3 import (
+5  5  |     convert_dataset_to_openlineage as s3_convert_dataset_to_openlineage,
+6  6  | )
+--------------------------------------------------------------------------------
+22 22 |     translate_airflow_dataset,
+23 23 | )
+24 24 | 
+25    |-DATASET
+   25 |+ASSET
+26 26 | 
+27 27 | s3_create_dataset()
+28 28 | s3_convert_dataset_to_openlineage()
+
+AIR301_provider_names_fix.py:27:1: AIR301 [*] `airflow.providers.amazon.aws.datasets.s3.create_dataset` is removed in Airflow 3.0
+   |
+25 | DATASET
+26 |
+27 | s3_create_dataset()
+   | ^^^^^^^^^^^^^^^^^ AIR301
+28 | s3_convert_dataset_to_openlineage()
+   |
+   = help: Use `airflow.providers.amazon.aws.assets.s3.create_asset` instead
+
+ℹ Safe fix
+21 21 |     DatasetInfo,
+22 22 |     translate_airflow_dataset,
+23 23 | )
+   24 |+from airflow.providers.amazon.aws.assets.s3 import create_asset
+24 25 | 
+25 26 | DATASET
+26 27 | 
+27    |-s3_create_dataset()
+   28 |+create_asset()
+28 29 | s3_convert_dataset_to_openlineage()
+29 30 | 
+30 31 | io_create_dataset()
+
+AIR301_provider_names_fix.py:28:1: AIR301 [*] `airflow.providers.amazon.aws.datasets.s3.convert_dataset_to_openlineage` is removed in Airflow 3.0
+   |
+27 | s3_create_dataset()
+28 | s3_convert_dataset_to_openlineage()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
+29 |
+30 | io_create_dataset()
+   |
+   = help: Use `airflow.providers.amazon.aws.assets.s3.convert_asset_to_openlineage` instead
+
+ℹ Safe fix
+21 21 |     DatasetInfo,
+22 22 |     translate_airflow_dataset,
+23 23 | )
+   24 |+from airflow.providers.amazon.aws.assets.s3 import convert_asset_to_openlineage
+24 25 | 
+25 26 | DATASET
+26 27 | 
+27 28 | s3_create_dataset()
+28    |-s3_convert_dataset_to_openlineage()
+   29 |+convert_asset_to_openlineage()
+29 30 | 
+30 31 | io_create_dataset()
+31 32 | io_convert_dataset_to_openlineage()
+
+AIR301_provider_names_fix.py:33:1: AIR301 [*] `airflow.providers.fab.auth_manager.fab_auth_manager.is_authorized_dataset` is removed in Airflow 3.0
+   |
+31 | io_convert_dataset_to_openlineage()
+32 |
+33 | fab_is_authorized_dataset()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
+34 |
+35 | # airflow.providers.google.datasets.bigquery
+   |
+   = help: Use `airflow.providers.fab.auth_manager.fab_auth_manager.is_authorized_asset` instead
+
+ℹ Safe fix
+9  9  |     convert_dataset_to_openlineage as io_convert_dataset_to_openlineage,
+10 10 | )
+11 11 | from airflow.providers.common.io.dataset.file import create_dataset as io_create_dataset
+12    |-from airflow.providers.fab.auth_manager.fab_auth_manager import is_authorized_dataset as fab_is_authorized_dataset
+   12 |+from airflow.providers.fab.auth_manager.fab_auth_manager import is_authorized_dataset as fab_is_authorized_dataset, is_authorized_asset
+13 13 | from airflow.providers.google.datasets.bigquery import (
+14 14 |     create_dataset as bigquery_create_dataset,
+15 15 | )
+--------------------------------------------------------------------------------
+30 30 | io_create_dataset()
+31 31 | io_convert_dataset_to_openlineage()
+32 32 | 
+33    |-fab_is_authorized_dataset()
+   33 |+is_authorized_asset()
+34 34 | 
+35 35 | # airflow.providers.google.datasets.bigquery
+36 36 | bigquery_create_dataset()
+
+AIR301_provider_names_fix.py:36:1: AIR301 [*] `airflow.providers.google.datasets.bigquery.create_dataset` is removed in Airflow 3.0
+   |
+35 | # airflow.providers.google.datasets.bigquery
+36 | bigquery_create_dataset()
+   | ^^^^^^^^^^^^^^^^^^^^^^^ AIR301
+37 | # airflow.providers.google.datasets.gcs
+38 | gcs_create_dataset()
+   |
+   = help: Use `airflow.providers.google.assets.bigquery.create_asset` instead
+
+ℹ Safe fix
+21 21 |     DatasetInfo,
+22 22 |     translate_airflow_dataset,
+23 23 | )
+   24 |+from airflow.providers.google.assets.bigquery import create_asset
+24 25 | 
+25 26 | DATASET
+26 27 | 
+--------------------------------------------------------------------------------
+33 34 | fab_is_authorized_dataset()
+34 35 | 
+35 36 | # airflow.providers.google.datasets.bigquery
+36    |-bigquery_create_dataset()
+   37 |+create_asset()
+37 38 | # airflow.providers.google.datasets.gcs
+38 39 | gcs_create_dataset()
+39 40 | gcs_convert_dataset_to_openlineage()
+
+AIR301_provider_names_fix.py:38:1: AIR301 [*] `airflow.providers.google.datasets.gcs.create_dataset` is removed in Airflow 3.0
+   |
+36 | bigquery_create_dataset()
+37 | # airflow.providers.google.datasets.gcs
+38 | gcs_create_dataset()
+   | ^^^^^^^^^^^^^^^^^^ AIR301
+39 | gcs_convert_dataset_to_openlineage()
+40 | # airflow.providers.openlineage.utils.utils
+   |
+   = help: Use `airflow.providers.google.assets.gcs.create_asset` instead
+
+ℹ Safe fix
+21 21 |     DatasetInfo,
+22 22 |     translate_airflow_dataset,
+23 23 | )
+   24 |+from airflow.providers.google.assets.gcs import create_asset
+24 25 | 
+25 26 | DATASET
+26 27 | 
+--------------------------------------------------------------------------------
+35 36 | # airflow.providers.google.datasets.bigquery
+36 37 | bigquery_create_dataset()
+37 38 | # airflow.providers.google.datasets.gcs
+38    |-gcs_create_dataset()
+   39 |+create_asset()
+39 40 | gcs_convert_dataset_to_openlineage()
+40 41 | # airflow.providers.openlineage.utils.utils
+41 42 | DatasetInfo()
+
+AIR301_provider_names_fix.py:39:1: AIR301 [*] `airflow.providers.google.datasets.gcs.convert_dataset_to_openlineage` is removed in Airflow 3.0
+   |
+37 | # airflow.providers.google.datasets.gcs
+38 | gcs_create_dataset()
+39 | gcs_convert_dataset_to_openlineage()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
+40 | # airflow.providers.openlineage.utils.utils
+41 | DatasetInfo()
+   |
+   = help: Use `airflow.providers.google.assets.gcs.convert_asset_to_openlineage` instead
+
+ℹ Safe fix
+21 21 |     DatasetInfo,
+22 22 |     translate_airflow_dataset,
+23 23 | )
+   24 |+from airflow.providers.google.assets.gcs import convert_asset_to_openlineage
+24 25 | 
+25 26 | DATASET
+26 27 | 
+--------------------------------------------------------------------------------
+36 37 | bigquery_create_dataset()
+37 38 | # airflow.providers.google.datasets.gcs
+38 39 | gcs_create_dataset()
+39    |-gcs_convert_dataset_to_openlineage()
+   40 |+convert_asset_to_openlineage()
+40 41 | # airflow.providers.openlineage.utils.utils
+41 42 | DatasetInfo()
+42 43 | translate_airflow_dataset()
+
+AIR301_provider_names_fix.py:41:1: AIR301 [*] `airflow.providers.openlineage.utils.utils.DatasetInfo` is removed in Airflow 3.0
+   |
+39 | gcs_convert_dataset_to_openlineage()
+40 | # airflow.providers.openlineage.utils.utils
+41 | DatasetInfo()
+   | ^^^^^^^^^^^ AIR301
+42 | translate_airflow_dataset()
+43 | #
+   |
+   = help: Use `airflow.providers.openlineage.utils.utils.AssetInfo` instead
+
+ℹ Safe fix
+20 20 | from airflow.providers.openlineage.utils.utils import (
+21 21 |     DatasetInfo,
+22 22 |     translate_airflow_dataset,
+   23 |+AssetInfo,
+23 24 | )
+24 25 | 
+25 26 | DATASET
+--------------------------------------------------------------------------------
+38 39 | gcs_create_dataset()
+39 40 | gcs_convert_dataset_to_openlineage()
+40 41 | # airflow.providers.openlineage.utils.utils
+41    |-DatasetInfo()
+   42 |+AssetInfo()
+42 43 | translate_airflow_dataset()
+43 44 | #
+44 45 | # airflow.secrets.local_filesystem
+
+AIR301_provider_names_fix.py:42:1: AIR301 [*] `airflow.providers.openlineage.utils.utils.translate_airflow_dataset` is removed in Airflow 3.0
+   |
+40 | # airflow.providers.openlineage.utils.utils
+41 | DatasetInfo()
+42 | translate_airflow_dataset()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
+43 | #
+44 | # airflow.secrets.local_filesystem
+   |
+   = help: Use `airflow.providers.openlineage.utils.utils.translate_airflow_asset` instead
+
+ℹ Safe fix
+20 20 | from airflow.providers.openlineage.utils.utils import (
+21 21 |     DatasetInfo,
+22 22 |     translate_airflow_dataset,
+   23 |+translate_airflow_asset,
+23 24 | )
+24 25 | 
+25 26 | DATASET
+--------------------------------------------------------------------------------
+39 40 | gcs_convert_dataset_to_openlineage()
+40 41 | # airflow.providers.openlineage.utils.utils
+41 42 | DatasetInfo()
+42    |-translate_airflow_dataset()
+   43 |+translate_airflow_asset()
+43 44 | #
+44 45 | # airflow.secrets.local_filesystem
+45 46 | load_connections()

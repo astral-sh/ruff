@@ -15,7 +15,7 @@ use ruff_python_stdlib::typing::{
     is_typed_dict, is_typed_dict_member,
 };
 use ruff_text_size::Ranged;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 
 use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
@@ -252,9 +252,7 @@ pub fn is_immutable_annotation(
                 .is_some_and(|qualified_name| {
                     is_immutable_non_generic_type(qualified_name.segments())
                         || is_immutable_generic_type(qualified_name.segments())
-                        || extend_immutable_calls
-                            .iter()
-                            .any(|target| qualified_name == *target)
+                        || extend_immutable_calls.contains(&qualified_name)
                 })
         }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => semantic
@@ -308,9 +306,7 @@ pub fn is_immutable_func(
         .resolve_qualified_name(map_subscript(func))
         .is_some_and(|qualified_name| {
             is_immutable_return_type(qualified_name.segments())
-                || extend_immutable_calls
-                    .iter()
-                    .any(|target| qualified_name == *target)
+                || extend_immutable_calls.contains(&qualified_name)
         })
 }
 
@@ -636,6 +632,18 @@ pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -
             Some(Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })) => {
                 T::match_annotation(annotation, semantic)
             }
+            _ => false,
+        },
+
+        BindingKind::FunctionDefinition(_) => match binding.statement(semantic) {
+            // ```python
+            // def foo() -> int:
+            //   ...
+            // ```
+            Some(Stmt::FunctionDef(ast::StmtFunctionDef { returns, .. })) => returns
+                .as_ref()
+                .is_some_and(|return_ann| T::match_annotation(return_ann, semantic)),
+
             _ => false,
         },
 
@@ -1135,7 +1143,7 @@ pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) ->
 ///
 /// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
 /// `StringLiteral` with value `"str"` when called with `bla`.
-#[allow(clippy::single_match)]
+#[expect(clippy::single_match)]
 pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) -> Option<&'a Expr> {
     match binding.kind {
         // Ex) `x := 1`
@@ -1153,7 +1161,7 @@ pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) ->
             Some(Stmt::Assign(ast::StmtAssign { value, targets, .. })) => {
                 return targets
                     .iter()
-                    .find_map(|target| match_value(binding, target, value))
+                    .find_map(|target| match_value(binding, target, value));
             }
             Some(Stmt::AnnAssign(ast::StmtAnnAssign {
                 value: Some(value),

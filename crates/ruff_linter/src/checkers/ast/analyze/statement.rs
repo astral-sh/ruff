@@ -1242,14 +1242,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ruff::rules::invalid_assert_message_literal_argument(checker, assert_stmt);
             }
         }
-        Stmt::With(
-            with_stmt @ ast::StmtWith {
-                items,
-                body,
-                is_async,
-                ..
-            },
-        ) => {
+        Stmt::With(with_stmt @ ast::StmtWith { items, body, .. }) => {
             if checker.enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
@@ -1283,11 +1276,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::CancelScopeNoCheckpoint) {
                 flake8_async::rules::cancel_scope_no_checkpoint(checker, with_stmt, items);
-            }
-            if *is_async {
-                if checker.enabled(Rule::AwaitOutsideAsync) {
-                    pylint::rules::await_outside_async(checker, stmt);
-                }
             }
         }
         Stmt::While(while_stmt @ ast::StmtWhile { body, orelse, .. }) => {
@@ -1331,6 +1319,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::UnnecessaryEnumerate,
                 Rule::UnusedLoopControlVariable,
                 Rule::YieldInForLoop,
+                Rule::ManualDictComprehension,
                 Rule::ManualListComprehension,
             ]) {
                 checker.analyze.for_loops.push(checker.semantic.snapshot());
@@ -1359,9 +1348,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ManualListCopy) {
                 perflint::rules::manual_list_copy(checker, for_stmt);
             }
-            if checker.enabled(Rule::ManualDictComprehension) {
-                perflint::rules::manual_dict_comprehension(checker, target, body);
-            }
+
             if checker.enabled(Rule::ModifiedIteratingSet) {
                 pylint::rules::modified_iterating_set(checker, for_stmt);
             }
@@ -1377,11 +1364,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ReadlinesInFor) {
                 refurb::rules::readlines_in_for(checker, for_stmt);
             }
-            if *is_async {
-                if checker.enabled(Rule::AwaitOutsideAsync) {
-                    pylint::rules::await_outside_async(checker, stmt);
-                }
-            } else {
+            if !*is_async {
                 if checker.enabled(Rule::ReimplementedBuiltin) {
                     flake8_simplify::rules::convert_for_loop_to_any_all(checker, stmt);
                 }

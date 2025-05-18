@@ -11,8 +11,8 @@ use strum::IntoEnumIterator;
 use ruff_diagnostics::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_linter::upstream_categories::UpstreamCategoryAndPrefix;
+use ruff_options_metadata::OptionsMetadata;
 use ruff_workspace::options::Options;
-use ruff_workspace::options_base::OptionsMetadata;
 
 const FIX_SYMBOL: &str = "🛠️";
 const PREVIEW_SYMBOL: &str = "🧪";
@@ -34,7 +34,6 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
             RuleGroup::Deprecated => {
                 format!("<span title='Rule has been deprecated'>{WARNING_SYMBOL}</span>")
             }
-            #[allow(deprecated)]
             RuleGroup::Preview => {
                 format!("<span title='Rule is in preview'>{PREVIEW_SYMBOL}</span>")
             }
@@ -49,7 +48,9 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
                 format!("<span title='Automatic fix available'>{FIX_SYMBOL}</span>")
             }
             FixAvailability::None => {
-                format!("<span title='Automatic fix not available' style='opacity: 0.1' aria-hidden='true'>{FIX_SYMBOL}</span>")
+                format!(
+                    "<span title='Automatic fix not available' style='opacity: 0.1' aria-hidden='true'>{FIX_SYMBOL}</span>"
+                )
             }
         };
 
@@ -78,7 +79,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
             se = "</span>";
         }
 
-        #[allow(clippy::or_fun_call)]
+        #[expect(clippy::or_fun_call)]
         let _ = write!(
             table_out,
             "| {ss}{0}{1}{se} {{ #{0}{1} }} | {ss}{2}{se} | {ss}{3}{se} | {ss}{4}{se} |",
@@ -109,22 +110,26 @@ pub(crate) fn generate() -> String {
     );
     table_out.push_str("<br />");
 
-    let _ = write!(&mut table_out,
+    let _ = write!(
+        &mut table_out,
         "{SPACER}{PREVIEW_SYMBOL}{SPACER} The rule is unstable and is in [\"preview\"](faq.md#what-is-preview)."
     );
     table_out.push_str("<br />");
 
-    let _ = write!(&mut table_out,
+    let _ = write!(
+        &mut table_out,
         "{SPACER}{WARNING_SYMBOL}{SPACER} The rule has been deprecated and will be removed in a future release."
     );
     table_out.push_str("<br />");
 
-    let _ = write!(&mut table_out,
+    let _ = write!(
+        &mut table_out,
         "{SPACER}{REMOVED_SYMBOL}{SPACER} The rule has been removed only the documentation is available."
     );
     table_out.push_str("<br />");
 
-    let _ = write!(&mut table_out,
+    let _ = write!(
+        &mut table_out,
         "{SPACER}{FIX_SYMBOL}{SPACER} The rule is automatically fixable by the `--fix` command-line option."
     );
     table_out.push_str("<br />");

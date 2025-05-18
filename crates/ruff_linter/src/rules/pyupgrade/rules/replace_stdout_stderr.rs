@@ -1,13 +1,13 @@
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Keyword};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::{remove_argument, Parentheses};
+use crate::fix::edits::{Parentheses, remove_argument};
 
 /// ## What it does
 /// Checks for uses of `subprocess.run` that send `stdout` and `stderr` to a
@@ -32,6 +32,12 @@ use crate::fix::edits::{remove_argument, Parentheses};
 ///
 /// subprocess.run(["foo"], capture_output=True)
 /// ```
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because replacing `stdout=subprocess.PIPE` and
+/// `stderr=subprocess.PIPE` with `capture_output=True` may delete comments attached
+/// to the original arguments.
 ///
 /// ## References
 /// - [Python 3.7 release notes](https://docs.python.org/3/whatsnew/3.7.html#subprocess)

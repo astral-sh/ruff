@@ -126,8 +126,6 @@ pub enum ParseErrorType {
     /// A default value was found for a `*` or `**` parameter.
     VarParameterWithDefault,
 
-    /// A duplicate parameter was found in a function definition or lambda expression.
-    DuplicateParameter(String),
     /// A keyword argument was repeated.
     DuplicateKeywordArgumentError(String),
 
@@ -194,7 +192,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::ExpectedToken { found, expected } => {
                 write!(f, "Expected {expected}, found {found}",)
             }
-            ParseErrorType::Lexical(ref lex_error) => write!(f, "{lex_error}"),
+            ParseErrorType::Lexical(lex_error) => write!(f, "{lex_error}"),
             ParseErrorType::SimpleStatementsOnSameLine => {
                 f.write_str("Simple statements must be separated by newlines or semicolons")
             }
@@ -285,16 +283,13 @@ impl std::fmt::Display for ParseErrorType {
                 f.write_str("Invalid augmented assignment target")
             }
             ParseErrorType::InvalidDeleteTarget => f.write_str("Invalid delete target"),
-            ParseErrorType::DuplicateParameter(arg_name) => {
-                write!(f, "Duplicate parameter {arg_name:?}")
-            }
             ParseErrorType::DuplicateKeywordArgumentError(arg_name) => {
                 write!(f, "Duplicate keyword argument {arg_name:?}")
             }
             ParseErrorType::UnexpectedIpythonEscapeCommand => {
                 f.write_str("IPython escape commands are only allowed in `Mode::Ipython`")
             }
-            ParseErrorType::FStringError(ref fstring_error) => {
+            ParseErrorType::FStringError(fstring_error) => {
                 write!(f, "f-string: {fstring_error}")
             }
             ParseErrorType::UnexpectedExpressionToken => {
@@ -818,6 +813,41 @@ pub enum UnsupportedSyntaxErrorKind {
     /// [PEG parser rewrite]: https://peps.python.org/pep-0617/
     /// [Python 3.11 release]: https://docs.python.org/3/whatsnew/3.11.html#other-language-changes
     UnparenthesizedUnpackInFor,
+    /// Represents the use of multiple exception names in an except clause without an `as` binding, before Python 3.14.
+    ///
+    /// ## Examples
+    /// Before Python 3.14, catching multiple exceptions required
+    /// parentheses like so:
+    ///
+    /// ```python
+    /// try:
+    ///     ...
+    /// except (ExceptionA, ExceptionB, ExceptionC):
+    ///     ...
+    /// ```
+    ///
+    /// Starting with Python 3.14, thanks to [PEP 758], it was permitted
+    /// to omit the parentheses:
+    ///
+    /// ```python
+    /// try:
+    ///     ...
+    /// except ExceptionA, ExceptionB, ExceptionC:
+    ///     ...
+    /// ```
+    ///
+    /// However, parentheses are still required in the presence of an `as`:
+    ///
+    /// ```python
+    /// try:
+    ///     ...
+    /// except (ExceptionA, ExceptionB, ExceptionC) as e:
+    ///     ...
+    /// ```
+    ///
+    ///
+    /// [PEP 758]: https://peps.python.org/pep-0758/
+    UnparenthesizedExceptionTypes,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -834,7 +864,9 @@ impl Display for UnsupportedSyntaxError {
             ) => "Cannot use unparenthesized assignment expression as an element in a set literal",
             UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
                 UnparenthesizedNamedExprKind::SetComprehension,
-            ) => "Cannot use unparenthesized assignment expression as an element in a set comprehension",
+            ) => {
+                "Cannot use unparenthesized assignment expression as an element in a set comprehension"
+            }
             UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
                 "Cannot use parenthesized keyword argument name"
             }
@@ -864,7 +896,7 @@ impl Display for UnsupportedSyntaxError {
                         self.target_version,
                         changed = self.kind.changed_version(),
                     ),
-                }
+                };
             }
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 "Cannot use positional-only parameter separator"
@@ -892,6 +924,9 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::StarAnnotation => "Cannot use star annotation",
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 "Cannot use iterable unpacking in `for` statements"
+            }
+            UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes => {
+                "Multiple exception types must be parenthesized"
             }
         };
 
@@ -959,6 +994,9 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::StarAnnotation => Change::Added(PythonVersion::PY311),
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 Change::Added(PythonVersion::PY39)
+            }
+            UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes => {
+                Change::Added(PythonVersion::PY314)
             }
         }
     }

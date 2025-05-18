@@ -1,19 +1,19 @@
-use filetime::FileTime;
-use ruff_notebook::{Notebook, NotebookError};
-use rustc_hash::FxHashSet;
-use std::panic::RefUnwindSafe;
-use std::sync::Arc;
-use std::{any::Any, path::PathBuf};
-
-use crate::system::{
-    CaseSensitivity, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
-};
-
 use super::walk_directory::{
     self, DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration,
     WalkDirectoryVisitorBuilder, WalkState,
 };
+use crate::max_parallelism;
+use crate::system::{
+    CaseSensitivity, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System,
+    SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
+};
+use filetime::FileTime;
+use ruff_notebook::{Notebook, NotebookError};
+use rustc_hash::FxHashSet;
+use std::num::NonZeroUsize;
+use std::panic::RefUnwindSafe;
+use std::sync::Arc;
+use std::{any::Any, path::PathBuf};
 
 /// A system implementation that uses the OS file system.
 #[derive(Debug, Clone)]
@@ -50,7 +50,6 @@ impl OsSystem {
 
         Self {
             // Spreading `..Default` because it isn't possible to feature gate the initializer of a single field.
-            #[allow(clippy::needless_update)]
             inner: Arc::new(OsSystemInner {
                 cwd: cwd.to_path_buf(),
                 case_sensitivity,
@@ -257,7 +256,9 @@ impl OsSystem {
         let Ok(canonicalized) = SystemPathBuf::from_path_buf(canonicalized) else {
             // The original path is valid UTF8 but the canonicalized path isn't. This definitely suggests
             // that a symlink is involved. Fall back to the slow path.
-            tracing::debug!("Falling back to the slow case-sensitive path existence check because the canonicalized path of `{simplified}` is not valid UTF-8");
+            tracing::debug!(
+                "Falling back to the slow case-sensitive path existence check because the canonicalized path of `{simplified}` is not valid UTF-8"
+            );
             return None;
         };
 
@@ -267,7 +268,9 @@ impl OsSystem {
         // `path` pointed to a symlink (or some other none reversible path normalization happened).
         // In this case, fall back to the slow path.
         if simplified_canonicalized.as_str().to_lowercase() != simplified.as_str().to_lowercase() {
-            tracing::debug!("Falling back to the slow case-sensitive path existence check for `{simplified}` because the canonicalized path `{simplified_canonicalized}` differs not only by casing");
+            tracing::debug!(
+                "Falling back to the slow case-sensitive path existence check for `{simplified}` because the canonicalized path `{simplified_canonicalized}` differs not only by casing"
+            );
             return None;
         }
 
@@ -427,11 +430,7 @@ impl DirectoryWalker for OsDirectoryWalker {
             builder.add(additional_path.as_std_path());
         }
 
-        builder.threads(
-            std::thread::available_parallelism()
-                .map_or(1, std::num::NonZeroUsize::get)
-                .min(12),
-        );
+        builder.threads(max_parallelism().min(NonZeroUsize::new(12).unwrap()).get());
 
         builder.build_parallel().run(|| {
             let mut visitor = visitor_builder.build();
@@ -667,8 +666,8 @@ fn detect_case_sensitivity(path: &SystemPath) -> CaseSensitivity {
 mod tests {
     use tempfile::TempDir;
 
-    use crate::system::walk_directory::tests::DirectoryEntryToString;
     use crate::system::DirectoryEntry;
+    use crate::system::walk_directory::tests::DirectoryEntryToString;
 
     use super::*;
 

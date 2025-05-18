@@ -1,15 +1,15 @@
 use flake8_quotes::helpers::{contains_escaped_quote, raw_contents, unescape_string};
 use flake8_quotes::settings::Quote;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::visitor::{walk_f_string, Visitor};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::visitor::{Visitor, walk_f_string};
 use ruff_python_ast::{self as ast, AnyStringFlags, PythonVersion, StringFlags, StringLike};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_quotes;
 use crate::settings::LinterSettings;
-use crate::Locator;
 
 /// ## What it does
 /// Checks for strings that include escaped quotes, and suggests changing

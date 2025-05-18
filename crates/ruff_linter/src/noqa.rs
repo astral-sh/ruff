@@ -10,16 +10,16 @@ use itertools::Itertools;
 use log::warn;
 
 use ruff_diagnostics::Edit;
-use ruff_python_trivia::{indentation_at_offset, CommentRanges, Cursor};
+use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Locator;
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
 use crate::message::Message;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
-use crate::Locator;
 
 /// Generates an array of edits that matches the length of `messages`.
 /// Each potential edit in the array is paired, in order, with the associated diagnostic.
@@ -238,16 +238,20 @@ impl<'a> FileNoqaDirectives<'a> {
                     let no_indentation_at_offset =
                         indentation_at_offset(range.start(), locator.contents()).is_none();
                     if !warnings.is_empty() || no_indentation_at_offset {
-                        #[allow(deprecated)]
+                        #[expect(deprecated)]
                         let line = locator.compute_line_index(range.start());
                         let path_display = relativize_path(path);
 
                         for warning in warnings {
-                            warn!("Missing or joined rule code(s) at {path_display}:{line}: {warning}");
+                            warn!(
+                                "Missing or joined rule code(s) at {path_display}:{line}: {warning}"
+                            );
                         }
 
                         if no_indentation_at_offset {
-                            warn!("Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line. For line-level suppression, omit the `ruff:` prefix.");
+                            warn!(
+                                "Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line. For line-level suppression, omit the `ruff:` prefix."
+                            );
                             continue;
                         }
                     }
@@ -268,7 +272,7 @@ impl<'a> FileNoqaDirectives<'a> {
                                 {
                                     Some(rule.noqa_code())
                                 } else {
-                                    #[allow(deprecated)]
+                                    #[expect(deprecated)]
                                     let line = locator.compute_line_index(range.start());
                                     let path_display = relativize_path(path);
                                     warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
@@ -285,7 +289,7 @@ impl<'a> FileNoqaDirectives<'a> {
                     });
                 }
                 Err(err) => {
-                    #[allow(deprecated)]
+                    #[expect(deprecated)]
                     let line = locator.compute_line_index(range.start());
                     let path_display = relativize_path(path);
                     warn!("Invalid `# ruff: noqa` directive at {path_display}:{line}: {err}");
@@ -855,7 +859,7 @@ fn find_noqa_comments<'a>(
             }
             FileExemption::Codes(codes) => {
                 // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
-                if codes.contains(&&diagnostic.kind.rule().noqa_code()) {
+                if codes.contains(&&diagnostic.rule().noqa_code()) {
                     comments_by_line.push(None);
                     continue;
                 }
@@ -873,7 +877,7 @@ fn find_noqa_comments<'a>(
                         continue;
                     }
                     Directive::Codes(codes) => {
-                        if codes.includes(diagnostic.kind.rule()) {
+                        if codes.includes(diagnostic.rule()) {
                             comments_by_line.push(None);
                             continue;
                         }
@@ -884,7 +888,7 @@ fn find_noqa_comments<'a>(
 
         let noqa_offset = noqa_line_for.resolve(diagnostic.range.start());
 
-        let rule = diagnostic.kind.rule();
+        let rule = diagnostic.rule();
 
         // Or ignored by the directive itself?
         if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {
@@ -1053,11 +1057,13 @@ impl<'a> NoqaDirectives<'a> {
                     directive,
                 })) => {
                     if !warnings.is_empty() {
-                        #[allow(deprecated)]
+                        #[expect(deprecated)]
                         let line = locator.compute_line_index(range.start());
                         let path_display = relativize_path(path);
                         for warning in warnings {
-                            warn!("Missing or joined rule code(s) at {path_display}:{line}: {warning}");
+                            warn!(
+                                "Missing or joined rule code(s) at {path_display}:{line}: {warning}"
+                            );
                         }
                     }
                     if let Directive::Codes(codes) = &directive {
@@ -1073,10 +1079,12 @@ impl<'a> NoqaDirectives<'a> {
                                 )
                                 .is_err()
                                 {
-                                    #[allow(deprecated)]
+                                    #[expect(deprecated)]
                                     let line = locator.compute_line_index(range.start());
                                     let path_display = relativize_path(path);
-                                    warn!("Invalid rule code provided to `# noqa` at {path_display}:{line}: {code}");
+                                    warn!(
+                                        "Invalid rule code provided to `# noqa` at {path_display}:{line}: {code}"
+                                    );
                                 }
                             }
                         }
@@ -1091,7 +1099,7 @@ impl<'a> NoqaDirectives<'a> {
                     });
                 }
                 Err(err) => {
-                    #[allow(deprecated)]
+                    #[expect(deprecated)]
                     let line = locator.compute_line_index(range.start());
                     let path_display = relativize_path(path);
                     warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");
@@ -1221,13 +1229,13 @@ mod tests {
 
     use crate::message::Message;
     use crate::noqa::{
-        add_noqa_inner, lex_codes, lex_file_exemption, lex_inline_noqa, Directive, LexicalError,
-        NoqaLexerOutput, NoqaMapping,
+        Directive, LexicalError, NoqaLexerOutput, NoqaMapping, add_noqa_inner, lex_codes,
+        lex_file_exemption, lex_inline_noqa,
     };
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
-    use crate::{generate_noqa_edits, Locator};
+    use crate::{Locator, generate_noqa_edits};
 
     fn assert_lexed_ranges_match_slices(
         directive: Result<Option<NoqaLexerOutput>, LexicalError>,

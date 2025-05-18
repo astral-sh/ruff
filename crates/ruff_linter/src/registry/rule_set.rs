@@ -16,7 +16,7 @@ pub struct RuleSet([u64; RULESET_SIZE]);
 impl RuleSet {
     const EMPTY: [u64; RULESET_SIZE] = [0; RULESET_SIZE];
     // 64 fits into a u16 without truncation
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     const SLICE_BITS: u16 = u64::BITS as u16;
 
     /// Returns an empty rule set.
@@ -361,14 +361,14 @@ impl Iterator for RuleSetIterator {
         loop {
             let slice = self.set.0.get_mut(self.index as usize)?;
             // `trailing_zeros` is guaranteed to return a value in [0;64]
-            #[allow(clippy::cast_possible_truncation)]
+            #[expect(clippy::cast_possible_truncation)]
             let bit = slice.trailing_zeros() as u16;
 
             if bit < RuleSet::SLICE_BITS {
                 *slice ^= 1 << bit;
                 let rule_value = self.index * RuleSet::SLICE_BITS + bit;
                 // SAFETY: RuleSet guarantees that only valid rules are stored in the set.
-                #[allow(unsafe_code)]
+                #[expect(unsafe_code)]
                 return Some(unsafe { std::mem::transmute::<u16, Rule>(rule_value) });
             }
 

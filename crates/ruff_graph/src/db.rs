@@ -2,15 +2,16 @@ use anyhow::Result;
 use std::sync::Arc;
 use zip::CompressionMethod;
 
-use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
-use red_knot_python_semantic::{
-    default_lint_registry, Db, Program, ProgramSettings, PythonPlatform, SearchPathSettings,
-};
 use ruff_db::files::{File, Files};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
 use ruff_db::{Db as SourceDb, Upcast};
 use ruff_python_ast::PythonVersion;
+use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+use ty_python_semantic::{
+    Db, Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
+    default_lint_registry,
+};
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
     let mut builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
@@ -32,8 +33,12 @@ impl ModuleDb {
     pub fn from_src_roots(
         src_roots: Vec<SystemPathBuf>,
         python_version: PythonVersion,
+        venv_path: Option<SystemPathBuf>,
     ) -> Result<Self> {
-        let search_paths = SearchPathSettings::new(src_roots);
+        let mut search_paths = SearchPathSettings::new(src_roots);
+        if let Some(venv_path) = venv_path {
+            search_paths.python_path = PythonPath::from_cli_flag(venv_path);
+        }
 
         let db = Self::default();
         Program::from_settings(
@@ -71,6 +76,10 @@ impl SourceDb for ModuleDb {
     fn files(&self) -> &Files {
         &self.files
     }
+
+    fn python_version(&self) -> PythonVersion {
+        Program::get(self).python_version(self)
+    }
 }
 
 #[salsa::db]
@@ -79,8 +88,8 @@ impl Db for ModuleDb {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> Arc<RuleSelection> {
-        self.rule_selection.clone()
+    fn rule_selection(&self) -> &RuleSelection {
+        &self.rule_selection
     }
 
     fn lint_registry(&self) -> &LintRegistry {
@@ -89,6 +98,4 @@ impl Db for ModuleDb {
 }
 
 #[salsa::db]
-impl salsa::Database for ModuleDb {
-    fn salsa_event(&self, _event: &dyn Fn() -> salsa::Event) {}
-}
+impl salsa::Database for ModuleDb {}

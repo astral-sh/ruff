@@ -2,11 +2,11 @@ use std::collections::HashSet;
 
 use itertools::Itertools;
 use ruff_python_ast::{Identifier, Stmt};
-use ruff_python_semantic::cfg::graph::{build_cfg, BlockId, Condition, ControlFlowGraph};
+use ruff_python_semantic::cfg::graph::{BlockId, Condition, ControlFlowGraph, build_cfg};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
 
@@ -98,7 +98,7 @@ fn reachable(cfg: &ControlFlowGraph) -> HashSet<BlockId> {
 /// Returns `Some(true)` if the condition is always true, e.g. `if True`, same
 /// with `Some(false)` if it's never taken. If it can't be determined it returns
 /// `None`, e.g. `if i == 100`.
-#[allow(clippy::unnecessary_wraps)]
+#[expect(clippy::unnecessary_wraps)]
 fn taken(condition: &Condition) -> Option<bool> {
     match condition {
         Condition::Always => Some(true),

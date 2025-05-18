@@ -1,5 +1,5 @@
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 
@@ -62,7 +62,7 @@ impl Serialize for SerializedMessages<'_> {
             let start_location = message.compute_start_location();
             let end_location = message.compute_end_location();
 
-            let lines = if self.context.is_notebook(message.filename()) {
+            let lines = if self.context.is_notebook(&message.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 json!({
@@ -71,14 +71,14 @@ impl Serialize for SerializedMessages<'_> {
                 })
             } else {
                 json!({
-                    "begin": start_location.row,
-                    "end": end_location.row
+                    "begin": start_location.line,
+                    "end": end_location.line
                 })
             };
 
             let path = self.project_dir.as_ref().map_or_else(
-                || relativize_path(message.filename()),
-                |project_dir| relativize_path_to(message.filename(), project_dir),
+                || relativize_path(&*message.filename()),
+                |project_dir| relativize_path_to(&*message.filename(), project_dir),
             );
 
             let mut message_fingerprint = fingerprint(message, &path, 0);
@@ -137,10 +137,10 @@ fn fingerprint(message: &Message, project_path: &str, salt: u64) -> u64 {
 mod tests {
     use insta::assert_snapshot;
 
+    use crate::message::GitlabEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
-    use crate::message::GitlabEmitter;
 
     #[test]
     fn output() {

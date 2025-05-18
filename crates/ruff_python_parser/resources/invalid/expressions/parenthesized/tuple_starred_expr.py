@@ -1,5 +1,5 @@
 # For tuple expression, the minimum binding power of star expression is bitwise or.
-# Test the first and any other element as the there are two separate calls.
+# Test the first and any other element as there are two separate calls.
 
 (*x in y, z, *x in y)
 (*not x, z, *not x)

@@ -5,9 +5,9 @@ use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
 use ruff_python_ast::str::Quote;
 use ruff_python_parser::Tokens;
 
+use crate::PyFormatOptions;
 use crate::comments::Comments;
 use crate::other::f_string_element::FStringExpressionElementContext;
-use crate::PyFormatOptions;
 
 pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
@@ -106,7 +106,6 @@ impl<'a> PyFormatContext<'a> {
     }
 
     /// Returns `true` if preview mode is enabled.
-    #[allow(unused)]
     pub(crate) const fn is_preview(&self) -> bool {
         self.options.preview().is_enabled()
     }

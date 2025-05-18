@@ -1,9 +1,7 @@
-use ruff_diagnostics::{
-    Applicability, Diagnostic, DiagnosticKind, Edit, Fix, FixAvailability, Violation,
-};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::Pep604Operator;
 use ruff_text_size::Ranged;
@@ -11,7 +9,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix::edits::pad;
-use crate::settings::types::PreviewMode;
+use crate::preview::is_defer_optional_to_up045_enabled;
 
 /// ## What it does
 /// Check for type annotations that can be rewritten based on [PEP 604] syntax.
@@ -150,22 +148,21 @@ pub(crate) fn non_pep604_annotation(
 
     match operator {
         Pep604Operator::Optional => {
-            let (rule, diagnostic_kind) = match checker.settings.preview {
-                PreviewMode::Disabled => (
-                    Rule::NonPEP604AnnotationUnion,
-                    DiagnosticKind::from(NonPEP604AnnotationUnion),
-                ),
-                PreviewMode::Enabled => (
+            let (rule, mut diagnostic) = if is_defer_optional_to_up045_enabled(checker.settings) {
+                (
                     Rule::NonPEP604AnnotationOptional,
-                    DiagnosticKind::from(NonPEP604AnnotationOptional),
-                ),
+                    Diagnostic::new(NonPEP604AnnotationOptional, expr.range()),
+                )
+            } else {
+                (
+                    Rule::NonPEP604AnnotationUnion,
+                    Diagnostic::new(NonPEP604AnnotationUnion, expr.range()),
+                )
             };
 
             if !checker.enabled(rule) {
                 return;
             }
-
-            let mut diagnostic = Diagnostic::new(diagnostic_kind, expr.range());
 
             if fixable {
                 match slice {

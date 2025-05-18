@@ -4,23 +4,23 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    DIAGNOSTIC_NAME, PositionEncoding,
     edit::{NotebookRange, ToRangeExt},
     resolve::is_document_excluded_for_linting,
     session::DocumentQuery,
-    PositionEncoding, DIAGNOSTIC_NAME,
 };
-use ruff_diagnostics::{Applicability, DiagnosticKind, Edit, Fix};
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
-    directives::{extract_directives, Flags},
+    Locator,
+    directives::{Flags, extract_directives},
     generate_noqa_edits,
     linter::check_path,
-    message::{DiagnosticMessage, Message, SyntaxErrorMessage},
+    message::{DiagnosticMessage, Message},
     package::PackageRoot,
     packaging::detect_package_root,
     registry::AsRule,
     settings::flags,
     source_kind::SourceKind,
-    Locator,
 };
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
@@ -32,7 +32,7 @@ use ruff_text_size::{Ranged, TextRange};
 /// This is serialized on the diagnostic `data` field.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct AssociatedDiagnosticData {
-    pub(crate) kind: DiagnosticKind,
+    pub(crate) title: String,
     /// Edits to fix the diagnostic. If this is empty, a fix
     /// does not exist.
     pub(crate) edits: Vec<lsp_types::TextEdit>,
@@ -101,7 +101,8 @@ pub(crate) fn check(
         settings.linter.unresolved_target_version
     };
 
-    let parse_options = ParseOptions::from(source_type).with_target_version(target_version);
+    let parse_options =
+        ParseOptions::from(source_type).with_target_version(target_version.parser_version());
 
     // Parse once.
     let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), parse_options)
@@ -172,10 +173,10 @@ pub(crate) fn check(
                     locator.to_index(),
                     encoding,
                 )),
-                Message::SyntaxError(syntax_error_message) => {
+                Message::SyntaxError(_) => {
                     if show_syntax_errors {
                         Some(syntax_error_to_lsp_diagnostic(
-                            syntax_error_message,
+                            &message,
                             &source_kind,
                             locator.to_index(),
                             encoding,
@@ -226,10 +227,7 @@ pub(crate) fn fixes_for_diagnostics(
             Ok(Some(DiagnosticFix {
                 fixed_diagnostic,
                 code: associated_data.code,
-                title: associated_data
-                    .kind
-                    .suggestion
-                    .unwrap_or(associated_data.kind.name),
+                title: associated_data.title,
                 noqa_edit: associated_data.noqa_edit,
                 edits: associated_data.edits,
             }))
@@ -247,14 +245,15 @@ fn to_lsp_diagnostic(
     index: &LineIndex,
     encoding: PositionEncoding,
 ) -> (usize, lsp_types::Diagnostic) {
+    let rule = diagnostic.rule();
     let DiagnosticMessage {
-        kind,
         range: diagnostic_range,
         fix,
+        name,
+        body,
+        suggestion,
         ..
     } = diagnostic;
-
-    let rule = kind.rule();
 
     let fix = fix.and_then(|fix| fix.applies(Applicability::Unsafe).then_some(fix));
 
@@ -274,7 +273,7 @@ fn to_lsp_diagnostic(
                 new_text: noqa_edit.into_content().unwrap_or_default().into_string(),
             });
             serde_json::to_value(AssociatedDiagnosticData {
-                kind: kind.clone(),
+                title: suggestion.unwrap_or_else(|| name.to_string()),
                 noqa_edit,
                 edits,
                 code: rule.noqa_code().to_string(),
@@ -313,7 +312,7 @@ fn to_lsp_diagnostic(
                 })
             }),
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: kind.body,
+            message: body,
             related_information: None,
             data,
         },
@@ -321,7 +320,7 @@ fn to_lsp_diagnostic(
 }
 
 fn syntax_error_to_lsp_diagnostic(
-    syntax_error: SyntaxErrorMessage,
+    syntax_error: &Message,
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
@@ -330,7 +329,7 @@ fn syntax_error_to_lsp_diagnostic(
     let cell: usize;
 
     if let Some(notebook_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
-        NotebookRange { cell, range } = syntax_error.range.to_notebook_range(
+        NotebookRange { cell, range } = syntax_error.range().to_notebook_range(
             source_kind.source_code(),
             index,
             notebook_index,
@@ -339,7 +338,7 @@ fn syntax_error_to_lsp_diagnostic(
     } else {
         cell = usize::default();
         range = syntax_error
-            .range
+            .range()
             .to_range(source_kind.source_code(), index, encoding);
     }
 
@@ -352,7 +351,7 @@ fn syntax_error_to_lsp_diagnostic(
             code: None,
             code_description: None,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: syntax_error.message,
+            message: syntax_error.body().to_string(),
             related_information: None,
             data: None,
         },

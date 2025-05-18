@@ -1,9 +1,9 @@
 use std::fmt;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, Operator, Parameters};
@@ -72,6 +72,11 @@ use super::super::typing::type_hint_explicitly_allows_none;
 /// ## Options
 /// - `target-version`
 ///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because it can change the behavior of code that relies on
+/// type hints, and it assumes the default value is always appropriate—which might not be the case.
+///
 /// [PEP 484]: https://peps.python.org/pep-0484/#union-types
 #[derive(ViolationMetadata)]
 pub(crate) struct ImplicitOptional {
@@ -136,8 +141,10 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             )))
         }
         ConversionType::Optional => {
-            let (import_edit, binding) =
-                checker.import_from_typing("Optional", expr.start(), PythonVersion::lowest())?;
+            let importer = checker
+                .typing_importer("Optional", PythonVersion::lowest())
+                .context("Optional should be available on all supported Python versions")?;
+            let (import_edit, binding) = importer.import(expr.start())?;
             let new_expr = Expr::Subscript(ast::ExprSubscript {
                 range: TextRange::default(),
                 value: Box::new(Expr::Name(ast::ExprName {

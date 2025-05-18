@@ -19,26 +19,11 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::str_prefix::{AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix};
 use crate::{
-    int,
+    Expr, ExprRef, FStringElement, LiteralExpressionRef, OperatorPrecedence, Pattern, Stmt,
+    TypeParam, int,
     name::Name,
     str::{Quote, TripleQuotes},
-    Expr, ExprRef, FStringElement, LiteralExpressionRef, OperatorPrecedence, Pattern, Stmt,
-    TypeParam,
 };
-
-/// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ModModule {
-    pub range: TextRange,
-    pub body: Vec<Stmt>,
-}
-
-/// See also [Expression](https://docs.python.org/3/library/ast.html#ast.Expression)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ModExpression {
-    pub range: TextRange,
-    pub body: Box<Expr>,
-}
 
 impl StmtClassDef {
     /// Return an iterator over the bases of the class.
@@ -366,7 +351,7 @@ impl Deref for FStringLiteralElement {
 /// Transforms a value prior to formatting it.
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, is_macro::Is)]
 #[repr(i8)]
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 pub enum ConversionFlag {
     /// No conversion
     None = -1, // CPython uses -1
@@ -1153,10 +1138,12 @@ impl StringLiteralFlags {
 
     pub const fn prefix(self) -> StringLiteralPrefix {
         if self.0.contains(StringLiteralFlagsInner::U_PREFIX) {
-            debug_assert!(!self.0.intersects(
-                StringLiteralFlagsInner::R_PREFIX_LOWER
-                    .union(StringLiteralFlagsInner::R_PREFIX_UPPER)
-            ));
+            debug_assert!(
+                !self.0.intersects(
+                    StringLiteralFlagsInner::R_PREFIX_LOWER
+                        .union(StringLiteralFlagsInner::R_PREFIX_UPPER)
+                )
+            );
             StringLiteralPrefix::Unicode
         } else if self.0.contains(StringLiteralFlagsInner::R_PREFIX_LOWER) {
             debug_assert!(!self.0.contains(StringLiteralFlagsInner::R_PREFIX_UPPER));
@@ -2858,7 +2845,7 @@ impl Arguments {
         self.find_argument(name, position).map(ArgOrKeyword::value)
     }
 
-    /// Return the the argument with the given name or at the given position, or `None` if no such
+    /// Return the argument with the given name or at the given position, or `None` if no such
     /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
     /// positional arguments.
     pub fn find_argument(&self, name: &str, position: usize) -> Option<ArgOrKeyword> {
@@ -3134,8 +3121,8 @@ impl From<bool> for Singleton {
 
 #[cfg(test)]
 mod tests {
-    use crate::generated::*;
     use crate::Mod;
+    use crate::generated::*;
 
     #[test]
     #[cfg(target_pointer_width = "64")]

@@ -8,15 +8,15 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Parsed;
 
+use crate::Locator;
 use crate::directives::IsortDirectives;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
 use crate::rules::isort;
 use crate::rules::isort::block::{Block, BlockBuilder};
 use crate::settings::LinterSettings;
-use crate::Locator;
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn check_imports(
     parsed: &Parsed<ModModule>,
     locator: &Locator,

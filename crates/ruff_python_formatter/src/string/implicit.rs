@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_formatter::{format_args, write, FormatContext};
+use ruff_formatter::{FormatContext, format_args, write};
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
@@ -16,10 +16,11 @@ use crate::other::f_string_element::FormatFStringExpressionElement;
 use crate::prelude::*;
 use crate::string::docstring::needs_chaperone_space;
 use crate::string::normalize::{
-    is_fstring_with_quoted_debug_expression, is_fstring_with_quoted_format_spec_and_debug,
-    is_fstring_with_triple_quoted_literal_expression_containing_quotes, QuoteMetadata,
+    QuoteMetadata, is_fstring_with_quoted_debug_expression,
+    is_fstring_with_quoted_format_spec_and_debug,
+    is_fstring_with_triple_quoted_literal_expression_containing_quotes,
 };
-use crate::string::{normalize_string, StringLikeExtensions, StringNormalizer, StringQuotes};
+use crate::string::{StringLikeExtensions, StringNormalizer, StringQuotes, normalize_string};
 
 /// Formats any implicitly concatenated string. This could be any valid combination
 /// of string, bytes or f-string literals.

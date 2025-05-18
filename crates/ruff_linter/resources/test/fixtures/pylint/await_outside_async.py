@@ -72,3 +72,15 @@ def await_generator_target():
 # See: https://github.com/astral-sh/ruff/issues/14167
 def async_for_list_comprehension_target():
     [x for x in await foo()]
+
+
+def async_for_dictionary_comprehension_key():
+    {await x: y for x, y in foo()}
+
+
+def async_for_dictionary_comprehension_value():
+    {y: await x for x, y in foo()}
+
+
+def async_for_dict_comprehension():
+    {x: y async for x, y in foo()}

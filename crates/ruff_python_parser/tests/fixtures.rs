@@ -5,13 +5,13 @@ use std::fs;
 use std::path::Path;
 
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
-use ruff_python_ast::visitor::source_order::{walk_module, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_module};
 use ruff_python_ast::{self as ast, AnyNodeRef, Mod, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
 };
-use ruff_python_parser::{parse_unchecked, Mode, ParseErrorType, ParseOptions, Token};
+use ruff_python_parser::{Mode, ParseErrorType, ParseOptions, Token, parse_unchecked};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -274,7 +274,7 @@ fn extract_options(source: &str) -> Option<ParseOptions> {
 // Use it for quickly debugging a parser issue.
 #[test]
 #[ignore]
-#[allow(clippy::print_stdout)]
+#[expect(clippy::print_stdout)]
 fn parser_quick_test() {
     let source = "\
 f'{'
@@ -433,7 +433,9 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
         );
 
         if let Some(previous) = self.previous {
-            assert_ne!(previous.range().ordering(node.range()), Ordering::Greater,
+            assert_ne!(
+                previous.range().ordering(node.range()),
+                Ordering::Greater,
                 "{path}: The ranges of the nodes are not strictly increasing when traversing the AST in pre-order.\nPrevious node: {previous:#?}\n\nCurrent node: {node:#?}\n\nRoot: {root:#?}",
                 path = self.test_path.display(),
                 root = self.parents.first()
@@ -441,7 +443,8 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
         }
 
         if let Some(parent) = self.parents.last() {
-            assert!(parent.range().contains_range(node.range()),
+            assert!(
+                parent.range().contains_range(node.range()),
                 "{path}: The range of the parent node does not fully enclose the range of the child node.\nParent node: {parent:#?}\n\nChild node: {node:#?}\n\nRoot: {root:#?}",
                 path = self.test_path.display(),
                 root = self.parents.first()
@@ -462,7 +465,7 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
 
 enum Scope {
     Module,
-    Function { is_async: bool },
+    Function,
     Comprehension { is_async: bool },
     Class,
 }
@@ -504,10 +507,6 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
 }
 
 impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
-    fn seen_docstring_boundary(&self) -> bool {
-        false
-    }
-
     fn future_annotations_or_stub(&self) -> bool {
         false
     }
@@ -529,12 +528,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn in_async_context(&self) -> bool {
-        for scope in &self.scopes {
-            if let Scope::Function { is_async } = scope {
-                return *is_async;
-            }
-        }
-        false
+        true
     }
 
     fn in_sync_comprehension(&self) -> bool {
@@ -547,7 +541,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn in_module_scope(&self) -> bool {
-        true
+        self.scopes.len() == 1
     }
 
     fn in_function_scope(&self) -> bool {
@@ -559,6 +553,10 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn in_await_allowed_context(&self) -> bool {
+        true
+    }
+
+    fn in_generator_scope(&self) -> bool {
         true
     }
 }
@@ -587,10 +585,8 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 self.visit_body(body);
                 self.scopes.pop().unwrap();
             }
-            ast::Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
-                self.scopes.push(Scope::Function {
-                    is_async: *is_async,
-                });
+            ast::Stmt::FunctionDef(ast::StmtFunctionDef { .. }) => {
+                self.scopes.push(Scope::Function);
                 ast::visitor::walk_stmt(self, stmt);
                 self.scopes.pop().unwrap();
             }
@@ -604,7 +600,7 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
         self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
         match expr {
             ast::Expr::Lambda(_) => {
-                self.scopes.push(Scope::Function { is_async: false });
+                self.scopes.push(Scope::Function);
                 ast::visitor::walk_expr(self, expr);
                 self.scopes.pop().unwrap();
             }
@@ -621,7 +617,7 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                     self.visit_comprehension(comprehension);
                 }
                 self.scopes.push(Scope::Comprehension {
-                    is_async: generators.iter().any(|gen| gen.is_async),
+                    is_async: generators.iter().any(|generator| generator.is_async),
                 });
                 self.visit_expr(elt);
                 self.scopes.pop().unwrap();
@@ -636,7 +632,7 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                     self.visit_comprehension(comprehension);
                 }
                 self.scopes.push(Scope::Comprehension {
-                    is_async: generators.iter().any(|gen| gen.is_async),
+                    is_async: generators.iter().any(|generator| generator.is_async),
                 });
                 self.visit_expr(key);
                 self.visit_expr(value);
