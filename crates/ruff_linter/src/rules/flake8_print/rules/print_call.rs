@@ -21,7 +21,7 @@ use crate::registry::AsRule;
 /// ## Example
 /// ```python
 /// def sum_less_than_four(a, b):
-///     print(f"are there less than 4? {a}+{b} = {a+b}")
+///     print(f"Calling sum_less_than_four")
 ///     return a + b < 4
 /// ```
 ///
@@ -41,7 +41,7 @@ use crate::registry::AsRule;
 ///
 ///
 /// def sum_less_than_four(a, b):
-///     logging.info(f"are there less than 4? {a}+{b} = {a+b}")
+///     logging.debug("Calling sum_less_than_four")
 ///     return a + b < 4
 /// ```
 ///
