@@ -6,6 +6,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
+use std::fmt;
 
 use crate::checkers::ast::Checker;
 
@@ -43,22 +44,26 @@ use crate::checkers::ast::Checker;
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
 /// - [`pytest` documentation: `pytest.deprecated_call`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-deprecated-call)
 #[derive(ViolationMetadata)]
-pub(crate) struct LegacyFormPytestRaisesWarnsDeprecatedCall {
-    name: &'static str,
+pub(crate) struct LegacyFormPytestRaises {
+    context_type: PytestContextType,
 }
 
-impl Violation for LegacyFormPytestRaisesWarnsDeprecatedCall {
+impl Violation for LegacyFormPytestRaises {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Self { name } = self;
-        format!("Use context-manager form of `pytest.{name}()`")
+        format!(
+            "Use context-manager form of `pytest.{}()`",
+            self.context_type
+        )
     }
 
     fn fix_title(&self) -> Option<String> {
-        let Self { name } = self;
-        Some(format!("Use `pytest.{name}()` as a context-manager"))
+        Some(format!(
+            "Use `pytest.{}()` as a context-manager",
+            self.context_type
+        ))
     }
 }
 
@@ -68,6 +73,17 @@ enum PytestContextType {
     Raises,
     Warns,
     DeprecatedCall,
+}
+
+impl fmt::Display for PytestContextType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::Raises => "raises",
+            Self::Warns => "warns",
+            Self::DeprecatedCall => "deprecated_call",
+        };
+        write!(f, "{name}")
+    }
 }
 
 impl PytestContextType {
@@ -96,14 +112,6 @@ impl PytestContextType {
             Self::DeprecatedCall => ("func", 0),
         }
     }
-
-    fn name(self) -> &'static str {
-        match self {
-            Self::Raises => "raises",
-            Self::Warns => "warns",
-            Self::DeprecatedCall => "deprecated_call",
-        }
-    }
 }
 
 pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: &ast::ExprCall) {
@@ -121,18 +129,13 @@ pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: &ast:
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
-        LegacyFormPytestRaisesWarnsDeprecatedCall {
-            name: context_type.name(),
-        },
-        call.range(),
-    );
+    let mut diagnostic = Diagnostic::new(LegacyFormPytestRaises { context_type }, call.range());
 
-    let stmt = checker.semantic().current_statement();
+    let stmt = semantic.current_statement();
     if !has_leading_content(stmt.start(), checker.source())
         && !has_trailing_content(stmt.end(), checker.source())
     {
-        if let Some(with_stmt) = try_fix_legacy_call(context_type, stmt, checker.semantic()) {
+        if let Some(with_stmt) = try_fix_legacy_call(context_type, stmt, semantic) {
             let generated = checker.generator().stmt(&Stmt::With(with_stmt));
             let first_line = checker.locator().line_str(stmt.start());
             let indentation = leading_indentation(first_line);
@@ -165,12 +168,17 @@ fn try_fix_legacy_call(
         Stmt::Expr(StmtExpr { value, .. }) => {
             let call = value.as_call_expr()?;
 
+            // Handle two patterns for legacy calls:
+            // 1. Direct usage: `pytest.raises(ZeroDivisionError, func, 1, b=0)`
+            // 2. With match method: `pytest.raises(ZeroDivisionError, func, 1, b=0).match("division by zero")`
+            //
+            // The second branch specifically looks for raises().match() pattern which only exists for
+            // `raises` (not `warns`/`deprecated_call`) since only `raises` returns an ExceptionInfo
+            // object with a .match() method. We need to preserve this match condition when converting
+            // to context manager form.
             if PytestContextType::from_expr_name(&call.func, semantic) == Some(context_type) {
                 generate_with_statement(context_type, call, None, None, None)
             } else if let PytestContextType::Raises = context_type {
-                // Handle call to match right after the legacy call
-                // This applies only for `raises` because it returns `ExceptionInfo`
-                // while `warns` and `deprecated_call` return what `func` returns
                 let inner_raises_call = call
                     .func
                     .as_attribute_expr()

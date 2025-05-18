@@ -962,7 +962,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             ]) {
                 flake8_pytest_style::rules::raises_call(checker, call);
             }
-            if checker.enabled(Rule::LegacyFormPytestRaisesWarnsDeprecatedCall) {
+            if checker.enabled(Rule::LegacyFormPytestRaises) {
                 ruff::rules::legacy_raises_warns_deprecated_call(checker, call);
             }
             if checker.any_enabled(&[Rule::PytestWarnsWithoutWarning, Rule::PytestWarnsTooBroad]) {
