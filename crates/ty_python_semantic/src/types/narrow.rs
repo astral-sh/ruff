@@ -623,9 +623,13 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
             let lhs_ty = last_rhs_ty.unwrap_or_else(|| {
-                inference.expression_type(left.scoped_expression_id(self.db, scope))
+                inference
+                    .try_expression_type(left.scoped_expression_id(self.db, scope))
+                    .unwrap_or(Type::unknown())
             });
-            let rhs_ty = inference.expression_type(right.scoped_expression_id(self.db, scope));
+            let rhs_ty = inference
+                .try_expression_type(right.scoped_expression_id(self.db, scope))
+                .unwrap_or(Type::unknown());
             last_rhs_ty = Some(rhs_ty);
 
             match left {
@@ -704,8 +708,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         let scope = self.scope();
         let inference = infer_expression_types(self.db, expression);
 
-        let callable_ty =
-            inference.expression_type(expr_call.func.scoped_expression_id(self.db, scope));
+        let callable_ty = inference
+            .try_expression_type(expr_call.func.scoped_expression_id(self.db, scope))
+            .unwrap_or(Type::unknown());
 
         // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
@@ -835,7 +840,8 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             // filter our arms with statically known truthiness
             .filter(|expr| {
                 inference
-                    .expression_type(expr.scoped_expression_id(self.db, scope))
+                    .try_expression_type(expr.scoped_expression_id(self.db, scope))
+                    .unwrap_or(Type::unknown())
                     .bool(self.db)
                     != match expr_bool_op.op {
                         BoolOp::And => Truthiness::AlwaysTrue,
