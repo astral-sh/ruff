@@ -12,7 +12,6 @@ alerta
 altair
 anyio
 apprise
-arviz
 async-utils
 asynq
 attrs
@@ -99,11 +98,9 @@ sockeye
 speedrun.com_global_scoreboard_webapp
 sphinx
 starlette
-static-frame
 stone
 strawberry
 streamlit
-sympy
 tornado
 trio
 twine

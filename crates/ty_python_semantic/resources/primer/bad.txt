@@ -1,6 +1,7 @@
 Tanjun  # hangs
 antidote  # hangs / slow
 artigraph  # cycle panics (value_type_)
+arviz # slow? (depends on pandas)
 core  # cycle panics (value_type_)
 cpython  # access to field whilst being initialized, too many cycle iterations
 discord.py  # some kind of hang, only when multi-threaded?
@@ -22,5 +23,7 @@ scikit-learn  # success, but mypy-primer hangs processing the output
 setuptools  # vendors packaging, see above
 spack  # success, but mypy-primer hangs processing the output
 spark  # too many iterations
+static-frame # probabilistic panic https://github.com/salsa-rs/salsa/issues/831
 steam.py  # hangs
+sympy # hangs when multi-threaded
 xarray  # too many iterations
