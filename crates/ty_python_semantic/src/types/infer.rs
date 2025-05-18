@@ -221,7 +221,7 @@ fn deferred_cycle_initial<'db>(db: &'db dyn Db, definition: Definition<'db>) -> 
 /// assignment, which might be unpacking/multi-target and thus part of multiple definitions, or a
 /// type narrowing guard expression (e.g. if statement test node).
 /// If you call this function from a function that may cause a cycle
-/// (a function in the dependency tree of `infer_expression_types`, type inference related functions, etc.),
+/// (a function in the call graph of `infer_expression_types`, type inference related functions, etc.),
 /// you must take into account that an incomplete [`TypeInference`] may be returned.
 /// For example, [`TypeInference::expression_type`] may fail.
 #[salsa::tracked(returns(ref), cycle_fn=expression_cycle_recover, cycle_initial=expression_cycle_initial)]

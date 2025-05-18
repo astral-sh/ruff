@@ -206,6 +206,8 @@ pub(crate) fn symbol<'db>(
     symbol_impl(db, scope, name, RequiresExplicitReExport::No)
 }
 
+/// Infer the public type of a place (its type as seen from outside its scope) in the given
+/// `scope`.
 pub(crate) fn place<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -257,14 +259,12 @@ pub(crate) fn class_symbol<'db>(
         .unwrap_or_default()
 }
 
-/// Infers the public type of an explicit module-global symbol as seen from within the same file.
+/// Infers the public type of an explicit module-global place as seen from within the same file.
 ///
 /// Note that all global scopes also include various "implicit globals" such as `__name__`,
 /// `__doc__` and `__file__`. This function **does not** consider those symbols; it will return
 /// `Place::Unbound` for them. Use the (currently test-only) `global_symbol` query to also include
 /// those additional symbols.
-///
-/// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
 pub(crate) fn explicit_global_place<'db>(
     db: &'db dyn Db,
     file: File,
@@ -278,13 +278,11 @@ pub(crate) fn explicit_global_place<'db>(
     )
 }
 
-/// Infers the public type of an explicit module-global symbol as seen from within the same file.
+/// Infers the public type of an explicit module-global place as seen from within the same file.
 ///
 /// Unlike [`explicit_global_symbol`], this function also considers various "implicit globals"
 /// such as `__name__`, `__doc__` and `__file__`. These are looked up as attributes on `types.ModuleType`
 /// rather than being looked up as symbols explicitly defined/declared in the global scope.
-///
-/// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
 pub(crate) fn global_place<'db>(
     db: &'db dyn Db,
     file: File,

@@ -186,12 +186,14 @@ impl PlaceExpr {
         &self.root_name
     }
 
+    /// Does the place expression have the form `self.{name}` (`self` is the first parameter of the method)?
     pub(super) fn is_instance_attribute_named(&self, name: &str) -> bool {
         self.flags.contains(PlaceFlags::IS_INSTANCE_ATTRIBUTE)
             && self.sub_segments.len() == 1
             && self.sub_segments[0].as_member().unwrap().as_str() == name
     }
 
+    /// Is the place an instance attribute?
     pub fn is_instance_attribute(&self) -> bool {
         self.flags.contains(PlaceFlags::IS_INSTANCE_ATTRIBUTE)
     }
@@ -211,10 +213,12 @@ impl PlaceExpr {
         self.flags.contains(PlaceFlags::IS_DECLARED)
     }
 
+    /// Is the place just a name?
     pub fn is_name(&self) -> bool {
         self.sub_segments.is_empty()
     }
 
+    /// Does the place expression have the form `<object>.member`?
     pub fn is_member(&self) -> bool {
         self.sub_segments
             .last()
@@ -520,6 +524,7 @@ impl PlaceTable {
         Some(self.place_expr(id))
     }
 
+    /// Returns the flagged place by the unflagged place expression.
     pub(crate) fn place_by_expr(&self, place_expr: &PlaceExpr) -> Option<&PlaceExpr> {
         let id = self.place_id_by_expr(place_expr)?;
         Some(self.place_expr(id))

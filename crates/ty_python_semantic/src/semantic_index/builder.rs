@@ -387,6 +387,8 @@ impl<'db> SemanticIndexBuilder<'db> {
         place_id
     }
 
+    /// Add a place to the place table and the use-def map.
+    /// Return the [`ScopedPlaceId`] that uniquely identifies the place in both.
     fn add_place(&mut self, place_expr: PlaceExpr) -> ScopedPlaceId {
         let (place_id, added) = self.current_place_table().add_place(place_expr);
         if added {
