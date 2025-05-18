@@ -1,90 +1,290 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-B019.py:78:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
-   |
-77 |     # Remaining methods should emit B019
-78 |     @functools.cache
-   |     ^^^^^^^^^^^^^^^^ B019
-79 |     def cached_instance_method(self, y):
-80 |         ...
-   |
-
-B019.py:82:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
-   |
-80 |         ...
-81 |
-82 |     @cache
-   |     ^^^^^^ B019
-83 |     def another_cached_instance_method(self, y):
-84 |         ...
-   |
-
-B019.py:86:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
-   |
-84 |         ...
-85 |
-86 |     @functools.cache()
-   |     ^^^^^^^^^^^^^^^^^^ B019
-87 |     def called_cached_instance_method(self, y):
-88 |         ...
-   |
-
-B019.py:90:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
-   |
-88 |         ...
-89 |
-90 |     @cache()
-   |     ^^^^^^^^ B019
-91 |     def another_called_cached_instance_method(self, y):
-92 |         ...
-   |
-
-B019.py:94:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
-   |
-92 |         ...
-93 |
-94 |     @functools.lru_cache
-   |     ^^^^^^^^^^^^^^^^^^^^ B019
-95 |     def lru_cached_instance_method(self, y):
-96 |         ...
-   |
-
-B019.py:98:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+B019.py:185:5: B019 Use of `functools.cache` on methods can lead to memory leaks
     |
- 96 |         ...
- 97 |
- 98 |     @lru_cache
-    |     ^^^^^^^^^^ B019
- 99 |     def another_lru_cached_instance_method(self, y):
-100 |         ...
+184 |     # functools
+185 |     @functools.cache
+    |     ^^^^^^^^^^^^^^^^ B019
+186 |     def cached_instance_method(self, y):
+187 |         ...
     |
 
-B019.py:102:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+B019.py:189:5: B019 Use of `functools.cache` on methods can lead to memory leaks
     |
-100 |         ...
-101 |
-102 |     @functools.lru_cache()
-    |     ^^^^^^^^^^^^^^^^^^^^^^ B019
-103 |     def called_lru_cached_instance_method(self, y):
-104 |         ...
-    |
-
-B019.py:106:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
-    |
-104 |         ...
-105 |
-106 |     @lru_cache()
-    |     ^^^^^^^^^^^^ B019
-107 |     def another_called_lru_cached_instance_method(self, y):
-108 |         ...
+187 |         ...
+188 |
+189 |     @cache
+    |     ^^^^^^ B019
+190 |     def another_cached_instance_method(self, y):
+191 |         ...
     |
 
-B019.py:124:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+B019.py:193:5: B019 Use of `functools.cache` on methods can lead to memory leaks
     |
-123 | class Metaclass(type):
-124 |     @functools.lru_cache
+191 |         ...
+192 |
+193 |     @functools.cache()
+    |     ^^^^^^^^^^^^^^^^^^ B019
+194 |     def called_cached_instance_method(self, y):
+195 |         ...
+    |
+
+B019.py:197:5: B019 Use of `functools.cache` on methods can lead to memory leaks
+    |
+195 |         ...
+196 |
+197 |     @cache()
+    |     ^^^^^^^^ B019
+198 |     def another_called_cached_instance_method(self, y):
+199 |         ...
+    |
+
+B019.py:201:5: B019 Use of `functools.lru_cache` on methods can lead to memory leaks
+    |
+199 |         ...
+200 |
+201 |     @functools.lru_cache
     |     ^^^^^^^^^^^^^^^^^^^^ B019
-125 |     def lru_cached_instance_method_on_metaclass(cls, x: int):
-126 |         ...
+202 |     def lru_cached_instance_method(self, y):
+203 |         ...
+    |
+
+B019.py:205:5: B019 Use of `functools.lru_cache` on methods can lead to memory leaks
+    |
+203 |         ...
+204 |
+205 |     @lru_cache
+    |     ^^^^^^^^^^ B019
+206 |     def another_lru_cached_instance_method(self, y):
+207 |         ...
+    |
+
+B019.py:209:5: B019 Use of `functools.lru_cache` on methods can lead to memory leaks
+    |
+207 |         ...
+208 |
+209 |     @functools.lru_cache()
+    |     ^^^^^^^^^^^^^^^^^^^^^^ B019
+210 |     def called_lru_cached_instance_method(self, y):
+211 |         ...
+    |
+
+B019.py:213:5: B019 Use of `functools.lru_cache` on methods can lead to memory leaks
+    |
+211 |         ...
+212 |
+213 |     @lru_cache()
+    |     ^^^^^^^^^^^^ B019
+214 |     def another_called_lru_cached_instance_method(self, y):
+215 |         ...
+    |
+
+B019.py:219:5: B019 Use of `async_lru.alru_cache` on methods can lead to memory leaks
+    |
+217 |     # async_lru
+218 |
+219 |     @async_lru.alru_cache
+    |     ^^^^^^^^^^^^^^^^^^^^^ B019
+220 |     async def alru_cached_instance_method(self, y):
+221 |         ...
+    |
+
+B019.py:223:5: B019 Use of `async_lru.alru_cache` on methods can lead to memory leaks
+    |
+221 |         ...
+222 |
+223 |     @alru_cache
+    |     ^^^^^^^^^^^ B019
+224 |     async def another_alru_cached_instance_method(self, y):
+225 |         ...
+    |
+
+B019.py:227:5: B019 Use of `async_lru.alru_cache` on methods can lead to memory leaks
+    |
+225 |         ...
+226 |
+227 |     @async_lru.alru_cache()
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ B019
+228 |     async def called_alru_cached_instance_method(self, y):
+229 |         ...
+    |
+
+B019.py:231:5: B019 Use of `async_lru.alru_cache` on methods can lead to memory leaks
+    |
+229 |         ...
+230 |
+231 |     @alru_cache()
+    |     ^^^^^^^^^^^^^ B019
+232 |     async def another_called_alru_cached_instance_method(self, y):
+233 |         ...
+    |
+
+B019.py:237:5: B019 Use of `aiocache.cached` on methods can lead to memory leaks
+    |
+235 |     # aiocache
+236 |
+237 |     @aiocache.cached
+    |     ^^^^^^^^^^^^^^^^ B019
+238 |     async def aiocache_cached_instance_method(self, y):
+239 |         ...
+    |
+
+B019.py:241:5: B019 Use of `aiocache.cached` on methods can lead to memory leaks
+    |
+239 |         ...
+240 |
+241 |     @cached
+    |     ^^^^^^^ B019
+242 |     async def another_aiocache_cached_instance_method(self, y):
+243 |         ...
+    |
+
+B019.py:245:5: B019 Use of `aiocache.cached` on methods can lead to memory leaks
+    |
+243 |         ...
+244 |
+245 |     @aiocache.cached()
+    |     ^^^^^^^^^^^^^^^^^^ B019
+246 |     async def called_aiocache_cached_instance_method(self, y):
+247 |         ...
+    |
+
+B019.py:249:5: B019 Use of `aiocache.cached` on methods can lead to memory leaks
+    |
+247 |         ...
+248 |
+249 |     @cached()
+    |     ^^^^^^^^^ B019
+250 |     async def another_called_aiocache_cached_instance_method(self, y):
+251 |         ...
+    |
+
+B019.py:253:5: B019 Use of `aiocache.cached_stampede` on methods can lead to memory leaks
+    |
+251 |         ...
+252 |
+253 |     @aiocache.cached_stampede
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ B019
+254 |     async def aiocache_cached_stampede_instance_method(self, y):
+255 |         ...
+    |
+
+B019.py:257:5: B019 Use of `aiocache.cached_stampede` on methods can lead to memory leaks
+    |
+255 |         ...
+256 |
+257 |     @cached_stampede
+    |     ^^^^^^^^^^^^^^^^ B019
+258 |     async def another_aiocache_cached_stampede_instance_method(self, y):
+259 |         ...
+    |
+
+B019.py:261:5: B019 Use of `aiocache.cached_stampede` on methods can lead to memory leaks
+    |
+259 |         ...
+260 |
+261 |     @aiocache.cached_stampede()
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ B019
+262 |     async def called_aiocache_cached_stampede_instance_method(self, y):
+263 |         ...
+    |
+
+B019.py:265:5: B019 Use of `aiocache.cached_stampede` on methods can lead to memory leaks
+    |
+263 |         ...
+264 |
+265 |     @cached_stampede()
+    |     ^^^^^^^^^^^^^^^^^^ B019
+266 |     async def another_cached_stampede_aiocache_cached_instance_method(self, y):
+267 |         ...
+    |
+
+B019.py:269:5: B019 Use of `aiocache.multi_cached` on methods can lead to memory leaks
+    |
+267 |         ...
+268 |     
+269 |     @aiocache.multi_cached
+    |     ^^^^^^^^^^^^^^^^^^^^^^ B019
+270 |     async def aiocache_multi_cached_instance_method(self, y):
+271 |         ...
+    |
+
+B019.py:273:5: B019 Use of `aiocache.multi_cached` on methods can lead to memory leaks
+    |
+271 |         ...
+272 |
+273 |     @multi_cached
+    |     ^^^^^^^^^^^^^ B019
+274 |     async def another_aiocache_multi_cached_instance_method(self, y):
+275 |         ...
+    |
+
+B019.py:277:5: B019 Use of `aiocache.multi_cached` on methods can lead to memory leaks
+    |
+275 |         ...
+276 |
+277 |     @aiocache.multi_cached()
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^ B019
+278 |     async def called_aiocache_multi_cached_instance_method(self, y):
+279 |         ...
+    |
+
+B019.py:281:5: B019 Use of `aiocache.multi_cached` on methods can lead to memory leaks
+    |
+279 |         ...
+280 |
+281 |     @multi_cached()
+    |     ^^^^^^^^^^^^^^^ B019
+282 |     async def another_called_aiocache_multi_cached_instance_method(self, y):
+283 |         ...
+    |
+
+B019.py:299:5: B019 Use of `functools.lru_cache` on methods can lead to memory leaks
+    |
+298 | class Metaclass(type):
+299 |     @functools.lru_cache
+    |     ^^^^^^^^^^^^^^^^^^^^ B019
+300 |     def lru_cached_instance_method_on_metaclass(cls, x: int):
+301 |         ...
+    |
+
+B019.py:303:5: B019 Use of `async_lru.alru_cache` on methods can lead to memory leaks
+    |
+301 |         ...
+302 |     
+303 |     @async_lru.alru_cache
+    |     ^^^^^^^^^^^^^^^^^^^^^ B019
+304 |     async def alru_cached_instance_method_on_metaclass(cls, x: int):
+305 |         ...
+    |
+
+B019.py:307:5: B019 Use of `aiocache.cached` on methods can lead to memory leaks
+    |
+305 |         ...
+306 |     
+307 |     @aiocache.cached
+    |     ^^^^^^^^^^^^^^^^ B019
+308 |     async def aiocache_cached_instance_method_on_metaclass(cls, x: int):
+309 |         ...
+    |
+
+B019.py:311:5: B019 Use of `aiocache.cached_stampede` on methods can lead to memory leaks
+    |
+309 |         ...
+310 |     
+311 |     @aiocache.cached_stampede
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ B019
+312 |     async def aiocache_cached_stampede_instance_method_on_metaclass(cls, x: int):
+313 |         ...
+    |
+
+B019.py:315:5: B019 Use of `aiocache.multi_cached` on methods can lead to memory leaks
+    |
+313 |         ...
+314 |     
+315 |     @aiocache.multi_cached
+    |     ^^^^^^^^^^^^^^^^^^^^^^ B019
+316 |     async def aiocache_multi_cached_instance_method_on_metaclass(cls, x: int):
+317 |         ...
     |
