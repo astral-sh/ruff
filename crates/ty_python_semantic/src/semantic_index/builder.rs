@@ -2013,15 +2013,6 @@ where
                                 node,
                                 first,
                             }) => {
-                                if !comprehension_scopes.is_empty() {
-                                    self.with_semantic_checker(|semantic, context| {
-                                        semantic.visit_expr(expr, context);
-                                    });
-
-                                    self.scopes_by_expression
-                                        .insert(expr.into(), self.current_scope());
-                                    self.current_ast_ids().record_expression(expr);
-                                }
                                 self.add_definition(
                                     place_id,
                                     ComprehensionDefinitionNodeRef {
