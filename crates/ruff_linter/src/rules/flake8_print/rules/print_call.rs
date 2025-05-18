@@ -25,17 +25,21 @@ use crate::registry::AsRule;
 ///     return a + b < 4
 /// ```
 ///
-/// The automatic fix will remove the print statment entirely:
+/// The automatic fix will remove the print statement entirely:
+///
 /// ```python
 /// def sum_less_than_four(a, b):
 ///     return a + b < 4
 /// ```
 ///
 /// To keep the line for logging purposes, instead use something like:
+///
 /// ```python
 /// import logging
 ///
 /// logging.basicConfig(level=logging.INFO)
+///
+///
 /// def sum_less_than_four(a, b):
 ///     logging.info(f"are there less than 4? {a}+{b} = {a+b}")
 ///     return a + b < 4
