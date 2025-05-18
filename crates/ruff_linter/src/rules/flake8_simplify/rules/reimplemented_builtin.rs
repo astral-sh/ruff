@@ -36,10 +36,7 @@ use crate::line_width::LineWidthBuilder;
 ///
 /// # Fix safety
 ///
-/// This fix is always marked as unsafe because Python generator expressions used in
-/// `any` or `all` are lazy—that is, they defer evaluation of each item until it is needed.
-/// This can lead to differences in behavior if, for example, the `predicate` is reassigned or
-/// modified during iteration. Additionally, the fix may remove comments.
+/// This fix is always marked as unsafe because it might remove comments.
 ///
 /// ## References
 /// - [Python documentation: `any`](https://docs.python.org/3/library/functions.html#any)
