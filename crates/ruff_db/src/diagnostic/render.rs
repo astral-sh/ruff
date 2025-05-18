@@ -6,6 +6,7 @@ use ruff_annotate_snippets::{
 };
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
+use serde::Serialize;
 
 use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
 use crate::{
@@ -67,62 +68,130 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
             DiagnosticStylesheet::plain()
         };
 
-        if matches!(self.config.format, DiagnosticFormat::Concise) {
-            let (severity, severity_style) = match self.diag.severity() {
-                Severity::Info => ("info", stylesheet.info),
-                Severity::Warning => ("warning", stylesheet.warning),
-                Severity::Error => ("error", stylesheet.error),
-                Severity::Fatal => ("fatal", stylesheet.error),
-            };
+        match self.config.format {
+            DiagnosticFormat::Concise => {
+                let (severity, severity_style) = match self.diag.severity() {
+                    Severity::Info => ("info", stylesheet.info),
+                    Severity::Warning => ("warning", stylesheet.warning),
+                    Severity::Error => ("error", stylesheet.error),
+                    Severity::Fatal => ("fatal", stylesheet.error),
+                };
 
-            write!(
-                f,
-                "{severity}[{id}]",
-                severity = fmt_styled(severity, severity_style),
-                id = fmt_styled(self.diag.id(), stylesheet.emphasis)
-            )?;
-
-            if let Some(span) = self.diag.primary_span() {
                 write!(
                     f,
-                    " {path}",
-                    path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
+                    "{severity}[{id}]",
+                    severity = fmt_styled(severity, severity_style),
+                    id = fmt_styled(self.diag.id(), stylesheet.emphasis)
                 )?;
-                if let Some(range) = span.range() {
-                    let diagnostic_source = span.file().diagnostic_source(self.resolver);
-                    let start = diagnostic_source
-                        .as_source_code()
-                        .line_column(range.start());
 
+                if let Some(span) = self.diag.primary_span() {
                     write!(
                         f,
-                        ":{line}:{col}",
-                        line = fmt_styled(start.line, stylesheet.emphasis),
-                        col = fmt_styled(start.column, stylesheet.emphasis),
+                        " {path}",
+                        path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
                     )?;
+                    if let Some(range) = span.range() {
+                        let diagnostic_source = span.file().diagnostic_source(self.resolver);
+                        let start = diagnostic_source
+                            .as_source_code()
+                            .line_column(range.start());
+
+                        write!(
+                            f,
+                            ":{line}:{col}",
+                            line = fmt_styled(start.line, stylesheet.emphasis),
+                            col = fmt_styled(start.column, stylesheet.emphasis),
+                        )?;
+                    }
+                    write!(f, ":")?;
                 }
-                write!(f, ":")?;
+                writeln!(f, " {message}", message = self.diag.concise_message())
             }
-            return writeln!(f, " {message}", message = self.diag.concise_message());
+            DiagnosticFormat::Json => {
+                // Placeholder for JSON serialization logic
+                // This will be replaced with actual serialization code
+                let json_diagnostic = JsonDiagnostic::from_diagnostic(self.diag, self.resolver);
+                match serde_json::to_string(&json_diagnostic) {
+                    Ok(json_string) => write!(f, "{}", json_string),
+                    Err(_) => Err(std::fmt::Error), // Or handle error more gracefully
+                }
+            }
+            DiagnosticFormat::Full => {
+                let mut renderer = self.annotate_renderer.clone();
+                renderer = renderer
+                    .error(stylesheet.error)
+                    .warning(stylesheet.warning)
+                    .info(stylesheet.info)
+                    .note(stylesheet.note)
+                    .help(stylesheet.help)
+                    .line_no(stylesheet.line_no)
+                    .emphasis(stylesheet.emphasis)
+                    .none(stylesheet.none);
+
+                let resolved = Resolved::new(self.resolver, self.diag);
+                let renderable = resolved.to_renderable(self.config.context);
+                for diag_item in renderable.diagnostics.iter() {
+                    writeln!(f, "{}", renderer.render(diag_item.to_annotate()))?;
+                }
+                writeln!(f)
+            }
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct JsonLocation {
+    row: usize,
+    column: usize,
+}
+
+#[derive(Serialize)]
+struct JsonDiagnostic<'a> {
+    code: String,
+    severity: String,
+    message: String,
+    path: String,
+    location: JsonLocation,
+    // Store a reference to the resolver if needed for path/line_column, or pass it to `from_diagnostic`
+    #[serde(skip)]
+    _resolver: &'a dyn FileResolver, // We need resolver to get path and line_column
+}
+
+impl<'a> JsonDiagnostic<'a> {
+    fn from_diagnostic(diag: &'a Diagnostic, resolver: &'a dyn FileResolver) -> Self {
+        let code = diag.id().to_string();
+        let severity_str = match diag.severity() {
+            Severity::Info => "info",
+            Severity::Warning => "warning",
+            Severity::Error => "error",
+            Severity::Fatal => "fatal", // Or "error" depending on desired output
+        }
+        .to_string();
+        let message = diag.primary_message().to_string();
+
+        let mut path_str = "".to_string();
+        let mut location = JsonLocation { row: 0, column: 0 };
+
+        if let Some(span) = diag.primary_span() {
+            path_str = span.file().path(resolver).to_string();
+            if let Some(range) = span.range() {
+                let diagnostic_source = span.file().diagnostic_source(resolver);
+                let start_pos = diagnostic_source
+                    .as_source_code()
+                    .line_column(range.start());
+                location.row = start_pos.line.get();
+                location.column = start_pos.column.get();
+            }
         }
 
-        let mut renderer = self.annotate_renderer.clone();
-        renderer = renderer
-            .error(stylesheet.error)
-            .warning(stylesheet.warning)
-            .info(stylesheet.info)
-            .note(stylesheet.note)
-            .help(stylesheet.help)
-            .line_no(stylesheet.line_no)
-            .emphasis(stylesheet.emphasis)
-            .none(stylesheet.none);
-
-        let resolved = Resolved::new(self.resolver, self.diag);
-        let renderable = resolved.to_renderable(self.config.context);
-        for diag in renderable.diagnostics.iter() {
-            writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
+        Self {
+            code,
+            severity: severity_str,
+            message,
+            path: path_str,
+            location,
+            _resolver: resolver,
         }
-        writeln!(f)
     }
 }
 

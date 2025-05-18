@@ -1,5 +1,6 @@
 [workspace]
 members = ["crates/*"]
+exclude = ["crates/ruff_cli"]
 resolver = "2"
 
 [workspace.package]

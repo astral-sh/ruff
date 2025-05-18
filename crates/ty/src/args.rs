@@ -1,7 +1,7 @@
 use crate::logging::Verbosity;
 use crate::python_version::PythonVersion;
 use clap::error::ErrorKind;
-use clap::{ArgAction, ArgMatches, Error, Parser};
+use clap::{ArgAction, ArgMatches, Error, Parser, ValueEnum};
 use ruff_db::system::SystemPathBuf;
 use ty_project::combine::Combine;
 use ty_project::metadata::options::{EnvironmentOptions, Options, TerminalOptions};
@@ -281,7 +281,8 @@ impl clap::Args for RulesArg {
 }
 
 /// The diagnostic output format.
-#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, ValueEnum)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum OutputFormat {
     /// Print diagnostics verbosely, with context and helpful hints.
     ///
@@ -298,13 +299,17 @@ pub enum OutputFormat {
     /// dropped.
     #[value(name = "concise")]
     Concise,
+    /// Print diagnostics in JSON format.
+    #[value(name = "json", help = "Print diagnostics as a JSON array.")]
+    Json,
 }
 
 impl From<OutputFormat> for ruff_db::diagnostic::DiagnosticFormat {
     fn from(format: OutputFormat) -> ruff_db::diagnostic::DiagnosticFormat {
         match format {
-            OutputFormat::Full => Self::Full,
-            OutputFormat::Concise => Self::Concise,
+            OutputFormat::Full => ruff_db::diagnostic::DiagnosticFormat::Full,
+            OutputFormat::Concise => ruff_db::diagnostic::DiagnosticFormat::Concise,
+            OutputFormat::Json => ruff_db::diagnostic::DiagnosticFormat::Json,
         }
     }
 }

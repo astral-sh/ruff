@@ -32,6 +32,7 @@ indicatif = { workspace = true }
 jiff = { workspace = true }
 rayon = { workspace = true }
 salsa = { workspace = true }
+schemars = { workspace = true, optional = true }
 tracing = { workspace = true, features = ["release_max_level_debug"] }
 tracing-subscriber = { workspace = true }
 tracing-flame = { workspace = true }
@@ -50,3 +51,7 @@ toml = { workspace = true }
 
 [lints]
 workspace = true
+
+[features]
+default = []
+schemars = ["dep:schemars"]

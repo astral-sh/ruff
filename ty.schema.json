@@ -71,6 +71,13 @@
           "enum": [
             "concise"
           ]
+        },
+        {
+          "description": "Print diagnostics as a JSON array.",
+          "type": "string",
+          "enum": [
+            "json"
+          ]
         }
       ]
     },
