@@ -5536,7 +5536,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
-                    "Expected the symbol table to create a symbol for every Name node"
+                    "Expected the place table to create a place for every Name node"
                 );
                 Place::Unbound
             };
@@ -5553,7 +5553,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 None => {
                     assert!(
                         self.deferred_state.in_string_annotation(),
-                        "Expected the symbol table to create a symbol for every Name node"
+                        "Expected the place table to create a place for every Name node"
                     );
                     false
                 }

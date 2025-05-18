@@ -461,7 +461,7 @@ impl ScopeKind {
 
     pub(crate) fn is_function_like(self) -> bool {
         // Type parameter scopes behave like function scopes in terms of name resolution; CPython
-        // symbol table also uses the term "function-like" for these scopes.
+        // place table also uses the term "function-like" for these scopes.
         matches!(
             self,
             ScopeKind::Annotation

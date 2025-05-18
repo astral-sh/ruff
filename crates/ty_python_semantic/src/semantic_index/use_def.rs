@@ -291,7 +291,7 @@ mod place_state;
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct UseDefMap<'db> {
     /// Array of [`Definition`] in this scope. Only the first entry should be `None`;
-    /// this represents the implicit "unbound"/"undeclared" definition of every symbol.
+    /// this represents the implicit "unbound"/"undeclared" definition of every place.
     all_definitions: IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
 
     /// Array of predicates in this scope.
@@ -418,8 +418,8 @@ impl<'db> UseDefMap<'db> {
             Some(EagerSnapshot::Constraint(constraint)) => {
                 EagerSnapshotResult::FoundConstraint(*constraint)
             }
-            Some(EagerSnapshot::Bindings(symbol_bindings)) => {
-                EagerSnapshotResult::FoundBindings(self.bindings_iterator(symbol_bindings))
+            Some(EagerSnapshot::Bindings(bindings)) => {
+                EagerSnapshotResult::FoundBindings(self.bindings_iterator(bindings))
             }
             None => EagerSnapshotResult::NotFound,
         }
@@ -512,7 +512,7 @@ impl<'db> UseDefMap<'db> {
 ///
 /// An eager scope has its entire body executed immediately at the location where it is defined.
 /// For any free references in the nested scope, we use the bindings that are visible at the point
-/// where the nested scope is defined, instead of using the public type of the symbol.
+/// where the nested scope is defined, instead of using the public type of the place.
 ///
 /// There is a unique ID for each distinct [`EagerSnapshotKey`] in the file.
 #[newtype_index]
@@ -668,7 +668,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     pub(super) visibility_constraints: VisibilityConstraintsBuilder,
 
     /// A constraint which describes the visibility of the unbound/undeclared state, i.e.
-    /// whether or not a use of a symbol at the current point in control flow would see
+    /// whether or not a use of a place at the current point in control flow would see
     /// the fake `x = <unbound>` binding at the start of the scope. This is important for
     /// cases like the following, where we need to hide the implicit unbound binding in
     /// the "else" branch:
@@ -766,9 +766,9 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert_eq!(place, new_place);
     }
 
-    pub(super) fn record_binding(&mut self, symbol: ScopedPlaceId, binding: Definition<'db>) {
+    pub(super) fn record_binding(&mut self, place: ScopedPlaceId, binding: Definition<'db>) {
         let def_id = self.all_definitions.push(Some(binding));
-        let place_state = &mut self.place_states[symbol];
+        let place_state = &mut self.place_states[place];
         self.declarations_by_binding
             .insert(binding, place_state.declarations().clone());
         place_state.record_binding(def_id, self.scope_start_visibility, self.is_class_scope);

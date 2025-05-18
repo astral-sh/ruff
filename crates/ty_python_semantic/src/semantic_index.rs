@@ -146,7 +146,7 @@ pub(crate) enum EagerSnapshotResult<'map, 'db> {
     NoLongerInEagerContext,
 }
 
-/// The symbol tables and use-def maps for all scopes in a file.
+/// The place tables and use-def maps for all scopes in a file.
 #[derive(Debug, Update)]
 pub(crate) struct SemanticIndex<'db> {
     /// List of all place tables in this file, indexed by scope.

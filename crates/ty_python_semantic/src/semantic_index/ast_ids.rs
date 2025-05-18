@@ -13,7 +13,7 @@ use crate::semantic_index::semantic_index;
 ///
 /// The motivation for building the AST ids per scope isn't about reducing invalidation because
 /// the struct changes whenever the parsed AST changes. Instead, it's mainly that we can
-/// build the AST ids struct when building the symbol table and also keep the property that
+/// build the AST ids struct when building the place table and also keep the property that
 /// IDs of outer scopes are unaffected by changes in inner scopes.
 ///
 /// For example, we don't want that adding new statements to `foo` changes the statement id of `x = foo()` in:

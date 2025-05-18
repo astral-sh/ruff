@@ -2147,9 +2147,7 @@ where
                                 first,
                             }) => {
                                 if !comprehension_scopes.is_empty() {
-                                    self.scopes_by_expression
-                                        .insert(expr.into(), self.current_scope());
-                                    self.current_ast_ids().record_expression(expr);
+                                    self.prepare_expr(expr);
                                 }
                                 self.add_definition(
                                     place_id,
@@ -2192,7 +2190,7 @@ where
 
                 // Track reachability of attribute expressions to silence `unresolved-attribute`
                 // diagnostics in unreachable code.
-                if expr.is_attribute_expr() || expr.is_subscript_expr() {
+                if expr.is_attribute_expr() {
                     self.current_use_def_map_mut()
                         .record_node_reachability(node_key);
                 }

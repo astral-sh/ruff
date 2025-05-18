@@ -11,13 +11,13 @@ use crate::node_key::NodeKey;
 use crate::semantic_index::place::{FileScopeId, ScopeId, ScopedPlaceId};
 use crate::unpack::{Unpack, UnpackPosition};
 
-/// A definition of a symbol.
+/// A definition of a place.
 ///
 /// ## ID stability
 /// The `Definition`'s ID is stable when the only field that change is its `kind` (AST node).
 ///
-/// The `Definition` changes when the `file`, `scope`, or `symbol` change. This can be
-/// because a new scope gets inserted before the `Definition` or a new symbol is inserted
+/// The `Definition` changes when the `file`, `scope`, or `place` change. This can be
+/// because a new scope gets inserted before the `Definition` or a new place is inserted
 /// before this `Definition`. However, the ID can be considered stable and it is okay to use
 /// `Definition` in cross-module` salsa queries or as a field on other salsa tracked structs.
 #[salsa::tracked(debug)]
@@ -517,7 +517,7 @@ pub(crate) enum DefinitionCategory {
 }
 
 impl DefinitionCategory {
-    /// True if this definition establishes a "declared type" for the symbol.
+    /// True if this definition establishes a "declared type" for the place.
     ///
     /// If so, any assignments reached by this definition are in error if they assign a value of a
     /// type not assignable to the declared type.
@@ -530,7 +530,7 @@ impl DefinitionCategory {
         )
     }
 
-    /// True if this definition assigns a value to the symbol.
+    /// True if this definition assigns a value to the place.
     ///
     /// False only for annotated assignments without a RHS.
     pub(crate) fn is_binding(self) -> bool {
@@ -591,8 +591,8 @@ impl DefinitionKind<'_> {
 
     /// Returns the [`TextRange`] of the definition target.
     ///
-    /// A definition target would mainly be the node representing the symbol being defined i.e.,
-    /// [`ast::ExprName`] or [`ast::Identifier`] but could also be other nodes.
+    /// A definition target would mainly be the node representing the place being defined i.e.,
+    /// [`ast::ExprName`], [`ast::Identifier`], [`ast::ExprAttribute`] or [`ast::ExprSubscript`] but could also be other nodes.
     pub(crate) fn target_range(&self) -> TextRange {
         match self {
             DefinitionKind::Import(import) => import.alias().range(),
