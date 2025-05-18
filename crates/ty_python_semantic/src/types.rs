@@ -1646,6 +1646,10 @@ impl<'db> Type<'db> {
                     Symbol::Type(Type::BoundMethod(call_function), _) => call_function
                         .into_callable_type(db)
                         .is_assignable_to(db, target),
+                    Symbol::Type(Self::Callable(self_callable), Boundness::Bound) => {
+                        Type::Callable(self_callable.bind_self(db)).is_assignable_to(db, target)
+                    }
+                    Symbol::Type(t, Boundness::Bound) => t.is_assignable_to(db, target),
                     _ => false,
                 }
             }
@@ -7769,6 +7773,15 @@ impl<'db> CallableType<'db> {
                 .iter()
                 .cloned()
                 .map(|signature| signature.replace_self_reference(db, class)),
+        )
+    }
+
+    pub(crate) fn bind_self(self, db: &'db dyn Db) -> Self {
+        CallableType::from_overloads(
+            db,
+            self.signatures(db)
+                .iter()
+                .map(signatures::Signature::bind_self),
         )
     }
 }
