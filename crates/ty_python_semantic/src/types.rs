@@ -1647,6 +1647,15 @@ impl<'db> Type<'db> {
                 left.is_equivalent_to(db, right)
             }
             (Type::Tuple(left), Type::Tuple(right)) => left.is_equivalent_to(db, right),
+            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
+                self_function.is_equivalent_to(db, target_function)
+            }
+            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
+                self_method.is_equivalent_to(db, target_method)
+            }
+            (Type::MethodWrapper(self_method), Type::MethodWrapper(target_method)) => {
+                self_method.is_equivalent_to(db, target_method)
+            }
             (Type::Callable(left), Type::Callable(right)) => left.is_equivalent_to(db, right),
             (Type::NominalInstance(left), Type::NominalInstance(right)) => {
                 left.is_equivalent_to(db, right)
@@ -1702,6 +1711,15 @@ impl<'db> Type<'db> {
                 first.is_gradual_equivalent_to(db, second)
             }
 
+            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
+                self_function.is_gradual_equivalent_to(db, target_function)
+            }
+            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
+                self_method.is_gradual_equivalent_to(db, target_method)
+            }
+            (Type::MethodWrapper(self_method), Type::MethodWrapper(target_method)) => {
+                self_method.is_gradual_equivalent_to(db, target_method)
+            }
             (Type::Callable(first), Type::Callable(second)) => {
                 first.is_gradual_equivalent_to(db, second)
             }
@@ -6946,6 +6964,20 @@ impl<'db> FunctionType<'db> {
                 .is_assignable_to(db, other.into_callable_type(db))
     }
 
+    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.body_scope(db) == other.body_scope(db)
+            && self
+                .into_callable_type(db)
+                .is_equivalent_to(db, other.into_callable_type(db))
+    }
+
+    fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.body_scope(db) == other.body_scope(db)
+            && self
+                .into_callable_type(db)
+                .is_gradual_equivalent_to(db, other.into_callable_type(db))
+    }
+
     /// Returns a tuple of two spans. The first is
     /// the span for the identifier of the function
     /// definition for `self`. The second is
@@ -7249,6 +7281,21 @@ impl<'db> BoundMethodType<'db> {
                 .self_instance(db)
                 .is_assignable_to(db, self.self_instance(db))
     }
+
+    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.function(db).is_equivalent_to(db, other.function(db))
+            && other
+                .self_instance(db)
+                .is_equivalent_to(db, self.self_instance(db))
+    }
+
+    fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.function(db)
+            .is_gradual_equivalent_to(db, other.function(db))
+            && other
+                .self_instance(db)
+                .is_gradual_equivalent_to(db, self.self_instance(db))
+    }
 }
 
 /// This type represents the set of all callable objects with a certain, possibly overloaded,
@@ -7524,6 +7571,72 @@ impl<'db> MethodWrapperKind<'db> {
                 MethodWrapperKind::FunctionTypeDunderCall(self_function),
                 MethodWrapperKind::FunctionTypeDunderCall(other_function),
             ) => self_function.is_assignable_to(db, other_function),
+
+            (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
+            | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
+            | (MethodWrapperKind::StrStartswith(_), MethodWrapperKind::StrStartswith(_)) => {
+                self == other
+            }
+
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+            ) => false,
+        }
+    }
+
+    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(self_function),
+                MethodWrapperKind::FunctionTypeDunderGet(other_function),
+            ) => self_function.is_equivalent_to(db, other_function),
+
+            (
+                MethodWrapperKind::FunctionTypeDunderCall(self_function),
+                MethodWrapperKind::FunctionTypeDunderCall(other_function),
+            ) => self_function.is_equivalent_to(db, other_function),
+
+            (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
+            | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
+            | (MethodWrapperKind::StrStartswith(_), MethodWrapperKind::StrStartswith(_)) => {
+                self == other
+            }
+
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+            ) => false,
+        }
+    }
+
+    fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(self_function),
+                MethodWrapperKind::FunctionTypeDunderGet(other_function),
+            ) => self_function.is_gradual_equivalent_to(db, other_function),
+
+            (
+                MethodWrapperKind::FunctionTypeDunderCall(self_function),
+                MethodWrapperKind::FunctionTypeDunderCall(other_function),
+            ) => self_function.is_gradual_equivalent_to(db, other_function),
 
             (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
             | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
