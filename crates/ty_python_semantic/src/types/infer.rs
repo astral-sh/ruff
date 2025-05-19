@@ -3812,11 +3812,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         let Some(builder) = self.context.report_lint(&UNRESOLVED_IMPORT, range) else {
             return;
         };
-        builder.into_diagnostic(format_args!(
+        let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot resolve imported module `{}{}`",
             ".".repeat(level as usize),
             module.unwrap_or_default()
         ));
+        if level == 0 {
+            diagnostic.info(
+                "make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment"
+            );
+        }
     }
 
     fn infer_import_definition(
