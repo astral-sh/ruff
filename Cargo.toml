@@ -99,7 +99,7 @@ is-wsl = { version = "0.4.0" }
 itertools = { version = "0.14.0" }
 jiff = { version = "0.2.0" }
 js-sys = { version = "0.3.69" }
-jod-thread = { version = "0.1.2" }
+jod-thread = { version = "1.0.0" }
 libc = { version = "0.2.153" }
 libcst = { version = "1.1.0", default-features = false }
 log = { version = "0.4.17" }
