@@ -132,15 +132,6 @@ impl VirtualEnvironment {
                     ));
                 }
 
-                if value.contains('=') {
-                    return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
-                        pyvenv_cfg_path,
-                        PyvenvCfgParseErrorKind::TooManyEquals {
-                            line_number: pyvenv_cfg_line_number(index),
-                        },
-                    ));
-                }
-
                 match key {
                     "include-system-site-packages" => {
                         include_system_site_packages = value.eq_ignore_ascii_case("true");
@@ -305,7 +296,6 @@ pub(crate) enum SitePackagesDiscoveryError {
 /// The various ways in which parsing a `pyvenv.cfg` file could fail
 #[derive(Debug)]
 pub(crate) enum PyvenvCfgParseErrorKind {
-    TooManyEquals { line_number: NonZeroUsize },
     MalformedKeyValuePair { line_number: NonZeroUsize },
     NoHomeKey,
     InvalidHomeValue(io::Error),
@@ -314,9 +304,6 @@ pub(crate) enum PyvenvCfgParseErrorKind {
 impl fmt::Display for PyvenvCfgParseErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::TooManyEquals { line_number } => {
-                write!(f, "line {line_number} has too many '=' characters")
-            }
             Self::MalformedKeyValuePair { line_number } => write!(
                 f,
                 "line {line_number} has a malformed `<key> = <value>` pair"
@@ -639,6 +626,7 @@ mod tests {
     struct VirtualEnvironmentTestCase {
         system_site_packages: bool,
         pyvenv_cfg_version_field: Option<&'static str>,
+        command_field: Option<&'static str>,
     }
 
     struct PythonEnvironmentTestCase {
@@ -690,6 +678,7 @@ mod tests {
             let Some(VirtualEnvironmentTestCase {
                 pyvenv_cfg_version_field,
                 system_site_packages,
+                command_field,
             }) = virtual_env
             else {
                 return system_install_sys_prefix;
@@ -714,6 +703,10 @@ mod tests {
             let mut pyvenv_cfg_contents = format!("home = {system_home_path}\n");
             if let Some(version_field) = pyvenv_cfg_version_field {
                 pyvenv_cfg_contents.push_str(version_field);
+                pyvenv_cfg_contents.push('\n');
+            }
+            if let Some(command_field) = command_field {
+                pyvenv_cfg_contents.push_str(command_field);
                 pyvenv_cfg_contents.push('\n');
             }
             // Deliberately using weird casing here to test that our pyvenv.cfg parsing is case-insensitive:
@@ -947,6 +940,7 @@ mod tests {
             virtual_env: Some(VirtualEnvironmentTestCase {
                 system_site_packages: false,
                 pyvenv_cfg_version_field: None,
+                command_field: None,
             }),
         };
         test.run();
@@ -962,6 +956,7 @@ mod tests {
             virtual_env: Some(VirtualEnvironmentTestCase {
                 system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version = 3.12"),
+                command_field: None,
             }),
         };
         test.run();
@@ -977,6 +972,7 @@ mod tests {
             virtual_env: Some(VirtualEnvironmentTestCase {
                 system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version_info = 3.12"),
+                command_field: None,
             }),
         };
         test.run();
@@ -992,6 +988,7 @@ mod tests {
             virtual_env: Some(VirtualEnvironmentTestCase {
                 system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version_info = 3.12.0rc2"),
+                command_field: None,
             }),
         };
         test.run();
@@ -1007,6 +1004,7 @@ mod tests {
             virtual_env: Some(VirtualEnvironmentTestCase {
                 system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version_info = 3.13"),
+                command_field: None,
             }),
         };
         test.run();
@@ -1022,6 +1020,7 @@ mod tests {
             virtual_env: Some(VirtualEnvironmentTestCase {
                 system_site_packages: true,
                 pyvenv_cfg_version_field: Some("version_info = 3.13"),
+                command_field: None,
             }),
         };
         test.run();
@@ -1109,24 +1108,23 @@ mod tests {
         );
     }
 
+    /// See <https://github.com/astral-sh/ty/issues/430>
     #[test]
-    fn parsing_pyvenv_cfg_with_too_many_equals() {
-        let system = TestSystem::default();
-        let memory_fs = system.memory_file_system();
-        let pyvenv_cfg_path = SystemPathBuf::from("/.venv/pyvenv.cfg");
-        memory_fs
-            .write_file_all(&pyvenv_cfg_path, "home = bar = /.venv/bin")
-            .unwrap();
-        let venv_result =
-            PythonEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
-        assert!(matches!(
-            venv_result,
-            Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
-                path,
-                PyvenvCfgParseErrorKind::TooManyEquals { line_number }
-            ))
-            if path == pyvenv_cfg_path && Some(line_number) == NonZeroUsize::new(1)
-        ));
+    fn parsing_pyvenv_cfg_with_equals_in_value() {
+        let test = PythonEnvironmentTestCase {
+            system: TestSystem::default(),
+            minor_version: 13,
+            free_threaded: true,
+            origin: SysPrefixPathOrigin::VirtualEnvVar,
+            virtual_env: Some(VirtualEnvironmentTestCase {
+                system_site_packages: true,
+                pyvenv_cfg_version_field: Some("version_info = 3.13"),
+                command_field: Some(
+                    r#"command = /.pyenv/versions/3.13.3/bin/python3.13 -m venv --without-pip --prompt="python-default/3.13.3" /somewhere-else/python/virtualenvs/python-default/3.13.3"#,
+                ),
+            }),
+        };
+        test.run();
     }
 
     #[test]

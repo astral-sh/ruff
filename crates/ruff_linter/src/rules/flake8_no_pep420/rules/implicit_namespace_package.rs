@@ -83,10 +83,6 @@ pub(crate) fn implicit_namespace_package(
         // Ignore PEP 723 scripts.
         && ScriptTag::parse(locator.contents().as_bytes()).is_none()
     {
-        #[cfg(all(test, windows))]
-        let path = path
-            .to_string_lossy()
-            .replace(std::path::MAIN_SEPARATOR, "/"); // The snapshot test expects / as the path separator.
         return Some(Diagnostic::new(
             ImplicitNamespacePackage {
                 filename: fs::relativize_path(path),
@@ -104,11 +100,6 @@ pub(crate) fn implicit_namespace_package(
                     .ancestors()
                     .find(|parent| !parent.join("__init__.py").exists())
                 {
-                    #[cfg(all(test, windows))]
-                    let path = path
-                        .to_string_lossy()
-                        .replace(std::path::MAIN_SEPARATOR, "/"); // The snapshot test expects / as the path separator.
-
                     return Some(Diagnostic::new(
                         ImplicitNamespacePackage {
                             filename: fs::relativize_path(path),

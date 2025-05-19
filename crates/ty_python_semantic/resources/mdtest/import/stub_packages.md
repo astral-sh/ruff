@@ -311,6 +311,5 @@ class YamlLoader: ...
 ```py
 import yaml
 
-# TODO: This should not be an error
-yaml.YamlLoader  # error: [unresolved-attribute] "Type `<module 'yaml'>` has no attribute `YamlLoader`"
+reveal_type(yaml.YamlLoader)  # revealed: <class 'YamlLoader'>
 ```

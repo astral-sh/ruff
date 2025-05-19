@@ -457,10 +457,13 @@ impl<'db> Specialization<'db> {
             // corresponding typevar:
             //   - covariant: verify that self_type <: other_type
             //   - contravariant: verify that other_type <: self_type
-            //   - invariant: verify that self_type == other_type
+            //   - invariant: verify that self_type <: other_type AND other_type <: self_type
             //   - bivariant: skip, can't make assignability false
             let compatible = match typevar.variance(db) {
-                TypeVarVariance::Invariant => self_type.is_gradual_equivalent_to(db, *other_type),
+                TypeVarVariance::Invariant => {
+                    self_type.is_assignable_to(db, *other_type)
+                        && other_type.is_assignable_to(db, *self_type)
+                }
                 TypeVarVariance::Covariant => self_type.is_assignable_to(db, *other_type),
                 TypeVarVariance::Contravariant => other_type.is_assignable_to(db, *self_type),
                 TypeVarVariance::Bivariant => true,

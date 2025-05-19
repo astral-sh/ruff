@@ -4,7 +4,6 @@ use std::fmt;
 use std::sync::Arc;
 
 use camino::{Utf8Path, Utf8PathBuf};
-
 use ruff_db::files::{File, FileError, system_path_to_file, vendored_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
@@ -189,7 +188,18 @@ impl ModulePath {
             stdlib_path_to_module_name(relative_path)
         } else {
             let parent = relative_path.parent()?;
-            let parent_components = parent.components().map(|component| component.as_str());
+            let parent_components = parent.components().enumerate().map(|(index, component)| {
+                let component = component.as_str();
+
+                // For stub packages, strip the `-stubs` suffix from the first component
+                // because it isn't a valid module name part AND the module name is the name without the `-stubs`.
+                if index == 0 {
+                    component.strip_suffix("-stubs").unwrap_or(component)
+                } else {
+                    component
+                }
+            });
+
             let skip_final_part =
                 relative_path.ends_with("__init__.py") || relative_path.ends_with("__init__.pyi");
             if skip_final_part {
