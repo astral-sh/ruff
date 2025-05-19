@@ -65,54 +65,28 @@ pub(crate) fn write_whole_file(checker: &Checker, with: &ast::StmtWith) {
     }
 
     // Then we need to match each `open` operation with exactly one `write` call.
-    let (matches, contents) = {
-        let mut matcher = WriteMatcher::new(candidates);
-        visitor::walk_body(&mut matcher, &with.body);
-        matcher.finish()
-    };
-
-    // All the matched operations should be reported.
-    let diagnostics: Vec<Diagnostic> = matches
-        .iter()
-        .zip(contents)
-        .map(|(open, content)| {
-            Diagnostic::new(
-                WriteWholeFile {
-                    filename: SourceCodeSnippet::from_str(&checker.generator().expr(open.filename)),
-                    suggestion: make_suggestion(open, content, checker.generator()),
-                },
-                open.item.range(),
-            )
-        })
-        .collect();
-    checker.report_diagnostics(diagnostics);
+    let mut matcher = WriteMatcher::new(checker, candidates);
+    visitor::walk_body(&mut matcher, &with.body);
 }
 
 /// AST visitor that matches `open` operations with the corresponding `write` calls.
-#[derive(Debug)]
-struct WriteMatcher<'a> {
+struct WriteMatcher<'a, 'b> {
+    checker: &'a Checker<'b>,
     candidates: Vec<FileOpen<'a>>,
-    matches: Vec<FileOpen<'a>>,
-    contents: Vec<&'a Expr>,
     loop_counter: u32,
 }
 
-impl<'a> WriteMatcher<'a> {
-    fn new(candidates: Vec<FileOpen<'a>>) -> Self {
+impl<'a, 'b> WriteMatcher<'a, 'b> {
+    fn new(checker: &'a Checker<'b>, candidates: Vec<FileOpen<'a>>) -> Self {
         Self {
+            checker,
             candidates,
-            matches: vec![],
-            contents: vec![],
             loop_counter: 0,
         }
     }
-
-    fn finish(self) -> (Vec<FileOpen<'a>>, Vec<&'a Expr>) {
-        (self.matches, self.contents)
-    }
 }
 
-impl<'a> Visitor<'a> for WriteMatcher<'a> {
+impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         if matches!(stmt, ast::Stmt::While(_) | ast::Stmt::For(_)) {
             self.loop_counter += 1;
@@ -131,8 +105,16 @@ impl<'a> Visitor<'a> for WriteMatcher<'a> {
                 .position(|open| open.is_ref(write_to))
             {
                 if self.loop_counter == 0 {
-                    self.matches.push(self.candidates.remove(open));
-                    self.contents.push(content);
+                    let open = self.candidates.remove(open);
+                    self.checker.report_diagnostic(Diagnostic::new(
+                        WriteWholeFile {
+                            filename: SourceCodeSnippet::from_str(
+                                &self.checker.generator().expr(open.filename),
+                            ),
+                            suggestion: make_suggestion(&open, content, self.checker.generator()),
+                        },
+                        open.item.range(),
+                    ));
                 } else {
                     self.candidates.remove(open);
                 }

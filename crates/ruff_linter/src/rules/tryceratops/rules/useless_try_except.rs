@@ -67,6 +67,8 @@ pub(crate) fn useless_try_except(checker: &Checker, handlers: &[ExceptHandler]) 
         .collect::<Option<Vec<_>>>()
     {
         // Require that all handlers are useless, but create one diagnostic per handler.
-        checker.report_diagnostics(diagnostics);
+        for diagnostic in diagnostics {
+            checker.report_diagnostic(diagnostic);
+        }
     }
 }

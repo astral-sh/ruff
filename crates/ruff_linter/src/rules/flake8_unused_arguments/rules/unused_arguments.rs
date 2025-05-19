@@ -304,7 +304,7 @@ fn call<'a>(
 ) {
     let semantic = checker.semantic();
     let dummy_variable_rgx = &checker.settings.dummy_variable_rgx;
-    checker.report_diagnostics(parameters.filter_map(|arg| {
+    for diagnostic in parameters.filter_map(|arg| {
         let binding = scope
             .get(arg.name())
             .map(|binding_id| semantic.binding(binding_id))?;
@@ -316,7 +316,9 @@ fn call<'a>(
         } else {
             None
         }
-    }));
+    }) {
+        checker.report_diagnostic(diagnostic);
+    }
 }
 
 /// Returns `true` if a function appears to be a base class stub. In other

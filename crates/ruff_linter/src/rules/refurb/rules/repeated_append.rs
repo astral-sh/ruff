@@ -86,48 +86,42 @@ pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
         return;
     }
 
-    // group borrows from checker, so we can't directly push into checker.diagnostics
-    let diagnostics: Vec<Diagnostic> = group_appends(appends)
-        .iter()
-        .filter_map(|group| {
-            // Groups with just one element are fine, and shouldn't be replaced by `extend`.
-            if group.appends.len() <= 1 {
-                return None;
-            }
+    for group in group_appends(appends) {
+        // Groups with just one element are fine, and shouldn't be replaced by `extend`.
+        if group.appends.len() <= 1 {
+            continue;
+        }
 
-            let replacement = make_suggestion(group, checker.generator());
+        let replacement = make_suggestion(&group, checker.generator());
 
-            let mut diagnostic = Diagnostic::new(
-                RepeatedAppend {
-                    name: group.name().to_string(),
-                    replacement: SourceCodeSnippet::new(replacement.clone()),
-                },
-                group.range(),
-            );
+        let mut diagnostic = Diagnostic::new(
+            RepeatedAppend {
+                name: group.name().to_string(),
+                replacement: SourceCodeSnippet::new(replacement.clone()),
+            },
+            group.range(),
+        );
 
-            // We only suggest a fix when all appends in a group are clumped together. If they're
-            // non-consecutive, fixing them is much more difficult.
-            //
-            // Avoid fixing if there are comments in between the appends:
-            //
-            // ```python
-            // a.append(1)
-            // # comment
-            // a.append(2)
-            // ```
-            if group.is_consecutive && !checker.comment_ranges().intersects(group.range()) {
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
-                    replacement,
-                    group.start(),
-                    group.end(),
-                )));
-            }
+        // We only suggest a fix when all appends in a group are clumped together. If they're
+        // non-consecutive, fixing them is much more difficult.
+        //
+        // Avoid fixing if there are comments in between the appends:
+        //
+        // ```python
+        // a.append(1)
+        // # comment
+        // a.append(2)
+        // ```
+        if group.is_consecutive && !checker.comment_ranges().intersects(group.range()) {
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
+                replacement,
+                group.start(),
+                group.end(),
+            )));
+        }
 
-            Some(diagnostic)
-        })
-        .collect();
-
-    checker.report_diagnostics(diagnostics);
+        checker.report_diagnostic(diagnostic);
+    }
 }
 
 #[derive(Debug, Clone)]

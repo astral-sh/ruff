@@ -70,7 +70,9 @@ pub(crate) fn redefined_slots_in_subclass(checker: &Checker, class_def: &ast::St
     let diagnostics = class_slots
         .iter()
         .filter_map(|slot| check_super_slots(class_def, semantic, slot));
-    checker.report_diagnostics(diagnostics);
+    for diagnostic in diagnostics {
+        checker.report_diagnostic(diagnostic);
+    }
 }
 
 #[derive(Clone, Debug)]

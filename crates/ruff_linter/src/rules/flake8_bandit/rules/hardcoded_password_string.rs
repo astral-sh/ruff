@@ -76,7 +76,7 @@ pub(crate) fn compare_to_hardcoded_password_string(
     left: &Expr,
     comparators: &[Expr],
 ) {
-    checker.report_diagnostics(comparators.iter().filter_map(|comp| {
+    for diagnostic in comparators.iter().filter_map(|comp| {
         string_literal(comp).filter(|string| !string.is_empty())?;
         let name = password_target(left)?;
         Some(Diagnostic::new(
@@ -85,7 +85,9 @@ pub(crate) fn compare_to_hardcoded_password_string(
             },
             comp.range(),
         ))
-    }));
+    }) {
+        checker.report_diagnostic(diagnostic);
+    }
 }
 
 /// S105

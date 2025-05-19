@@ -379,15 +379,13 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
         _ => panic!("redefined_loop_name called on Statement that is not a `With` or `For`"),
     };
 
-    let mut diagnostics = Vec::new();
-
     for outer_assignment_target in &outer_assignment_targets {
         for inner_assignment_target in &inner_assignment_targets {
             // Compare the targets structurally.
             if ComparableExpr::from(outer_assignment_target.expr)
                 .eq(&(ComparableExpr::from(inner_assignment_target.expr)))
             {
-                diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     RedefinedLoopName {
                         name: checker.generator().expr(outer_assignment_target.expr),
                         outer_kind: outer_assignment_target.binding_kind,
@@ -398,6 +396,4 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
             }
         }
     }
-
-    checker.report_diagnostics(diagnostics);
 }
