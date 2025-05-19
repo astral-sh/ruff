@@ -23,25 +23,25 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
     }
 
     fn run_with_snapshot(
+        db: &ProjectDatabase,
         snapshot: DocumentSnapshot,
-        db: ProjectDatabase,
         _notifier: Notifier,
         params: HoverParams,
     ) -> crate::server::Result<Option<lsp_types::Hover>> {
-        let Some(file) = snapshot.file(&db) else {
+        let Some(file) = snapshot.file(db) else {
             tracing::debug!("Failed to resolve file for {:?}", params);
             return Ok(None);
         };
 
-        let source = source_text(&db, file);
-        let line_index = line_index(&db, file);
+        let source = source_text(db, file);
+        let line_index = line_index(db, file);
         let offset = params.text_document_position_params.position.to_text_size(
             &source,
             &line_index,
             snapshot.encoding(),
         );
 
-        let Some(range_info) = hover(&db, file, offset) else {
+        let Some(range_info) = hover(db, file, offset) else {
             return Ok(None);
         };
 
@@ -54,7 +54,7 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
             (MarkupKind::PlainText, lsp_types::MarkupKind::PlainText)
         };
 
-        let contents = range_info.display(&db, markup_kind).to_string();
+        let contents = range_info.display(db, markup_kind).to_string();
 
         Ok(Some(lsp_types::Hover {
             contents: HoverContents::Markup(MarkupContent {
