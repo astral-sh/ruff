@@ -296,6 +296,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     3 |
     4 | stat = add(10, 15)
       |
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
@@ -481,6 +482,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | y = 4 / 0
       |
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
     info: rule `unresolved-import` is enabled by default
 
     error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
@@ -532,6 +534,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | y = 4 / 0
       |
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
     info: rule `unresolved-import` was selected on the command line
 
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
@@ -1120,6 +1123,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
     info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `does_not_exist`
@@ -1128,6 +1132,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 3 diagnostics
@@ -1153,6 +1158,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
     info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `does_not_exist`
@@ -1161,6 +1167,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
