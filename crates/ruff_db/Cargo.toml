@@ -32,6 +32,7 @@ matchit = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 path-slash = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
@@ -52,6 +53,6 @@ tempfile = { workspace = true }
 [features]
 cache = ["ruff_cache"]
 os = ["ignore", "dep:etcetera"]
-serde = ["dep:serde", "camino/serde1"]
+serde = ["dep:serde", "camino/serde1", "dep:serde_json"]
 # Exposes testing utilities.
 testing = ["tracing-subscriber"]

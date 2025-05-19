@@ -951,6 +951,8 @@ pub enum DiagnosticFormat {
     ///
     /// This may use color when printing to a `tty`.
     Concise,
+    /// Print diagnostics in JSON format.
+    Json,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

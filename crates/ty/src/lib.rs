@@ -279,7 +279,13 @@ impl MainLoop {
                         let mut stdout = stdout().lock();
 
                         if result.is_empty() {
-                            writeln!(stdout, "{}", "All checks passed!".green().bold())?;
+                            if terminal_settings.output_format
+                                == ruff_db::diagnostic::DiagnosticFormat::Json
+                            {
+                                writeln!(stdout, "[]")?;
+                            } else {
+                                writeln!(stdout, "{}", "All checks passed!".green().bold())?;
+                            }
 
                             if self.watcher.is_none() {
                                 return Ok(ExitStatus::Success);
@@ -288,22 +294,40 @@ impl MainLoop {
                             let mut max_severity = Severity::Info;
                             let diagnostics_count = result.len();
 
-                            for diagnostic in result {
-                                write!(
+                            if terminal_settings.output_format
+                                == ruff_db::diagnostic::DiagnosticFormat::Json
+                            {
+                                writeln!(stdout, "[")?;
+                                for (i, diagnostic) in result.iter().enumerate() {
+                                    write!(
+                                        stdout,
+                                        "{}",
+                                        diagnostic.display(&db.upcast(), &display_config)
+                                    )?;
+                                    if i < diagnostics_count - 1 {
+                                        writeln!(stdout, ",")?;
+                                    } else {
+                                        writeln!(stdout)?;
+                                    }
+                                    max_severity = max_severity.max(diagnostic.severity());
+                                }
+                                writeln!(stdout, "]")?;
+                            } else {
+                                for diagnostic in result {
+                                    write!(
+                                        stdout,
+                                        "{}",
+                                        diagnostic.display(&db.upcast(), &display_config)
+                                    )?;
+                                    max_severity = max_severity.max(diagnostic.severity());
+                                }
+                                writeln!(
                                     stdout,
-                                    "{}",
-                                    diagnostic.display(&db.upcast(), &display_config)
+                                    "Found {} diagnostic{}",
+                                    diagnostics_count,
+                                    if diagnostics_count > 1 { "s" } else { "" }
                                 )?;
-
-                                max_severity = max_severity.max(diagnostic.severity());
                             }
-
-                            writeln!(
-                                stdout,
-                                "Found {} diagnostic{}",
-                                diagnostics_count,
-                                if diagnostics_count > 1 { "s" } else { "" }
-                            )?;
 
                             if max_severity.is_fatal() {
                                 tracing::warn!(
