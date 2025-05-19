@@ -94,6 +94,18 @@ def foo(
     # error: [invalid-exception-caught]
     except z as g:
         reveal_type(g)  # revealed: Unknown
+
+try:
+    {}.get("foo")
+# error: [invalid-exception-caught]
+except int:
+    pass
+
+try:
+    {}.get("foo")
+# error: [invalid-exception-caught]
+except int as err:
+    pass
 ```
 
 ## Object raised is not an exception
