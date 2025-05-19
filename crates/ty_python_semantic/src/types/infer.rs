@@ -48,8 +48,8 @@ use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::place::{
-    Boundness, LookupError, builtins_module_scope, builtins_symbol, explicit_global_place,
-    global_place, module_type_implicit_global_declaration, module_type_implicit_global_symbol,
+    Boundness, LookupError, builtins_module_scope, builtins_symbol, explicit_global_symbol,
+    global_symbol, module_type_implicit_global_declaration, module_type_implicit_global_symbol,
     place, place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::place::{Place, PlaceAndQualifiers};
@@ -1512,13 +1512,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types.bindings.insert(binding, bound_ty);
     }
 
-    /// Returns `true` if `place_id` should be looked up in the global scope, skipping intervening
+    /// Returns `true` if `symbol_id` should be looked up in the global scope, skipping intervening
     /// local scopes.
-    fn skip_non_global_scopes(&self, file_scope_id: FileScopeId, place_id: ScopedPlaceId) -> bool {
+    fn skip_non_global_scopes(&self, file_scope_id: FileScopeId, symbol_id: ScopedPlaceId) -> bool {
         !file_scope_id.is_global()
             && self
                 .index
-                .symbol_is_global_in_scope(place_id, file_scope_id)
+                .symbol_is_global_in_scope(symbol_id, file_scope_id)
     }
 
     fn add_declaration(
@@ -5565,12 +5565,14 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             let current_file = self.file();
 
-            let skip_non_global_scopes = place_table
-                .place_id_by_expr(expr)
-                .is_some_and(|place_id| self.skip_non_global_scopes(file_scope_id, place_id));
+            if let Some(name) = expr.as_name() {
+                let skip_non_global_scopes = place_table
+                    .place_id_by_name(name)
+                    .is_some_and(|symbol_id| self.skip_non_global_scopes(file_scope_id, symbol_id));
 
-            if skip_non_global_scopes {
-                return global_place(self.db(), self.file(), expr);
+                if skip_non_global_scopes {
+                    return global_symbol(self.db(), self.file(), name);
+                }
             }
 
             // If it's a function-like scope and there is one or more binding in this scope (but
@@ -5708,7 +5710,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
 
-                    explicit_global_place(db, self.file(), expr).map_type(|ty| {
+                    let Some(name) = expr.as_name() else {
+                        return Place::Unbound.into();
+                    };
+
+                    explicit_global_symbol(db, self.file(), name).map_type(|ty| {
                         self.narrow_with_applicable_constraints(expr, ty, &constraint_keys)
                     })
                 })

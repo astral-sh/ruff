@@ -259,44 +259,6 @@ pub(crate) fn class_symbol<'db>(
         .unwrap_or_default()
 }
 
-/// Infers the public type of an explicit module-global place as seen from within the same file.
-///
-/// Note that all global scopes also include various "implicit globals" such as `__name__`,
-/// `__doc__` and `__file__`. This function **does not** consider those symbols; it will return
-/// `Place::Unbound` for them. Use the (currently test-only) `global_symbol` query to also include
-/// those additional symbols.
-pub(crate) fn explicit_global_place<'db>(
-    db: &'db dyn Db,
-    file: File,
-    expr: &PlaceExpr,
-) -> PlaceAndQualifiers<'db> {
-    place_impl(
-        db,
-        global_scope(db, file),
-        expr,
-        RequiresExplicitReExport::No,
-    )
-}
-
-/// Infers the public type of an explicit module-global place as seen from within the same file.
-///
-/// Unlike [`explicit_global_symbol`], this function also considers various "implicit globals"
-/// such as `__name__`, `__doc__` and `__file__`. These are looked up as attributes on `types.ModuleType`
-/// rather than being looked up as symbols explicitly defined/declared in the global scope.
-pub(crate) fn global_place<'db>(
-    db: &'db dyn Db,
-    file: File,
-    expr: &PlaceExpr,
-) -> PlaceAndQualifiers<'db> {
-    explicit_global_place(db, file, expr).or_fall_back_to(db, || {
-        if let Some(name) = expr.as_name() {
-            module_type_implicit_global_symbol(db, name)
-        } else {
-            Place::Unbound.into()
-        }
-    })
-}
-
 /// Infers the public type of an explicit module-global symbol as seen from within the same file.
 ///
 /// Note that all global scopes also include various "implicit globals" such as `__name__`,
