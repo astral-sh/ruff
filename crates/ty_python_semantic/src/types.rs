@@ -4682,6 +4682,19 @@ impl<'db> Type<'db> {
                 }
                 Some(builder.build())
             }
+            // If there is no bound or constraints on a typevar `T`, `T: object` implicitly.
+            // `Type::NominalInstance("object").to_instance(db)` => `None`, so we short-circuit for
+            // TypeVars without an explicit bound or constraints.
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db)? {
+                TypeVarBoundOrConstraints::UpperBound(upper_bound) => upper_bound.to_instance(db),
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                    let mut builder = UnionBuilder::new(db);
+                    for constraint in constraints.elements(db) {
+                        builder = builder.add(constraint.to_instance(db)?);
+                    }
+                    Some(builder.build())
+                }
+            },
             Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
@@ -4700,7 +4713,6 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)
             | Type::Tuple(_)
-            | Type::TypeVar(_)
             | Type::LiteralString
             | Type::BoundSuper(_)
             | Type::AlwaysTruthy
