@@ -62,6 +62,19 @@ impl PythonEnvironment {
     }
 }
 
+/// The Python runtime that produced the venv.
+///
+/// We only need to distinguish cases that change the on-disk layout.
+/// Everything else can be treated like CPython.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub(crate) enum PythonImplementation {
+    CPython,
+    PyPy,
+    /// Fallback when the value is missing or unrecognised.
+    /// We treat it like CPython but keep the information for diagnostics.
+    Unknown,
+}
+
 /// Abstraction for a Python virtual environment.
 ///
 /// Most of this information is derived from the virtual environment's `pyvenv.cfg` file.
@@ -82,6 +95,7 @@ pub(crate) struct VirtualEnvironment {
     /// in an acceptable format under any of the keys we expect.
     /// This field will be `None` if so.
     version: Option<PythonVersion>,
+    implementation: PythonImplementation,
 }
 
 impl VirtualEnvironment {
@@ -104,6 +118,7 @@ impl VirtualEnvironment {
         let mut include_system_site_packages = false;
         let mut base_executable_home_path = None;
         let mut version_info_string = None;
+        let mut implementation = PythonImplementation::Unknown;
 
         // A `pyvenv.cfg` file *looks* like a `.ini` file, but actually isn't valid `.ini` syntax!
         // The Python standard-library's `site` module parses these files by splitting each line on
@@ -140,6 +155,13 @@ impl VirtualEnvironment {
                     // `virtualenv` and `uv` call this key `version_info`,
                     // but the stdlib venv module calls it `version`
                     "version" | "version_info" => version_info_string = Some(value),
+                    "implementation" => {
+                        implementation = match value.to_ascii_lowercase().as_str() {
+                            "cpython" => PythonImplementation::CPython,
+                            "pypy"    => PythonImplementation::PyPy,
+                            _         => PythonImplementation::Unknown,
+                        };
+                    }
                     _ => continue,
                 }
             }
@@ -179,6 +201,7 @@ impl VirtualEnvironment {
             base_executable_home_path,
             include_system_site_packages,
             version,
+            implementation,
         };
 
         tracing::trace!("Resolved metadata for virtual environment: {metadata:?}");
@@ -196,11 +219,12 @@ impl VirtualEnvironment {
             root_path,
             base_executable_home_path,
             include_system_site_packages,
+            implementation,
             version,
         } = self;
 
         let mut site_packages_directories = vec![site_packages_directory_from_sys_prefix(
-            root_path, *version, system,
+            root_path, *version, *implementation, system,
         )?];
 
         if *include_system_site_packages {
@@ -211,7 +235,7 @@ impl VirtualEnvironment {
             // or if we fail to resolve the `site-packages` from the `sys.prefix` path,
             // we should probably print a warning but *not* abort type checking
             if let Some(sys_prefix_path) = system_sys_prefix {
-                match site_packages_directory_from_sys_prefix(&sys_prefix_path, *version, system) {
+                match site_packages_directory_from_sys_prefix(&sys_prefix_path, *version, *implementation, system) {
                     Ok(site_packages_directory) => {
                         site_packages_directories.push(site_packages_directory);
                     }
@@ -265,7 +289,7 @@ impl SystemEnvironment {
         let SystemEnvironment { root_path } = self;
 
         let site_packages_directories = vec![site_packages_directory_from_sys_prefix(
-            root_path, None, system,
+            root_path, None, PythonImplementation::Unknown, system,
         )?];
 
         tracing::debug!(
@@ -320,6 +344,29 @@ when trying to resolve the `home` value to a directory on disk: {io_err}"
     }
 }
 
+/// Return the canonical `lib/.../site-packages` path for a given
+/// implementation + version pair, or `None` if we can’t form one.
+fn expected_site_packages_path(
+    sys_prefix_path: &SysPrefixPath,
+    implementation: PythonImplementation,
+    version: Option<PythonVersion>,
+) -> Option<SystemPathBuf> {
+    let version = version?;
+    Some(match implementation {
+        PythonImplementation::CPython => {
+            sys_prefix_path.join(format!("lib/python{version}/site-packages"))
+        }
+        PythonImplementation::PyPy => {
+            sys_prefix_path.join(format!(
+                "lib/pypy{major}.{minor}/site-packages",
+                major = version.major,
+                minor = version.minor
+            ))
+        }
+        PythonImplementation::Unknown => return None,
+    })
+}
+
 /// Attempt to retrieve the `site-packages` directory
 /// associated with a given Python installation.
 ///
@@ -330,6 +377,7 @@ when trying to resolve the `home` value to a directory on disk: {io_err}"
 fn site_packages_directory_from_sys_prefix(
     sys_prefix_path: &SysPrefixPath,
     python_version: Option<PythonVersion>,
+    implementation: PythonImplementation,
     system: &dyn System,
 ) -> SitePackagesDiscoveryResult<SystemPathBuf> {
     tracing::debug!("Searching for site-packages directory in {sys_prefix_path}");
@@ -369,15 +417,21 @@ fn site_packages_directory_from_sys_prefix(
 
     // If we were able to figure out what Python version this installation is,
     // we should be able to avoid iterating through all items in the `lib/` directory:
-    if let Some(version) = python_version {
-        let expected_path = sys_prefix_path.join(format!("lib/python{version}/site-packages"));
+    if let Some(expected_path) =
+        expected_site_packages_path(sys_prefix_path, implementation, python_version)
+    {
         if system.is_directory(&expected_path) {
             return Ok(expected_path);
         }
-        if version.free_threaded_build_available() {
-            // Nearly the same as `expected_path`, but with an additional `t` after {version}:
-            let alternative_path =
-                sys_prefix_path.join(format!("lib/python{version}t/site-packages"));
+
+        // CPython free-threaded (3.13+) variant: pythonXYt
+        if matches!(implementation, PythonImplementation::CPython)
+            && python_version.map_or(false, |v| v.free_threaded_build_available())
+        {
+            let alternative_path = sys_prefix_path.join(format!(
+                "lib/python{}t/site-packages",
+                python_version.unwrap()
+            ));
             if system.is_directory(&alternative_path) {
                 return Ok(alternative_path);
             }
@@ -412,7 +466,7 @@ fn site_packages_directory_from_sys_prefix(
             .file_name()
             .expect("File name to be non-null because path is guaranteed to be a child of `lib`");
 
-        if !name.starts_with("python3.") {
+        if !(name.starts_with("python3.") || name.starts_with("pypy3.")) {
             continue;
         }
 
