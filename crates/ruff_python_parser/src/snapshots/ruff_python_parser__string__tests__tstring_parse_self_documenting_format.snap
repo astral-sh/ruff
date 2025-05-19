@@ -15,10 +15,10 @@ expression: suite
                                 TString {
                                     range: 0..14,
                                     elements: [
-                                        Interpolation(
-                                            TStringInterpolationElement {
+                                        Expression(
+                                            FTStringInterpolatedElement {
                                                 range: 2..13,
-                                                interpolation: Name(
+                                                expression: Name(
                                                     ExprName {
                                                         range: 3..7,
                                                         id: Name("user"),
@@ -33,7 +33,7 @@ expression: suite
                                                 ),
                                                 conversion: None,
                                                 format_spec: Some(
-                                                    TStringFormatSpec {
+                                                    FTStringFormatSpec {
                                                         range: 9..12,
                                                         elements: [
                                                             Literal(

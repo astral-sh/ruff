@@ -21,10 +21,10 @@ expression: suite
                                                 value: "mix ",
                                             },
                                         ),
-                                        Interpolation(
-                                            TStringInterpolationElement {
+                                        Expression(
+                                            FTStringInterpolatedElement {
                                                 range: 6..13,
-                                                interpolation: Name(
+                                                expression: Name(
                                                     ExprName {
                                                         range: 7..11,
                                                         id: Name("user"),
@@ -47,10 +47,10 @@ expression: suite
                                                 value: " with text and ",
                                             },
                                         ),
-                                        Interpolation(
-                                            TStringInterpolationElement {
+                                        Expression(
+                                            FTStringInterpolatedElement {
                                                 range: 28..37,
-                                                interpolation: Name(
+                                                expression: Name(
                                                     ExprName {
                                                         range: 29..35,
                                                         id: Name("second"),

@@ -15,10 +15,10 @@ expression: suite
                                 TString {
                                     range: 0..10,
                                     elements: [
-                                        Interpolation(
-                                            TStringInterpolationElement {
+                                        Expression(
+                                            FTStringInterpolatedElement {
                                                 range: 2..9,
-                                                interpolation: Yield(
+                                                expression: Yield(
                                                     ExprYield {
                                                         range: 3..8,
                                                         value: None,

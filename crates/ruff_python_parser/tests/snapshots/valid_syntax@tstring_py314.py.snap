@@ -21,10 +21,10 @@ Module(
                                         TString {
                                             range: 46..55,
                                             elements: [
-                                                Interpolation(
-                                                    TStringInterpolationElement {
+                                                Expression(
+                                                    FTStringInterpolatedElement {
                                                         range: 48..54,
-                                                        interpolation: Name(
+                                                        expression: Name(
                                                             ExprName {
                                                                 range: 49..53,
                                                                 id: Name("name"),
@@ -37,7 +37,7 @@ Module(
                                                     },
                                                 ),
                                             ],
-                                            flags: TStringFlags {
+                                            flags: FTStringFlags {
                                                 quote_style: Single,
                                                 prefix: Regular,
                                                 triple_quoted: false,

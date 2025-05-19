@@ -34,7 +34,7 @@ expression: suite
                                                 },
                                             ),
                                             Expression(
-                                                FStringExpressionElement {
+                                                FTStringInterpolatedElement {
                                                     range: 16..21,
                                                     expression: StringLiteral(
                                                         ExprStringLiteral {

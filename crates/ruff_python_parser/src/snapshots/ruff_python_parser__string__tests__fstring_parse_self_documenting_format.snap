@@ -16,7 +16,7 @@ expression: suite
                                     range: 0..14,
                                     elements: [
                                         Expression(
-                                            FStringExpressionElement {
+                                            FTStringInterpolatedElement {
                                                 range: 2..13,
                                                 expression: Name(
                                                     ExprName {
@@ -33,7 +33,7 @@ expression: suite
                                                 ),
                                                 conversion: None,
                                                 format_spec: Some(
-                                                    FStringFormatSpec {
+                                                    FTStringFormatSpec {
                                                         range: 9..12,
                                                         elements: [
                                                             Literal(

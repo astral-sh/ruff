@@ -7,32 +7,32 @@ input_file: crates/ruff_python_parser/resources/inline/err/t_string_unclosed_lbr
 ```
 Module(
     ModModule {
-        range: 0..75,
+        range: 0..73,
         body: [
             Expr(
                 StmtExpr {
-                    range: 46..58,
+                    range: 44..56,
                     value: TString(
                         ExprTString {
-                            range: 46..58,
+                            range: 44..56,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 46..58,
+                                            range: 44..56,
                                             elements: [
                                                 Literal(
                                                     FTStringLiteralElement {
-                                                        range: 48..54,
+                                                        range: 46..52,
                                                         value: "hello ",
                                                     },
                                                 ),
-                                                Interpolation(
-                                                    TStringInterpolationElement {
-                                                        range: 54..58,
-                                                        interpolation: Name(
+                                                Expression(
+                                                    FTStringInterpolatedElement {
+                                                        range: 52..55,
+                                                        expression: Name(
                                                             ExprName {
-                                                                range: 55..56,
+                                                                range: 53..54,
                                                                 id: Name("x"),
                                                                 ctx: Load,
                                                             },
@@ -40,8 +40,8 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            TStringFormatSpec {
-                                                                range: 57..58,
+                                                            FTStringFormatSpec {
+                                                                range: 55..55,
                                                                 elements: [],
                                                             },
                                                         ),
@@ -63,28 +63,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 59..75,
+                    range: 57..72,
                     value: TString(
                         ExprTString {
-                            range: 59..75,
+                            range: 57..72,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 59..75,
+                                            range: 57..72,
                                             elements: [
                                                 Literal(
                                                     FTStringLiteralElement {
-                                                        range: 61..67,
+                                                        range: 59..65,
                                                         value: "hello ",
                                                     },
                                                 ),
-                                                Interpolation(
-                                                    TStringInterpolationElement {
-                                                        range: 67..75,
-                                                        interpolation: Name(
+                                                Expression(
+                                                    FTStringInterpolatedElement {
+                                                        range: 65..71,
+                                                        expression: Name(
                                                             ExprName {
-                                                                range: 68..69,
+                                                                range: 66..67,
                                                                 id: Name("x"),
                                                                 ctx: Load,
                                                             },
@@ -92,12 +92,12 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            TStringFormatSpec {
-                                                                range: 70..75,
+                                                            FTStringFormatSpec {
+                                                                range: 68..71,
                                                                 elements: [
                                                                     Literal(
                                                                         FTStringLiteralElement {
-                                                                            range: 70..73,
+                                                                            range: 68..71,
                                                                             value: ".3f",
                                                                         },
                                                                     ),
@@ -127,31 +127,16 @@ Module(
 ## Errors
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"hello {x:"
-  |            ^ Syntax Error: Expected a t-string element or a '}'
+  |            ^ Syntax Error: t-string: expecting '}'
 3 | t"hello {x:.3f"
   |
 
 
   |
-1 | # parse_options: { "target-version": "3.14" }
-2 | t"hello {x:"
-  |             ^ Syntax Error: t-string: unterminated string
-3 | t"hello {x:.3f"
-  |
-
-
-  |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"hello {x:"
 3 | t"hello {x:.3f"
-  |               ^ Syntax Error: Expected a t-string element or a '}'
-  |
-
-
-  |
-2 | t"hello {x:"
-3 | t"hello {x:.3f"
-  |                ^ Syntax Error: unexpected EOF while parsing
+  |               ^ Syntax Error: t-string: expecting '}'
   |

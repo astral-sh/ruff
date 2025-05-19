@@ -15,10 +15,10 @@ expression: suite
                                 TString {
                                     range: 0..16,
                                     elements: [
-                                        Interpolation(
-                                            TStringInterpolationElement {
+                                        Expression(
+                                            FTStringInterpolatedElement {
                                                 range: 2..15,
-                                                interpolation: Name(
+                                                expression: Name(
                                                     ExprName {
                                                         range: 3..6,
                                                         id: Name("foo"),
@@ -28,13 +28,13 @@ expression: suite
                                                 debug_text: None,
                                                 conversion: None,
                                                 format_spec: Some(
-                                                    TStringFormatSpec {
+                                                    FTStringFormatSpec {
                                                         range: 7..14,
                                                         elements: [
-                                                            Interpolation(
-                                                                TStringInterpolationElement {
+                                                            Expression(
+                                                                FTStringInterpolatedElement {
                                                                     range: 7..14,
-                                                                    interpolation: StringLiteral(
+                                                                    expression: StringLiteral(
                                                                         ExprStringLiteral {
                                                                             range: 8..13,
                                                                             value: StringLiteralValue {

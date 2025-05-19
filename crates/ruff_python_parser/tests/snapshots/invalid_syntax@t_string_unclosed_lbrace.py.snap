@@ -7,26 +7,26 @@ input_file: crates/ruff_python_parser/resources/inline/err/t_string_unclosed_lbr
 ```
 Module(
     ModModule {
-        range: 0..84,
+        range: 0..82,
         body: [
             Expr(
                 StmtExpr {
-                    range: 46..50,
+                    range: 44..48,
                     value: TString(
                         ExprTString {
-                            range: 46..50,
+                            range: 44..48,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 46..50,
+                                            range: 44..48,
                                             elements: [
-                                                Interpolation(
-                                                    TStringInterpolationElement {
-                                                        range: 48..49,
-                                                        interpolation: Name(
+                                                Expression(
+                                                    FTStringInterpolatedElement {
+                                                        range: 46..47,
+                                                        expression: Name(
                                                             ExprName {
-                                                                range: 49..49,
+                                                                range: 47..47,
                                                                 id: Name(""),
                                                                 ctx: Invalid,
                                                             },
@@ -52,22 +52,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 51..60,
+                    range: 49..58,
                     value: TString(
                         ExprTString {
-                            range: 51..60,
+                            range: 49..58,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 51..60,
+                                            range: 49..58,
                                             elements: [
-                                                Interpolation(
-                                                    TStringInterpolationElement {
-                                                        range: 53..60,
-                                                        interpolation: Name(
+                                                Expression(
+                                                    FTStringInterpolatedElement {
+                                                        range: 51..58,
+                                                        expression: Name(
                                                             ExprName {
-                                                                range: 54..57,
+                                                                range: 52..55,
                                                                 id: Name("foo"),
                                                                 ctx: Load,
                                                             },
@@ -93,22 +93,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 61..69,
+                    range: 59..67,
                     value: TString(
                         ExprTString {
-                            range: 61..69,
+                            range: 59..67,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 61..69,
+                                            range: 59..67,
                                             elements: [
-                                                Interpolation(
-                                                    TStringInterpolationElement {
-                                                        range: 63..68,
-                                                        interpolation: Name(
+                                                Expression(
+                                                    FTStringInterpolatedElement {
+                                                        range: 61..66,
+                                                        expression: Name(
                                                             ExprName {
-                                                                range: 64..67,
+                                                                range: 62..65,
                                                                 id: Name("foo"),
                                                                 ctx: Load,
                                                             },
@@ -139,23 +139,23 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 70..83,
+                    range: 68..81,
                     value: TString(
                         ExprTString {
-                            range: 70..83,
+                            range: 68..81,
                             value: TStringValue {
                                 inner: Concatenated(
                                     [
                                         TString(
                                             TString {
-                                                range: 70..74,
+                                                range: 68..72,
                                                 elements: [
-                                                    Interpolation(
-                                                        TStringInterpolationElement {
-                                                            range: 72..73,
-                                                            interpolation: Name(
+                                                    Expression(
+                                                        FTStringInterpolatedElement {
+                                                            range: 70..71,
+                                                            expression: Name(
                                                                 ExprName {
-                                                                    range: 73..73,
+                                                                    range: 71..71,
                                                                     id: Name(""),
                                                                     ctx: Invalid,
                                                                 },
@@ -175,14 +175,14 @@ Module(
                                         ),
                                         TString(
                                             TString {
-                                                range: 75..83,
+                                                range: 73..81,
                                                 elements: [
-                                                    Interpolation(
-                                                        TStringInterpolationElement {
-                                                            range: 79..80,
-                                                            interpolation: Name(
+                                                    Expression(
+                                                        FTStringInterpolatedElement {
+                                                            range: 77..78,
+                                                            expression: Name(
                                                                 ExprName {
-                                                                    range: 80..80,
+                                                                    range: 78..78,
                                                                     id: Name(""),
                                                                     ctx: Invalid,
                                                                 },
@@ -214,7 +214,7 @@ Module(
 ## Errors
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"{"
   |    ^ Syntax Error: missing closing quote in string literal
 3 | t"{foo!r"
@@ -223,7 +223,7 @@ Module(
 
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"{"
   |     ^ Syntax Error: t-string: unterminated string
 3 | t"{foo!r"
@@ -232,7 +232,7 @@ Module(
 
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"{"
   |     ^ Syntax Error: t-string: unterminated string
 3 | t"{foo!r"
@@ -241,7 +241,7 @@ Module(
 
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"{"
 3 | t"{foo!r"
   |        ^^ Syntax Error: missing closing quote in string literal
@@ -251,7 +251,7 @@ Module(
 
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"{"
 3 | t"{foo!r"
   |          ^ Syntax Error: t-string: unterminated string
@@ -261,7 +261,7 @@ Module(
 
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"{"
 3 | t"{foo!r"
   |          ^ Syntax Error: t-string: unterminated string
@@ -281,7 +281,7 @@ Module(
 
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"{"
 3 | t"{foo!r"
   |          ^ Syntax Error: Expected TStringEnd, found Unknown

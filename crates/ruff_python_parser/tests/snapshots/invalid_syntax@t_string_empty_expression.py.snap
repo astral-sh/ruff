@@ -7,26 +7,26 @@ input_file: crates/ruff_python_parser/resources/inline/err/t_string_empty_expres
 ```
 Module(
     ModModule {
-        range: 0..60,
+        range: 0..58,
         body: [
             Expr(
                 StmtExpr {
-                    range: 46..51,
+                    range: 44..49,
                     value: TString(
                         ExprTString {
-                            range: 46..51,
+                            range: 44..49,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 46..51,
+                                            range: 44..49,
                                             elements: [
-                                                Interpolation(
-                                                    TStringInterpolationElement {
-                                                        range: 48..50,
-                                                        interpolation: Name(
+                                                Expression(
+                                                    FTStringInterpolatedElement {
+                                                        range: 46..48,
+                                                        expression: Name(
                                                             ExprName {
-                                                                range: 49..49,
+                                                                range: 47..47,
                                                                 id: Name(""),
                                                                 ctx: Invalid,
                                                             },
@@ -52,22 +52,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 52..59,
+                    range: 50..57,
                     value: TString(
                         ExprTString {
-                            range: 52..59,
+                            range: 50..57,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 52..59,
+                                            range: 50..57,
                                             elements: [
-                                                Interpolation(
-                                                    TStringInterpolationElement {
-                                                        range: 54..58,
-                                                        interpolation: Name(
+                                                Expression(
+                                                    FTStringInterpolatedElement {
+                                                        range: 52..56,
+                                                        expression: Name(
                                                             ExprName {
-                                                                range: 55..55,
+                                                                range: 53..53,
                                                                 id: Name(""),
                                                                 ctx: Invalid,
                                                             },
@@ -98,7 +98,7 @@ Module(
 ## Errors
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"{}"
   |    ^ Syntax Error: Expected an expression
 3 | t"{  }"
@@ -106,7 +106,7 @@ Module(
 
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"{}"
 3 | t"{  }"
   |      ^ Syntax Error: Expected an expression

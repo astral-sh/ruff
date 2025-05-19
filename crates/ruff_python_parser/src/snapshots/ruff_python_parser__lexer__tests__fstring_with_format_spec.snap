@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
-snapshot_kind: text
 ---
 ## Tokens
 ```
@@ -32,7 +31,7 @@ snapshot_kind: text
         7..8,
     ),
     (
-        FStringMiddle(
+        FTStringMiddle(
             " ",
         ),
         8..9,
@@ -69,7 +68,7 @@ snapshot_kind: text
         14..15,
     ),
     (
-        FStringMiddle(
+        FTStringMiddle(
             ".3f",
         ),
         15..18,
@@ -82,7 +81,7 @@ snapshot_kind: text
         18..19,
     ),
     (
-        FStringMiddle(
+        FTStringMiddle(
             " ",
         ),
         19..20,
@@ -105,7 +104,7 @@ snapshot_kind: text
         22..23,
     ),
     (
-        FStringMiddle(
+        FTStringMiddle(
             ".",
         ),
         23..24,
@@ -128,7 +127,7 @@ snapshot_kind: text
         26..27,
     ),
     (
-        FStringMiddle(
+        FTStringMiddle(
             "f",
         ),
         27..28,
@@ -141,7 +140,7 @@ snapshot_kind: text
         28..29,
     ),
     (
-        FStringMiddle(
+        FTStringMiddle(
             " ",
         ),
         29..30,
@@ -164,7 +163,7 @@ snapshot_kind: text
         33..34,
     ),
     (
-        FStringMiddle(
+        FTStringMiddle(
             "*^",
         ),
         34..36,
@@ -209,7 +208,7 @@ snapshot_kind: text
         43..44,
     ),
     (
-        FStringMiddle(
+        FTStringMiddle(
             " ",
         ),
         44..45,

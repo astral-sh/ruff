@@ -7,38 +7,38 @@ input_file: crates/ruff_python_parser/resources/inline/err/t_string_lambda_witho
 ```
 Module(
     ModModule {
-        range: 0..63,
+        range: 0..61,
         body: [
             Expr(
                 StmtExpr {
-                    range: 46..62,
+                    range: 44..60,
                     value: TString(
                         ExprTString {
-                            range: 46..62,
+                            range: 44..60,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 46..62,
+                                            range: 44..60,
                                             elements: [
-                                                Interpolation(
-                                                    TStringInterpolationElement {
-                                                        range: 48..58,
-                                                        interpolation: Lambda(
+                                                Expression(
+                                                    FTStringInterpolatedElement {
+                                                        range: 46..56,
+                                                        expression: Lambda(
                                                             ExprLambda {
-                                                                range: 49..58,
+                                                                range: 47..56,
                                                                 parameters: Some(
                                                                     Parameters {
-                                                                        range: 56..57,
+                                                                        range: 54..55,
                                                                         posonlyargs: [],
                                                                         args: [
                                                                             ParameterWithDefault {
-                                                                                range: 56..57,
+                                                                                range: 54..55,
                                                                                 parameter: Parameter {
-                                                                                    range: 56..57,
+                                                                                    range: 54..55,
                                                                                     name: Identifier {
                                                                                         id: Name("x"),
-                                                                                        range: 56..57,
+                                                                                        range: 54..55,
                                                                                     },
                                                                                     annotation: None,
                                                                                 },
@@ -52,7 +52,7 @@ Module(
                                                                 ),
                                                                 body: Name(
                                                                     ExprName {
-                                                                        range: 58..58,
+                                                                        range: 56..56,
                                                                         id: Name(""),
                                                                         ctx: Invalid,
                                                                     },
@@ -66,7 +66,7 @@ Module(
                                                 ),
                                                 Literal(
                                                     FTStringLiteralElement {
-                                                        range: 58..60,
+                                                        range: 56..58,
                                                         value: " x",
                                                     },
                                                 ),
@@ -91,28 +91,28 @@ Module(
 ## Errors
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"{lambda x: x}"
   |             ^^ Syntax Error: Expected an expression
   |
 
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"{lambda x: x}"
   |    ^^^^^^^^^ Syntax Error: t-string: lambda expressions are not allowed without parentheses
   |
 
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"{lambda x: x}"
   |             ^^ Syntax Error: t-string: expecting '}'
   |
 
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"{lambda x: x}"
-  |               ^ Syntax Error: Expected a t-string element or the end of the t-string
+  |               ^ Syntax Error: Expected an f or t-string element or the end of the f or t-string
   |

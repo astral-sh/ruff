@@ -13,7 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "first ",
         ),
         2..8,
@@ -62,7 +62,7 @@ expression: lex_source(source)
         40..41,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             " second",
         ),
         41..48,

@@ -7,26 +7,26 @@ input_file: crates/ruff_python_parser/resources/inline/err/t_string_invalid_conv
 ```
 Module(
     ModModule {
-        range: 0..55,
+        range: 0..53,
         body: [
             Expr(
                 StmtExpr {
-                    range: 46..54,
+                    range: 44..52,
                     value: TString(
                         ExprTString {
-                            range: 46..54,
+                            range: 44..52,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 46..54,
+                                            range: 44..52,
                                             elements: [
-                                                Interpolation(
-                                                    TStringInterpolationElement {
-                                                        range: 48..53,
-                                                        interpolation: Name(
+                                                Expression(
+                                                    FTStringInterpolatedElement {
+                                                        range: 46..51,
+                                                        expression: Name(
                                                             ExprName {
-                                                                range: 49..50,
+                                                                range: 47..48,
                                                                 id: Name("x"),
                                                                 ctx: Load,
                                                             },
@@ -57,7 +57,7 @@ Module(
 ## Errors
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | t"{x!z}"
   |      ^ Syntax Error: t-string: invalid conversion character
   |

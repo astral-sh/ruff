@@ -27,10 +27,10 @@ Module(
                                                         value: "hello ",
                                                     },
                                                 ),
-                                                Interpolation(
-                                                    TStringInterpolationElement {
+                                                Expression(
+                                                    FTStringInterpolatedElement {
                                                         range: 52..56,
-                                                        interpolation: Name(
+                                                        expression: Name(
                                                             ExprName {
                                                                 range: 53..54,
                                                                 id: Name("x"),
@@ -40,7 +40,7 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            TStringFormatSpec {
+                                                            FTStringFormatSpec {
                                                                 range: 55..55,
                                                                 elements: [],
                                                             },
@@ -54,7 +54,7 @@ Module(
                                                     },
                                                 ),
                                             ],
-                                            flags: TStringFlags {
+                                            flags: FTStringFlags {
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: false,
@@ -85,10 +85,10 @@ Module(
                                                         value: "hello ",
                                                     },
                                                 ),
-                                                Interpolation(
-                                                    TStringInterpolationElement {
+                                                Expression(
+                                                    FTStringInterpolatedElement {
                                                         range: 72..79,
-                                                        interpolation: Name(
+                                                        expression: Name(
                                                             ExprName {
                                                                 range: 73..74,
                                                                 id: Name("x"),
@@ -98,7 +98,7 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            TStringFormatSpec {
+                                                            FTStringFormatSpec {
                                                                 range: 75..78,
                                                                 elements: [
                                                                     Literal(
@@ -119,7 +119,7 @@ Module(
                                                     },
                                                 ),
                                             ],
-                                            flags: TStringFlags {
+                                            flags: FTStringFlags {
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: false,

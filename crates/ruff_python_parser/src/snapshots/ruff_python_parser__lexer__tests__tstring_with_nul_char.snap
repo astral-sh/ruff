@@ -13,7 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "\\0",
         ),
         2..4,

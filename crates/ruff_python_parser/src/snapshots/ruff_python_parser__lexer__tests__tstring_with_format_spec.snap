@@ -31,7 +31,7 @@ expression: lex_source(source)
         7..8,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             " ",
         ),
         8..9,
@@ -68,7 +68,7 @@ expression: lex_source(source)
         14..15,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             ".3f",
         ),
         15..18,
@@ -81,7 +81,7 @@ expression: lex_source(source)
         18..19,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             " ",
         ),
         19..20,
@@ -104,7 +104,7 @@ expression: lex_source(source)
         22..23,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             ".",
         ),
         23..24,
@@ -127,7 +127,7 @@ expression: lex_source(source)
         26..27,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "f",
         ),
         27..28,
@@ -140,7 +140,7 @@ expression: lex_source(source)
         28..29,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             " ",
         ),
         29..30,
@@ -163,7 +163,7 @@ expression: lex_source(source)
         33..34,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "*^",
         ),
         34..36,
@@ -208,7 +208,7 @@ expression: lex_source(source)
         43..44,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             " ",
         ),
         44..45,

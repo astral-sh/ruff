@@ -13,7 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "foo ",
         ),
         2..6,
@@ -33,7 +33,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "bar ",
         ),
         9..13,
@@ -99,7 +99,7 @@ expression: lex_source(source)
         28..29,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             " baz",
         ),
         29..33,
@@ -122,7 +122,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "foo ",
         ),
         37..41,
@@ -142,7 +142,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "bar",
         ),
         44..47,
@@ -162,7 +162,7 @@ expression: lex_source(source)
         48..49,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             " some ",
         ),
         49..55,
@@ -182,7 +182,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "another",
         ),
         58..65,

@@ -7,29 +7,29 @@ input_file: crates/ruff_python_parser/resources/inline/err/t_string_invalid_star
 ```
 Module(
     ModModule {
-        range: 0..158,
+        range: 0..156,
         body: [
             Expr(
                 StmtExpr {
-                    range: 123..129,
+                    range: 121..127,
                     value: TString(
                         ExprTString {
-                            range: 123..129,
+                            range: 121..127,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 123..129,
+                                            range: 121..127,
                                             elements: [
-                                                Interpolation(
-                                                    TStringInterpolationElement {
-                                                        range: 125..128,
-                                                        interpolation: Starred(
+                                                Expression(
+                                                    FTStringInterpolatedElement {
+                                                        range: 123..126,
+                                                        expression: Starred(
                                                             ExprStarred {
-                                                                range: 126..127,
+                                                                range: 124..125,
                                                                 value: Name(
                                                                     ExprName {
-                                                                        range: 127..127,
+                                                                        range: 125..125,
                                                                         id: Name(""),
                                                                         ctx: Invalid,
                                                                     },
@@ -58,37 +58,37 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 130..143,
+                    range: 128..141,
                     value: TString(
                         ExprTString {
-                            range: 130..143,
+                            range: 128..141,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 130..143,
+                                            range: 128..141,
                                             elements: [
-                                                Interpolation(
-                                                    TStringInterpolationElement {
-                                                        range: 132..142,
-                                                        interpolation: Starred(
+                                                Expression(
+                                                    FTStringInterpolatedElement {
+                                                        range: 130..140,
+                                                        expression: Starred(
                                                             ExprStarred {
-                                                                range: 133..141,
+                                                                range: 131..139,
                                                                 value: BoolOp(
                                                                     ExprBoolOp {
-                                                                        range: 134..141,
+                                                                        range: 132..139,
                                                                         op: And,
                                                                         values: [
                                                                             Name(
                                                                                 ExprName {
-                                                                                    range: 134..135,
+                                                                                    range: 132..133,
                                                                                     id: Name("x"),
                                                                                     ctx: Load,
                                                                                 },
                                                                             ),
                                                                             Name(
                                                                                 ExprName {
-                                                                                    range: 140..141,
+                                                                                    range: 138..139,
                                                                                     id: Name("y"),
                                                                                     ctx: Load,
                                                                                 },
@@ -120,29 +120,29 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 144..157,
+                    range: 142..155,
                     value: TString(
                         ExprTString {
-                            range: 144..157,
+                            range: 142..155,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 144..157,
+                                            range: 142..155,
                                             elements: [
-                                                Interpolation(
-                                                    TStringInterpolationElement {
-                                                        range: 146..156,
-                                                        interpolation: Starred(
+                                                Expression(
+                                                    FTStringInterpolatedElement {
+                                                        range: 144..154,
+                                                        expression: Starred(
                                                             ExprStarred {
-                                                                range: 147..155,
+                                                                range: 145..153,
                                                                 value: Yield(
                                                                     ExprYield {
-                                                                        range: 148..155,
+                                                                        range: 146..153,
                                                                         value: Some(
                                                                             Name(
                                                                                 ExprName {
-                                                                                    range: 154..155,
+                                                                                    range: 152..153,
                                                                                     id: Name("x"),
                                                                                     ctx: Load,
                                                                                 },
@@ -179,7 +179,7 @@ Module(
 ## Errors
 
   |
-1 | # parse_options: { "target-version": "3.14" }
+1 | # parse_options: {"target-version": "3.14"}
 2 | # Starred expression inside t-string has a minimum precedence of bitwise or.
 3 | t"{*}"
   |     ^ Syntax Error: Expected an expression

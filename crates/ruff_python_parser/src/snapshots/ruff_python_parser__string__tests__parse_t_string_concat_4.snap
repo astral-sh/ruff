@@ -33,10 +33,10 @@ expression: suite
                                                     value: "world",
                                                 },
                                             ),
-                                            Interpolation(
-                                                TStringInterpolationElement {
+                                            Expression(
+                                                FTStringInterpolatedElement {
                                                     range: 16..21,
-                                                    interpolation: StringLiteral(
+                                                    expression: StringLiteral(
                                                         ExprStringLiteral {
                                                             range: 17..20,
                                                             value: StringLiteralValue {

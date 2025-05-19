@@ -582,7 +582,7 @@ Module(
                                                                                             },
                                                                                         ),
                                                                                         Expression(
-                                                                                            FStringExpressionElement {
+                                                                                            FTStringInterpolatedElement {
                                                                                                 range: 514..523,
                                                                                                 expression: Call(
                                                                                                     ExprCall {
@@ -687,7 +687,7 @@ Module(
                                                                                             },
                                                                                         ),
                                                                                         Expression(
-                                                                                            FStringExpressionElement {
+                                                                                            FTStringInterpolatedElement {
                                                                                                 range: 566..575,
                                                                                                 expression: Call(
                                                                                                     ExprCall {
@@ -960,7 +960,7 @@ Module(
                                                                                             },
                                                                                         ),
                                                                                         Expression(
-                                                                                            FStringExpressionElement {
+                                                                                            FTStringInterpolatedElement {
                                                                                                 range: 713..722,
                                                                                                 expression: Call(
                                                                                                     ExprCall {
@@ -999,7 +999,7 @@ Module(
                                                                                             },
                                                                                         ),
                                                                                         Expression(
-                                                                                            FStringExpressionElement {
+                                                                                            FTStringInterpolatedElement {
                                                                                                 range: 735..749,
                                                                                                 expression: Attribute(
                                                                                                     ExprAttribute {
@@ -1096,7 +1096,7 @@ Module(
                                                                                             },
                                                                                         ),
                                                                                         Expression(
-                                                                                            FStringExpressionElement {
+                                                                                            FTStringInterpolatedElement {
                                                                                                 range: 793..802,
                                                                                                 expression: Call(
                                                                                                     ExprCall {
@@ -1135,7 +1135,7 @@ Module(
                                                                                             },
                                                                                         ),
                                                                                         Expression(
-                                                                                            FStringExpressionElement {
+                                                                                            FTStringInterpolatedElement {
                                                                                                 range: 815..829,
                                                                                                 expression: Attribute(
                                                                                                     ExprAttribute {

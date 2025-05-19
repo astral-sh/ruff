@@ -28,7 +28,7 @@ Module(
                                                     },
                                                 ),
                                                 Expression(
-                                                    FStringExpressionElement {
+                                                    FTStringInterpolatedElement {
                                                         range: 171..191,
                                                         expression: StringLiteral(
                                                             ExprStringLiteral {
@@ -51,7 +51,7 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            FStringFormatSpec {
+                                                            FTStringFormatSpec {
                                                                 range: 181..191,
                                                                 elements: [
                                                                     Literal(
@@ -122,7 +122,7 @@ Module(
                                                     },
                                                 ),
                                                 Expression(
-                                                    FStringExpressionElement {
+                                                    FTStringInterpolatedElement {
                                                         range: 216..228,
                                                         expression: StringLiteral(
                                                             ExprStringLiteral {
@@ -145,7 +145,7 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            FStringFormatSpec {
+                                                            FTStringFormatSpec {
                                                                 range: 226..228,
                                                                 elements: [
                                                                     Literal(
@@ -215,7 +215,7 @@ Module(
                                                     },
                                                 ),
                                                 Expression(
-                                                    FStringExpressionElement {
+                                                    FTStringInterpolatedElement {
                                                         range: 262..284,
                                                         expression: StringLiteral(
                                                             ExprStringLiteral {
@@ -238,7 +238,7 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            FStringFormatSpec {
+                                                            FTStringFormatSpec {
                                                                 range: 272..284,
                                                                 elements: [
                                                                     Literal(

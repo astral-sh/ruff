@@ -28,7 +28,7 @@ Module(
                                                     },
                                                 ),
                                             ],
-                                            flags: TStringFlags {
+                                            flags: FTStringFlags {
                                                 quote_style: Single,
                                                 prefix: Regular,
                                                 triple_quoted: false,
@@ -60,7 +60,7 @@ Module(
                                                     },
                                                 ),
                                             ],
-                                            flags: TStringFlags {
+                                            flags: FTStringFlags {
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: true,

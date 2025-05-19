@@ -15,10 +15,10 @@ expression: suite
                                 TString {
                                     range: 0..11,
                                     elements: [
-                                        Interpolation(
-                                            TStringInterpolationElement {
+                                        Expression(
+                                            FTStringInterpolatedElement {
                                                 range: 2..10,
-                                                interpolation: Compare(
+                                                expression: Compare(
                                                     ExprCompare {
                                                         range: 3..9,
                                                         left: NumberLiteral(

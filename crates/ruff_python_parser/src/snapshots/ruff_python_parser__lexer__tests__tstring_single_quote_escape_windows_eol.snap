@@ -13,7 +13,7 @@ expression: tstring_single_quote_escape_eol(WINDOWS_EOL)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "text \\\r\n more text",
         ),
         2..20,

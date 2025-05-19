@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/f_string_invalid_starred_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -23,7 +22,7 @@ Module(
                                             range: 77..83,
                                             elements: [
                                                 Expression(
-                                                    FStringExpressionElement {
+                                                    FTStringInterpolatedElement {
                                                         range: 79..82,
                                                         expression: Starred(
                                                             ExprStarred {
@@ -70,7 +69,7 @@ Module(
                                             range: 84..97,
                                             elements: [
                                                 Expression(
-                                                    FStringExpressionElement {
+                                                    FTStringInterpolatedElement {
                                                         range: 86..96,
                                                         expression: Starred(
                                                             ExprStarred {
@@ -132,7 +131,7 @@ Module(
                                             range: 98..111,
                                             elements: [
                                                 Expression(
-                                                    FStringExpressionElement {
+                                                    FTStringInterpolatedElement {
                                                         range: 100..110,
                                                         expression: Starred(
                                                             ExprStarred {

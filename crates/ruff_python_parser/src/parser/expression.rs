@@ -1459,6 +1459,18 @@ impl<'src> Parser<'src> {
         // f"test {a \
         //     } more"                        # line continuation
 
+        // test_ok pep701_t_string_py314
+        // # parse_options: {"target-version": "3.14"}
+        // t'Magic wand: { bag['wand'] }'     # nested quotes
+        // t"{'\n'.join(a)}"                  # escape sequence
+        // t'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // t"{t"{t"{t"{t"{t"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // t"{t'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // t"test {a \
+        //     } more"                        # line continuation
+
         // test_ok pep701_f_string_py311
         // # parse_options: {"target-version": "3.11"}
         // f"outer {'# not a comment'}"
@@ -1610,11 +1622,23 @@ impl<'src> Parser<'src> {
         // f"{}"
         // f"{  }"
 
+        // test_err t_string_empty_expression
+        // # parse_options: {"target-version": "3.14"}
+        // t"{}"
+        // t"{  }"
+
         // test_err f_string_invalid_starred_expr
         // # Starred expression inside f-string has a minimum precedence of bitwise or.
         // f"{*}"
         // f"{*x and y}"
         // f"{*yield x}"
+
+        // test_err t_string_invalid_starred_expr
+        // # parse_options: {"target-version": "3.14"}
+        // # Starred expression inside t-string has a minimum precedence of bitwise or.
+        // t"{*}"
+        // t"{*x and y}"
+        // t"{*yield x}"
         let value = self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
         if !value.is_parenthesized && value.expr.is_lambda_expr() {
@@ -1624,6 +1648,10 @@ impl<'src> Parser<'src> {
 
             // test_err f_string_lambda_without_parentheses
             // f"{lambda x: x}"
+
+            // test_err t_string_lambda_without_parentheses
+            // # parse_options: {"target-version": "3.14"}
+            // t"{lambda x: x}"
             self.add_error(
                 ParseErrorType::from_ftstring_error(
                     FTStringErrorType::LambdaWithoutParentheses,
@@ -1656,6 +1684,10 @@ impl<'src> Parser<'src> {
                     _ => {
                         // test_err f_string_invalid_conversion_flag_name_tok
                         // f"{x!z}"
+
+                        // test_err t_string_invalid_conversion_flag_name_tok
+                        // # parse_options: {"target-version": "3.14"}
+                        // t"{x!z}"
                         self.add_error(
                             ParseErrorType::from_ftstring_error(
                                 FTStringErrorType::InvalidConversionFlag,
@@ -1670,6 +1702,11 @@ impl<'src> Parser<'src> {
                 // test_err f_string_invalid_conversion_flag_other_tok
                 // f"{x!123}"
                 // f"{x!'a'}"
+
+                // test_err t_string_invalid_conversion_flag_other_tok
+                // # parse_options: {"target-version": "3.14"}
+                // t"{x!123}"
+                // t"{x!'a'}"
                 self.add_error(
                     ParseErrorType::from_ftstring_error(
                         FTStringErrorType::InvalidConversionFlag,
@@ -1710,11 +1747,24 @@ impl<'src> Parser<'src> {
             // f"{"
             // f"""{"""
 
+            // test_err t_string_unclosed_lbrace
+            // # parse_options: {"target-version": "3.14"}
+            // t"{"
+            // t"{foo!r"
+            // t"{foo="
+            // t"{"
+            // t"""{"""
+
             // The lexer does emit `FStringEnd` for the following test cases:
 
             // test_err f_string_unclosed_lbrace_in_format_spec
             // f"hello {x:"
             // f"hello {x:.3f"
+
+            // test_err t_string_unclosed_lbrace_in_format_spec
+            // # parse_options: {"target-version": "3.14"}
+            // t"hello {x:"
+            // t"hello {x:.3f"
             self.add_error(
                 ParseErrorType::from_ftstring_error(FTStringErrorType::UnclosedLbrace, T::kind()),
                 self.current_token_range(),

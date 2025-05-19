@@ -35,7 +35,7 @@ Module(
                                                             range: 239..253,
                                                             elements: [
                                                                 Expression(
-                                                                    FStringExpressionElement {
+                                                                    FTStringInterpolatedElement {
                                                                         range: 243..250,
                                                                         expression: Name(
                                                                             ExprName {
@@ -47,7 +47,7 @@ Module(
                                                                         debug_text: None,
                                                                         conversion: None,
                                                                         format_spec: Some(
-                                                                            FStringFormatSpec {
+                                                                            FTStringFormatSpec {
                                                                                 range: 246..250,
                                                                                 elements: [
                                                                                     Literal(

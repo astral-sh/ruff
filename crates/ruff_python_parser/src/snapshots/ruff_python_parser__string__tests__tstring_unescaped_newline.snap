@@ -21,10 +21,10 @@ expression: suite
                                                 value: "\n",
                                             },
                                         ),
-                                        Interpolation(
-                                            TStringInterpolationElement {
+                                        Expression(
+                                            FTStringInterpolatedElement {
                                                 range: 5..8,
-                                                interpolation: Name(
+                                                expression: Name(
                                                     ExprName {
                                                         range: 6..7,
                                                         id: Name("x"),

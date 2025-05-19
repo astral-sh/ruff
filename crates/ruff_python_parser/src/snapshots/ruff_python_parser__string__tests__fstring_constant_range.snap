@@ -22,7 +22,7 @@ expression: suite
                                             },
                                         ),
                                         Expression(
-                                            FStringExpressionElement {
+                                            FTStringInterpolatedElement {
                                                 range: 5..10,
                                                 expression: Name(
                                                     ExprName {
@@ -43,7 +43,7 @@ expression: suite
                                             },
                                         ),
                                         Expression(
-                                            FStringExpressionElement {
+                                            FTStringInterpolatedElement {
                                                 range: 13..18,
                                                 expression: Name(
                                                     ExprName {

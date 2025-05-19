@@ -28,7 +28,7 @@ Module(
                                                     },
                                                 ),
                                                 Expression(
-                                                    FStringExpressionElement {
+                                                    FTStringInterpolatedElement {
                                                         range: 8..12,
                                                         expression: Name(
                                                             ExprName {
@@ -40,7 +40,7 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            FStringFormatSpec {
+                                                            FTStringFormatSpec {
                                                                 range: 11..11,
                                                                 elements: [],
                                                             },
@@ -86,7 +86,7 @@ Module(
                                                     },
                                                 ),
                                                 Expression(
-                                                    FStringExpressionElement {
+                                                    FTStringInterpolatedElement {
                                                         range: 28..35,
                                                         expression: Name(
                                                             ExprName {
@@ -98,7 +98,7 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            FStringFormatSpec {
+                                                            FTStringFormatSpec {
                                                                 range: 31..34,
                                                                 elements: [
                                                                     Literal(

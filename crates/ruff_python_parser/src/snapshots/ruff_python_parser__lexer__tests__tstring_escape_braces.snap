@@ -13,7 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "\\",
         ),
         2..3,
@@ -50,7 +50,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "\\\\",
         ),
         12..14,
@@ -87,7 +87,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "\\{foo}",
         ),
         23..31,
@@ -110,7 +110,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "\\\\{foo}",
         ),
         35..44,

@@ -21,10 +21,10 @@ expression: suite
                                                 value: "aaa",
                                             },
                                         ),
-                                        Interpolation(
-                                            TStringInterpolationElement {
+                                        Expression(
+                                            FTStringInterpolatedElement {
                                                 range: 5..10,
-                                                interpolation: Name(
+                                                expression: Name(
                                                     ExprName {
                                                         range: 6..9,
                                                         id: Name("bbb"),
@@ -42,10 +42,10 @@ expression: suite
                                                 value: "ccc",
                                             },
                                         ),
-                                        Interpolation(
-                                            TStringInterpolationElement {
+                                        Expression(
+                                            FTStringInterpolatedElement {
                                                 range: 13..18,
-                                                interpolation: Name(
+                                                expression: Name(
                                                     ExprName {
                                                         range: 14..17,
                                                         id: Name("ddd"),

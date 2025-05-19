@@ -22,7 +22,7 @@ Module(
                                             range: 0..16,
                                             elements: [
                                                 Expression(
-                                                    FStringExpressionElement {
+                                                    FTStringInterpolatedElement {
                                                         range: 2..12,
                                                         expression: Lambda(
                                                             ExprLambda {
@@ -110,5 +110,5 @@ Module(
 
   |
 1 | f"{lambda x: x}"
-  |               ^ Syntax Error: Expected an f-string element or the end of the f-string
+  |               ^ Syntax Error: Expected an f or t-string element or the end of the f or t-string
   |

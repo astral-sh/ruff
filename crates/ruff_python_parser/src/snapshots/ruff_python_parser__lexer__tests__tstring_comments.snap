@@ -13,7 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "\n# not a comment ",
         ),
         4..21,
@@ -48,7 +48,7 @@ expression: lex_source(source)
         41..42,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             " # not a comment\n",
         ),
         42..59,

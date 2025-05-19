@@ -13,7 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "__",
         ),
         4..6,
@@ -40,7 +40,7 @@ expression: lex_source(source)
         13..14,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "d\n",
         ),
         14..16,
@@ -53,7 +53,7 @@ expression: lex_source(source)
         16..17,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "__",
         ),
         17..19,
@@ -80,7 +80,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "__",
         ),
         27..29,
@@ -107,7 +107,7 @@ expression: lex_source(source)
         36..37,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "a\n        b\n          c\n",
         ),
         37..61,
@@ -120,7 +120,7 @@ expression: lex_source(source)
         61..62,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "__",
         ),
         62..64,
@@ -147,7 +147,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "__",
         ),
         70..72,
@@ -174,7 +174,7 @@ expression: lex_source(source)
         79..80,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "d",
         ),
         80..81,
@@ -191,7 +191,7 @@ expression: lex_source(source)
         82..83,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "__",
         ),
         83..85,
@@ -218,7 +218,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "__",
         ),
         89..91,
@@ -245,7 +245,7 @@ expression: lex_source(source)
         98..99,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "a",
         ),
         99..100,
@@ -272,7 +272,7 @@ expression: lex_source(source)
         111..112,
     ),
     (
-        TStringMiddle(
+        FTStringMiddle(
             "__",
         ),
         112..114,
