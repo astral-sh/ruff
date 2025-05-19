@@ -5888,19 +5888,24 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_binary_expression_type(binary.into(), false, left_ty, right_ty, *op)
             .unwrap_or_else(|| {
+                let db = self.db();
+
                 if let Some(builder) = self.context.report_lint(&UNSUPPORTED_OPERATOR, binary) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Operator `{op}` is unsupported between objects of type `{}` and `{}`",
-                        left_ty.display(self.db()),
-                        right_ty.display(self.db())
+                        left_ty.display(db),
+                        right_ty.display(db)
                     ));
 
-                    if op == &ast::Operator::BitOr && left_ty.into_class_literal().is_some()
-                        && right_ty.into_class_literal().is_some() && Program::get(self.db()).python_version(self.db())
-                            < PythonVersion::PY310
+                    if op == &ast::Operator::BitOr
+                        && (left_ty.is_subtype_of(db, KnownClass::Type.to_instance(db))
+                            || right_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)))
+                        && Program::get(db).python_version(db) < PythonVersion::PY310
                     {
-                        diag.info("Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later");
-                        diagnostic::add_inferred_python_version_hint(self.db(), diag);
+                        diag.info(
+                            "Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later",
+                        );
+                        diagnostic::add_inferred_python_version_hint(db, diag);
                     }
                 }
                 Type::unknown()
