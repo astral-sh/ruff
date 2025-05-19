@@ -48,6 +48,11 @@ except* (KeyboardInterrupt, AttributeError) as e:
 ```py
 try:
     help()
+except* int:  # error: [invalid-exception-caught]
+    pass
+
+try:
+    help()
 except* 3 as e:  # error: [invalid-exception-caught]
     reveal_type(e)  # revealed: BaseExceptionGroup[Unknown]
 
