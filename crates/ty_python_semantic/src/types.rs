@@ -4745,6 +4745,32 @@ impl<'db> Type<'db> {
                 }
                 Some(builder.build())
             }
+            // If there is no bound or constraints on a typevar `T`, `T: object` implicitly, which
+            // has no instance type. Otherwise, synthesize a typevar with bound or constraints
+            // mapped through `to_instance`.
+            Type::TypeVar(typevar) => {
+                let bound_or_constraints = match typevar.bound_or_constraints(db)? {
+                    TypeVarBoundOrConstraints::UpperBound(upper_bound) => {
+                        TypeVarBoundOrConstraints::UpperBound(upper_bound.to_instance(db)?)
+                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        let mut builder = UnionBuilder::new(db);
+                        for constraint in constraints.elements(db) {
+                            builder = builder.add(constraint.to_instance(db)?);
+                        }
+                        TypeVarBoundOrConstraints::Constraints(builder.build().into_union()?)
+                    }
+                };
+                Some(Type::TypeVar(TypeVarInstance::new(
+                    db,
+                    Name::new(format!("{}'instance", typevar.name(db))),
+                    None,
+                    Some(bound_or_constraints),
+                    typevar.variance(db),
+                    None,
+                    typevar.kind(db),
+                )))
+            }
             Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
@@ -4763,7 +4789,6 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)
             | Type::Tuple(_)
-            | Type::TypeVar(_)
             | Type::LiteralString
             | Type::BoundSuper(_)
             | Type::AlwaysTruthy
@@ -4890,7 +4915,7 @@ impl<'db> Type<'db> {
                     Ok(Type::TypeVar(TypeVarInstance::new(
                         db,
                         ast::name::Name::new("Self"),
-                        class_def,
+                        Some(class_def),
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
                         None,
@@ -5431,7 +5456,7 @@ impl<'db> Type<'db> {
             }
             Self::KnownInstance(instance) => match instance {
                 KnownInstanceType::TypeVar(var) => {
-                    Some(TypeDefinition::TypeVar(var.definition(db)))
+                    Some(TypeDefinition::TypeVar(var.definition(db)?))
                 }
                 KnownInstanceType::TypeAliasType(type_alias) => {
                     type_alias.definition(db).map(TypeDefinition::TypeAlias)
@@ -5457,7 +5482,7 @@ impl<'db> Type<'db> {
             | Self::BoundSuper(_)
             | Self::Tuple(_) => self.to_meta_type(db).definition(db),
 
-            Self::TypeVar(var) => Some(TypeDefinition::TypeVar(var.definition(db))),
+            Self::TypeVar(var) => Some(TypeDefinition::TypeVar(var.definition(db)?)),
 
             Self::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(class) => Some(TypeDefinition::Class(class.definition(db))),
@@ -5806,8 +5831,8 @@ pub struct TypeVarInstance<'db> {
     #[returns(ref)]
     name: ast::name::Name,
 
-    /// The type var's definition
-    pub definition: Definition<'db>,
+    /// The type var's definition (None if synthesized)
+    pub definition: Option<Definition<'db>>,
 
     /// The upper bound or constraint on the type of this TypeVar
     bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,

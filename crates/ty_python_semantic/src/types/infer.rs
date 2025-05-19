@@ -2452,7 +2452,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             if symbol_name.is_some() {
                 self.infer_definition(handler);
             } else {
-                self.infer_optional_expression(handled_exceptions.as_deref());
+                self.infer_exception(handled_exceptions.as_deref(), try_statement.is_star);
             }
 
             self.infer_body(body);
@@ -2555,11 +2555,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             })
     }
 
-    fn infer_except_handler_definition(
-        &mut self,
-        except_handler_definition: &ExceptHandlerDefinitionKind,
-        definition: Definition<'db>,
-    ) {
+    fn infer_exception(&mut self, node: Option<&ast::Expr>, is_star: bool) -> Type<'db> {
         fn extract_tuple_specialization<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
             let class = ty.into_nominal_instance()?.class;
             if !class.is_known(db, KnownClass::Tuple) {
@@ -2575,8 +2571,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .is_assignable_to(db, KnownClass::BaseException.to_instance(db))
                 .then_some(specialization_instance)
         }
-
-        let node = except_handler_definition.handled_exceptions();
 
         // If there is no handled exception, it's invalid syntax;
         // a diagnostic will have already been emitted
@@ -2632,7 +2626,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::unknown()
         };
 
-        let symbol_ty = if except_handler_definition.is_star() {
+        if is_star {
             let class = if symbol_ty
                 .is_subtype_of(self.db(), KnownClass::Exception.to_instance(self.db()))
             {
@@ -2643,7 +2637,18 @@ impl<'db> TypeInferenceBuilder<'db> {
             class.to_specialized_instance(self.db(), [symbol_ty])
         } else {
             symbol_ty
-        };
+        }
+    }
+
+    fn infer_except_handler_definition(
+        &mut self,
+        except_handler_definition: &ExceptHandlerDefinitionKind,
+        definition: Definition<'db>,
+    ) {
+        let symbol_ty = self.infer_exception(
+            except_handler_definition.handled_exceptions(),
+            except_handler_definition.is_star(),
+        );
 
         self.add_binding(
             except_handler_definition.node().into(),
@@ -2706,7 +2711,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
             name.id.clone(),
-            definition,
+            Some(definition),
             bound_or_constraint,
             TypeVarVariance::Invariant, // TODO: infer this
             default_ty,
@@ -5361,7 +5366,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             KnownInstanceType::TypeVar(TypeVarInstance::new(
                                                 self.db(),
                                                 target.id.clone(),
-                                                containing_assignment,
+                                                Some(containing_assignment),
                                                 bound_or_constraint,
                                                 variance,
                                                 *default,
