@@ -49,8 +49,9 @@ use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::place::{
     Boundness, LookupError, builtins_module_scope, builtins_symbol, explicit_global_symbol,
-    global_symbol, module_type_implicit_global_declaration, module_type_implicit_global_symbol,
-    place, place_from_bindings, place_from_declarations, typing_extensions_symbol,
+    fallback_place, global_symbol, module_type_implicit_global_declaration,
+    module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
+    typing_extensions_symbol,
 };
 use crate::place::{Place, PlaceAndQualifiers};
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
@@ -1477,7 +1478,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                      ..
                  }| {
                     if resolved_place.is_unbound() && !place_table.place_expr(place_id).is_name() {
-                        if let Place::Type(ty, Boundness::Bound) = place(
+                        if let Place::Type(ty, Boundness::Bound) = fallback_place(
                             db,
                             file_scope_id.to_scope_id(db, self.file()),
                             place_table.place_expr(place_id),
