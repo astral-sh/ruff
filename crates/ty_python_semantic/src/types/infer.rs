@@ -4399,8 +4399,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ast::FStringPart::FString(fstring) => {
                     for element in &fstring.elements {
                         match element {
-                            ast::FStringElement::Expression(expression) => {
-                                let ast::FStringExpressionElement {
+                            ast::FTStringElement::Expression(expression) => {
+                                let ast::FTStringInterpolatedElement {
                                     range: _,
                                     expression,
                                     debug_text: _,
@@ -4429,7 +4429,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     }
                                 }
                             }
-                            ast::FStringElement::Literal(literal) => {
+                            ast::FTStringElement::Literal(literal) => {
                                 collector.push_str(&literal.value);
                             }
                         }
@@ -4448,8 +4448,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ast::TStringPart::FString(fstring) => {
                     for element in &fstring.elements {
                         match element {
-                            ast::FStringElement::Expression(expression) => {
-                                let ast::FStringExpressionElement {
+                            ast::FTStringElement::Expression(expression) => {
+                                let ast::FTStringInterpolatedElement {
                                     expression,
                                     format_spec,
                                     ..
@@ -4462,27 +4462,27 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     }
                                 }
                             }
-                            ast::FStringElement::Literal(_) => {}
+                            ast::FTStringElement::Literal(_) => {}
                         }
                     }
                 }
                 ast::TStringPart::TString(tstring) => {
                     for element in &tstring.elements {
                         match element {
-                            ast::TStringElement::Interpolation(tstring_interpolation_element) => {
-                                let ast::TStringInterpolationElement {
-                                    interpolation,
+                            ast::FTStringElement::Expression(tstring_interpolation_element) => {
+                                let ast::FTStringInterpolatedElement {
+                                    expression,
                                     format_spec,
                                     ..
                                 } = tstring_interpolation_element;
-                                self.infer_expression(interpolation);
+                                self.infer_expression(expression);
                                 if let Some(format_spec) = format_spec {
-                                    for element in format_spec.elements.interpolations() {
-                                        self.infer_expression(&element.interpolation);
+                                    for element in format_spec.elements.expressions() {
+                                        self.infer_expression(&element.expression);
                                     }
                                 }
                             }
-                            ast::TStringElement::Literal(_) => {}
+                            ast::FTStringElement::Literal(_) => {}
                         }
                     }
                 }
