@@ -118,7 +118,10 @@ impl Cache {
             }
         };
 
-        let mut package: PackageCache = match bincode::deserialize_from(BufReader::new(file)) {
+        let mut package: PackageCache = match bincode::serde::decode_from_reader(
+            BufReader::new(file),
+            bincode::config::standard(),
+        ) {
             Ok(package) => package,
             Err(err) => {
                 warn_user!("Failed parse cache file `{}`: {err}", path.display());
@@ -177,7 +180,8 @@ impl Cache {
         // Serialize to in-memory buffer because hyperfine benchmark showed that it's faster than
         // using a `BufWriter` and our cache files are small enough that streaming isn't necessary.
         let serialized =
-            bincode::serialize(&self.package).context("Failed to serialize cache data")?;
+            bincode::serde::encode_to_vec(&self.package, bincode::config::standard())
+                .context("Failed to serialize cache data")?;
         temp_file
             .write_all(&serialized)
             .context("Failed to write serialized cache to temporary file.")?;
