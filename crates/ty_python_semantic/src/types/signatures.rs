@@ -1516,7 +1516,7 @@ mod tests {
         db.write_dedented("/src/a.py", "def f(): ...").unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let sig = func.internal_signature(&db);
+        let sig = func.internal_signature(&db, None);
 
         assert!(sig.return_ty.is_none());
         assert_params(&sig, &[]);
@@ -1539,7 +1539,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let sig = func.internal_signature(&db);
+        let sig = func.internal_signature(&db, None);
 
         assert_eq!(sig.return_ty.unwrap().display(&db).to_string(), "bytes");
         assert_params(
@@ -1590,7 +1590,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let sig = func.internal_signature(&db);
+        let sig = func.internal_signature(&db, None);
 
         let [
             Parameter {
@@ -1626,7 +1626,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.pyi");
 
-        let sig = func.internal_signature(&db);
+        let sig = func.internal_signature(&db, None);
 
         let [
             Parameter {
@@ -1662,7 +1662,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let sig = func.internal_signature(&db);
+        let sig = func.internal_signature(&db, None);
 
         let [
             Parameter {
@@ -1708,7 +1708,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.pyi");
 
-        let sig = func.internal_signature(&db);
+        let sig = func.internal_signature(&db, None);
 
         let [
             Parameter {
@@ -1744,7 +1744,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let expected_sig = func.internal_signature(&db);
+        let expected_sig = func.internal_signature(&db, None);
 
         // With no decorators, internal and external signature are the same
         assert_eq!(

@@ -342,6 +342,39 @@ reveal_type(C(1, True))  # revealed: C[int]
 wrong_innards: C[int] = C("five", 1)
 ```
 
+### Some `__init__` overloads only apply to certain specializations
+
+```py
+from typing import overload, Generic, TypeVar
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    @overload
+    def __init__(self: "C[str]", x: str) -> None: ...
+    @overload
+    def __init__(self: "C[bytes]", x: bytes) -> None: ...
+    @overload
+    def __init__(self, x: int) -> None: ...
+    def __init__(self, x: str | bytes | int) -> None: ...
+
+reveal_type(C("string"))  # revealed: C[str]
+reveal_type(C(b"bytes"))  # revealed: C[bytes]
+reveal_type(C(12))  # revealed: C[Unknown]
+
+C[str]("string")
+C[str](b"bytes")  # error: [no-matching-overload]
+C[str](12)
+
+C[bytes]("string")  # error: [no-matching-overload]
+C[bytes](b"bytes")
+C[bytes](12)
+
+C[None]("string")  # error: [no-matching-overload]
+C[None](b"bytes")  # error: [no-matching-overload]
+C[None](12)
+```
+
 ## Generic subclass
 
 When a generic subclass fills its superclass's type parameter with one of its own, the actual types
