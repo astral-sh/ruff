@@ -563,6 +563,11 @@ impl Annotation {
         &self.span
     }
 
+    /// Sets the span on this annotation.
+    pub fn set_span(&mut self, span: Span) {
+        self.span = span;
+    }
+
     /// Returns the tags associated with this annotation.
     pub fn get_tags(&self) -> &[DiagnosticTag] {
         &self.tags
@@ -686,7 +691,7 @@ impl DiagnosticId {
     ///
     /// Note that this doesn't include the lint's category. It
     /// only includes the lint's name.
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             DiagnosticId::Panic => "panic",
             DiagnosticId::Io => "io",

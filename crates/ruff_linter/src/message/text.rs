@@ -151,8 +151,8 @@ impl Display for RuleCodeAndBody<'_> {
             if let Some(fix) = self.message.fix() {
                 // Do not display an indicator for inapplicable fixes
                 if fix.applies(self.unsafe_fixes.required_applicability()) {
-                    if let Some(rule) = self.message.rule() {
-                        write!(f, "{} ", rule.noqa_code().to_string().red().bold())?;
+                    if let Some(code) = self.message.to_noqa_code() {
+                        write!(f, "{} ", code.to_string().red().bold())?;
                     }
                     return write!(
                         f,
@@ -164,11 +164,11 @@ impl Display for RuleCodeAndBody<'_> {
             }
         }
 
-        if let Some(rule) = self.message.rule() {
+        if let Some(code) = self.message.to_noqa_code() {
             write!(
                 f,
                 "{code} {body}",
-                code = rule.noqa_code().to_string().red().bold(),
+                code = code.to_string().red().bold(),
                 body = self.message.body(),
             )
         } else {
@@ -254,8 +254,8 @@ impl Display for MessageCodeFrame<'_> {
 
         let label = self
             .message
-            .rule()
-            .map_or_else(String::new, |rule| rule.noqa_code().to_string());
+            .to_noqa_code()
+            .map_or_else(String::new, |code| code.to_string());
 
         let line_start = self.notebook_index.map_or_else(
             || start_index.get(),
