@@ -165,4 +165,20 @@ PYI053.pyi:68:13: PYI053 [*] String and bytes literals longer than 50 characters
    68 |+fbaz: str = ...  # Error: PYI053
 69 69 | 
 70 70 | from typing import TypeAlias, Literal, Annotated
-71 71 |
+71 71 | 
+
+PYI053.pyi:86:13: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+   |
+84 | ttoo: str = t"50 character stringggggggggggggggggggggggggggggggg"  # OK
+85 |
+86 | tbar: str = t"51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
+   |
+   = help: Replace with `...`
+
+ℹ Safe fix
+83 83 | 
+84 84 | ttoo: str = t"50 character stringggggggggggggggggggggggggggggggg"  # OK
+85 85 | 
+86    |-tbar: str = t"51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
+   86 |+tbar: str = ...  # Error: PYI053

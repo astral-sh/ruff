@@ -179,7 +179,7 @@ fn analyze_escape_chars(
 
         let next_char = match source[i + 1..].chars().next() {
             Some(next_char) => next_char,
-            None if flags.is_f_string() => {
+            None if (flags.is_f_string() || flags.is_t_string()) => {
                 // If we're at the end of a f-string middle token, the next character
                 // is actually emitted as a different token. For example,
                 //

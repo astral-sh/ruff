@@ -75,26 +75,8 @@ pub(crate) fn hardcoded_tmp_directory(checker: &Checker, string: StringLike) {
                 }
             }
         }
-        StringLike::TString(ast::ExprTString { value, .. }) => {
-            for part in value {
-                match part {
-                    ast::TStringPart::Literal(literal) => {
-                        check(checker, literal, literal.range());
-                    }
-                    ast::TStringPart::FString(f_string) => {
-                        for literal in f_string.elements.literals() {
-                            check(checker, literal, literal.range());
-                        }
-                    }
-                    ast::TStringPart::TString(t_string) => {
-                        for literal in t_string.elements.literals() {
-                            check(checker, literal, literal.range());
-                        }
-                    }
-                }
-            }
-        }
-        StringLike::Bytes(_) => (),
+        // These are not actually strings
+        StringLike::Bytes(_) | StringLike::TString(_) => (),
     }
 }
 

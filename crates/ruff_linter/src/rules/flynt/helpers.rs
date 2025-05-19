@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Arguments, ConversionFlag, Expr};
 use ruff_text_size::TextRange;
 
 /// Wrap an expression in a [`ast::FStringElement::Expression`] with no special formatting.
-fn to_f_string_expression_element(inner: &Expr) -> ast::FTStringElement {
+fn to_ft_string_expression_element(inner: &Expr) -> ast::FTStringElement {
     ast::FTStringElement::Expression(ast::FTStringInterpolatedElement {
         expression: Box::new(inner.clone()),
         debug_text: None,
@@ -13,7 +13,7 @@ fn to_f_string_expression_element(inner: &Expr) -> ast::FTStringElement {
 }
 
 /// Convert a string to a [`ast::FStringElement::Literal`].
-pub(super) fn to_f_string_literal_element(s: &str) -> ast::FTStringElement {
+pub(super) fn to_ft_string_literal_element(s: &str) -> ast::FTStringElement {
     ast::FTStringElement::Literal(ast::FTStringLiteralElement {
         value: Box::from(s),
         range: TextRange::default(),
@@ -48,8 +48,8 @@ fn is_simple_callee(func: &Expr) -> bool {
     }
 }
 
-/// Convert an expression to a f-string element (if it looks like a good idea).
-pub(super) fn to_f_string_element(expr: &Expr) -> Option<ast::FTStringElement> {
+/// Convert an expression to an f-string element (if it looks like a good idea).
+pub(super) fn to_ft_string_element(expr: &Expr) -> Option<ast::FTStringElement> {
     match expr {
         Expr::StringLiteral(ast::ExprStringLiteral { value, range }) => {
             Some(ast::FTStringElement::Literal(ast::FTStringLiteralElement {
@@ -59,9 +59,9 @@ pub(super) fn to_f_string_element(expr: &Expr) -> Option<ast::FTStringElement> {
         }
         // These should be pretty safe to wrap in a formatted value.
         Expr::NumberLiteral(_) | Expr::BooleanLiteral(_) | Expr::Name(_) | Expr::Attribute(_) => {
-            Some(to_f_string_expression_element(expr))
+            Some(to_ft_string_expression_element(expr))
         }
-        Expr::Call(_) if is_simple_call(expr) => Some(to_f_string_expression_element(expr)),
+        Expr::Call(_) if is_simple_call(expr) => Some(to_ft_string_expression_element(expr)),
         _ => None,
     }
 }

@@ -1879,6 +1879,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.flags |= SemanticModelFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
+            Expr::TString(_) => {
+                self.semantic.flags |= SemanticModelFlags::T_STRING;
+                visitor::walk_expr(self, expr);
+            }
             Expr::Named(ast::ExprNamed {
                 target,
                 value,
@@ -1912,6 +1916,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
             Expr::BytesLiteral(bytes_literal) => analyze::string_like(bytes_literal.into(), self),
             Expr::FString(f_string) => analyze::string_like(f_string.into(), self),
+            Expr::TString(t_string) => analyze::string_like(t_string.into(), self),
             _ => {}
         }
 
@@ -2104,7 +2109,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_ft_string_element(&mut self, f_string_element: &'a FTStringElement) {
         let snapshot = self.semantic.flags;
         if f_string_element.is_expression() {
-            self.semantic.flags |= SemanticModelFlags::F_STRING_REPLACEMENT_FIELD;
+            self.semantic.flags |= SemanticModelFlags::FT_STRING_REPLACEMENT_FIELD;
         }
         visitor::walk_ft_string_element(self, f_string_element);
         self.semantic.flags = snapshot;

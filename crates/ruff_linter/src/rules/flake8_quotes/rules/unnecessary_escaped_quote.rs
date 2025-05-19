@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, AnyStringFlags, StringFlags, StringLike};
+use ruff_python_ast::{self as ast, AnyStringFlags, FTStringElements, StringFlags, StringLike};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
@@ -97,7 +97,7 @@ fn check_string_or_bytes(
     range: TextRange,
     flags: AnyStringFlags,
 ) -> Option<Diagnostic> {
-    assert!(!flags.is_f_string());
+    assert!(!(flags.is_f_string() || flags.is_t_string()));
 
     if flags.is_triple_quoted() || flags.is_raw_string() {
         return None;
@@ -123,36 +123,31 @@ fn check_string_or_bytes(
 
 /// Checks for unnecessary escaped quotes in an f-string.
 fn check_f_string(locator: &Locator, f_string: &ast::FString) -> Option<Diagnostic> {
-    let ast::FString { flags, range, .. } = f_string;
-    if flags.is_triple_quoted() || flags.prefix().is_raw() {
-        return None;
-    }
-
-    let opposite_quote_char = flags.quote_style().opposite().as_char();
-
-    let mut edits = vec![];
-    for literal in f_string.elements.literals() {
-        let content = locator.slice(literal);
-        if !contains_escaped_quote(content, opposite_quote_char) {
-            continue;
-        }
-        edits.push(Edit::range_replacement(
-            unescape_string(content, opposite_quote_char),
-            literal.range(),
-        ));
-    }
-
-    let mut edits_iter = edits.into_iter();
-    let first = edits_iter.next()?;
-
-    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, *range);
-    diagnostic.set_fix(Fix::safe_edits(first, edits_iter));
-    Some(diagnostic)
+    let ast::FString {
+        flags,
+        range,
+        elements,
+    } = f_string;
+    check_ft_string(locator, AnyStringFlags::from(*flags), *range, elements)
 }
 
 /// Checks for unnecessary escaped quotes in a t-string.
 fn check_t_string(locator: &Locator, t_string: &ast::TString) -> Option<Diagnostic> {
-    let ast::TString { flags, range, .. } = t_string;
+    let ast::TString {
+        flags,
+        range,
+        elements,
+    } = t_string;
+    check_ft_string(locator, AnyStringFlags::from(*flags), *range, elements)
+}
+
+/// Checks for unnecessary escaped quotes in an f-string or t-string.
+fn check_ft_string(
+    locator: &Locator,
+    flags: AnyStringFlags,
+    range: TextRange,
+    elements: &FTStringElements,
+) -> Option<Diagnostic> {
     if flags.is_triple_quoted() || flags.prefix().is_raw() {
         return None;
     }
@@ -160,7 +155,7 @@ fn check_t_string(locator: &Locator, t_string: &ast::TString) -> Option<Diagnost
     let opposite_quote_char = flags.quote_style().opposite().as_char();
 
     let mut edits = vec![];
-    for literal in t_string.elements.literals() {
+    for literal in elements.literals() {
         let content = locator.slice(literal);
         if !contains_escaped_quote(content, opposite_quote_char) {
             continue;
@@ -174,7 +169,7 @@ fn check_t_string(locator: &Locator, t_string: &ast::TString) -> Option<Diagnost
     let mut edits_iter = edits.into_iter();
     let first = edits_iter.next()?;
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, *range);
+    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, range);
     diagnostic.set_fix(Fix::safe_edits(first, edits_iter));
     Some(diagnostic)
 }
