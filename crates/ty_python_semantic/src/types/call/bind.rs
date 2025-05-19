@@ -915,7 +915,11 @@ impl<'db> Bindings<'db> {
                                 if let Some(name) = name.into_string_literal() {
                                     overload.set_return_type(Type::KnownInstance(
                                         KnownInstanceType::TypeAliasType(TypeAliasType::Bare(
-                                            BareTypeAliasType::new(db, name.value(db), value),
+                                            BareTypeAliasType::new(
+                                                db,
+                                                ast::name::Name::new(name.value(db)),
+                                                value,
+                                            ),
                                         )),
                                     ));
                                 }

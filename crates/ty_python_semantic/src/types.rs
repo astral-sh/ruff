@@ -7534,7 +7534,7 @@ impl<'db> PEP695TypeAliasType<'db> {
 #[salsa::interned(debug)]
 pub struct BareTypeAliasType<'db> {
     #[returns(ref)]
-    pub name: String,
+    pub name: ast::name::Name,
     pub value: Type<'db>,
 }
 
