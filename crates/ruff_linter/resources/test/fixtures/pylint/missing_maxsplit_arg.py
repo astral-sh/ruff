@@ -179,6 +179,6 @@ kwargs_without_maxsplit = {"seq": ","}
 "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
 # OK
 kwargs_with_maxsplit = {"maxsplit": 1}
-"1,2,3".split(",", **kwargs_with_maxsplit)[0]
+"1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
 kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
-"1,2,3".split(**kwargs_with_maxsplit)[0]
+"1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive

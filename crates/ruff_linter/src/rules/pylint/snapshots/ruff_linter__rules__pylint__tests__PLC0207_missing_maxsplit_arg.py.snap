@@ -309,16 +309,16 @@ missing_maxsplit_arg.py:182:1: PLC0207 Accessing only the first or last element 
     |
 180 | # OK
 181 | kwargs_with_maxsplit = {"maxsplit": 1}
-182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]
+182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
 183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
-184 | "1,2,3".split(**kwargs_with_maxsplit)[0]
+184 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
     |
 
 missing_maxsplit_arg.py:184:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
     |
-182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]
+182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
 183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
-184 | "1,2,3".split(**kwargs_with_maxsplit)[0]
+184 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
     |

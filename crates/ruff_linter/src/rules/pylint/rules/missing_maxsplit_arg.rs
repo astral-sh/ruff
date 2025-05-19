@@ -43,26 +43,14 @@ impl Violation for MissingMaxsplitArg {
 
 fn is_string(expr: &Expr, semantic: &SemanticModel) -> bool {
     if let Expr::Name(name) = expr {
-        let Some(binding_id) = semantic.only_binding(name) else {
-            return false;
-        };
-        let binding = semantic.binding(binding_id);
-
-        if !typing::is_string(binding, semantic) {
-            return false;
-        }
-        return true;
+        semantic
+            .only_binding(name)
+            .is_some_and(|binding_id| typing::is_string(semantic.binding(binding_id), semantic))
     } else if let Some(binding_id) = semantic.lookup_attribute(expr) {
-        let binding = semantic.binding(binding_id);
-        if !typing::is_string(binding, semantic) {
-            return false;
-        }
-        return true;
-    } else if let Expr::StringLiteral(_) = expr {
-        return true;
+        typing::is_string(semantic.binding(binding_id), semantic)
+    } else {
+        expr.is_string_literal_expr()
     }
-
-    false
 }
 
 /// PLC0207
