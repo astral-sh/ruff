@@ -1545,7 +1545,7 @@ impl<'db> Type<'db> {
             (Type::ClassLiteral(class), Type::SubclassOf(_))
                 if class
                     .iter_mro(db, None)
-                    .any(|x| ClassBase::Dynamic(DynamicType::Unknown) == x) =>
+                    .any(class_base::ClassBase::is_dynamic) =>
             {
                 true
             }
