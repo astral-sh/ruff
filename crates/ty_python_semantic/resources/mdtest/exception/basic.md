@@ -62,6 +62,20 @@ def foo(
         reveal_type(i)  # revealed: BaseException
 ```
 
+We do not emit an `invalid-exception-caught` if a class is caught that has `Any` or `Unknown` in its
+MRO, as the dynamic element in the MRO could materialize to some subclass of `BaseException`:
+
+```py
+from compat import BASE_EXCEPTION_CLASS  # error: [unresolved-import] "Cannot resolve imported module `compat`"
+
+class Error(BASE_EXCEPTION_CLASS): ...
+
+try:
+    ...
+except Error as err:
+    ...
+```
+
 ## Exception with no captured type
 
 ```py

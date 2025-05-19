@@ -1170,6 +1170,21 @@ impl<'db> Type<'db> {
                 target.is_equivalent_to(db, Type::object(db))
             }
 
+            // These clauses handle type variants that include function literals. A function
+            // literal is the subtype of itself, and not of any other function literal. However,
+            // our representation of a function literal includes any specialization that should be
+            // applied to the signature. Different specializations of the same function literal are
+            // only subtypes of each other if they result in the same signature.
+            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
+                self_function.is_subtype_of(db, target_function)
+            }
+            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
+                self_method.is_subtype_of(db, target_method)
+            }
+            (Type::MethodWrapper(self_method), Type::MethodWrapper(target_method)) => {
+                self_method.is_subtype_of(db, target_method)
+            }
+
             // No literal type is a subtype of any other literal type, unless they are the same
             // type (which is handled above). This case is not necessary from a correctness
             // perspective (the fallback cases below will handle it correctly), but it is important
@@ -1504,10 +1519,33 @@ impl<'db> Type<'db> {
                 true
             }
 
+            // These clauses handle type variants that include function literals. A function
+            // literal is assignable to itself, and not to any other function literal. However, our
+            // representation of a function literal includes any specialization that should be
+            // applied to the signature. Different specializations of the same function literal are
+            // only assignable to each other if they result in the same signature.
+            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
+                self_function.is_assignable_to(db, target_function)
+            }
+            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
+                self_method.is_assignable_to(db, target_method)
+            }
+            (Type::MethodWrapper(self_method), Type::MethodWrapper(target_method)) => {
+                self_method.is_assignable_to(db, target_method)
+            }
+
             // `type[Any]` is assignable to any `type[...]` type, because `type[Any]` can
             // materialize to any `type[...]` type.
             (Type::SubclassOf(subclass_of_ty), Type::SubclassOf(_))
                 if subclass_of_ty.is_dynamic() =>
+            {
+                true
+            }
+
+            (Type::ClassLiteral(class), Type::SubclassOf(_))
+                if class
+                    .iter_mro(db, None)
+                    .any(class_base::ClassBase::is_dynamic) =>
             {
                 true
             }
@@ -1627,6 +1665,15 @@ impl<'db> Type<'db> {
                 left.is_equivalent_to(db, right)
             }
             (Type::Tuple(left), Type::Tuple(right)) => left.is_equivalent_to(db, right),
+            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
+                self_function.is_equivalent_to(db, target_function)
+            }
+            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
+                self_method.is_equivalent_to(db, target_method)
+            }
+            (Type::MethodWrapper(self_method), Type::MethodWrapper(target_method)) => {
+                self_method.is_equivalent_to(db, target_method)
+            }
             (Type::Callable(left), Type::Callable(right)) => left.is_equivalent_to(db, right),
             (Type::NominalInstance(left), Type::NominalInstance(right)) => {
                 left.is_equivalent_to(db, right)
@@ -1682,6 +1729,15 @@ impl<'db> Type<'db> {
                 first.is_gradual_equivalent_to(db, second)
             }
 
+            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
+                self_function.is_gradual_equivalent_to(db, target_function)
+            }
+            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
+                self_method.is_gradual_equivalent_to(db, target_method)
+            }
+            (Type::MethodWrapper(self_method), Type::MethodWrapper(target_method)) => {
+                self_method.is_gradual_equivalent_to(db, target_method)
+            }
             (Type::Callable(first), Type::Callable(second)) => {
                 first.is_gradual_equivalent_to(db, second)
             }
@@ -4601,24 +4657,14 @@ impl<'db> Type<'db> {
                     }
                 }
 
-                fn combine_binding_specialization<'db>(
-                    db: &'db dyn Db,
-                    binding: &CallableBinding<'db>,
-                ) -> Option<Specialization<'db>> {
-                    binding
-                        .matching_overloads()
-                        .map(|(_, binding)| binding.inherited_specialization())
-                        .reduce(|acc, specialization| {
-                            combine_specializations(db, acc, specialization)
-                        })
-                        .flatten()
-                }
-
                 let new_specialization = new_call_outcome
                     .and_then(Result::ok)
                     .as_ref()
                     .and_then(Bindings::single_element)
-                    .and_then(|binding| combine_binding_specialization(db, binding))
+                    .into_iter()
+                    .flat_map(CallableBinding::matching_overloads)
+                    .next()
+                    .and_then(|(_, binding)| binding.inherited_specialization())
                     .filter(|specialization| {
                         Some(specialization.generic_context(db)) == generic_context
                     });
@@ -4626,7 +4672,10 @@ impl<'db> Type<'db> {
                     .and_then(Result::ok)
                     .as_ref()
                     .and_then(Bindings::single_element)
-                    .and_then(|binding| combine_binding_specialization(db, binding))
+                    .into_iter()
+                    .flat_map(CallableBinding::matching_overloads)
+                    .next()
+                    .and_then(|(_, binding)| binding.inherited_specialization())
                     .filter(|specialization| {
                         Some(specialization.generic_context(db)) == generic_context
                     });
@@ -6739,6 +6788,7 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
+        let inherited_generic_context = self.inherited_generic_context(db);
         let specialization = self.specialization(db);
         if let Some(overloaded) = self.to_overloaded(db) {
             FunctionSignature {
@@ -6746,13 +6796,13 @@ impl<'db> FunctionType<'db> {
                     Type::FunctionLiteral(self),
                     overloaded.overloads.iter().copied().map(|overload| {
                         overload
-                            .internal_signature(db)
+                            .internal_signature(db, inherited_generic_context)
                             .apply_optional_specialization(db, specialization)
                     }),
                 ),
                 implementation: overloaded.implementation.map(|implementation| {
                     implementation
-                        .internal_signature(db)
+                        .internal_signature(db, inherited_generic_context)
                         .apply_optional_specialization(db, specialization)
                 }),
             }
@@ -6760,7 +6810,7 @@ impl<'db> FunctionType<'db> {
             FunctionSignature {
                 overloads: CallableSignature::single(
                     Type::FunctionLiteral(self),
-                    self.internal_signature(db)
+                    self.internal_signature(db, inherited_generic_context)
                         .apply_optional_specialization(db, specialization),
                 ),
                 implementation: None,
@@ -6778,7 +6828,11 @@ impl<'db> FunctionType<'db> {
     ///
     /// Don't call this when checking any other file; only when type-checking the function body
     /// scope.
-    fn internal_signature(self, db: &'db dyn Db) -> Signature<'db> {
+    fn internal_signature(
+        self,
+        db: &'db dyn Db,
+        inherited_generic_context: Option<GenericContext<'db>>,
+    ) -> Signature<'db> {
         let scope = self.body_scope(db);
         let function_stmt_node = scope.node(db).expect_function();
         let definition = self.definition(db);
@@ -6789,7 +6843,7 @@ impl<'db> FunctionType<'db> {
         Signature::from_function(
             db,
             generic_context,
-            self.inherited_generic_context(db),
+            inherited_generic_context,
             definition,
             function_stmt_node,
         )
@@ -6944,6 +6998,42 @@ impl<'db> FunctionType<'db> {
                 implementation,
             })
         }
+    }
+
+    fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+        // A function literal is the subtype of itself, and not of any other function literal.
+        // However, our representation of a function literal includes any specialization that
+        // should be applied to the signature. Different specializations of the same function
+        // literal are only subtypes of each other if they result in subtype signatures.
+        self.body_scope(db) == other.body_scope(db)
+            && self
+                .into_callable_type(db)
+                .is_subtype_of(db, other.into_callable_type(db))
+    }
+
+    fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
+        // A function literal is assignable to itself, and not to any other function literal.
+        // However, our representation of a function literal includes any specialization that
+        // should be applied to the signature. Different specializations of the same function
+        // literal are only assignable to each other if they result in assignable signatures.
+        self.body_scope(db) == other.body_scope(db)
+            && self
+                .into_callable_type(db)
+                .is_assignable_to(db, other.into_callable_type(db))
+    }
+
+    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.body_scope(db) == other.body_scope(db)
+            && self
+                .into_callable_type(db)
+                .is_equivalent_to(db, other.into_callable_type(db))
+    }
+
+    fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.body_scope(db) == other.body_scope(db)
+            && self
+                .into_callable_type(db)
+                .is_gradual_equivalent_to(db, other.into_callable_type(db))
     }
 
     /// Returns a tuple of two spans. The first is
@@ -7227,6 +7317,43 @@ impl<'db> BoundMethodType<'db> {
                 .map(signatures::Signature::bind_self),
         ))
     }
+
+    fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+        // A bound method is a typically a subtype of itself. However, we must explicitly verify
+        // the subtyping of the underlying function signatures (since they might be specialized
+        // differently), and of the bound self parameter (taking care that parameters, including a
+        // bound self parameter, are contravariant.)
+        self.function(db).is_subtype_of(db, other.function(db))
+            && other
+                .self_instance(db)
+                .is_subtype_of(db, self.self_instance(db))
+    }
+
+    fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
+        // A bound method is a typically assignable to itself. However, we must explicitly verify
+        // the assignability of the underlying function signatures (since they might be specialized
+        // differently), and of the bound self parameter (taking care that parameters, including a
+        // bound self parameter, are contravariant.)
+        self.function(db).is_assignable_to(db, other.function(db))
+            && other
+                .self_instance(db)
+                .is_assignable_to(db, self.self_instance(db))
+    }
+
+    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.function(db).is_equivalent_to(db, other.function(db))
+            && other
+                .self_instance(db)
+                .is_equivalent_to(db, self.self_instance(db))
+    }
+
+    fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.function(db)
+            .is_gradual_equivalent_to(db, other.function(db))
+            && other
+                .self_instance(db)
+                .is_gradual_equivalent_to(db, self.self_instance(db))
+    }
 }
 
 /// This type represents the set of all callable objects with a certain, possibly overloaded,
@@ -7455,6 +7582,140 @@ pub enum MethodWrapperKind<'db> {
     /// this allows us to understand statically known branches for common tests such as
     /// `if sys.platform.startswith("freebsd")`.
     StrStartswith(StringLiteralType<'db>),
+}
+
+impl<'db> MethodWrapperKind<'db> {
+    fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(self_function),
+                MethodWrapperKind::FunctionTypeDunderGet(other_function),
+            ) => self_function.is_subtype_of(db, other_function),
+
+            (
+                MethodWrapperKind::FunctionTypeDunderCall(self_function),
+                MethodWrapperKind::FunctionTypeDunderCall(other_function),
+            ) => self_function.is_subtype_of(db, other_function),
+
+            (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
+            | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
+            | (MethodWrapperKind::StrStartswith(_), MethodWrapperKind::StrStartswith(_)) => {
+                self == other
+            }
+
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+            ) => false,
+        }
+    }
+
+    fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(self_function),
+                MethodWrapperKind::FunctionTypeDunderGet(other_function),
+            ) => self_function.is_assignable_to(db, other_function),
+
+            (
+                MethodWrapperKind::FunctionTypeDunderCall(self_function),
+                MethodWrapperKind::FunctionTypeDunderCall(other_function),
+            ) => self_function.is_assignable_to(db, other_function),
+
+            (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
+            | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
+            | (MethodWrapperKind::StrStartswith(_), MethodWrapperKind::StrStartswith(_)) => {
+                self == other
+            }
+
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+            ) => false,
+        }
+    }
+
+    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(self_function),
+                MethodWrapperKind::FunctionTypeDunderGet(other_function),
+            ) => self_function.is_equivalent_to(db, other_function),
+
+            (
+                MethodWrapperKind::FunctionTypeDunderCall(self_function),
+                MethodWrapperKind::FunctionTypeDunderCall(other_function),
+            ) => self_function.is_equivalent_to(db, other_function),
+
+            (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
+            | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
+            | (MethodWrapperKind::StrStartswith(_), MethodWrapperKind::StrStartswith(_)) => {
+                self == other
+            }
+
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+            ) => false,
+        }
+    }
+
+    fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(self_function),
+                MethodWrapperKind::FunctionTypeDunderGet(other_function),
+            ) => self_function.is_gradual_equivalent_to(db, other_function),
+
+            (
+                MethodWrapperKind::FunctionTypeDunderCall(self_function),
+                MethodWrapperKind::FunctionTypeDunderCall(other_function),
+            ) => self_function.is_gradual_equivalent_to(db, other_function),
+
+            (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
+            | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
+            | (MethodWrapperKind::StrStartswith(_), MethodWrapperKind::StrStartswith(_)) => {
+                self == other
+            }
+
+            (
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+                MethodWrapperKind::FunctionTypeDunderGet(_)
+                | MethodWrapperKind::FunctionTypeDunderCall(_)
+                | MethodWrapperKind::PropertyDunderGet(_)
+                | MethodWrapperKind::PropertyDunderSet(_)
+                | MethodWrapperKind::StrStartswith(_),
+            ) => false,
+        }
+    }
 }
 
 /// Represents a specific instance of `types.WrapperDescriptorType`

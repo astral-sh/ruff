@@ -38,7 +38,7 @@ use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
-use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
+use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
@@ -94,7 +94,7 @@ use crate::types::{
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Program};
 
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
@@ -5939,12 +5939,25 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_binary_expression_type(binary.into(), false, left_ty, right_ty, *op)
             .unwrap_or_else(|| {
+                let db = self.db();
+
                 if let Some(builder) = self.context.report_lint(&UNSUPPORTED_OPERATOR, binary) {
-                    builder.into_diagnostic(format_args!(
+                    let mut diag = builder.into_diagnostic(format_args!(
                         "Operator `{op}` is unsupported between objects of type `{}` and `{}`",
-                        left_ty.display(self.db()),
-                        right_ty.display(self.db())
+                        left_ty.display(db),
+                        right_ty.display(db)
                     ));
+
+                    if op == &ast::Operator::BitOr
+                        && (left_ty.is_subtype_of(db, KnownClass::Type.to_instance(db))
+                            || right_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)))
+                        && Program::get(db).python_version(db) < PythonVersion::PY310
+                    {
+                        diag.info(
+                            "Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later",
+                        );
+                        diagnostic::add_inferred_python_version_hint(db, diag);
+                    }
                 }
                 Type::unknown()
             })

@@ -244,7 +244,8 @@ impl ProjectMetadata {
     }
 
     pub fn to_program_settings(&self, system: &dyn System) -> ProgramSettings {
-        self.options.to_program_settings(self.root(), system)
+        self.options
+            .to_program_settings(self.root(), self.name(), system)
     }
 
     /// Combine the project options with the CLI options where the CLI options take precedence.
@@ -943,6 +944,87 @@ expected `.`, `]`
             &error,
             "Invalid `requires-python` version specifier (`/app/pyproject.toml`): The major version `999` is larger than the maximum supported value 255",
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn no_src_root_src_layout() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("src/main.py"),
+                r#"
+                print("Hello, world!")
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "my_package", &system);
+
+        assert_eq!(
+            settings.search_paths.src_roots,
+            vec![root.clone(), root.join("src")]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn no_src_root_package_layout() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("psycopg/psycopg/main.py"),
+                r#"
+                print("Hello, world!")
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "psycopg", &system);
+
+        assert_eq!(
+            settings.search_paths.src_roots,
+            vec![root.clone(), root.join("psycopg")]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn no_src_root_flat_layout() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("my_package/main.py"),
+                r#"
+                print("Hello, world!")
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "my_package", &system);
+
+        assert_eq!(settings.search_paths.src_roots, vec![root]);
 
         Ok(())
     }

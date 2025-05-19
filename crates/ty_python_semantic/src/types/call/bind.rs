@@ -1412,7 +1412,7 @@ impl<'db> Binding<'db> {
         }
 
         num_synthetic_args = 0;
-        for (argument_index, (argument, argument_type)) in argument_types.iter().enumerate() {
+        for (argument_index, (argument, mut argument_type)) in argument_types.iter().enumerate() {
             if matches!(argument, Argument::Synthetic) {
                 num_synthetic_args += 1;
             }
@@ -1424,9 +1424,12 @@ impl<'db> Binding<'db> {
             let parameter = &parameters[parameter_index];
             if let Some(mut expected_ty) = parameter.annotated_type() {
                 if let Some(specialization) = self.specialization {
+                    argument_type = argument_type.apply_specialization(db, specialization);
                     expected_ty = expected_ty.apply_specialization(db, specialization);
                 }
                 if let Some(inherited_specialization) = self.inherited_specialization {
+                    argument_type =
+                        argument_type.apply_specialization(db, inherited_specialization);
                     expected_ty = expected_ty.apply_specialization(db, inherited_specialization);
                 }
                 if !argument_type.is_assignable_to(db, expected_ty) {
