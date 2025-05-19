@@ -93,18 +93,18 @@ fn count_f_string_chars(f_string: &ast::ExprFString) -> usize {
                 .elements
                 .iter()
                 .map(|element| match element {
-                    ast::FStringElement::Literal(string) => string.chars().count(),
-                    ast::FStringElement::Expression(expr) => expr.range().len().to_usize(),
+                    ast::FTStringElement::Literal(string) => string.chars().count(),
+                    ast::FTStringElement::Expression(expr) => expr.range().len().to_usize(),
                 })
                 .sum(),
         })
         .sum()
 }
 
-/// Count the number of visible characters in an f-string. This accounts for
-/// implicitly concatenated f-strings as well.
-fn count_t_string_chars(f_string: &ast::ExprTString) -> usize {
-    f_string
+/// Count the number of visible characters in a t-string. This accounts for
+/// implicitly concatenated t-strings as well.
+fn count_t_string_chars(t_string: &ast::ExprTString) -> usize {
+    t_string
         .value
         .iter()
         .map(|part| match part {
@@ -113,16 +113,16 @@ fn count_t_string_chars(f_string: &ast::ExprTString) -> usize {
                 .elements
                 .iter()
                 .map(|element| match element {
-                    ast::FStringElement::Literal(string) => string.chars().count(),
-                    ast::FStringElement::Expression(expr) => expr.range().len().to_usize(),
+                    ast::FTStringElement::Literal(string) => string.chars().count(),
+                    ast::FTStringElement::Expression(expr) => expr.range().len().to_usize(),
                 })
                 .sum(),
             ast::TStringPart::TString(t_string) => t_string
                 .elements
                 .iter()
                 .map(|element| match element {
-                    ast::TStringElement::Literal(string) => string.chars().count(),
-                    ast::TStringElement::Interpolation(interp) => interp.range().len().to_usize(),
+                    ast::FTStringElement::Literal(string) => string.chars().count(),
+                    ast::FTStringElement::Expression(interp) => interp.range().len().to_usize(),
                 })
                 .sum(),
         })

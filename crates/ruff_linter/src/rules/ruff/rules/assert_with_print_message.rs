@@ -89,8 +89,8 @@ pub(crate) fn assert_with_print_message(checker: &Checker, stmt: &ast::StmtAsser
 mod print_arguments {
     use itertools::Itertools;
     use ruff_python_ast::{
-        Arguments, ConversionFlag, Expr, ExprFString, FString, FStringElement, FStringElements,
-        FStringExpressionElement, FStringFlags, FStringValue, FTStringLiteralElement,
+        Arguments, ConversionFlag, Expr, ExprFString, FString, FStringFlags, FStringValue,
+        FTStringElement, FTStringElements, FTStringInterpolatedElement, FTStringLiteralElement,
         StringLiteral, StringLiteralFlags,
     };
     use ruff_text_size::TextRange;
@@ -104,14 +104,14 @@ mod print_arguments {
     ///   `FStringLiteralElement`.
     /// - if the expression is an f-string, the elements will be returned as-is.
     /// - otherwise, the expression will be wrapped in a `FStringExpressionElement`.
-    fn expr_to_fstring_elements(expr: &Expr) -> Vec<FStringElement> {
+    fn expr_to_fstring_elements(expr: &Expr) -> Vec<FTStringElement> {
         match expr {
             // If the expression is a string literal, convert each part to a `FStringLiteralElement`.
             Expr::StringLiteral(string) => string
                 .value
                 .iter()
                 .map(|part| {
-                    FStringElement::Literal(FTStringLiteralElement {
+                    FTStringElement::Literal(FTStringLiteralElement {
                         value: part.value.clone(),
                         range: TextRange::default(),
                     })
@@ -123,7 +123,7 @@ mod print_arguments {
 
             // Otherwise, return the expression as a single `FStringExpressionElement` wrapping
             // the expression.
-            expr => vec![FStringElement::Expression(FStringExpressionElement {
+            expr => vec![FTStringElement::Expression(FTStringInterpolatedElement {
                 expression: Box::new(expr.clone()),
                 debug_text: None,
                 conversion: ConversionFlag::None,
@@ -141,11 +141,11 @@ mod print_arguments {
     /// checking if the `sep` and `args` arguments to `print` are all string
     /// literals.
     fn fstring_elements_to_string_literals<'a>(
-        mut elements: impl ExactSizeIterator<Item = &'a FStringElement>,
+        mut elements: impl ExactSizeIterator<Item = &'a FTStringElement>,
         flags: StringLiteralFlags,
     ) -> Option<Vec<StringLiteral>> {
         elements.try_fold(Vec::with_capacity(elements.len()), |mut acc, element| {
-            if let FStringElement::Literal(literal) = element {
+            if let FTStringElement::Literal(literal) = element {
                 acc.push(StringLiteral {
                     value: literal.value.clone(),
                     flags,
@@ -163,8 +163,8 @@ mod print_arguments {
     /// This function will return [`None`] if any of the arguments are not string literals,
     /// or if there are no arguments at all.
     fn args_to_string_literal_expr<'a>(
-        args: impl ExactSizeIterator<Item = &'a Vec<FStringElement>>,
-        sep: impl ExactSizeIterator<Item = &'a FStringElement>,
+        args: impl ExactSizeIterator<Item = &'a Vec<FTStringElement>>,
+        sep: impl ExactSizeIterator<Item = &'a FTStringElement>,
         flags: StringLiteralFlags,
     ) -> Option<Expr> {
         // If there are no arguments, short-circuit and return `None`
@@ -221,8 +221,8 @@ mod print_arguments {
     /// Also note that the iterator arguments of this function are consumed,
     /// as opposed to the references taken by [`args_to_string_literal_expr`].
     fn args_to_fstring_expr(
-        mut args: impl ExactSizeIterator<Item = Vec<FStringElement>>,
-        sep: impl ExactSizeIterator<Item = FStringElement>,
+        mut args: impl ExactSizeIterator<Item = Vec<FTStringElement>>,
+        sep: impl ExactSizeIterator<Item = FTStringElement>,
         flags: FStringFlags,
     ) -> Option<Expr> {
         // If there are no arguments, short-circuit and return `None`
@@ -237,7 +237,7 @@ mod print_arguments {
 
         Some(Expr::FString(ExprFString {
             value: FStringValue::single(FString {
-                elements: FStringElements::from(fstring_elements),
+                elements: FTStringElements::from(fstring_elements),
                 flags,
                 range: TextRange::default(),
             }),
@@ -274,7 +274,7 @@ mod print_arguments {
             )
             .map(expr_to_fstring_elements)
             .unwrap_or_else(|| {
-                vec![FStringElement::Literal(FTStringLiteralElement {
+                vec![FTStringElement::Literal(FTStringLiteralElement {
                     range: TextRange::default(),
                     value: " ".into(),
                 })]

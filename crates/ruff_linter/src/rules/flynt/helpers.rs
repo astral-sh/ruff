@@ -2,8 +2,8 @@ use ruff_python_ast::{self as ast, Arguments, ConversionFlag, Expr};
 use ruff_text_size::TextRange;
 
 /// Wrap an expression in a [`ast::FStringElement::Expression`] with no special formatting.
-fn to_f_string_expression_element(inner: &Expr) -> ast::FStringElement {
-    ast::FStringElement::Expression(ast::FStringExpressionElement {
+fn to_f_string_expression_element(inner: &Expr) -> ast::FTStringElement {
+    ast::FTStringElement::Expression(ast::FTStringInterpolatedElement {
         expression: Box::new(inner.clone()),
         debug_text: None,
         conversion: ConversionFlag::None,
@@ -13,8 +13,8 @@ fn to_f_string_expression_element(inner: &Expr) -> ast::FStringElement {
 }
 
 /// Convert a string to a [`ast::FStringElement::Literal`].
-pub(super) fn to_f_string_literal_element(s: &str) -> ast::FStringElement {
-    ast::FStringElement::Literal(ast::FTStringLiteralElement {
+pub(super) fn to_f_string_literal_element(s: &str) -> ast::FTStringElement {
+    ast::FTStringElement::Literal(ast::FTStringLiteralElement {
         value: Box::from(s),
         range: TextRange::default(),
     })
@@ -49,10 +49,10 @@ fn is_simple_callee(func: &Expr) -> bool {
 }
 
 /// Convert an expression to a f-string element (if it looks like a good idea).
-pub(super) fn to_f_string_element(expr: &Expr) -> Option<ast::FStringElement> {
+pub(super) fn to_f_string_element(expr: &Expr) -> Option<ast::FTStringElement> {
     match expr {
         Expr::StringLiteral(ast::ExprStringLiteral { value, range }) => {
-            Some(ast::FStringElement::Literal(ast::FTStringLiteralElement {
+            Some(ast::FTStringElement::Literal(ast::FTStringLiteralElement {
                 value: value.to_string().into_boxed_str(),
                 range: *range,
             }))

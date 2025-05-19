@@ -104,7 +104,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
             if f_string
                 .value
                 .f_strings()
-                .any(|fs| fs.elements.iter().any(ast::FStringElement::is_expression)) =>
+                .any(|fs| fs.elements.iter().any(ast::FTStringElement::is_expression)) =>
         {
             concatenated_f_string(f_string, checker.locator())
         }

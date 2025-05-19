@@ -1007,8 +1007,9 @@ fn suspicious_function(
             // Ex) f"foo"
             Expr::FString(ast::ExprFString { value, .. }) => {
                 value.elements().next().and_then(|element| {
-                    if let ast::FStringElement::Literal(ast::FTStringLiteralElement {
-                        value, ..
+                    if let ast::FTStringElement::Literal(ast::FTStringLiteralElement {
+                        value,
+                        ..
                     }) = element
                     {
                         Some(Either::Right(value.chars()))

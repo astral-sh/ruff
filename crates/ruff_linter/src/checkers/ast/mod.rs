@@ -40,7 +40,7 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern,
+    ExprContext, FTStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern,
     PythonVersion, Stmt, Suite, UnaryOp,
 };
 use ruff_python_ast::{PySourceType, helpers, str, visitor};
@@ -2101,12 +2101,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
     }
 
-    fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement) {
+    fn visit_ft_string_element(&mut self, f_string_element: &'a FTStringElement) {
         let snapshot = self.semantic.flags;
         if f_string_element.is_expression() {
             self.semantic.flags |= SemanticModelFlags::F_STRING_REPLACEMENT_FIELD;
         }
-        visitor::walk_f_string_element(self, f_string_element);
+        visitor::walk_ft_string_element(self, f_string_element);
         self.semantic.flags = snapshot;
     }
 }

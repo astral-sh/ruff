@@ -2,7 +2,7 @@ use memchr::memchr_iter;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{AnyStringFlags, FStringElement, StringLike, StringLikePart, TStringElement};
+use ruff_python_ast::{AnyStringFlags, FTStringElement, StringLike, StringLikePart};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -80,14 +80,14 @@ pub(crate) fn invalid_escape_sequence(checker: &Checker, string_like: StringLike
                 // element before pushing a diagnostic and fix.
                 for element in &f_string.elements {
                     match element {
-                        FStringElement::Literal(literal) => {
+                        FTStringElement::Literal(literal) => {
                             escape_chars_state.update(analyze_escape_chars(
                                 locator,
                                 literal.range(),
                                 flags,
                             ));
                         }
-                        FStringElement::Expression(expression) => {
+                        FTStringElement::Expression(expression) => {
                             let Some(format_spec) = expression.format_spec.as_ref() else {
                                 continue;
                             };
@@ -113,14 +113,14 @@ pub(crate) fn invalid_escape_sequence(checker: &Checker, string_like: StringLike
                 // element before pushing a diagnostic and fix.
                 for element in &t_string.elements {
                     match element {
-                        TStringElement::Literal(literal) => {
+                        FTStringElement::Literal(literal) => {
                             escape_chars_state.update(analyze_escape_chars(
                                 locator,
                                 literal.range(),
                                 flags,
                             ));
                         }
-                        TStringElement::Interpolation(interpolation) => {
+                        FTStringElement::Expression(interpolation) => {
                             let Some(format_spec) = interpolation.format_spec.as_ref() else {
                                 continue;
                             };
