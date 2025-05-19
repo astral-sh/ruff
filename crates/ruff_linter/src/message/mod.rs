@@ -206,10 +206,7 @@ impl Message {
 
     /// Returns the fix suggestion for the violation.
     pub fn suggestion(&self) -> Option<&str> {
-        self.diagnostic
-            .primary_annotation()
-            .expect("Expected a primary annotation for a ruff diagnostic")
-            .get_message()
+        self.diagnostic.primary_annotation()?.get_message()
     }
 
     /// Returns the offset at which the `noqa` comment will be placed if it's a diagnostic message.
