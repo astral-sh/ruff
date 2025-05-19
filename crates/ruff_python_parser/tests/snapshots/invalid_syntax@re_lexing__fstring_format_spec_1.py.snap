@@ -22,7 +22,7 @@ Module(
                                             range: 162..192,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 164..171,
                                                         value: "middle ",
                                                     },
@@ -55,7 +55,7 @@ Module(
                                                                 range: 181..191,
                                                                 elements: [
                                                                     Literal(
-                                                                        FStringLiteralElement {
+                                                                        FTStringLiteralElement {
                                                                             range: 181..191,
                                                                             value: "        ",
                                                                         },
@@ -116,7 +116,7 @@ Module(
                                             range: 207..228,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 209..216,
                                                         value: "middle ",
                                                     },
@@ -149,7 +149,7 @@ Module(
                                                                 range: 226..228,
                                                                 elements: [
                                                                     Literal(
-                                                                        FStringLiteralElement {
+                                                                        FTStringLiteralElement {
                                                                             range: 226..228,
                                                                             value: "\\",
                                                                         },
@@ -209,7 +209,7 @@ Module(
                                             range: 253..285,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 255..262,
                                                         value: "middle ",
                                                     },
@@ -242,7 +242,7 @@ Module(
                                                                 range: 272..284,
                                                                 elements: [
                                                                     Literal(
-                                                                        FStringLiteralElement {
+                                                                        FTStringLiteralElement {
                                                                             range: 272..284,
                                                                             value: "\\        ",
                                                                         },

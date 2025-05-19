@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/f_string_unclosed_lbrace_in_format_spec.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -23,7 +22,7 @@ Module(
                                             range: 0..12,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 2..8,
                                                         value: "hello ",
                                                     },
@@ -75,7 +74,7 @@ Module(
                                             range: 13..28,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 15..21,
                                                         value: "hello ",
                                                     },
@@ -97,7 +96,7 @@ Module(
                                                                 range: 24..27,
                                                                 elements: [
                                                                     Literal(
-                                                                        FStringLiteralElement {
+                                                                        FTStringLiteralElement {
                                                                             range: 24..27,
                                                                             value: ".3f",
                                                                         },

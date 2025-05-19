@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_fstring_3.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -52,7 +51,7 @@ Module(
                                                                                 range: 246..250,
                                                                                 elements: [
                                                                                     Literal(
-                                                                                        FStringLiteralElement {
+                                                                                        FTStringLiteralElement {
                                                                                             range: 246..250,
                                                                                             value: ".3f\n",
                                                                                         },

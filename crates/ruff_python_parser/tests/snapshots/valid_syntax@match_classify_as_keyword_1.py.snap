@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/match_classify_as_keyword_1.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -223,7 +222,7 @@ Module(
                                             range: 140..150,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 142..146,
                                                         value: "foo ",
                                                     },

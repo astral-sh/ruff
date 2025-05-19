@@ -22,7 +22,7 @@ Module(
                                             range: 44..74,
                                             elements: [
                                                 Literal(
-                                                    TStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 46..58,
                                                         value: "Magic wand: ",
                                                     },
@@ -173,7 +173,7 @@ Module(
                                             range: 148..220,
                                             elements: [
                                                 Literal(
-                                                    TStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 152..169,
                                                         value: "A complex trick: ",
                                                     },
@@ -483,7 +483,7 @@ Module(
                                                                                         },
                                                                                     ),
                                                                                     Literal(
-                                                                                        TStringLiteralElement {
+                                                                                        FTStringLiteralElement {
                                                                                             range: 293..299,
                                                                                             value: " inner",
                                                                                         },
@@ -506,7 +506,7 @@ Module(
                                                     },
                                                 ),
                                                 Literal(
-                                                    TStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 303..309,
                                                         value: " outer",
                                                     },
@@ -538,7 +538,7 @@ Module(
                                             range: 336..359,
                                             elements: [
                                                 Literal(
-                                                    TStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 338..343,
                                                         value: "test ",
                                                     },
@@ -559,7 +559,7 @@ Module(
                                                     },
                                                 ),
                                                 Literal(
-                                                    TStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 353..358,
                                                         value: " more",
                                                     },

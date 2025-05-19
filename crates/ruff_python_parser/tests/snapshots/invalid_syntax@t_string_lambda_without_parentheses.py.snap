@@ -65,7 +65,7 @@ Module(
                                                     },
                                                 ),
                                                 Literal(
-                                                    TStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 58..60,
                                                         value: " x",
                                                     },

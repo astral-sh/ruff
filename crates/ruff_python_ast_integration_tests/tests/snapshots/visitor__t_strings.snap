@@ -3,14 +3,14 @@ source: crates/ruff_python_ast_integration_tests/tests/visitor.rs
 expression: trace
 ---
 - StmtExpr
-  - ExprFString
+  - ExprTString
     - StringLiteral
-    - FString
+    - TString
       - FTStringLiteralElement
-      - FStringExpressionElement
+      - TStringInterpolationElement
         - ExprName
         - FTStringLiteralElement
-        - FStringExpressionElement
+        - TStringInterpolationElement
           - ExprName
         - FTStringLiteralElement
       - FTStringLiteralElement

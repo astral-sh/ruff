@@ -34,7 +34,7 @@ Module(
                                                 range: 18..31,
                                                 elements: [
                                                     Literal(
-                                                        FStringLiteralElement {
+                                                        FTStringLiteralElement {
                                                             range: 20..26,
                                                             value: "world ",
                                                         },
@@ -132,7 +132,7 @@ Module(
                                             range: 68..76,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 70..75,
                                                         value: "third",
                                                     },

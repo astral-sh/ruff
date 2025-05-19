@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/f_string_lambda_without_parentheses.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -66,7 +65,7 @@ Module(
                                                     },
                                                 ),
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 12..14,
                                                         value: " x",
                                                     },

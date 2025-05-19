@@ -74,7 +74,7 @@ Module(
                                             range: 58..68,
                                             elements: [
                                                 Literal(
-                                                    TStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 60..66,
                                                         value: "hello ",
                                                     },
@@ -148,7 +148,7 @@ Module(
                                             range: 75..86,
                                             elements: [
                                                 Literal(
-                                                    TStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 77..83,
                                                         value: "hello ",
                                                     },
@@ -227,7 +227,7 @@ Module(
                                             range: 93..104,
                                             elements: [
                                                 Literal(
-                                                    TStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 95..101,
                                                         value: "hello ",
                                                     },

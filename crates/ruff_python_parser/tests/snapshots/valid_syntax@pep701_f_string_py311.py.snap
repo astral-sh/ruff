@@ -22,7 +22,7 @@ Module(
                                             range: 44..72,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 46..52,
                                                         value: "outer ",
                                                     },
@@ -80,7 +80,7 @@ Module(
                                             range: 73..106,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 75..81,
                                                         value: "outer ",
                                                     },
@@ -128,7 +128,7 @@ Module(
                                                                         },
                                                                     ),
                                                                     Literal(
-                                                                        FStringLiteralElement {
+                                                                        FTStringLiteralElement {
                                                                             range: 103..104,
                                                                             value: " ",
                                                                         },
@@ -287,7 +287,7 @@ Module(
                                                                                 range: 153..207,
                                                                                 elements: [
                                                                                     Literal(
-                                                                                        FStringLiteralElement {
+                                                                                        FTStringLiteralElement {
                                                                                             range: 157..177,
                                                                                             value: "# before expression ",
                                                                                         },
@@ -305,7 +305,7 @@ Module(
                                                                                                                     range: 178..203,
                                                                                                                     elements: [
                                                                                                                         Literal(
-                                                                                                                            FStringLiteralElement {
+                                                                                                                            FTStringLiteralElement {
                                                                                                                                 range: 180..185,
                                                                                                                                 value: "# aro",
                                                                                                                             },
@@ -323,7 +323,7 @@ Module(
                                                                                                                                                         range: 186..196,
                                                                                                                                                         elements: [
                                                                                                                                                             Literal(
-                                                                                                                                                                FStringLiteralElement {
+                                                                                                                                                                FTStringLiteralElement {
                                                                                                                                                                     range: 188..189,
                                                                                                                                                                     value: "#",
                                                                                                                                                                 },
@@ -359,7 +359,7 @@ Module(
                                                                                                                                                                 },
                                                                                                                                                             ),
                                                                                                                                                             Literal(
-                                                                                                                                                                FStringLiteralElement {
+                                                                                                                                                                FTStringLiteralElement {
                                                                                                                                                                     range: 194..195,
                                                                                                                                                                     value: "#",
                                                                                                                                                                 },
@@ -382,7 +382,7 @@ Module(
                                                                                                                             },
                                                                                                                         ),
                                                                                                                         Literal(
-                                                                                                                            FStringLiteralElement {
+                                                                                                                            FTStringLiteralElement {
                                                                                                                                 range: 197..202,
                                                                                                                                 value: "und #",
                                                                                                                             },
@@ -422,7 +422,7 @@ Module(
                                                     },
                                                 ),
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 208..227,
                                                         value: " # after expression",
                                                     },
@@ -454,7 +454,7 @@ Module(
                                             range: 231..263,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 233..254,
                                                         value: "escape outside of \t ",
                                                     },
@@ -475,7 +475,7 @@ Module(
                                                     },
                                                 ),
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 260..262,
                                                         value: "\n",
                                                     },
@@ -507,7 +507,7 @@ Module(
                                             range: 264..277,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 266..276,
                                                         value: "test\"abcd",
                                                     },

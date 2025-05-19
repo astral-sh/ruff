@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/mixed_bytes_and_non_bytes_literals.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -61,7 +60,7 @@ Module(
                                                 range: 18..26,
                                                 elements: [
                                                     Literal(
-                                                        FStringLiteralElement {
+                                                        FTStringLiteralElement {
                                                             range: 20..25,
                                                             value: "first",
                                                         },
@@ -117,7 +116,7 @@ Module(
                                                 range: 45..54,
                                                 elements: [
                                                     Literal(
-                                                        FStringLiteralElement {
+                                                        FTStringLiteralElement {
                                                             range: 47..53,
                                                             value: "second",
                                                         },

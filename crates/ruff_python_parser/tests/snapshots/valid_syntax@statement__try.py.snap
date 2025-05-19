@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/try.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -577,7 +576,7 @@ Module(
                                                                                     range: 505..524,
                                                                                     elements: [
                                                                                         Literal(
-                                                                                            FStringLiteralElement {
+                                                                                            FTStringLiteralElement {
                                                                                                 range: 507..514,
                                                                                                 value: "caught ",
                                                                                             },
@@ -682,7 +681,7 @@ Module(
                                                                                     range: 557..576,
                                                                                     elements: [
                                                                                         Literal(
-                                                                                            FStringLiteralElement {
+                                                                                            FTStringLiteralElement {
                                                                                                 range: 559..566,
                                                                                                 value: "caught ",
                                                                                             },
@@ -955,7 +954,7 @@ Module(
                                                                                     range: 704..750,
                                                                                     elements: [
                                                                                         Literal(
-                                                                                            FStringLiteralElement {
+                                                                                            FTStringLiteralElement {
                                                                                                 range: 706..713,
                                                                                                 value: "caught ",
                                                                                             },
@@ -994,7 +993,7 @@ Module(
                                                                                             },
                                                                                         ),
                                                                                         Literal(
-                                                                                            FStringLiteralElement {
+                                                                                            FTStringLiteralElement {
                                                                                                 range: 722..735,
                                                                                                 value: " with nested ",
                                                                                             },
@@ -1091,7 +1090,7 @@ Module(
                                                                                     range: 784..830,
                                                                                     elements: [
                                                                                         Literal(
-                                                                                            FStringLiteralElement {
+                                                                                            FTStringLiteralElement {
                                                                                                 range: 786..793,
                                                                                                 value: "caught ",
                                                                                             },
@@ -1130,7 +1129,7 @@ Module(
                                                                                             },
                                                                                         ),
                                                                                         Literal(
-                                                                                            FStringLiteralElement {
+                                                                                            FTStringLiteralElement {
                                                                                                 range: 802..815,
                                                                                                 value: " with nested ",
                                                                                             },

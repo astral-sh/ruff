@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/ambiguous_lpar_with_items.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -962,7 +961,7 @@ Module(
                                                                         range: 1195..1199,
                                                                         elements: [
                                                                             Literal(
-                                                                                FStringLiteralElement {
+                                                                                FTStringLiteralElement {
                                                                                     range: 1195..1199,
                                                                                     value: "= 42",
                                                                                 },

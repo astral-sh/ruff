@@ -4,14 +4,14 @@ expression: trace
 ---
 - ModModule
   - StmtExpr
-    - ExprFString
+    - ExprTString
       - StringLiteral
-      - FString
+      - TString
         - FTStringLiteralElement
-        - FStringExpressionElement
+        - TStringInterpolationElement
           - ExprName
           - FTStringLiteralElement
-          - FStringExpressionElement
+          - TStringInterpolationElement
             - ExprName
           - FTStringLiteralElement
         - FTStringLiteralElement

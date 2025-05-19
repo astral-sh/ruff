@@ -22,7 +22,7 @@ Module(
                                             range: 46..58,
                                             elements: [
                                                 Literal(
-                                                    TStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 48..54,
                                                         value: "hello ",
                                                     },
@@ -74,7 +74,7 @@ Module(
                                             range: 59..75,
                                             elements: [
                                                 Literal(
-                                                    TStringLiteralElement {
+                                                    FTStringLiteralElement {
                                                         range: 61..67,
                                                         value: "hello ",
                                                     },
@@ -96,7 +96,7 @@ Module(
                                                                 range: 70..75,
                                                                 elements: [
                                                                     Literal(
-                                                                        TStringLiteralElement {
+                                                                        FTStringLiteralElement {
                                                                             range: 70..73,
                                                                             value: ".3f",
                                                                         },
