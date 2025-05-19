@@ -2555,11 +2555,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             })
     }
 
-    fn infer_exception(
-        &mut self,
-        handled_exceptions: Option<&ast::Expr>,
-        is_star: bool,
-    ) -> Type<'db> {
+    fn infer_exception(&mut self, node: Option<&ast::Expr>, is_star: bool) -> Type<'db> {
         fn extract_tuple_specialization<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
             let class = ty.into_nominal_instance()?.class;
             if !class.is_known(db, KnownClass::Tuple) {
@@ -2575,8 +2571,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .is_assignable_to(db, KnownClass::BaseException.to_instance(db))
                 .then_some(specialization_instance)
         }
-
-        let node = handled_exceptions.as_deref();
 
         // If there is no handled exception, it's invalid syntax;
         // a diagnostic will have already been emitted
