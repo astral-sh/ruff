@@ -355,6 +355,42 @@ pub(crate) fn enclosing_class_symbol<'db>(
         })
 }
 
+/// Returns in iterator of any generic context introduced by the given scope or any enclosing
+/// scope.
+pub(crate) fn enclosing_generic_contexts<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    scope: ScopeId,
+) -> impl Iterator<Item = GenericContext<'db>> {
+    index
+        .ancestor_scopes(scope.file_scope_id(db))
+        .filter_map(|(_, ancestor_scope)| match ancestor_scope.node() {
+            NodeWithScopeKind::Class(class) => {
+                binding_type(db, index.expect_single_definition(class.node()))
+                    .into_class_literal()?
+                    .generic_context(db)
+            }
+            NodeWithScopeKind::Function(function) => {
+                binding_type(db, index.expect_single_definition(function.node()))
+                    .into_function_literal()?
+                    .non_overloaded_signature(db)
+                    .generic_context
+            }
+            _ => None,
+        })
+}
+
+/// Returns the legacy typevars that have been bound in the given scope or any enclosing scope.
+pub(crate) fn bound_legacy_typevars<'db>(
+    db: &'db dyn Db,
+    index: &'db SemanticIndex<'db>,
+    scope: ScopeId,
+) -> impl Iterator<Item = TypeVarInstance<'db>> {
+    enclosing_generic_contexts(db, index, scope)
+        .filter(|generic_context| generic_context.is_legacy(db))
+        .flat_map(|generic_context| generic_context.variables(db).iter().copied())
+}
+
 /// A region within which we can infer types.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum InferenceRegion<'db> {
@@ -4233,7 +4269,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_expression_impl(&mut self, expression: &ast::Expr) -> Type<'db> {
-        let ty = match expression {
+        let mut ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral { range: _ }) => Type::none(self.db()),
             ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
             ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
@@ -4273,6 +4309,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("Ipy escape command support")
             }
         };
+
+        // If the expression resolves to a legacy typevar, we will have the TypeVarInstance that
+        // was created when the typevar was created, which will not have an associated definition.
+        // Walk the enclosing scopes, looking for the nearest generic context that binds the
+        // typevar.
+        if let Type::TypeVar(typevar) = f
 
         self.store_expression_type(expression, ty);
 

@@ -105,6 +105,15 @@ impl<'db> GenericContext<'db> {
         Some(Self::new(db, variables, GenericContextOrigin::Inherited))
     }
 
+    pub(crate) fn is_legacy(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.origin(db),
+            GenericContextOrigin::LegacyBase(_)
+                | GenericContextOrigin::Inherited
+                | GenericContextOrigin::LegacyGenericFunction
+        )
+    }
+
     pub(crate) fn len(self, db: &'db dyn Db) -> usize {
         self.variables(db).len()
     }

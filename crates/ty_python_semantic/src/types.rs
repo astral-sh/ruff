@@ -6867,6 +6867,10 @@ impl<'db> FunctionType<'db> {
         }
     }
 
+    pub(crate) fn non_overloaded_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.internal_signature(db, self.inherited_generic_context(db))
+    }
+
     /// Typed internally-visible signature for this function.
     ///
     /// This represents the annotations on the function itself, unmodified by decorators and
