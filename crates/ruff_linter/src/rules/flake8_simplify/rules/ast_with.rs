@@ -8,10 +8,10 @@ use ruff_python_ast::{self as ast, Stmt, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
+use super::fix_with;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
-
-use super::fix_with;
+use crate::preview::multiple_with_statements_enabled;
 
 /// ## What it does
 /// Checks for the unnecessary nesting of multiple consecutive context
@@ -44,6 +44,11 @@ use super::fix_with;
 /// with A() as a, B() as b:
 ///     pass
 /// ```
+///
+/// # Fix safety
+///
+/// An automatic fix is available in [preview] mode. The fix is only applied when it
+/// does not remove comments.
 ///
 /// ## References
 /// - [Python documentation: The `with` statement](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
@@ -188,7 +193,11 @@ pub(crate) fn multiple_with_statements(
                                 checker.settings.tab_size,
                             )
                         }) {
-                            Ok(Some(Fix::unsafe_edit(edit)))
+                            if multiple_with_statements_enabled(checker.settings) {
+                                Ok(Some(Fix::safe_edit(edit)))
+                            } else {
+                                Ok(Some(Fix::unsafe_edit(edit)))
+                            }
                         } else {
                             Ok(None)
                         }
