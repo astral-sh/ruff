@@ -96,7 +96,8 @@ impl ProjectDatabase {
         // https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries
         let _ = self.zalsa_mut();
 
-        Arc::get_mut(&mut self.system).unwrap()
+        Arc::get_mut(&mut self.system)
+            .expect("ref count should be 1 because `zalsa_mut` drops all other DB references.")
     }
 
     pub(crate) fn with_db<F, T>(&self, f: F) -> Result<T, Cancelled>

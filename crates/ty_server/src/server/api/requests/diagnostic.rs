@@ -29,12 +29,12 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
     }
 
     fn run_with_snapshot(
+        db: &ProjectDatabase,
         snapshot: DocumentSnapshot,
-        db: ProjectDatabase,
         _notifier: Notifier,
         _params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
-        let diagnostics = compute_diagnostics(&snapshot, &db);
+        let diagnostics = compute_diagnostics(&snapshot, db);
 
         Ok(DocumentDiagnosticReportResult::Report(
             DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {

@@ -1,6 +1,7 @@
 use crate::server::schedule::Task;
 use crate::session::Session;
 use crate::system::{AnySystemPath, url_to_any_system_path};
+use anyhow::anyhow;
 use lsp_server as server;
 use lsp_types::notification::Notification;
 
@@ -44,7 +45,11 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
 
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
-            return Task::nothing();
+            let result: Result<()> = Err(Error::new(
+                anyhow!("Unknown request"),
+                server::ErrorCode::MethodNotFound,
+            ));
+            return Task::immediate(id, result);
         }
     }
     .unwrap_or_else(|err| {
@@ -120,9 +125,10 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
         let url = R::document_url(&params).into_owned();
 
         let Ok(path) = url_to_any_system_path(&url) else {
+            tracing::warn!("Ignoring request for invalid `{url}`");
             return Box::new(|_, _| {});
         };
-        let db = match path {
+        let db = match &path {
             AnySystemPath::System(path) => match session.project_db_for_path(path.as_std_path()) {
                 Some(db) => db.clone(),
                 None => session.default_project_db().clone(),
@@ -131,12 +137,13 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
         };
 
         let Some(snapshot) = session.take_snapshot(url) else {
+            tracing::warn!("Ignoring request because snapshot for path `{path:?}` doesn't exist.");
             return Box::new(|_, _| {});
         };
 
         Box::new(move |notifier, responder| {
             let _span = tracing::trace_span!("request", %id, method = R::METHOD).entered();
-            let result = R::run_with_snapshot(snapshot, db, notifier, params);
+            let result = R::run_with_snapshot(&db, snapshot, notifier, params);
             respond::<R>(id, result, &responder);
         })
     }))
@@ -162,8 +169,11 @@ fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationH
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
-        // TODO(jane): we should log an error if we can't take a snapshot.
-        let Some(snapshot) = session.take_snapshot(N::document_url(&params).into_owned()) else {
+        let url = N::document_url(&params);
+        let Some(snapshot) = session.take_snapshot((*url).clone()) else {
+            tracing::debug!(
+                "Ignoring notification because snapshot for url `{url}` doesn't exist."
+            );
             return Box::new(|_, _| {});
         };
         Box::new(move |notifier, _| {
