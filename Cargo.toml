@@ -3,6 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
+# Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
 rust-version = "1.85"
 homepage = "https://docs.astral.sh/ruff"
