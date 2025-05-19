@@ -4649,24 +4649,14 @@ impl<'db> Type<'db> {
                     }
                 }
 
-                fn combine_binding_specialization<'db>(
-                    db: &'db dyn Db,
-                    binding: &CallableBinding<'db>,
-                ) -> Option<Specialization<'db>> {
-                    binding
-                        .matching_overloads()
-                        .map(|(_, binding)| binding.inherited_specialization())
-                        .reduce(|acc, specialization| {
-                            combine_specializations(db, acc, specialization)
-                        })
-                        .flatten()
-                }
-
                 let new_specialization = new_call_outcome
                     .and_then(Result::ok)
                     .as_ref()
                     .and_then(Bindings::single_element)
-                    .and_then(|binding| combine_binding_specialization(db, binding))
+                    .into_iter()
+                    .flat_map(CallableBinding::matching_overloads)
+                    .next()
+                    .and_then(|(_, binding)| binding.inherited_specialization())
                     .filter(|specialization| {
                         Some(specialization.generic_context(db)) == generic_context
                     });
@@ -4674,7 +4664,10 @@ impl<'db> Type<'db> {
                     .and_then(Result::ok)
                     .as_ref()
                     .and_then(Bindings::single_element)
-                    .and_then(|binding| combine_binding_specialization(db, binding))
+                    .into_iter()
+                    .flat_map(CallableBinding::matching_overloads)
+                    .next()
+                    .and_then(|(_, binding)| binding.inherited_specialization())
                     .filter(|specialization| {
                         Some(specialization.generic_context(db)) == generic_context
                     });

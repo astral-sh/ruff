@@ -290,6 +290,8 @@ class C[T]:
     @overload
     def __init__(self: C[bytes], x: bytes) -> None: ...
     @overload
+    def __init__(self: C[int], x: bytes) -> None: ...
+    @overload
     def __init__(self, x: int) -> None: ...
     def __init__(self, x: str | bytes | int) -> None: ...
 
@@ -304,6 +306,10 @@ C[str](12)
 C[bytes]("string")  # error: [no-matching-overload]
 C[bytes](b"bytes")
 C[bytes](12)
+
+C[int]("string")  # error: [no-matching-overload]
+C[int](b"bytes")
+C[int](12)
 
 C[None]("string")  # error: [no-matching-overload]
 C[None](b"bytes")  # error: [no-matching-overload]
