@@ -2711,7 +2711,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
             name.id.clone(),
-            definition,
+            Some(definition),
             bound_or_constraint,
             TypeVarVariance::Invariant, // TODO: infer this
             default_ty,
@@ -5361,7 +5361,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             KnownInstanceType::TypeVar(TypeVarInstance::new(
                                                 self.db(),
                                                 target.id.clone(),
-                                                containing_assignment,
+                                                Some(containing_assignment),
                                                 bound_or_constraint,
                                                 variance,
                                                 *default,

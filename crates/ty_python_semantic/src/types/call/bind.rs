@@ -1815,10 +1815,13 @@ impl<'db> BindingError<'db> {
                     typevar.name(context.db()),
                 ));
 
-                let typevar_range = typevar.definition(context.db()).full_range(context.db());
-                let mut sub = SubDiagnostic::new(Severity::Info, "Type variable defined here");
-                sub.annotate(Annotation::primary(typevar_range.into()));
-                diag.sub(sub);
+                if let Some(typevar_definition) = typevar.definition(context.db()) {
+                    let typevar_range = typevar_definition.full_range(context.db());
+                    let mut sub = SubDiagnostic::new(Severity::Info, "Type variable defined here");
+                    sub.annotate(Annotation::primary(typevar_range.into()));
+                    diag.sub(sub);
+                }
+
                 if let Some(union_diag) = union_diag {
                     union_diag.add_union_context(context.db(), &mut diag);
                 }

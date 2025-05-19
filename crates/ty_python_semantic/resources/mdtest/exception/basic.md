@@ -85,6 +85,35 @@ except TypeError:
     pass
 ```
 
+## Exception which catches typevar
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable
+
+def silence[T: type[BaseException]](
+    func: Callable[[], None],
+    exception_type: T,
+):
+    try:
+        func()
+    except exception_type as e:
+        reveal_type(e)  # revealed: T'instance
+
+def silence2[T: (
+    type[ValueError],
+    type[TypeError],
+)](func: Callable[[], None], exception_type: T,):
+    try:
+        func()
+    except exception_type as e:
+        reveal_type(e)  # revealed: T'instance
+```
+
 ## Invalid exception handlers
 
 ```py
