@@ -6952,7 +6952,7 @@ impl<'db> FunctionType<'db> {
         // A function literal is the subtype of itself, and not of any other function literal.
         // However, our representation of a function literal includes any specialization that
         // should be applied to the signature. Different specializations of the same function
-        // literal are only subtypes of each other if they result in the same signature.
+        // literal are only subtypes of each other if they result in subtype signatures.
         self.body_scope(db) == other.body_scope(db)
             && self
                 .into_callable_type(db)
@@ -6963,7 +6963,7 @@ impl<'db> FunctionType<'db> {
         // A function literal is assignable to itself, and not to any other function literal.
         // However, our representation of a function literal includes any specialization that
         // should be applied to the signature. Different specializations of the same function
-        // literal are only assignable to each other if they result in the same signature.
+        // literal are only assignable to each other if they result in assignable signatures.
         self.body_scope(db) == other.body_scope(db)
             && self
                 .into_callable_type(db)
