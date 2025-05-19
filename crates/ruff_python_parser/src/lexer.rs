@@ -13,14 +13,14 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 use unicode_normalization::UnicodeNormalization;
 
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{Int, IpyEscapeKind, StringFlags};
+use ruff_python_ast::{FTStringKind, Int, IpyEscapeKind, StringFlags};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Mode;
 use crate::error::{FTStringErrorType, LexicalError, LexicalErrorType};
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
-use crate::lexer::ftstring::{FTStringContext, FTStringKind, FTStrings, FTStringsCheckpoint};
+use crate::lexer::ftstring::{FTStringContext, FTStrings, FTStringsCheckpoint};
 use crate::lexer::indentation::{Indentation, Indentations, IndentationsCheckpoint};
 use crate::token::{TokenFlags, TokenKind, TokenValue};
 
@@ -938,10 +938,7 @@ impl<'src> Lexer<'src> {
             normalized
         };
 
-        self.current_value = match string_kind {
-            FTStringKind::FString => TokenValue::FStringMiddle(value.into_boxed_str()),
-            FTStringKind::TString => TokenValue::TStringMiddle(value.into_boxed_str()),
-        };
+        self.current_value = TokenValue::FTStringMiddle(value.into_boxed_str());
 
         self.current_flags = ftstring.flags();
         match string_kind {

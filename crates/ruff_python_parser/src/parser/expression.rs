@@ -6,23 +6,24 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
-    IpyEscapeKind, Number, Operator, OperatorPrecedence, StringFlags, TStringElement,
-    TStringElements, UnaryOp,
+    self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FTStringElement, IpyEscapeKind,
+    Number, Operator, OperatorPrecedence, StringFlags, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::error::{FStringKind, StarTupleKind, UnparenthesizedNamedExprKind};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{FunctionKind, Parser, helpers};
-use crate::string::{StringType, parse_ftstring_literal_element, parse_string_literal};
+use crate::string::{
+    InterpolatedString, StringType, parse_ftstring_literal_element, parse_string_literal,
+};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
 use crate::{
     FTStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxError, UnsupportedSyntaxErrorKind,
 };
 
-use super::{FStringElementsKind, Parenthesized, RecoveryContextKind, TStringElementsKind};
+use super::{FTStringElementsKind, Parenthesized, RecoveryContextKind};
 
 /// A token set consisting of a newline or end of file.
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new([TokenKind::Newline, TokenKind::EndOfFile]);
@@ -1202,9 +1203,9 @@ impl<'src> Parser<'src> {
             if self.at(TokenKind::String) {
                 strings.push(self.parse_string_or_byte_literal());
             } else if self.at(TokenKind::FStringStart) {
-                strings.push(StringType::FString(self.parse_fstring()));
+                strings.push(StringType::FString(self.parse_ftstring()));
             } else if self.at(TokenKind::TStringStart) {
-                strings.push(StringType::TString(self.parse_tstring()));
+                strings.push(StringType::TString(self.parse_ftstring()));
             }
         }
 
@@ -1437,14 +1438,14 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/grammar.html> (Search "fstring:")
     /// See: <https://docs.python.org/3/reference/lexical_analysis.html#formatted-string-literals>
-    fn parse_fstring(&mut self) -> ast::FString {
+    fn parse_ftstring<T: InterpolatedString>(&mut self) -> T {
         let start = self.node_start();
         let flags = self.tokens.current_flags().as_any_string_flags();
 
-        self.bump(TokenKind::FStringStart);
-        let elements = self.parse_fstring_elements(flags, FStringElementsKind::Regular);
+        self.bump(T::token_start());
+        let elements = self.parse_ftstring_elements::<T>(flags, FTStringElementsKind::Regular);
 
-        self.expect(TokenKind::FStringEnd);
+        self.expect(T::token_end());
 
         // test_ok pep701_f_string_py312
         // # parse_options: {"target-version": "3.12"}
@@ -1483,7 +1484,9 @@ impl<'src> Parser<'src> {
 
         let range = self.node_range(start);
 
-        if !self.options.target_version.supports_pep_701() {
+        if !self.options.target_version.supports_pep_701()
+            && matches!(T::kind(), ast::FTStringKind::FString)
+        {
             let quote_bytes = flags.quote_str().as_bytes();
             let quote_len = flags.quote_len();
             for expr in elements.expressions() {
@@ -1510,11 +1513,7 @@ impl<'src> Parser<'src> {
             self.check_fstring_comments(range);
         }
 
-        ast::FString {
-            elements,
-            range,
-            flags: ast::FStringFlags::from(flags),
-        }
+        T::new(elements, range, flags)
     }
 
     /// Check `range` for comment tokens and report an `UnsupportedSyntaxError` for each one found.
@@ -1534,26 +1533,26 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `{` or `FStringMiddle` token.
-    fn parse_fstring_elements(
+    fn parse_ftstring_elements<T: InterpolatedString>(
         &mut self,
         flags: ast::AnyStringFlags,
-        kind: FStringElementsKind,
-    ) -> FStringElements {
+        kind: FTStringElementsKind,
+    ) -> ast::FTStringElements {
         let mut elements = vec![];
+        let middle_token_kind = T::token_middle();
 
-        self.parse_list(RecoveryContextKind::FStringElements(kind), |parser| {
+        self.parse_list(RecoveryContextKind::FTStringElements(kind), |parser| {
             let element = match parser.current_token_kind() {
                 TokenKind::Lbrace => {
-                    FStringElement::Expression(parser.parse_fstring_expression_element(flags))
+                    ast::FTStringElement::from(parser.parse_ftstring_expression_element::<T>(flags))
                 }
-                TokenKind::FStringMiddle => {
+                tok if tok == middle_token_kind => {
                     let range = parser.current_token_range();
-                    let TokenValue::FStringMiddle(value) =
-                        parser.bump_value(TokenKind::FStringMiddle)
+                    let TokenValue::FTStringMiddle(value) = parser.bump_value(middle_token_kind)
                     else {
                         unreachable!()
                     };
-                    FStringElement::Literal(
+                    FTStringElement::Literal(
                         parse_ftstring_literal_element(value, flags, range).unwrap_or_else(
                             |lex_error| {
                                 // test_err invalid_fstring_literal_element
@@ -1583,7 +1582,8 @@ impl<'src> Parser<'src> {
                     // call this closure for the above token kinds which are the same
                     // as in the FIRST set.
                     unreachable!(
-                        "f-string: unexpected token `{tok:?}` at {:?}",
+                        "{}: unexpected token `{tok:?}` at {:?}",
+                        T::kind(),
                         parser.current_token_range()
                     );
                 }
@@ -1591,7 +1591,7 @@ impl<'src> Parser<'src> {
             elements.push(element);
         });
 
-        FStringElements::from(elements)
+        ast::FTStringElements::from(elements)
     }
 
     /// Parses an f-string expression element.
@@ -1599,10 +1599,10 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `{` token.
-    fn parse_fstring_expression_element(
+    fn parse_ftstring_expression_element<T: InterpolatedString>(
         &mut self,
         flags: ast::AnyStringFlags,
-    ) -> ast::FStringExpressionElement {
+    ) -> ast::FTStringInterpolatedElement {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
@@ -1625,7 +1625,10 @@ impl<'src> Parser<'src> {
             // test_err f_string_lambda_without_parentheses
             // f"{lambda x: x}"
             self.add_error(
-                ParseErrorType::FStringError(FTStringErrorType::LambdaWithoutParentheses),
+                ParseErrorType::from_ftstring_error(
+                    FTStringErrorType::LambdaWithoutParentheses,
+                    T::kind(),
+                ),
                 value.range(),
             );
         }
@@ -1654,7 +1657,10 @@ impl<'src> Parser<'src> {
                         // test_err f_string_invalid_conversion_flag_name_tok
                         // f"{x!z}"
                         self.add_error(
-                            ParseErrorType::FStringError(FTStringErrorType::InvalidConversionFlag),
+                            ParseErrorType::from_ftstring_error(
+                                FTStringErrorType::InvalidConversionFlag,
+                                T::kind(),
+                            ),
                             conversion_flag_range,
                         );
                         ConversionFlag::None
@@ -1665,7 +1671,10 @@ impl<'src> Parser<'src> {
                 // f"{x!123}"
                 // f"{x!'a'}"
                 self.add_error(
-                    ParseErrorType::FStringError(FTStringErrorType::InvalidConversionFlag),
+                    ParseErrorType::from_ftstring_error(
+                        FTStringErrorType::InvalidConversionFlag,
+                        T::kind(),
+                    ),
                     conversion_flag_range,
                 );
                 // TODO(dhruvmanila): Avoid dropping this token
@@ -1678,8 +1687,9 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = self.parse_fstring_elements(flags, FStringElementsKind::FormatSpec);
-            Some(Box::new(ast::FStringFormatSpec {
+            let elements =
+                self.parse_ftstring_elements::<T>(flags, FTStringElementsKind::FormatSpec);
+            Some(Box::new(ast::FTStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
             }))
@@ -1706,262 +1716,13 @@ impl<'src> Parser<'src> {
             // f"hello {x:"
             // f"hello {x:.3f"
             self.add_error(
-                ParseErrorType::FStringError(FTStringErrorType::UnclosedLbrace),
+                ParseErrorType::from_ftstring_error(FTStringErrorType::UnclosedLbrace, T::kind()),
                 self.current_token_range(),
             );
         }
 
-        ast::FStringExpressionElement {
+        ast::FTStringInterpolatedElement {
             expression: Box::new(value.expr),
-            debug_text,
-            conversion,
-            format_spec,
-            range: self.node_range(start),
-        }
-    }
-
-    /// Parses a t-string.
-    ///
-    /// This does not handle implicitly concatenated strings.
-    ///
-    /// # Panics
-    ///
-    /// If the parser isn't positioned at a `TStringStart` token.
-    ///
-    /// See: <https://docs.python.org/3/reference/grammar.html> (Search "fstring:")
-    /// See: <https://docs.python.org/3/reference/lexical_analysis.html#formatted-string-literals>
-    fn parse_tstring(&mut self) -> ast::TString {
-        let start = self.node_start();
-        let flags = self.tokens.current_flags().as_any_string_flags();
-
-        self.bump(TokenKind::TStringStart);
-        let elements = self.parse_tstring_elements(flags, TStringElementsKind::Regular);
-
-        self.expect(TokenKind::TStringEnd);
-
-        // test_ok pep701_t_string_py314
-        // # parse_options: {"target-version": "3.14"}
-        // t'Magic wand: { bag['wand'] }'     # nested quotes
-        // t"{'\n'.join(a)}"                  # escape sequence
-        // t'''A complex trick: {
-        //     bag['bag']                     # comment
-        // }'''
-        // t"{t"{t"{t"{t"{t"{1+1}"}"}"}"}"}"  # arbitrary nesting
-        // t"{t'''{"nested"} inner'''} outer" # nested (triple) quotes
-        // t"test {a \
-        //     } more"                        # line continuation
-
-        let range = self.node_range(start);
-
-        // test_err tstring_py313
-        // # parse_options: { "target-version": "3.13" }
-        // t'{name}'
-
-        // test_ok tstring_py314
-        // # parse_options: { "target-version": "3.14" }
-        // t'{name}'
-
-        self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::TemplateStrings, range);
-
-        ast::TString {
-            elements,
-            range,
-            flags: ast::TStringFlags::from(flags),
-        }
-    }
-
-    /// Parses a list of t-string elements.
-    ///
-    /// # Panics
-    ///
-    /// If the parser isn't positioned at a `{` or `TStringMiddle` token.
-    fn parse_tstring_elements(
-        &mut self,
-        flags: ast::AnyStringFlags,
-        kind: TStringElementsKind,
-    ) -> TStringElements {
-        let mut elements = vec![];
-
-        self.parse_list(RecoveryContextKind::TStringElements(kind), |parser| {
-            let element = match parser.current_token_kind() {
-                TokenKind::Lbrace => {
-                    TStringElement::Interpolation(parser.parse_tstring_interpolation_element(flags))
-                }
-                TokenKind::TStringMiddle => {
-                    let range = parser.current_token_range();
-                    let TokenValue::TStringMiddle(value) =
-                        parser.bump_value(TokenKind::TStringMiddle)
-                    else {
-                        unreachable!()
-                    };
-                    TStringElement::Literal(
-                        parse_ftstring_literal_element(value, flags, range).unwrap_or_else(
-                            |lex_error| {
-                                // test_err invalid_tstring_literal_element
-                                // # parse_options: { "target-version": "3.14" }
-                                // t'hello \N{INVALID} world'
-                                // t"""hello \N{INVALID} world"""
-                                let location = lex_error.location();
-                                parser.add_error(
-                                    ParseErrorType::Lexical(lex_error.into_error()),
-                                    location,
-                                );
-                                ast::FTStringLiteralElement {
-                                    value: "".into(),
-                                    range,
-                                }
-                            },
-                        ),
-                    )
-                }
-                // `Invalid` tokens are created when there's a lexical error, so
-                // we ignore it here to avoid creating unexpected token errors
-                TokenKind::Unknown => {
-                    parser.bump_any();
-                    return;
-                }
-                tok => {
-                    // This should never happen because the list parsing will only
-                    // call this closure for the above token kinds which are the same
-                    // as in the FIRST set.
-                    unreachable!(
-                        "t-string: unexpected token `{tok:?}` at {:?}",
-                        parser.current_token_range()
-                    );
-                }
-            };
-            elements.push(element);
-        });
-
-        TStringElements::from(elements)
-    }
-
-    /// Parses a t-string interpolation element.
-    ///
-    /// # Panics
-    ///
-    /// If the parser isn't positioned at a `{` token.
-    fn parse_tstring_interpolation_element(
-        &mut self,
-        flags: ast::AnyStringFlags,
-    ) -> ast::TStringInterpolationElement {
-        let start = self.node_start();
-        self.bump(TokenKind::Lbrace);
-
-        // test_err t_string_empty_expression
-        // # parse_options: { "target-version": "3.14" }
-        // t"{}"
-        // t"{  }"
-
-        // test_err t_string_invalid_starred_expr
-        // # parse_options: { "target-version": "3.14" }
-        // # Starred expression inside t-string has a minimum precedence of bitwise or.
-        // t"{*}"
-        // t"{*x and y}"
-        // t"{*yield x}"
-        let value = self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
-
-        if !value.is_parenthesized && value.expr.is_lambda_expr() {
-            // TODO(dhruvmanila): This requires making some changes in lambda expression
-            // parsing logic to handle the emitted `TStringMiddle` token in case the
-            // lambda expression is not parenthesized.
-
-            // test_err t_string_lambda_without_parentheses
-            // # parse_options: { "target-version": "3.14" }
-            // t"{lambda x: x}"
-            self.add_error(
-                ParseErrorType::TStringError(FTStringErrorType::LambdaWithoutParentheses),
-                value.range(),
-            );
-        }
-        let debug_text = if self.eat(TokenKind::Equal) {
-            let leading_range = TextRange::new(start + "{".text_len(), value.start());
-            let trailing_range = TextRange::new(value.end(), self.current_token_range().start());
-            Some(ast::DebugText {
-                leading: self.src_text(leading_range).to_string(),
-                trailing: self.src_text(trailing_range).to_string(),
-            })
-        } else {
-            None
-        };
-
-        let conversion = if self.eat(TokenKind::Exclamation) {
-            let conversion_flag_range = self.current_token_range();
-            if self.at(TokenKind::Name) {
-                let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
-                    unreachable!();
-                };
-                match &*name {
-                    "s" => ConversionFlag::Str,
-                    "r" => ConversionFlag::Repr,
-                    "a" => ConversionFlag::Ascii,
-                    _ => {
-                        // test_err t_string_invalid_conversion_flag_name_tok
-                        // # parse_options: { "target-version": "3.14" }
-                        // t"{x!z}"
-                        self.add_error(
-                            ParseErrorType::TStringError(FTStringErrorType::InvalidConversionFlag),
-                            conversion_flag_range,
-                        );
-                        ConversionFlag::None
-                    }
-                }
-            } else {
-                // test_err t_string_invalid_conversion_flag_other_tok
-                // # parse_options: { "target-version": "3.14" }
-                // t"{x!123}"
-                // t"{x!'a'}"
-                self.add_error(
-                    ParseErrorType::TStringError(FTStringErrorType::InvalidConversionFlag),
-                    conversion_flag_range,
-                );
-                // TODO(dhruvmanila): Avoid dropping this token
-                self.bump_any();
-                ConversionFlag::None
-            }
-        } else {
-            ConversionFlag::None
-        };
-
-        let format_spec = if self.eat(TokenKind::Colon) {
-            let spec_start = self.node_start();
-            let elements = self.parse_tstring_elements(flags, TStringElementsKind::FormatSpec);
-            Some(Box::new(ast::TStringFormatSpec {
-                range: self.node_range(spec_start),
-                elements,
-            }))
-        } else {
-            None
-        };
-
-        // We're using `eat` here instead of `expect` to use the f-string specific error type.
-        if !self.eat(TokenKind::Rbrace) {
-            // TODO(dhruvmanila): This requires some changes in the lexer. One of them
-            // would be to emit `TStringEnd`. Currently, the following test cases doesn't
-            // really work as expected. Refer https://github.com/astral-sh/ruff/pull/10372
-
-            // test_err t_string_unclosed_lbrace
-            // # parse_options: { "target-version": "3.14" }
-            // t"{"
-            // t"{foo!r"
-            // t"{foo="
-            // t"{"
-            // t"""{"""
-
-            // The lexer does emit `TStringEnd` for the following test cases:
-
-            // test_err t_string_unclosed_lbrace_in_format_spec
-            // # parse_options: { "target-version": "3.14" }
-            // t"hello {x:"
-            // t"hello {x:.3f"
-            self.add_error(
-                ParseErrorType::TStringError(FTStringErrorType::UnclosedLbrace),
-                self.current_token_range(),
-            );
-        }
-
-        ast::TStringInterpolationElement {
-            interpolation: Box::new(value.expr),
             debug_text,
             conversion,
             format_spec,

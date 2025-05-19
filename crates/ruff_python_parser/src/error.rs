@@ -1,6 +1,6 @@
 use std::fmt::{self, Display};
 
-use ruff_python_ast::PythonVersion;
+use ruff_python_ast::{FTStringKind, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::TokenKind;
@@ -183,6 +183,15 @@ pub enum ParseErrorType {
     TStringError(FTStringErrorType),
     /// Parser encountered an error during lexing.
     Lexical(LexicalErrorType),
+}
+
+impl ParseErrorType {
+    pub(crate) fn from_ftstring_error(error: FTStringErrorType, string_kind: FTStringKind) -> Self {
+        match string_kind {
+            FTStringKind::FString => Self::FStringError(error),
+            FTStringKind::TString => Self::TStringError(error),
+        }
+    }
 }
 
 impl std::error::Error for ParseErrorType {}

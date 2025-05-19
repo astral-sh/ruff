@@ -5,7 +5,10 @@ use bstr::ByteSlice;
 use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::error::{LexicalError, LexicalErrorType};
+use crate::{
+    TokenKind,
+    error::{LexicalError, LexicalErrorType},
+};
 
 #[derive(Debug)]
 pub(crate) enum StringType {
@@ -467,6 +470,65 @@ pub(crate) fn parse_ftstring_literal_element(
     range: TextRange,
 ) -> Result<ast::FTStringLiteralElement, LexicalError> {
     StringParser::new(source, flags, range.start(), range).parse_ftstring_middle()
+}
+
+pub(crate) trait InterpolatedString {
+    fn kind() -> ast::FTStringKind;
+    fn new(elements: ast::FTStringElements, range: TextRange, flags: ast::AnyStringFlags) -> Self;
+    fn token_start() -> TokenKind;
+    fn token_middle() -> TokenKind;
+    fn token_end() -> TokenKind;
+}
+
+impl InterpolatedString for ast::FString {
+    fn kind() -> ast::FTStringKind {
+        ast::FTStringKind::FString
+    }
+    fn new(elements: ast::FTStringElements, range: TextRange, flags: ast::AnyStringFlags) -> Self {
+        ast::FString {
+            elements,
+            range,
+            flags: flags.into(),
+        }
+    }
+
+    fn token_start() -> TokenKind {
+        TokenKind::FStringStart
+    }
+
+    fn token_middle() -> TokenKind {
+        TokenKind::FStringMiddle
+    }
+
+    fn token_end() -> TokenKind {
+        TokenKind::FStringEnd
+    }
+}
+
+impl InterpolatedString for ast::TString {
+    fn kind() -> ast::FTStringKind {
+        ast::FTStringKind::TString
+    }
+
+    fn new(elements: ast::FTStringElements, range: TextRange, flags: ast::AnyStringFlags) -> Self {
+        ast::TString {
+            elements,
+            range,
+            flags: flags.into(),
+        }
+    }
+
+    fn token_start() -> TokenKind {
+        TokenKind::TStringStart
+    }
+
+    fn token_middle() -> TokenKind {
+        TokenKind::TStringMiddle
+    }
+
+    fn token_end() -> TokenKind {
+        TokenKind::TStringEnd
+    }
 }
 
 #[cfg(test)]

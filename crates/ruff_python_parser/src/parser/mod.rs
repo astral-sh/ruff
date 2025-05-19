@@ -798,7 +798,7 @@ impl WithItemKind {
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
-enum FStringElementsKind {
+enum FTStringElementsKind {
     /// The regular f-string elements.
     ///
     /// For example, the `"hello "`, `x`, and `" world"` elements in:
@@ -816,46 +816,16 @@ enum FStringElementsKind {
     FormatSpec,
 }
 
-impl FStringElementsKind {
-    const fn list_terminator(self) -> TokenKind {
+impl FTStringElementsKind {
+    const fn list_terminators(self) -> TokenSet {
         match self {
-            FStringElementsKind::Regular => TokenKind::FStringEnd,
+            FTStringElementsKind::Regular => {
+                TokenSet::new([TokenKind::FStringEnd, TokenKind::TStringEnd])
+            }
             // test_ok fstring_format_spec_terminator
             // f"hello {x:} world"
             // f"hello {x:.3f} world"
-            FStringElementsKind::FormatSpec => TokenKind::Rbrace,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Copy, Clone)]
-enum TStringElementsKind {
-    /// The regular t-string elements.
-    ///
-    /// For example, the `"hello "`, `x`, and `" world"` elements in:
-    /// ```py
-    /// f"hello {x:.2f} world"
-    /// ```
-    Regular,
-
-    /// The t-string elements are part of the format specifier.
-    ///
-    /// For example, the `.2f` in:
-    /// ```py
-    /// t"hello {x:.2f} world"
-    /// ```
-    FormatSpec,
-}
-
-impl TStringElementsKind {
-    const fn list_terminator(self) -> TokenKind {
-        match self {
-            TStringElementsKind::Regular => TokenKind::TStringEnd,
-            // test_ok tstring_format_spec_terminator
-            // # parse_options: {"target-version": "3.14"}
-            // t"hello {x:} world"
-            // t"hello {x:.3f} world"
-            TStringElementsKind::FormatSpec => TokenKind::Rbrace,
+            FTStringElementsKind::FormatSpec => TokenSet::new([TokenKind::Rbrace]),
         }
     }
 }
@@ -963,12 +933,8 @@ enum RecoveryContextKind {
     /// When parsing a list of items in a `with` statement
     WithItems(WithItemKind),
 
-    /// When parsing a list of f-string elements which are either literal elements
-    /// or expressions.
-    FStringElements(FStringElementsKind),
-    /// When parsing a list of t-string elements which are either literal elements
-    /// or interpolations.
-    TStringElements(TStringElementsKind),
+    /// When parsing a list of f-string or t-string elements which are either literal elements, expressions, or interpolations.
+    FTStringElements(FTStringElementsKind),
 }
 
 impl RecoveryContextKind {
@@ -1152,8 +1118,8 @@ impl RecoveryContextKind {
                     .at(TokenKind::Colon)
                     .then_some(ListTerminatorKind::Regular),
             },
-            RecoveryContextKind::FStringElements(kind) => {
-                if p.at(kind.list_terminator()) {
+            RecoveryContextKind::FTStringElements(kind) => {
+                if p.at_ts(kind.list_terminators()) {
                     Some(ListTerminatorKind::Regular)
                 } else {
                     // test_err unterminated_fstring_newline_recovery
@@ -1164,24 +1130,6 @@ impl RecoveryContextKind {
                     // f"hello {x:
                     // 3 + 3
                     // f"hello {x}
-                    // 4 + 4
-                    p.at(TokenKind::Newline)
-                        .then_some(ListTerminatorKind::ErrorRecovery)
-                }
-            }
-            RecoveryContextKind::TStringElements(kind) => {
-                if p.at(kind.list_terminator()) {
-                    Some(ListTerminatorKind::Regular)
-                } else {
-                    // test_err unterminated_tstring_newline_recovery
-                    // # parse_options: {"target-version": "3.14"}
-                    // t"hello
-                    // 1 + 1
-                    // t"hello {x
-                    // 2 + 2
-                    // t"hello {x:
-                    // 3 + 3
-                    // t"hello {x}
                     // 4 + 4
                     p.at(TokenKind::Newline)
                         .then_some(ListTerminatorKind::ErrorRecovery)
@@ -1227,18 +1175,11 @@ impl RecoveryContextKind {
                 ) || p.at_name_or_soft_keyword()
             }
             RecoveryContextKind::WithItems(_) => p.at_expr(),
-            RecoveryContextKind::FStringElements(_) => matches!(
+            RecoveryContextKind::FTStringElements(_) => matches!(
                 p.current_token_kind(),
                 // Literal element
-                TokenKind::FStringMiddle
+                TokenKind::FStringMiddle | TokenKind::TStringMiddle
                 // Expression element
-                | TokenKind::Lbrace
-            ),
-            RecoveryContextKind::TStringElements(_) => matches!(
-                p.current_token_kind(),
-                // Literal element
-                TokenKind::TStringMiddle
-                // Interpolation element
                 | TokenKind::Lbrace
             ),
         }
@@ -1328,21 +1269,13 @@ impl RecoveryContextKind {
                     "Expected an expression or the end of the with item list".to_string(),
                 ),
             },
-            RecoveryContextKind::FStringElements(kind) => match kind {
-                FStringElementsKind::Regular => ParseErrorType::OtherError(
-                    "Expected an f-string element or the end of the f-string".to_string(),
+            RecoveryContextKind::FTStringElements(kind) => match kind {
+                FTStringElementsKind::Regular => ParseErrorType::OtherError(
+                    "Expected an f or t-string element or the end of the f or t-string".to_string(),
                 ),
-                FStringElementsKind::FormatSpec => {
-                    ParseErrorType::OtherError("Expected an f-string element or a '}'".to_string())
-                }
-            },
-            RecoveryContextKind::TStringElements(kind) => match kind {
-                TStringElementsKind::Regular => ParseErrorType::OtherError(
-                    "Expected a t-string element or the end of the t-string".to_string(),
+                FTStringElementsKind::FormatSpec => ParseErrorType::OtherError(
+                    "Expected an f or t-string element or a '}'".to_string(),
                 ),
-                TStringElementsKind::FormatSpec => {
-                    ParseErrorType::OtherError("Expected a t-string element or a '}'".to_string())
-                }
             },
         }
     }
@@ -1435,15 +1368,9 @@ impl RecoveryContext {
                 }
                 WithItemKind::Unparenthesized => RecoveryContext::WITH_ITEMS_UNPARENTHESIZED,
             },
-            RecoveryContextKind::FStringElements(kind) => match kind {
-                FStringElementsKind::Regular => RecoveryContext::F_OR_T_STRING_ELEMENTS,
-                FStringElementsKind::FormatSpec => {
-                    RecoveryContext::F_OR_T_STRING_ELEMENTS_IN_FORMAT_SPEC
-                }
-            },
-            RecoveryContextKind::TStringElements(kind) => match kind {
-                TStringElementsKind::Regular => RecoveryContext::F_OR_T_STRING_ELEMENTS,
-                TStringElementsKind::FormatSpec => {
+            RecoveryContextKind::FTStringElements(kind) => match kind {
+                FTStringElementsKind::Regular => RecoveryContext::F_OR_T_STRING_ELEMENTS,
+                FTStringElementsKind::FormatSpec => {
                     RecoveryContext::F_OR_T_STRING_ELEMENTS_IN_FORMAT_SPEC
                 }
             },
@@ -1514,10 +1441,10 @@ impl RecoveryContext {
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized)
             }
             RecoveryContext::F_OR_T_STRING_ELEMENTS => {
-                RecoveryContextKind::FStringElements(FStringElementsKind::Regular)
+                RecoveryContextKind::FTStringElements(FTStringElementsKind::Regular)
             }
             RecoveryContext::F_OR_T_STRING_ELEMENTS_IN_FORMAT_SPEC => {
-                RecoveryContextKind::FStringElements(FStringElementsKind::FormatSpec)
+                RecoveryContextKind::FTStringElements(FTStringElementsKind::FormatSpec)
             }
             _ => return None,
         })

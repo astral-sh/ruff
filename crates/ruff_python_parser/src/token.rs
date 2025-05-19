@@ -853,10 +853,7 @@ pub(crate) enum TokenValue {
     String(Box<str>),
     /// Token value that includes the portion of text inside the f-string that's not
     /// part of the expression part and isn't an opening or closing brace.
-    FStringMiddle(Box<str>),
-    /// Token value that includes the portion of text inside the t-string that's not
-    /// part of the interpolation part and isn't an opening or closing brace.
-    TStringMiddle(Box<str>),
+    FTStringMiddle(Box<str>),
     /// Token value for IPython escape commands. These are recognized by the lexer
     /// only when the mode is [`Mode::Ipython`].
     IpyEscapeCommand {

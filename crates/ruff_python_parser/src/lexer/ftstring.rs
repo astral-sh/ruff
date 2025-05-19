@@ -1,4 +1,4 @@
-use ruff_python_ast::StringFlags;
+use ruff_python_ast::{FTStringKind, StringFlags};
 
 use super::TokenFlags;
 
@@ -149,9 +149,3 @@ impl FTStrings {
 
 #[derive(Debug, Clone)]
 pub(crate) struct FTStringsCheckpoint(Vec<FTStringContext>);
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum FTStringKind {
-    FString,
-    TString,
-}
