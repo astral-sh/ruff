@@ -316,7 +316,7 @@ fn print_syntax_errors(
 
 /// Print the [`Message::Diagnostic`]s in `messages`.
 fn print_diagnostics(mut messages: Vec<Message>, path: &Path, source: &SourceKind) -> String {
-    messages.retain(Message::is_diagnostic_message);
+    messages.retain(|msg| !msg.is_syntax_error());
 
     if let Some(notebook) = source.as_ipy_notebook() {
         print_jupyter_messages(&messages, path, notebook)

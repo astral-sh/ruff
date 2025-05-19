@@ -185,11 +185,6 @@ impl Message {
         )
     }
 
-    /// Returns `true` if `self` is a diagnostic message.
-    pub fn is_diagnostic_message(&self) -> bool {
-        !self.is_syntax_error()
-    }
-
     /// Returns `true` if `self` is a syntax error message.
     pub fn is_syntax_error(&self) -> bool {
         self.diagnostic.id().is_invalid_syntax()

@@ -35,7 +35,6 @@ pub(crate) fn fix_file(
 
     let mut with_fixes = messages
         .iter()
-        .filter(|msg| msg.is_diagnostic_message())
         .filter(|message| {
             message
                 .fix()
