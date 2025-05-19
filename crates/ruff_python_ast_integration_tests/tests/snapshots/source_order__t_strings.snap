@@ -8,10 +8,10 @@ expression: trace
       - StringLiteral
       - TString
         - FTStringLiteralElement
-        - TStringInterpolationElement
+        - FTStringInterpolatedElement
           - ExprName
           - FTStringLiteralElement
-          - TStringInterpolationElement
+          - FTStringInterpolatedElement
             - ExprName
           - FTStringLiteralElement
         - FTStringLiteralElement

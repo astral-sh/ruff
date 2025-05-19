@@ -4,14 +4,14 @@ use insta::assert_snapshot;
 
 use ruff_python_ast::visitor::{
     Visitor, walk_alias, walk_bytes_literal, walk_comprehension, walk_except_handler, walk_expr,
-    walk_f_string, walk_f_string_element, walk_keyword, walk_match_case, walk_parameter,
-    walk_parameters, walk_pattern, walk_stmt, walk_string_literal, walk_t_string,
-    walk_t_string_element, walk_type_param, walk_with_item,
+    walk_f_string, walk_ft_string_element, walk_keyword, walk_match_case, walk_parameter,
+    walk_parameters, walk_pattern, walk_stmt, walk_string_literal, walk_t_string, walk_type_param,
+    walk_with_item,
 };
 use ruff_python_ast::{
     self as ast, Alias, AnyNodeRef, BoolOp, BytesLiteral, CmpOp, Comprehension, ExceptHandler,
-    Expr, FString, FStringElement, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
-    Stmt, StringLiteral, TString, TStringElement, TypeParam, UnaryOp, WithItem,
+    Expr, FString, FTStringElement, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
+    Stmt, StringLiteral, TString, TypeParam, UnaryOp, WithItem,
 };
 use ruff_python_parser::{Mode, ParseOptions, parse};
 
@@ -328,21 +328,15 @@ impl Visitor<'_> for RecordVisitor {
         self.exit_node();
     }
 
-    fn visit_f_string_element(&mut self, f_string_element: &FStringElement) {
+    fn visit_ft_string_element(&mut self, f_string_element: &FTStringElement) {
         self.enter_node(f_string_element);
-        walk_f_string_element(self, f_string_element);
+        walk_ft_string_element(self, f_string_element);
         self.exit_node();
     }
 
     fn visit_t_string(&mut self, t_string: &TString) {
         self.enter_node(t_string);
         walk_t_string(self, t_string);
-        self.exit_node();
-    }
-
-    fn visit_t_string_element(&mut self, t_string_element: &TStringElement) {
-        self.enter_node(t_string_element);
-        walk_t_string_element(self, t_string_element);
         self.exit_node();
     }
 }

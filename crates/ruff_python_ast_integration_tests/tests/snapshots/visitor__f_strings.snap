@@ -7,10 +7,10 @@ expression: trace
     - StringLiteral
     - FString
       - FTStringLiteralElement
-      - FStringExpressionElement
+      - FTStringInterpolatedElement
         - ExprName
         - FTStringLiteralElement
-        - FStringExpressionElement
+        - FTStringInterpolatedElement
           - ExprName
         - FTStringLiteralElement
       - FTStringLiteralElement
