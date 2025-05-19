@@ -500,7 +500,7 @@ impl FStringValue {
         self.iter().filter_map(|part| part.as_f_string())
     }
 
-    /// Returns an iterator over all the [`FStringElement`] contained in this value.
+    /// Returns an iterator over all the [`FTStringElement`] contained in this value.
     ///
     /// An f-string element is what makes up an [`FString`] i.e., it is either a
     /// string literal or an expression. In the following example,
@@ -677,7 +677,7 @@ impl TStringValue {
         self.iter().filter_map(|part| part.as_t_string())
     }
 
-    /// Returns an iterator over all the [`TStringElement`] contained in this value.
+    /// Returns an iterator over all the [`FTStringElement`] contained in this value.
     ///
     /// An t-string element is what makes up an [`TString`] i.e., it is either a
     /// string literal or an interpolation. In the following example,
@@ -1078,17 +1078,17 @@ impl From<FString> for Expr {
     }
 }
 
-/// A newtype wrapper around a list of [`FStringElement`].
+/// A newtype wrapper around a list of [`FTStringElement`].
 #[derive(Clone, Default, PartialEq)]
 pub struct FTStringElements(Vec<FTStringElement>);
 
 impl FTStringElements {
-    /// Returns an iterator over all the [`FStringLiteralElement`] nodes contained in this f-string.
+    /// Returns an iterator over all the [`FTStringLiteralElement`] nodes contained in this f-string.
     pub fn literals(&self) -> impl Iterator<Item = &FTStringLiteralElement> {
         self.iter().filter_map(|element| element.as_literal())
     }
 
-    /// Returns an iterator over all the [`FStringExpressionElement`] nodes contained in this f-string.
+    /// Returns an iterator over all the [`FTStringInterpolatedElement`] nodes contained in this f-string.
     pub fn expressions(&self) -> impl Iterator<Item = &FTStringInterpolatedElement> {
         self.iter().filter_map(|element| element.as_expression())
     }
