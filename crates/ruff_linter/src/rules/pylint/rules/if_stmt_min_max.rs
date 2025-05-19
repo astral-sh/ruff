@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, CmpOp, Stmt};
@@ -93,11 +93,13 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
         return;
     }
 
-    let [body @ Stmt::Assign(ast::StmtAssign {
-        targets: body_targets,
-        value: body_value,
-        ..
-    })] = body.as_slice()
+    let [
+        body @ Stmt::Assign(ast::StmtAssign {
+            targets: body_targets,
+            value: body_value,
+            ..
+        }),
+    ] = body.as_slice()
     else {
         return;
     };

@@ -1,4 +1,4 @@
-use crate::db::tests::{setup_db, TestDb};
+use crate::db::tests::{TestDb, setup_db};
 use std::sync::{Arc, Mutex, OnceLock};
 
 static CACHED_DB: OnceLock<Arc<Mutex<TestDb>>> = OnceLock::new();

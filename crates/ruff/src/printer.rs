@@ -6,7 +6,7 @@ use std::io::Write;
 use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
-use itertools::{iterate, Itertools};
+use itertools::{Itertools, iterate};
 use serde::Serialize;
 
 use ruff_linter::fs::relativize_path;
@@ -157,7 +157,8 @@ impl Printer {
                             } else {
                                 "es"
                             };
-                            writeln!(writer,
+                            writeln!(
+                                writer,
                                 "{fix_prefix} {} fixable with the `--fix` option ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
                                 fixables.applicable, fixables.inapplicable_unsafe
                             )?;
@@ -175,7 +176,8 @@ impl Printer {
                             } else {
                                 "es"
                             };
-                            writeln!(writer,
+                            writeln!(
+                                writer,
                                 "No fixes available ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
                                 fixables.inapplicable_unsafe
                             )?;
@@ -205,15 +207,27 @@ impl Printer {
                     if fixed > 0 {
                         let s = if fixed == 1 { "" } else { "s" };
                         if self.fix_mode.is_apply() {
-                            writeln!(writer, "Fixed {fixed} error{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`).")?;
+                            writeln!(
+                                writer,
+                                "Fixed {fixed} error{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`)."
+                            )?;
                         } else {
-                            writeln!(writer, "Would fix {fixed} error{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`).")?;
+                            writeln!(
+                                writer,
+                                "Would fix {fixed} error{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`)."
+                            )?;
                         }
                     } else {
                         if self.fix_mode.is_apply() {
-                            writeln!(writer, "No errors fixed ({unapplied} fix{es} available with `--unsafe-fixes`).")?;
+                            writeln!(
+                                writer,
+                                "No errors fixed ({unapplied} fix{es} available with `--unsafe-fixes`)."
+                            )?;
                         } else {
-                            writeln!(writer, "No errors would be fixed ({unapplied} fix{es} available with `--unsafe-fixes`).")?;
+                            writeln!(
+                                writer,
+                                "No errors would be fixed ({unapplied} fix{es} available with `--unsafe-fixes`)."
+                            )?;
                         }
                     }
                 } else {

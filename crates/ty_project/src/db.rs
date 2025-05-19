@@ -1,7 +1,7 @@
 use std::panic::{AssertUnwindSafe, RefUnwindSafe};
 use std::sync::Arc;
 
-use crate::{DummyReporter, DEFAULT_LINT_REGISTRY};
+use crate::{DEFAULT_LINT_REGISTRY, DummyReporter};
 use crate::{Project, ProjectMetadata, Reporter};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
@@ -201,8 +201,8 @@ impl Db for ProjectDatabase {
 #[cfg(feature = "format")]
 mod format {
     use crate::ProjectDatabase;
-    use ruff_db::files::File;
     use ruff_db::Upcast;
+    use ruff_db::files::File;
     use ruff_python_formatter::{Db as FormatDb, PyFormatOptions};
 
     #[salsa::db]
@@ -235,8 +235,8 @@ pub(crate) mod tests {
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
     use ty_python_semantic::{Db as SemanticDb, Program};
 
-    use crate::db::Db;
     use crate::DEFAULT_LINT_REGISTRY;
+    use crate::db::Db;
     use crate::{Project, ProjectMetadata};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;

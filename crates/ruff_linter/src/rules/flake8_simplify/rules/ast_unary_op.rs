@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprContext, Stmt, Un
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_semantic::ScopeKind;
 

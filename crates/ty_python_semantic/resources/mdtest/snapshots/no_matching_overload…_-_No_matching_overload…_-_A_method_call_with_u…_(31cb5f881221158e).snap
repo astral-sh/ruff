@@ -1,0 +1,63 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: no_matching_overload.md - No matching overload diagnostics - A method call with unmatched overloads
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/no_matching_overload.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import overload
+ 2 | 
+ 3 | class Foo:
+ 4 |     @overload
+ 5 |     def bar(self, x: int) -> int: ...
+ 6 |     @overload
+ 7 |     def bar(self, x: str) -> str: ...
+ 8 |     def bar(self, x: int | str) -> int | str:
+ 9 |         return x
+10 | 
+11 | foo = Foo()
+12 | foo.bar(b"wat")  # error: [no-matching-overload]
+```
+
+# Diagnostics
+
+```
+error[no-matching-overload]: No overload of bound method `bar` matches arguments
+  --> src/mdtest_snippet.py:12:1
+   |
+11 | foo = Foo()
+12 | foo.bar(b"wat")  # error: [no-matching-overload]
+   | ^^^^^^^^^^^^^^^
+   |
+info: First overload defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+3 | class Foo:
+4 |     @overload
+5 |     def bar(self, x: int) -> int: ...
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^
+6 |     @overload
+7 |     def bar(self, x: str) -> str: ...
+  |
+info: Possible overloads for bound method `bar`:
+info:   (self, x: int) -> int
+info:   (self, x: str) -> str
+info: Overload implementation defined here
+ --> src/mdtest_snippet.py:8:9
+  |
+6 |     @overload
+7 |     def bar(self, x: str) -> str: ...
+8 |     def bar(self, x: int | str) -> int | str:
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+9 |         return x
+  |
+info: rule `no-matching-overload` is enabled by default
+
+```

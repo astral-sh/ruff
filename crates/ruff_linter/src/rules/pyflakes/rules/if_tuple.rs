@@ -1,7 +1,7 @@
 use ruff_python_ast::{Expr, StmtIf};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::stmt_if::if_elif_branches;
 use ruff_text_size::Ranged;
 

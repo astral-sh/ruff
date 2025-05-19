@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprStringLiteral;
 use ruff_text_size::TextRange;
 

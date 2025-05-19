@@ -149,9 +149,14 @@ impl<'db> ProtocolInterface<'db> {
         }
     }
 
-    /// Return `true` if any of the members of this protocol type contain any `Todo` types.
-    pub(super) fn contains_todo(self, db: &'db dyn Db) -> bool {
-        self.members(db).any(|member| member.ty.contains_todo(db))
+    /// Return `true` if the types of any of the members match the closure passed in.
+    pub(super) fn any_over_type(
+        self,
+        db: &'db dyn Db,
+        type_fn: &dyn Fn(Type<'db>) -> bool,
+    ) -> bool {
+        self.members(db)
+            .any(|member| member.ty.any_over_type(db, type_fn))
     }
 
     pub(super) fn normalized(self, db: &'db dyn Db) -> Self {

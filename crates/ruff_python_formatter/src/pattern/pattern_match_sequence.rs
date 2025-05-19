@@ -1,11 +1,11 @@
-use ruff_formatter::{format_args, Format, FormatResult};
+use ruff_formatter::{Format, FormatResult, format_args};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::PatternMatchSequence;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::expression::parentheses::{
-    empty_parenthesized, optional_parentheses, parenthesized, NeedsParentheses, OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, empty_parenthesized, optional_parentheses, parenthesized,
 };
 use crate::prelude::*;
 
@@ -25,7 +25,7 @@ impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
             // If the sequence is empty, format the empty parentheses, along with any dangling
             // comments.
             ([], SequenceType::Tuple | SequenceType::TupleNoParens) => {
-                return empty_parenthesized("(", dangling, ")").fmt(f)
+                return empty_parenthesized("(", dangling, ")").fmt(f);
             }
             ([], SequenceType::List) => return empty_parenthesized("[", dangling, "]").fmt(f),
 
@@ -34,7 +34,7 @@ impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
             ([elt], SequenceType::Tuple | SequenceType::TupleNoParens) => {
                 return parenthesized("(", &format_args![elt.format(), token(",")], ")")
                     .with_dangling_comments(dangling)
-                    .fmt(f)
+                    .fmt(f);
             }
 
             _ => {}

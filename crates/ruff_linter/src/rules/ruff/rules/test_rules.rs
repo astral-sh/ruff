@@ -14,12 +14,12 @@
 /// Rules that provide a fix _must_ not raise unconditionally or the linter
 /// will not converge.
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::TextSize;
 
-use crate::registry::Rule;
 use crate::Locator;
+use crate::registry::Rule;
 
 /// Check if a comment exists anywhere in a given file
 fn comment_exists(text: &str, locator: &Locator, comment_ranges: &CommentRanges) -> bool {

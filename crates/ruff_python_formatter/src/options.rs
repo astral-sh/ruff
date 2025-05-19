@@ -398,7 +398,7 @@ pub enum DocstringCodeLineWidth {
 #[cfg(feature = "schemars")]
 mod schema {
     use ruff_formatter::LineWidth;
-    use schemars::gen::SchemaGenerator;
+    use schemars::r#gen::SchemaGenerator;
     use schemars::schema::{Metadata, Schema, SubschemaValidation};
 
     /// A dummy type that is used to generate a schema for `DocstringCodeLineWidth::Dynamic`.
@@ -415,8 +415,8 @@ mod schema {
     //
     // The only difference to the automatically derived schema is that we use `oneOf` instead of
     // `allOf`. There's no semantic difference between `allOf` and `oneOf` for single element lists.
-    pub(super) fn fixed(gen: &mut SchemaGenerator) -> Schema {
-        let schema = gen.subschema_for::<LineWidth>();
+    pub(super) fn fixed(generator: &mut SchemaGenerator) -> Schema {
+        let schema = generator.subschema_for::<LineWidth>();
         Schema::Object(schemars::schema::SchemaObject {
             metadata: Some(Box::new(Metadata {
                 description: Some(
@@ -457,7 +457,7 @@ fn deserialize_docstring_code_line_width_dynamic<'de, D>(d: D) -> Result<(), D::
 where
     D: serde::Deserializer<'de>,
 {
-    use serde::{de::Error, Deserialize};
+    use serde::{Deserialize, de::Error};
 
     let value = String::deserialize(d)?;
     match &*value {

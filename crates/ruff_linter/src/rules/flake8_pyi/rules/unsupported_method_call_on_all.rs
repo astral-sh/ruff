@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -49,7 +49,9 @@ impl Violation for UnsupportedMethodCallOnAll {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnsupportedMethodCallOnAll { name } = self;
-        format!("Calling `.{name}()` on `__all__` may not be supported by all type checkers (use `+=` instead)")
+        format!(
+            "Calling `.{name}()` on `__all__` may not be supported by all type checkers (use `+=` instead)"
+        )
     }
 }
 

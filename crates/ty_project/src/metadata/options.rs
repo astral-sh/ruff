@@ -1,5 +1,5 @@
-use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
 use crate::Db;
+use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, Severity, Span};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath};
@@ -417,11 +417,11 @@ pub struct TerminalOptions {
 #[cfg(feature = "schemars")]
 mod schema {
     use crate::DEFAULT_LINT_REGISTRY;
-    use schemars::gen::SchemaGenerator;
+    use schemars::JsonSchema;
+    use schemars::r#gen::SchemaGenerator;
     use schemars::schema::{
         InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SubschemaValidation,
     };
-    use schemars::JsonSchema;
     use ty_python_semantic::lint::Level;
 
     pub(super) struct Rules;
@@ -431,10 +431,10 @@ mod schema {
             "Rules".to_string()
         }
 
-        fn json_schema(gen: &mut SchemaGenerator) -> Schema {
+        fn json_schema(generator: &mut SchemaGenerator) -> Schema {
             let registry = &*DEFAULT_LINT_REGISTRY;
 
-            let level_schema = gen.subschema_for::<Level>();
+            let level_schema = generator.subschema_for::<Level>();
 
             let properties: schemars::Map<String, Schema> = registry
                 .lints()

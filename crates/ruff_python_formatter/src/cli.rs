@@ -3,16 +3,16 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use clap::{command, Parser, ValueEnum};
+use clap::{Parser, ValueEnum, command};
 
 use ruff_formatter::SourceCode;
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::{parse, ParseOptions};
+use ruff_python_parser::{ParseOptions, parse};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::comments::collect_comments;
-use crate::{format_module_ast, MagicTrailingComma, PreviewMode, PyFormatOptions};
+use crate::{MagicTrailingComma, PreviewMode, PyFormatOptions, format_module_ast};
 
 #[derive(ValueEnum, Clone, Debug)]
 pub enum Emit {

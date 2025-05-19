@@ -38,7 +38,7 @@ use crate::prelude::TagKind;
 use std::fmt;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
-use std::num::{NonZeroU16, NonZeroU8, TryFromIntError};
+use std::num::{NonZeroU8, NonZeroU16, TryFromIntError};
 
 use crate::format_element::document::Document;
 use crate::printer::{Printer, PrinterOptions};
@@ -50,7 +50,7 @@ pub use builders::BestFitting;
 pub use source_code::{SourceCode, SourceCodeSlice};
 
 pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, PrintError};
-pub use format_element::{normalize_newlines, FormatElement, LINE_TERMINATORS};
+pub use format_element::{FormatElement, LINE_TERMINATORS, normalize_newlines};
 pub use group_id::GroupId;
 use ruff_macros::CacheKey;
 use ruff_text_size::{TextLen, TextRange, TextSize};

@@ -56,6 +56,10 @@ readers of ty's output. For `Unknown` in particular, we may consider it differen
 of some opt-in diagnostics, as it indicates that the gradual type has come about due to an invalid
 annotation, missing annotation or missing type argument somewhere.
 
+A cast from `Unknown` to `Todo` or `Any` is also not considered a "redundant cast", as this breaks
+the gradual guarantee and leads to cascading errors when an object is inferred as having type
+`Unknown` due to a missing import or similar.
+
 ```py
 from ty_extensions import Unknown
 
@@ -66,5 +70,11 @@ def f(x: Any, y: Unknown, z: Any | str | int):
     b = cast(Any, y)
     reveal_type(b)  # revealed: Any
 
-    c = cast(str | int | Any, z)  # error: [redundant-cast]
+    c = cast(Unknown, y)
+    reveal_type(c)  # revealed: Unknown
+
+    d = cast(Unknown, x)
+    reveal_type(d)  # revealed: Unknown
+
+    e = cast(str | int | Any, z)  # error: [redundant-cast]
 ```

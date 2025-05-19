@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 use std::slice::Iter;
 
-use ruff_formatter::{write, FormatError};
+use ruff_formatter::{FormatError, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::Stmt;
 use ruff_python_parser::{self as parser, TokenKind};
@@ -11,7 +11,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::format::{empty_lines, format_comment};
-use crate::comments::{leading_comments, trailing_comments, SourceComment};
+use crate::comments::{SourceComment, leading_comments, trailing_comments};
 use crate::prelude::*;
 use crate::statement::clause::ClauseHeader;
 use crate::statement::suite::SuiteChildStatement;
@@ -798,13 +798,13 @@ impl Iterator for LogicalLinesIter<'_> {
                 Some(token) if token.kind() == TokenKind::Unknown => {
                     return Some(Err(FormatError::syntax_error(
                         "Unexpected token when lexing verbatim statement range.",
-                    )))
+                    )));
                 }
                 Some(token) => match token.kind() {
                     TokenKind::Newline => break (token.start(), token.end()),
                     // Ignore if inside an expression
                     TokenKind::NonLogicalNewline if parens == 0 => {
-                        break (token.start(), token.end())
+                        break (token.start(), token.end());
                     }
                     TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
                         parens = parens.saturating_add(1);

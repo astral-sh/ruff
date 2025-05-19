@@ -3,7 +3,7 @@ use ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_diagnostics::{FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
@@ -68,12 +68,14 @@ impl Violation for MultipleWithStatements {
 /// Returns a boolean indicating whether it's an async with statement, the items
 /// and body.
 fn next_with(body: &[Stmt]) -> Option<(bool, &[WithItem], &[Stmt])> {
-    let [Stmt::With(ast::StmtWith {
-        is_async,
-        items,
-        body,
-        ..
-    })] = body
+    let [
+        Stmt::With(ast::StmtWith {
+            is_async,
+            items,
+            body,
+            ..
+        }),
+    ] = body
     else {
         return None;
     };

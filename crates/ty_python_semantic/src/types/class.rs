@@ -164,6 +164,10 @@ pub struct GenericAlias<'db> {
 }
 
 impl<'db> GenericAlias<'db> {
+    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
+        Self::new(db, self.origin(db), self.specialization(db).normalized(db))
+    }
+
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.origin(db).definition(db)
     }
@@ -207,6 +211,13 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
+    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::NonGeneric(_) => self,
+            Self::Generic(generic) => Self::Generic(generic.normalized(db)),
+        }
+    }
+
     /// Returns the class literal and specialization for this class. For a non-generic class, this
     /// is the class itself. For a generic alias, this is the alias's origin.
     pub(crate) fn class_literal(
@@ -1121,6 +1132,18 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> SymbolAndQualifiers<'db> {
+        if name == "__dataclass_fields__" && self.dataclass_params(db).is_some() {
+            // Make this class look like a subclass of the `DataClassInstance` protocol
+            return Symbol::bound(KnownClass::Dict.to_specialized_instance(
+                db,
+                [
+                    KnownClass::Str.to_instance(db),
+                    KnownClass::Field.to_specialized_instance(db, [Type::any()]),
+                ],
+            ))
+            .with_qualifiers(TypeQualifiers::CLASS_VAR);
+        }
+
         let body_scope = self.body_scope(db);
         let symbol = class_symbol(db, body_scope, name).map_type(|ty| {
             // The `__new__` and `__init__` members of a non-specialized generic class are handled
@@ -1265,6 +1288,14 @@ impl<'db> ClassLiteral<'db> {
                 );
 
                 Some(Type::Callable(CallableType::single(db, signature)))
+            }
+            (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
+                KnownClass::NamedTupleFallback
+                    .to_class_literal(db)
+                    .into_class_literal()?
+                    .own_class_member(db, None, name)
+                    .symbol
+                    .ignore_possibly_unbound()
             }
             _ => None,
         }
@@ -1539,7 +1570,9 @@ impl<'db> ClassLiteral<'db> {
                             Truthiness::Ambiguous => {
                                 return Symbol::possibly_unbound(annotation_ty);
                             }
-                            Truthiness::AlwaysFalse => unreachable!("If the attribute assignments are all invisible, inference of their types should be skipped"),
+                            Truthiness::AlwaysFalse => unreachable!(
+                                "If the attribute assignments are all invisible, inference of their types should be skipped"
+                            ),
                         }
                     }
                     DefinitionKind::Assignment(assign) => {
@@ -1962,6 +1995,8 @@ pub enum KnownClass {
     NotImplementedType,
     // dataclasses
     Field,
+    // _typeshed._type_checker_internals
+    NamedTupleFallback,
 }
 
 impl<'db> KnownClass {
@@ -2044,7 +2079,8 @@ impl<'db> KnownClass {
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
             | Self::NotImplementedType
             | Self::Classmethod
-            | Self::Field => Truthiness::Ambiguous,
+            | Self::Field
+            | Self::NamedTupleFallback => Truthiness::Ambiguous,
         }
     }
 
@@ -2118,7 +2154,8 @@ impl<'db> KnownClass {
             | Self::EllipsisType
             | Self::NotImplementedType
             | Self::UnionType
-            | Self::Field => false,
+            | Self::Field
+            | Self::NamedTupleFallback => false,
         }
     }
 
@@ -2194,6 +2231,7 @@ impl<'db> KnownClass {
             }
             Self::NotImplementedType => "_NotImplementedType",
             Self::Field => "Field",
+            Self::NamedTupleFallback => "NamedTupleFallback",
         }
     }
 
@@ -2423,6 +2461,7 @@ impl<'db> KnownClass {
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field => KnownModule::Dataclasses,
+            Self::NamedTupleFallback => KnownModule::TypeCheckerInternals,
         }
     }
 
@@ -2485,7 +2524,8 @@ impl<'db> KnownClass {
             | Self::Super
             | Self::NamedTuple
             | Self::NewType
-            | Self::Field => false,
+            | Self::Field
+            | Self::NamedTupleFallback => false,
         }
     }
 
@@ -2550,7 +2590,8 @@ impl<'db> KnownClass {
             | Self::UnionType
             | Self::NamedTuple
             | Self::NewType
-            | Self::Field => false,
+            | Self::Field
+            | Self::NamedTupleFallback => false,
         }
     }
 
@@ -2623,6 +2664,7 @@ impl<'db> KnownClass {
             }
             "_NotImplementedType" => Self::NotImplementedType,
             "Field" => Self::Field,
+            "NamedTupleFallback" => Self::NamedTupleFallback,
             _ => return None,
         };
 
@@ -2677,7 +2719,8 @@ impl<'db> KnownClass {
             | Self::GeneratorType
             | Self::AsyncGeneratorType
             | Self::WrapperDescriptorType
-            | Self::Field => module == self.canonical_module(db),
+            | Self::Field
+            | Self::NamedTupleFallback => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeVar
@@ -2737,7 +2780,7 @@ impl<'db> KnownClassLookupError<'db> {
                         f,
                         "Error looking up `{class}` in typeshed on Python {python_version}: \
                         expected to find a fully bound symbol, but found one that is possibly unbound",
-                    )
+                    ),
                 }
             }
         }

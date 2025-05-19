@@ -3,14 +3,14 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 
-use ruff_python_semantic::{analyze, SemanticModel};
+use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier};
 
 use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
 

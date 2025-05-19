@@ -1,5 +1,5 @@
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 
@@ -137,10 +137,10 @@ fn fingerprint(message: &Message, project_path: &str, salt: u64) -> u64 {
 mod tests {
     use insta::assert_snapshot;
 
+    use crate::message::GitlabEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
-    use crate::message::GitlabEmitter;
 
     #[test]
     fn output() {

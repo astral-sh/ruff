@@ -1,6 +1,6 @@
 use crate::preview::is_readlines_in_for_fix_safe;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Comprehension, Expr, StmtFor};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::analyze::typing::is_io_base_expr;

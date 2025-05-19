@@ -1,11 +1,11 @@
 use std::borrow::Cow;
 use std::iter;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use std::collections::BTreeMap;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::{
@@ -158,12 +158,12 @@ impl Violation for UnusedImport {
                     submodule_import: true,
                 } => {
                     return Some(format!(
-                    "Use an explicit re-export: `import {parent} as {parent}; import {binding}`",
-                    parent = binding
-                        .split('.')
-                        .next()
-                        .expect("Expected all submodule imports to contain a '.'")
-                    ))
+                        "Use an explicit re-export: `import {parent} as {parent}; import {binding}`",
+                        parent = binding
+                            .split('.')
+                            .next()
+                            .expect("Expected all submodule imports to contain a '.'")
+                    ));
                 }
                 UnusedImportContext::DunderInitFirstParty {
                     dunder_all_count: DunderAllCount::One,
@@ -179,7 +179,7 @@ impl Violation for UnusedImport {
                             .split('.')
                             .next()
                             .expect("Expected all submodule imports to contain a '.'")
-                    ))
+                    ));
                 }
                 UnusedImportContext::DunderInitFirstParty {
                     dunder_all_count: DunderAllCount::Many,

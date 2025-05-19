@@ -1120,7 +1120,19 @@ impl<'db> CallableBinding<'db> {
                         String::new()
                     }
                 ));
-                if let Some(function) = self.signature_type.into_function_literal() {
+                // TODO: This should probably be adapted to handle more
+                // types of callables[1]. At present, it just handles
+                // standard function and method calls.
+                //
+                // [1]: https://github.com/astral-sh/ty/issues/274#issuecomment-2881856028
+                let function_type_and_kind = match self.signature_type {
+                    Type::FunctionLiteral(function) => Some(("function", function)),
+                    Type::BoundMethod(bound_method) => {
+                        Some(("bound method", bound_method.function(context.db())))
+                    }
+                    _ => None,
+                };
+                if let Some((kind, function)) = function_type_and_kind {
                     if let Some(overloaded_function) = function.to_overloaded(context.db()) {
                         if let Some(spans) = overloaded_function
                             .overloads
@@ -1134,7 +1146,7 @@ impl<'db> CallableBinding<'db> {
                         }
 
                         diag.info(format_args!(
-                            "Possible overloads for function `{}`:",
+                            "Possible overloads for {kind} `{}`:",
                             function.name(context.db())
                         ));
 
@@ -1285,14 +1297,8 @@ impl<'db> Binding<'db> {
                     first_excess_argument_index,
                     num_synthetic_args,
                 ),
-                expected_positional_count: parameters
-                    .positional()
-                    .count()
-                    // using saturating_sub to avoid negative values due to invalid syntax in source code
-                    .saturating_sub(num_synthetic_args),
-                provided_positional_count: next_positional
-                    // using saturating_sub to avoid negative values due to invalid syntax in source code
-                    .saturating_sub(num_synthetic_args),
+                expected_positional_count: parameters.positional().count(),
+                provided_positional_count: next_positional,
             });
         }
         let mut missing = vec![];

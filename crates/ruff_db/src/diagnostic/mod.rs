@@ -7,7 +7,7 @@ use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange};
 
 pub use self::render::DisplayDiagnostic;
-use crate::{files::File, Db};
+use crate::{Db, files::File};
 
 mod render;
 mod stylesheet;

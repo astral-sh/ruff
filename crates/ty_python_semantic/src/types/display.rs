@@ -752,10 +752,10 @@ impl Display for DisplayStringLiteralType<'_> {
 mod tests {
     use ruff_python_ast::name::Name;
 
+    use crate::Db;
     use crate::db::tests::setup_db;
     use crate::symbol::typing_extensions_symbol;
     use crate::types::{KnownClass, Parameter, Parameters, Signature, StringLiteralType, Type};
-    use crate::Db;
 
     #[test]
     fn string_literal_display() {
