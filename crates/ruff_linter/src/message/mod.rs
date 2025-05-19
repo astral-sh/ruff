@@ -247,7 +247,7 @@ impl Message {
     }
 
     /// Returns the URL for the rule documentation, if it exists.
-    pub fn url(&self) -> Option<String> {
+    pub fn to_url(&self) -> Option<String> {
         // TODO(brent) Rule::url calls Rule::explanation, which calls ViolationMetadata::explain,
         // which when derived (seems always to be the case?) is always `Some`, so I think it's
         // pretty safe to inline the Rule::url implementation here, using `self.name()`:
