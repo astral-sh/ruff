@@ -385,6 +385,47 @@ pub(crate) fn nearest_enclosing_class<'db>(
         })
 }
 
+/// Returns in iterator of any generic context introduced by the given scope or any enclosing
+/// scope.
+pub(crate) fn enclosing_generic_contexts<'ast, 'db>(
+    db: &'db dyn Db,
+    module: &'ast ParsedModuleRef,
+    index: &SemanticIndex<'db>,
+    scope: FileScopeId,
+) -> impl Iterator<Item = GenericContext<'db>> {
+    index
+        .ancestor_scopes(scope)
+        .filter_map(|(_, ancestor_scope)| match ancestor_scope.node() {
+            NodeWithScopeKind::Class(class) => {
+                binding_type(db, index.expect_single_definition(class.node(module)))
+                    .into_class_literal()?
+                    .generic_context(db)
+            }
+            NodeWithScopeKind::Function(function) => {
+                binding_type(db, index.expect_single_definition(function.node(module)))
+                    .into_function_literal()?
+                    .signature(db)
+                    .iter()
+                    .last()
+                    .expect("function should have at least one overload")
+                    .generic_context
+            }
+            _ => None,
+        })
+}
+
+/// Returns the legacy typevars that have been bound in the given scope or any enclosing scope.
+pub(crate) fn bound_legacy_typevars<'ast, 'db>(
+    db: &'db dyn Db,
+    module: &'ast ParsedModuleRef,
+    index: &'db SemanticIndex<'db>,
+    scope: FileScopeId,
+) -> impl Iterator<Item = TypeVarInstance<'db>> {
+    enclosing_generic_contexts(db, module, index, scope)
+        .flat_map(|generic_context| generic_context.variables(db).iter().copied())
+        .filter(|typevar| typevar.is_legacy(db))
+}
+
 /// A region within which we can infer types.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum InferenceRegion<'db> {

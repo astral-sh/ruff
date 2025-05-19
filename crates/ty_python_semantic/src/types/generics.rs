@@ -1,11 +1,14 @@
 use std::borrow::Cow;
 
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
 use crate::semantic_index::SemanticIndex;
+use crate::semantic_index::scope::FileScopeId;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
+use crate::types::infer::bound_legacy_typevars;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -82,6 +85,9 @@ impl<'db> GenericContext<'db> {
     /// list.
     pub(crate) fn from_function_params(
         db: &'db dyn Db,
+        module: &ParsedModuleRef,
+        index: &'db SemanticIndex<'db>,
+        containing_scope: FileScopeId,
         parameters: &Parameters<'db>,
         return_type: Option<Type<'db>>,
     ) -> Option<Self> {
@@ -96,6 +102,9 @@ impl<'db> GenericContext<'db> {
         }
         if let Some(ty) = return_type {
             ty.find_legacy_typevars(db, &mut variables);
+        }
+        for typevar in bound_legacy_typevars(db, module, index, containing_scope) {
+            variables.remove(&typevar);
         }
         if variables.is_empty() {
             return None;
