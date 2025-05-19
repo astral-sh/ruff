@@ -41,6 +41,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
     registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
+    registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
@@ -586,6 +587,27 @@ declare_lint! {
     /// - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
     pub(crate) static INVALID_LEGACY_TYPE_VARIABLE = {
         summary: "detects invalid legacy type variables",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for the creation of invalid `TypeAliasType`s
+    ///
+    /// ## Why is this bad?
+    /// There are several requirements that you must follow when creating a `TypeAliasType`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeAliasType
+    ///
+    /// IntOrStr = TypeAliasType("IntOrStr", int | str)  # okay
+    /// NewAlias = TypeAliasType(get_name(), int)        # error: TypeAliasType name must be a string literal
+    /// ```
+    pub(crate) static INVALID_TYPE_ALIAS_TYPE = {
+        summary: "detects invalid TypeAliasType definitions",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }

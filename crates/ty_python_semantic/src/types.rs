@@ -7535,6 +7535,7 @@ impl<'db> PEP695TypeAliasType<'db> {
 pub struct BareTypeAliasType<'db> {
     #[returns(ref)]
     pub name: ast::name::Name,
+    pub definition: Option<Definition<'db>>,
     pub value: Type<'db>,
 }
 
@@ -7555,7 +7556,7 @@ impl<'db> TypeAliasType<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias.definition(db)),
-            TypeAliasType::Bare(_) => None,
+            TypeAliasType::Bare(type_alias) => type_alias.definition(db),
         }
     }
 

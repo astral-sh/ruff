@@ -124,3 +124,17 @@ IntAnd = TypeAliasType("IntAndT", tuple[int, T], type_params=(T,))
 def f(x: IntAnd[str]) -> None:
     reveal_type(x)  # revealed: @Todo(Generic PEP-695 type alias)
 ```
+
+### Error cases
+
+#### Name is not a string literal
+
+```py
+from typing_extensions import TypeAliasType
+
+def get_name() -> str:
+    return "IntOrStr"
+
+# error: [invalid-type-alias-type] "The name of a `typing.TypeAlias` must be a string literal"
+IntOrStr = TypeAliasType(get_name(), int | str)
+```

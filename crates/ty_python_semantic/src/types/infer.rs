@@ -71,26 +71,26 @@ use crate::types::diagnostic::{
     CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, INCONSISTENT_MRO,
     INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
     INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR, report_implicit_return_type,
-    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
-    report_invalid_assignment, report_invalid_attribute_assignment,
-    report_invalid_generator_function_return_type, report_invalid_return_type,
-    report_possibly_unbound_attribute,
+    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
+    report_implicit_return_type, report_invalid_arguments_to_annotated,
+    report_invalid_arguments_to_callable, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
+    report_invalid_return_type, report_possibly_unbound_attribute,
 };
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    CallDunderError, CallableSignature, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, FunctionDecorators, FunctionType, GenericAlias, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownFunction, KnownInstanceType, MemberLookupPolicy,
-    MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, Signature,
-    Signatures, StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness,
-    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder,
-    UnionType, binding_type, todo_type,
+    BareTypeAliasType, CallDunderError, CallableSignature, CallableType, ClassLiteral, ClassType,
+    DataclassParams, DynamicType, FunctionDecorators, FunctionType, GenericAlias,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
+    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
+    Parameters, Signature, Signatures, StringLiteralType, SubclassOfType, Symbol,
+    SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
+    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -5363,6 +5363,50 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                 TypeVarKind::Legacy,
                                             )),
                                         ));
+                                    }
+
+                                    KnownClass::TypeAliasType => {
+                                        let assigned_to = (self.index)
+                                            .try_expression(call_expression_node)
+                                            .and_then(|expr| expr.assigned_to(self.db()));
+
+                                        let containing_assignment =
+                                            assigned_to.as_ref().and_then(|assigned_to| {
+                                                match assigned_to.node().targets.as_slice() {
+                                                    [ast::Expr::Name(target)] => Some(
+                                                        self.index.expect_single_definition(target),
+                                                    ),
+                                                    _ => None,
+                                                }
+                                            });
+
+                                        let [Some(name), Some(value), ..] =
+                                            overload.parameter_types()
+                                        else {
+                                            continue;
+                                        };
+
+                                        if let Some(name) = name.into_string_literal() {
+                                            overload.set_return_type(Type::KnownInstance(
+                                                KnownInstanceType::TypeAliasType(
+                                                    TypeAliasType::Bare(BareTypeAliasType::new(
+                                                        self.db(),
+                                                        ast::name::Name::new(name.value(self.db())),
+                                                        containing_assignment,
+                                                        value,
+                                                    )),
+                                                ),
+                                            ));
+                                        } else {
+                                            if let Some(builder) = self.context.report_lint(
+                                                &INVALID_TYPE_ALIAS_TYPE,
+                                                call_expression,
+                                            ) {
+                                                builder.into_diagnostic(format_args!(
+                                                    "The name of a `typing.TypeAlias` must be a string literal",
+                                                ));
+                                            }
+                                        }
                                     }
 
                                     _ => (),
