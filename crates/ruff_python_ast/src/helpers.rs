@@ -12,7 +12,7 @@ use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
 use crate::{
-    self as ast, Arguments, CmpOp, DictItem, ExceptHandler, Expr, FStringElement, MatchCase,
+    self as ast, Arguments, CmpOp, DictItem, ExceptHandler, Expr, FTStringElement, MatchCase,
     Operator, Pattern, Stmt, TypeParam,
 };
 use crate::{AnyNodeRef, ExprContext};
@@ -138,10 +138,10 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         }
         Expr::FString(ast::ExprFString { value, .. }) => value
             .elements()
-            .any(|expr| any_over_f_string_element(expr, func)),
+            .any(|expr| any_over_ft_string_element(expr, func)),
         Expr::TString(ast::ExprTString { value, .. }) => value
             .elements()
-            .any(|expr| any_over_t_string_element(expr, func)),
+            .any(|expr| any_over_ft_string_element(expr, func)),
         Expr::Named(ast::ExprNamed {
             target,
             value,
@@ -318,13 +318,13 @@ pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool
     }
 }
 
-pub fn any_over_f_string_element(
-    element: &ast::FStringElement,
+pub fn any_over_ft_string_element(
+    element: &ast::FTStringElement,
     func: &dyn Fn(&Expr) -> bool,
 ) -> bool {
     match element {
-        ast::FStringElement::Literal(_) => false,
-        ast::FStringElement::Expression(ast::FStringExpressionElement {
+        ast::FTStringElement::Literal(_) => false,
+        ast::FTStringElement::Expression(ast::FTStringInterpolatedElement {
             expression,
             format_spec,
             ..
@@ -333,28 +333,7 @@ pub fn any_over_f_string_element(
                 || format_spec.as_ref().is_some_and(|spec| {
                     spec.elements
                         .iter()
-                        .any(|spec_element| any_over_f_string_element(spec_element, func))
-                })
-        }
-    }
-}
-
-pub fn any_over_t_string_element(
-    element: &ast::TStringElement,
-    func: &dyn Fn(&Expr) -> bool,
-) -> bool {
-    match element {
-        ast::TStringElement::Literal(_) => false,
-        ast::TStringElement::Interpolation(ast::TStringInterpolationElement {
-            interpolation,
-            format_spec,
-            ..
-        }) => {
-            any_over_expr(interpolation, func)
-                || format_spec.as_ref().is_some_and(|spec| {
-                    spec.elements
-                        .iter()
-                        .any(|spec_element| any_over_t_string_element(spec_element, func))
+                        .any(|spec_element| any_over_ft_string_element(spec_element, func))
                 })
         }
     }
@@ -1339,8 +1318,8 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
         ast::FStringPart::Literal(string_literal) => !string_literal.is_empty(),
         ast::FStringPart::FString(f_string) => {
             f_string.elements.iter().all(|element| match element {
-                FStringElement::Literal(string_literal) => !string_literal.is_empty(),
-                FStringElement::Expression(f_string) => inner(&f_string.expression),
+                FTStringElement::Literal(string_literal) => !string_literal.is_empty(),
+                FTStringElement::Expression(f_string) => inner(&f_string.expression),
             })
         }
     })
@@ -1399,14 +1378,14 @@ fn is_non_empty_t_string(expr: &ast::ExprTString) -> bool {
         ast::TStringPart::Literal(string_literal) => !string_literal.is_empty(),
         ast::TStringPart::TString(t_string) => {
             t_string.elements.iter().all(|element| match element {
-                ast::TStringElement::Literal(string_literal) => !string_literal.is_empty(),
-                ast::TStringElement::Interpolation(t_string) => inner(&t_string.interpolation),
+                ast::FTStringElement::Literal(string_literal) => !string_literal.is_empty(),
+                ast::FTStringElement::Expression(t_string) => inner(&t_string.expression),
             })
         }
         ast::TStringPart::FString(f_string) => {
             f_string.elements.iter().all(|element| match element {
-                FStringElement::Literal(string_literal) => !string_literal.is_empty(),
-                FStringElement::Expression(f_string) => inner(&f_string.expression),
+                FTStringElement::Literal(string_literal) => !string_literal.is_empty(),
+                FTStringElement::Expression(f_string) => inner(&f_string.expression),
             })
         }
     })
@@ -1423,10 +1402,10 @@ fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
                 value
                     .elements()
                     .all(|f_string_element| match f_string_element {
-                        FStringElement::Literal(ast::FTStringLiteralElement { value, .. }) => {
+                        FTStringElement::Literal(ast::FTStringLiteralElement { value, .. }) => {
                             value.is_empty()
                         }
-                        FStringElement::Expression(ast::FStringExpressionElement {
+                        FTStringElement::Expression(ast::FTStringInterpolatedElement {
                             expression,
                             ..
                         }) => inner(expression),
@@ -1440,8 +1419,8 @@ fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
         ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
         ast::FStringPart::FString(f_string) => {
             f_string.elements.iter().all(|element| match element {
-                FStringElement::Literal(string_literal) => string_literal.is_empty(),
-                FStringElement::Expression(f_string) => inner(&f_string.expression),
+                FTStringElement::Literal(string_literal) => string_literal.is_empty(),
+                FTStringElement::Expression(f_string) => inner(&f_string.expression),
             })
         }
     })

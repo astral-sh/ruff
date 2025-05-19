@@ -85,23 +85,23 @@ impl ast::ExprCompare {
     }
 }
 
-impl ast::FStringFormatSpec {
+impl ast::FTStringFormatSpec {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         for element in &self.elements {
-            visitor.visit_f_string_element(element);
+            visitor.visit_ft_string_element(element);
         }
     }
 }
 
-impl ast::FStringExpressionElement {
+impl ast::FTStringInterpolatedElement {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::FStringExpressionElement {
+        let ast::FTStringInterpolatedElement {
             expression,
             format_spec,
             ..
@@ -110,7 +110,7 @@ impl ast::FStringExpressionElement {
 
         if let Some(format_spec) = format_spec {
             for spec_part in &format_spec.elements {
-                visitor.visit_f_string_element(spec_part);
+                visitor.visit_ft_string_element(spec_part);
             }
         }
     }
@@ -140,37 +140,6 @@ impl ast::ExprFString {
                 ast::FStringPart::FString(f_string) => {
                     visitor.visit_f_string(f_string);
                 }
-            }
-        }
-    }
-}
-
-impl ast::TStringFormatSpec {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        for element in &self.elements {
-            visitor.visit_t_string_element(element);
-        }
-    }
-}
-
-impl ast::TStringInterpolationElement {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::TStringInterpolationElement {
-            interpolation,
-            format_spec,
-            ..
-        } = self;
-        visitor.visit_expr(interpolation);
-
-        if let Some(format_spec) = format_spec {
-            for spec_part in &format_spec.elements {
-                visitor.visit_t_string_element(spec_part);
             }
         }
     }
@@ -669,7 +638,7 @@ impl ast::FString {
         } = self;
 
         for fstring_element in elements {
-            visitor.visit_f_string_element(fstring_element);
+            visitor.visit_ft_string_element(fstring_element);
         }
     }
 }
@@ -686,7 +655,7 @@ impl ast::TString {
         } = self;
 
         for tstring_element in elements {
-            visitor.visit_t_string_element(tstring_element);
+            visitor.visit_ft_string_element(tstring_element);
         }
     }
 }

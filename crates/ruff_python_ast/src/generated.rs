@@ -2806,24 +2806,24 @@ impl ExceptHandler {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum FStringElement {
-    Expression(crate::FStringExpressionElement),
+pub enum FTStringElement {
+    Expression(crate::FTStringInterpolatedElement),
     Literal(crate::FTStringLiteralElement),
 }
 
-impl From<crate::FStringExpressionElement> for FStringElement {
-    fn from(node: crate::FStringExpressionElement) -> Self {
+impl From<crate::FTStringInterpolatedElement> for FTStringElement {
+    fn from(node: crate::FTStringInterpolatedElement) -> Self {
         Self::Expression(node)
     }
 }
 
-impl From<crate::FTStringLiteralElement> for FStringElement {
+impl From<crate::FTStringLiteralElement> for FTStringElement {
     fn from(node: crate::FTStringLiteralElement) -> Self {
         Self::Literal(node)
     }
 }
 
-impl ruff_text_size::Ranged for FStringElement {
+impl ruff_text_size::Ranged for FTStringElement {
     fn range(&self) -> ruff_text_size::TextRange {
         match self {
             Self::Expression(node) => node.range(),
@@ -2833,14 +2833,14 @@ impl ruff_text_size::Ranged for FStringElement {
 }
 
 #[allow(dead_code, clippy::match_wildcard_for_single_variants)]
-impl FStringElement {
+impl FTStringElement {
     #[inline]
     pub const fn is_expression(&self) -> bool {
         matches!(self, Self::Expression(_))
     }
 
     #[inline]
-    pub fn expression(self) -> Option<crate::FStringExpressionElement> {
+    pub fn expression(self) -> Option<crate::FTStringInterpolatedElement> {
         match self {
             Self::Expression(val) => Some(val),
             _ => None,
@@ -2848,7 +2848,7 @@ impl FStringElement {
     }
 
     #[inline]
-    pub fn expect_expression(self) -> crate::FStringExpressionElement {
+    pub fn expect_expression(self) -> crate::FTStringInterpolatedElement {
         match self {
             Self::Expression(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2856,7 +2856,7 @@ impl FStringElement {
     }
 
     #[inline]
-    pub fn as_expression_mut(&mut self) -> Option<&mut crate::FStringExpressionElement> {
+    pub fn as_expression_mut(&mut self) -> Option<&mut crate::FTStringInterpolatedElement> {
         match self {
             Self::Expression(val) => Some(val),
             _ => None,
@@ -2864,113 +2864,9 @@ impl FStringElement {
     }
 
     #[inline]
-    pub fn as_expression(&self) -> Option<&crate::FStringExpressionElement> {
+    pub fn as_expression(&self) -> Option<&crate::FTStringInterpolatedElement> {
         match self {
             Self::Expression(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_literal(&self) -> bool {
-        matches!(self, Self::Literal(_))
-    }
-
-    #[inline]
-    pub fn literal(self) -> Option<crate::FTStringLiteralElement> {
-        match self {
-            Self::Literal(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_literal(self) -> crate::FTStringLiteralElement {
-        match self {
-            Self::Literal(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_literal_mut(&mut self) -> Option<&mut crate::FTStringLiteralElement> {
-        match self {
-            Self::Literal(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_literal(&self) -> Option<&crate::FTStringLiteralElement> {
-        match self {
-            Self::Literal(val) => Some(val),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum TStringElement {
-    Interpolation(crate::TStringInterpolationElement),
-    Literal(crate::FTStringLiteralElement),
-}
-
-impl From<crate::TStringInterpolationElement> for TStringElement {
-    fn from(node: crate::TStringInterpolationElement) -> Self {
-        Self::Interpolation(node)
-    }
-}
-
-impl From<crate::FTStringLiteralElement> for TStringElement {
-    fn from(node: crate::FTStringLiteralElement) -> Self {
-        Self::Literal(node)
-    }
-}
-
-impl ruff_text_size::Ranged for TStringElement {
-    fn range(&self) -> ruff_text_size::TextRange {
-        match self {
-            Self::Interpolation(node) => node.range(),
-            Self::Literal(node) => node.range(),
-        }
-    }
-}
-
-#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
-impl TStringElement {
-    #[inline]
-    pub const fn is_interpolation(&self) -> bool {
-        matches!(self, Self::Interpolation(_))
-    }
-
-    #[inline]
-    pub fn interpolation(self) -> Option<crate::TStringInterpolationElement> {
-        match self {
-            Self::Interpolation(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_interpolation(self) -> crate::TStringInterpolationElement {
-        match self {
-            Self::Interpolation(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_interpolation_mut(&mut self) -> Option<&mut crate::TStringInterpolationElement> {
-        match self {
-            Self::Interpolation(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_interpolation(&self) -> Option<&crate::TStringInterpolationElement> {
-        match self {
-            Self::Interpolation(val) => Some(val),
             _ => None,
         }
     }
@@ -3904,13 +3800,7 @@ impl ruff_text_size::Ranged for crate::ExceptHandlerExceptHandler {
     }
 }
 
-impl ruff_text_size::Ranged for crate::FStringExpressionElement {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
-impl ruff_text_size::Ranged for crate::TStringInterpolationElement {
+impl ruff_text_size::Ranged for crate::FTStringInterpolatedElement {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
@@ -3988,13 +3878,7 @@ impl ruff_text_size::Ranged for crate::TypeParamParamSpec {
     }
 }
 
-impl ruff_text_size::Ranged for crate::FStringFormatSpec {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
-impl ruff_text_size::Ranged for crate::TStringFormatSpec {
+impl ruff_text_size::Ranged for crate::FTStringFormatSpec {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
@@ -4219,28 +4103,15 @@ impl ExceptHandler {
     }
 }
 
-impl FStringElement {
+impl FTStringElement {
     #[allow(unused)]
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
     {
         match self {
-            FStringElement::Expression(node) => node.visit_source_order(visitor),
-            FStringElement::Literal(node) => node.visit_source_order(visitor),
-        }
-    }
-}
-
-impl TStringElement {
-    #[allow(unused)]
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
-    {
-        match self {
-            TStringElement::Interpolation(node) => node.visit_source_order(visitor),
-            TStringElement::Literal(node) => node.visit_source_order(visitor),
+            FTStringElement::Expression(node) => node.visit_source_order(visitor),
+            FTStringElement::Literal(node) => node.visit_source_order(visitor),
         }
     }
 }
@@ -4962,72 +4833,36 @@ impl ruff_text_size::Ranged for ExceptHandlerRef<'_> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
-pub enum FStringElementRef<'a> {
-    Expression(&'a crate::FStringExpressionElement),
+pub enum FTStringElementRef<'a> {
+    Expression(&'a crate::FTStringInterpolatedElement),
     Literal(&'a crate::FTStringLiteralElement),
 }
 
-impl<'a> From<&'a FStringElement> for FStringElementRef<'a> {
-    fn from(node: &'a FStringElement) -> Self {
+impl<'a> From<&'a FTStringElement> for FTStringElementRef<'a> {
+    fn from(node: &'a FTStringElement) -> Self {
         match node {
-            FStringElement::Expression(node) => FStringElementRef::Expression(node),
-            FStringElement::Literal(node) => FStringElementRef::Literal(node),
+            FTStringElement::Expression(node) => FTStringElementRef::Expression(node),
+            FTStringElement::Literal(node) => FTStringElementRef::Literal(node),
         }
     }
 }
 
-impl<'a> From<&'a crate::FStringExpressionElement> for FStringElementRef<'a> {
-    fn from(node: &'a crate::FStringExpressionElement) -> Self {
+impl<'a> From<&'a crate::FTStringInterpolatedElement> for FTStringElementRef<'a> {
+    fn from(node: &'a crate::FTStringInterpolatedElement) -> Self {
         Self::Expression(node)
     }
 }
 
-impl<'a> From<&'a crate::FTStringLiteralElement> for FStringElementRef<'a> {
+impl<'a> From<&'a crate::FTStringLiteralElement> for FTStringElementRef<'a> {
     fn from(node: &'a crate::FTStringLiteralElement) -> Self {
         Self::Literal(node)
     }
 }
 
-impl ruff_text_size::Ranged for FStringElementRef<'_> {
+impl ruff_text_size::Ranged for FTStringElementRef<'_> {
     fn range(&self) -> ruff_text_size::TextRange {
         match self {
             Self::Expression(node) => node.range(),
-            Self::Literal(node) => node.range(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
-pub enum TStringElementRef<'a> {
-    Interpolation(&'a crate::TStringInterpolationElement),
-    Literal(&'a crate::FTStringLiteralElement),
-}
-
-impl<'a> From<&'a TStringElement> for TStringElementRef<'a> {
-    fn from(node: &'a TStringElement) -> Self {
-        match node {
-            TStringElement::Interpolation(node) => TStringElementRef::Interpolation(node),
-            TStringElement::Literal(node) => TStringElementRef::Literal(node),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::TStringInterpolationElement> for TStringElementRef<'a> {
-    fn from(node: &'a crate::TStringInterpolationElement) -> Self {
-        Self::Interpolation(node)
-    }
-}
-
-impl<'a> From<&'a crate::FTStringLiteralElement> for TStringElementRef<'a> {
-    fn from(node: &'a crate::FTStringLiteralElement) -> Self {
-        Self::Literal(node)
-    }
-}
-
-impl ruff_text_size::Ranged for TStringElementRef<'_> {
-    fn range(&self) -> ruff_text_size::TextRange {
-        match self {
-            Self::Interpolation(node) => node.range(),
             Self::Literal(node) => node.range(),
         }
     }
@@ -5233,8 +5068,7 @@ pub enum AnyNodeRef<'a> {
     ExprSlice(&'a crate::ExprSlice),
     ExprIpyEscapeCommand(&'a crate::ExprIpyEscapeCommand),
     ExceptHandlerExceptHandler(&'a crate::ExceptHandlerExceptHandler),
-    FStringExpressionElement(&'a crate::FStringExpressionElement),
-    TStringInterpolationElement(&'a crate::TStringInterpolationElement),
+    FTStringInterpolatedElement(&'a crate::FTStringInterpolatedElement),
     FTStringLiteralElement(&'a crate::FTStringLiteralElement),
     PatternMatchValue(&'a crate::PatternMatchValue),
     PatternMatchSingleton(&'a crate::PatternMatchSingleton),
@@ -5247,8 +5081,7 @@ pub enum AnyNodeRef<'a> {
     TypeParamTypeVar(&'a crate::TypeParamTypeVar),
     TypeParamTypeVarTuple(&'a crate::TypeParamTypeVarTuple),
     TypeParamParamSpec(&'a crate::TypeParamParamSpec),
-    FStringFormatSpec(&'a crate::FStringFormatSpec),
-    TStringFormatSpec(&'a crate::TStringFormatSpec),
+    FTStringFormatSpec(&'a crate::FTStringFormatSpec),
     PatternArguments(&'a crate::PatternArguments),
     PatternKeyword(&'a crate::PatternKeyword),
     Comprehension(&'a crate::Comprehension),
@@ -5545,58 +5378,29 @@ impl<'a> AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a FStringElement> for AnyNodeRef<'a> {
-    fn from(node: &'a FStringElement) -> AnyNodeRef<'a> {
+impl<'a> From<&'a FTStringElement> for AnyNodeRef<'a> {
+    fn from(node: &'a FTStringElement) -> AnyNodeRef<'a> {
         match node {
-            FStringElement::Expression(node) => AnyNodeRef::FStringExpressionElement(node),
-            FStringElement::Literal(node) => AnyNodeRef::FTStringLiteralElement(node),
+            FTStringElement::Expression(node) => AnyNodeRef::FTStringInterpolatedElement(node),
+            FTStringElement::Literal(node) => AnyNodeRef::FTStringLiteralElement(node),
         }
     }
 }
 
-impl<'a> From<FStringElementRef<'a>> for AnyNodeRef<'a> {
-    fn from(node: FStringElementRef<'a>) -> AnyNodeRef<'a> {
+impl<'a> From<FTStringElementRef<'a>> for AnyNodeRef<'a> {
+    fn from(node: FTStringElementRef<'a>) -> AnyNodeRef<'a> {
         match node {
-            FStringElementRef::Expression(node) => AnyNodeRef::FStringExpressionElement(node),
-            FStringElementRef::Literal(node) => AnyNodeRef::FTStringLiteralElement(node),
+            FTStringElementRef::Expression(node) => AnyNodeRef::FTStringInterpolatedElement(node),
+            FTStringElementRef::Literal(node) => AnyNodeRef::FTStringLiteralElement(node),
         }
     }
 }
 
 impl<'a> AnyNodeRef<'a> {
-    pub fn as_f_string_element_ref(self) -> Option<FStringElementRef<'a>> {
+    pub fn as_f_t_string_element_ref(self) -> Option<FTStringElementRef<'a>> {
         match self {
-            Self::FStringExpressionElement(node) => Some(FStringElementRef::Expression(node)),
-            Self::FTStringLiteralElement(node) => Some(FStringElementRef::Literal(node)),
-
-            _ => None,
-        }
-    }
-}
-
-impl<'a> From<&'a TStringElement> for AnyNodeRef<'a> {
-    fn from(node: &'a TStringElement) -> AnyNodeRef<'a> {
-        match node {
-            TStringElement::Interpolation(node) => AnyNodeRef::TStringInterpolationElement(node),
-            TStringElement::Literal(node) => AnyNodeRef::FTStringLiteralElement(node),
-        }
-    }
-}
-
-impl<'a> From<TStringElementRef<'a>> for AnyNodeRef<'a> {
-    fn from(node: TStringElementRef<'a>) -> AnyNodeRef<'a> {
-        match node {
-            TStringElementRef::Interpolation(node) => AnyNodeRef::TStringInterpolationElement(node),
-            TStringElementRef::Literal(node) => AnyNodeRef::FTStringLiteralElement(node),
-        }
-    }
-}
-
-impl<'a> AnyNodeRef<'a> {
-    pub fn as_t_string_element_ref(self) -> Option<TStringElementRef<'a>> {
-        match self {
-            Self::TStringInterpolationElement(node) => Some(TStringElementRef::Interpolation(node)),
-            Self::FTStringLiteralElement(node) => Some(TStringElementRef::Literal(node)),
+            Self::FTStringInterpolatedElement(node) => Some(FTStringElementRef::Expression(node)),
+            Self::FTStringLiteralElement(node) => Some(FTStringElementRef::Literal(node)),
 
             _ => None,
         }
@@ -6048,15 +5852,9 @@ impl<'a> From<&'a crate::ExceptHandlerExceptHandler> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a crate::FStringExpressionElement> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::FStringExpressionElement) -> AnyNodeRef<'a> {
-        AnyNodeRef::FStringExpressionElement(node)
-    }
-}
-
-impl<'a> From<&'a crate::TStringInterpolationElement> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::TStringInterpolationElement) -> AnyNodeRef<'a> {
-        AnyNodeRef::TStringInterpolationElement(node)
+impl<'a> From<&'a crate::FTStringInterpolatedElement> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::FTStringInterpolatedElement) -> AnyNodeRef<'a> {
+        AnyNodeRef::FTStringInterpolatedElement(node)
     }
 }
 
@@ -6132,15 +5930,9 @@ impl<'a> From<&'a crate::TypeParamParamSpec> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a crate::FStringFormatSpec> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::FStringFormatSpec) -> AnyNodeRef<'a> {
-        AnyNodeRef::FStringFormatSpec(node)
-    }
-}
-
-impl<'a> From<&'a crate::TStringFormatSpec> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::TStringFormatSpec) -> AnyNodeRef<'a> {
-        AnyNodeRef::TStringFormatSpec(node)
+impl<'a> From<&'a crate::FTStringFormatSpec> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::FTStringFormatSpec) -> AnyNodeRef<'a> {
+        AnyNodeRef::FTStringFormatSpec(node)
     }
 }
 
@@ -6322,8 +6114,7 @@ impl ruff_text_size::Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ExprSlice(node) => node.range(),
             AnyNodeRef::ExprIpyEscapeCommand(node) => node.range(),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => node.range(),
-            AnyNodeRef::FStringExpressionElement(node) => node.range(),
-            AnyNodeRef::TStringInterpolationElement(node) => node.range(),
+            AnyNodeRef::FTStringInterpolatedElement(node) => node.range(),
             AnyNodeRef::FTStringLiteralElement(node) => node.range(),
             AnyNodeRef::PatternMatchValue(node) => node.range(),
             AnyNodeRef::PatternMatchSingleton(node) => node.range(),
@@ -6336,8 +6127,7 @@ impl ruff_text_size::Ranged for AnyNodeRef<'_> {
             AnyNodeRef::TypeParamTypeVar(node) => node.range(),
             AnyNodeRef::TypeParamTypeVarTuple(node) => node.range(),
             AnyNodeRef::TypeParamParamSpec(node) => node.range(),
-            AnyNodeRef::FStringFormatSpec(node) => node.range(),
-            AnyNodeRef::TStringFormatSpec(node) => node.range(),
+            AnyNodeRef::FTStringFormatSpec(node) => node.range(),
             AnyNodeRef::PatternArguments(node) => node.range(),
             AnyNodeRef::PatternKeyword(node) => node.range(),
             AnyNodeRef::Comprehension(node) => node.range(),
@@ -6425,8 +6215,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprSlice(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::ExprIpyEscapeCommand(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => std::ptr::NonNull::from(*node).cast(),
-            AnyNodeRef::FStringExpressionElement(node) => std::ptr::NonNull::from(*node).cast(),
-            AnyNodeRef::TStringInterpolationElement(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::FTStringInterpolatedElement(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::FTStringLiteralElement(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchValue(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchSingleton(node) => std::ptr::NonNull::from(*node).cast(),
@@ -6439,8 +6228,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::TypeParamTypeVar(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::TypeParamTypeVarTuple(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::TypeParamParamSpec(node) => std::ptr::NonNull::from(*node).cast(),
-            AnyNodeRef::FStringFormatSpec(node) => std::ptr::NonNull::from(*node).cast(),
-            AnyNodeRef::TStringFormatSpec(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::FTStringFormatSpec(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::PatternArguments(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::PatternKeyword(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::Comprehension(node) => std::ptr::NonNull::from(*node).cast(),
@@ -6532,8 +6320,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::ExprSlice(node) => node.visit_source_order(visitor),
             AnyNodeRef::ExprIpyEscapeCommand(node) => node.visit_source_order(visitor),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => node.visit_source_order(visitor),
-            AnyNodeRef::FStringExpressionElement(node) => node.visit_source_order(visitor),
-            AnyNodeRef::TStringInterpolationElement(node) => node.visit_source_order(visitor),
+            AnyNodeRef::FTStringInterpolatedElement(node) => node.visit_source_order(visitor),
             AnyNodeRef::FTStringLiteralElement(node) => node.visit_source_order(visitor),
             AnyNodeRef::PatternMatchValue(node) => node.visit_source_order(visitor),
             AnyNodeRef::PatternMatchSingleton(node) => node.visit_source_order(visitor),
@@ -6546,8 +6333,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::TypeParamTypeVar(node) => node.visit_source_order(visitor),
             AnyNodeRef::TypeParamTypeVarTuple(node) => node.visit_source_order(visitor),
             AnyNodeRef::TypeParamParamSpec(node) => node.visit_source_order(visitor),
-            AnyNodeRef::FStringFormatSpec(node) => node.visit_source_order(visitor),
-            AnyNodeRef::TStringFormatSpec(node) => node.visit_source_order(visitor),
+            AnyNodeRef::FTStringFormatSpec(node) => node.visit_source_order(visitor),
             AnyNodeRef::PatternArguments(node) => node.visit_source_order(visitor),
             AnyNodeRef::PatternKeyword(node) => node.visit_source_order(visitor),
             AnyNodeRef::Comprehension(node) => node.visit_source_order(visitor),
@@ -6661,19 +6447,10 @@ impl AnyNodeRef<'_> {
 }
 
 impl AnyNodeRef<'_> {
-    pub const fn is_f_string_element(self) -> bool {
+    pub const fn is_f_t_string_element(self) -> bool {
         matches!(
             self,
-            AnyNodeRef::FStringExpressionElement(_) | AnyNodeRef::FTStringLiteralElement(_)
-        )
-    }
-}
-
-impl AnyNodeRef<'_> {
-    pub const fn is_t_string_element(self) -> bool {
-        matches!(
-            self,
-            AnyNodeRef::TStringInterpolationElement(_) | AnyNodeRef::FTStringLiteralElement(_)
+            AnyNodeRef::FTStringInterpolatedElement(_) | AnyNodeRef::FTStringLiteralElement(_)
         )
     }
 }
@@ -6768,8 +6545,7 @@ pub enum NodeKind {
     ExprSlice,
     ExprIpyEscapeCommand,
     ExceptHandlerExceptHandler,
-    FStringExpressionElement,
-    TStringInterpolationElement,
+    FTStringInterpolatedElement,
     FTStringLiteralElement,
     PatternMatchValue,
     PatternMatchSingleton,
@@ -6782,8 +6558,7 @@ pub enum NodeKind {
     TypeParamTypeVar,
     TypeParamTypeVarTuple,
     TypeParamParamSpec,
-    FStringFormatSpec,
-    TStringFormatSpec,
+    FTStringFormatSpec,
     PatternArguments,
     PatternKeyword,
     Comprehension,
@@ -6869,9 +6644,8 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprSlice(_) => NodeKind::ExprSlice,
             AnyNodeRef::ExprIpyEscapeCommand(_) => NodeKind::ExprIpyEscapeCommand,
             AnyNodeRef::ExceptHandlerExceptHandler(_) => NodeKind::ExceptHandlerExceptHandler,
-            AnyNodeRef::FStringExpressionElement(_) => NodeKind::FStringExpressionElement,
+            AnyNodeRef::FTStringInterpolatedElement(_) => NodeKind::FTStringInterpolatedElement,
             AnyNodeRef::FTStringLiteralElement(_) => NodeKind::FTStringLiteralElement,
-            AnyNodeRef::TStringInterpolationElement(_) => NodeKind::TStringInterpolationElement,
             AnyNodeRef::PatternMatchValue(_) => NodeKind::PatternMatchValue,
             AnyNodeRef::PatternMatchSingleton(_) => NodeKind::PatternMatchSingleton,
             AnyNodeRef::PatternMatchSequence(_) => NodeKind::PatternMatchSequence,
@@ -6883,8 +6657,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::TypeParamTypeVar(_) => NodeKind::TypeParamTypeVar,
             AnyNodeRef::TypeParamTypeVarTuple(_) => NodeKind::TypeParamTypeVarTuple,
             AnyNodeRef::TypeParamParamSpec(_) => NodeKind::TypeParamParamSpec,
-            AnyNodeRef::FStringFormatSpec(_) => NodeKind::FStringFormatSpec,
-            AnyNodeRef::TStringFormatSpec(_) => NodeKind::TStringFormatSpec,
+            AnyNodeRef::FTStringFormatSpec(_) => NodeKind::FTStringFormatSpec,
             AnyNodeRef::PatternArguments(_) => NodeKind::PatternArguments,
             AnyNodeRef::PatternKeyword(_) => NodeKind::PatternKeyword,
             AnyNodeRef::Comprehension(_) => NodeKind::Comprehension,
