@@ -43,7 +43,16 @@ except* (KeyboardInterrupt, AttributeError) as e:
     reveal_type(e)  # revealed: BaseExceptionGroup[KeyboardInterrupt | AttributeError]
 ```
 
-## Invalid `except*` handlers
+## `except*` with no captured exception type
+
+```py
+try:
+    help()
+except* TypeError:
+    pass
+```
+
+## Invalid `except*` handlers with or without a captured exception type
 
 ```py
 try:

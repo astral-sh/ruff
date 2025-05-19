@@ -62,6 +62,15 @@ def foo(
         reveal_type(i)  # revealed: BaseException
 ```
 
+## Exception with no captured type
+
+```py
+try:
+    {}.get("foo")
+except TypeError:
+    pass
+```
+
 ## Invalid exception handlers
 
 ```py
@@ -99,12 +108,6 @@ try:
     {}.get("foo")
 # error: [invalid-exception-caught]
 except int:
-    pass
-
-try:
-    {}.get("foo")
-# error: [invalid-exception-caught]
-except int as err:
     pass
 ```
 
