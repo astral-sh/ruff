@@ -411,7 +411,7 @@ cargo install hyperfine
 To benchmark the release build:
 
 ```shell
-cargo build --release && hyperfine --warmup 10 \
+cargo build --release --bin ruff && hyperfine --warmup 10 \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache -e" \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ -e"
 
