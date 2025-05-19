@@ -1542,6 +1542,14 @@ impl<'db> Type<'db> {
                 true
             }
 
+            (Type::ClassLiteral(class), Type::SubclassOf(_))
+                if class
+                    .iter_mro(db, None)
+                    .any(|x| ClassBase::Dynamic(DynamicType::Unknown) == x) =>
+            {
+                true
+            }
+
             // Every `type[...]` is assignable to `type`
             (Type::SubclassOf(_), _)
                 if KnownClass::Type

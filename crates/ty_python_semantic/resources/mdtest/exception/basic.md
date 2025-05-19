@@ -96,6 +96,17 @@ def foo(
         reveal_type(g)  # revealed: Unknown
 ```
 
+```py
+from compat import BASE_EXCEPTION_CLASS  # error: [unresolved-import] "Cannot resolve imported module `compat`"
+
+class Error(BASE_EXCEPTION_CLASS): ...
+
+try:
+    ...
+except Error as err:
+    ...
+```
+
 ## Object raised is not an exception
 
 ```py
