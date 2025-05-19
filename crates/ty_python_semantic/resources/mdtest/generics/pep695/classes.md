@@ -296,8 +296,7 @@ class C[T]:
     def __init__(self, x: str | bytes | int) -> None: ...
 
 reveal_type(C("string"))  # revealed: C[str]
-# TODO: revealed: C[bytes]
-reveal_type(C(b"bytes"))  # revealed: C[bytes | int]
+reveal_type(C(b"bytes"))  # revealed: C[bytes]
 reveal_type(C(12))  # revealed: C[Unknown]
 
 C[str]("string")
