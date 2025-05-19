@@ -210,7 +210,7 @@ impl Workspace {
             .map(|msg| {
                 let message = msg.body().to_string();
                 let range = msg.range();
-                match msg.noqa_code() {
+                match msg.to_noqa_code() {
                     Some(code) => ExpandedMessage {
                         code: Some(code.to_string()),
                         message,

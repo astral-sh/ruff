@@ -242,7 +242,7 @@ impl Message {
     }
 
     /// Returns the [`NoqaCode`] corresponding to the diagnostic message.
-    pub fn noqa_code(&self) -> Option<NoqaCode> {
+    pub fn to_noqa_code(&self) -> Option<NoqaCode> {
         self.rule().map(|rule| rule.noqa_code())
     }
 
