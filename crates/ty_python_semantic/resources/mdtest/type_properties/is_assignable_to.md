@@ -674,8 +674,13 @@ c1: Callable[[int], None] = partial(f, y="a")
 
 ### Classes with `__call__` defined as attribute
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```py
-from typing import Callable, Any
+from typing import Callable, Any, Self
 from ty_extensions import static_assert, is_assignable_to
 
 class A:
@@ -688,17 +693,15 @@ class A:
 class B:
     def method1(self, b: int) -> int:
         return b
-
     __call__ = method1
 
 class C:
     def method1(self, c: int) -> int:
         return c
-
-    __call__: Callable[["C", int], int] = method1
+    __call__: Callable[[Self, int], int] = method1
 
 class D:
-    __call__: Callable[["D", int], int] = lambda self, d: d
+    __call__: Callable[[Self, int], int] = lambda self, d: d
 
 static_assert(is_assignable_to(A, Callable[[int], int]))
 
