@@ -1,5 +1,4 @@
 use std::cmp::Reverse;
-use std::fmt::Display;
 use std::hash::Hash;
 use std::io::Write;
 
@@ -37,34 +36,10 @@ bitflags! {
 
 #[derive(Serialize)]
 struct ExpandedStatistics {
-    code: Option<SerializeRuleAsCode>,
+    code: Option<NoqaCode>,
     name: &'static str,
     count: usize,
     fixable: bool,
-}
-
-#[derive(Copy, Clone)]
-struct SerializeRuleAsCode(NoqaCode);
-
-impl Serialize for SerializeRuleAsCode {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.0.to_string())
-    }
-}
-
-impl Display for SerializeRuleAsCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<NoqaCode> for SerializeRuleAsCode {
-    fn from(rule: NoqaCode) -> Self {
-        Self(rule)
-    }
 }
 
 pub(crate) struct Printer {
@@ -344,7 +319,7 @@ impl Printer {
             )
             .iter()
             .map(|&((code, message), count)| ExpandedStatistics {
-                code: code.map(std::convert::Into::into),
+                code,
                 name: message.name(),
                 count,
                 fixable: if let Some(fix) = message.fix() {
