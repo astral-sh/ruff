@@ -13,12 +13,12 @@
 use std::{collections::HashMap, slice::Iter};
 
 use itertools::EitherOrBoth;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 
-use super::{definition_expression_type, DynamicType, Type};
+use super::{DynamicType, Type, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::GenericContext;
-use crate::types::{todo_type, ClassLiteral, TypeMapping, TypeVarInstance};
+use crate::types::{ClassLiteral, TypeMapping, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
@@ -1491,7 +1491,7 @@ pub(crate) enum ParameterForm {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::tests::{setup_db, TestDb};
+    use crate::db::tests::{TestDb, setup_db};
     use crate::symbol::global_symbol;
     use crate::types::{FunctionSignature, FunctionType, KnownClass};
     use ruff_db::system::DbWithWritableSystem as _;
@@ -1592,11 +1592,13 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        let [Parameter {
-            annotated_type,
-            kind: ParameterKind::PositionalOrKeyword { name, .. },
-            ..
-        }] = &sig.parameters.value[..]
+        let [
+            Parameter {
+                annotated_type,
+                kind: ParameterKind::PositionalOrKeyword { name, .. },
+                ..
+            },
+        ] = &sig.parameters.value[..]
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -1626,11 +1628,13 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        let [Parameter {
-            annotated_type,
-            kind: ParameterKind::PositionalOrKeyword { name, .. },
-            ..
-        }] = &sig.parameters.value[..]
+        let [
+            Parameter {
+                annotated_type,
+                kind: ParameterKind::PositionalOrKeyword { name, .. },
+                ..
+            },
+        ] = &sig.parameters.value[..]
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -1660,15 +1664,18 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        let [Parameter {
-            annotated_type: a_annotated_ty,
-            kind: ParameterKind::PositionalOrKeyword { name: a_name, .. },
-            ..
-        }, Parameter {
-            annotated_type: b_annotated_ty,
-            kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
-            ..
-        }] = &sig.parameters.value[..]
+        let [
+            Parameter {
+                annotated_type: a_annotated_ty,
+                kind: ParameterKind::PositionalOrKeyword { name: a_name, .. },
+                ..
+            },
+            Parameter {
+                annotated_type: b_annotated_ty,
+                kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
+                ..
+            },
+        ] = &sig.parameters.value[..]
         else {
             panic!("expected two positional-or-keyword parameters");
         };
@@ -1703,15 +1710,18 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        let [Parameter {
-            annotated_type: a_annotated_ty,
-            kind: ParameterKind::PositionalOrKeyword { name: a_name, .. },
-            ..
-        }, Parameter {
-            annotated_type: b_annotated_ty,
-            kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
-            ..
-        }] = &sig.parameters.value[..]
+        let [
+            Parameter {
+                annotated_type: a_annotated_ty,
+                kind: ParameterKind::PositionalOrKeyword { name: a_name, .. },
+                ..
+            },
+            Parameter {
+                annotated_type: b_annotated_ty,
+                kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
+                ..
+            },
+        ] = &sig.parameters.value[..]
         else {
             panic!("expected two positional-or-keyword parameters");
         };

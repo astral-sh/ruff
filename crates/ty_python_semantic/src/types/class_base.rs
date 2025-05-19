@@ -1,9 +1,9 @@
+use crate::Db;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::{
-    todo_type, ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, Type,
-    TypeMapping,
+    ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, Type,
+    TypeMapping, todo_type,
 };
-use crate::Db;
 
 /// Enumeration of the possible kinds of types we allow in class bases.
 ///

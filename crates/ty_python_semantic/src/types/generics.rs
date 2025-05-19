@@ -9,8 +9,8 @@ use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    declaration_type, todo_type, KnownInstanceType, Type, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarVariance, UnionType,
+    KnownInstanceType, Type, TypeMapping, TypeVarBoundOrConstraints, TypeVarInstance,
+    TypeVarVariance, UnionType, declaration_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
