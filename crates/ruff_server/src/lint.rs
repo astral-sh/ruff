@@ -166,7 +166,7 @@ pub(crate) fn check(
         messages
             .into_iter()
             .zip(noqa_edits)
-            .filter_map(|(message, noqa_edit)| match message.rule() {
+            .filter_map(|(message, noqa_edit)| match message.to_rule() {
                 Some(rule) => Some(to_lsp_diagnostic(
                     rule,
                     &message,

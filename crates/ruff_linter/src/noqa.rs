@@ -845,7 +845,7 @@ fn find_noqa_comments<'a>(
 
     // Mark any non-ignored diagnostics.
     for message in messages {
-        let Some(rule) = message.rule() else {
+        let Some(rule) = message.to_rule() else {
             comments_by_line.push(None);
             continue;
         };

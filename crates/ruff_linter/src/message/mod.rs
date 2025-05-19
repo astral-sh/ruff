@@ -233,7 +233,7 @@ impl Message {
     }
 
     /// Returns the [`Rule`] corresponding to the diagnostic message.
-    pub fn rule(&self) -> Option<Rule> {
+    pub fn to_rule(&self) -> Option<Rule> {
         if self.is_syntax_error() {
             None
         } else {
@@ -243,7 +243,7 @@ impl Message {
 
     /// Returns the [`NoqaCode`] corresponding to the diagnostic message.
     pub fn to_noqa_code(&self) -> Option<NoqaCode> {
-        self.rule().map(|rule| rule.noqa_code())
+        self.to_rule().map(|rule| rule.noqa_code())
     }
 
     /// Returns the URL for the rule documentation, if it exists.
@@ -255,7 +255,7 @@ impl Message {
         // format!("{}/rules/{}", env!("CARGO_PKG_HOMEPAGE"), self.name())
         //
         // at least in the case of diagnostics, I guess syntax errors will return None
-        self.rule().and_then(|rule| rule.url())
+        self.to_rule().and_then(|rule| rule.url())
     }
 
     /// Returns the filename for the message.

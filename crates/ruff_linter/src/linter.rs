@@ -682,7 +682,7 @@ fn collect_rule_codes(rules: impl IntoIterator<Item = Rule>) -> String {
 
 #[expect(clippy::print_stderr)]
 fn report_failed_to_converge_error(path: &Path, transformed: &str, messages: &[Message]) {
-    let codes = collect_rule_codes(messages.iter().filter_map(Message::rule));
+    let codes = collect_rule_codes(messages.iter().filter_map(Message::to_rule));
     if cfg!(debug_assertions) {
         eprintln!(
             "{}{} Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",

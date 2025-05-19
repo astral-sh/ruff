@@ -439,7 +439,7 @@ impl LintCacheData {
 
         let messages = messages
             .iter()
-            .filter_map(|msg| msg.rule().map(|rule| (rule, msg)))
+            .filter_map(|msg| msg.to_rule().map(|rule| (rule, msg)))
             .map(|(rule, msg)| {
                 // Make sure that all message use the same source file.
                 assert_eq!(

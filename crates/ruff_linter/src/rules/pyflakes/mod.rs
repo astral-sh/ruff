@@ -776,7 +776,7 @@ mod tests {
         messages.sort_by_key(Ranged::start);
         let actual = messages
             .iter()
-            .filter_map(Message::rule)
+            .filter_map(Message::to_rule)
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
     }
