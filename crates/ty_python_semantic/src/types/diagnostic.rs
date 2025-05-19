@@ -1647,6 +1647,18 @@ pub(super) fn report_possibly_unbound_attribute(
     ));
 }
 
+pub(super) fn add_inferred_python_version_hint(db: &dyn Db, mut diagnostic: LintDiagnosticGuard) {
+    diagnostic.info(format_args!(
+        "The inferred target version of your project is Python {}",
+        Program::get(db).python_version(db)
+    ));
+
+    diagnostic.info(
+            "If using a pyproject.toml file, \
+            consider adjusting the `project.requires-python` or `tool.ty.environment.python-version` field"
+        );
+}
+
 pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
     let Some(builder) = context.report_lint(&UNRESOLVED_REFERENCE, expr_name_node) else {
         return;
@@ -1661,15 +1673,7 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
 
         // TODO: can we tell the user *why* we're inferring this target version?
         // CLI flag? pyproject.toml? Python environment?
-        diagnostic.info(format_args!(
-            "The inferred target version of your project is Python {}",
-            Program::get(context.db()).python_version(context.db())
-        ));
-
-        diagnostic.info(
-            "If using a pyproject.toml file, \
-            consider adjusting the `project.requires-python` or `tool.ty.environment.python-version` field"
-        );
+        add_inferred_python_version_hint(context.db(), diagnostic);
     }
 }
 

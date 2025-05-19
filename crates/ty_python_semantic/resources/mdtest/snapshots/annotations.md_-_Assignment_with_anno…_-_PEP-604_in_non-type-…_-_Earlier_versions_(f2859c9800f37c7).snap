@@ -27,6 +27,8 @@ error[unsupported-operator]: Operator `|` is unsupported between objects of type
   |            ^^^^^^^^^
   |
 info: Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later
+info: The inferred target version of your project is Python 3.9
+info: If using a pyproject.toml file, consider adjusting the `project.requires-python` or `tool.ty.environment.python-version` field
 info: rule `unsupported-operator` is enabled by default
 
 ```
