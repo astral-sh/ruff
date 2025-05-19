@@ -1170,6 +1170,11 @@ impl<'db> Type<'db> {
                 target.is_equivalent_to(db, Type::object(db))
             }
 
+            // These clauses handle type variants that include function literals. A function
+            // literal is the subtype of itself, and not of any other function literal. However,
+            // our representation of a function literal includes any specialization that should be
+            // applied to the signature. Different specializations of the same function literal are
+            // only subtypes of each other if they result in the same signature.
             (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
                 self_function.is_subtype_of(db, target_function)
             }
@@ -1514,6 +1519,11 @@ impl<'db> Type<'db> {
                 true
             }
 
+            // These clauses handle type variants that include function literals. A function
+            // literal is assignable to itself, and not to any other function literal. However, our
+            // representation of a function literal includes any specialization that should be
+            // applied to the signature. Different specializations of the same function literal are
+            // only assignable to each other if they result in the same signature.
             (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
                 self_function.is_assignable_to(db, target_function)
             }
@@ -6942,9 +6952,7 @@ impl<'db> FunctionType<'db> {
         // A function literal is the subtype of itself, and not of any other function literal.
         // However, our representation of a function literal includes any specialization that
         // should be applied to the signature. Different specializations of the same function
-        // literal are only subtypes of each other if they result in the same signature. (Note that
-        // the equality check above will have already handled the case where `self` and `target`
-        // are the same function literal with the same specialization.)
+        // literal are only subtypes of each other if they result in the same signature.
         self.body_scope(db) == other.body_scope(db)
             && self
                 .into_callable_type(db)
@@ -6955,9 +6963,7 @@ impl<'db> FunctionType<'db> {
         // A function literal is assignable to itself, and not to any other function literal.
         // However, our representation of a function literal includes any specialization that
         // should be applied to the signature. Different specializations of the same function
-        // literal are only assignable to each other if they result in the same signature. (Note
-        // that the equality check above will have already handled the case where `self` and
-        // `target` are the same function literal with the same specialization.)
+        // literal are only assignable to each other if they result in the same signature.
         self.body_scope(db) == other.body_scope(db)
             && self
                 .into_callable_type(db)
