@@ -2,6 +2,7 @@ Tanjun  # hangs
 antidote  # hangs / slow
 artigraph  # cycle panics (value_type_)
 arviz # slow? (depends on pandas)
+bokeh # slow? (depends on pandas)
 core  # cycle panics (value_type_)
 cpython  # access to field whilst being initialized, too many cycle iterations
 discord.py  # some kind of hang, only when multi-threaded?
