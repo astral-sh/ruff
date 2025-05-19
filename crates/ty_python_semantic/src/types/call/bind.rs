@@ -22,7 +22,7 @@ use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators, FunctionType,
     KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType,
-    TupleType, UnionType, WrapperDescriptorKind, todo_type,
+    TupleType, TypeMapping, UnionType, WrapperDescriptorKind, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -1406,9 +1406,14 @@ impl<'db> Binding<'db> {
                 }
             }
             self.specialization = signature.generic_context.map(|gc| builder.build(gc));
-            self.inherited_specialization = signature
-                .inherited_generic_context
-                .map(|gc| builder.build(gc));
+            self.inherited_specialization = signature.inherited_generic_context.map(|gc| {
+                // The inherited generic context is used when inferring the specialization of a
+                // generic class from a constructor call. In this case (only), we promote any
+                // typevars that are inferred as a literal to the corresponding instance type.
+                builder
+                    .build(gc)
+                    .apply_type_mapping(db, &TypeMapping::PromoteLiterals)
+            });
         }
 
         num_synthetic_args = 0;

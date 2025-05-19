@@ -1,7 +1,8 @@
 use crate::Db;
-use crate::types::generics::{GenericContext, Specialization, TypeMapping};
+use crate::types::generics::{GenericContext, Specialization};
 use crate::types::{
-    ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, Type, todo_type,
+    ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, Type,
+    TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -254,7 +255,7 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.apply_type_mapping(db, type_mapping)),
             Self::Dynamic(_) | Self::Generic(_) | Self::Protocol(_) => self,
@@ -267,7 +268,7 @@ impl<'db> ClassBase<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         if let Some(specialization) = specialization {
-            self.apply_type_mapping(db, specialization.type_mapping())
+            self.apply_type_mapping(db, &TypeMapping::Specialization(specialization))
         } else {
             self
         }
