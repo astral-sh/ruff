@@ -4,19 +4,15 @@ use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
 };
-use ruff_python_ast::{
-    AnyStringFlags, FStringElement, StringFlags, StringLike, StringLikePart, TStringElement,
-};
+use ruff_python_ast::{AnyStringFlags, FTStringElement, StringFlags, StringLike, StringLikePart};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 use std::borrow::Cow;
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
-use crate::other::f_string::{FStringContext, FStringLayout};
-use crate::other::f_string_element::FormatFStringExpressionElement;
-use crate::other::t_string::{TStringContext, TStringLayout};
-use crate::other::t_string_element::FormatTStringInterpolationElement;
+use crate::other::f_t_string::{FTStringContext, FTStringLayout};
+use crate::other::f_t_string_element::FormatFTStringInterpolatedElement;
 use crate::prelude::*;
 use crate::string::docstring::needs_chaperone_space;
 use crate::string::normalize::{
@@ -335,7 +331,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                 StringLikePart::FString(f_string) => {
                     for element in &f_string.elements {
                         match element {
-                            FStringElement::Literal(literal) => {
+                            FTStringElement::Literal(literal) => {
                                 FormatLiteralContent {
                                     range: literal.range(),
                                     flags: self.flags,
@@ -347,13 +343,14 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                             }
                             // Formatting the expression here and in the expanded version is safe **only**
                             // because we assert that the f-string never contains any comments.
-                            FStringElement::Expression(expression) => {
-                                let context = FStringContext::new(
+                            FTStringElement::Expression(expression) => {
+                                let context = FTStringContext::new(
                                     self.flags,
-                                    FStringLayout::from_f_string(f_string, f.context().source()),
+                                    FTStringLayout::from_f_string(f_string, f.context().source()),
                                 );
 
-                                FormatFStringExpressionElement::new(expression, context).fmt(f)?;
+                                FormatFTStringInterpolatedElement::new(expression, context)
+                                    .fmt(f)?;
                             }
                         }
                     }
@@ -361,7 +358,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                 StringLikePart::TString(f_string) => {
                     for element in &f_string.elements {
                         match element {
-                            TStringElement::Literal(literal) => {
+                            FTStringElement::Literal(literal) => {
                                 FormatLiteralContent {
                                     range: literal.range(),
                                     flags: self.flags,
@@ -373,13 +370,13 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                             }
                             // Formatting the expression here and in the expanded version is safe **only**
                             // because we assert that the t-string never contains any comments.
-                            TStringElement::Interpolation(expression) => {
-                                let context = TStringContext::new(
+                            FTStringElement::Expression(expression) => {
+                                let context = FTStringContext::new(
                                     self.flags,
-                                    TStringLayout::from_t_string(f_string, f.context().source()),
+                                    FTStringLayout::from_t_string(f_string, f.context().source()),
                                 );
 
-                                FormatTStringInterpolationElement::new(expression, context)
+                                FormatFTStringInterpolatedElement::new(expression, context)
                                     .fmt(f)?;
                             }
                         }

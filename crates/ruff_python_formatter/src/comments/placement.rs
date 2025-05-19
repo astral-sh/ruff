@@ -320,7 +320,7 @@ fn handle_enclosed_comment<'a>(
             _ => CommentPlacement::Default(comment),
         },
         AnyNodeRef::FString(fstring) => CommentPlacement::dangling(fstring, comment),
-        AnyNodeRef::FStringExpressionElement(_) => {
+        AnyNodeRef::FTStringInterpolatedElement(_) => {
             // Handle comments after the format specifier (should be rare):
             //
             // ```python
@@ -334,30 +334,7 @@ fn handle_enclosed_comment<'a>(
             if matches!(
                 comment.preceding_node(),
                 Some(
-                    AnyNodeRef::FStringExpressionElement(_) | AnyNodeRef::FTStringLiteralElement(_)
-                )
-            ) {
-                CommentPlacement::trailing(comment.enclosing_node(), comment)
-            } else {
-                handle_bracketed_end_of_line_comment(comment, source)
-            }
-        }
-        AnyNodeRef::TString(tstring) => CommentPlacement::dangling(tstring, comment),
-        AnyNodeRef::TStringInterpolationElement(_) => {
-            // Handle comments after the format specifier (should be rare):
-            //
-            // ```python
-            // t"literal {
-            //     expr:.3f
-            //     # comment
-            // }"
-            // ```
-            //
-            // This is a valid comment placement.
-            if matches!(
-                comment.preceding_node(),
-                Some(
-                    AnyNodeRef::TStringInterpolationElement(_)
+                    AnyNodeRef::FTStringInterpolatedElement(_)
                         | AnyNodeRef::FTStringLiteralElement(_)
                 )
             ) {
@@ -366,6 +343,8 @@ fn handle_enclosed_comment<'a>(
                 handle_bracketed_end_of_line_comment(comment, source)
             }
         }
+        AnyNodeRef::TString(tstring) => CommentPlacement::dangling(tstring, comment),
+
         AnyNodeRef::ExprList(_)
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprListComp(_)

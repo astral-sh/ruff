@@ -17,8 +17,7 @@ use crate::expression::{
     can_omit_optional_parentheses, has_own_parentheses, has_parentheses,
     maybe_parenthesize_expression,
 };
-use crate::other::f_string::FStringLayout;
-use crate::other::t_string::TStringLayout;
+use crate::other::f_t_string::FTStringLayout;
 use crate::statement::trailing_semicolon;
 use crate::string::StringLikeExtensions;
 use crate::string::implicit::{
@@ -1328,7 +1327,7 @@ fn format_f_string_assignment<'a>(
     // If the f-string is flat, there are no breakpoints from which it can be made multiline.
     // This is the case when the f-string has no expressions or if it does then the expressions
     // are flat (no newlines).
-    if FStringLayout::from_f_string(f_string, context.source()).is_flat() {
+    if FTStringLayout::from_f_string(f_string, context.source()).is_flat() {
         return None;
     }
 
@@ -1408,7 +1407,7 @@ fn format_t_string_assignment<'a>(
     // If the t-string is flat, there are no breakpoints from which it can be made multiline.
     // This is the case when the t-string has no expressions or if it does then the expressions
     // are flat (no newlines).
-    if TStringLayout::from_t_string(t_string, context.source()).is_flat() {
+    if FTStringLayout::from_t_string(t_string, context.source()).is_flat() {
         return None;
     }
 

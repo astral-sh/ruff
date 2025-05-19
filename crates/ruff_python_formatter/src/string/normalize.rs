@@ -5,9 +5,8 @@ use std::iter::FusedIterator;
 use ruff_formatter::FormatContext;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{
-    AnyStringFlags, BytesLiteral, FString, FStringElement, FStringElements, FStringFlags,
-    StringFlags, StringLikePart, StringLiteral, TString, TStringElement, TStringElements,
-    TStringFlags,
+    AnyStringFlags, BytesLiteral, FString, FStringFlags, FTStringElement, FTStringElements,
+    StringFlags, StringLikePart, StringLiteral, TString, TStringFlags,
 };
 use ruff_text_size::{Ranged, TextRange, TextSlice};
 
@@ -49,11 +48,8 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
 
         // For f-strings and t-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
         if let Some(parent_flags) = match self.context.ft_string_state() {
-            FTStringState::InsideExpressionElement(parent_context) => {
-                Some(parent_context.f_string().flags())
-            }
-            FTStringState::InsideInterpolationElement(parent_context) => {
-                Some(parent_context.t_string().flags())
+            FTStringState::InsideInterpolatedElement(parent_context) => {
+                Some(parent_context.ft_string().flags())
             }
             FTStringState::Outside => None,
         } {
@@ -402,7 +398,7 @@ impl QuoteMetadata {
     /// ```
     fn merge_fstring_elements(
         self,
-        elements: &FStringElements,
+        elements: &FTStringElements,
         flags: FStringFlags,
         context: &PyFormatContext,
         preferred_quote: Quote,
@@ -411,7 +407,7 @@ impl QuoteMetadata {
 
         for element in elements {
             match element {
-                FStringElement::Literal(literal) => {
+                FTStringElement::Literal(literal) => {
                     merged = merged
                         .merge(&QuoteMetadata::from_str(
                             context.source().slice(literal),
@@ -420,7 +416,7 @@ impl QuoteMetadata {
                         ))
                         .expect("Merge to succeed because all parts have the same flags");
                 }
-                FStringElement::Expression(expression) => {
+                FTStringElement::Expression(expression) => {
                     if let Some(spec) = expression.format_spec.as_deref() {
                         if expression.debug_text.is_none() {
                             merged = merged.merge_fstring_elements(
@@ -447,7 +443,7 @@ impl QuoteMetadata {
     /// ```
     fn merge_tstring_elements(
         self,
-        elements: &TStringElements,
+        elements: &FTStringElements,
         flags: TStringFlags,
         context: &PyFormatContext,
         preferred_quote: Quote,
@@ -456,7 +452,7 @@ impl QuoteMetadata {
 
         for element in elements {
             match element {
-                TStringElement::Literal(literal) => {
+                FTStringElement::Literal(literal) => {
                     merged = merged
                         .merge(&QuoteMetadata::from_str(
                             context.source().slice(literal),
@@ -465,7 +461,7 @@ impl QuoteMetadata {
                         ))
                         .expect("Merge to succeed because all parts have the same flags");
                 }
-                TStringElement::Interpolation(interpolation) => {
+                FTStringElement::Expression(interpolation) => {
                     if let Some(spec) = interpolation.format_spec.as_deref() {
                         if interpolation.debug_text.is_none() {
                             merged = merged.merge_tstring_elements(
@@ -971,18 +967,18 @@ pub(super) fn is_fstring_with_quoted_format_spec_and_debug(
     context: &PyFormatContext,
 ) -> bool {
     fn has_format_spec_with_opposite_quote(
-        elements: &FStringElements,
+        elements: &FTStringElements,
         flags: FStringFlags,
         context: &PyFormatContext,
         in_debug: bool,
     ) -> bool {
         elements.iter().any(|element| match element {
-            FStringElement::Literal(literal) => {
+            FTStringElement::Literal(literal) => {
                 let content = context.source().slice(literal);
 
                 in_debug && contains_opposite_quote(content, flags.into())
             }
-            FStringElement::Expression(expression) => {
+            FTStringElement::Expression(expression) => {
                 expression.format_spec.as_deref().is_some_and(|spec| {
                     has_format_spec_with_opposite_quote(
                         &spec.elements,
@@ -1111,18 +1107,18 @@ pub(super) fn is_tstring_with_quoted_format_spec_and_debug(
     context: &PyFormatContext,
 ) -> bool {
     fn has_format_spec_with_opposite_quote(
-        elements: &TStringElements,
+        elements: &FTStringElements,
         flags: TStringFlags,
         context: &PyFormatContext,
         in_debug: bool,
     ) -> bool {
         elements.iter().any(|element| match element {
-            TStringElement::Literal(literal) => {
+            FTStringElement::Literal(literal) => {
                 let content = context.source().slice(literal);
 
                 in_debug && contains_opposite_quote(content, flags.into())
             }
-            TStringElement::Interpolation(expression) => {
+            FTStringElement::Expression(expression) => {
                 expression.format_spec.as_deref().is_some_and(|spec| {
                     has_format_spec_with_opposite_quote(
                         &spec.elements,
@@ -1135,7 +1131,7 @@ pub(super) fn is_tstring_with_quoted_format_spec_and_debug(
         })
     }
 
-    tstring.elements.interpolations().any(|expression| {
+    tstring.elements.expressions().any(|expression| {
         if let Some(spec) = expression.format_spec.as_deref() {
             return has_format_spec_with_opposite_quote(
                 &spec.elements,

@@ -38,12 +38,9 @@ for node_line in node_lines:
     # `FStringLiteralElement`, `FStringFormatSpec` and `FStringExpressionElement` are
     # handled by the `FString` implementation.
     if node in (
-        "FStringLiteralElement",
-        "FStringExpressionElement",
-        "FStringFormatSpec",
-        "TStringLiteralElement",
-        "TStringInterpolationElement",
-        "TStringFormatSpec",
+        "FTStringLiteralElement",
+        "FTStringInterpolatedElement",
+        "FTStringFormatSpec",
         "Identifier",
     ):
         continue

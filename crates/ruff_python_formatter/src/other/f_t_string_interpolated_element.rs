@@ -1,15 +1,15 @@
 use crate::prelude::*;
 use crate::verbatim_text;
 use ruff_formatter::write;
-use ruff_python_ast::TStringInterpolationElement;
+use ruff_python_ast::FTStringInterpolatedElement;
 
 #[derive(Default)]
-pub struct FormatTStringInterpolationElement;
+pub struct FormatFTStringInterpolatedElement;
 
-impl FormatNodeRule<TStringInterpolationElement> for FormatTStringInterpolationElement {
+impl FormatNodeRule<FTStringInterpolatedElement> for FormatFTStringInterpolatedElement {
     fn fmt_fields(
         &self,
-        item: &TStringInterpolationElement,
+        item: &FTStringInterpolatedElement,
         f: &mut PyFormatter,
     ) -> FormatResult<()> {
         write!(f, [verbatim_text(item)])

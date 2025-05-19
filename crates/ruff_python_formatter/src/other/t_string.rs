@@ -1,17 +1,14 @@
-use ruff_formatter::write;
-use ruff_python_ast::{AnyStringFlags, StringFlags, TString};
-use ruff_source_file::LineRanges;
-use ruff_text_size::Ranged;
-
+use super::f_t_string_element::FormatFTStringElement;
+use crate::other::f_t_string::{FTStringContext, FTStringLayout};
 use crate::prelude::*;
 use crate::string::{StringNormalizer, StringQuotes};
+use ruff_formatter::write;
+use ruff_python_ast::{StringFlags, TString};
 
-use super::t_string_element::FormatTStringElement;
-
-/// Formats a t-string which is part of a larger t-string expression.
+/// Formats an f-string which is part of a larger f-string expression.
 ///
-/// For example, this would be used to format the t-string part in `"foo" t"bar {x}"`
-/// or the standalone t-string in `t"foo {x} bar"`.
+/// For example, this would be used to format the f-string part in `"foo" f"bar {x}"`
+/// or the standalone f-string in `f"foo {x} bar"`.
 #[derive(Default)]
 pub struct FormatTString;
 
@@ -21,9 +18,9 @@ impl FormatNodeRule<TString> for FormatTString {
 
         let string_kind = normalizer.choose_quotes(item.into()).flags();
 
-        let context = TStringContext::new(
+        let context = FTStringContext::new(
             string_kind,
-            TStringLayout::from_t_string(item, f.context().source()),
+            FTStringLayout::from_t_string(item, f.context().source()),
         );
 
         // Starting prefix and quote
@@ -31,73 +28,10 @@ impl FormatNodeRule<TString> for FormatTString {
         write!(f, [string_kind.prefix(), quotes])?;
 
         for element in &item.elements {
-            FormatTStringElement::new(element, context).fmt(f)?;
+            FormatFTStringElement::new(element, context).fmt(f)?;
         }
 
         // Ending quote
         quotes.fmt(f)
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct TStringContext {
-    /// The string flags of the enclosing t-string part.
-    enclosing_flags: AnyStringFlags,
-    layout: TStringLayout,
-}
-
-impl TStringContext {
-    pub(crate) const fn new(flags: AnyStringFlags, layout: TStringLayout) -> Self {
-        Self {
-            enclosing_flags: flags,
-            layout,
-        }
-    }
-
-    pub(crate) fn flags(self) -> AnyStringFlags {
-        self.enclosing_flags
-    }
-
-    pub(crate) const fn layout(self) -> TStringLayout {
-        self.layout
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-pub(crate) enum TStringLayout {
-    /// Original t-string is flat.
-    /// Don't break expressions to keep the string flat.
-    Flat,
-    /// Original t-string has multiline expressions in the replacement fields.
-    /// Allow breaking expressions across multiple lines.
-    Multiline,
-}
-
-impl TStringLayout {
-    pub(crate) fn from_t_string(t_string: &TString, source: &str) -> Self {
-        // Heuristic: Allow breaking the t-string expressions across multiple lines
-        // only if there already is at least one multiline expression. This puts the
-        // control in the hands of the user to decide if they want to break the
-        // t-string expressions across multiple lines or not. This is similar to
-        // how Prettier does it for template literals in JavaScript.
-        //
-        // Reference: https://prettier.io/docs/en/next/rationale.html#template-literals
-        if t_string
-            .elements
-            .interpolations()
-            .any(|expr| source.contains_line_break(expr.range()))
-        {
-            Self::Multiline
-        } else {
-            Self::Flat
-        }
-    }
-
-    pub(crate) const fn is_flat(self) -> bool {
-        matches!(self, TStringLayout::Flat)
-    }
-
-    pub(crate) const fn is_multiline(self) -> bool {
-        matches!(self, TStringLayout::Multiline)
     }
 }

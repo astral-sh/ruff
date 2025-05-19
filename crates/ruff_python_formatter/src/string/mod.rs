@@ -92,16 +92,16 @@ impl StringLikeExtensions for ast::StringLike<'_> {
             }
             StringLikePart::FString(f_string) => {
                 fn contains_line_break_or_comments(
-                    elements: &ast::FStringElements,
+                    elements: &ast::FTStringElements,
                     context: &PyFormatContext,
                     triple_quotes: TripleQuotes,
                 ) -> bool {
                     elements.iter().any(|element| match element {
-                        ast::FStringElement::Literal(literal) => {
+                        ast::FTStringElement::Literal(literal) => {
                             triple_quotes.is_yes()
                                 && context.source().contains_line_break(literal.range())
                         }
-                        ast::FStringElement::Expression(expression) => {
+                        ast::FTStringElement::Expression(expression) => {
                             // Expressions containing comments can't be joined.
                             //
                             // Format specifiers needs to be checked as well. For example, the
@@ -138,16 +138,16 @@ impl StringLikeExtensions for ast::StringLike<'_> {
             }
             StringLikePart::TString(t_string) => {
                 fn contains_line_break_or_comments(
-                    elements: &ast::TStringElements,
+                    elements: &ast::FTStringElements,
                     context: &PyFormatContext,
                     triple_quotes: TripleQuotes,
                 ) -> bool {
                     elements.iter().any(|element| match element {
-                        ast::TStringElement::Literal(literal) => {
+                        ast::FTStringElement::Literal(literal) => {
                             triple_quotes.is_yes()
                                 && context.source().contains_line_break(literal.range())
                         }
-                        ast::TStringElement::Interpolation(interpolation) => {
+                        ast::FTStringElement::Expression(interpolation) => {
                             // Interpolations containing comments can't be joined.
                             //
                             // Format specifiers needs to be checked as well. For example, the

@@ -7,8 +7,7 @@ use ruff_python_parser::Tokens;
 
 use crate::PyFormatOptions;
 use crate::comments::Comments;
-use crate::other::f_string_element::FStringExpressionElementContext;
-use crate::other::t_string_element::TStringInterpolationElementContext;
+use crate::other::f_t_string_element::FTStringInterpolatedElementContext;
 
 pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
@@ -141,12 +140,7 @@ pub(crate) enum FTStringState {
     /// curly brace in `f"foo {x}"`.
     ///
     /// The containing `FStringContext` is the surrounding f-string context.
-    InsideExpressionElement(FStringExpressionElementContext),
-    /// The formatter is inside an t-string interpolation element i.e., between the
-    /// curly brace in `t"foo {x}"`.
-    ///
-    /// The containing `TStringContext` is the surrounding f-string context.
-    InsideInterpolationElement(TStringInterpolationElementContext),
+    InsideInterpolatedElement(FTStringInterpolatedElementContext),
     /// The formatter is outside an f-string.
     #[default]
     Outside,
@@ -155,13 +149,10 @@ pub(crate) enum FTStringState {
 impl FTStringState {
     pub(crate) fn can_contain_line_breaks(self) -> Option<bool> {
         match self {
-            FTStringState::InsideExpressionElement(context) => {
+            FTStringState::InsideInterpolatedElement(context) => {
                 Some(context.can_contain_line_breaks())
             }
             FTStringState::Outside => None,
-            FTStringState::InsideInterpolationElement(context) => {
-                Some(context.can_contain_line_breaks())
-            }
         }
     }
 }

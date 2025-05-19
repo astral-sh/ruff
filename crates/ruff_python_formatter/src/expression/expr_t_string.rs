@@ -3,7 +3,7 @@ use ruff_python_ast::{AnyNodeRef, ExprTString, StringLike};
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, in_parentheses_only_group,
 };
-use crate::other::t_string::TStringLayout;
+use crate::other::f_t_string::FTStringLayout;
 use crate::prelude::*;
 use crate::string::StringLikeExtensions;
 use crate::string::implicit::{
@@ -41,7 +41,7 @@ impl NeedsParentheses for ExprTString {
         if let Some(tstring_part) = self.as_single_part_tstring() {
             // The t-string is not implicitly concatenated
             if StringLike::TString(self).is_multiline(context)
-                || TStringLayout::from_t_string(tstring_part, context.source()).is_multiline()
+                || FTStringLayout::from_t_string(tstring_part, context.source()).is_multiline()
             {
                 OptionalParentheses::Never
             } else {

@@ -6,7 +6,7 @@ use {
 
 use ruff_python_ast::visitor::transformer::Transformer;
 use ruff_python_ast::{
-    self as ast, BytesLiteralFlags, Expr, FStringElement, FStringFlags, FStringPart,
+    self as ast, BytesLiteralFlags, Expr, FStringFlags, FStringPart, FTStringElement,
     FTStringLiteralElement, Stmt, StringFlags,
 };
 use ruff_python_ast::{StringLiteralFlags, visitor::transformer};
@@ -117,7 +117,7 @@ impl Transformer for Normalizer {
                     if can_join {
                         #[derive(Default)]
                         struct Collector {
-                            elements: Vec<FStringElement>,
+                            elements: Vec<FTStringElement>,
                         }
 
                         impl Collector {
@@ -127,7 +127,7 @@ impl Transformer for Normalizer {
                             // `elements` vector, while subsequent strings
                             // are concatenated onto this top string.
                             fn push_literal(&mut self, literal: &str, range: TextRange) {
-                                if let Some(FStringElement::Literal(existing_literal)) =
+                                if let Some(FTStringElement::Literal(existing_literal)) =
                                     self.elements.last_mut()
                                 {
                                     let value = std::mem::take(&mut existing_literal.value);
@@ -137,7 +137,7 @@ impl Transformer for Normalizer {
                                     existing_literal.range =
                                         TextRange::new(existing_literal.start(), range.end());
                                 } else {
-                                    self.elements.push(FStringElement::Literal(
+                                    self.elements.push(FTStringElement::Literal(
                                         FTStringLiteralElement {
                                             range,
                                             value: literal.into(),
@@ -148,9 +148,9 @@ impl Transformer for Normalizer {
 
                             fn push_expression(
                                 &mut self,
-                                expression: ast::FStringExpressionElement,
+                                expression: ast::FTStringInterpolatedElement,
                             ) {
-                                self.elements.push(FStringElement::Expression(expression));
+                                self.elements.push(FTStringElement::Expression(expression));
                             }
                         }
 
@@ -165,11 +165,11 @@ impl Transformer for Normalizer {
                                 ast::FStringPart::FString(fstring) => {
                                     for element in &fstring.elements {
                                         match element {
-                                            ast::FStringElement::Literal(literal) => {
+                                            ast::FTStringElement::Literal(literal) => {
                                                 collector
                                                     .push_literal(&literal.value, literal.range);
                                             }
-                                            ast::FStringElement::Expression(expression) => {
+                                            ast::FTStringElement::Expression(expression) => {
                                                 collector.push_expression(expression.clone());
                                             }
                                         }

@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use ruff_formatter::{Buffer, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{
-    AnyStringFlags, ConversionFlag, Expr, FStringElement, FStringExpressionElement,
+    AnyStringFlags, ConversionFlag, Expr, FTStringElement, FTStringInterpolatedElement,
     FTStringLiteralElement, StringFlags,
 };
 use ruff_text_size::{Ranged, TextSlice};
@@ -14,30 +14,30 @@ use crate::prelude::*;
 use crate::string::normalize_string;
 use crate::verbatim::verbatim_text;
 
-use super::f_string::FStringContext;
+use super::f_t_string::FTStringContext;
 
 /// Formats an f-string element which is either a literal or a formatted expression.
 ///
 /// This delegates the actual formatting to the appropriate formatter.
-pub(crate) struct FormatFStringElement<'a> {
-    element: &'a FStringElement,
-    context: FStringContext,
+pub(crate) struct FormatFTStringElement<'a> {
+    element: &'a FTStringElement,
+    context: FTStringContext,
 }
 
-impl<'a> FormatFStringElement<'a> {
-    pub(crate) fn new(element: &'a FStringElement, context: FStringContext) -> Self {
+impl<'a> FormatFTStringElement<'a> {
+    pub(crate) fn new(element: &'a FTStringElement, context: FTStringContext) -> Self {
         Self { element, context }
     }
 }
 
-impl Format<PyFormatContext<'_>> for FormatFStringElement<'_> {
+impl Format<PyFormatContext<'_>> for FormatFTStringElement<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         match self.element {
-            FStringElement::Literal(string_literal) => {
+            FTStringElement::Literal(string_literal) => {
                 FormatFStringLiteralElement::new(string_literal, self.context.flags()).fmt(f)
             }
-            FStringElement::Expression(expression) => {
-                FormatFStringExpressionElement::new(expression, self.context).fmt(f)
+            FTStringElement::Expression(expression) => {
+                FormatFTStringInterpolatedElement::new(expression, self.context).fmt(f)
             }
         }
     }
@@ -72,16 +72,16 @@ impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
 
 /// Context representing an f-string expression element.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct FStringExpressionElementContext {
+pub(crate) struct FTStringInterpolatedElementContext {
     /// The context of the parent f-string containing this expression element.
-    parent_context: FStringContext,
+    parent_context: FTStringContext,
     /// Indicates whether this expression element has format specifier or not.
     has_format_spec: bool,
 }
 
-impl FStringExpressionElementContext {
-    /// Returns the [`FStringContext`] containing this expression element.
-    pub(crate) fn f_string(self) -> FStringContext {
+impl FTStringInterpolatedElementContext {
+    /// Returns the [`FTStringContext`] containing this expression element.
+    pub(crate) fn ft_string(self) -> FTStringContext {
         self.parent_context
     }
 
@@ -113,16 +113,16 @@ impl FStringExpressionElementContext {
 }
 
 /// Formats an f-string expression element.
-pub(crate) struct FormatFStringExpressionElement<'a> {
-    element: &'a FStringExpressionElement,
-    context: FStringExpressionElementContext,
+pub(crate) struct FormatFTStringInterpolatedElement<'a> {
+    element: &'a FTStringInterpolatedElement,
+    context: FTStringInterpolatedElementContext,
 }
 
-impl<'a> FormatFStringExpressionElement<'a> {
-    pub(crate) fn new(element: &'a FStringExpressionElement, context: FStringContext) -> Self {
+impl<'a> FormatFTStringInterpolatedElement<'a> {
+    pub(crate) fn new(element: &'a FTStringInterpolatedElement, context: FTStringContext) -> Self {
         Self {
             element,
-            context: FStringExpressionElementContext {
+            context: FTStringInterpolatedElementContext {
                 parent_context: context,
                 has_format_spec: element.format_spec.is_some(),
             },
@@ -130,9 +130,9 @@ impl<'a> FormatFStringExpressionElement<'a> {
     }
 }
 
-impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
+impl Format<PyFormatContext<'_>> for FormatFTStringInterpolatedElement<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let FStringExpressionElement {
+        let FTStringInterpolatedElement {
             expression,
             debug_text,
             conversion,
@@ -215,7 +215,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
             let item = format_with(|f: &mut PyFormatter| {
                 // Update the context to be inside the f-string expression element.
                 let f = &mut WithFTStringState::new(
-                    FTStringState::InsideExpressionElement(self.context),
+                    FTStringState::InsideInterpolatedElement(self.context),
                     f,
                 );
 
@@ -233,7 +233,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                     token(":").fmt(f)?;
 
                     for element in &format_spec.elements {
-                        FormatFStringElement::new(element, self.context.f_string()).fmt(f)?;
+                        FormatFTStringElement::new(element, self.context.ft_string()).fmt(f)?;
                     }
 
                     // These trailing comments can only occur if the format specifier is
