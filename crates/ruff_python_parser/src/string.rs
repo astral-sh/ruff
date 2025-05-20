@@ -49,7 +49,7 @@ pub(crate) enum FTStringKind {
 
 impl FTStringKind {
     #[inline]
-    const fn start_token(self) -> TokenKind {
+    pub(crate) const fn start_token(self) -> TokenKind {
         match self {
             FTStringKind::FString => TokenKind::FStringStart,
             FTStringKind::TString => TokenKind::TStringStart,
@@ -57,7 +57,7 @@ impl FTStringKind {
     }
 
     #[inline]
-    const fn middle_token(self) -> TokenKind {
+    pub(crate) const fn middle_token(self) -> TokenKind {
         match self {
             FTStringKind::FString => TokenKind::FStringMiddle,
             FTStringKind::TString => TokenKind::TStringMiddle,
@@ -65,7 +65,7 @@ impl FTStringKind {
     }
 
     #[inline]
-    const fn end_token(self) -> TokenKind {
+    pub(crate) const fn end_token(self) -> TokenKind {
         match self {
             FTStringKind::FString => TokenKind::FStringEnd,
             FTStringKind::TString => TokenKind::TStringEnd,

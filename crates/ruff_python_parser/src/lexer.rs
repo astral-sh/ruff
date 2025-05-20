@@ -22,7 +22,6 @@ use crate::error::{FTStringErrorType, LexicalError, LexicalErrorType};
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
 use crate::lexer::ftstring::{FTStringContext, FTStrings, FTStringsCheckpoint};
 use crate::lexer::indentation::{Indentation, Indentations, IndentationsCheckpoint};
-use crate::string::FTStringKind;
 use crate::token::{TokenFlags, TokenKind, TokenValue};
 
 mod cursor;
@@ -770,10 +769,7 @@ impl<'src> Lexer<'src> {
 
         self.ftstrings.push(ftcontext);
 
-        match kind {
-            FTStringKind::FString => TokenKind::FStringStart,
-            FTStringKind::TString => TokenKind::TStringStart,
-        }
+        kind.start_token()
     }
 
     /// Lex a f-string middle or end token.
@@ -787,17 +783,11 @@ impl<'src> Lexer<'src> {
             let quote_char = ftstring.quote_char();
             if self.cursor.eat_char3(quote_char, quote_char, quote_char) {
                 self.current_flags = ftstring.flags();
-                return Some(match string_kind {
-                    FTStringKind::FString => TokenKind::FStringEnd,
-                    FTStringKind::TString => TokenKind::TStringEnd,
-                });
+                return Some(string_kind.end_token());
             }
         } else if self.cursor.eat_char(ftstring.quote_char()) {
             self.current_flags = ftstring.flags();
-            return Some(match string_kind {
-                FTStringKind::FString => TokenKind::FStringEnd,
-                FTStringKind::TString => TokenKind::TStringEnd,
-            });
+            return Some(string_kind.end_token());
         }
 
         // We have to decode `{{` and `}}` into `{` and `}` respectively. As an
@@ -921,10 +911,7 @@ impl<'src> Lexer<'src> {
         self.current_value = TokenValue::FTStringMiddle(value.into_boxed_str());
 
         self.current_flags = ftstring.flags();
-        match string_kind {
-            FTStringKind::FString => Some(TokenKind::FStringMiddle),
-            FTStringKind::TString => Some(TokenKind::TStringMiddle),
-        }
+        Some(string_kind.middle_token())
     }
 
     /// Lex a string literal.
