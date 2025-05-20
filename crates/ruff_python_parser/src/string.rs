@@ -515,17 +515,24 @@ pub(crate) fn parse_ftstring_literal_element(
 }
 
 pub(crate) trait InterpolatedString {
-    fn kind() -> ast::FTStringKind;
+    fn kind() -> FTStringKind;
     fn new(elements: ast::FTStringElements, range: TextRange, flags: ast::AnyStringFlags) -> Self;
-    fn token_start() -> TokenKind;
-    fn token_middle() -> TokenKind;
-    fn token_end() -> TokenKind;
+    fn start_token() -> TokenKind {
+        Self::kind().start_token()
+    }
+    fn middle_token() -> TokenKind {
+        Self::kind().middle_token()
+    }
+    fn end_token() -> TokenKind {
+        Self::kind().end_token()
+    }
 }
 
 impl InterpolatedString for ast::FString {
-    fn kind() -> ast::FTStringKind {
-        ast::FTStringKind::FString
+    fn kind() -> FTStringKind {
+        FTStringKind::FString
     }
+
     fn new(elements: ast::FTStringElements, range: TextRange, flags: ast::AnyStringFlags) -> Self {
         ast::FString {
             elements,
@@ -546,18 +553,6 @@ impl InterpolatedString for ast::TString {
             range,
             flags: flags.into(),
         }
-    }
-
-    fn token_start() -> TokenKind {
-        TokenKind::TStringStart
-    }
-
-    fn token_middle() -> TokenKind {
-        TokenKind::TStringMiddle
-    }
-
-    fn token_end() -> TokenKind {
-        TokenKind::TStringEnd
     }
 }
 

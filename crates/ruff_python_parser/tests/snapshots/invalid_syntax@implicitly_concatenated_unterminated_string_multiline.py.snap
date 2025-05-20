@@ -198,7 +198,7 @@ Module(
 2 |     'hello'
 3 |     f'world {x}
 4 | )
-  | ^ Syntax Error: Expected an f or t-string element or the end of the f or t-string
+  | ^ Syntax Error: Expected an f-string or t-string element or the end of the f-string or t-string
 5 | 1 + 1
 6 | (
   |

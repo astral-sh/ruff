@@ -1271,10 +1271,10 @@ impl RecoveryContextKind {
             },
             RecoveryContextKind::FTStringElements(kind) => match kind {
                 FTStringElementsKind::Regular => ParseErrorType::OtherError(
-                    "Expected an f or t-string element or the end of the f or t-string".to_string(),
+                    "Expected an f-string or t-string element or the end of the f-string or t-string".to_string(),
                 ),
                 FTStringElementsKind::FormatSpec => ParseErrorType::OtherError(
-                    "Expected an f or t-string element or a '}'".to_string(),
+                    "Expected an f-string or t-string element or a '}'".to_string(),
                 ),
             },
         }

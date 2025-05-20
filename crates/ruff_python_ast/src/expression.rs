@@ -80,7 +80,7 @@ impl LiteralExpressionRef<'_> {
 }
 
 /// An enum that holds a reference to a string-like expression from the AST. This includes string
-/// literals, bytes literals, and f-strings.
+/// literals, bytes literals, f-strings, and t-strings.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum StringLike<'a> {
     String(&'a ast::ExprStringLiteral),

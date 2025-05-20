@@ -1429,24 +1429,25 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Parses an f-string.
+    /// Parses an f/t-string.
     ///
     /// This does not handle implicitly concatenated strings.
     ///
     /// # Panics
     ///
-    /// If the parser isn't positioned at a `FStringStart` token.
+    /// If the parser isn't positioned at an `FStringStart` or
+    /// `TStringStart` token.
     ///
-    /// See: <https://docs.python.org/3/reference/grammar.html> (Search "fstring:")
+    /// See: <https://docs.python.org/3/reference/grammar.html> (Search "fstring:" or "tstring:")
     /// See: <https://docs.python.org/3/reference/lexical_analysis.html#formatted-string-literals>
     fn parse_ftstring<T: InterpolatedString>(&mut self) -> T {
         let start = self.node_start();
         let flags = self.tokens.current_flags().as_any_string_flags();
 
-        self.bump(T::token_start());
+        self.bump(T::start_token());
         let elements = self.parse_ftstring_elements::<T>(flags, FTStringElementsKind::Regular);
 
-        self.expect(T::token_end());
+        self.expect(T::end_token());
 
         // test_ok pep701_f_string_py312
         // # parse_options: {"target-version": "3.12"}
@@ -1552,7 +1553,7 @@ impl<'src> Parser<'src> {
         kind: FTStringElementsKind,
     ) -> ast::FTStringElements {
         let mut elements = vec![];
-        let middle_token_kind = T::token_middle();
+        let middle_token_kind = T::middle_token();
 
         self.parse_list(RecoveryContextKind::FTStringElements(kind), |parser| {
             let element = match parser.current_token_kind() {
@@ -1607,7 +1608,7 @@ impl<'src> Parser<'src> {
         ast::FTStringElements::from(elements)
     }
 
-    /// Parses an f-string expression element.
+    /// Parses an f/t-string expression element.
     ///
     /// # Panics
     ///
