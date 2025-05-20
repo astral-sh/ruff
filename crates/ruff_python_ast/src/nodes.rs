@@ -313,21 +313,6 @@ impl<'a> IntoIterator for &'a ExprSet {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum FTStringKind {
-    FString,
-    TString,
-}
-
-impl fmt::Display for FTStringKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            FTStringKind::FString => f.write_str("f-string"),
-            FTStringKind::TString => f.write_str("t-string"),
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct FTStringFormatSpec {
     pub range: TextRange,

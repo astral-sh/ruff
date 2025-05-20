@@ -1,4 +1,6 @@
-use ruff_python_ast::{FTStringKind, StringFlags};
+use ruff_python_ast::StringFlags;
+
+use crate::string::FTStringKind;
 
 use super::TokenFlags;
 

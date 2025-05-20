@@ -15,7 +15,8 @@ use crate::error::{FStringKind, StarTupleKind, UnparenthesizedNamedExprKind};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{FunctionKind, Parser, helpers};
 use crate::string::{
-    InterpolatedString, StringType, parse_ftstring_literal_element, parse_string_literal,
+    FTStringKind, InterpolatedString, StringType, parse_ftstring_literal_element,
+    parse_string_literal,
 };
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
@@ -1497,7 +1498,7 @@ impl<'src> Parser<'src> {
         let range = self.node_range(start);
 
         if !self.options.target_version.supports_pep_701()
-            && matches!(T::kind(), ast::FTStringKind::FString)
+            && matches!(T::kind(), FTStringKind::FString)
         {
             let quote_bytes = flags.quote_str().as_bytes();
             let quote_len = flags.quote_len();

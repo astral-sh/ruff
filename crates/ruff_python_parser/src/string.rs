@@ -1,6 +1,7 @@
 //! Parsing of string literals, bytes literals, and implicit string concatenation.
 
 use bstr::ByteSlice;
+use std::fmt;
 
 use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -36,6 +37,47 @@ impl From<StringType> for Expr {
             StringType::Bytes(node) => Expr::from(node),
             StringType::FString(node) => Expr::from(node),
             StringType::TString(node) => Expr::from(node),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum FTStringKind {
+    FString,
+    TString,
+}
+
+impl FTStringKind {
+    #[inline]
+    const fn start_token(&self) -> TokenKind {
+        match self {
+            FTStringKind::FString => TokenKind::FStringStart,
+            FTStringKind::TString => TokenKind::TStringStart,
+        }
+    }
+
+    #[inline]
+    const fn middle_token(&self) -> TokenKind {
+        match self {
+            FTStringKind::FString => TokenKind::FStringMiddle,
+            FTStringKind::TString => TokenKind::TStringMiddle,
+        }
+    }
+
+    #[inline]
+    const fn end_token(&self) -> TokenKind {
+        match self {
+            FTStringKind::FString => TokenKind::FStringEnd,
+            FTStringKind::TString => TokenKind::TStringEnd,
+        }
+    }
+}
+
+impl fmt::Display for FTStringKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FTStringKind::FString => f.write_str("f-string"),
+            FTStringKind::TString => f.write_str("t-string"),
         }
     }
 }
@@ -491,23 +533,11 @@ impl InterpolatedString for ast::FString {
             flags: flags.into(),
         }
     }
-
-    fn token_start() -> TokenKind {
-        TokenKind::FStringStart
-    }
-
-    fn token_middle() -> TokenKind {
-        TokenKind::FStringMiddle
-    }
-
-    fn token_end() -> TokenKind {
-        TokenKind::FStringEnd
-    }
 }
 
 impl InterpolatedString for ast::TString {
-    fn kind() -> ast::FTStringKind {
-        ast::FTStringKind::TString
+    fn kind() -> FTStringKind {
+        FTStringKind::TString
     }
 
     fn new(elements: ast::FTStringElements, range: TextRange, flags: ast::AnyStringFlags) -> Self {
