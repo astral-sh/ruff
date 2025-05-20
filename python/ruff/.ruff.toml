@@ -1,0 +1,4 @@
+extend = "../../pyproject.toml"
+
+[lint.isort]
+required-imports = []
