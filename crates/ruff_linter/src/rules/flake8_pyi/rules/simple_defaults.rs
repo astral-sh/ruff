@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Operator, Parameters, Stmt, UnaryOp};

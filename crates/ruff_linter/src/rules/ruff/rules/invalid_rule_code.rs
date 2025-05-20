@@ -1,7 +1,7 @@
 use crate::Locator;
 use crate::noqa::{Code, Directive};
 use crate::registry::Rule;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 

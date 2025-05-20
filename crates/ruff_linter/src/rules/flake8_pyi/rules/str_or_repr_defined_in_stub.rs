@@ -1,7 +1,7 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::Stmt;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use crate::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_abstract;

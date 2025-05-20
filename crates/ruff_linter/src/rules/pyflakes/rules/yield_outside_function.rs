@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_diagnostics::Violation;
+use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::semantic_errors::YieldOutsideFunctionKind;
 

@@ -1,6 +1,6 @@
 use ruff_python_ast::StmtImportFrom;
 
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
+use crate::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::{checkers::ast::Checker, fix, preview::is_fix_future_annotations_in_stub_enabled};

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
+use crate::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
 use ruff_python_semantic::Binding;

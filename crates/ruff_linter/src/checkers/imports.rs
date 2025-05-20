@@ -1,6 +1,6 @@
 //! Lint rules based on import analysis.
 
-use ruff_diagnostics::Diagnostic;
+use crate::Diagnostic;
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{ModModule, PySourceType, PythonVersion};

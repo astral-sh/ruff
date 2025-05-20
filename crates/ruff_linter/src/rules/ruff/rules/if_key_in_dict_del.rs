@@ -1,5 +1,5 @@
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{CmpOp, Expr, ExprName, ExprSubscript, Stmt, StmtIf};
 use ruff_python_semantic::analyze::typing;

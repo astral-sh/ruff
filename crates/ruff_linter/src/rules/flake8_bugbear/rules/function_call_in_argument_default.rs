@@ -1,8 +1,8 @@
 use ruff_python_ast::{self as ast, Expr, Parameters};
 use ruff_text_size::Ranged;
 
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
+use crate::Diagnostic;
+use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::visitor;

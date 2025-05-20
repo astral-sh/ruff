@@ -1,6 +1,6 @@
 use ruff_python_ast::{Arguments, Expr, ExprCall};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use crate::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 

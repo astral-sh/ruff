@@ -2,7 +2,7 @@ use ruff_python_parser::TokenKind;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
 use ruff_python_semantic::SemanticModel;

@@ -1,5 +1,5 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Violation};
+use crate::{Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};

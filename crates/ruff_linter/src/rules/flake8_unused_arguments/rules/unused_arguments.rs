@@ -1,7 +1,7 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::{Parameter, Parameters, Stmt, StmtExpr, StmtFunctionDef, StmtRaise};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};

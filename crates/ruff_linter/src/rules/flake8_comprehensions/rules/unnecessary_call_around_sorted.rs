@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
+use crate::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;

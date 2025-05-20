@@ -1,6 +1,6 @@
 use std::cmp::Reverse;
 
-use ruff_diagnostics::Edit;
+use crate::Edit;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;

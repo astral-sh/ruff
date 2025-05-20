@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::resolve_imported_module_path;
 use ruff_python_codegen::Generator;

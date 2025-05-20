@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use crate::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::{MemberNameImport, NameImport};

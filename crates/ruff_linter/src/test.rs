@@ -10,7 +10,7 @@ use itertools::Itertools;
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Applicability, FixAvailability};
+use crate::{Applicability, FixAvailability};
 use ruff_notebook::Notebook;
 #[cfg(not(fuzzing))]
 use ruff_notebook::NotebookError;

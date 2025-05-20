@@ -9,7 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
 
-use ruff_diagnostics::Edit;
+use crate::Edit;
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -1221,7 +1221,7 @@ mod tests {
 
     use insta::assert_debug_snapshot;
 
-    use ruff_diagnostics::{Diagnostic, Edit};
+    use crate::{Diagnostic, Edit};
     use ruff_python_trivia::CommentRanges;
     use ruff_source_file::{LineEnding, SourceFileBuilder};
     use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};

@@ -1,4 +1,4 @@
-use ruff_diagnostics::Diagnostic;
+use crate::Diagnostic;
 use ruff_python_ast::helpers;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::{self as ast, Expr, Stmt};

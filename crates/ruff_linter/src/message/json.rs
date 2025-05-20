@@ -4,7 +4,7 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::{Value, json};
 
-use ruff_diagnostics::Edit;
+use crate::Edit;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed, SourceCode};
 use ruff_text_size::Ranged;

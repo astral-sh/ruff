@@ -5,7 +5,7 @@ use std::path::Path;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
+use crate::{Diagnostic, Edit, Fix};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 

@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Operator};
 use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 
-use ruff_diagnostics::Diagnostic;
+use crate::Diagnostic;
 
 use ruff_python_ast::types::Node;
 use ruff_python_semantic::ScopeKind;

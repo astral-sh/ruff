@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display, Formatter};
 
-use ruff_diagnostics::Applicability;
+use crate::Applicability;
 use ruff_macros::CacheKey;
 use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;

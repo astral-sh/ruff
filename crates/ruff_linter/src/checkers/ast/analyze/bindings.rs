@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Fix};
+use crate::{Diagnostic, Fix};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;

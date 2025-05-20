@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Fix};
+use crate::{Diagnostic, Fix};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Binding, BindingKind, Imported, ResolvedReference, ScopeKind};
 use ruff_text_size::Ranged;

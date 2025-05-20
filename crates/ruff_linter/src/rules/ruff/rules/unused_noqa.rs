@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::AlwaysFixableViolation;
+use crate::AlwaysFixableViolation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 #[derive(Debug, PartialEq, Eq)]

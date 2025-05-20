@@ -5,10 +5,10 @@ use std::slice::Iter;
 
 use itertools::Itertools;
 
-use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Edit;
-use ruff_diagnostics::Fix;
+use crate::AlwaysFixableViolation;
+use crate::Diagnostic;
+use crate::Edit;
+use crate::Fix;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;

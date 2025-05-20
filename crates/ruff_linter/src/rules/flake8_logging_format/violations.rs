@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Violation};
+use crate::{AlwaysFixableViolation, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 /// ## What it does

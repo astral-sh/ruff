@@ -1,6 +1,6 @@
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use flake8_quotes::helpers::{contains_escaped_quote, raw_contents, unescape_string};
 use flake8_quotes::settings::Quote;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::{Visitor, walk_f_string};
 use ruff_python_ast::{self as ast, AnyStringFlags, PythonVersion, StringFlags, StringLike};

@@ -1,6 +1,6 @@
 use ruff_python_ast::{Expr, ExprCall};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::{Modules, SemanticModel};

@@ -3,7 +3,7 @@ use log::warn;
 use pyproject_toml::PyProjectToml;
 use ruff_text_size::{TextRange, TextSize};
 
-use ruff_diagnostics::Diagnostic;
+use crate::Diagnostic;
 use ruff_source_file::SourceFile;
 
 use crate::IOError;

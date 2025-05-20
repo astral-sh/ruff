@@ -12,7 +12,7 @@ use colored::Colorize;
 use log::{debug, warn};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::Diagnostic;
+use ruff_linter::Diagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
 use ruff_linter::message::Message;

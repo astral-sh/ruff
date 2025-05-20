@@ -1,7 +1,7 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Fix};
-use ruff_diagnostics::{FixAvailability, Violation};
+use crate::{Diagnostic, Fix};
+use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::visitor::Visitor;

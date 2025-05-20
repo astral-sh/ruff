@@ -1,5 +1,5 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_diagnostics::{Applicability, Edit};
+use crate::{AlwaysFixableViolation, Diagnostic, Fix};
+use crate::{Applicability, Edit};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::parenthesize::parenthesized_range;

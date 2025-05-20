@@ -1,4 +1,4 @@
-use ruff_diagnostics::{FixAvailability, Violation};
+use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 /// ## Removed

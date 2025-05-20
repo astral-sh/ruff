@@ -1,8 +1,8 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Edit;
-use ruff_diagnostics::Fix;
-use ruff_diagnostics::FixAvailability;
-use ruff_diagnostics::Violation;
+use crate::Diagnostic;
+use crate::Edit;
+use crate::Fix;
+use crate::FixAvailability;
+use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Number;
 use ruff_python_ast::{self as ast, Expr};

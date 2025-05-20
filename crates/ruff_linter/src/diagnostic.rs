@@ -1,14 +1,13 @@
 use anyhow::Result;
 use log::debug;
 
+use crate::{Fix, codes::Rule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::{Fix, Violation};
+use crate::violation::Violation;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Diagnostic {
-    /// The identifier of the diagnostic, used to align the diagnostic with a rule.
-    pub name: &'static str,
     /// The message body to display to the user, to explain the diagnostic.
     pub body: String,
     /// The message to display to the user, to explain the suggested fix.
@@ -16,17 +15,20 @@ pub struct Diagnostic {
     pub range: TextRange,
     pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
+
+    pub(crate) rule: Rule,
 }
 
 impl Diagnostic {
+    #[expect(clippy::needless_pass_by_value)]
     pub fn new<T: Violation>(kind: T, range: TextRange) -> Self {
         Self {
-            name: T::rule_name(),
             body: Violation::message(&kind),
             suggestion: Violation::fix_title(&kind),
             range,
             fix: None,
             parent: None,
+            rule: T::RULE,
         }
     }
 
@@ -50,7 +52,7 @@ impl Diagnostic {
     pub fn try_set_fix(&mut self, func: impl FnOnce() -> Result<Fix>) {
         match func() {
             Ok(fix) => self.fix = Some(fix),
-            Err(err) => debug!("Failed to create fix for {}: {}", self.name, err),
+            Err(err) => debug!("Failed to create fix for {}: {}", self.rule, err),
         }
     }
 
@@ -61,7 +63,7 @@ impl Diagnostic {
         match func() {
             Ok(None) => {}
             Ok(Some(fix)) => self.fix = Some(fix),
-            Err(err) => debug!("Failed to create fix for {}: {}", self.name, err),
+            Err(err) => debug!("Failed to create fix for {}: {}", self.rule, err),
         }
     }
 
