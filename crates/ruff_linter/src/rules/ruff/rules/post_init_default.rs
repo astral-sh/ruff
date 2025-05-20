@@ -108,7 +108,6 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
     }
 
     let mut stopped_fixes = false;
-    let mut diagnostics = vec![];
 
     for parameter in function_def.parameters.iter_non_variadic_params() {
         let Some(default) = parameter.default() else {
@@ -132,10 +131,8 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
             stopped_fixes |= diagnostic.fix.is_none();
         }
 
-        diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
-
-    checker.report_diagnostics(diagnostics);
 }
 
 /// Generate a [`Fix`] to transform a `__post_init__` default argument into a

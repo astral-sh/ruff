@@ -385,15 +385,6 @@ impl<'a> Checker<'a> {
         diagnostics.push(diagnostic);
     }
 
-    /// Extend the collection of [`Diagnostic`] objects in the [`Checker`]
-    pub(crate) fn report_diagnostics<I>(&self, diagnostics: I)
-    where
-        I: IntoIterator<Item = Diagnostic>,
-    {
-        let mut checker_diagnostics = self.diagnostics.borrow_mut();
-        checker_diagnostics.extend(diagnostics);
-    }
-
     /// Adds a [`TextRange`] to the set of ranges of variable names
     /// flagged in `flake8-bugbear` violations so far.
     ///
