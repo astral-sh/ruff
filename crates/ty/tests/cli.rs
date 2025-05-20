@@ -387,22 +387,11 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
             "#,
     )?;
 
-    // Assert that there's an `unresolved-reference` diagnostic (error)
-    // and a `division-by-zero` diagnostic (error).
-    assert_cmd_snapshot!(case.command(), @r"
+    // Assert that there's an `unresolved-reference` diagnostic (error).
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
-     --> test.py:2:5
-      |
-    2 | y = 4 / 0
-      |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
-      |
-    info: rule `division-by-zero` is enabled by default
-
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:7:1
       |
@@ -413,17 +402,17 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
       |
     info: rule `unresolved-reference` is enabled by default
 
-    Found 2 diagnostics
+    Found 1 diagnostic
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     case.write_file(
         "pyproject.toml",
         r#"
         [tool.ty.rules]
-        division-by-zero = "warn" # demote to warn
+        division-by-zero = "warn" # promote to warn
         unresolved-reference = "ignore"
     "#,
     )?;
@@ -468,9 +457,9 @@ fn cli_rule_severity() -> anyhow::Result<()> {
         "#,
     )?;
 
-    // Assert that there's an `unresolved-reference` diagnostic (error),
-    // a `division-by-zero` (error) and a unresolved-import (error) diagnostic by default.
-    assert_cmd_snapshot!(case.command(), @r"
+    // Assert that there's an `unresolved-reference` diagnostic (error)
+    // and an unresolved-import (error) diagnostic by default.
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -485,18 +474,6 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
     info: rule `unresolved-import` is enabled by default
 
-    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
-     --> test.py:4:5
-      |
-    2 | import does_not_exit
-    3 |
-    4 | y = 4 / 0
-      |     ^^^^^
-    5 |
-    6 | for a in range(0, int(y)):
-      |
-    info: rule `division-by-zero` is enabled by default
-
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:9:1
       |
@@ -507,11 +484,11 @@ fn cli_rule_severity() -> anyhow::Result<()> {
       |
     info: rule `unresolved-reference` is enabled by default
 
-    Found 3 diagnostics
+    Found 2 diagnostics
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     assert_cmd_snapshot!(
         case
@@ -575,22 +552,11 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
         "#,
     )?;
 
-    // Assert that there's a `unresolved-reference` diagnostic (error)
-    // and a `division-by-zero` (error) by default.
-    assert_cmd_snapshot!(case.command(), @r"
+    // Assert that there's a `unresolved-reference` diagnostic (error) by default.
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
-     --> test.py:2:5
-      |
-    2 | y = 4 / 0
-      |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
-      |
-    info: rule `division-by-zero` is enabled by default
-
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:7:1
       |
@@ -601,11 +567,11 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
       |
     info: rule `unresolved-reference` is enabled by default
 
-    Found 2 diagnostics
+    Found 1 diagnostic
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     assert_cmd_snapshot!(
         case
@@ -614,7 +580,6 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
             .arg("unresolved-reference")
             .arg("--warn")
             .arg("division-by-zero")
-            // Override the error severity with warning
             .arg("--ignore")
             .arg("unresolved-reference"),
         @r"
@@ -1103,18 +1068,10 @@ fn check_specific_paths() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command(),
-        @r"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
-     --> project/main.py:2:5
-      |
-    2 | y = 4 / 0  # error: division-by-zero
-      |     ^^^^^
-      |
-    info: rule `division-by-zero` is enabled by default
-
     error[unresolved-import]: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
@@ -1135,11 +1092,11 @@ fn check_specific_paths() -> anyhow::Result<()> {
     info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
     info: rule `unresolved-import` is enabled by default
 
-    Found 3 diagnostics
+    Found 2 diagnostics
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "
+    "###
     );
 
     // Now check only the `tests` and `other.py` files.
