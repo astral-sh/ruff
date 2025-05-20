@@ -6,7 +6,7 @@ use ruff_python_ast::PythonVersion;
 
 use crate::db::tests::TestDb;
 use crate::program::{Program, SearchPathSettings};
-use crate::{ProgramSettings, PythonPath, PythonPlatform};
+use crate::{ProgramSettings, PythonPath, PythonPlatform, PythonVersionWithSource};
 
 /// A test case for the module resolver.
 ///
@@ -235,8 +235,10 @@ impl TestCaseBuilder<MockedTypeshed> {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version,
-                python_version_source: crate::ValueSource::default(),
+                python_version: PythonVersionWithSource::new(
+                    python_version,
+                    crate::ValueSource::default(),
+                ),
                 python_platform,
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -294,8 +296,10 @@ impl TestCaseBuilder<VendoredTypeshed> {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version,
-                python_version_source: crate::ValueSource::default(),
+                python_version: PythonVersionWithSource::new(
+                    python_version,
+                    crate::ValueSource::default(),
+                ),
                 python_platform,
                 search_paths: SearchPathSettings {
                     python_path: PythonPath::KnownSitePackages(vec![site_packages.clone()]),

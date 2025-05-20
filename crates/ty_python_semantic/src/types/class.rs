@@ -2885,6 +2885,7 @@ pub(super) enum MetaclassErrorKind<'db> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::PythonVersionWithSource;
     use crate::db::tests::setup_db;
     use crate::module_resolver::resolve_module;
     use salsa::Setter;
@@ -2910,8 +2911,11 @@ mod tests {
         let mut db = setup_db();
 
         Program::get(&db)
-            .set_python_version(&mut db)
-            .to(PythonVersion::latest_ty());
+            .set_python_version_with_source(&mut db)
+            .to(PythonVersionWithSource::new(
+                PythonVersion::latest_ty(),
+                crate::ValueSource::default(),
+            ));
 
         for class in KnownClass::iter() {
             assert_ne!(
@@ -2935,8 +2939,11 @@ mod tests {
             };
 
             Program::get(&db)
-                .set_python_version(&mut db)
-                .to(version_added);
+                .set_python_version_with_source(&mut db)
+                .to(PythonVersionWithSource::new(
+                    version_added,
+                    crate::ValueSource::default(),
+                ));
 
             assert_ne!(
                 class.to_instance(&db),

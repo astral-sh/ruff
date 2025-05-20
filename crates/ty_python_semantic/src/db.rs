@@ -17,7 +17,7 @@ pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::program::{Program, SearchPathSettings};
-    use crate::{ProgramSettings, PythonPlatform, default_lint_registry};
+    use crate::{ProgramSettings, PythonPlatform, PythonVersionWithSource, default_lint_registry};
 
     use super::Db;
     use crate::lint::{LintRegistry, RuleSelection};
@@ -179,8 +179,10 @@ pub(crate) mod tests {
             Program::from_settings(
                 &db,
                 ProgramSettings {
-                    python_version: self.python_version,
-                    python_version_source: crate::ValueSource::default(),
+                    python_version: PythonVersionWithSource::new(
+                        self.python_version,
+                        crate::ValueSource::default(),
+                    ),
                     python_platform: self.python_platform,
                     search_paths: SearchPathSettings::new(vec![src_root]),
                 },

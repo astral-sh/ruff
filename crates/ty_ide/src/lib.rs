@@ -204,10 +204,10 @@ mod tests {
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
-    use ruff_python_ast::PythonVersion;
     use ruff_text_size::TextSize;
     use ty_python_semantic::{
-        Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
+        Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionWithSource,
+        SearchPathSettings,
     };
 
     pub(super) fn cursor_test(source: &str) -> CursorTest {
@@ -227,8 +227,7 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersion::latest_ty(),
-                python_version_source: ty_python_semantic::ValueSource::default(),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],

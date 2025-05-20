@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
-use ty_python_semantic::{ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings};
+use ty_python_semantic::{
+    ProgramSettings, PythonPath, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
+};
 
 use super::settings::{Settings, TerminalSettings};
 
@@ -90,12 +92,12 @@ impl Options {
         project_name: &str,
         system: &dyn System,
     ) -> ProgramSettings {
-        let (python_version, python_version_source) = self
+        let python_version = self
             .environment
             .as_ref()
             .and_then(|env| env.python_version.as_ref())
             .map(|ranged_version| {
-                (
+                PythonVersionWithSource::new(
                     ranged_version.inner_copied(),
                     match ranged_version.source() {
                         ValueSource::Cli => ty_python_semantic::ValueSource::Cli,
@@ -106,10 +108,7 @@ impl Options {
                     },
                 )
             })
-            .unwrap_or((
-                PythonVersion::latest_ty(),
-                ty_python_semantic::ValueSource::default(),
-            ));
+            .unwrap_or_default();
         let python_platform = self
             .environment
             .as_ref()
@@ -121,7 +120,6 @@ impl Options {
             });
         ProgramSettings {
             python_version,
-            python_version_source,
             python_platform,
             search_paths: self.to_search_path_settings(project_root, project_name, system),
         }

@@ -14,10 +14,8 @@ use salsa::Setter;
 
 #[salsa::input(singleton)]
 pub struct Program {
-    pub python_version: PythonVersion,
-
     #[returns(ref)]
-    pub python_version_source: ValueSource,
+    pub python_version_with_source: PythonVersionWithSource,
 
     #[returns(ref)]
     pub python_platform: PythonPlatform,
@@ -29,25 +27,32 @@ pub struct Program {
 impl Program {
     pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> anyhow::Result<Self> {
         let ProgramSettings {
-            python_version,
-            python_version_source,
+            python_version: python_version_with_source,
             python_platform,
             search_paths,
         } = settings;
 
-        tracing::info!("Python version: Python {python_version}, platform: {python_platform}");
+        tracing::info!(
+            "Python version: Python {python_version}, platform: {python_platform}",
+            python_version = python_version_with_source.version
+        );
 
         let search_paths = SearchPaths::from_settings(db, &search_paths)
             .with_context(|| "Invalid search path settings")?;
 
-        Ok(Program::builder(
-            python_version,
-            python_version_source,
-            python_platform,
-            search_paths,
+        Ok(
+            Program::builder(python_version_with_source, python_platform, search_paths)
+                .durability(Durability::HIGH)
+                .new(db),
         )
-        .durability(Durability::HIGH)
-        .new(db))
+    }
+
+    pub fn python_version(self, db: &dyn Db) -> PythonVersion {
+        self.python_version_with_source(db).version
+    }
+
+    pub fn python_version_source(self, db: &dyn Db) -> &ValueSource {
+        &self.python_version_with_source(db).source
     }
 
     pub fn update_from_settings(
@@ -57,7 +62,6 @@ impl Program {
     ) -> anyhow::Result<()> {
         let ProgramSettings {
             python_version,
-            python_version_source,
             python_platform,
             search_paths,
         } = settings;
@@ -67,14 +71,9 @@ impl Program {
             self.set_python_platform(db).to(python_platform);
         }
 
-        if &python_version_source != self.python_version_source(db) {
-            tracing::debug!("Updating python version source: `{python_version_source:?}`");
-            self.set_python_version_source(db).to(python_version_source);
-        }
-
-        if python_version != self.python_version(db) {
-            tracing::debug!("Updating python version: Python {python_version}");
-            self.set_python_version(db).to(python_version);
+        if &python_version != self.python_version_with_source(db) {
+            tracing::debug!("Updating python version: `{python_version:?}`");
+            self.set_python_version_with_source(db).to(python_version);
         }
 
         self.update_search_paths(db, &search_paths)?;
@@ -105,9 +104,7 @@ impl Program {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ProgramSettings {
-    pub python_version: PythonVersion,
-    #[cfg_attr(feature = "serde", serde(skip))]
-    pub python_version_source: ValueSource,
+    pub python_version: PythonVersionWithSource,
     pub python_platform: PythonPlatform,
     pub search_paths: SearchPathSettings,
 }
@@ -124,6 +121,29 @@ pub enum ValueSource {
     /// We fell back to a default value because the value was not specified via the CLI or a config file.
     #[default]
     Default,
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[derive(Eq, PartialEq, Debug, Clone)]
+pub struct PythonVersionWithSource {
+    version: PythonVersion,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    source: ValueSource,
+}
+
+impl PythonVersionWithSource {
+    pub fn new(version: PythonVersion, source: ValueSource) -> Self {
+        Self { version, source }
+    }
+}
+
+impl Default for PythonVersionWithSource {
+    fn default() -> Self {
+        Self {
+            version: PythonVersion::latest_ty(),
+            source: ValueSource::Default,
+        }
+    }
 }
 
 /// Configures the search paths for module resolution.

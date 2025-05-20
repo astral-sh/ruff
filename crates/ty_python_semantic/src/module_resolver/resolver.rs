@@ -918,7 +918,7 @@ mod tests {
     use crate::module_name::ModuleName;
     use crate::module_resolver::module::ModuleKind;
     use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
-    use crate::{ProgramSettings, PythonPlatform};
+    use crate::{ProgramSettings, PythonPlatform, PythonVersionWithSource};
 
     use super::*;
 
@@ -1363,7 +1363,7 @@ mod tests {
     fn symlink() -> anyhow::Result<()> {
         use anyhow::Context;
 
-        use crate::{PythonPlatform, program::Program};
+        use crate::{PythonPlatform, PythonVersionWithSource, program::Program};
         use ruff_db::system::{OsSystem, SystemPath};
 
         use crate::db::tests::TestDb;
@@ -1396,8 +1396,10 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersion::PY38,
-                python_version_source: crate::ValueSource::default(),
+                python_version: PythonVersionWithSource::new(
+                    PythonVersion::PY38,
+                    crate::ValueSource::default(),
+                ),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -1907,8 +1909,7 @@ not_a_directory
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersion::default(),
-                python_version_source: crate::ValueSource::default(),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -1981,8 +1982,7 @@ not_a_directory
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersion::default(),
-                python_version_source: crate::ValueSource::default(),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -2024,8 +2024,7 @@ not_a_directory
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersion::default(),
-                python_version_source: crate::ValueSource::default(),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
