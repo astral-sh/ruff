@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
@@ -48,26 +48,26 @@ const HEX_THRESHOLD: usize = 5;
 const BIN_THRESHOLD: usize = 9;
 const OCT_THRESHOLD: usize = 5;
 const DEC_THRESHOLD: usize = 5;
+const FLT_THRESHOLD: usize = 5;
 
 const HEX_GROUPSIZE: usize = 4;
 const BIN_GROUPSIZE: usize = 8;
 const OCT_GROUPSIZE: usize = 4;
 const DEC_GROUPSIZE: usize = 3;
+const FLT_GROUPSIZE: usize = 3;
 
 /// RUF061: Large numeric literal without underscore separators
 pub(crate) fn large_number_without_underscore_separators(checker: &Checker, expr: &ast::Expr) {
     let value_text = checker.locator().slice(expr.range());
-    
+
     // format number to compare with the source
     let formatted_value: String = format_number_with_underscores(value_text);
 
     if formatted_value != value_text {
-        let diagnostic = Diagnostic::new(
-            LargeNumberWithoutUnderscoreSeparators, 
-            expr.range()
-        ).with_fix(
-            Fix::safe_edit(Edit::range_replacement(formatted_value, expr.range()))
-        );
+        let diagnostic =
+            Diagnostic::new(LargeNumberWithoutUnderscoreSeparators, expr.range()).with_fix(
+                Fix::safe_edit(Edit::range_replacement(formatted_value, expr.range())),
+            );
         checker.report_diagnostic(diagnostic);
     }
 }
@@ -86,12 +86,12 @@ fn format_number_with_underscores(value: &str) -> String {
         } else {
             let formatted = format_digits(hex_part, HEX_GROUPSIZE);
             format!("{}{}", prefix, formatted)
-        }        
+        }
     } else if value.starts_with("0b") || value.starts_with("0B") {
         // Binary
         let prefix = &value[..2];
         let bin_part = &value[2..];
-        
+
         if bin_part.len() < BIN_THRESHOLD {
             format!("{}{}", prefix, bin_part)
         } else {
@@ -102,7 +102,7 @@ fn format_number_with_underscores(value: &str) -> String {
         // Octal
         let prefix = &value[..2];
         let oct_part = &value[2..];
-        
+
         if oct_part.len() < OCT_THRESHOLD {
             format!("{}{}", prefix, oct_part)
         } else {
@@ -115,33 +115,32 @@ fn format_number_with_underscores(value: &str) -> String {
             let parts: Vec<&str> = value.split(['e', 'E']).collect();
             let base = format_number_with_underscores(parts[0]);
             let exponent = parts[1];
-            
+
             // Determine which separator was used (e or E)
             let separator = if value.contains('e') { 'e' } else { 'E' };
-            
+
             return format!("{}{}{}", base, separator, exponent);
-        }  
+        }
 
         // Decimal (integer or float)
         let parts: Vec<&str> = value.split('.').collect();
-        let integer_part = parts[0];
-        
-        if integer_part.len() < DEC_THRESHOLD {
-            if parts.len() > 1 {
-                return format!("{}.{}", integer_part, parts[1]);
-            } else {
-                return format!("{}", integer_part);
-            }
-        }
-        // Format integer part with underscores every 3 digits from the right
-        let formatted_integer = format_digits(integer_part, DEC_GROUPSIZE);
-        
+        let integer_part = if parts[0].len() < DEC_THRESHOLD {
+            parts[0]
+        } else {
+            &(format_digits(&parts[0], DEC_GROUPSIZE))
+        };
+
         if parts.len() > 1 {
             // It's a float, handle the fractional part
-            format!("{}.{}", formatted_integer, parts[1])
+            let float_part = if parts[1].len() < FLT_THRESHOLD {
+                parts[1]
+            } else {
+                &(format_float(parts[1], FLT_GROUPSIZE))
+            };
+            return format!("{}.{}", integer_part, float_part);
         } else {
             // It's an integer
-            format!("{}", formatted_integer)
+            return format!("{}", integer_part);
         }
     }
 }
@@ -150,7 +149,7 @@ fn format_number_with_underscores(value: &str) -> String {
 fn format_digits(digits: &str, group_size: usize) -> String {
     let mut result = String::new();
     let mut count = 0;
-    
+
     // Process digits from right to left
     for c in digits.chars().rev() {
         if count > 0 && count % group_size == 0 {
@@ -159,7 +158,25 @@ fn format_digits(digits: &str, group_size: usize) -> String {
         result.push(c);
         count += 1;
     }
-    
+
     // Reverse the result to get the correct order
     result.chars().rev().collect()
+}
+
+// Helper function to format float parts with underscores at specified intervals
+fn format_float(digits: &str, group_size: usize) -> String {
+    let mut result = String::new();
+    let mut count = 0;
+
+    // Process digits from right to left
+    for c in digits.chars() {
+        if count > 0 && count % group_size == 0 {
+            result.push('_');
+        }
+        result.push(c);
+        count += 1;
+    }
+
+    // Reverse the result to get the correct order
+    result
 }

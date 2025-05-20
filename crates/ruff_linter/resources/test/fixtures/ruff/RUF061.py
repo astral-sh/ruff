@@ -2,7 +2,7 @@
 
 # These should trigger the rule (large numbers without underscore separators)
 i = 1000000
-f = 1234567.89
+f = 123456789.123456789
 x = 0x1234ABCD
 b = 0b10101010101010101010101
 o = 0o12345671234
@@ -24,6 +24,7 @@ sci_with_separators = 1_000_000e10
 dec_misplaced_separators = 123_4567_89
 oct_misplaced_separators = 0o12_34_56
 hex_misplaced_separators = 0xABCD_EF
+flt_misplaced_separators = 123.12_3456_789
 
 # uppercase base prefix
 hex_uppercase = 0XABCDEF
@@ -48,3 +49,5 @@ bin_8_digits = 0b01010101  # Should not trigger, just below the threshold of 9 d
 bin_9_digits = 0b101010101  # Should trigger, 9 digits
 hex_4_digits = 0xABCD  # Should not trigger, just below the threshold of 5 digits
 hex_5_digits = 0xABCDE  # Should trigger, 5 digits
+flt_4_digits = .1234  # Should not trigger, just below the threshold of 5 digits
+flt_5_digits = .12345  # Should trigger, 5 digits
