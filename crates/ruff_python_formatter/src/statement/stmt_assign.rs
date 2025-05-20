@@ -1,5 +1,4 @@
-use ruff_formatter::group_id::DebugGroupId;
-use ruff_formatter::{FormatError, RemoveSoftLinesBuffer, format_args, write};
+use ruff_formatter::{FormatError, GroupId, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{
     AnyNodeRef, Expr, ExprAttribute, ExprCall, FString, Operator, StmtAssign, StringLike, TString,
     TypeParams,
@@ -870,7 +869,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     format_ft_string_right_left_helper(
                         value,
                         *statement,
-                        before_operator,
+                        *before_operator,
                         *operator,
                         format_t_string,
                         &inline_comments,
@@ -886,7 +885,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     format_ft_string_right_left_helper(
                         value,
                         *statement,
-                        before_operator,
+                        *before_operator,
                         *operator,
                         format_f_string,
                         &inline_comments,
@@ -1077,7 +1076,7 @@ fn format_ft_string_left_right_helper<'a, T: AsFormat<PyFormatContext<'a>>>(
     format_ft_string: &T,
     inline_comments: &OptionalParenthesesInlinedComments,
     f: &mut Formatter<PyFormatContext<'a>>,
-    group_id: DebugGroupId,
+    group_id: GroupId,
 ) -> FormatResult<()> {
     inline_comments.mark_formatted();
 
@@ -1156,7 +1155,7 @@ fn format_ft_string_left_right_helper<'a, T: AsFormat<PyFormatContext<'a>>>(
 fn format_ft_string_right_left_helper<'a, T: AsFormat<PyFormatContext<'a>>>(
     value: &Expr,
     statement: AnyNodeRef<'_>,
-    before_operator: &AnyBeforeOperator<'_>,
+    before_operator: AnyBeforeOperator<'_>,
     operator: AnyAssignmentOperator,
     format_ft_string: &T,
     inline_comments: &OptionalParenthesesInlinedComments,
