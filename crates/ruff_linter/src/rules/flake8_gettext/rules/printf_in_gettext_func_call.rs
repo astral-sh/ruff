@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr, Operator};
 
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
@@ -60,8 +60,7 @@ pub(crate) fn printf_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
         }) = &first
         {
             if left.is_string_literal_expr() {
-                checker
-                    .report_diagnostic(Diagnostic::new(PrintfInGetTextFuncCall {}, first.range()));
+                checker.report_diagnostic(PrintfInGetTextFuncCall {}, first.range());
             }
         }
     }

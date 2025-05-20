@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 
@@ -59,12 +59,12 @@ pub(crate) fn nonlocal_and_global(checker: &Checker, nonlocal: &ast::StmtNonloca
     // `global`.
     for name in &nonlocal.names {
         if let Some(global) = checker.semantic().global(name) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 NonlocalAndGlobal {
                     name: name.to_string(),
                 },
                 global,
-            ));
+            );
         }
     }
 }

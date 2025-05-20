@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{Expr, ExprName, Stmt, StmtAssign, StmtClassDef};
@@ -95,8 +95,6 @@ pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: 
             continue;
         }
 
-        let diagnostic = Diagnostic::new(ImplicitClassVarInDataclass, target.range());
-
-        checker.report_diagnostic(diagnostic);
+        checker.report_diagnostic(ImplicitClassVarInDataclass, target.range());
     }
 }

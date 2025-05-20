@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Number};
 use ruff_text_size::Ranged;
@@ -55,7 +55,7 @@ pub(crate) fn math_constant(checker: &Checker, literal: &ast::ExprNumberLiteral)
     };
 
     if let Some(constant) = Constant::from_value(value) {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             MathConstant {
                 literal: checker.locator().slice(literal).into(),
                 constant: constant.name(),
@@ -63,7 +63,6 @@ pub(crate) fn math_constant(checker: &Checker, literal: &ast::ExprNumberLiteral)
             literal.range(),
         );
         diagnostic.try_set_fix(|| convert_to_constant(literal, constant.name(), checker));
-        checker.report_diagnostic(diagnostic);
     }
 }
 

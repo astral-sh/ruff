@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::analyze::typing::traverse_union;
@@ -70,6 +70,6 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
     }
 
     for none_expr in none_exprs {
-        checker.report_diagnostic(Diagnostic::new(NoneNotAtEndOfUnion, none_expr.range()));
+        checker.report_diagnostic(NoneNotAtEndOfUnion, none_expr.range());
     }
 }

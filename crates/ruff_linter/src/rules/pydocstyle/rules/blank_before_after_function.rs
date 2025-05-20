@@ -1,7 +1,7 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
@@ -126,7 +126,7 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
         }
 
         if blank_lines_before != 0 {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 BlankLineBeforeFunction {
                     num_lines: blank_lines_before,
                 },
@@ -137,7 +137,6 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
                 blank_lines_start,
                 docstring.line_start(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -180,7 +179,7 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
         }
 
         if blank_lines_after != 0 {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 BlankLineAfterFunction {
                     num_lines: blank_lines_after,
                 },
@@ -191,7 +190,6 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
                 first_line_end,
                 blank_lines_end,
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Alias;
 
@@ -63,11 +63,11 @@ pub(crate) fn builtin_import_shadowing(checker: &Checker, alias: &Alias) {
         &checker.settings.flake8_builtins.ignorelist,
         checker.target_version(),
     ) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             BuiltinImportShadowing {
                 name: name.to_string(),
             },
             name.range,
-        ));
+        );
     }
 }

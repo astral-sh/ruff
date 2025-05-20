@@ -1,7 +1,7 @@
 use crate::importer::ImportRequest;
 
 use crate::rules::airflow::helpers::{ProviderReplacement, is_guarded_by_try_except};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
@@ -281,7 +281,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         _ => return,
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         Airflow3SuggestedToMoveToProvider {
             deprecated: qualified_name.to_string(),
             replacement: replacement.clone(),
@@ -298,6 +298,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ProviderReplacement::None => None,
     } {
         if is_guarded_by_try_except(expr, module, name, semantic) {
+            diagnostic.defuse();
             return;
         }
         diagnostic.try_set_fix(|| {
@@ -310,6 +311,4 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             Ok(Fix::safe_edits(import_edit, [replacement_edit]))
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
@@ -101,10 +101,10 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
         _ => return,
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         BadStaticmethodArgument {
             argument_name: self_or_cls.name.to_string(),
         },
         self_or_cls.range(),
-    ));
+    );
 }

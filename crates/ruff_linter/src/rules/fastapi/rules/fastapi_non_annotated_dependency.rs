@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_callable;
@@ -237,7 +237,7 @@ fn create_diagnostic(
         return seen_default;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         FastApiNonAnnotatedDependency {
             py_version: checker.target_version(),
         },
@@ -307,8 +307,6 @@ fn create_diagnostic(
         seen_default = true;
     }
     diagnostic.try_set_optional_fix(|| fix);
-
-    checker.report_diagnostic(diagnostic);
 
     seen_default
 }

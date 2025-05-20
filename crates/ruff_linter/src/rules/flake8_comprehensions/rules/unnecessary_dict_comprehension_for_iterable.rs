@@ -1,5 +1,5 @@
 use ast::ExprName;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
@@ -113,7 +113,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryDictComprehensionForIterable {
             is_value_none_literal: dict_comp.value.is_none_literal_expr(),
         },
@@ -131,8 +131,6 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
             dict_comp.range(),
         )));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if the expression can be shared across multiple values.

@@ -1,6 +1,6 @@
 use ruff_python_ast::{ExceptHandler, Expr, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
@@ -64,7 +64,7 @@ pub(crate) fn try_except_continue(
 ) {
     if matches!(body, [Stmt::Continue(_)]) {
         if check_typed_exception || is_untyped_exception(type_, checker.semantic()) {
-            checker.report_diagnostic(Diagnostic::new(TryExceptContinue, except_handler.range()));
+            checker.report_diagnostic(TryExceptContinue, except_handler.range());
         }
     }
 }

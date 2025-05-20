@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
@@ -73,7 +73,7 @@ pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr) {
                 _ => None,
             })
     {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             NumpyDeprecatedFunction {
                 existing: existing.to_string(),
                 replacement: replacement.to_string(),
@@ -89,6 +89,5 @@ pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr) {
             let replacement_edit = Edit::range_replacement(binding, expr.range());
             Ok(Fix::safe_edits(import_edit, [replacement_edit]))
         });
-        checker.report_diagnostic(diagnostic);
     }
 }

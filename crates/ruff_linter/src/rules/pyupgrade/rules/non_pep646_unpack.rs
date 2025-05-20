@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprSubscript, PythonVersion};
 use ruff_python_semantic::SemanticModel;
@@ -88,12 +88,11 @@ pub(crate) fn use_pep646_unpack(checker: &Checker, expr: &ExprSubscript) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(NonPEP646Unpack, *range);
+    let mut diagnostic = checker.report_diagnostic(NonPEP646Unpack, *range);
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         format!("*{}", checker.locator().slice(slice.as_ref())),
         *range,
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Determine whether the [`ExprSubscript`] is in a subscript index (e.g., `Generic[Unpack[int]]`).

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
@@ -94,5 +94,5 @@ pub(crate) fn os_sep_split(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(OsSepSplit, attr.range()));
+    checker.report_diagnostic(OsSepSplit, attr.range());
 }

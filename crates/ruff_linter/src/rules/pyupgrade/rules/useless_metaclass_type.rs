@@ -1,6 +1,6 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
@@ -62,12 +62,11 @@ pub(crate) fn useless_metaclass_type(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UselessMetaclassType, stmt.range());
+    let mut diagnostic = checker.report_diagnostic(UselessMetaclassType, stmt.range());
     let stmt = checker.semantic().current_statement();
     let parent = checker.semantic().current_statement_parent();
     let edit = fix::edits::delete_stmt(stmt, parent, checker.locator(), checker.indexer());
     diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().current_statement_parent_id(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

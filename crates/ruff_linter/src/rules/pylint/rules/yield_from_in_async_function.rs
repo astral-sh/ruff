@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::ScopeKind;
@@ -43,6 +43,6 @@ pub(crate) fn yield_from_in_async_function(checker: &Checker, expr: &ast::ExprYi
         checker.semantic().current_scope().kind,
         ScopeKind::Function(ast::StmtFunctionDef { is_async: true, .. })
     ) {
-        checker.report_diagnostic(Diagnostic::new(YieldFromInAsyncFunction, expr.range()));
+        checker.report_diagnostic(YieldFromInAsyncFunction, expr.range());
     }
 }

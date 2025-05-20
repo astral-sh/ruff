@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
@@ -90,18 +90,17 @@ pub(crate) fn len_test(checker: &Checker, call: &ExprCall) {
 
     let replacement = checker.locator().slice(argument.range()).to_string();
 
-    checker.report_diagnostic(
-        Diagnostic::new(
+    checker
+        .report_diagnostic(
             LenTest {
                 expression: SourceCodeSnippet::new(replacement.clone()),
             },
             call.range(),
         )
-        .with_fix(Fix::safe_edit(Edit::range_replacement(
+        .set_fix(Fix::safe_edit(Edit::range_replacement(
             replacement,
             call.range(),
-        ))),
-    );
+        )));
 }
 
 fn is_indirect_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {

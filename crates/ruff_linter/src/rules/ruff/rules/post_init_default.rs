@@ -1,6 +1,6 @@
 use anyhow::Context;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::{Scope, ScopeKind};
@@ -113,7 +113,7 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
         let Some(default) = parameter.default() else {
             continue;
         };
-        let mut diagnostic = Diagnostic::new(PostInitDefault, default.range());
+        let mut diagnostic = checker.report_diagnostic(PostInitDefault, default.range());
 
         if !stopped_fixes {
             diagnostic.try_set_fix(|| {
@@ -130,8 +130,6 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
             // following parameter with a default).
             stopped_fixes |= diagnostic.fix.is_none();
         }
-
-        checker.report_diagnostic(diagnostic);
     }
 }
 

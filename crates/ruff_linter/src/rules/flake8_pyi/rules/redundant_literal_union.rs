@@ -2,7 +2,7 @@ use std::fmt;
 
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, LiteralExpressionRef};
 use ruff_python_semantic::SemanticModel;
@@ -90,7 +90,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
         };
 
         if builtin_types_in_union.contains(&literal_type) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 RedundantLiteralUnion {
                     literal: SourceCodeSnippet::from_str(
                         checker.locator().slice(typing_literal_expr),
@@ -98,7 +98,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
                     builtin_type: literal_type,
                 },
                 typing_literal_expr.range(),
-            ));
+            );
         }
     }
 }

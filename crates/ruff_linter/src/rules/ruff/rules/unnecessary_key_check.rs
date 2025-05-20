@@ -1,7 +1,7 @@
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -102,7 +102,7 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryKeyCheck, expr.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryKeyCheck, expr.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         format!(
             "{}.get({})",
@@ -127,5 +127,4 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
         ),
         expr.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

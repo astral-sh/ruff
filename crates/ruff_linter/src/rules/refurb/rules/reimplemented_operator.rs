@@ -4,7 +4,7 @@ use std::fmt::{Debug, Display, Formatter};
 use anyhow::Result;
 use itertools::Itertools;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::identifier::Identifier;
@@ -112,7 +112,7 @@ pub(crate) fn reimplemented_operator(checker: &Checker, target: &FunctionLike) {
         return;
     };
     let fix = target.try_fix(&operator, checker.importer(), checker.semantic());
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ReimplementedOperator {
             operator,
             target: target.kind(),
@@ -120,7 +120,6 @@ pub(crate) fn reimplemented_operator(checker: &Checker, target: &FunctionLike) {
         target.range(),
     );
     diagnostic.try_set_optional_fix(|| fix);
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Candidate for lambda expression or function definition consisting of a return statement.

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::generate_comparison;
 use ruff_python_ast::{self as ast, CmpOp, Expr, ExprStringLiteral};
@@ -83,8 +83,6 @@ pub(crate) fn single_item_membership_test(
         return;
     };
 
-    let diagnostic = Diagnostic::new(SingleItemMembershipTest { membership_test }, expr.range());
-
     let edit = Edit::range_replacement(
         pad(
             generate_comparison(
@@ -110,7 +108,9 @@ pub(crate) fn single_item_membership_test(
 
     let fix = Fix::applicable_edit(edit, applicability);
 
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(SingleItemMembershipTest { membership_test }, expr.range())
+        .set_fix(fix);
 }
 
 /// Return the single item wrapped in `Some` if the expression contains a single

@@ -1,7 +1,7 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::Stmt;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_abstract;
@@ -82,7 +82,7 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         StrOrReprDefinedInStub {
             name: name.to_string(),
         },
@@ -94,5 +94,4 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
     diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().current_statement_parent_id(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

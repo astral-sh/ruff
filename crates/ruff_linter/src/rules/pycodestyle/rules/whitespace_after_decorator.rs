@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Decorator;
 use ruff_python_trivia::is_python_whitespace;
@@ -62,9 +62,8 @@ pub(crate) fn whitespace_after_decorator(checker: &Checker, decorator_list: &[De
                 let end = start + TextSize::try_from(end).unwrap();
                 let range = TextRange::new(start, end);
 
-                let mut diagnostic = Diagnostic::new(WhitespaceAfterDecorator, range);
+                let mut diagnostic = checker.report_diagnostic(WhitespaceAfterDecorator, range);
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                checker.report_diagnostic(diagnostic);
             }
         }
     }

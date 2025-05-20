@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtClassDef;
 use ruff_python_semantic::analyze::class::is_enumeration;
@@ -70,7 +70,5 @@ pub(crate) fn dataclass_enum(checker: &Checker, class_def: &StmtClassDef) {
         return;
     }
 
-    let diagnostic = Diagnostic::new(DataclassEnum, decorator.range);
-
-    checker.report_diagnostic(diagnostic);
+    checker.report_diagnostic(DataclassEnum, decorator.range);
 }

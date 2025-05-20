@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
@@ -60,10 +60,14 @@ pub(crate) fn decimal_from_float_literal_syntax(checker: &Checker, call: &ast::E
                 matches!(qualified_name.segments(), ["decimal", "Decimal"])
             })
         {
-            let diagnostic = Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(
-                fix_float_literal(arg.range(), float, checker.locator(), checker.stylist()),
-            );
-            checker.report_diagnostic(diagnostic);
+            checker
+                .report_diagnostic(DecimalFromFloatLiteral, arg.range())
+                .set_fix(fix_float_literal(
+                    arg.range(),
+                    float,
+                    checker.locator(),
+                    checker.stylist(),
+                ));
         }
     }
 }

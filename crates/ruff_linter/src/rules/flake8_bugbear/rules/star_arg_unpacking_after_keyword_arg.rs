@@ -1,6 +1,6 @@
 use ruff_python_ast::{Expr, Keyword};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
@@ -71,9 +71,6 @@ pub(crate) fn star_arg_unpacking_after_keyword_arg(
         if arg.start() <= keyword.start() {
             continue;
         }
-        checker.report_diagnostic(Diagnostic::new(
-            StarArgUnpackingAfterKeywordArg,
-            arg.range(),
-        ));
+        checker.report_diagnostic(StarArgUnpackingAfterKeywordArg, arg.range());
     }
 }

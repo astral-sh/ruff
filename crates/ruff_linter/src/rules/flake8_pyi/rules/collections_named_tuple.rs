@@ -1,6 +1,6 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -62,6 +62,6 @@ pub(crate) fn collections_named_tuple(checker: &Checker, expr: &Expr) {
             matches!(qualified_name.segments(), ["collections", "namedtuple"])
         })
     {
-        checker.report_diagnostic(Diagnostic::new(CollectionsNamedTuple, expr.range()));
+        checker.report_diagnostic(CollectionsNamedTuple, expr.range());
     }
 }

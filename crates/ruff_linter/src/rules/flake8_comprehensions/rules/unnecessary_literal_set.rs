@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextSize};
@@ -67,7 +67,7 @@ pub(crate) fn unnecessary_literal_set(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryLiteralSet { kind }, call.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryLiteralSet { kind }, call.range());
 
     // Convert `set((1, 2))` to `{1, 2}`.
     diagnostic.set_fix({
@@ -124,8 +124,6 @@ pub(crate) fn unnecessary_literal_set(checker: &Checker, call: &ast::ExprCall) {
             }
         }
     });
-
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

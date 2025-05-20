@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, Expr};
@@ -92,7 +92,7 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
                 .position(|open| open.is_ref(read_from))
             {
                 let open = self.candidates.remove(open);
-                self.checker.report_diagnostic(Diagnostic::new(
+                self.checker.report_diagnostic(
                     ReadWholeFile {
                         filename: SourceCodeSnippet::from_str(
                             &self.checker.generator().expr(open.filename),
@@ -100,7 +100,7 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
                         suggestion: make_suggestion(&open, self.checker.generator()),
                     },
                     open.item.range(),
-                ));
+                );
             }
             return;
         }

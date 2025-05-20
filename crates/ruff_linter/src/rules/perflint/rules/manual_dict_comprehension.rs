@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     self as ast, Expr, Stmt, comparable::ComparableExpr, helpers::any_over_expr,
@@ -296,7 +296,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             DictComprehensionType::Update
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             ManualDictComprehension {
                 fix_type,
                 is_async: for_stmt.is_async,
@@ -314,16 +314,14 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 checker,
             ))
         });
-
-        checker.report_diagnostic(diagnostic);
     } else {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             ManualDictComprehension {
                 fix_type: DictComprehensionType::Comprehension,
                 is_async: for_stmt.is_async,
             },
             *range,
-        ));
+        );
     }
 }
 

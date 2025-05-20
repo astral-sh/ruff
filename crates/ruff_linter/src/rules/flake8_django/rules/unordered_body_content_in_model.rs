@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -112,14 +112,13 @@ pub(crate) fn unordered_body_content_in_model(checker: &Checker, class_def: &ast
             .iter()
             .find(|&&prev_element_type| prev_element_type > element_type)
         {
-            let diagnostic = Diagnostic::new(
+            checker.report_diagnostic(
                 DjangoUnorderedBodyContentInModel {
                     element_type,
                     prev_element_type,
                 },
                 element.range(),
             );
-            checker.report_diagnostic(diagnostic);
         } else {
             element_types.push(element_type);
         }

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 use ruff_text_size::Ranged;
@@ -43,7 +43,7 @@ pub(crate) fn ssl_with_no_version(checker: &Checker, call: &ExprCall) {
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["ssl", "wrap_socket"]))
     {
         if call.arguments.find_keyword("ssl_version").is_none() {
-            checker.report_diagnostic(Diagnostic::new(SslWithNoVersion, call.range()));
+            checker.report_diagnostic(SslWithNoVersion, call.range());
         }
     }
 }

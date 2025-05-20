@@ -3,7 +3,7 @@ use std::hash::Hash;
 use ruff_python_semantic::analyze::class::iter_super_class;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
@@ -104,13 +104,13 @@ impl Ranged for Slot<'_> {
 fn check_super_slots(checker: &Checker, class_def: &ast::StmtClassDef, slot: &Slot) {
     for super_class in iter_super_class(class_def, checker.semantic()).skip(1) {
         if slots_members(&super_class.body).contains(slot) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 RedefinedSlotsInSubclass {
                     base: super_class.name.to_string(),
                     slot_name: slot.name.to_string(),
                 },
                 slot.range(),
-            ));
+            );
         }
     }
 }

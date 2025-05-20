@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 
 use ast::traversal;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::traversal::EnclosingSuite;
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -94,7 +94,7 @@ pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
 
         let replacement = make_suggestion(&group, checker.generator());
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             RepeatedAppend {
                 name: group.name().to_string(),
                 replacement: SourceCodeSnippet::new(replacement.clone()),
@@ -119,8 +119,6 @@ pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
                 group.end(),
             )));
         }
-
-        checker.report_diagnostic(diagnostic);
     }
 }
 

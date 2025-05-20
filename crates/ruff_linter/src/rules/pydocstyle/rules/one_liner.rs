@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::Ranged;
@@ -67,7 +67,8 @@ pub(crate) fn one_liner(checker: &Checker, docstring: &Docstring) {
     }
 
     if non_empty_line_count == 1 && line_count > 1 {
-        let mut diagnostic = Diagnostic::new(UnnecessaryMultilineDocstring, docstring.range());
+        let mut diagnostic =
+            checker.report_diagnostic(UnnecessaryMultilineDocstring, docstring.range());
 
         // If removing whitespace would lead to an invalid string of quote
         // characters, avoid applying the fix.
@@ -87,7 +88,5 @@ pub(crate) fn one_liner(checker: &Checker, docstring: &Docstring) {
                 docstring.range(),
             )));
         }
-
-        checker.report_diagnostic(diagnostic);
     }
 }

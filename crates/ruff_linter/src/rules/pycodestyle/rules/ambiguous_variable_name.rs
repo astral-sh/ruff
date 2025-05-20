@@ -1,6 +1,6 @@
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
@@ -50,9 +50,6 @@ pub(crate) fn ambiguous_variable_name(checker: &Checker, name: &str, range: Text
         return;
     }
     if is_ambiguous_name(name) {
-        checker.report_diagnostic(Diagnostic::new(
-            AmbiguousVariableName(name.to_string()),
-            range,
-        ));
+        checker.report_diagnostic(AmbiguousVariableName(name.to_string()), range);
     }
 }

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::{self as ast, Expr, ExprCall};
@@ -74,7 +74,7 @@ pub(crate) fn exception_without_exc_info(checker: &Checker, call: &ExprCall) {
     }
 
     if exc_info_arg_is_falsey(call, checker) {
-        checker.report_diagnostic(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
+        checker.report_diagnostic(ExceptionWithoutExcInfo, call.range());
     }
 }
 

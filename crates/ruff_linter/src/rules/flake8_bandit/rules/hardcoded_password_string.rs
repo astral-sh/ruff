@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -83,12 +83,12 @@ pub(crate) fn compare_to_hardcoded_password_string(
         let Some(name) = password_target(left) else {
             continue;
         };
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             HardcodedPasswordString {
                 name: name.to_string(),
             },
             comp.range(),
-        ));
+        );
     }
 }
 
@@ -100,12 +100,12 @@ pub(crate) fn assign_hardcoded_password_string(checker: &Checker, value: &Expr, 
     {
         for target in targets {
             if let Some(name) = password_target(target) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     HardcodedPasswordString {
                         name: name.to_string(),
                     },
                     value.range(),
-                ));
+                );
                 return;
             }
         }
