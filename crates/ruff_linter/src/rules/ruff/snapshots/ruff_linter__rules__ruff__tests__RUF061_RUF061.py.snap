@@ -1,0 +1,469 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF061.py:4:5: RUF061 [*] Large numeric literal without underscore separators
+  |
+3 | # These should trigger the rule (large numbers without underscore separators)
+4 | i = 1000000
+  |     ^^^^^^^ RUF061
+5 | f = 1234567.89
+6 | x = 0x1234ABCD
+  |
+  = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+1 1 | """Tests for the RUF061 rule (large numeric literals without underscore separators)."""
+2 2 | 
+3 3 | # These should trigger the rule (large numbers without underscore separators)
+4   |-i = 1000000
+  4 |+i = 1_000_000
+5 5 | f = 1234567.89
+6 6 | x = 0x1234ABCD
+7 7 | b = 0b10101010101010101010101
+
+RUF061.py:5:5: RUF061 [*] Large numeric literal without underscore separators
+  |
+3 | # These should trigger the rule (large numbers without underscore separators)
+4 | i = 1000000
+5 | f = 1234567.89
+  |     ^^^^^^^^^^ RUF061
+6 | x = 0x1234ABCD
+7 | b = 0b10101010101010101010101
+  |
+  = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+2 2 | 
+3 3 | # These should trigger the rule (large numbers without underscore separators)
+4 4 | i = 1000000
+5   |-f = 1234567.89
+  5 |+f = 1_234_567.89
+6 6 | x = 0x1234ABCD
+7 7 | b = 0b10101010101010101010101
+8 8 | o = 0o12345671234
+
+RUF061.py:6:5: RUF061 [*] Large numeric literal without underscore separators
+  |
+4 | i = 1000000
+5 | f = 1234567.89
+6 | x = 0x1234ABCD
+  |     ^^^^^^^^^^ RUF061
+7 | b = 0b10101010101010101010101
+8 | o = 0o12345671234
+  |
+  = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+3 3 | # These should trigger the rule (large numbers without underscore separators)
+4 4 | i = 1000000
+5 5 | f = 1234567.89
+6   |-x = 0x1234ABCD
+  6 |+x = 0x1234_ABCD
+7 7 | b = 0b10101010101010101010101
+8 8 | o = 0o12345671234
+9 9 | 
+
+RUF061.py:7:5: RUF061 [*] Large numeric literal without underscore separators
+  |
+5 | f = 1234567.89
+6 | x = 0x1234ABCD
+7 | b = 0b10101010101010101010101
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF061
+8 | o = 0o12345671234
+  |
+  = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+4 4 | i = 1000000
+5 5 | f = 1234567.89
+6 6 | x = 0x1234ABCD
+7   |-b = 0b10101010101010101010101
+  7 |+b = 0b1010101_01010101_01010101
+8 8 | o = 0o12345671234
+9 9 | 
+10 10 | # Scientific notation
+
+RUF061.py:8:5: RUF061 [*] Large numeric literal without underscore separators
+   |
+ 6 | x = 0x1234ABCD
+ 7 | b = 0b10101010101010101010101
+ 8 | o = 0o12345671234
+   |     ^^^^^^^^^^^^^ RUF061
+ 9 |
+10 | # Scientific notation
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+5 5 | f = 1234567.89
+6 6 | x = 0x1234ABCD
+7 7 | b = 0b10101010101010101010101
+8   |-o = 0o12345671234
+  8 |+o = 0o123_4567_1234
+9 9 | 
+10 10 | # Scientific notation
+11 11 | sci = 1000000e10
+
+RUF061.py:11:7: RUF061 [*] Large numeric literal without underscore separators
+   |
+10 | # Scientific notation
+11 | sci = 1000000e10
+   |       ^^^^^^^^^^ RUF061
+12 | sci_uppercase = 1000000E10
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+8  8  | o = 0o12345671234
+9  9  | 
+10 10 | # Scientific notation
+11    |-sci = 1000000e10
+   11 |+sci = 1_000_000e10
+12 12 | sci_uppercase = 1000000E10
+13 13 | 
+14 14 | # These should not trigger the rule (small numbers or already have separators)
+
+RUF061.py:12:17: RUF061 [*] Large numeric literal without underscore separators
+   |
+10 | # Scientific notation
+11 | sci = 1000000e10
+12 | sci_uppercase = 1000000E10
+   |                 ^^^^^^^^^^ RUF061
+13 |
+14 | # These should not trigger the rule (small numbers or already have separators)
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+9  9  | 
+10 10 | # Scientific notation
+11 11 | sci = 1000000e10
+12    |-sci_uppercase = 1000000E10
+   12 |+sci_uppercase = 1_000_000E10
+13 13 | 
+14 14 | # These should not trigger the rule (small numbers or already have separators)
+15 15 | dec_small_int = 1234
+
+RUF061.py:24:28: RUF061 [*] Large numeric literal without underscore separators
+   |
+23 | # These should trigger the rule because their separators are misplaced
+24 | dec_misplaced_separators = 123_4567_89
+   |                            ^^^^^^^^^^^ RUF061
+25 | oct_misplaced_separators = 0o12_34_56
+26 | hex_misplaced_separators = 0xABCD_EF
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+21 21 | sci_with_separators = 1_000_000e10
+22 22 | 
+23 23 | # These should trigger the rule because their separators are misplaced
+24    |-dec_misplaced_separators = 123_4567_89
+   24 |+dec_misplaced_separators = 123_456_789
+25 25 | oct_misplaced_separators = 0o12_34_56
+26 26 | hex_misplaced_separators = 0xABCD_EF
+27 27 | 
+
+RUF061.py:25:28: RUF061 [*] Large numeric literal without underscore separators
+   |
+23 | # These should trigger the rule because their separators are misplaced
+24 | dec_misplaced_separators = 123_4567_89
+25 | oct_misplaced_separators = 0o12_34_56
+   |                            ^^^^^^^^^^ RUF061
+26 | hex_misplaced_separators = 0xABCD_EF
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+22 22 | 
+23 23 | # These should trigger the rule because their separators are misplaced
+24 24 | dec_misplaced_separators = 123_4567_89
+25    |-oct_misplaced_separators = 0o12_34_56
+   25 |+oct_misplaced_separators = 0o12_3456
+26 26 | hex_misplaced_separators = 0xABCD_EF
+27 27 | 
+28 28 | # uppercase base prefix
+
+RUF061.py:26:28: RUF061 [*] Large numeric literal without underscore separators
+   |
+24 | dec_misplaced_separators = 123_4567_89
+25 | oct_misplaced_separators = 0o12_34_56
+26 | hex_misplaced_separators = 0xABCD_EF
+   |                            ^^^^^^^^^ RUF061
+27 |
+28 | # uppercase base prefix
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+23 23 | # These should trigger the rule because their separators are misplaced
+24 24 | dec_misplaced_separators = 123_4567_89
+25 25 | oct_misplaced_separators = 0o12_34_56
+26    |-hex_misplaced_separators = 0xABCD_EF
+   26 |+hex_misplaced_separators = 0xAB_CDEF
+27 27 | 
+28 28 | # uppercase base prefix
+29 29 | hex_uppercase = 0XABCDEF
+
+RUF061.py:29:17: RUF061 [*] Large numeric literal without underscore separators
+   |
+28 | # uppercase base prefix
+29 | hex_uppercase = 0XABCDEF
+   |                 ^^^^^^^^ RUF061
+30 | oct_uppercase = 0O123456
+31 | bin_uppercase = 0B01010101010101
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+26 26 | hex_misplaced_separators = 0xABCD_EF
+27 27 | 
+28 28 | # uppercase base prefix
+29    |-hex_uppercase = 0XABCDEF
+   29 |+hex_uppercase = 0XAB_CDEF
+30 30 | oct_uppercase = 0O123456
+31 31 | bin_uppercase = 0B01010101010101
+32 32 | 
+
+RUF061.py:30:17: RUF061 [*] Large numeric literal without underscore separators
+   |
+28 | # uppercase base prefix
+29 | hex_uppercase = 0XABCDEF
+30 | oct_uppercase = 0O123456
+   |                 ^^^^^^^^ RUF061
+31 | bin_uppercase = 0B01010101010101
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+27 27 | 
+28 28 | # uppercase base prefix
+29 29 | hex_uppercase = 0XABCDEF
+30    |-oct_uppercase = 0O123456
+   30 |+oct_uppercase = 0O12_3456
+31 31 | bin_uppercase = 0B01010101010101
+32 32 | 
+33 33 | # Negative numbers should also be checked
+
+RUF061.py:31:17: RUF061 [*] Large numeric literal without underscore separators
+   |
+29 | hex_uppercase = 0XABCDEF
+30 | oct_uppercase = 0O123456
+31 | bin_uppercase = 0B01010101010101
+   |                 ^^^^^^^^^^^^^^^^ RUF061
+32 |
+33 | # Negative numbers should also be checked
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+28 28 | # uppercase base prefix
+29 29 | hex_uppercase = 0XABCDEF
+30 30 | oct_uppercase = 0O123456
+31    |-bin_uppercase = 0B01010101010101
+   31 |+bin_uppercase = 0B010101_01010101
+32 32 | 
+33 33 | # Negative numbers should also be checked
+34 34 | neg_large = -1000000
+
+RUF061.py:34:14: RUF061 [*] Large numeric literal without underscore separators
+   |
+33 | # Negative numbers should also be checked
+34 | neg_large = -1000000
+   |              ^^^^^^^ RUF061
+35 | neg_with_separators = -1_000_000 # should not trigger
+36 | neg_with_spaces = -   100000
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+31 31 | bin_uppercase = 0B01010101010101
+32 32 | 
+33 33 | # Negative numbers should also be checked
+34    |-neg_large = -1000000
+   34 |+neg_large = -1_000_000
+35 35 | neg_with_separators = -1_000_000 # should not trigger
+36 36 | neg_with_spaces = -   100000
+37 37 | neg_oct = -0o1234567
+
+RUF061.py:36:23: RUF061 [*] Large numeric literal without underscore separators
+   |
+34 | neg_large = -1000000
+35 | neg_with_separators = -1_000_000 # should not trigger
+36 | neg_with_spaces = -   100000
+   |                       ^^^^^^ RUF061
+37 | neg_oct = -0o1234567
+38 | neg_hex = -0xABCDEF
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+33 33 | # Negative numbers should also be checked
+34 34 | neg_large = -1000000
+35 35 | neg_with_separators = -1_000_000 # should not trigger
+36    |-neg_with_spaces = -   100000
+   36 |+neg_with_spaces = -   100_000
+37 37 | neg_oct = -0o1234567
+38 38 | neg_hex = -0xABCDEF
+39 39 | neg_bin -0b0101010100101
+
+RUF061.py:37:12: RUF061 [*] Large numeric literal without underscore separators
+   |
+35 | neg_with_separators = -1_000_000 # should not trigger
+36 | neg_with_spaces = -   100000
+37 | neg_oct = -0o1234567
+   |            ^^^^^^^^^ RUF061
+38 | neg_hex = -0xABCDEF
+39 | neg_bin -0b0101010100101
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+34 34 | neg_large = -1000000
+35 35 | neg_with_separators = -1_000_000 # should not trigger
+36 36 | neg_with_spaces = -   100000
+37    |-neg_oct = -0o1234567
+   37 |+neg_oct = -0o123_4567
+38 38 | neg_hex = -0xABCDEF
+39 39 | neg_bin -0b0101010100101
+40 40 | neg_hex_with_spaces = -   0xABCDEF
+
+RUF061.py:38:12: RUF061 [*] Large numeric literal without underscore separators
+   |
+36 | neg_with_spaces = -   100000
+37 | neg_oct = -0o1234567
+38 | neg_hex = -0xABCDEF
+   |            ^^^^^^^^ RUF061
+39 | neg_bin -0b0101010100101
+40 | neg_hex_with_spaces = -   0xABCDEF
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+35 35 | neg_with_separators = -1_000_000 # should not trigger
+36 36 | neg_with_spaces = -   100000
+37 37 | neg_oct = -0o1234567
+38    |-neg_hex = -0xABCDEF
+   38 |+neg_hex = -0xAB_CDEF
+39 39 | neg_bin -0b0101010100101
+40 40 | neg_hex_with_spaces = -   0xABCDEF
+41 41 | 
+
+RUF061.py:39:10: RUF061 [*] Large numeric literal without underscore separators
+   |
+37 | neg_oct = -0o1234567
+38 | neg_hex = -0xABCDEF
+39 | neg_bin -0b0101010100101
+   |          ^^^^^^^^^^^^^^^ RUF061
+40 | neg_hex_with_spaces = -   0xABCDEF
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+36 36 | neg_with_spaces = -   100000
+37 37 | neg_oct = -0o1234567
+38 38 | neg_hex = -0xABCDEF
+39    |-neg_bin -0b0101010100101
+   39 |+neg_bin -0b01010_10100101
+40 40 | neg_hex_with_spaces = -   0xABCDEF
+41 41 | 
+42 42 | # Testing for minimun size thresholds
+
+RUF061.py:40:27: RUF061 [*] Large numeric literal without underscore separators
+   |
+38 | neg_hex = -0xABCDEF
+39 | neg_bin -0b0101010100101
+40 | neg_hex_with_spaces = -   0xABCDEF
+   |                           ^^^^^^^^ RUF061
+41 |
+42 | # Testing for minimun size thresholds
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+37 37 | neg_oct = -0o1234567
+38 38 | neg_hex = -0xABCDEF
+39 39 | neg_bin -0b0101010100101
+40    |-neg_hex_with_spaces = -   0xABCDEF
+   40 |+neg_hex_with_spaces = -   0xAB_CDEF
+41 41 | 
+42 42 | # Testing for minimun size thresholds
+43 43 | dec_4_digits = 1234  # Should not trigger, just below the threshold of 5 digits
+
+RUF061.py:44:16: RUF061 [*] Large numeric literal without underscore separators
+   |
+42 | # Testing for minimun size thresholds
+43 | dec_4_digits = 1234  # Should not trigger, just below the threshold of 5 digits
+44 | dec_5_digits = 12345  # Should trigger, 5 digits
+   |                ^^^^^ RUF061
+45 | oct_4_digits = 0o1234  # Should not trigger, just below the threshold of 4 digits
+46 | oct_5_digits = 0o12345  # Should trigger, 5 digits
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+41 41 | 
+42 42 | # Testing for minimun size thresholds
+43 43 | dec_4_digits = 1234  # Should not trigger, just below the threshold of 5 digits
+44    |-dec_5_digits = 12345  # Should trigger, 5 digits
+   44 |+dec_5_digits = 12_345  # Should trigger, 5 digits
+45 45 | oct_4_digits = 0o1234  # Should not trigger, just below the threshold of 4 digits
+46 46 | oct_5_digits = 0o12345  # Should trigger, 5 digits
+47 47 | bin_8_digits = 0b01010101  # Should not trigger, just below the threshold of 9 digits
+
+RUF061.py:46:16: RUF061 [*] Large numeric literal without underscore separators
+   |
+44 | dec_5_digits = 12345  # Should trigger, 5 digits
+45 | oct_4_digits = 0o1234  # Should not trigger, just below the threshold of 4 digits
+46 | oct_5_digits = 0o12345  # Should trigger, 5 digits
+   |                ^^^^^^^ RUF061
+47 | bin_8_digits = 0b01010101  # Should not trigger, just below the threshold of 9 digits
+48 | bin_9_digits = 0b101010101  # Should trigger, 9 digits
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+43 43 | dec_4_digits = 1234  # Should not trigger, just below the threshold of 5 digits
+44 44 | dec_5_digits = 12345  # Should trigger, 5 digits
+45 45 | oct_4_digits = 0o1234  # Should not trigger, just below the threshold of 4 digits
+46    |-oct_5_digits = 0o12345  # Should trigger, 5 digits
+   46 |+oct_5_digits = 0o1_2345  # Should trigger, 5 digits
+47 47 | bin_8_digits = 0b01010101  # Should not trigger, just below the threshold of 9 digits
+48 48 | bin_9_digits = 0b101010101  # Should trigger, 9 digits
+49 49 | hex_4_digits = 0xABCD  # Should not trigger, just below the threshold of 5 digits
+
+RUF061.py:48:16: RUF061 [*] Large numeric literal without underscore separators
+   |
+46 | oct_5_digits = 0o12345  # Should trigger, 5 digits
+47 | bin_8_digits = 0b01010101  # Should not trigger, just below the threshold of 9 digits
+48 | bin_9_digits = 0b101010101  # Should trigger, 9 digits
+   |                ^^^^^^^^^^^ RUF061
+49 | hex_4_digits = 0xABCD  # Should not trigger, just below the threshold of 5 digits
+50 | hex_5_digits = 0xABCDE  # Should trigger, 5 digits
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+45 45 | oct_4_digits = 0o1234  # Should not trigger, just below the threshold of 4 digits
+46 46 | oct_5_digits = 0o12345  # Should trigger, 5 digits
+47 47 | bin_8_digits = 0b01010101  # Should not trigger, just below the threshold of 9 digits
+48    |-bin_9_digits = 0b101010101  # Should trigger, 9 digits
+   48 |+bin_9_digits = 0b1_01010101  # Should trigger, 9 digits
+49 49 | hex_4_digits = 0xABCD  # Should not trigger, just below the threshold of 5 digits
+50 50 | hex_5_digits = 0xABCDE  # Should trigger, 5 digits
+
+RUF061.py:50:16: RUF061 [*] Large numeric literal without underscore separators
+   |
+48 | bin_9_digits = 0b101010101  # Should trigger, 9 digits
+49 | hex_4_digits = 0xABCD  # Should not trigger, just below the threshold of 5 digits
+50 | hex_5_digits = 0xABCDE  # Should trigger, 5 digits
+   |                ^^^^^^^ RUF061
+   |
+   = help: Add underscore separators to numeric literal
+
+ℹ Safe fix
+47 47 | bin_8_digits = 0b01010101  # Should not trigger, just below the threshold of 9 digits
+48 48 | bin_9_digits = 0b101010101  # Should trigger, 9 digits
+49 49 | hex_4_digits = 0xABCD  # Should not trigger, just below the threshold of 5 digits
+50    |-hex_5_digits = 0xABCDE  # Should trigger, 5 digits
+   50 |+hex_5_digits = 0xA_BCDE  # Should trigger, 5 digits
