@@ -21,11 +21,15 @@ pub(crate) struct FTStringContext {
 }
 
 impl FTStringContext {
-    pub(crate) const fn new(flags: TokenFlags, nesting: u32) -> Self {
-        Self {
-            flags,
-            nesting,
-            format_spec_depth: 0,
+    pub(crate) const fn new(flags: TokenFlags, nesting: u32) -> Option<Self> {
+        if flags.is_ft_string() {
+            Some(Self {
+                flags,
+                nesting,
+                format_spec_depth: 0,
+            })
+        } else {
+            None
         }
     }
 
@@ -35,7 +39,7 @@ impl FTStringContext {
         } else if self.flags.is_t_string() {
             FTStringKind::TString
         } else {
-            panic!("Expected `FTStringContext` to have either f-string or t-string flag")
+            unreachable!("Can only be constructed when f-string or t-string flag is present")
         }
     }
 

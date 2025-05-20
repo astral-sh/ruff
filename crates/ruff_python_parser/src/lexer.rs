@@ -763,7 +763,8 @@ impl<'src> Lexer<'src> {
             self.current_flags |= TokenFlags::TRIPLE_QUOTED_STRING;
         }
 
-        let ftcontext = FTStringContext::new(self.current_flags, self.nesting);
+        let ftcontext = FTStringContext::new(self.current_flags, self.nesting)
+            .expect("Expect to have f or t-string flag set");
 
         let kind = ftcontext.kind();
 
