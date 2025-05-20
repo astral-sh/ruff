@@ -211,3 +211,20 @@ def f(
     else:
         reveal_type(d)  # revealed: P & ~AlwaysFalsy
 ```
+
+## Narrowing a generic class
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class A[T]: ...
+
+def _(x: A[int] | int):
+    if isinstance(x, A):
+        reveal_type(x)  # revealed: A[int] | (int & A[Unknown])
+    else:
+        reveal_type(x)  # revealed: int & ~A[Unknown]
+```

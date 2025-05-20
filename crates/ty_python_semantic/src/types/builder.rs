@@ -793,7 +793,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
                 for existing_positive in &self.positive {
                     // S & ~T = Never    if S <: T
-                    if existing_positive.is_subtype_of(db, new_negative) {
+                    if existing_positive.is_subtype_of(db, new_negative)
+                        || existing_positive.is_gradual_equivalent_to(db, new_negative)
+                    {
                         *self = Self::default();
                         self.positive.insert(Type::Never);
                         return;

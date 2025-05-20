@@ -510,6 +510,8 @@ impl<'db> Specialization<'db> {
                 | TypeVarVariance::Covariant
                 | TypeVarVariance::Contravariant => {
                     self_type.is_gradual_equivalent_to(db, *other_type)
+                        || self_type.is_unknown()
+                        || other_type.is_unknown()
                 }
                 TypeVarVariance::Bivariant => true,
             };
