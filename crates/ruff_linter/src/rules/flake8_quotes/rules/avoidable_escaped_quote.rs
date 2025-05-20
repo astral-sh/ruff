@@ -222,8 +222,10 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_, '_> {
             .literals()
             .any(|literal| contains_quote(literal, opposite_quote_char))
         {
-            if let Some(diagnostic) = check_t_string(self.locator, self.quotes_settings, t_string) {
-                self.diagnostics.push(diagnostic);
+            if let Some(diagnostic) =
+                check_t_string(self.checker.locator(), self.quotes_settings, t_string)
+            {
+                self.checker.report_diagnostic(diagnostic);
             }
         }
 
