@@ -4,10 +4,13 @@ from airflow.hooks.dbapi import (
     ConnectorProtocol,
     DbApiHook,
 )
+
+ConnectorProtocol()
+DbApiHook()
+
 from airflow.hooks.dbapi_hook import DbApiHook
 from airflow.operators.check_operator import SQLCheckOperator
 
-ConnectorProtocol()
 DbApiHook()
 SQLCheckOperator()
 
