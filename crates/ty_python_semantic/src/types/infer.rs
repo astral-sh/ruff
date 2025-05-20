@@ -7265,7 +7265,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::unknown()
                 }
             }
-            // Ex) Given `b"value"[1]`, return `b"a"`
+            // Ex) Given `b"value"[1]`, return `97` (i.e., `ord(b"a")`)
             (Type::BytesLiteral(literal_ty), Type::IntLiteral(int), _)
                 if i32::try_from(int).is_ok() =>
             {
@@ -7273,7 +7273,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 literal_value
                     .iter()
                     .py_index(i32::try_from(int).expect("checked in branch arm"))
-                    .map(|byte| Type::bytes_literal(self.db(), &[*byte]))
+                    .map(|byte| Type::IntLiteral((*byte).into()))
                     .unwrap_or_else(|_| {
                         report_index_out_of_bounds(
                             &self.context,
