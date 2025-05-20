@@ -862,7 +862,7 @@ if condition:
     	print('Should change quotes')
 
     ----- stderr -----
-    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `select` or `extend-select` configuration, or adding it to the `lint.ignore` configuration.
+    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `select` or `extend-select` configuration, or adding it to the `ruff.ignore` configuration.
     "#);
     Ok(())
 }
@@ -899,7 +899,7 @@ if True:
           Cause: Failed to parse [RUFF-TOML-PATH]
           Cause: TOML parse error at line 1, column 1
           |
-        1 | 
+        1 |
           | ^
         unknown field `tab-size`
         ");
