@@ -357,6 +357,14 @@ impl<'db> PropertyInstanceType<'db> {
         Self::new(db, getter, setter)
     }
 
+    fn normalized(self, db: &'db dyn Db) -> Self {
+        Self::new(
+            db,
+            self.getter(db).map(|ty| ty.normalized(db)),
+            self.setter(db).map(|ty| ty.normalized(db)),
+        )
+    }
+
     fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
@@ -1005,28 +1013,17 @@ impl<'db> Type<'db> {
             Type::Callable(callable) => Type::Callable(callable.normalized(db)),
             Type::ProtocolInstance(protocol) => protocol.normalized(db),
             Type::NominalInstance(instance) => Type::NominalInstance(instance.normalized(db)),
-            Type::Dynamic(_) => Type::any(),
-            Type::LiteralString
-            | Type::PropertyInstance(_)
-            | Type::AlwaysFalsy
-            | Type::AlwaysTruthy
-            | Type::BooleanLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::Never
-            | Type::FunctionLiteral(_)
-            | Type::MethodWrapper(_)
-            | Type::BoundMethod(_)
-            | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::ModuleLiteral(_)
-            | Type::ClassLiteral(_)
-            | Type::KnownInstance(_)
-            | Type::IntLiteral(_)
-            | Type::BoundSuper(_)
-            | Type::SubclassOf(_) => self,
+            Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
+            Type::FunctionLiteral(function) => Type::FunctionLiteral(function.normalized(db)),
+            Type::PropertyInstance(property) => Type::PropertyInstance(property.normalized(db)),
+            Type::MethodWrapper(method_kind) => Type::MethodWrapper(method_kind.normalized(db)),
+            Type::BoundMethod(method) => Type::BoundMethod(method.normalized(db)),
+            Type::BoundSuper(bound_super) => Type::BoundSuper(bound_super.normalized(db)),
             Type::GenericAlias(generic) => Type::GenericAlias(generic.normalized(db)),
+            Type::SubclassOf(subclass_of) => Type::SubclassOf(subclass_of.normalized(db)),
+            Type::KnownInstance(known_instance) => {
+                Type::KnownInstance(known_instance.normalized(db))
+            }
             Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     Type::TypeVar(TypeVarInstance::new(
@@ -1052,6 +1049,19 @@ impl<'db> Type<'db> {
                 }
                 None => self,
             },
+            Type::LiteralString
+            | Type::AlwaysFalsy
+            | Type::AlwaysTruthy
+            | Type::BooleanLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::Never
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ModuleLiteral(_)
+            | Type::ClassLiteral(_)
+            | Type::IntLiteral(_) => self,
         }
     }
 
@@ -5604,6 +5614,18 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
         }
     }
+
+    fn normalized(&self, db: &'db dyn Db) -> Self {
+        match self {
+            TypeMapping::Specialization(specialization) => {
+                TypeMapping::Specialization(specialization.normalized(db))
+            }
+            TypeMapping::PartialSpecialization(partial) => {
+                TypeMapping::PartialSpecialization(partial.normalized(db))
+            }
+            TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -5625,6 +5647,13 @@ pub enum DynamicType {
     /// A special Todo-variant for PEP-695 `ParamSpec` types. A temporary variant to detect and special-
     /// case the handling of these types in `Callable` annotations.
     TodoPEP695ParamSpec,
+}
+
+impl DynamicType {
+    #[expect(clippy::unused_self)]
+    fn normalized(self) -> Self {
+        Self::Any
+    }
 }
 
 impl std::fmt::Display for DynamicType {
@@ -5877,6 +5906,18 @@ impl<'db> TypeVarInstance<'db> {
             None
         }
     }
+
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        Self::new(
+            db,
+            self.name(db),
+            self.definition(db),
+            self.bound_or_constraints(db).map(|b| b.normalized(db)),
+            self.variance(db),
+            self.default_ty(db).map(|d| d.normalized(db)),
+            self.kind(db),
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
@@ -5891,6 +5932,19 @@ pub enum TypeVarVariance {
 pub enum TypeVarBoundOrConstraints<'db> {
     UpperBound(Type<'db>),
     Constraints(UnionType<'db>),
+}
+
+impl<'db> TypeVarBoundOrConstraints<'db> {
+    fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                TypeVarBoundOrConstraints::UpperBound(bound.normalized(db))
+            }
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                TypeVarBoundOrConstraints::Constraints(constraints.normalized(db))
+            }
+        }
+    }
 }
 
 /// Error returned if a type is not (or may not be) a context manager.
@@ -7123,6 +7177,29 @@ impl<'db> FunctionType<'db> {
                 .is_gradual_equivalent_to(db, other.into_callable_type(db))
     }
 
+    fn normalized(self, db: &'db dyn Db) -> Self {
+        let context = self
+            .inherited_generic_context(db)
+            .map(|ctx| ctx.normalized(db));
+
+        let mappings: Box<_> = self
+            .type_mappings(db)
+            .iter()
+            .map(|mapping| mapping.normalized(db))
+            .collect();
+
+        Self::new(
+            db,
+            self.name(db),
+            self.known(db),
+            self.body_scope(db),
+            self.decorators(db),
+            self.dataclass_transformer_params(db),
+            context,
+            mappings,
+        )
+    }
+
     /// Returns a tuple of two spans. The first is
     /// the span for the identifier of the function
     /// definition for `self`. The second is
@@ -7408,6 +7485,14 @@ impl<'db> BoundMethodType<'db> {
                 .iter()
                 .map(signatures::Signature::bind_self),
         ))
+    }
+
+    fn normalized(self, db: &'db dyn Db) -> Self {
+        Self::new(
+            db,
+            self.function(db).normalized(db),
+            self.self_instance(db).normalized(db),
+        )
     }
 
     fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
@@ -7813,6 +7898,24 @@ impl<'db> MethodWrapperKind<'db> {
             ) => false,
         }
     }
+
+    fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            MethodWrapperKind::FunctionTypeDunderGet(function) => {
+                MethodWrapperKind::FunctionTypeDunderGet(function.normalized(db))
+            }
+            MethodWrapperKind::FunctionTypeDunderCall(function) => {
+                MethodWrapperKind::FunctionTypeDunderCall(function.normalized(db))
+            }
+            MethodWrapperKind::PropertyDunderGet(property) => {
+                MethodWrapperKind::PropertyDunderGet(property.normalized(db))
+            }
+            MethodWrapperKind::PropertyDunderSet(property) => {
+                MethodWrapperKind::PropertyDunderSet(property.normalized(db))
+            }
+            MethodWrapperKind::StrStartswith(_) => self,
+        }
+    }
 }
 
 /// Represents a specific instance of `types.WrapperDescriptorType`
@@ -7907,6 +8010,10 @@ impl<'db> PEP695TypeAliasType<'db> {
         let definition = self.definition(db);
         definition_expression_type(db, definition, &type_alias_stmt_node.value)
     }
+
+    fn normalized(self, _db: &'db dyn Db) -> Self {
+        self
+    }
 }
 
 /// # Ordering
@@ -7921,6 +8028,17 @@ pub struct BareTypeAliasType<'db> {
     pub value: Type<'db>,
 }
 
+impl<'db> BareTypeAliasType<'db> {
+    fn normalized(self, db: &'db dyn Db) -> Self {
+        Self::new(
+            db,
+            self.name(db),
+            self.definition(db),
+            self.value(db).normalized(db),
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, salsa::Update)]
 pub enum TypeAliasType<'db> {
     PEP695(PEP695TypeAliasType<'db>),
@@ -7928,10 +8046,17 @@ pub enum TypeAliasType<'db> {
 }
 
 impl<'db> TypeAliasType<'db> {
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            TypeAliasType::PEP695(type_alias) => TypeAliasType::PEP695(type_alias.normalized(db)),
+            TypeAliasType::Bare(type_alias) => TypeAliasType::Bare(type_alias.normalized(db)),
+        }
+    }
+
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.name(db),
-            TypeAliasType::Bare(type_alias) => type_alias.name(db).as_str(),
+            TypeAliasType::Bare(type_alias) => type_alias.name(db),
         }
     }
 
@@ -8595,6 +8720,14 @@ pub enum SuperOwnerKind<'db> {
 }
 
 impl<'db> SuperOwnerKind<'db> {
+    fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            SuperOwnerKind::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic.normalized()),
+            SuperOwnerKind::Class(class) => SuperOwnerKind::Class(class.normalized(db)),
+            SuperOwnerKind::Instance(instance) => SuperOwnerKind::Instance(instance.normalized(db)),
+        }
+    }
+
     fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => {
@@ -8828,6 +8961,14 @@ impl<'db> BoundSuperType<'db> {
                 self.skip_until_after_pivot(db, owner.iter_mro(db)),
             ),
         }
+    }
+
+    fn normalized(self, db: &'db dyn Db) -> Self {
+        Self::new(
+            db,
+            self.pivot_class(db).normalized(db),
+            self.owner(db).normalized(db),
+        )
     }
 }
 

@@ -237,6 +237,15 @@ impl<'db> GenericContext<'db> {
 
         Specialization::new(db, self, expanded.into_boxed_slice())
     }
+
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        let variables: FxOrderSet<_> = self
+            .variables(db)
+            .iter()
+            .map(|ty| ty.normalized(db))
+            .collect();
+        Self::new(db, variables, self.origin(db))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -559,6 +568,16 @@ impl<'db> PartialSpecialization<'_, 'db> {
         PartialSpecialization {
             generic_context: self.generic_context,
             types: Cow::from(self.types.clone().into_owned()),
+        }
+    }
+
+    pub(crate) fn normalized(&self, db: &'db dyn Db) -> PartialSpecialization<'db, 'db> {
+        let generic_context = self.generic_context.normalized(db);
+        let types: Cow<_> = self.types.iter().map(|ty| ty.normalized(db)).collect();
+
+        PartialSpecialization {
+            generic_context,
+            types,
         }
     }
 }
