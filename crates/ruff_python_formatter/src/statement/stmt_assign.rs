@@ -1,3 +1,4 @@
+use ruff_formatter::group_id::DebugGroupId;
 use ruff_formatter::{FormatError, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{
     AnyNodeRef, Expr, ExprAttribute, ExprCall, FString, Operator, StmtAssign, StringLike, TString,
@@ -450,151 +451,23 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                             .with_mode(BestFittingMode::AllLines)
                             .fmt(f)?;
                     } else if let Some(format_t_string) = format_t_string {
-                        inline_comments.mark_formatted();
-
-                        let t_string_flat = format_with(|f| {
-                            let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
-
-                            write!(buffer, [format_t_string.format()])
-                        })
-                        .memoized();
-
-                        // T-String containing an interpolation with a magic trailing comma, a comment, or a
-                        // multiline debug interpolation should never be joined. Use the default layout.
-                        // ```python
-                        // aaaa = t"aaaa {[
-                        //     1, 2,
-                        // ]} bbbb"
-                        // ```
-                        if t_string_flat.inspect(f)?.will_break() {
-                            inline_comments.mark_unformatted();
-
-                            return write!(
-                                f,
-                                [maybe_parenthesize_expression(
-                                    value,
-                                    *statement,
-                                    Parenthesize::IfBreaks,
-                                )]
-                            );
-                        }
-
-                        // Considering the following example:
-                        // ```python
-                        // aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
-                        //     expression}moreeeeeeeeeeeeeeeee"
-                        // ```
-
-                        // Flatten the t-string.
-                        // ```python
-                        // aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
-                        // ```
-                        let single_line =
-                            format_with(|f| write!(f, [t_string_flat, inline_comments]));
-
-                        // Parenthesize the t-string and flatten the t-string.
-                        // ```python
-                        // aaaaaaaaaaaaaaaaaa = (
-                        //     t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
-                        // )
-                        // ```
-                        let joined_parenthesized = format_with(|f| {
-                            group(&format_args![
-                                token("("),
-                                soft_block_indent(&format_args![t_string_flat, inline_comments]),
-                                token(")"),
-                            ])
-                            .with_id(Some(group_id))
-                            .should_expand(true)
-                            .fmt(f)
-                        });
-
-                        // Avoid flattening or parenthesizing the t-string, keep the original
-                        // t-string formatting.
-                        // ```python
-                        // aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
-                        //     expression
-                        // }moreeeeeeeeeeeeeeeee"
-                        // ```
-                        let format_t_string =
-                            format_with(|f| write!(f, [format_t_string.format(), inline_comments]));
-
-                        best_fitting![single_line, joined_parenthesized, format_t_string]
-                            .with_mode(BestFittingMode::AllLines)
-                            .fmt(f)?;
+                        format_ft_string_left_right_helper(
+                            value,
+                            *statement,
+                            format_t_string,
+                            &inline_comments,
+                            f,
+                            group_id,
+                        )?;
                     } else if let Some(format_f_string) = format_f_string {
-                        inline_comments.mark_formatted();
-
-                        let f_string_flat = format_with(|f| {
-                            let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
-
-                            write!(buffer, [format_f_string.format()])
-                        })
-                        .memoized();
-
-                        // F-String containing an expression with a magic trailing comma, a comment, or a
-                        // multiline debug expression should never be joined. Use the default layout.
-                        // ```python
-                        // aaaa = f"aaaa {[
-                        //     1, 2,
-                        // ]} bbbb"
-                        // ```
-                        if f_string_flat.inspect(f)?.will_break() {
-                            inline_comments.mark_unformatted();
-
-                            return write!(
-                                f,
-                                [maybe_parenthesize_expression(
-                                    value,
-                                    *statement,
-                                    Parenthesize::IfBreaks,
-                                )]
-                            );
-                        }
-
-                        // Considering the following example:
-                        // ```python
-                        // aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
-                        //     expression}moreeeeeeeeeeeeeeeee"
-                        // ```
-
-                        // Flatten the f-string.
-                        // ```python
-                        // aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
-                        // ```
-                        let single_line =
-                            format_with(|f| write!(f, [f_string_flat, inline_comments]));
-
-                        // Parenthesize the f-string and flatten the f-string.
-                        // ```python
-                        // aaaaaaaaaaaaaaaaaa = (
-                        //     f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
-                        // )
-                        // ```
-                        let joined_parenthesized = format_with(|f| {
-                            group(&format_args![
-                                token("("),
-                                soft_block_indent(&format_args![f_string_flat, inline_comments]),
-                                token(")"),
-                            ])
-                            .with_id(Some(group_id))
-                            .should_expand(true)
-                            .fmt(f)
-                        });
-
-                        // Avoid flattening or parenthesizing the f-string, keep the original
-                        // f-string formatting.
-                        // ```python
-                        // aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
-                        //     expression
-                        // }moreeeeeeeeeeeeeeeee"
-                        // ```
-                        let format_f_string =
-                            format_with(|f| write!(f, [format_f_string.format(), inline_comments]));
-
-                        best_fitting![single_line, joined_parenthesized, format_f_string]
-                            .with_mode(BestFittingMode::AllLines)
-                            .fmt(f)?;
+                        format_ft_string_left_right_helper(
+                            value,
+                            *statement,
+                            format_f_string,
+                            &inline_comments,
+                            f,
+                            group_id,
+                        )?;
                     } else {
                         best_fit_parenthesize(&format_once(|f| {
                             inline_comments.mark_formatted();
@@ -994,259 +867,37 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         .fmt(f)
                     }
                 } else if let Some(format_t_string) = &format_t_string {
-                    // T-String containing an interpolation with a magic trailing comma, a comment, or a
-                    // multiline debug expression should never be joined. Use the default layout.
-                    //
-                    // ```python
-                    // aaaa, bbbb = f"aaaa {[
-                    //     1, 2,
-                    // ]} bbbb"
-                    // ```
-                    if format_value.inspect(f)?.will_break() {
-                        inline_comments.mark_unformatted();
-
-                        return write!(
-                            f,
-                            [
-                                before_operator,
-                                space(),
-                                operator,
-                                space(),
-                                maybe_parenthesize_expression(
-                                    value,
-                                    *statement,
-                                    Parenthesize::IfBreaks
-                                )
-                            ]
-                        );
-                    }
-
-                    let format_t_string =
-                        format_with(|f| write!(f, [format_t_string.format(), inline_comments]))
-                            .memoized();
-
-                    // Considering the following initial source:
-                    //
-                    // ```python
-                    // aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
-                    //     t"aaaaaaaaaaaaaaaaaaa {
-                    //         aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
-                    // )
-                    // ```
-                    //
-                    // Keep the target flat, and use the regular t-string formatting.
-                    //
-                    // ```python
-                    // aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = t"aaaaaaaaaaaaaaaaaaa {
-                    //     aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc
-                    // } ddddddddddddddddddd"
-                    // ```
-                    let flat_target_regular_t_string = format_with(|f| {
-                        write!(
-                            f,
-                            [last_target, space(), operator, space(), format_t_string]
-                        )
-                    });
-
-                    // Expand the parent and parenthesize the flattened t-string.
-                    //
-                    // ```python
-                    // aaaaaaaaaaaa[
-                    //     "bbbbbbbbbbbbbbbb"
-                    // ] = (
-                    //     t"aaaaaaaaaaaaaaaaaaa {aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
-                    // )
-                    // ```
-                    let split_target_value_parenthesized_flat = format_with(|f| {
-                        write!(
-                            f,
-                            [
-                                group(&last_target).should_expand(true),
-                                space(),
-                                operator,
-                                space(),
-                                token("("),
-                                group(&soft_block_indent(&format_args![
-                                    format_value,
-                                    inline_comments
-                                ]))
-                                .should_expand(true),
-                                token(")")
-                            ]
-                        )
-                    });
-
-                    // Expand the parent, and use the regular t-string formatting.
-                    //
-                    // ```python
-                    // aaaaaaaaaaaa[
-                    //     "bbbbbbbbbbbbbbbb"
-                    // ] = t"aaaaaaaaaaaaaaaaaaa {
-                    //     aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc
-                    // } ddddddddddddddddddd"
-                    // ```
-                    let split_target_regular_t_string = format_with(|f| {
-                        write!(
-                            f,
-                            [
-                                group(&last_target).should_expand(true),
-                                space(),
-                                operator,
-                                space(),
-                                format_t_string,
-                            ]
-                        )
-                    });
-
-                    // This is only a perf optimisation. No point in trying all the "flat-target"
-                    // variants if we know that the last target must break.
-                    if last_target_breaks {
-                        best_fitting![
-                            split_target_flat_value,
-                            split_target_value_parenthesized_flat,
-                            split_target_regular_t_string,
-                        ]
-                        .with_mode(BestFittingMode::AllLines)
-                        .fmt(f)
-                    } else {
-                        best_fitting![
-                            single_line,
-                            flat_target_parenthesize_value,
-                            flat_target_regular_t_string,
-                            split_target_flat_value,
-                            split_target_value_parenthesized_flat,
-                            split_target_regular_t_string,
-                        ]
-                        .with_mode(BestFittingMode::AllLines)
-                        .fmt(f)
-                    }
+                    format_ft_string_right_left_helper(
+                        value,
+                        *statement,
+                        before_operator,
+                        *operator,
+                        format_t_string,
+                        &inline_comments,
+                        f,
+                        &format_value,
+                        &last_target,
+                        last_target_breaks,
+                        &single_line,
+                        &split_target_flat_value,
+                        &flat_target_parenthesize_value,
+                    )
                 } else if let Some(format_f_string) = &format_f_string {
-                    // F-String containing an expression with a magic trailing comma, a comment, or a
-                    // multiline debug expression should never be joined. Use the default layout.
-                    //
-                    // ```python
-                    // aaaa, bbbb = f"aaaa {[
-                    //     1, 2,
-                    // ]} bbbb"
-                    // ```
-                    if format_value.inspect(f)?.will_break() {
-                        inline_comments.mark_unformatted();
-
-                        return write!(
-                            f,
-                            [
-                                before_operator,
-                                space(),
-                                operator,
-                                space(),
-                                maybe_parenthesize_expression(
-                                    value,
-                                    *statement,
-                                    Parenthesize::IfBreaks
-                                )
-                            ]
-                        );
-                    }
-
-                    let format_f_string =
-                        format_with(|f| write!(f, [format_f_string.format(), inline_comments]))
-                            .memoized();
-
-                    // Considering the following initial source:
-                    //
-                    // ```python
-                    // aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
-                    //     f"aaaaaaaaaaaaaaaaaaa {
-                    //         aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
-                    // )
-                    // ```
-                    //
-                    // Keep the target flat, and use the regular f-string formatting.
-                    //
-                    // ```python
-                    // aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = f"aaaaaaaaaaaaaaaaaaa {
-                    //     aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc
-                    // } ddddddddddddddddddd"
-                    // ```
-                    let flat_target_regular_f_string = format_with(|f| {
-                        write!(
-                            f,
-                            [last_target, space(), operator, space(), format_f_string]
-                        )
-                    });
-
-                    // Expand the parent and parenthesize the flattened f-string.
-                    //
-                    // ```python
-                    // aaaaaaaaaaaa[
-                    //     "bbbbbbbbbbbbbbbb"
-                    // ] = (
-                    //     f"aaaaaaaaaaaaaaaaaaa {aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
-                    // )
-                    // ```
-                    let split_target_value_parenthesized_flat = format_with(|f| {
-                        write!(
-                            f,
-                            [
-                                group(&last_target).should_expand(true),
-                                space(),
-                                operator,
-                                space(),
-                                token("("),
-                                group(&soft_block_indent(&format_args![
-                                    format_value,
-                                    inline_comments
-                                ]))
-                                .should_expand(true),
-                                token(")")
-                            ]
-                        )
-                    });
-
-                    // Expand the parent, and use the regular f-string formatting.
-                    //
-                    // ```python
-                    // aaaaaaaaaaaa[
-                    //     "bbbbbbbbbbbbbbbb"
-                    // ] = f"aaaaaaaaaaaaaaaaaaa {
-                    //     aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc
-                    // } ddddddddddddddddddd"
-                    // ```
-                    let split_target_regular_f_string = format_with(|f| {
-                        write!(
-                            f,
-                            [
-                                group(&last_target).should_expand(true),
-                                space(),
-                                operator,
-                                space(),
-                                format_f_string,
-                            ]
-                        )
-                    });
-
-                    // This is only a perf optimisation. No point in trying all the "flat-target"
-                    // variants if we know that the last target must break.
-                    if last_target_breaks {
-                        best_fitting![
-                            split_target_flat_value,
-                            split_target_value_parenthesized_flat,
-                            split_target_regular_f_string,
-                        ]
-                        .with_mode(BestFittingMode::AllLines)
-                        .fmt(f)
-                    } else {
-                        best_fitting![
-                            single_line,
-                            flat_target_parenthesize_value,
-                            flat_target_regular_f_string,
-                            split_target_flat_value,
-                            split_target_value_parenthesized_flat,
-                            split_target_regular_f_string,
-                        ]
-                        .with_mode(BestFittingMode::AllLines)
-                        .fmt(f)
-                    }
+                    format_ft_string_right_left_helper(
+                        value,
+                        *statement,
+                        before_operator,
+                        *operator,
+                        format_f_string,
+                        &inline_comments,
+                        f,
+                        &format_value,
+                        &last_target,
+                        last_target_breaks,
+                        &single_line,
+                        &split_target_flat_value,
+                        &flat_target_parenthesize_value,
+                    )
                 } else {
                     best_fitting![
                         single_line,
@@ -1349,13 +1000,13 @@ fn format_f_string_assignment<'a>(
 /// and the t-string fits on the line, but only when it's surrounded by parentheses.
 ///
 /// ```python
-/// aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+/// aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
 ///     expression}moreeeeeeeeeeeeeeeee"
 /// ```
 ///
 /// Without the special handling, this would get formatted to:
 /// ```python
-/// aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+/// aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
 ///     expression
 /// }moreeeeeeeeeeeeeeeee"
 /// ```
@@ -1363,7 +1014,7 @@ fn format_f_string_assignment<'a>(
 /// However, if the parentheses already existed in the source like:
 /// ```python
 /// aaaaaaaaaaaaaaaaaa = (
-///     f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
+///     t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
 /// )
 /// ```
 ///
@@ -1373,7 +1024,7 @@ fn format_f_string_assignment<'a>(
 /// One might ask why not just use the `BestFit` layout in this case. Consider the following
 /// example in which the t-string doesn't fit on the line even when surrounded by parentheses:
 /// ```python
-/// xxxxxxx = f"{
+/// xxxxxxx = t"{
 ///     {'aaaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
 /// }"
 /// ```
@@ -1381,7 +1032,7 @@ fn format_f_string_assignment<'a>(
 /// The `BestFit` layout will format this as:
 /// ```python
 /// xxxxxxx = (
-///     f"{
+///     t"{
 ///         {
 ///             'aaaaaaaaaaaaaaaaaaaaaaaaa',
 ///             'bbbbbbbbbbbbbbbbbbbbbbbbbbb',
@@ -1418,6 +1069,241 @@ fn format_t_string_assignment<'a>(
     }
 
     Some(t_string)
+}
+
+fn format_ft_string_left_right_helper<'a, T: AsFormat<PyFormatContext<'a>>>(
+    value: &Expr,
+    statement: AnyNodeRef<'_>,
+    format_ft_string: &T,
+    inline_comments: &OptionalParenthesesInlinedComments,
+    f: &mut Formatter<PyFormatContext<'a>>,
+    group_id: DebugGroupId,
+) -> FormatResult<()> {
+    inline_comments.mark_formatted();
+
+    let ft_string_flat = format_with(|f| {
+        let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
+
+        write!(buffer, [format_ft_string.format()])
+    })
+    .memoized();
+
+    // F/T-String containing an interpolation with a magic trailing comma, a comment, or a
+    // multiline debug interpolation should never be joined. Use the default layout.
+    // ```python
+    // aaaa = t"aaaa {[
+    //     1, 2,
+    // ]} bbbb"
+    // ```
+    if ft_string_flat.inspect(f)?.will_break() {
+        inline_comments.mark_unformatted();
+
+        return write!(
+            f,
+            [maybe_parenthesize_expression(
+                value,
+                statement,
+                Parenthesize::IfBreaks,
+            )]
+        );
+    }
+
+    // Considering the following example:
+    // ```python
+    // aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    //     expression}moreeeeeeeeeeeeeeeee"
+    // ```
+
+    // Flatten the f/t-string.
+    // ```python
+    // aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
+    // ```
+    let single_line = format_with(|f| write!(f, [ft_string_flat, inline_comments]));
+
+    // Parenthesize the t-string and flatten the t-string.
+    // ```python
+    // aaaaaaaaaaaaaaaaaa = (
+    //     t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
+    // )
+    // ```
+    let joined_parenthesized = format_with(|f| {
+        group(&format_args![
+            token("("),
+            soft_block_indent(&format_args![ft_string_flat, inline_comments]),
+            token(")"),
+        ])
+        .with_id(Some(group_id))
+        .should_expand(true)
+        .fmt(f)
+    });
+
+    // Avoid flattening or parenthesizing the f/t-string, keep the original
+    // f/t-string formatting.
+    // ```python
+    // aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    //     expression
+    // }moreeeeeeeeeeeeeeeee"
+    // ```
+    let format_ft_string = format_with(|f| write!(f, [format_ft_string.format(), inline_comments]));
+
+    best_fitting![single_line, joined_parenthesized, format_ft_string]
+        .with_mode(BestFittingMode::AllLines)
+        .fmt(f)?;
+    Ok(())
+}
+
+#[expect(clippy::too_many_arguments)]
+fn format_ft_string_right_left_helper<'a, T: AsFormat<PyFormatContext<'a>>>(
+    value: &Expr,
+    statement: AnyNodeRef<'_>,
+    before_operator: &AnyBeforeOperator<'_>,
+    operator: AnyAssignmentOperator,
+    format_ft_string: &T,
+    inline_comments: &OptionalParenthesesInlinedComments,
+    f: &mut Formatter<PyFormatContext<'a>>,
+    format_value: &Memoized<
+        FormatWith<
+            PyFormatContext<'a>,
+            impl Fn(&mut Formatter<'_, PyFormatContext<'a>>) -> FormatResult<()>,
+        >,
+        PyFormatContext<'a>,
+    >,
+    last_target: &Memoized<&AnyBeforeOperator<'_>, PyFormatContext<'a>>,
+    last_target_breaks: bool,
+    single_line: &FormatWith<
+        PyFormatContext<'a>,
+        impl Fn(&mut Formatter<'_, PyFormatContext<'a>>) -> FormatResult<()>,
+    >,
+    split_target_flat_value: &FormatWith<
+        PyFormatContext<'a>,
+        impl Fn(&mut Formatter<'_, PyFormatContext<'a>>) -> FormatResult<()>,
+    >,
+    flat_target_parenthesize_value: &FormatWith<
+        PyFormatContext<'a>,
+        impl Fn(&mut Formatter<'_, PyFormatContext<'a>>) -> FormatResult<()>,
+    >,
+) -> FormatResult<()> {
+    // F/T-String containing an interpolation with a magic trailing comma, a comment, or a
+    // multiline debug expression should never be joined. Use the default layout.
+    //
+    // ```python
+    // aaaa, bbbb = t"aaaa {[
+    //     1, 2,
+    // ]} bbbb"
+    // ```
+    if format_value.inspect(f)?.will_break() {
+        inline_comments.mark_unformatted();
+
+        return write!(
+            f,
+            [
+                before_operator,
+                space(),
+                operator,
+                space(),
+                maybe_parenthesize_expression(value, statement, Parenthesize::IfBreaks)
+            ]
+        );
+    }
+
+    let format_ft_string =
+        format_with(|f| write!(f, [format_ft_string.format(), inline_comments])).memoized();
+
+    // Considering the following initial source:
+    //
+    // ```python
+    // aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
+    //     t"aaaaaaaaaaaaaaaaaaa {
+    //         aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
+    // )
+    // ```
+    //
+    // Keep the target flat, and use the regular f/t-string formatting.
+    //
+    // ```python
+    // aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = t"aaaaaaaaaaaaaaaaaaa {
+    //     aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc
+    // } ddddddddddddddddddd"
+    // ```
+    let flat_target_regular_ft_string = format_with(|f| {
+        write!(
+            f,
+            [last_target, space(), operator, space(), format_ft_string]
+        )
+    });
+
+    // Expand the parent and parenthesize the flattened f/t-string.
+    //
+    // ```python
+    // aaaaaaaaaaaa[
+    //     "bbbbbbbbbbbbbbbb"
+    // ] = (
+    //     t"aaaaaaaaaaaaaaaaaaa {aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
+    // )
+    // ```
+    let split_target_value_parenthesized_flat = format_with(|f| {
+        write!(
+            f,
+            [
+                group(&last_target).should_expand(true),
+                space(),
+                operator,
+                space(),
+                token("("),
+                group(&soft_block_indent(&format_args![
+                    format_value,
+                    inline_comments
+                ]))
+                .should_expand(true),
+                token(")")
+            ]
+        )
+    });
+
+    // Expand the parent, and use the regular f/t-string formatting.
+    //
+    // ```python
+    // aaaaaaaaaaaa[
+    //     "bbbbbbbbbbbbbbbb"
+    // ] = t"aaaaaaaaaaaaaaaaaaa {
+    //     aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc
+    // } ddddddddddddddddddd"
+    // ```
+    let split_target_regular_ft_string = format_with(|f| {
+        write!(
+            f,
+            [
+                group(&last_target).should_expand(true),
+                space(),
+                operator,
+                space(),
+                format_ft_string,
+            ]
+        )
+    });
+
+    // This is only a perf optimisation. No point in trying all the "flat-target"
+    // variants if we know that the last target must break.
+    if last_target_breaks {
+        best_fitting![
+            split_target_flat_value,
+            split_target_value_parenthesized_flat,
+            split_target_regular_ft_string,
+        ]
+        .with_mode(BestFittingMode::AllLines)
+        .fmt(f)
+    } else {
+        best_fitting![
+            single_line,
+            flat_target_parenthesize_value,
+            flat_target_regular_ft_string,
+            split_target_flat_value,
+            split_target_value_parenthesized_flat,
+            split_target_regular_ft_string,
+        ]
+        .with_mode(BestFittingMode::AllLines)
+        .fmt(f)
+    }
 }
 
 #[derive(Debug, Default)]
