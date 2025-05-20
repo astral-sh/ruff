@@ -405,6 +405,15 @@ pub enum LexicalErrorType {
 
 impl std::error::Error for LexicalErrorType {}
 
+impl LexicalErrorType {
+    pub(crate) fn from_ftstring_error(error: FTStringErrorType, string_kind: FTStringKind) -> Self {
+        match string_kind {
+            FTStringKind::FString => Self::FStringError(error),
+            FTStringKind::TString => Self::TStringError(error),
+        }
+    }
+}
+
 impl std::fmt::Display for LexicalErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {

@@ -521,14 +521,10 @@ impl<'src> Lexer<'src> {
             '}' => {
                 if let Some(ftstring) = self.ftstrings.current_mut() {
                     if ftstring.nesting() == self.nesting {
-                        let error_type = match ftstring.kind() {
-                            FTStringKind::FString => {
-                                LexicalErrorType::FStringError(FTStringErrorType::SingleRbrace)
-                            }
-                            FTStringKind::TString => {
-                                LexicalErrorType::TStringError(FTStringErrorType::SingleRbrace)
-                            }
-                        };
+                        let error_type = LexicalErrorType::from_ftstring_error(
+                            FTStringErrorType::SingleRbrace,
+                            ftstring.kind(),
+                        );
                         return self.push_error(LexicalError::new(error_type, self.token_range()));
                     }
                     ftstring.try_end_format_spec(self.nesting);
@@ -841,10 +837,7 @@ impl<'src> Lexer<'src> {
                     };
                     self.ftstrings.pop();
                     return Some(self.push_error(LexicalError::new(
-                        match string_kind {
-                            FTStringKind::FString => LexicalErrorType::FStringError(error),
-                            FTStringKind::TString => LexicalErrorType::TStringError(error),
-                        },
+                        LexicalErrorType::from_ftstring_error(error, string_kind),
                         self.token_range(),
                     )));
                 }
@@ -857,16 +850,13 @@ impl<'src> Lexer<'src> {
                         break;
                     }
                     self.ftstrings.pop();
-                    return Some(self.push_error(match string_kind {
-                        FTStringKind::FString => LexicalError::new(
-                            LexicalErrorType::FStringError(FTStringErrorType::UnterminatedString),
-                            self.token_range(),
+                    return Some(self.push_error(LexicalError::new(
+                        LexicalErrorType::from_ftstring_error(
+                            FTStringErrorType::UnterminatedString,
+                            string_kind,
                         ),
-                        FTStringKind::TString => LexicalError::new(
-                            LexicalErrorType::TStringError(FTStringErrorType::UnterminatedString),
-                            self.token_range(),
-                        ),
-                    }));
+                        self.token_range(),
+                    )));
                 }
                 '\\' => {
                     self.cursor.bump(); // '\'
