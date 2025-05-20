@@ -2,7 +2,7 @@ import abc
 import enum
 import sys
 from _collections_abc import dict_items, dict_keys, dict_values
-from _typeshed import IdentityFunction, Incomplete, Unused
+from _typeshed import AnnotationForm, IdentityFunction, Incomplete, Unused
 from collections.abc import (
     AsyncGenerator as AsyncGenerator,
     AsyncIterable as AsyncIterable,
@@ -241,7 +241,7 @@ class _TypedDict(Mapping[str, object], metaclass=abc.ABCMeta):
     __mutable_keys__: ClassVar[frozenset[str]]
     # PEP 728
     __closed__: ClassVar[bool]
-    __extra_items__: ClassVar[Any]
+    __extra_items__: ClassVar[AnnotationForm]
     def copy(self) -> Self: ...
     # Using Never so that only calls using mypy plugin hook that specialize the signature
     # can go through.
@@ -267,13 +267,14 @@ class _TypedDict(Mapping[str, object], metaclass=abc.ABCMeta):
 
 OrderedDict = _Alias()
 
-def get_type_hints(
-    obj: Callable[..., Any],
-    globalns: dict[str, Any] | None = None,
-    localns: Mapping[str, Any] | None = None,
-    include_extras: bool = False,
-) -> dict[str, Any]: ...
-def get_args(tp: Any) -> tuple[Any, ...]: ...
+if sys.version_info >= (3, 13):
+    from typing import get_type_hints as get_type_hints
+else:
+    def get_type_hints(
+        obj: Any, globalns: dict[str, Any] | None = None, localns: Mapping[str, Any] | None = None, include_extras: bool = False
+    ) -> dict[str, AnnotationForm]: ...
+
+def get_args(tp: AnnotationForm) -> tuple[AnnotationForm, ...]: ...
 
 if sys.version_info >= (3, 10):
     @overload
@@ -284,7 +285,7 @@ def get_origin(tp: GenericAlias) -> type: ...
 @overload
 def get_origin(tp: ParamSpecArgs | ParamSpecKwargs) -> ParamSpec: ...
 @overload
-def get_origin(tp: Any) -> Any | None: ...
+def get_origin(tp: AnnotationForm) -> AnnotationForm | None: ...
 
 Annotated: _SpecialForm
 _AnnotatedAlias: Any  # undocumented
@@ -340,7 +341,7 @@ else:
     Never: _SpecialForm
     def reveal_type(obj: _T, /) -> _T: ...
     def assert_never(arg: Never, /) -> Never: ...
-    def assert_type(val: _T, typ: Any, /) -> _T: ...
+    def assert_type(val: _T, typ: AnnotationForm, /) -> _T: ...
     def clear_overloads() -> None: ...
     def get_overloads(func: Callable[..., object]) -> Sequence[Callable[..., object]]: ...
 
@@ -373,7 +374,7 @@ else:
         def _replace(self, **kwargs: Any) -> Self: ...
 
     class NewType:
-        def __init__(self, name: str, tp: Any) -> None: ...
+        def __init__(self, name: str, tp: AnnotationForm) -> None: ...
         def __call__(self, obj: _T, /) -> _T: ...
         __supertype__: type | NewType
         if sys.version_info >= (3, 10):
@@ -480,9 +481,9 @@ else:
         @property
         def __name__(self) -> str: ...
         @property
-        def __bound__(self) -> Any | None: ...
+        def __bound__(self) -> AnnotationForm | None: ...
         @property
-        def __constraints__(self) -> tuple[Any, ...]: ...
+        def __constraints__(self) -> tuple[AnnotationForm, ...]: ...
         @property
         def __covariant__(self) -> bool: ...
         @property
@@ -490,15 +491,15 @@ else:
         @property
         def __infer_variance__(self) -> bool: ...
         @property
-        def __default__(self) -> Any: ...
+        def __default__(self) -> AnnotationForm: ...
         def __init__(
             self,
             name: str,
-            *constraints: Any,
-            bound: Any | None = None,
+            *constraints: AnnotationForm,
+            bound: AnnotationForm | None = None,
             covariant: bool = False,
             contravariant: bool = False,
-            default: Any = ...,
+            default: AnnotationForm = ...,
             infer_variance: bool = False,
         ) -> None: ...
         def has_default(self) -> bool: ...
@@ -514,7 +515,7 @@ else:
         @property
         def __name__(self) -> str: ...
         @property
-        def __bound__(self) -> Any | None: ...
+        def __bound__(self) -> AnnotationForm | None: ...
         @property
         def __covariant__(self) -> bool: ...
         @property
@@ -522,15 +523,15 @@ else:
         @property
         def __infer_variance__(self) -> bool: ...
         @property
-        def __default__(self) -> Any: ...
+        def __default__(self) -> AnnotationForm: ...
         def __init__(
             self,
             name: str,
             *,
-            bound: None | type[Any] | str = None,
+            bound: None | AnnotationForm | str = None,
             contravariant: bool = False,
             covariant: bool = False,
-            default: Any = ...,
+            default: AnnotationForm = ...,
         ) -> None: ...
         @property
         def args(self) -> ParamSpecArgs: ...
@@ -547,8 +548,8 @@ else:
         @property
         def __name__(self) -> str: ...
         @property
-        def __default__(self) -> Any: ...
-        def __init__(self, name: str, *, default: Any = ...) -> None: ...
+        def __default__(self) -> AnnotationForm: ...
+        def __init__(self, name: str, *, default: AnnotationForm = ...) -> None: ...
         def __iter__(self) -> Any: ...  # Unpack[Self]
         def has_default(self) -> bool: ...
         def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
@@ -563,23 +564,23 @@ else:
     @final
     class TypeAliasType:
         def __init__(
-            self, name: str, value: Any, *, type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()
-        ) -> None: ...  # value is a type expression
+            self, name: str, value: AnnotationForm, *, type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()
+        ) -> None: ...
         @property
-        def __value__(self) -> Any: ...  # a type expression
+        def __value__(self) -> AnnotationForm: ...
         @property
         def __type_params__(self) -> tuple[TypeVar | ParamSpec | TypeVarTuple, ...]: ...
         @property
         # `__parameters__` can include special forms if a `TypeVarTuple` was
         # passed as a `type_params` element to the constructor method.
-        def __parameters__(self) -> tuple[TypeVar | ParamSpec | Any, ...]: ...
+        def __parameters__(self) -> tuple[TypeVar | ParamSpec | AnnotationForm, ...]: ...
         @property
         def __name__(self) -> str: ...
         # It's writable on types, but not on instances of TypeAliasType.
         @property
         def __module__(self) -> str | None: ...  # type: ignore[override]
         # Returns typing._GenericAlias, which isn't stubbed.
-        def __getitem__(self, parameters: Incomplete | tuple[Incomplete, ...]) -> Any: ...
+        def __getitem__(self, parameters: Incomplete | tuple[Incomplete, ...]) -> AnnotationForm: ...
         def __init_subclass__(cls, *args: Unused, **kwargs: Unused) -> NoReturn: ...
         if sys.version_info >= (3, 10):
             def __or__(self, right: Any) -> _SpecialForm: ...
@@ -600,27 +601,75 @@ NoExtraItems: _NoExtraItemsType
 # PEP 747
 TypeForm: _SpecialForm
 
-class Format(enum.IntEnum):
-    VALUE = 1
-    FORWARDREF = 2
-    STRING = 3
-
 # PEP 649/749
-def get_annotations(
-    obj: Callable[..., object] | type[object] | ModuleType,  # any callable, class, or module
-    *,
-    globals: Mapping[str, Any] | None = None,  # value types depend on the key
-    locals: Mapping[str, Any] | None = None,  # value types depend on the key
-    eval_str: bool = False,
-    format: Format = Format.VALUE,  # noqa: Y011
-) -> dict[str, Any]: ...  # values are type expressions
-def evaluate_forward_ref(
-    forward_ref: ForwardRef,
-    *,
-    owner: Callable[..., object] | type[object] | ModuleType | None = None,  # any callable, class, or module
-    globals: Mapping[str, Any] | None = None,  # value types depend on the key
-    locals: Mapping[str, Any] | None = None,  # value types depend on the key
-    type_params: Iterable[TypeVar | ParamSpec | TypeVarTuple] | None = None,
-    format: Format = Format.VALUE,  # noqa: Y011
-    _recursive_guard: Container[str] = ...,
-) -> Any: ...  # str if format is Format.STRING, otherwise a type expression
+if sys.version_info >= (3, 14):
+    from typing import evaluate_forward_ref as evaluate_forward_ref
+
+    from annotationlib import Format as Format, get_annotations as get_annotations
+else:
+    class Format(enum.IntEnum):
+        VALUE = 1
+        VALUE_WITH_FAKE_GLOBALS = 2
+        FORWARDREF = 3
+        STRING = 4
+
+    @overload
+    def get_annotations(
+        obj: Any,  # any object with __annotations__ or __annotate__
+        *,
+        globals: Mapping[str, Any] | None = None,  # value types depend on the key
+        locals: Mapping[str, Any] | None = None,  # value types depend on the key
+        eval_str: bool = False,
+        format: Literal[Format.STRING],
+    ) -> dict[str, str]: ...
+    @overload
+    def get_annotations(
+        obj: Any,  # any object with __annotations__ or __annotate__
+        *,
+        globals: Mapping[str, Any] | None = None,  # value types depend on the key
+        locals: Mapping[str, Any] | None = None,  # value types depend on the key
+        eval_str: bool = False,
+        format: Literal[Format.FORWARDREF],
+    ) -> dict[str, AnnotationForm | ForwardRef]: ...
+    @overload
+    def get_annotations(
+        obj: Any,  # any object with __annotations__ or __annotate__
+        *,
+        globals: Mapping[str, Any] | None = None,  # value types depend on the key
+        locals: Mapping[str, Any] | None = None,  # value types depend on the key
+        eval_str: bool = False,
+        format: Format = Format.VALUE,  # noqa: Y011
+    ) -> dict[str, AnnotationForm]: ...
+    @overload
+    def evaluate_forward_ref(
+        forward_ref: ForwardRef,
+        *,
+        owner: Callable[..., object] | type[object] | ModuleType | None = None,  # any callable, class, or module
+        globals: Mapping[str, Any] | None = None,  # value types depend on the key
+        locals: Mapping[str, Any] | None = None,  # value types depend on the key
+        type_params: Iterable[TypeVar | ParamSpec | TypeVarTuple] | None = None,
+        format: Literal[Format.STRING],
+        _recursive_guard: Container[str] = ...,
+    ) -> str: ...
+    @overload
+    def evaluate_forward_ref(
+        forward_ref: ForwardRef,
+        *,
+        owner: Callable[..., object] | type[object] | ModuleType | None = None,  # any callable, class, or module
+        globals: Mapping[str, Any] | None = None,  # value types depend on the key
+        locals: Mapping[str, Any] | None = None,  # value types depend on the key
+        type_params: Iterable[TypeVar | ParamSpec | TypeVarTuple] | None = None,
+        format: Literal[Format.FORWARDREF],
+        _recursive_guard: Container[str] = ...,
+    ) -> AnnotationForm | ForwardRef: ...
+    @overload
+    def evaluate_forward_ref(
+        forward_ref: ForwardRef,
+        *,
+        owner: Callable[..., object] | type[object] | ModuleType | None = None,  # any callable, class, or module
+        globals: Mapping[str, Any] | None = None,  # value types depend on the key
+        locals: Mapping[str, Any] | None = None,  # value types depend on the key
+        type_params: Iterable[TypeVar | ParamSpec | TypeVarTuple] | None = None,
+        format: Format = Format.VALUE,  # noqa: Y011
+        _recursive_guard: Container[str] = ...,
+    ) -> AnnotationForm: ...

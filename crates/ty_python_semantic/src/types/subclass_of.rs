@@ -1,8 +1,8 @@
 use crate::symbol::SymbolAndQualifiers;
-use crate::types::generics::TypeMapping;
+use crate::types::{
+    ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeVarInstance,
+};
 use crate::{Db, FxOrderSet};
-
-use super::{ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeVarInstance};
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
@@ -71,7 +71,7 @@ impl<'db> SubclassOfType<'db> {
     pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
-        type_mapping: TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Self {
@@ -119,6 +119,12 @@ impl<'db> SubclassOfType<'db> {
                 // N.B. The subclass relation is fully static
                 self_class.is_subclass_of(db, other_class)
             }
+        }
+    }
+
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        Self {
+            subclass_of: self.subclass_of.normalized(db),
         }
     }
 
@@ -170,6 +176,13 @@ impl<'db> SubclassOfInner<'db> {
         match self {
             Self::Class(_) => None,
             Self::Dynamic(dynamic) => Some(dynamic),
+        }
+    }
+
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::Class(class) => Self::Class(class.normalized(db)),
+            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
         }
     }
 

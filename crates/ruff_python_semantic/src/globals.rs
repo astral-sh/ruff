@@ -8,8 +8,8 @@ use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 
-use ruff_index::{newtype_index, IndexVec};
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use ruff_index::{IndexVec, newtype_index};
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 
 /// Id uniquely identifying the set of global names for a given scope.
 #[newtype_index]

@@ -1,5 +1,5 @@
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::{Token, TokenKind};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -193,22 +193,22 @@ pub(crate) fn invalid_string_characters(
     };
 
     for (column, match_) in text.match_indices(&['\x08', '\x1A', '\x1B', '\0', '\u{200b}']) {
+        let location = token.start() + TextSize::try_from(column).unwrap();
         let c = match_.chars().next().unwrap();
-        let (replacement, rule): (&str, DiagnosticKind) = match c {
-            '\x08' => ("\\b", InvalidCharacterBackspace.into()),
-            '\x1A' => ("\\x1A", InvalidCharacterSub.into()),
-            '\x1B' => ("\\x1B", InvalidCharacterEsc.into()),
-            '\0' => ("\\0", InvalidCharacterNul.into()),
-            '\u{200b}' => ("\\u200b", InvalidCharacterZeroWidthSpace.into()),
+        let range = TextRange::at(location, c.text_len());
+        let (replacement, mut diagnostic) = match c {
+            '\x08' => ("\\b", Diagnostic::new(InvalidCharacterBackspace, range)),
+            '\x1A' => ("\\x1A", Diagnostic::new(InvalidCharacterSub, range)),
+            '\x1B' => ("\\x1B", Diagnostic::new(InvalidCharacterEsc, range)),
+            '\0' => ("\\0", Diagnostic::new(InvalidCharacterNul, range)),
+            '\u{200b}' => (
+                "\\u200b",
+                Diagnostic::new(InvalidCharacterZeroWidthSpace, range),
+            ),
             _ => {
                 continue;
             }
         };
-
-        let location = token.start() + TextSize::try_from(column).unwrap();
-        let range = TextRange::at(location, c.text_len());
-
-        let mut diagnostic = Diagnostic::new(rule, range);
 
         if !token.unwrap_string_flags().is_raw_string() {
             let edit = Edit::range_replacement(replacement.to_string(), range);

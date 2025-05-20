@@ -1,8 +1,8 @@
 //! Check for imports of or from suspicious modules.
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_imports.html>
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -361,76 +361,44 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
         Stmt::Import(ast::StmtImport { names, .. }) => {
             for name in names {
                 match name.name.as_str() {
-                    "telnetlib" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousTelnetlibImport),
-                        name.range,
-                    ),
-                    "ftplib" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousFtplibImport),
-                        name.range,
-                    ),
-                    "pickle" | "cPickle" | "dill" | "shelve" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousPickleImport),
-                        name.range,
-                    ),
-                    "subprocess" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousSubprocessImport),
-                        name.range,
-                    ),
-                    "xml.etree.cElementTree" | "xml.etree.ElementTree" => {
-                        check_and_push_diagnostic(
-                            checker,
-                            DiagnosticKind::from(SuspiciousXmlEtreeImport),
-                            name.range,
-                        );
+                    "telnetlib" => {
+                        check_and_push_diagnostic(checker, SuspiciousTelnetlibImport, name.range);
                     }
-                    "xml.sax" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousXmlSaxImport),
-                        name.range,
-                    ),
-                    "xml.dom.expatbuilder" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousXmlExpatImport),
-                        name.range,
-                    ),
-                    "xml.dom.minidom" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousXmlMinidomImport),
-                        name.range,
-                    ),
-                    "xml.dom.pulldom" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousXmlPulldomImport),
-                        name.range,
-                    ),
-                    "lxml" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousLxmlImport),
-                        name.range,
-                    ),
-                    "xmlrpc" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousXmlrpcImport),
-                        name.range,
-                    ),
+                    "ftplib" => {
+                        check_and_push_diagnostic(checker, SuspiciousFtplibImport, name.range);
+                    }
+                    "pickle" | "cPickle" | "dill" | "shelve" => {
+                        check_and_push_diagnostic(checker, SuspiciousPickleImport, name.range);
+                    }
+                    "subprocess" => {
+                        check_and_push_diagnostic(checker, SuspiciousSubprocessImport, name.range);
+                    }
+                    "xml.etree.cElementTree" | "xml.etree.ElementTree" => {
+                        check_and_push_diagnostic(checker, SuspiciousXmlEtreeImport, name.range);
+                    }
+                    "xml.sax" => {
+                        check_and_push_diagnostic(checker, SuspiciousXmlSaxImport, name.range);
+                    }
+                    "xml.dom.expatbuilder" => {
+                        check_and_push_diagnostic(checker, SuspiciousXmlExpatImport, name.range);
+                    }
+                    "xml.dom.minidom" => {
+                        check_and_push_diagnostic(checker, SuspiciousXmlMinidomImport, name.range);
+                    }
+                    "xml.dom.pulldom" => {
+                        check_and_push_diagnostic(checker, SuspiciousXmlPulldomImport, name.range);
+                    }
+                    "lxml" => check_and_push_diagnostic(checker, SuspiciousLxmlImport, name.range),
+                    "xmlrpc" => {
+                        check_and_push_diagnostic(checker, SuspiciousXmlrpcImport, name.range);
+                    }
                     "Crypto.Cipher" | "Crypto.Hash" | "Crypto.IO" | "Crypto.Protocol"
                     | "Crypto.PublicKey" | "Crypto.Random" | "Crypto.Signature" | "Crypto.Util" => {
-                        check_and_push_diagnostic(
-                            checker,
-                            DiagnosticKind::from(SuspiciousPycryptoImport),
-                            name.range,
-                        );
+                        check_and_push_diagnostic(checker, SuspiciousPycryptoImport, name.range);
                     }
-                    "pyghmi" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousPyghmiImport),
-                        name.range,
-                    ),
+                    "pyghmi" => {
+                        check_and_push_diagnostic(checker, SuspiciousPyghmiImport, name.range);
+                    }
                     _ => {}
                 }
             }
@@ -440,22 +408,18 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
             match identifier.as_str() {
                 "telnetlib" => check_and_push_diagnostic(
                     checker,
-                    DiagnosticKind::from(SuspiciousTelnetlibImport),
+                    SuspiciousTelnetlibImport,
                     identifier.range(),
                 ),
-                "ftplib" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousFtplibImport),
-                    identifier.range(),
-                ),
-                "pickle" | "cPickle" | "dill" | "shelve" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousPickleImport),
-                    identifier.range(),
-                ),
+                "ftplib" => {
+                    check_and_push_diagnostic(checker, SuspiciousFtplibImport, identifier.range());
+                }
+                "pickle" | "cPickle" | "dill" | "shelve" => {
+                    check_and_push_diagnostic(checker, SuspiciousPickleImport, identifier.range());
+                }
                 "subprocess" => check_and_push_diagnostic(
                     checker,
-                    DiagnosticKind::from(SuspiciousSubprocessImport),
+                    SuspiciousSubprocessImport,
                     identifier.range(),
                 ),
                 "xml.etree" => {
@@ -463,7 +427,7 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                         if matches!(name.name.as_str(), "cElementTree" | "ElementTree") {
                             check_and_push_diagnostic(
                                 checker,
-                                DiagnosticKind::from(SuspiciousXmlEtreeImport),
+                                SuspiciousXmlEtreeImport,
                                 identifier.range(),
                             );
                         }
@@ -472,7 +436,7 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                 "xml.etree.cElementTree" | "xml.etree.ElementTree" => {
                     check_and_push_diagnostic(
                         checker,
-                        DiagnosticKind::from(SuspiciousXmlEtreeImport),
+                        SuspiciousXmlEtreeImport,
                         identifier.range(),
                     );
                 }
@@ -481,70 +445,66 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                         if name.name.as_str() == "sax" {
                             check_and_push_diagnostic(
                                 checker,
-                                DiagnosticKind::from(SuspiciousXmlSaxImport),
+                                SuspiciousXmlSaxImport,
                                 identifier.range(),
                             );
                         }
                     }
                 }
-                "xml.sax" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousXmlSaxImport),
-                    identifier.range(),
-                ),
+                "xml.sax" => {
+                    check_and_push_diagnostic(checker, SuspiciousXmlSaxImport, identifier.range());
+                }
                 "xml.dom" => {
                     for name in names {
                         match name.name.as_str() {
                             "expatbuilder" => check_and_push_diagnostic(
                                 checker,
-                                DiagnosticKind::from(SuspiciousXmlExpatImport),
+                                SuspiciousXmlExpatImport,
                                 identifier.range(),
                             ),
                             "minidom" => check_and_push_diagnostic(
                                 checker,
-                                DiagnosticKind::from(SuspiciousXmlMinidomImport),
+                                SuspiciousXmlMinidomImport,
                                 identifier.range(),
                             ),
                             "pulldom" => check_and_push_diagnostic(
                                 checker,
-                                DiagnosticKind::from(SuspiciousXmlPulldomImport),
+                                SuspiciousXmlPulldomImport,
                                 identifier.range(),
                             ),
                             _ => (),
                         }
                     }
                 }
-                "xml.dom.expatbuilder" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousXmlExpatImport),
-                    identifier.range(),
-                ),
+                "xml.dom.expatbuilder" => {
+                    check_and_push_diagnostic(
+                        checker,
+                        SuspiciousXmlExpatImport,
+                        identifier.range(),
+                    );
+                }
                 "xml.dom.minidom" => check_and_push_diagnostic(
                     checker,
-                    DiagnosticKind::from(SuspiciousXmlMinidomImport),
+                    SuspiciousXmlMinidomImport,
                     identifier.range(),
                 ),
                 "xml.dom.pulldom" => check_and_push_diagnostic(
                     checker,
-                    DiagnosticKind::from(SuspiciousXmlPulldomImport),
+                    SuspiciousXmlPulldomImport,
                     identifier.range(),
                 ),
-                "lxml" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousLxmlImport),
-                    identifier.range(),
-                ),
-                "xmlrpc" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousXmlrpcImport),
-                    identifier.range(),
-                ),
+                "lxml" => {
+                    check_and_push_diagnostic(checker, SuspiciousLxmlImport, identifier.range());
+                }
+                "xmlrpc" => {
+                    check_and_push_diagnostic(checker, SuspiciousXmlrpcImport, identifier.range());
+                }
                 "wsgiref.handlers" => {
                     for name in names {
                         if name.name.as_str() == "CGIHandler" {
                             check_and_push_diagnostic(
                                 checker,
-                                DiagnosticKind::from(SuspiciousHttpoxyImport),
+                                SuspiciousHttpoxyImport,
                                 identifier.range(),
                             );
                         }
@@ -555,7 +515,7 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                         if name.name.as_str() == "CGIScript" {
                             check_and_push_diagnostic(
                                 checker,
-                                DiagnosticKind::from(SuspiciousHttpoxyImport),
+                                SuspiciousHttpoxyImport,
                                 identifier.range(),
                             );
                         }
@@ -576,7 +536,7 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                         ) {
                             check_and_push_diagnostic(
                                 checker,
-                                DiagnosticKind::from(SuspiciousPycryptoImport),
+                                SuspiciousPycryptoImport,
                                 identifier.range(),
                             );
                         }
@@ -586,15 +546,13 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                 | "Crypto.PublicKey" | "Crypto.Random" | "Crypto.Signature" | "Crypto.Util" => {
                     check_and_push_diagnostic(
                         checker,
-                        DiagnosticKind::from(SuspiciousPycryptoImport),
+                        SuspiciousPycryptoImport,
                         identifier.range(),
                     );
                 }
-                "pyghmi" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousPyghmiImport),
-                    identifier.range(),
-                ),
+                "pyghmi" => {
+                    check_and_push_diagnostic(checker, SuspiciousPyghmiImport, identifier.range());
+                }
                 _ => {}
             }
         }
@@ -602,9 +560,9 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
     }
 }
 
-fn check_and_push_diagnostic(checker: &Checker, diagnostic_kind: DiagnosticKind, range: TextRange) {
-    let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, range);
-    if checker.enabled(diagnostic.kind.rule()) {
+fn check_and_push_diagnostic<T: Violation>(checker: &Checker, diagnostic: T, range: TextRange) {
+    let diagnostic = Diagnostic::new(diagnostic, range);
+    if checker.enabled(diagnostic.rule()) {
         checker.report_diagnostic(diagnostic);
     }
 }

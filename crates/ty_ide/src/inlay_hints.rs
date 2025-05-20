@@ -150,7 +150,7 @@ mod tests {
 
     use insta::assert_snapshot;
     use ruff_db::{
-        files::{system_path_to_file, File},
+        files::{File, system_path_to_file},
         source::source_text,
     };
     use ruff_text_size::TextSize;

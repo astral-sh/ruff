@@ -7,13 +7,14 @@ use ruff_index::{IndexSlice, IndexVec};
 
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
-use salsa::plumbing::AsId;
 use salsa::Update;
+use salsa::plumbing::AsId;
 
+use crate::Db;
 use crate::module_name::ModuleName;
 use crate::node_key::NodeKey;
-use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIds;
+use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey, Definitions};
 use crate::semantic_index::expression::Expression;
@@ -23,7 +24,6 @@ use crate::semantic_index::symbol::{
     SymbolTable,
 };
 use crate::semantic_index::use_def::{EagerSnapshotKey, ScopedEagerSnapshotId, UseDefMap};
-use crate::Db;
 
 pub mod ast_ids;
 mod builder;
@@ -542,11 +542,12 @@ impl FusedIterator for ChildrenIter<'_> {}
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::files::{system_path_to_file, File};
+    use ruff_db::files::{File, system_path_to_file};
     use ruff_db::parsed::parsed_module;
     use ruff_python_ast::{self as ast};
     use ruff_text_size::{Ranged, TextRange};
 
+    use crate::Db;
     use crate::db::tests::{TestDb, TestDbBuilder};
     use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
     use crate::semantic_index::definition::{Definition, DefinitionKind};
@@ -555,7 +556,6 @@ mod tests {
     };
     use crate::semantic_index::use_def::UseDefMap;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
-    use crate::Db;
 
     impl UseDefMap<'_> {
         fn first_public_binding(&self, symbol: ScopedSymbolId) -> Option<Definition<'_>> {
@@ -1106,7 +1106,10 @@ def func():
         let global_table = index.symbol_table(FileScopeId::global());
 
         assert_eq!(names(&global_table), vec!["func"]);
-        let [(func_scope1_id, func_scope_1), (func_scope2_id, func_scope_2)] = index
+        let [
+            (func_scope1_id, func_scope_1),
+            (func_scope2_id, func_scope_2),
+        ] = index
             .child_scopes(FileScopeId::global())
             .collect::<Vec<_>>()[..]
         else {
@@ -1345,7 +1348,9 @@ match subject:
         assert!(global_table.symbol_by_name("Foo").unwrap().is_used());
         assert_eq!(
             names(global_table),
-            vec!["subject", "a", "b", "c", "d", "e", "f", "g", "h", "Foo", "i", "j", "k", "l"]
+            vec![
+                "subject", "a", "b", "c", "d", "e", "f", "g", "h", "Foo", "i", "j", "k", "l"
+            ]
         );
 
         let use_def = use_def_map(&db, global_scope_id);

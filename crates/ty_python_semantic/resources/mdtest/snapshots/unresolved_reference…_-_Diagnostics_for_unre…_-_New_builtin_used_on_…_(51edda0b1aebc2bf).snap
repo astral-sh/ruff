@@ -24,8 +24,8 @@ error[unresolved-reference]: Name `aiter` used when not defined
 1 | aiter  # error: [unresolved-reference]
   | ^^^^^
   |
-info: `aiter` was added as a builtin in Python 3.10, but Python 3.9 was assumed when resolving types
-info: This is because Python 3.9 was specified on the command line
+info: `aiter` was added as a builtin in Python 3.10
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
 info: rule `unresolved-reference` is enabled by default
 
 ```

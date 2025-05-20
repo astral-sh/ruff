@@ -1,14 +1,14 @@
 use ruff_python_ast::{self as ast, Expr};
 
+use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
+use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 
 /// ## What it does
 /// Checks for uses of `.isnull` on Pandas objects.
@@ -171,12 +171,14 @@ pub(crate) fn call(checker: &Checker, func: &Expr) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func else {
         return;
     };
-    let violation: DiagnosticKind = match attr.as_str() {
+
+    let range = func.range();
+    let diagnostic = match attr.as_str() {
         "isnull" if checker.settings.rules.enabled(Rule::PandasUseOfDotIsNull) => {
-            PandasUseOfDotIsNull.into()
+            Diagnostic::new(PandasUseOfDotIsNull, range)
         }
         "notnull" if checker.settings.rules.enabled(Rule::PandasUseOfDotNotNull) => {
-            PandasUseOfDotNotNull.into()
+            Diagnostic::new(PandasUseOfDotNotNull, range)
         }
         "pivot" | "unstack"
             if checker
@@ -184,10 +186,10 @@ pub(crate) fn call(checker: &Checker, func: &Expr) {
                 .rules
                 .enabled(Rule::PandasUseOfDotPivotOrUnstack) =>
         {
-            PandasUseOfDotPivotOrUnstack.into()
+            Diagnostic::new(PandasUseOfDotPivotOrUnstack, range)
         }
         "stack" if checker.settings.rules.enabled(Rule::PandasUseOfDotStack) => {
-            PandasUseOfDotStack.into()
+            Diagnostic::new(PandasUseOfDotStack, range)
         }
         _ => return,
     };
@@ -200,5 +202,5 @@ pub(crate) fn call(checker: &Checker, func: &Expr) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(violation, func.range()));
+    checker.report_diagnostic(diagnostic);
 }

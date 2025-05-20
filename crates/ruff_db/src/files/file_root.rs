@@ -3,9 +3,9 @@ use std::fmt::Formatter;
 use path_slash::PathExt;
 use salsa::Durability;
 
+use crate::Db;
 use crate::file_revision::FileRevision;
 use crate::system::{SystemPath, SystemPathBuf};
-use crate::Db;
 
 /// A root path for files tracked by the database.
 ///

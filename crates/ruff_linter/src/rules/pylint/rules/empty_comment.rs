@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_trivia::{is_python_whitespace, CommentRanges};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_trivia::{CommentRanges, is_python_whitespace};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
 

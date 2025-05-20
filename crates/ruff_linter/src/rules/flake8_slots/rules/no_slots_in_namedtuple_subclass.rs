@@ -1,8 +1,8 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, identifier::Identifier, Arguments, Expr, Stmt, StmtClassDef};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt, StmtClassDef, identifier::Identifier};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;

@@ -37,7 +37,7 @@ error[invalid-return-type]: Return type does not match returned value
   |            --- Expected `int` because of return type
 2 |     # error: [invalid-return-type]
 3 |     return ...
-  |            ^^^ Expected `int`, found `ellipsis`
+  |            ^^^ expected `int`, found `ellipsis`
 4 |
 5 | # error: [invalid-return-type]
   |

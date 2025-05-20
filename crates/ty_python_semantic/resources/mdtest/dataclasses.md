@@ -618,21 +618,43 @@ To do
 
 ## `dataclass.fields`
 
-Dataclasses have `__dataclass_fields__` in them, which makes them a subtype of the
-`DataclassInstance` protocol.
-
-Here, we verify that dataclasses can be passed to `dataclasses.fields` without any errors, and that
-the return type of `dataclasses.fields` is correct.
+Dataclasses have a special `__dataclass_fields__` class variable member. The `DataclassInstance`
+protocol checks for the presence of this attribute. It is used in the `dataclasses.fields` and
+`dataclasses.asdict` functions, for example:
 
 ```py
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, asdict
 
 @dataclass
 class Foo:
     x: int
 
-reveal_type(Foo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+foo = Foo(1)
+
+reveal_type(foo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
 reveal_type(fields(Foo))  # revealed: tuple[Field[Any], ...]
+reveal_type(asdict(foo))  # revealed: dict[str, Any]
+```
+
+The class objects themselves also have a `__dataclass_fields__` attribute:
+
+```py
+reveal_type(Foo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+```
+
+They can be passed into `fields` as well, because it also accepts `type[DataclassInstance]`
+arguments:
+
+```py
+reveal_type(fields(Foo))  # revealed: tuple[Field[Any], ...]
+```
+
+But calling `asdict` on the class object is not allowed:
+
+```py
+# TODO: this should be a invalid-argument-type error, but we don't properly check the
+# types (and more importantly, the `ClassVar` type qualifier) of protocol members yet.
+asdict(Foo)
 ```
 
 ## Other special cases

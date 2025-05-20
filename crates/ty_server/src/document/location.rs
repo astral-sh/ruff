@@ -1,6 +1,6 @@
+use crate::PositionEncoding;
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::system::file_to_url;
-use crate::PositionEncoding;
 use lsp_types::Location;
 use ruff_db::files::FileRange;
 use ruff_db::source::{line_index, source_text};

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, BoolOp, ElifElseClause, Expr, Stmt};
@@ -99,27 +99,33 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
     } = stmt_if;
 
     // `test: None` to only match an `else` clause
-    let [ElifElseClause {
-        body: else_body,
-        test: None,
-        ..
-    }] = elif_else_clauses.as_slice()
+    let [
+        ElifElseClause {
+            body: else_body,
+            test: None,
+            ..
+        },
+    ] = elif_else_clauses.as_slice()
     else {
         return;
     };
-    let [Stmt::Assign(ast::StmtAssign {
-        targets: body_targets,
-        value: body_value,
-        ..
-    })] = body.as_slice()
+    let [
+        Stmt::Assign(ast::StmtAssign {
+            targets: body_targets,
+            value: body_value,
+            ..
+        }),
+    ] = body.as_slice()
     else {
         return;
     };
-    let [Stmt::Assign(ast::StmtAssign {
-        targets: else_targets,
-        value: else_value,
-        ..
-    })] = else_body.as_slice()
+    let [
+        Stmt::Assign(ast::StmtAssign {
+            targets: else_targets,
+            value: else_value,
+            ..
+        }),
+    ] = else_body.as_slice()
     else {
         return;
     };

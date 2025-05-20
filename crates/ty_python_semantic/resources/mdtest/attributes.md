@@ -1462,6 +1462,14 @@ Instance attributes also take precedence over the `__getattr__` method:
 reveal_type(c.instance_attr)  # revealed: str
 ```
 
+Importantly, `__getattr__` is only called if attributes are accessed on instances, not if they are
+accessed on the class itself:
+
+```py
+# error: [unresolved-attribute]
+CustomGetAttr.whatever
+```
+
 ### Type of the `name` parameter
 
 If the `name` parameter of the `__getattr__` method is annotated with a (union of) literal type(s),

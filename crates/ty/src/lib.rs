@@ -5,7 +5,7 @@ mod version;
 
 pub use args::Cli;
 
-use std::io::{self, stdout, BufWriter, Write};
+use std::io::{self, BufWriter, Write, stdout};
 use std::process::{ExitCode, Termination};
 
 use anyhow::Result;
@@ -13,19 +13,19 @@ use std::sync::Mutex;
 
 use crate::args::{CheckCommand, Command, TerminalColor};
 use crate::logging::setup_tracing;
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
+use ruff_db::Upcast;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use ruff_db::Upcast;
 use salsa::plumbing::ZalsaDatabase;
 use ty_project::metadata::options::Options;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{watch, Db, DummyReporter, Reporter};
+use ty_project::{Db, DummyReporter, Reporter, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
 
@@ -60,7 +60,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let verbosity = args.verbosity.level();
     countme::enable(verbosity.is_trace());
-    let _guard = setup_tracing(verbosity)?;
+    let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
 
     tracing::warn!(
         "ty is pre-release software and not ready for production use. \
@@ -306,7 +306,9 @@ impl MainLoop {
                             )?;
 
                             if max_severity.is_fatal() {
-                                tracing::warn!("A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details.");
+                                tracing::warn!(
+                                    "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
+                                );
                             }
 
                             if self.watcher.is_none() {

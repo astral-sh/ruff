@@ -26,12 +26,8 @@ impl Emitter for PylintEmitter {
                 message.compute_start_location().line
             };
 
-            let body = if let Some(rule) = message.rule() {
-                format!(
-                    "[{code}] {body}",
-                    code = rule.noqa_code(),
-                    body = message.body()
-                )
+            let body = if let Some(code) = message.to_noqa_code() {
+                format!("[{code}] {body}", body = message.body())
             } else {
                 message.body().to_string()
             };
@@ -51,10 +47,10 @@ impl Emitter for PylintEmitter {
 mod tests {
     use insta::assert_snapshot;
 
+    use crate::message::PylintEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
-    use crate::message::PylintEmitter;
 
     #[test]
     fn output() {

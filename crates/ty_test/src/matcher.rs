@@ -6,7 +6,7 @@ use crate::diagnostic::SortedDiagnostics;
 use colored::Colorize;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::File;
-use ruff_db::source::{line_index, source_text, SourceText};
+use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::cmp::Ordering;
 use std::ops::Range;
@@ -339,7 +339,7 @@ impl Matcher {
 mod tests {
     use super::FailuresByLine;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
-    use ruff_db::files::{system_path_to_file, File};
+    use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;

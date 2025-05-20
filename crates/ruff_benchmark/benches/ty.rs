@@ -3,13 +3,13 @@ use ruff_benchmark::criterion;
 
 use std::ops::Range;
 
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use rayon::ThreadPoolBuilder;
 use rustc_hash::FxHashSet;
 
 use ruff_benchmark::TestFile;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
-use ruff_db::files::{system_path_to_file, File};
+use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::PythonVersion;
@@ -301,6 +301,56 @@ fn benchmark_many_string_assignments(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_many_tuple_assignments(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[many_tuple_assignments]", |b| {
+        b.iter_batched_ref(
+            || {
+                // This is a micro benchmark, but it is effectively identical to a code sample
+                // observed in https://github.com/astral-sh/ty/issues/362
+                setup_micro_case(
+                    r#"
+                    def flag() -> bool:
+                        return True
+
+                    t = ()
+                    if flag():
+                        t += (1,)
+                    if flag():
+                        t += (2,)
+                    if flag():
+                        t += (3,)
+                    if flag():
+                        t += (4,)
+                    if flag():
+                        t += (5,)
+                    if flag():
+                        t += (6,)
+                    if flag():
+                        t += (7,)
+                    if flag():
+                        t += (8,)
+
+                    # Perform some kind of operation on the union type
+                    print(1 in t)
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check().unwrap();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
-criterion_group!(micro, benchmark_many_string_assignments);
+criterion_group!(
+    micro,
+    benchmark_many_string_assignments,
+    benchmark_many_tuple_assignments
+);
 criterion_main!(check_file, micro);

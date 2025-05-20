@@ -100,8 +100,8 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     if parents_anchor.is_empty() {
         let _ = writeln!(output, "{header_level} [`{name}`](#{name}) {{: #{name} }}");
     } else {
-        let _ =
-            writeln!(output,
+        let _ = writeln!(
+            output,
             "{header_level} [`{name}`](#{parents_anchor}_{name}) {{: #{parents_anchor}_{name} }}"
         );
 

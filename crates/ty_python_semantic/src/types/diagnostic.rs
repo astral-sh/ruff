@@ -4,13 +4,14 @@ use super::{ClassLiteral, KnownClass};
 use crate::db::Db;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
+use crate::types::LintDiagnosticGuard;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{protocol_class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
-use crate::{declare_lint, Program};
+use crate::types::{KnownFunction, KnownInstanceType, Type, protocol_class::ProtocolClassLiteral};
+use crate::{Program, declare_lint};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
 use ruff_db::files::system_path_to_file;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -41,6 +42,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
     registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
+    registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
@@ -231,7 +233,7 @@ declare_lint! {
     pub(crate) static DIVISION_BY_ZERO = {
         summary: "detects division by zero",
         status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
+        default_level: Level::Ignore,
     }
 }
 
@@ -593,6 +595,27 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for the creation of invalid `TypeAliasType`s
+    ///
+    /// ## Why is this bad?
+    /// There are several requirements that you must follow when creating a `TypeAliasType`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeAliasType
+    ///
+    /// IntOrStr = TypeAliasType("IntOrStr", int | str)  # okay
+    /// NewAlias = TypeAliasType(get_name(), int)        # error: TypeAliasType name must be a string literal
+    /// ```
+    pub(crate) static INVALID_TYPE_ALIAS_TYPE = {
+        summary: "detects invalid TypeAliasType definitions",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for arguments to `metaclass=` that are invalid.
     ///
     /// ## Why is this bad?
@@ -789,7 +812,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for expressions that are used as type expressions
+    /// Checks for expressions that are used as [type expressions]
     /// but cannot validly be interpreted as such.
     ///
     /// ## Why is this bad?
@@ -803,6 +826,7 @@ declare_lint! {
     /// a: type[1]  # `1` is not a type
     /// b: Annotated[int]  # `Annotated` expects at least two arguments
     /// ```
+    /// [type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
     pub(crate) static INVALID_TYPE_FORM = {
         summary: "detects invalid type forms",
         status: LintStatus::preview("1.0.0"),
@@ -1549,7 +1573,7 @@ pub(super) fn report_invalid_return_type(
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     diag.set_primary_message(format_args!(
-        "Expected `{expected_ty}`, found `{actual_ty}`",
+        "expected `{expected_ty}`, found `{actual_ty}`",
         expected_ty = expected_ty.display(context.db()),
         actual_ty = actual_ty.display(context.db()),
     ));
@@ -1574,7 +1598,7 @@ pub(super) fn report_invalid_generator_function_return_type(
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     let inferred_ty = inferred_return.display(context.db());
     diag.set_primary_message(format_args!(
-        "Expected `{expected_ty}`, found `{inferred_ty}`",
+        "expected `{expected_ty}`, found `{inferred_ty}`",
         expected_ty = expected_ty.display(context.db()),
     ));
 
@@ -1646,6 +1670,47 @@ pub(super) fn report_possibly_unbound_attribute(
     ));
 }
 
+pub(super) fn add_inferred_python_version_hint(db: &dyn Db, mut diagnostic: LintDiagnosticGuard) {
+    let program = Program::get(db);
+    let python_version = program.python_version(db);
+    let python_version_source = program.python_version_source(db);
+
+    match python_version_source {
+        crate::ValueSource::Cli => {
+            diagnostic.info(format_args!(
+                "Python {python_version} was assumed when resolving types because it was specified on the command line",
+            ));
+        }
+        crate::ValueSource::File(path, range) => {
+            if let Ok(file) = system_path_to_file(db, &**path) {
+                let mut sub_diagnostic = SubDiagnostic::new(
+                    Severity::Info,
+                    format_args!("Python {python_version} was assumed when resolving types"),
+                );
+                sub_diagnostic.annotate(
+                    Annotation::primary(Span::from(file).with_optional_range(*range)).message(
+                        format_args!(
+                            "Python {python_version} assumed due to this configuration setting"
+                        ),
+                    ),
+                );
+                diagnostic.sub(sub_diagnostic);
+            } else {
+                diagnostic.info(format_args!(
+                    "Python {python_version} was assumed when resolving types because of your configuration file(s)",
+                ));
+            }
+        }
+        crate::ValueSource::Default => {
+            diagnostic.info(format_args!(
+                "Python {python_version} was assumed when resolving types \
+                because it is the newest Python version supported by ty, \
+                and neither a command-line argument nor a configuration setting was provided",
+            ));
+        }
+    }
+}
+
 pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
     let Some(builder) = context.report_lint(&UNRESOLVED_REFERENCE, expr_name_node) else {
         return;
@@ -1654,51 +1719,10 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
     let ast::ExprName { id, .. } = expr_name_node;
     let mut diagnostic = builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
     if let Some(version_added_to_builtins) = version_builtin_was_added(id) {
-        let program = Program::get(context.db());
-        let python_version = program.python_version(context.db());
-
-        let mut sub_diagnostic = SubDiagnostic::new(
-            Severity::Info,
-            format_args!(
-                "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}, \
-                but Python {python_version} was assumed when resolving types",
-            ),
-        );
-
-        let python_version_source = program.python_version_source(context.db());
-
-        match python_version_source {
-            crate::ValueSource::Cli => {
-                diagnostic.sub(sub_diagnostic);
-                diagnostic.info(format_args!(
-                    "This is because Python {python_version} was specified on the command line",
-                ));
-            }
-            crate::ValueSource::File(path, range) => {
-                if let Ok(file) = system_path_to_file(context.db(), &**path) {
-                    sub_diagnostic.annotate(
-                        Annotation::primary(Span::from(file).with_optional_range(*range)).message(
-                            format_args!(
-                                "Python {python_version} assumed due to this configuration setting"
-                            ),
-                        ),
-                    );
-                    diagnostic.sub(sub_diagnostic);
-                } else {
-                    diagnostic.sub(sub_diagnostic);
-                    diagnostic.info(format_args!(
-                        "This is because Python {python_version} was specified in your configuration file",
-                    ));
-                }
-            }
-            crate::ValueSource::Default => {
-                diagnostic.sub(sub_diagnostic);
-                diagnostic.info(format_args!(
-                    "This is because it is the newest Python version supported by ty, \
-                    and neither a command-line argument nor a configuration setting was provided",
-                ));
-            }
-        }
+        diagnostic.info(format_args!(
+            "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
+        ));
+        add_inferred_python_version_hint(context.db(), diagnostic);
     }
 }
 
@@ -1803,6 +1827,13 @@ pub(crate) fn report_invalid_arguments_to_callable(
         "Special form `{}` expected exactly two arguments (parameter types and return type)",
         KnownInstanceType::Callable.repr(db)
     ));
+}
+
+pub(crate) fn add_type_expression_reference_link(mut diag: LintDiagnosticGuard) {
+    diag.info("See the following page for a reference on valid type expressions:");
+    diag.info(
+        "https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
+    );
 }
 
 pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(

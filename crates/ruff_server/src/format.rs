@@ -2,7 +2,7 @@ use std::path::Path;
 
 use ruff_formatter::PrintedRange;
 use ruff_python_ast::PySourceType;
-use ruff_python_formatter::{format_module_source, FormatModuleError};
+use ruff_python_formatter::{FormatModuleError, format_module_source};
 use ruff_text_size::TextRange;
 use ruff_workspace::FormatterSettings;
 
@@ -73,8 +73,8 @@ mod tests {
     use ruff_text_size::{TextRange, TextSize};
     use ruff_workspace::FormatterSettings;
 
-    use crate::format::{format, format_range};
     use crate::TextDocument;
+    use crate::format::{format, format_range};
 
     #[test]
     fn format_per_file_version() {

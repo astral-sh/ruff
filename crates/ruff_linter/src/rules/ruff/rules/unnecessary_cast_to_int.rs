@@ -1,18 +1,18 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{Arguments, Expr, ExprCall};
-use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::{lines_after_ignoring_trivia, CommentRanges};
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
+use ruff_python_trivia::{CommentRanges, lines_after_ignoring_trivia};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::unnecessary_round::{
-    rounded_and_ndigits, InferredType, NdigitsValue, RoundedValue,
+    InferredType, NdigitsValue, RoundedValue, rounded_and_ndigits,
 };
-use crate::Locator;
 
 /// ## What it does
 /// Checks for `int` conversions of values that are already integers.
@@ -158,9 +158,10 @@ fn call_applicability(checker: &Checker, inner_call: &ExprCall) -> Option<Applic
     match qualified_name.segments() {
         // Always returns a strict instance of `int`
         ["" | "builtins", "len" | "id" | "hash" | "ord" | "int"]
-        | ["math", "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm"] => {
-            Some(Applicability::Safe)
-        }
+        | [
+            "math",
+            "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm",
+        ] => Some(Applicability::Safe),
 
         // Depends on `ndigits` and `number.__round__`
         ["" | "builtins", "round"] => round_applicability(arguments, checker.semantic()),

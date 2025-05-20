@@ -57,7 +57,7 @@ error[invalid-return-type]: Return type does not match returned value
   |            --- Expected `str` because of return type
 6 |     # error: [invalid-return-type]
 7 |     return 1
-  |            ^ Expected `str`, found `Literal[1]`
+  |            ^ expected `str`, found `Literal[1]`
 8 |
 9 | def f() -> int:
   |
@@ -75,7 +75,7 @@ error[invalid-return-type]: Return type does not match returned value
    |            --- Expected `int` because of return type
 10 |     # error: [invalid-return-type]
 11 |     return
-   |     ^^^^^^ Expected `int`, found `None`
+   |     ^^^^^^ expected `int`, found `None`
 12 |
 13 | from typing import TypeVar
    |
