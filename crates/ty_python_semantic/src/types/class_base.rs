@@ -31,6 +31,19 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
+            Self::Class(class) => Self::Class(class.normalized(db)),
+            Self::Protocol(generic_context) => {
+                Self::Protocol(generic_context.map(|context| context.normalized(db)))
+            }
+            Self::Generic(generic_context) => {
+                Self::Generic(generic_context.map(|context| context.normalized(db)))
+            }
+        }
+    }
+
     pub(crate) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
         struct Display<'db> {
             base: ClassBase<'db>,
