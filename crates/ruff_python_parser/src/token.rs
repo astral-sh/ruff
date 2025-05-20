@@ -473,6 +473,11 @@ impl TokenKind {
         matches!(self, TokenKind::Plus | TokenKind::Minus)
     }
 
+    #[inline]
+    pub const fn is_ft_string_end(self) -> bool {
+        matches!(self, TokenKind::FStringEnd | TokenKind::TStringEnd)
+    }
+
     /// Returns the [`UnaryOp`] that corresponds to this token kind, if it is a unary arithmetic
     /// operator, otherwise return [None].
     ///

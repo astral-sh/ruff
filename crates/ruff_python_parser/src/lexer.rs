@@ -165,23 +165,11 @@ impl<'src> Lexer<'src> {
     fn lex_token(&mut self) -> TokenKind {
         if let Some(ftstring) = self.ftstrings.current() {
             if !ftstring.is_in_expression(self.nesting) {
-                match ftstring.kind() {
-                    FTStringKind::FString => {
-                        if let Some(token) = self.lex_ftstring_middle_or_end() {
-                            if matches!(token, TokenKind::FStringEnd) {
-                                self.ftstrings.pop();
-                            }
-                            return token;
-                        }
+                if let Some(token) = self.lex_ftstring_middle_or_end() {
+                    if token.is_ft_string_end() {
+                        self.ftstrings.pop();
                     }
-                    FTStringKind::TString => {
-                        if let Some(token) = self.lex_ftstring_middle_or_end() {
-                            if matches!(token, TokenKind::TStringEnd) {
-                                self.ftstrings.pop();
-                            }
-                            return token;
-                        }
-                    }
+                    return token;
                 }
             }
         }
