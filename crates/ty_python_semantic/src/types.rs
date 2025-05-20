@@ -7146,7 +7146,7 @@ impl<'db> FunctionType<'db> {
         // However, our representation of a function literal includes any specialization that
         // should be applied to the signature. Different specializations of the same function
         // literal are only subtypes of each other if they result in subtype signatures.
-        self.is_equivalent_to(db, other)
+        self.normalized(db) == other.normalized(db)
             || (self.body_scope(db) == other.body_scope(db)
                 && self
                     .into_callable_type(db)
@@ -7166,6 +7166,10 @@ impl<'db> FunctionType<'db> {
 
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         self.normalized(db) == other.normalized(db)
+            || (self.body_scope(db) == other.body_scope(db)
+                && self
+                    .into_callable_type(db)
+                    .is_equivalent_to(db, other.into_callable_type(db)))
     }
 
     fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
