@@ -58,7 +58,11 @@ impl<'db> Deref for ProtocolClassLiteral<'db> {
     }
 }
 
+/// # Ordering
+/// Ordering is based on the protocol interface member's salsa-assigned id and not on its members.
+/// The id may change between runs, or when the protocol instance members was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub(super) struct ProtocolInterfaceMembers<'db> {
     #[returns(ref)]
     inner: BTreeMap<Name, ProtocolMemberData<'db>>,
