@@ -1196,6 +1196,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::StarmapZip) {
                 ruff::rules::starmap_zip(checker, call);
             }
+            if checker.enabled(Rule::ClassDictAnnotations) {
+                ruff::rules::class_dict_annotations(checker, call);
+            }
             if checker.enabled(Rule::LogExceptionOutsideExceptHandler) {
                 flake8_logging::rules::log_exception_outside_except_handler(checker, call);
             }
