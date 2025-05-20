@@ -681,10 +681,20 @@ mod tests {
 
     use super::*;
 
+    impl PythonEnvironment {
+        fn expect_venv(self) -> VirtualEnvironment {
+            match self {
+                Self::Virtual(venv) => venv,
+                Self::System(_) => panic!("Expected a virtual environment"),
+            }
+        }
+    }
+
     struct VirtualEnvironmentTestCase {
         system_site_packages: bool,
         pyvenv_cfg_version_field: Option<&'static str>,
         command_field: Option<&'static str>,
+        implementation_field: Option<&'static str>,
     }
 
     struct PythonEnvironmentTestCase {
@@ -737,6 +747,7 @@ mod tests {
                 pyvenv_cfg_version_field,
                 system_site_packages,
                 command_field,
+                implementation_field,
             }) = virtual_env
             else {
                 return system_install_sys_prefix;
@@ -767,6 +778,10 @@ mod tests {
                 pyvenv_cfg_contents.push_str(command_field);
                 pyvenv_cfg_contents.push('\n');
             }
+            if let Some(implementation_field) = implementation_field {
+                pyvenv_cfg_contents.push_str(implementation_field);
+                pyvenv_cfg_contents.push('\n');
+            }
             // Deliberately using weird casing here to test that our pyvenv.cfg parsing is case-insensitive:
             if *system_site_packages {
                 pyvenv_cfg_contents.push_str("include-system-site-packages = TRuE\n");
@@ -785,15 +800,15 @@ mod tests {
         }
 
         #[track_caller]
-        fn run(self) {
+        fn run(self) -> PythonEnvironment {
             let env_path = self.build();
             let env = PythonEnvironment::new(env_path.clone(), self.origin, &self.system)
                 .expect("Expected environment construction to succeed");
 
             let expect_virtual_env = self.virtual_env.is_some();
-            match env {
+            match &env {
                 PythonEnvironment::Virtual(venv) if expect_virtual_env => {
-                    self.assert_virtual_environment(&venv, &env_path);
+                    self.assert_virtual_environment(venv, &env_path);
                 }
                 PythonEnvironment::Virtual(venv) => {
                     panic!(
@@ -801,12 +816,13 @@ mod tests {
                     );
                 }
                 PythonEnvironment::System(env) if !expect_virtual_env => {
-                    self.assert_system_environment(&env, &env_path);
+                    self.assert_system_environment(env, &env_path);
                 }
                 PythonEnvironment::System(env) => {
                     panic!("Expected a virtual environment, but got a system environment: {env:?}");
                 }
             }
+            env
         }
 
         fn assert_virtual_environment(
@@ -999,6 +1015,7 @@ mod tests {
                 system_site_packages: false,
                 pyvenv_cfg_version_field: None,
                 command_field: None,
+                implementation_field: None,
             }),
         };
         test.run();
@@ -1015,6 +1032,7 @@ mod tests {
                 system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version = 3.12"),
                 command_field: None,
+                implementation_field: None,
             }),
         };
         test.run();
@@ -1031,6 +1049,7 @@ mod tests {
                 system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version_info = 3.12"),
                 command_field: None,
+                implementation_field: None,
             }),
         };
         test.run();
@@ -1047,6 +1066,7 @@ mod tests {
                 system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version_info = 3.12.0rc2"),
                 command_field: None,
+                implementation_field: None,
             }),
         };
         test.run();
@@ -1063,6 +1083,7 @@ mod tests {
                 system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version_info = 3.13"),
                 command_field: None,
+                implementation_field: None,
             }),
         };
         test.run();
@@ -1079,9 +1100,82 @@ mod tests {
                 system_site_packages: true,
                 pyvenv_cfg_version_field: Some("version_info = 3.13"),
                 command_field: None,
+                implementation_field: None,
             }),
         };
         test.run();
+    }
+
+    #[test]
+    fn detects_pypy_implementation() {
+        let test = PythonEnvironmentTestCase {
+            system: TestSystem::default(),
+            minor_version: 13,
+            free_threaded: true,
+            origin: SysPrefixPathOrigin::VirtualEnvVar,
+            virtual_env: Some(VirtualEnvironmentTestCase {
+                system_site_packages: true,
+                pyvenv_cfg_version_field: None,
+                command_field: None,
+                implementation_field: Some("implementation = PyPy"),
+            }),
+        };
+        let venv = test.run().expect_venv();
+        assert_eq!(venv.implementation, PythonImplementation::PyPy);
+    }
+
+    #[test]
+    fn detects_cpython_implementation() {
+        let test = PythonEnvironmentTestCase {
+            system: TestSystem::default(),
+            minor_version: 13,
+            free_threaded: true,
+            origin: SysPrefixPathOrigin::VirtualEnvVar,
+            virtual_env: Some(VirtualEnvironmentTestCase {
+                system_site_packages: true,
+                pyvenv_cfg_version_field: None,
+                command_field: None,
+                implementation_field: Some("implementation = CPython"),
+            }),
+        };
+        let venv = test.run().expect_venv();
+        assert_eq!(venv.implementation, PythonImplementation::CPython);
+    }
+
+    #[test]
+    fn detects_graalpy_implementation() {
+        let test = PythonEnvironmentTestCase {
+            system: TestSystem::default(),
+            minor_version: 13,
+            free_threaded: true,
+            origin: SysPrefixPathOrigin::VirtualEnvVar,
+            virtual_env: Some(VirtualEnvironmentTestCase {
+                system_site_packages: true,
+                pyvenv_cfg_version_field: None,
+                command_field: None,
+                implementation_field: Some("implementation = GraalVM"),
+            }),
+        };
+        let venv = test.run().expect_venv();
+        assert_eq!(venv.implementation, PythonImplementation::GraalPy);
+    }
+
+    #[test]
+    fn detects_unknown_implementation() {
+        let test = PythonEnvironmentTestCase {
+            system: TestSystem::default(),
+            minor_version: 13,
+            free_threaded: true,
+            origin: SysPrefixPathOrigin::VirtualEnvVar,
+            virtual_env: Some(VirtualEnvironmentTestCase {
+                system_site_packages: true,
+                pyvenv_cfg_version_field: None,
+                command_field: None,
+                implementation_field: None,
+            }),
+        };
+        let venv = test.run().expect_venv();
+        assert_eq!(venv.implementation, PythonImplementation::Unknown);
     }
 
     #[test]
@@ -1180,6 +1274,7 @@ mod tests {
                 command_field: Some(
                     r#"command = /.pyenv/versions/3.13.3/bin/python3.13 -m venv --without-pip --prompt="python-default/3.13.3" /somewhere-else/python/virtualenvs/python-default/3.13.3"#,
                 ),
+                implementation_field: None,
             }),
         };
         test.run();
