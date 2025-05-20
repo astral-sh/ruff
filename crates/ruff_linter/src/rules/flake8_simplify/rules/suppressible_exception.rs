@@ -96,8 +96,11 @@ pub(crate) fn suppressible_exception(
         return;
     }
 
-    let [ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, range, .. })] =
-        handlers
+    let [
+        ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+            body, range, type_, ..
+        }),
+    ] = handlers
     else {
         return;
     };
@@ -115,7 +118,13 @@ pub(crate) fn suppressible_exception(
     };
 
     let exception = if handler_names.is_empty() {
-        "Exception".to_string()
+        if type_.is_none() {
+            // case where there are no handler names provided at all
+            "BaseException".to_string()
+        } else {
+            // case where handler names is an empty tuple
+            String::new()
+        }
     } else {
         handler_names.join(", ")
     };
