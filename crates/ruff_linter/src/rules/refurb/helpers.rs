@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Applicability, Edit, Fix};
+use crate::{Applicability, Edit, Fix};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;

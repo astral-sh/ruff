@@ -2,8 +2,8 @@ use std::ops::Add;
 
 use anyhow::Result;
 
-use ruff_diagnostics::{AlwaysFixableViolation, FixAvailability, Violation};
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, FixAvailability, Violation};
+use crate::{Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;

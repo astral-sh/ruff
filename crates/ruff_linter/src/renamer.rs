@@ -3,7 +3,7 @@
 use anyhow::{Result, anyhow};
 use itertools::Itertools;
 
-use ruff_diagnostics::Edit;
+use crate::Edit;
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};

@@ -1,4 +1,4 @@
-use ruff_diagnostics::Violation;
+use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 /// ## Removed

@@ -1,6 +1,6 @@
 use anyhow::{Context, Ok, Result};
 
-use ruff_diagnostics::Edit;
+use crate::Edit;
 use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
 use ruff_python_codegen::Stylist;

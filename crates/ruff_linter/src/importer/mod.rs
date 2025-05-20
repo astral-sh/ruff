@@ -8,7 +8,7 @@ use std::error::Error;
 use anyhow::Result;
 use libcst_native::{ImportAlias, Name as cstName, NameOrAttribute};
 
-use ruff_diagnostics::Edit;
+use crate::Edit;
 use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{Parsed, Tokens};

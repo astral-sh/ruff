@@ -1,6 +1,6 @@
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;

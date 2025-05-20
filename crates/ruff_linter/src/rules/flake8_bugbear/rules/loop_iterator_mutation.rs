@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
+use crate::Diagnostic;
+use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::name::UnqualifiedName;

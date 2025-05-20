@@ -1,7 +1,7 @@
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::{AlwaysFixableViolation, Fix};
+use crate::Diagnostic;
+use crate::{AlwaysFixableViolation, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr, Stmt};

@@ -1,6 +1,6 @@
 use ruff_text_size::{TextLen, TextRange};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::Line;

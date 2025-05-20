@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{Expr, ExprBinOp, Operator, PythonVersion};

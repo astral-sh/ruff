@@ -4,7 +4,7 @@ use std::path::Path;
 
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::registry::AsRule;

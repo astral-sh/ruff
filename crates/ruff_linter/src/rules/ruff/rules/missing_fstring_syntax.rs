@@ -1,7 +1,7 @@
 use memchr::memchr2_iter;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_literal::format::FormatSpec;

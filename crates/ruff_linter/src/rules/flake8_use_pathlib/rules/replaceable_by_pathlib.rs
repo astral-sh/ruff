@@ -1,4 +1,4 @@
-use ruff_diagnostics::Diagnostic;
+use crate::Diagnostic;
 use ruff_python_ast::{self as ast, Expr, ExprBooleanLiteral, ExprCall};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing;

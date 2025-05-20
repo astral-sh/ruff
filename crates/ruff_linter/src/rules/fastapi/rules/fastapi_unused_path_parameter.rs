@@ -2,8 +2,8 @@ use std::iter::Peekable;
 use std::ops::Range;
 use std::str::CharIndices;
 
-use ruff_diagnostics::Fix;
-use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
+use crate::Fix;
+use crate::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};

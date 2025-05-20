@@ -7,6 +7,7 @@ use ruff_db::diagnostic::{self as db, Annotation, DiagnosticId, LintName, Severi
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::FxHashMap;
 
+use crate::{Diagnostic, Fix};
 pub use azure::AzureEmitter;
 pub use github::GithubEmitter;
 pub use gitlab::GitlabEmitter;
@@ -16,7 +17,6 @@ pub use json_lines::JsonLinesEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 pub use rdjson::RdjsonEmitter;
-use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_notebook::NotebookIndex;
 use ruff_python_parser::{ParseError, UnsupportedSyntaxError};
 use ruff_source_file::{LineColumn, SourceFile};
@@ -60,6 +60,7 @@ pub struct Message {
     pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
     pub(crate) noqa_offset: Option<TextSize>,
+    rule: Option<Rule>,
 }
 
 impl Message {
@@ -76,12 +77,12 @@ impl Message {
             fix: None,
             parent: None,
             noqa_offset: None,
+            rule: None,
         }
     }
 
     #[expect(clippy::too_many_arguments)]
     pub fn diagnostic(
-        name: &'static str,
         body: String,
         suggestion: Option<String>,
         range: TextRange,
@@ -89,9 +90,10 @@ impl Message {
         parent: Option<TextSize>,
         file: SourceFile,
         noqa_offset: Option<TextSize>,
+        rule: Rule,
     ) -> Message {
         let mut diagnostic = db::Diagnostic::new(
-            DiagnosticId::Lint(LintName::of(name)),
+            DiagnosticId::Lint(LintName::of(rule.into())),
             Severity::Error,
             body,
         );
@@ -107,6 +109,7 @@ impl Message {
             fix,
             parent,
             noqa_offset,
+            rule: Some(rule),
         }
     }
 
@@ -117,15 +120,14 @@ impl Message {
         noqa_offset: Option<TextSize>,
     ) -> Message {
         let Diagnostic {
-            name,
             body,
             suggestion,
             range,
             fix,
             parent,
+            rule,
         } = diagnostic;
         Self::diagnostic(
-            name,
             body,
             suggestion,
             range,
@@ -133,6 +135,7 @@ impl Message {
             parent,
             file,
             noqa_offset,
+            rule,
         )
     }
 
@@ -226,11 +229,7 @@ impl Message {
 
     /// Returns the [`Rule`] corresponding to the diagnostic message.
     pub fn to_rule(&self) -> Option<Rule> {
-        if self.is_syntax_error() {
-            None
-        } else {
-            Some(self.name().parse().expect("Expected a valid rule name"))
-        }
+        self.rule
     }
 
     /// Returns the [`NoqaCode`] corresponding to the diagnostic message.
@@ -371,7 +370,8 @@ impl<'a> EmitterContext<'a> {
 mod tests {
     use rustc_hash::FxHashMap;
 
-    use ruff_diagnostics::{Edit, Fix};
+    use crate::codes::Rule;
+    use crate::{Edit, Fix};
     use ruff_notebook::NotebookIndex;
     use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
     use ruff_source_file::{OneIndexed, SourceFileBuilder};
@@ -417,7 +417,6 @@ def fibonacci(n):
 
         let unused_import_start = TextSize::from(7);
         let unused_import = Message::diagnostic(
-            "unused-import",
             "`os` imported but unused".to_string(),
             Some("Remove unused import: `os`".to_string()),
             TextRange::new(unused_import_start, TextSize::from(9)),
@@ -428,11 +427,11 @@ def fibonacci(n):
             None,
             fib_source.clone(),
             Some(unused_import_start),
+            Rule::UnusedImport,
         );
 
         let unused_variable_start = TextSize::from(94);
         let unused_variable = Message::diagnostic(
-            "unused-variable",
             "Local variable `x` is assigned to but never used".to_string(),
             Some("Remove assignment to unused variable `x`".to_string()),
             TextRange::new(unused_variable_start, TextSize::from(95)),
@@ -443,13 +442,13 @@ def fibonacci(n):
             None,
             fib_source,
             Some(unused_variable_start),
+            Rule::UnusedVariable,
         );
 
         let file_2 = r"if a == 1: pass";
 
         let undefined_name_start = TextSize::from(3);
         let undefined_name = Message::diagnostic(
-            "undefined-name",
             "Undefined name `a`".to_string(),
             None,
             TextRange::new(undefined_name_start, TextSize::from(4)),
@@ -457,6 +456,7 @@ def fibonacci(n):
             None,
             SourceFileBuilder::new("undef.py", file_2).finish(),
             Some(undefined_name_start),
+            Rule::UndefinedName,
         );
 
         vec![unused_import, unused_variable, undefined_name]
@@ -479,7 +479,6 @@ def foo():
 
         let unused_import_os_start = TextSize::from(16);
         let unused_import_os = Message::diagnostic(
-            "unused-import",
             "`os` imported but unused".to_string(),
             Some("Remove unused import: `os`".to_string()),
             TextRange::new(unused_import_os_start, TextSize::from(18)),
@@ -490,11 +489,11 @@ def foo():
             None,
             notebook_source.clone(),
             Some(unused_import_os_start),
+            Rule::UnusedImport,
         );
 
         let unused_import_math_start = TextSize::from(35);
         let unused_import_math = Message::diagnostic(
-            "unused-import",
             "`math` imported but unused".to_string(),
             Some("Remove unused import: `math`".to_string()),
             TextRange::new(unused_import_math_start, TextSize::from(39)),
@@ -505,11 +504,11 @@ def foo():
             None,
             notebook_source.clone(),
             Some(unused_import_math_start),
+            Rule::UnusedImport,
         );
 
         let unused_variable_start = TextSize::from(98);
         let unused_variable = Message::diagnostic(
-            "unused-variable",
             "Local variable `x` is assigned to but never used".to_string(),
             Some("Remove assignment to unused variable `x`".to_string()),
             TextRange::new(unused_variable_start, TextSize::from(99)),
@@ -520,6 +519,7 @@ def foo():
             None,
             notebook_source,
             Some(unused_variable_start),
+            Rule::UnusedVariable,
         );
 
         let mut notebook_indexes = FxHashMap::default();

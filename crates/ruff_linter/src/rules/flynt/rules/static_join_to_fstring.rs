@@ -2,7 +2,7 @@ use ast::FStringFlags;
 use itertools::Itertools;
 
 use crate::fix::edits::pad;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::{Ranged, TextRange};

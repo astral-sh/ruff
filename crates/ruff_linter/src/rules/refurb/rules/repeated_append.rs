@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ast::traversal;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::traversal::EnclosingSuite;
 use ruff_python_ast::{self as ast, Expr, Stmt};

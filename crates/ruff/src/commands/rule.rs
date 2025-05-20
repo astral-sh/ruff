@@ -6,7 +6,7 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::FixAvailability;
+use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 
 use crate::args::HelpFormat;

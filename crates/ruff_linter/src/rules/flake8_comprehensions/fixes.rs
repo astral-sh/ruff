@@ -10,7 +10,7 @@ use libcst_native::{
     SimpleString, SimpleWhitespace, TrailingWhitespace, Tuple,
 };
 
-use ruff_diagnostics::{Edit, Fix};
+use crate::{Edit, Fix};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::SemanticModel;

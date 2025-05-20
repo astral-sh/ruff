@@ -2,7 +2,7 @@ use std::string::ToString;
 
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix, FixAvailability, Violation};
+use crate::{AlwaysFixableViolation, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, Keyword};

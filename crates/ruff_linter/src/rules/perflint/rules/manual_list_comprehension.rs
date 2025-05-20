@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, Arguments, Expr};
 
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use crate::{
     checkers::ast::Checker, preview::is_fix_manual_list_comprehension_enabled,
     rules::perflint::helpers::statement_deletion_range,
 };
 use anyhow::{Result, anyhow};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::perflint::helpers::comment_strings_in_range;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
