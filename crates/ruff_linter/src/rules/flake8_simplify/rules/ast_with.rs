@@ -52,6 +52,8 @@ use crate::preview::multiple_with_statements_fix_safe_enabled;
 ///
 /// ## References
 /// - [Python documentation: The `with` statement](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct MultipleWithStatements;
 
