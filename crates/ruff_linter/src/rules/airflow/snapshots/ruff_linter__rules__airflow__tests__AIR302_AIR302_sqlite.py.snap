@@ -8,4 +8,4 @@ AIR302_sqlite.py:5:1: AIR302 `airflow.hooks.sqlite_hook.SqliteHook` is moved int
 5 | SqliteHook()
   | ^^^^^^^^^^ AIR302
   |
-  = help: Install `apache-airflow-providers-sqlite>=1.0.0` and use `airflow.providers.sqlite.hooks.sqlite.SqliteHook` instead.
+  = help: Install `apache-airflow-providers-sqlite>=1.0.0` and use `SqliteHook` from `airflow.providers.sqlite.hooks.sqlite` instead.

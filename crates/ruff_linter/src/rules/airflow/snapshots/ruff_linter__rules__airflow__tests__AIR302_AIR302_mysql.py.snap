@@ -10,7 +10,7 @@ AIR302_mysql.py:9:1: AIR302 `airflow.hooks.mysql_hook.MySqlHook` is moved into `
 10 | PrestoToMySqlOperator()
 11 | PrestoToMySqlTransfer()
    |
-   = help: Install `apache-airflow-providers-mysql>=1.0.0` and use `airflow.providers.mysql.hooks.mysql.MySqlHook` instead.
+   = help: Install `apache-airflow-providers-mysql>=1.0.0` and use `MySqlHook` from `airflow.providers.mysql.hooks.mysql` instead.
 
 AIR302_mysql.py:10:1: AIR302 `airflow.operators.presto_to_mysql.PrestoToMySqlOperator` is moved into `mysql` provider in Airflow 3.0;
    |
@@ -19,7 +19,7 @@ AIR302_mysql.py:10:1: AIR302 `airflow.operators.presto_to_mysql.PrestoToMySqlOpe
    | ^^^^^^^^^^^^^^^^^^^^^ AIR302
 11 | PrestoToMySqlTransfer()
    |
-   = help: Install `apache-airflow-providers-mysql>=1.0.0` and use `airflow.providers.mysql.transfers.presto_to_mysql.PrestoToMySqlOperator` instead.
+   = help: Install `apache-airflow-providers-mysql>=1.0.0` and use `PrestoToMySqlOperator` from `airflow.providers.mysql.transfers.presto_to_mysql` instead.
 
 AIR302_mysql.py:11:1: AIR302 `airflow.operators.presto_to_mysql.PrestoToMySqlTransfer` is moved into `mysql` provider in Airflow 3.0;
    |
@@ -28,4 +28,4 @@ AIR302_mysql.py:11:1: AIR302 `airflow.operators.presto_to_mysql.PrestoToMySqlTra
 11 | PrestoToMySqlTransfer()
    | ^^^^^^^^^^^^^^^^^^^^^ AIR302
    |
-   = help: Install `apache-airflow-providers-mysql>=1.0.0` and use `airflow.providers.mysql.transfers.presto_to_mysql.PrestoToMySqlOperator` instead.
+   = help: Install `apache-airflow-providers-mysql>=1.0.0` and use `PrestoToMySqlOperator` from `airflow.providers.mysql.transfers.presto_to_mysql` instead.
