@@ -176,29 +176,6 @@ class B(A): ...
 * [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L195)
 </details>
 
-## `division-by-zero`
-
-**Default level**: error
-
-<details>
-<summary>detects division by zero</summary>
-
-### What it does
-It detects division by zero.
-
-### Why is this bad?
-Dividing by zero raises a `ZeroDivisionError` at runtime.
-
-### Examples
-```python
-5 / 0
-```
-
-### Links
-* [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20division-by-zero)
-* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L221)
-</details>
-
 ## `duplicate-base`
 
 **Default level**: error
@@ -1741,6 +1718,29 @@ a = 20 / 0  # ty: ignore[division-by-zero]
 ### Links
 * [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unknown-rule)
 * [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L40)
+</details>
+
+## `division-by-zero`
+
+**Default level**: ignore
+
+<details>
+<summary>detects division by zero</summary>
+
+### What it does
+It detects division by zero.
+
+### Why is this bad?
+Dividing by zero raises a `ZeroDivisionError` at runtime.
+
+### Examples
+```python
+5 / 0
+```
+
+### Links
+* [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20division-by-zero)
+* [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L221)
 </details>
 
 ## `possibly-unresolved-reference`

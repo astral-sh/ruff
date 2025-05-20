@@ -293,7 +293,7 @@
         "division-by-zero": {
           "title": "detects division by zero",
           "description": "## What it does\nIt detects division by zero.\n\n## Why is this bad?\nDividing by zero raises a `ZeroDivisionError` at runtime.\n\n## Examples\n```python\n5 / 0\n```",
-          "default": "error",
+          "default": "ignore",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
