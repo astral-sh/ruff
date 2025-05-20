@@ -232,7 +232,7 @@ declare_lint! {
     pub(crate) static DIVISION_BY_ZERO = {
         summary: "detects division by zero",
         status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
+        default_level: Level::Ignore,
     }
 }
 
