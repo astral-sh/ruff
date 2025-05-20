@@ -409,7 +409,7 @@ where
             .with_context(|| format!("Failed to create search path `{}`", path.path()))?;
     }
 
-    let mut db = ProjectDatabase::new(project.clone(), system)?;
+    let mut db = ProjectDatabase::new(project, system)?;
 
     if let Some(included_paths) = included_paths {
         db.project().set_included_paths(&mut db, included_paths);
