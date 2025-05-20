@@ -17,12 +17,13 @@ use crate::types::diagnostic::{
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT,
 };
+use crate::types::function::{DataclassTransformerParams, FunctionDecorators, KnownFunction};
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators, FunctionType,
-    KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType,
-    TupleType, TypeMapping, UnionType, WrapperDescriptorKind, todo_type,
+    BoundMethodType, DataclassParams, FunctionType, KnownClass, KnownInstanceType,
+    MethodWrapperKind, PropertyInstanceType, TupleType, TypeMapping, UnionType,
+    WrapperDescriptorKind, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
