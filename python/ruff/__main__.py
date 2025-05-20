@@ -42,7 +42,7 @@ def find_ruff_bin() -> str:
     paths = os.environ.get("PATH", "").split(os.pathsep)
     if len(paths) >= 2:
 
-        def get_last_three_path_parts(path: str) -> list[str]:
+        def get_last_three_path_parts(path: str) -> "list[str]":
             """Return a list of up to the last three parts of a path."""
             parts = []
 
