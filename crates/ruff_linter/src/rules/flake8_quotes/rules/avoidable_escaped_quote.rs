@@ -297,7 +297,7 @@ fn check_f_string(
     )
 }
 
-/// Checks for unnecessary escaped quotes in an f-string.
+/// Checks for unnecessary escaped quotes in a t-string.
 fn check_t_string(
     locator: &Locator,
     quotes_settings: &flake8_quotes::settings::Settings,
