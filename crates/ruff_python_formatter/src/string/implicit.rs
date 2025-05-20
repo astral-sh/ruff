@@ -404,7 +404,7 @@ impl Format<PyFormatContext<'_>> for FormatLiteralContent {
             content,
             0,
             self.flags,
-            (self.flags.is_f_string() || self.flags.is_t_string()) && !self.is_ftstring,
+            self.flags.is_ft_string() && !self.is_ftstring,
         );
 
         // Trim the start and end of the string if it's the first or last part of a docstring.

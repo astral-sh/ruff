@@ -644,7 +644,7 @@ impl<'src> Lexer<'src> {
         };
 
         if let Some(quote) = quote {
-            if self.current_flags.is_f_string() || self.current_flags.is_t_string() {
+            if self.current_flags.is_ft_string() {
                 return self.lex_ftstring_start(quote);
             }
 
@@ -1454,9 +1454,7 @@ impl<'src> Lexer<'src> {
 
         // The lexer can't be moved back for a triple-quoted f/t-string because the newlines are
         // part of the f/t-string itself, so there is no newline token to be emitted.
-        if self.current_flags.is_triple_quoted_fstring()
-            || self.current_flags.is_triple_quoted_tstring()
-        {
+        if self.current_flags.is_triple_quoted_ftstring() {
             return false;
         }
 

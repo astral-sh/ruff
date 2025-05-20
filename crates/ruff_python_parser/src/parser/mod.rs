@@ -1314,8 +1314,8 @@ bitflags! {
         const WITH_ITEMS_PARENTHESIZED = 1 << 25;
         const WITH_ITEMS_PARENTHESIZED_EXPRESSION = 1 << 26;
         const WITH_ITEMS_UNPARENTHESIZED = 1 << 28;
-        const F_OR_T_STRING_ELEMENTS = 1 << 29;
-        const F_OR_T_STRING_ELEMENTS_IN_FORMAT_SPEC = 1 << 30;
+        const FT_STRING_ELEMENTS = 1 << 29;
+        const FT_STRING_ELEMENTS_IN_FORMAT_SPEC = 1 << 30;
     }
 }
 
@@ -1369,9 +1369,9 @@ impl RecoveryContext {
                 WithItemKind::Unparenthesized => RecoveryContext::WITH_ITEMS_UNPARENTHESIZED,
             },
             RecoveryContextKind::FTStringElements(kind) => match kind {
-                FTStringElementsKind::Regular => RecoveryContext::F_OR_T_STRING_ELEMENTS,
+                FTStringElementsKind::Regular => RecoveryContext::FT_STRING_ELEMENTS,
                 FTStringElementsKind::FormatSpec => {
-                    RecoveryContext::F_OR_T_STRING_ELEMENTS_IN_FORMAT_SPEC
+                    RecoveryContext::FT_STRING_ELEMENTS_IN_FORMAT_SPEC
                 }
             },
         }
@@ -1440,10 +1440,10 @@ impl RecoveryContext {
             RecoveryContext::WITH_ITEMS_UNPARENTHESIZED => {
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized)
             }
-            RecoveryContext::F_OR_T_STRING_ELEMENTS => {
+            RecoveryContext::FT_STRING_ELEMENTS => {
                 RecoveryContextKind::FTStringElements(FTStringElementsKind::Regular)
             }
-            RecoveryContext::F_OR_T_STRING_ELEMENTS_IN_FORMAT_SPEC => {
+            RecoveryContext::FT_STRING_ELEMENTS_IN_FORMAT_SPEC => {
                 RecoveryContextKind::FTStringElements(FTStringElementsKind::FormatSpec)
             }
             _ => return None,

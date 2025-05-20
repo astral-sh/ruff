@@ -2060,14 +2060,10 @@ impl AnyStringFlags {
         )
     }
 
-    /// Does the string have an `f` or `F` prefix?
-    pub const fn is_f_string(self) -> bool {
-        self.0.contains(AnyStringFlagsInner::F_PREFIX)
-    }
-
-    /// Does the string have a `t` or `T` prefix?
-    pub const fn is_t_string(self) -> bool {
-        self.0.contains(AnyStringFlagsInner::T_PREFIX)
+    /// Does the string have an `f`,`F`,`t`, or `T` prefix?
+    pub const fn is_ft_string(self) -> bool {
+        self.0
+            .intersects(AnyStringFlagsInner::F_PREFIX.union(AnyStringFlagsInner::T_PREFIX))
     }
 
     /// Does the string have a `b` or `B` prefix?

@@ -808,19 +808,19 @@ impl TokenFlags {
         self.intersects(TokenFlags::F_STRING)
     }
 
-    /// Returns `true` if the token is a triple-quoted f-string.
-    pub(crate) fn is_triple_quoted_fstring(self) -> bool {
-        self.contains(TokenFlags::F_STRING | TokenFlags::TRIPLE_QUOTED_STRING)
-    }
-
     /// Returns `true` if the token is a t-string.
     pub(crate) const fn is_t_string(self) -> bool {
         self.intersects(TokenFlags::T_STRING)
     }
 
+    /// Returns `true` if the token is a t-string.
+    pub(crate) const fn is_ft_string(self) -> bool {
+        self.intersects(TokenFlags::T_STRING.union(TokenFlags::F_STRING))
+    }
+
     /// Returns `true` if the token is a triple-quoted t-string.
-    pub(crate) fn is_triple_quoted_tstring(self) -> bool {
-        self.contains(TokenFlags::T_STRING | TokenFlags::TRIPLE_QUOTED_STRING)
+    pub(crate) fn is_triple_quoted_ftstring(self) -> bool {
+        self.intersects(TokenFlags::TRIPLE_QUOTED_STRING) && self.is_ft_string()
     }
 
     /// Returns `true` if the token is a raw string.

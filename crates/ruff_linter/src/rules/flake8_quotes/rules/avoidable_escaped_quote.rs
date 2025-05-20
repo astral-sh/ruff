@@ -244,7 +244,7 @@ fn check_string_or_bytes(
     range: TextRange,
     flags: AnyStringFlags,
 ) -> Option<Diagnostic> {
-    assert!(!(flags.is_f_string() || flags.is_t_string()));
+    assert!(!flags.is_ft_string());
 
     if flags.is_triple_quoted() || flags.is_raw_string() {
         return None;
