@@ -13,20 +13,19 @@ use itertools::Itertools;
 use log::{debug, error};
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelBridge};
-use ruff_linter::{codes::Rule, registry::AsRule};
+use ruff_linter::codes::Rule;
 use rustc_hash::FxHashMap;
-use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::Fix;
-use ruff_linter::message::{DiagnosticMessage, Message};
+use ruff_linter::message::Message;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use ruff_workspace::Settings;
 use ruff_workspace::resolver::Resolver;
 
@@ -118,13 +117,14 @@ impl Cache {
             }
         };
 
-        let mut package: PackageCache = match bincode::deserialize_from(BufReader::new(file)) {
-            Ok(package) => package,
-            Err(err) => {
-                warn_user!("Failed parse cache file `{}`: {err}", path.display());
-                return Cache::empty(path, package_root);
-            }
-        };
+        let mut package: PackageCache =
+            match bincode::decode_from_reader(BufReader::new(file), bincode::config::standard()) {
+                Ok(package) => package,
+                Err(err) => {
+                    warn_user!("Failed parse cache file `{}`: {err}", path.display());
+                    return Cache::empty(path, package_root);
+                }
+            };
 
         // Sanity check.
         if package.package_root != package_root {
@@ -176,8 +176,8 @@ impl Cache {
 
         // Serialize to in-memory buffer because hyperfine benchmark showed that it's faster than
         // using a `BufWriter` and our cache files are small enough that streaming isn't necessary.
-        let serialized =
-            bincode::serialize(&self.package).context("Failed to serialize cache data")?;
+        let serialized = bincode::encode_to_vec(&self.package, bincode::config::standard())
+            .context("Failed to serialize cache data")?;
         temp_file
             .write_all(&serialized)
             .context("Failed to write serialized cache to temporary file.")?;
@@ -312,7 +312,7 @@ impl Cache {
 }
 
 /// On disk representation of a cache of a package.
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(bincode::Encode, Debug, bincode::Decode)]
 struct PackageCache {
     /// Path to the root of the package.
     ///
@@ -324,7 +324,7 @@ struct PackageCache {
 }
 
 /// On disk representation of the cache per source file.
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(bincode::Decode, Debug, bincode::Encode)]
 pub(crate) struct FileCache {
     /// Key that determines if the cached item is still valid.
     key: u64,
@@ -348,16 +348,16 @@ impl FileCache {
                 lint.messages
                     .iter()
                     .map(|msg| {
-                        Message::Diagnostic(DiagnosticMessage {
-                            name: msg.rule.into(),
-                            body: msg.body.clone(),
-                            suggestion: msg.suggestion.clone(),
-                            range: msg.range,
-                            fix: msg.fix.clone(),
-                            file: file.clone(),
-                            noqa_offset: msg.noqa_offset,
-                            parent: msg.parent,
-                        })
+                        Message::diagnostic(
+                            msg.rule.into(),
+                            msg.body.clone(),
+                            msg.suggestion.clone(),
+                            msg.range,
+                            msg.fix.clone(),
+                            msg.parent,
+                            file.clone(),
+                            msg.noqa_offset,
+                        )
                     })
                     .collect()
             };
@@ -371,7 +371,7 @@ impl FileCache {
     }
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, bincode::Decode, bincode::Encode)]
 struct FileCacheData {
     lint: Option<LintCacheData>,
     formatted: bool,
@@ -409,7 +409,7 @@ pub(crate) fn init(path: &Path) -> Result<()> {
     Ok(())
 }
 
-#[derive(Deserialize, Debug, Serialize, PartialEq)]
+#[derive(bincode::Decode, Debug, bincode::Encode, PartialEq)]
 pub(crate) struct LintCacheData {
     /// Imports made.
     // pub(super) imports: ImportMap,
@@ -422,6 +422,7 @@ pub(crate) struct LintCacheData {
     /// This will be empty if `messages` is empty.
     pub(super) source: String,
     /// Notebook index if this file is a Jupyter Notebook.
+    #[bincode(with_serde)]
     pub(super) notebook_index: Option<NotebookIndex>,
 }
 
@@ -438,22 +439,22 @@ impl LintCacheData {
 
         let messages = messages
             .iter()
-            .filter_map(|message| message.as_diagnostic_message())
-            .map(|msg| {
+            .filter_map(|msg| msg.to_rule().map(|rule| (rule, msg)))
+            .map(|(rule, msg)| {
                 // Make sure that all message use the same source file.
                 assert_eq!(
-                    msg.file,
+                    msg.source_file(),
                     messages.first().unwrap().source_file(),
                     "message uses a different source file"
                 );
                 CacheMessage {
-                    rule: msg.rule(),
-                    body: msg.body.clone(),
-                    suggestion: msg.suggestion.clone(),
-                    range: msg.range,
+                    rule,
+                    body: msg.body().to_string(),
+                    suggestion: msg.suggestion().map(ToString::to_string),
+                    range: msg.range(),
                     parent: msg.parent,
-                    fix: msg.fix.clone(),
-                    noqa_offset: msg.noqa_offset,
+                    fix: msg.fix().cloned(),
+                    noqa_offset: msg.noqa_offset(),
                 }
             })
             .collect();
@@ -467,19 +468,24 @@ impl LintCacheData {
 }
 
 /// On disk representation of a diagnostic message.
-#[derive(Deserialize, Debug, Serialize, PartialEq)]
+#[derive(bincode::Decode, Debug, bincode::Encode, PartialEq)]
 pub(super) struct CacheMessage {
     /// The rule for the cached diagnostic.
+    #[bincode(with_serde)]
     rule: Rule,
     /// The message body to display to the user, to explain the diagnostic.
     body: String,
     /// The message to display to the user, to explain the suggested fix.
     suggestion: Option<String>,
     /// Range into the message's [`FileCache::source`].
+    #[bincode(with_serde)]
     range: TextRange,
+    #[bincode(with_serde)]
     parent: Option<TextSize>,
+    #[bincode(with_serde)]
     fix: Option<Fix>,
-    noqa_offset: TextSize,
+    #[bincode(with_serde)]
+    noqa_offset: Option<TextSize>,
 }
 
 pub(crate) trait PackageCaches {

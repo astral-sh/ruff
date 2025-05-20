@@ -7,7 +7,7 @@
     "@monaco-editor/react": "^4.7.0",
     "classnames": "^2.3.2",
     "react": "^19.0.0",
-    "react-resizable-panels": "^2.1.7"
+    "react-resizable-panels": "^3.0.0"
   },
   "exports": "./src/index.ts"
 }

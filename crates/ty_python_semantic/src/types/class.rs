@@ -8,11 +8,11 @@ use super::{
 };
 use crate::semantic_index::DeclarationWithConstraint;
 use crate::semantic_index::definition::Definition;
-use crate::types::generics::{GenericContext, Specialization, TypeMapping};
+use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters};
 use crate::types::{
     CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, Signature,
-    TypeVarInstance,
+    TypeMapping, TypeVarInstance,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -174,7 +174,7 @@ impl<'db> GenericAlias<'db> {
     pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
-        type_mapping: TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
         Self::new(
             db,
@@ -277,7 +277,7 @@ impl<'db> ClassType<'db> {
     pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
-        type_mapping: TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
         match self {
             Self::NonGeneric(_) => self,

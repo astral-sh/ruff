@@ -523,6 +523,40 @@ mod tests {
     }
 
     #[test]
+    fn goto_type_of_bare_type_alias_type() {
+        let test = cursor_test(
+            r#"
+            from typing_extensions import TypeAliasType
+
+            Alias = TypeAliasType("Alias", tuple[int, int])
+
+            Alias<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+         --> main.py:4:13
+          |
+        2 |             from typing_extensions import TypeAliasType
+        3 |
+        4 |             Alias = TypeAliasType("Alias", tuple[int, int])
+          |             ^^^^^
+        5 |
+        6 |             Alias
+          |
+        info: Source
+         --> main.py:6:13
+          |
+        4 |             Alias = TypeAliasType("Alias", tuple[int, int])
+        5 |
+        6 |             Alias
+          |             ^^^^^
+          |
+        "#);
+    }
+
+    #[test]
     fn goto_type_on_keyword_argument() {
         let test = cursor_test(
             r#"

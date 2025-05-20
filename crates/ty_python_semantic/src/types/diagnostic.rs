@@ -41,6 +41,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
     registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
+    registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
@@ -586,6 +587,27 @@ declare_lint! {
     /// - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
     pub(crate) static INVALID_LEGACY_TYPE_VARIABLE = {
         summary: "detects invalid legacy type variables",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for the creation of invalid `TypeAliasType`s
+    ///
+    /// ## Why is this bad?
+    /// There are several requirements that you must follow when creating a `TypeAliasType`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeAliasType
+    ///
+    /// IntOrStr = TypeAliasType("IntOrStr", int | str)  # okay
+    /// NewAlias = TypeAliasType(get_name(), int)        # error: TypeAliasType name must be a string literal
+    /// ```
+    pub(crate) static INVALID_TYPE_ALIAS_TYPE = {
+        summary: "detects invalid TypeAliasType definitions",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1647,6 +1669,18 @@ pub(super) fn report_possibly_unbound_attribute(
     ));
 }
 
+pub(super) fn add_inferred_python_version_hint(db: &dyn Db, mut diagnostic: LintDiagnosticGuard) {
+    diagnostic.info(format_args!(
+        "The inferred target version of your project is Python {}",
+        Program::get(db).python_version(db)
+    ));
+
+    diagnostic.info(
+            "If using a pyproject.toml file, \
+            consider adjusting the `project.requires-python` or `tool.ty.environment.python-version` field"
+        );
+}
+
 pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
     let Some(builder) = context.report_lint(&UNRESOLVED_REFERENCE, expr_name_node) else {
         return;
@@ -1661,15 +1695,7 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
 
         // TODO: can we tell the user *why* we're inferring this target version?
         // CLI flag? pyproject.toml? Python environment?
-        diagnostic.info(format_args!(
-            "The inferred target version of your project is Python {}",
-            Program::get(context.db()).python_version(context.db())
-        ));
-
-        diagnostic.info(
-            "If using a pyproject.toml file, \
-            consider adjusting the `project.requires-python` or `tool.ty.environment.python-version` field"
-        );
+        add_inferred_python_version_hint(context.db(), diagnostic);
     }
 }
 

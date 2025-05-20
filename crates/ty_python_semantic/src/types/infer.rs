@@ -38,7 +38,7 @@ use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
-use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
+use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
@@ -48,12 +48,11 @@ use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::place::{
-    Boundness, LookupError, builtins_module_scope, builtins_symbol, explicit_global_symbol,
-    fallback_place, global_symbol, module_type_implicit_global_declaration,
+    Boundness, LookupError, Place, PlaceAndQualifiers, builtins_module_scope, builtins_symbol,
+    explicit_global_symbol, fallback_place, global_symbol, module_type_implicit_global_declaration,
     module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
     typing_extensions_symbol,
 };
-use crate::place::{Place, PlaceAndQualifiers};
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
@@ -73,30 +72,30 @@ use crate::types::diagnostic::{
     CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, INCONSISTENT_MRO,
     INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
     INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR, report_implicit_return_type,
-    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
-    report_invalid_assignment, report_invalid_attribute_assignment,
-    report_invalid_generator_function_return_type, report_invalid_return_type,
-    report_possibly_unbound_attribute,
+    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
+    report_implicit_return_type, report_invalid_arguments_to_annotated,
+    report_invalid_arguments_to_callable, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
+    report_invalid_return_type, report_possibly_unbound_attribute,
 };
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    CallDunderError, CallableSignature, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, FunctionDecorators, FunctionType, GenericAlias, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownFunction, KnownInstanceType, MemberLookupPolicy,
-    MetaclassCandidate, Parameter, ParameterForm, Parameters, Signature, Signatures,
-    StringLiteralType, SubclassOfType, Truthiness, TupleType, Type, TypeAliasType,
-    TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
-    todo_type,
+    BareTypeAliasType, CallDunderError, CallableSignature, CallableType, ClassLiteral, ClassType,
+    DataclassParams, DynamicType, FunctionDecorators, FunctionType, GenericAlias,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
+    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
+    Parameters, Signature, Signatures, StringLiteralType, SubclassOfType, Truthiness, TupleType,
+    Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder,
+    UnionType, binding_type, todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Program};
 
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
@@ -2025,7 +2024,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .to_scope_id(self.db(), self.file());
 
         let inherited_generic_context = None;
-        let specialization = None;
+        let type_mappings = Box::from([]);
 
         let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
             self.db(),
@@ -2035,7 +2034,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             function_decorators,
             dataclass_transformer_params,
             inherited_generic_context,
-            specialization,
+            type_mappings,
         ));
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
@@ -2389,12 +2388,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::TypeAlias(type_alias))
             .to_scope_id(self.db(), self.file());
 
-        let type_alias_ty =
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::new(
+        let type_alias_ty = Type::KnownInstance(KnownInstanceType::TypeAliasType(
+            TypeAliasType::PEP695(PEP695TypeAliasType::new(
                 self.db(),
                 &type_alias.name.as_name_expr().unwrap().id,
                 rhs_scope,
-            )));
+            )),
+        ));
 
         self.add_declaration_with_binding(
             type_alias.into(),
@@ -2466,7 +2466,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             if symbol_name.is_some() {
                 self.infer_definition(handler);
             } else {
-                self.infer_optional_expression(handled_exceptions.as_deref());
+                self.infer_exception(handled_exceptions.as_deref(), try_statement.is_star);
             }
 
             self.infer_body(body);
@@ -2569,11 +2569,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             })
     }
 
-    fn infer_except_handler_definition(
-        &mut self,
-        except_handler_definition: &ExceptHandlerDefinitionKind,
-        definition: Definition<'db>,
-    ) {
+    fn infer_exception(&mut self, node: Option<&ast::Expr>, is_star: bool) -> Type<'db> {
         fn extract_tuple_specialization<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
             let class = ty.into_nominal_instance()?.class;
             if !class.is_known(db, KnownClass::Tuple) {
@@ -2589,8 +2585,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .is_assignable_to(db, KnownClass::BaseException.to_instance(db))
                 .then_some(specialization_instance)
         }
-
-        let node = except_handler_definition.handled_exceptions();
 
         // If there is no handled exception, it's invalid syntax;
         // a diagnostic will have already been emitted
@@ -2646,7 +2640,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::unknown()
         };
 
-        let symbol_ty = if except_handler_definition.is_star() {
+        if is_star {
             let class = if symbol_ty
                 .is_subtype_of(self.db(), KnownClass::Exception.to_instance(self.db()))
             {
@@ -2657,7 +2651,18 @@ impl<'db> TypeInferenceBuilder<'db> {
             class.to_specialized_instance(self.db(), [symbol_ty])
         } else {
             symbol_ty
-        };
+        }
+    }
+
+    fn infer_except_handler_definition(
+        &mut self,
+        except_handler_definition: &ExceptHandlerDefinitionKind,
+        definition: Definition<'db>,
+    ) {
+        let symbol_ty = self.infer_exception(
+            except_handler_definition.handled_exceptions(),
+            except_handler_definition.is_star(),
+        );
 
         self.add_binding(
             except_handler_definition.node().into(),
@@ -2720,7 +2725,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
             name.id.clone(),
-            definition,
+            Some(definition),
             bound_or_constraint,
             TypeVarVariance::Invariant, // TODO: infer this
             default_ty,
@@ -3821,11 +3826,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         let Some(builder) = self.context.report_lint(&UNRESOLVED_IMPORT, range) else {
             return;
         };
-        builder.into_diagnostic(format_args!(
+        let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot resolve imported module `{}{}`",
             ".".repeat(level as usize),
             module.unwrap_or_default()
         ));
+        if level == 0 {
+            diagnostic.info(
+                "make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment"
+            );
+        }
     }
 
     fn infer_import_definition(
@@ -4879,6 +4889,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         | KnownClass::Super
                         | KnownClass::TypeVar
                         | KnownClass::NamedTuple
+                        | KnownClass::TypeAliasType
                 )
             )
             // temporary special-casing for all subclasses of `enum.Enum`
@@ -5373,13 +5384,57 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             KnownInstanceType::TypeVar(TypeVarInstance::new(
                                                 self.db(),
                                                 target.id.clone(),
-                                                containing_assignment,
+                                                Some(containing_assignment),
                                                 bound_or_constraint,
                                                 variance,
                                                 *default,
                                                 TypeVarKind::Legacy,
                                             )),
                                         ));
+                                    }
+
+                                    KnownClass::TypeAliasType => {
+                                        let assigned_to = (self.index)
+                                            .try_expression(call_expression_node)
+                                            .and_then(|expr| expr.assigned_to(self.db()));
+
+                                        let containing_assignment =
+                                            assigned_to.as_ref().and_then(|assigned_to| {
+                                                match assigned_to.node().targets.as_slice() {
+                                                    [ast::Expr::Name(target)] => Some(
+                                                        self.index.expect_single_definition(target),
+                                                    ),
+                                                    _ => None,
+                                                }
+                                            });
+
+                                        let [Some(name), Some(value), ..] =
+                                            overload.parameter_types()
+                                        else {
+                                            continue;
+                                        };
+
+                                        if let Some(name) = name.into_string_literal() {
+                                            overload.set_return_type(Type::KnownInstance(
+                                                KnownInstanceType::TypeAliasType(
+                                                    TypeAliasType::Bare(BareTypeAliasType::new(
+                                                        self.db(),
+                                                        ast::name::Name::new(name.value(self.db())),
+                                                        containing_assignment,
+                                                        value,
+                                                    )),
+                                                ),
+                                            ));
+                                        } else {
+                                            if let Some(builder) = self.context.report_lint(
+                                                &INVALID_TYPE_ALIAS_TYPE,
+                                                call_expression,
+                                            ) {
+                                                builder.into_diagnostic(format_args!(
+                                                    "The name of a `typing.TypeAlias` must be a string literal",
+                                                ));
+                                            }
+                                        }
                                     }
 
                                     _ => (),
@@ -5962,12 +6017,25 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_binary_expression_type(binary.into(), false, left_ty, right_ty, *op)
             .unwrap_or_else(|| {
+                let db = self.db();
+
                 if let Some(builder) = self.context.report_lint(&UNSUPPORTED_OPERATOR, binary) {
-                    builder.into_diagnostic(format_args!(
+                    let mut diag = builder.into_diagnostic(format_args!(
                         "Operator `{op}` is unsupported between objects of type `{}` and `{}`",
-                        left_ty.display(self.db()),
-                        right_ty.display(self.db())
+                        left_ty.display(db),
+                        right_ty.display(db)
                     ));
+
+                    if op == &ast::Operator::BitOr
+                        && (left_ty.is_subtype_of(db, KnownClass::Type.to_instance(db))
+                            || right_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)))
+                        && Program::get(db).python_version(db) < PythonVersion::PY310
+                    {
+                        diag.info(
+                            "Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later",
+                        );
+                        diagnostic::add_inferred_python_version_hint(db, diag);
+                    }
                 }
                 Type::unknown()
             })

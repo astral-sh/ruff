@@ -204,6 +204,34 @@ static_assert(is_assignable_to(type[AnyMeta], type[object]))
 static_assert(is_assignable_to(type[AnyMeta], type[Any]))
 ```
 
+## Class-literals that inherit from `Any`
+
+Class-literal types that inherit from `Any` are assignable to any type `T` where `T` is assignable
+to `type`:
+
+```py
+from typing import Any
+from ty_extensions import is_assignable_to, static_assert, TypeOf
+
+def test(x: Any):
+    class Foo(x): ...
+    class Bar(Any): ...
+    static_assert(is_assignable_to(TypeOf[Foo], Any))
+    static_assert(is_assignable_to(TypeOf[Foo], type))
+    static_assert(is_assignable_to(TypeOf[Foo], type[int]))
+    static_assert(is_assignable_to(TypeOf[Foo], type[Any]))
+
+    static_assert(is_assignable_to(TypeOf[Bar], Any))
+    static_assert(is_assignable_to(TypeOf[Bar], type))
+    static_assert(is_assignable_to(TypeOf[Bar], type[int]))
+    static_assert(is_assignable_to(TypeOf[Bar], type[Any]))
+
+    static_assert(not is_assignable_to(TypeOf[Foo], int))
+    static_assert(not is_assignable_to(TypeOf[Bar], int))
+```
+
+This is because the `Any` element in the MRO could materialize to any subtype of `type`.
+
 ## Heterogeneous tuple types
 
 ```py

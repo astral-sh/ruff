@@ -22,7 +22,7 @@ use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators, FunctionType,
     KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType,
-    TupleType, UnionType, WrapperDescriptorKind, todo_type,
+    TupleType, TypeMapping, UnionType, WrapperDescriptorKind, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -1406,13 +1406,18 @@ impl<'db> Binding<'db> {
                 }
             }
             self.specialization = signature.generic_context.map(|gc| builder.build(gc));
-            self.inherited_specialization = signature
-                .inherited_generic_context
-                .map(|gc| builder.build(gc));
+            self.inherited_specialization = signature.inherited_generic_context.map(|gc| {
+                // The inherited generic context is used when inferring the specialization of a
+                // generic class from a constructor call. In this case (only), we promote any
+                // typevars that are inferred as a literal to the corresponding instance type.
+                builder
+                    .build(gc)
+                    .apply_type_mapping(db, &TypeMapping::PromoteLiterals)
+            });
         }
 
         num_synthetic_args = 0;
-        for (argument_index, (argument, argument_type)) in argument_types.iter().enumerate() {
+        for (argument_index, (argument, mut argument_type)) in argument_types.iter().enumerate() {
             if matches!(argument, Argument::Synthetic) {
                 num_synthetic_args += 1;
             }
@@ -1424,9 +1429,12 @@ impl<'db> Binding<'db> {
             let parameter = &parameters[parameter_index];
             if let Some(mut expected_ty) = parameter.annotated_type() {
                 if let Some(specialization) = self.specialization {
+                    argument_type = argument_type.apply_specialization(db, specialization);
                     expected_ty = expected_ty.apply_specialization(db, specialization);
                 }
                 if let Some(inherited_specialization) = self.inherited_specialization {
+                    argument_type =
+                        argument_type.apply_specialization(db, inherited_specialization);
                     expected_ty = expected_ty.apply_specialization(db, inherited_specialization);
                 }
                 if !argument_type.is_assignable_to(db, expected_ty) {
@@ -1812,10 +1820,13 @@ impl<'db> BindingError<'db> {
                     typevar.name(context.db()),
                 ));
 
-                let typevar_range = typevar.definition(context.db()).full_range(context.db());
-                let mut sub = SubDiagnostic::new(Severity::Info, "Type variable defined here");
-                sub.annotate(Annotation::primary(typevar_range.into()));
-                diag.sub(sub);
+                if let Some(typevar_definition) = typevar.definition(context.db()) {
+                    let typevar_range = typevar_definition.full_range(context.db());
+                    let mut sub = SubDiagnostic::new(Severity::Info, "Type variable defined here");
+                    sub.annotate(Annotation::primary(typevar_range.into()));
+                    diag.sub(sub);
+                }
+
                 if let Some(union_diag) = union_diag {
                     union_diag.add_union_context(context.db(), &mut diag);
                 }

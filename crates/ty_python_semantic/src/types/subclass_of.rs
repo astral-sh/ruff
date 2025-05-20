@@ -1,8 +1,8 @@
 use crate::place::PlaceAndQualifiers;
-use crate::types::generics::TypeMapping;
+use crate::types::{
+    ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeVarInstance,
+};
 use crate::{Db, FxOrderSet};
-
-use super::{ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeVarInstance};
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
@@ -71,7 +71,7 @@ impl<'db> SubclassOfType<'db> {
     pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
-        type_mapping: TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Self {

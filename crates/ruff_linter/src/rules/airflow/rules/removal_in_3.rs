@@ -100,8 +100,8 @@ pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
             check_method(checker, call_expr);
             check_context_key_usage_in_call(checker, call_expr);
         }
-        Expr::Attribute(attribute_expr @ ExprAttribute { attr, .. }) => {
-            check_name(checker, expr, attr.range());
+        Expr::Attribute(attribute_expr @ ExprAttribute { range, .. }) => {
+            check_name(checker, expr, *range);
             check_class_attribute(checker, attribute_expr);
         }
         Expr::Name(ExprName { id, ctx, range }) => {
@@ -260,8 +260,9 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                         ..,
                         "operators",
                         "weekday",
-                        "DayOfWeekSensor" | "BranchDayOfWeekOperator",
-                    ] => {
+                        "BranchDayOfWeekOperator",
+                    ]
+                    | ["airflow", .., "sensors", "weekday", "DayOfWeekSensor"] => {
                         checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
                             "use_task_execution_day",
@@ -496,17 +497,6 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
             "collected_datasets" => Replacement::AttrName("collected_assets"),
             _ => return,
         },
-        [
-            "airflow",
-            "providers",
-            "amazon",
-            "auth_manager",
-            "aws_auth_manager",
-            "AwsAuthManager",
-        ] => match attr.as_str() {
-            "is_authorized_dataset" => Replacement::AttrName("is_authorized_asset"),
-            _ => return,
-        },
         ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
             "initialize_providers_dataset_uri_resources" => {
                 Replacement::AttrName("initialize_providers_asset_uri_resources")
@@ -538,6 +528,12 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
                 match attr.as_str() {
                     "get_connections" => Replacement::AttrName("get_connection"),
                     _ => return,
+                }
+            } else if is_airflow_auth_manager(segments) {
+                if attr.as_str() == "is_authorized_dataset" {
+                    Replacement::AttrName("is_authorized_asset")
+                } else {
+                    return;
                 }
             } else {
                 return;
@@ -596,20 +592,30 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ] => Replacement::Message("Use `sys.version_info` instead"),
 
         // airflow.api_connexion.security
-        ["airflow", "api_connexion", "security", "requires_access"] => {
-            Replacement::Message("Use `airflow.api_connexion.security.requires_access_*` instead")
-        }
+        ["airflow", "api_connexion", "security", "requires_access"] => Replacement::Message(
+            "Use `airflow.api_fastapi.core_api.security.requires_access_*` instead",
+        ),
         [
             "airflow",
             "api_connexion",
             "security",
             "requires_access_dataset",
         ] => Replacement::AutoImport {
-            module: "airflow.api_connexion.security",
+            module: "airflow.api_fastapi.core_api.security",
             name: "requires_access_asset",
         },
 
         // airflow.auth.managers
+        [
+            "airflow",
+            "auth",
+            "managers",
+            "base_auth_manager",
+            "BaseAuthManager",
+        ] => Replacement::AutoImport {
+            module: "airflow.api_fastapi.auth.managers.base_auth_manager",
+            name: "BaseAuthManager",
+        },
         [
             "airflow",
             "auth",
@@ -621,26 +627,17 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             module: "airflow.api_fastapi.auth.managers.models.resource_details",
             name: "AssetDetails",
         },
-        [
-            "airflow",
-            "auth",
-            "managers",
-            "base_auth_manager",
-            "is_authorized_dataset",
-        ] => Replacement::AutoImport {
-            module: "airflow.api_fastapi.auth.managers.base_auth_manager",
-            name: "is_authorized_asset",
-        },
 
         // airflow.configuration
+        // TODO: check whether we could improve it
         [
             "airflow",
             "configuration",
             rest @ ("as_dict" | "get" | "getboolean" | "getfloat" | "getint" | "has_option"
             | "remove_option" | "set"),
         ] => Replacement::SourceModuleMoved {
-            module: "airflow.configuration.conf",
-            name: (*rest).to_string(),
+            module: "airflow.configuration",
+            name: format!("conf.{rest}"),
         },
 
         // airflow.contrib.*
@@ -680,7 +677,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.listeners.spec
-        // TODO: this is removed
         ["airflow", "listeners", "spec", "dataset", rest] => match *rest {
             "on_dataset_created" => Replacement::AutoImport {
                 module: "airflow.listeners.spec.asset",
@@ -708,7 +704,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
         // airflow.notifications
         ["airflow", "notifications", "basenotifier", "BaseNotifier"] => Replacement::AutoImport {
-            module: "airflow.sdk",
+            module: "airflow.sdk.bases.notifier",
             name: "BaseNotifier",
         },
 
@@ -818,22 +814,18 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.www
-        // TODO: www has been removed
-        ["airflow", "www", "auth", "has_access"] => {
-            Replacement::Message("Use `airflow.www.auth.has_access_*` instead")
-        }
-        ["airflow", "www", "auth", "has_access_dataset"] => Replacement::AutoImport {
-            module: "airflow.www.auth",
-            name: "has_access_asset",
-        },
-        ["airflow", "www", "utils", "get_sensitive_variables_fields"] => Replacement::AutoImport {
-            module: "airflow.utils.log.secrets_masker",
-            name: "get_sensitive_variables_fields",
-        },
-        ["airflow", "www", "utils", "should_hide_value_for_key"] => Replacement::AutoImport {
-            module: "airflow.utils.log.secrets_masker",
-            name: "should_hide_value_for_key",
-        },
+        [
+            "airflow",
+            "www",
+            "auth",
+            "has_access" | "has_access_dataset",
+        ] => Replacement::None,
+        [
+            "airflow",
+            "www",
+            "utils",
+            "get_sensitive_variables_fields" | "should_hide_value_for_key",
+        ] => Replacement::None,
 
         // airflow.providers.amazon
         [
@@ -870,8 +862,8 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "AvpEntities",
             "DATASET",
         ] => Replacement::AutoImport {
-            module: "airflow.providers.amazon.aws.auth_manager.avp.entities.AvpEntities",
-            name: "ASSET",
+            module: "airflow.providers.amazon.aws.auth_manager.avp.entities",
+            name: "AvpEntities.ASSET",
         },
 
         // airflow.providers.common.io
@@ -898,19 +890,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 name: "sanitize_uri",
             },
             _ => return,
-        },
-
-        // airflow.providers.fab
-        [
-            "airflow",
-            "providers",
-            "fab",
-            "auth_manager",
-            "fab_auth_manager",
-            "is_authorized_dataset",
-        ] => Replacement::AutoImport {
-            module: "airflow.providers.fab.auth_manager.fab_auth_manager",
-            name: "is_authorized_asset",
         },
 
         // airflow.providers.google
@@ -1016,13 +995,16 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         if is_guarded_by_try_except(expr, module, name, semantic) {
             return;
         }
+
+        let import_target = name.split('.').next().unwrap_or(name);
+
         diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(module, name),
+            let (import_edit, _) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import_from(module, import_target),
                 expr.start(),
                 checker.semantic(),
             )?;
-            let replacement_edit = Edit::range_replacement(binding, range);
+            let replacement_edit = Edit::range_replacement(name.to_string(), range);
             Ok(Fix::safe_edits(import_edit, [replacement_edit]))
         });
     }
