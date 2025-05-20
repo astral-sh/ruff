@@ -1167,7 +1167,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         [
             "airflow",
             "sensors",
-            "external_task",
+            "external_task" | "external_task_sensor",
             "ExternalTaskSensorLink",
         ] => ProviderReplacement::AutoImport {
             module: "airflow.providers.standard.sensors.external_task",
@@ -1179,7 +1179,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             "airflow",
             "sensors",
             "external_task_sensor",
-            rest @ ("ExternalTaskMarker" | "ExternalTaskSensor" | "ExternalTaskSensorLink"),
+            rest @ ("ExternalTaskMarker" | "ExternalTaskSensor"),
         ] => ProviderReplacement::SourceModuleMovedToProvider {
             module: "airflow.providers.standard.sensors.external_task",
             name: (*rest).to_string(),
