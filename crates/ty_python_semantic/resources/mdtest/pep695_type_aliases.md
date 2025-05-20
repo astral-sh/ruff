@@ -28,7 +28,7 @@ def f() -> None:
 ```py
 type IntOrStr = int | str
 
-reveal_type(IntOrStr.__value__)  # revealed: @Todo(Support for `typing.TypeAlias`)
+reveal_type(IntOrStr.__value__)  # revealed: Any
 ```
 
 ## Invalid assignment

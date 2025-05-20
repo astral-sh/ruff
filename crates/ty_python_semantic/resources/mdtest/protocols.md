@@ -243,7 +243,8 @@ def f(
 Nonetheless, `Protocol` can still be used as the second argument to `issubclass()` at runtime:
 
 ```py
-# Could also be `Literal[True]`, but `bool` is fine:
+# TODO: Should be `Literal[True]`, but `bool` is also fine
+# error: [invalid-argument-type]
 reveal_type(issubclass(MyProtocol, Protocol))  # revealed: bool
 ```
 

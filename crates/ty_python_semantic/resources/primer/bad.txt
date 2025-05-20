@@ -1,4 +1,5 @@
 Tanjun  # hangs
+alerta  # too many iterations
 antidote  # hangs / slow
 artigraph  # cycle panics (value_type_)
 core  # cycle panics (value_type_)
@@ -6,21 +7,29 @@ cpython  # access to field whilst being initialized, too many cycle iterations
 discord.py  # some kind of hang, only when multi-threaded?
 freqtrade  # hangs
 hydpy  # too many iterations
+hydra-zen  # too many iterations
 ibis  # too many iterations
+isort  # too many iterations
 jax  # too many iterations
+meson  # too many iterations
+mypy  # too many iterations
 packaging  # too many iterations
 pandas  # slow
 pandas-stubs  # hangs/slow, or else https://github.com/salsa-rs/salsa/issues/831
 pandera  # stack overflow
 pip  # vendors packaging, see above
 prefect # slow
+psycopg2  # too many iterations
+pydantic  # too many iterations
 pylint  # cycle panics (self-recursive type alias)
 pyodide  # too many cycle iterations
 pywin32  # bad use-def map (binding with definitely-visible unbound)
 schemathesis  # https://github.com/salsa-rs/salsa/issues/831
 scikit-learn  # success, but mypy-primer hangs processing the output
+scipy  # slow / hangs
 setuptools  # vendors packaging, see above
 spack  # success, but mypy-primer hangs processing the output
 spark  # too many iterations
 steam.py  # hangs
+strawberry  # too many iterations
 xarray  # too many iterations

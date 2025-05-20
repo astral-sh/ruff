@@ -3575,7 +3575,29 @@ impl<'db> TypeInferenceBuilder<'db> {
         debug_assert!(target.is_name_expr());
 
         if let Some(value) = value {
+            if declared_ty.inner_type() == Type::KnownInstance(KnownInstanceType::TypeAlias) {
+                let value_ty = self.infer_type_expression(value);
+
+                let type_alias_ty = Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                    TypeAliasType::Bare(BareTypeAliasType::new(
+                        self.db(),
+                        ast::name::Name::new("dummy"),
+                        Some(definition),
+                        value_ty,
+                    )),
+                ));
+
+                self.add_declaration_with_binding(
+                    target.into(),
+                    definition,
+                    &DeclaredAndInferredType::AreTheSame(type_alias_ty),
+                );
+                self.store_expression_type(target, type_alias_ty);
+                return;
+            }
+
             let inferred_ty = self.infer_expression(value);
+
             let inferred_ty = if target
                 .as_name_expr()
                 .is_some_and(|name| &name.id == "TYPE_CHECKING")

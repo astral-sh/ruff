@@ -4922,7 +4922,9 @@ impl<'db> Type<'db> {
                         TypeVarKind::Legacy,
                     )))
                 }
-                KnownInstanceType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
+                KnownInstanceType::TypeAlias => {
+                    Ok(Type::KnownInstance(KnownInstanceType::TypeAlias))
+                }
                 KnownInstanceType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
 
                 KnownInstanceType::Protocol(_) => Err(InvalidTypeExpressionError {
