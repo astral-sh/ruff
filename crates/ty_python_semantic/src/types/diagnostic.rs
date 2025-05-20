@@ -12,6 +12,7 @@ use crate::types::string_annotation::{
 use crate::types::{protocol_class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
 use crate::{declare_lint, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
+use ruff_db::files::system_path_to_file;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
@@ -1673,17 +1674,22 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
                     "This is because Python {python_version} was specified on the command line",
                 ));
             }
-            crate::ValueSource::File(file, range) => {
-                if let Some(file) = file {
+            crate::ValueSource::File(path, range) => {
+                if let Ok(file) = system_path_to_file(context.db(), &**path) {
                     sub_diagnostic.annotate(
-                        Annotation::primary(Span::from(*file).with_optional_range(*range)).message(
+                        Annotation::primary(Span::from(file).with_optional_range(*range)).message(
                             format_args!(
                                 "Python {python_version} assumed due to this configuration setting"
                             ),
                         ),
                     );
+                    diagnostic.sub(sub_diagnostic);
+                } else {
+                    diagnostic.sub(sub_diagnostic);
+                    diagnostic.info(format_args!(
+                        "This is because Python {python_version} was specified in your configuration file",
+                    ));
                 }
-                diagnostic.sub(sub_diagnostic);
             }
             crate::ValueSource::Default => {
                 diagnostic.sub(sub_diagnostic);

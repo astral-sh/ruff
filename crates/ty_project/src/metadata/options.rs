@@ -86,8 +86,8 @@ impl Options {
 
     pub(crate) fn to_program_settings(
         &self,
-        db: &dyn crate::Db,
         project_root: &SystemPath,
+        system: &dyn System,
     ) -> ProgramSettings {
         let (python_version, python_version_source) = self
             .environment
@@ -99,7 +99,7 @@ impl Options {
                     match ranged_version.source() {
                         ValueSource::Cli => ty_python_semantic::ValueSource::Cli,
                         ValueSource::File(path) => ty_python_semantic::ValueSource::File(
-                            system_path_to_file(db.upcast(), &**path).ok(),
+                            path.clone(),
                             ranged_version.range(),
                         ),
                     },
@@ -122,7 +122,7 @@ impl Options {
             python_version,
             python_version_source,
             python_platform,
-            search_paths: self.to_search_path_settings(project_root, db.system()),
+            search_paths: self.to_search_path_settings(project_root, system),
         }
     }
 

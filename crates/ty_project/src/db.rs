@@ -59,7 +59,7 @@ impl ProjectDatabase {
         //   we may want to have a dedicated method for this?
 
         // Initialize the `Program` singleton
-        let program_settings = project_metadata.to_program_settings(&db);
+        let program_settings = project_metadata.to_program_settings(db.system());
         Program::from_settings(&db, program_settings)?;
 
         db.project = Some(Project::from_metadata(&db, project_metadata));

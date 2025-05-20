@@ -239,8 +239,8 @@ impl ProjectMetadata {
         &self.extra_configuration_paths
     }
 
-    pub fn to_program_settings(&self, db: &dyn crate::Db) -> ProgramSettings {
-        self.options.to_program_settings(db, self.root())
+    pub fn to_program_settings(&self, system: &dyn System) -> ProgramSettings {
+        self.options.to_program_settings(self.root(), system)
     }
 
     /// Combine the project options with the CLI options where the CLI options take precedence.

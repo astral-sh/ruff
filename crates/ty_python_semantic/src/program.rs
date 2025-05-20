@@ -1,10 +1,11 @@
+use std::sync::Arc;
+
 use crate::module_resolver::SearchPaths;
 use crate::python_platform::PythonPlatform;
 use crate::site_packages::SysPrefixPathOrigin;
 use crate::Db;
 
 use anyhow::Context;
-use ruff_db::files::File;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use ruff_text_size::TextRange;
@@ -114,7 +115,7 @@ pub struct ProgramSettings {
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub enum ValueSource {
     /// Value loaded from a project's configuration file.
-    File(Option<File>, Option<TextRange>),
+    File(Arc<SystemPathBuf>, Option<TextRange>),
 
     /// The value comes from a CLI argument, while it's left open if specified using a short argument,
     /// long argument (`--extra-paths`) or `--config key=value`.
