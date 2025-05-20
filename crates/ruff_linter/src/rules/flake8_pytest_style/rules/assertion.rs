@@ -595,13 +595,13 @@ pub(crate) fn assert_falsy(checker: &Checker, stmt: &Stmt, test: &Expr) {
 
 /// PT017
 pub(crate) fn assert_in_exception_handler(checker: &Checker, handlers: &[ExceptHandler]) {
-    handlers.iter().for_each(|handler| match handler {
-        ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, body, .. }) => {
-            if let Some(name) = name {
-                check_assert_in_except(checker, name, body);
-            }
+    for handler in handlers {
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, body, .. }) =
+            handler;
+        if let Some(name) = name {
+            check_assert_in_except(checker, name, body);
         }
-    });
+    }
 }
 
 #[derive(Copy, Clone)]
