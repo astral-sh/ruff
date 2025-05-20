@@ -65,24 +65,26 @@ impl Violation for Airflow3MovedToProvider {
 
     fn fix_title(&self) -> Option<String> {
         let Airflow3MovedToProvider { replacement, .. } = self;
-        match replacement {
-            ProviderReplacement::None => None,
+        if let Some((module, name, provider, version)) = match &replacement {
             ProviderReplacement::AutoImport {
-                name,
                 module,
+                name,
                 provider,
                 version,
-            } => Some(format!(
-                "Install `apache-airflow-providers-{provider}>={version}` and use `{module}.{name}` instead."
-            )),
+            } => Some((module, *name, provider, version)),
             ProviderReplacement::SourceModuleMovedToProvider {
-                name,
                 module,
+                name,
                 provider,
                 version,
-            } => Some(format!(
-                "Install `apache-airflow-providers-{provider}>={version}` and use `{module}.{name}` instead."
-            )),
+            } => Some((module, name.as_str(), provider, version)),
+            ProviderReplacement::None => None,
+        } {
+            Some(format!(
+                "Install `apache-airflow-providers-{provider}>={version}` and use `{name}` from `{module}` instead."
+            ))
+        } else {
+            None
         }
     }
 }
