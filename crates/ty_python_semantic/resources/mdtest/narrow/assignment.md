@@ -43,6 +43,25 @@ c.x = -1
 reveal_type(c.x)  # revealed: int
 ```
 
+### Do not narrow the type of a descriptor by assignment
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+class C:
+    desc: Descriptor = Descriptor()
+
+c = C()
+c.desc = -1
+# Don't infer `c.desc` to be `Literal[-1]`
+reveal_type(c.desc)  # revealed: int
+```
+
 ## Subscript
 
 ### Basic
