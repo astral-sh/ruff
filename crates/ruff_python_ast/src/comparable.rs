@@ -514,11 +514,11 @@ impl<'a> From<&'a ast::ExceptHandler> for ComparableExceptHandler<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ComparableFTStringElement<'a> {
     Literal(Cow<'a, str>),
-    FTStringExpressionElement(FTStringExpressionElement<'a>),
+    FTStringInterpolatedElement(FTStringInterpolatedElement<'a>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct FTStringExpressionElement<'a> {
+pub struct FTStringInterpolatedElement<'a> {
     expression: ComparableExpr<'a>,
     debug_text: Option<&'a ast::DebugText>,
     conversion: ast::ConversionFlag,
@@ -526,8 +526,8 @@ pub struct FTStringExpressionElement<'a> {
 }
 
 impl<'a> From<&'a ast::FTStringElement> for ComparableFTStringElement<'a> {
-    fn from(fstring_element: &'a ast::FTStringElement) -> Self {
-        match fstring_element {
+    fn from(ftstring_element: &'a ast::FTStringElement) -> Self {
+        match ftstring_element {
             ast::FTStringElement::Literal(ast::FTStringLiteralElement { value, .. }) => {
                 Self::Literal(value.as_ref().into())
             }
@@ -536,60 +536,30 @@ impl<'a> From<&'a ast::FTStringElement> for ComparableFTStringElement<'a> {
     }
 }
 
-impl<'a> From<&'a ast::FTStringInterpolatedElement> for ComparableFTStringElement<'a> {
-    fn from(fstring_expression_element: &'a ast::FTStringInterpolatedElement) -> Self {
+impl<'a> From<&'a ast::FTStringInterpolatedElement> for FTStringInterpolatedElement<'a> {
+    fn from(ftstring_interpolated_element: &'a ast::FTStringInterpolatedElement) -> Self {
         let ast::FTStringInterpolatedElement {
             expression,
             debug_text,
             conversion,
             format_spec,
             range: _,
-        } = fstring_expression_element;
+        } = ftstring_interpolated_element;
 
-        Self::FTStringExpressionElement(FTStringExpressionElement {
+        Self {
             expression: (expression).into(),
             debug_text: debug_text.as_ref(),
             conversion: *conversion,
             format_spec: format_spec
                 .as_ref()
                 .map(|spec| spec.elements.iter().map(Into::into).collect()),
-        })
+        }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableTStringElement<'a> {
-    Literal(Cow<'a, str>),
-    FStringExpressionElement(FTStringExpressionElement<'a>),
-    TStringInterpolationElement(TStringInterpolationElement<'a>),
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct TStringInterpolationElement<'a> {
-    interpolation: ComparableExpr<'a>,
-    debug_text: Option<&'a ast::DebugText>,
-    conversion: ast::ConversionFlag,
-    format_spec: Option<Vec<ComparableTStringElement<'a>>>,
-}
-
-impl<'a> From<&'a ast::FTStringInterpolatedElement> for ComparableTStringElement<'a> {
-    fn from(fstring_expression_element: &'a ast::FTStringInterpolatedElement) -> Self {
-        let ast::FTStringInterpolatedElement {
-            expression,
-            debug_text,
-            conversion,
-            format_spec,
-            range: _,
-        } = fstring_expression_element;
-
-        Self::FStringExpressionElement(FTStringExpressionElement {
-            expression: (expression).into(),
-            debug_text: debug_text.as_ref(),
-            conversion: *conversion,
-            format_spec: format_spec
-                .as_ref()
-                .map(|spec| spec.elements.iter().map(Into::into).collect()),
-        })
+impl<'a> From<&'a ast::FTStringInterpolatedElement> for ComparableFTStringElement<'a> {
+    fn from(ftstring_interpolated_element: &'a ast::FTStringInterpolatedElement) -> Self {
+        Self::FTStringInterpolatedElement(ftstring_interpolated_element.into())
     }
 }
 
@@ -725,57 +695,95 @@ impl<'a> From<&'a ast::FStringValue> for ComparableFString<'a> {
         }
     }
 }
+
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ComparableTString<'a> {
-    elements: Box<[ComparableTStringElement<'a>]>,
+    strings: Box<[ComparableFTStringElement<'a>]>,
+    interpolations: Box<[FTStringInterpolatedElement<'a>]>,
 }
 
 impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
-    // The approach below is somewhat complicated, so it may
-    // require some justification.
+    // The approach taken below necessarily deviates from the
+    // corresponding implementation for [`ast::FStringValue`].
+    // The reason is that a t-string value is composed of _three_
+    // non-comparable parts: literals, f-string expressions, and
+    // t-string interpolations. Since we have merged the AST nodes
+    // that capture f-string expressions and t-string interpolations
+    // into the shared [`ast::FTStringInterpolatedElement`], we must
+    // be careful to distinguish between them here.
     //
-    // Suppose given a t-string of the form
-    // `t"{foo!r} one" " and two " t" and three {bar!s}"`
-    // This decomposes as:
-    // - A `TStringPart::TString`, `t"{foo!r} one"` with elements
-    //      - `TStringElement::Expression` encoding `{foo!r}`
-    //      - `TStringElement::Literal` encoding " one"
-    // - A `TStringPart::Literal` capturing `" and two "`
-    // - A `TStringPart::TString`, `t" and three {bar!s}"` with elements
-    //      - `TStringElement::Literal` encoding " and three "
-    //      - `TStringElement::Expression` encoding `{bar!s}`
+    // Consequently, we model a [`ComparableTString`] on the actual
+    // [CPython implementation] of a `string.templatelib.Template` object:
+    // it is composed of `strings` and `interpolations`. In CPython,
+    // the `strings` field is a tuple of honest strings (since f-strings
+    // are evaluated). Our `strings` field will house both f-string
+    // expressions and string literals.
     //
-    // We would like to extract from this a vector of (comparable) t-string
-    // _elements_ which alternate between interpolation elements and literal
-    // elements. In order to do so, we need to concatenate adjacent string
-    // literals. String literals may be separated for two reasons: either
-    // they appear in adjacent string literal parts, or else a string literal
-    // part is adjacent to a string literal _element_ inside of a t-string part.
+    // Finally, as in CPython, we must be careful to ensure that the length
+    // of `strings` is always one more than the length of `interpolations` -
+    // that way we can recover the original reading order by interleaving
+    // starting with `strings`. This is how we can tell the
+    // difference between, e.g. `t"{foo}bar"` and `t"bar{foo}"`.
+    //
+    // - [CPython implementation](https://github.com/python/cpython/blob/c91ad5da9d92eac4718e4da8d53689c3cc24535e/Python/codegen.c#L4052-L4103)
     fn from(value: &'a ast::TStringValue) -> Self {
-        #[derive(Default)]
         struct Collector<'a> {
-            elements: Vec<ComparableTStringElement<'a>>,
+            strings: Vec<ComparableFTStringElement<'a>>,
+            interpolations: Vec<FTStringInterpolatedElement<'a>>,
+        }
+
+        impl Default for Collector<'_> {
+            fn default() -> Self {
+                Self {
+                    strings: vec![ComparableFTStringElement::Literal("".into())],
+                    interpolations: vec![],
+                }
+            }
         }
 
         impl<'a> Collector<'a> {
             // The logic for concatenating adjacent string literals
             // occurs here, implicitly: when we encounter a sequence
             // of string literals, the first gets pushed to the
-            // `elements` vector, while subsequent strings
+            // `strings` vector, while subsequent strings
             // are concatenated onto this top string.
             fn push_literal(&mut self, literal: &'a str) {
-                if let Some(ComparableTStringElement::Literal(existing_literal)) =
-                    self.elements.last_mut()
+                if let Some(ComparableFTStringElement::Literal(existing_literal)) =
+                    self.strings.last_mut()
                 {
                     existing_literal.to_mut().push_str(literal);
                 } else {
-                    self.elements
-                        .push(ComparableTStringElement::Literal(literal.into()));
+                    self.strings
+                        .push(ComparableFTStringElement::Literal(literal.into()));
                 }
             }
 
-            fn push_expression(&mut self, expression: &'a ast::FTStringInterpolatedElement) {
-                self.elements.push(expression.into());
+            fn start_new_literal(&mut self) {
+                self.strings
+                    .push(ComparableFTStringElement::Literal("".into()));
+            }
+
+            fn push_fstring_expression(
+                &mut self,
+                expression: &'a ast::FTStringInterpolatedElement,
+            ) {
+                if let Some(ComparableFTStringElement::Literal(last_literal)) = self.strings.last()
+                {
+                    // Recall that we insert empty strings after
+                    // each interpolation. If we encounter an f-string
+                    // expression, we replace the empty string with it.
+                    if last_literal.is_empty() {
+                        self.strings.pop();
+                    }
+                }
+                self.strings.push(expression.into());
+            }
+            fn push_tstring_interpolation(
+                &mut self,
+                expression: &'a ast::FTStringInterpolatedElement,
+            ) {
+                self.interpolations.push(expression.into());
+                self.start_new_literal();
             }
         }
 
@@ -793,7 +801,7 @@ impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
                                 collector.push_literal(&literal.value);
                             }
                             ast::FTStringElement::Expression(interpolation) => {
-                                collector.push_expression(interpolation);
+                                collector.push_tstring_interpolation(interpolation);
                             }
                         }
                     }
@@ -805,7 +813,7 @@ impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
                                 collector.push_literal(&literal.value);
                             }
                             ast::FTStringElement::Expression(expression) => {
-                                collector.push_expression(expression);
+                                collector.push_fstring_expression(expression);
                             }
                         }
                     }
@@ -814,7 +822,8 @@ impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
         }
 
         Self {
-            elements: collector.elements.into_boxed_slice(),
+            strings: collector.strings.into_boxed_slice(),
+            interpolations: collector.interpolations.into_boxed_slice(),
         }
     }
 }
@@ -962,7 +971,7 @@ pub struct ExprCall<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprFStringExpressionElement<'a> {
+pub struct ExprFTStringInterpolatedElement<'a> {
     value: Box<ComparableExpr<'a>>,
     debug_text: Option<&'a ast::DebugText>,
     conversion: ast::ConversionFlag,
@@ -972,14 +981,6 @@ pub struct ExprFStringExpressionElement<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprFString<'a> {
     value: ComparableFString<'a>,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprTStringInterpolationElement<'a> {
-    value: Box<ComparableExpr<'a>>,
-    debug_text: Option<&'a ast::DebugText>,
-    conversion: ast::ConversionFlag,
-    format_spec: Vec<ComparableTStringElement<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1071,9 +1072,9 @@ pub enum ComparableExpr<'a> {
     YieldFrom(ExprYieldFrom<'a>),
     Compare(ExprCompare<'a>),
     Call(ExprCall<'a>),
-    FStringExpressionElement(ExprFStringExpressionElement<'a>),
+    FStringExpressionElement(ExprFTStringInterpolatedElement<'a>),
     FString(ExprFString<'a>),
-    TStringInterpolationElement(ExprTStringInterpolationElement<'a>),
+    TStringInterpolationElement(ExprFTStringInterpolatedElement<'a>),
     TString(ExprTString<'a>),
     StringLiteral(ExprStringLiteral<'a>),
     BytesLiteral(ExprBytesLiteral<'a>),
