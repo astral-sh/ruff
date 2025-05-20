@@ -335,7 +335,12 @@ pub use crate::types::definition::TypeDefinition;
 pub(crate) use todo_type;
 
 /// Represents an instance of `builtins.property`.
+///
+/// # Ordering
+/// Ordering is based on the property instance's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the property instance was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub struct PropertyInstanceType<'db> {
     getter: Option<Type<'db>>,
     setter: Option<Type<'db>>,
@@ -438,6 +443,7 @@ impl Default for DataclassTransformerParams {
 }
 
 /// Representation of a type: a set of possible values at runtime.
+///
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
@@ -5825,7 +5831,12 @@ pub enum TypeVarKind {
 /// typevar represents as an annotation: that is, an unknown set of objects, constrained by the
 /// upper-bound/constraints on this type var, defaulting to the default type of this type var when
 /// not otherwise bound to a type.
+///
+/// # Ordering
+/// Ordering is based on the type var instance's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the type var instance was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub struct TypeVarInstance<'db> {
     /// The name of this TypeVar (e.g. `T`)
     #[returns(ref)]
@@ -6745,7 +6756,11 @@ impl<'db> OverloadedFunction<'db> {
     }
 }
 
+/// # Ordering
+/// Ordering is based on the function type's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the function type was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub struct FunctionType<'db> {
     /// Name of the function at definition.
     #[returns(ref)]
@@ -7368,7 +7383,12 @@ impl KnownFunction {
 /// on an instance of a class. For example, the expression `Path("a.txt").touch` creates
 /// a bound method object that represents the `Path.touch` method which is bound to the
 /// instance `Path("a.txt")`.
+///
+/// # Ordering
+/// Ordering is based on the bounded method's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the bounded method was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub struct BoundMethodType<'db> {
     /// The function that is being bound. Corresponds to the `__func__` attribute on a
     /// bound method object
@@ -7434,7 +7454,12 @@ impl<'db> BoundMethodType<'db> {
 /// It can be written in type expressions using `typing.Callable`. `lambda` expressions are
 /// inferred directly as `CallableType`s; all function-literal types are subtypes of a
 /// `CallableType`.
+///
+/// # Ordering
+/// Ordering is based on the callable type's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the callable type was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub struct CallableType<'db> {
     #[returns(deref)]
     signatures: Box<[Signature<'db>]>,
@@ -7801,7 +7826,11 @@ pub enum WrapperDescriptorKind {
     PropertyDunderSet,
 }
 
+/// # Ordering
+/// Ordering is based on the module literal's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the module literal was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub struct ModuleLiteralType<'db> {
     /// The file in which this module was imported.
     ///
@@ -7850,7 +7879,11 @@ impl<'db> ModuleLiteralType<'db> {
     }
 }
 
+/// # Ordering
+/// Ordering is based on the type alias's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the alias was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub struct PEP695TypeAliasType<'db> {
     #[returns(ref)]
     pub name: ast::name::Name,
@@ -7876,7 +7909,11 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 }
 
+/// # Ordering
+/// Ordering is based on the type alias's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the alias was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub struct BareTypeAliasType<'db> {
     #[returns(ref)]
     pub name: ast::name::Name,
@@ -8380,7 +8417,11 @@ impl<'db> IntersectionType<'db> {
     }
 }
 
+/// # Ordering
+/// Ordering is based on the string literal's salsa-assigned id and not on its value.
+/// The id may change between runs, or when the string literal was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub struct StringLiteralType<'db> {
     #[returns(deref)]
     value: Box<str>,
@@ -8401,7 +8442,11 @@ impl<'db> StringLiteralType<'db> {
     }
 }
 
+/// # Ordering
+/// Ordering is based on the byte literal's salsa-assigned id and not on its value.
+/// The id may change between runs, or when the byte literal was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub struct BytesLiteralType<'db> {
     #[returns(deref)]
     value: Box<[u8]>,
@@ -8413,7 +8458,11 @@ impl<'db> BytesLiteralType<'db> {
     }
 }
 
+/// # Ordering
+/// Ordering is based on the tuple's salsa-assigned id and not on its elements.
+/// The id may change between runs, or when the tuple was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub struct TupleType<'db> {
     #[returns(deref)]
     elements: Box<[Type<'db>]>,

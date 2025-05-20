@@ -13,11 +13,10 @@ pub use hover::hover;
 pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
 
-use rustc_hash::FxHashSet;
-use std::ops::{Deref, DerefMut};
-
 use ruff_db::files::{File, FileRange};
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashSet;
+use std::ops::{Deref, DerefMut};
 use ty_python_semantic::types::{Type, TypeDefinition};
 
 /// Information associated with a text range.

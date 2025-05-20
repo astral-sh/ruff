@@ -18,7 +18,12 @@ use crate::{Db, FxOrderSet};
 ///
 /// TODO: Handle nested generic contexts better, with actual parent links to the lexically
 /// containing context.
+///
+/// # Ordering
+/// Ordering is based on the context's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the context was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub struct GenericContext<'db> {
     #[returns(ref)]
     pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
