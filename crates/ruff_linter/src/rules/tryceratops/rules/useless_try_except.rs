@@ -40,33 +40,30 @@ impl Violation for UselessTryExcept {
 
 /// TRY203 (previously TRY302)
 pub(crate) fn useless_try_except(checker: &Checker, handlers: &[ExceptHandler]) {
-    if let Some(diagnostics) = handlers
-        .iter()
-        .map(|handler| {
-            let ExceptHandler::ExceptHandler(ExceptHandlerExceptHandler { name, body, .. }) =
-                handler;
-            let Some(Stmt::Raise(ast::StmtRaise {
-                exc, cause: None, ..
-            })) = &body.first()
-            else {
-                return None;
-            };
-            if let Some(expr) = exc {
-                // E.g., `except ... as e: raise e`
-                if let Expr::Name(ast::ExprName { id, .. }) = expr.as_ref() {
-                    if name.as_ref().is_some_and(|name| name.as_str() == id) {
-                        return Some(Diagnostic::new(UselessTryExcept, handler.range()));
-                    }
+    if handlers.iter().all(|handler| {
+        let ExceptHandler::ExceptHandler(ExceptHandlerExceptHandler { name, body, .. }) = handler;
+        let Some(Stmt::Raise(ast::StmtRaise {
+            exc, cause: None, ..
+        })) = &body.first()
+        else {
+            return false;
+        };
+        if let Some(expr) = exc {
+            // E.g., `except ... as e: raise e`
+            if let Expr::Name(ast::ExprName { id, .. }) = expr.as_ref() {
+                if name.as_ref().is_some_and(|name| name.as_str() == id) {
+                    return true;
                 }
-                None
-            } else {
-                // E.g., `except ...: raise`
-                Some(Diagnostic::new(UselessTryExcept, handler.range()))
             }
-        })
-        .collect::<Option<Vec<_>>>()
-    {
+            false
+        } else {
+            // E.g., `except ...: raise`
+            true
+        }
+    }) {
         // Require that all handlers are useless, but create one diagnostic per handler.
-        checker.report_diagnostics(diagnostics);
+        for handler in handlers {
+            checker.report_diagnostic(Diagnostic::new(UselessTryExcept, handler.range()));
+        }
     }
 }

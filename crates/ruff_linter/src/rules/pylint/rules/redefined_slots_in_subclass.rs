@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use ruff_python_semantic::{SemanticModel, analyze::class::iter_super_class};
+use ruff_python_semantic::analyze::class::iter_super_class;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -66,11 +66,9 @@ pub(crate) fn redefined_slots_in_subclass(checker: &Checker, class_def: &ast::St
         return;
     }
 
-    let semantic = checker.semantic();
-    let diagnostics = class_slots
-        .iter()
-        .filter_map(|slot| check_super_slots(class_def, semantic, slot));
-    checker.report_diagnostics(diagnostics);
+    for slot in class_slots {
+        check_super_slots(checker, class_def, &slot);
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -103,25 +101,18 @@ impl Ranged for Slot<'_> {
     }
 }
 
-fn check_super_slots(
-    class_def: &ast::StmtClassDef,
-    semantic: &SemanticModel,
-    slot: &Slot,
-) -> Option<Diagnostic> {
-    iter_super_class(class_def, semantic)
-        .skip(1)
-        .find_map(&|super_class: &ast::StmtClassDef| {
-            if slots_members(&super_class.body).contains(slot) {
-                return Some(Diagnostic::new(
-                    RedefinedSlotsInSubclass {
-                        base: super_class.name.to_string(),
-                        slot_name: slot.name.to_string(),
-                    },
-                    slot.range(),
-                ));
-            }
-            None
-        })
+fn check_super_slots(checker: &Checker, class_def: &ast::StmtClassDef, slot: &Slot) {
+    for super_class in iter_super_class(class_def, checker.semantic()).skip(1) {
+        if slots_members(&super_class.body).contains(slot) {
+            checker.report_diagnostic(Diagnostic::new(
+                RedefinedSlotsInSubclass {
+                    base: super_class.name.to_string(),
+                    slot_name: slot.name.to_string(),
+                },
+                slot.range(),
+            ));
+        }
+    }
 }
 
 fn slots_members(body: &[Stmt]) -> FxHashSet<Slot> {

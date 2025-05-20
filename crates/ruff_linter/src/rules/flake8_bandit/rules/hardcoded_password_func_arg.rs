@@ -52,17 +52,21 @@ impl Violation for HardcodedPasswordFuncArg {
 
 /// S106
 pub(crate) fn hardcoded_password_func_arg(checker: &Checker, keywords: &[Keyword]) {
-    checker.report_diagnostics(keywords.iter().filter_map(|keyword| {
-        string_literal(&keyword.value).filter(|string| !string.is_empty())?;
-        let arg = keyword.arg.as_ref()?;
-        if !matches_password_name(arg) {
-            return None;
+    for keyword in keywords {
+        if string_literal(&keyword.value).is_none_or(str::is_empty) {
+            continue;
         }
-        Some(Diagnostic::new(
+        let Some(arg) = &keyword.arg else {
+            continue;
+        };
+        if !matches_password_name(arg) {
+            continue;
+        }
+        checker.report_diagnostic(Diagnostic::new(
             HardcodedPasswordFuncArg {
                 name: arg.to_string(),
             },
             keyword.range(),
-        ))
-    }));
+        ));
+    }
 }

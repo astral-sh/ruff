@@ -604,9 +604,9 @@ pub(crate) fn definition(
     checker: &Checker,
     definition: &Definition,
     visibility: visibility::Visibility,
-) -> Vec<Diagnostic> {
+) {
     let Some(function) = definition.as_function_def() else {
-        return vec![];
+        return;
     };
 
     let ast::StmtFunctionDef {
@@ -899,13 +899,10 @@ pub(crate) fn definition(
         }
     }
 
-    if !checker.settings.flake8_annotations.ignore_fully_untyped {
-        return diagnostics;
-    }
-
     // If settings say so, don't report any of the
     // diagnostics gathered here if there were no type annotations at all.
-    if has_any_typed_arg
+    if !checker.settings.flake8_annotations.ignore_fully_untyped
+        || has_any_typed_arg
         || has_typed_return
         || (is_method
             && !visibility::is_staticmethod(decorator_list, checker.semantic())
@@ -915,8 +912,8 @@ pub(crate) fn definition(
                 .or_else(|| parameters.args.first())
                 .is_some_and(|first_param| first_param.annotation().is_some()))
     {
-        diagnostics
-    } else {
-        vec![]
+        for diagnostic in diagnostics {
+            checker.report_diagnostic(diagnostic);
+        }
     }
 }
