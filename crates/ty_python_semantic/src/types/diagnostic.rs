@@ -1682,7 +1682,7 @@ pub(super) fn add_inferred_python_version_hint(db: &dyn Db, mut diagnostic: Lint
             ));
         }
         crate::ValueSource::File(path, range) => {
-            if let Ok(file) = system_path_to_file(db, &**path) {
+            if let Ok(file) = system_path_to_file(db.upcast(), &**path) {
                 let mut sub_diagnostic = SubDiagnostic::new(
                     Severity::Info,
                     format_args!("Python {python_version} was assumed when resolving types"),
