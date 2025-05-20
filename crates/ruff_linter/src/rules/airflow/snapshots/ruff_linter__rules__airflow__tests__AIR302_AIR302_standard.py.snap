@@ -478,13 +478,13 @@ AIR302_standard.py:78:1: AIR302 [*] `airflow.sensors.external_task_sensor.Extern
 78 | ExternalTaskSensorLink()
    | ^^^^^^^^^^^^^^^^^^^^^^ AIR302
    |
-   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalTaskSensorLink` from `airflow.providers.standard.sensors.external_task` instead.
+   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalDagLink` from `airflow.providers.standard.sensors.external_task` instead.
 
-ℹ Unsafe fix
-73 73 | 
+ℹ Safe fix
 74 74 | EmptyOperator()
 75 75 | 
-76    |-from airflow.sensors.external_task_sensor import ExternalTaskSensorLink
-   76 |+from airflow.providers.standard.sensors.external_task import ExternalTaskSensorLink
-77 77 | 
-78 78 | ExternalTaskSensorLink()
+76 76 | from airflow.sensors.external_task_sensor import ExternalTaskSensorLink
+   77 |+from airflow.providers.standard.sensors.external_task import ExternalDagLink
+77 78 | 
+78    |-ExternalTaskSensorLink()
+   79 |+ExternalDagLink()
