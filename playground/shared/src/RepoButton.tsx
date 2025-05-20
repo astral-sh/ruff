@@ -2,7 +2,7 @@ export default function RepoButton() {
   return (
     <a
       className="rounded-full"
-      href="https://github.com/astral-sh/ruff"
+      href="https://github.com/astral-sh/ty"
       target="_blank"
       rel="noreferrer"
     >
