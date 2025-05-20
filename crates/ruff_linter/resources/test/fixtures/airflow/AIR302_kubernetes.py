@@ -16,15 +16,8 @@ from airflow.kubernetes.kube_client import (
 from airflow.kubernetes.kubernetes_helper_functions import (
     add_pod_suffix,
     annotations_for_logging_task_metadata,
-    
     create_pod_id,
-    
-
 )
-
-
-
-
 
 ALL_NAMESPACES
 POD_EXECUTOR_DONE_KEY
@@ -37,21 +30,13 @@ _enable_tcp_keepalive()
 get_kube_client()
 
 add_pod_suffix()
-create_pod_id()
-
 annotations_for_logging_task_metadata()
-
-
-
-
-
-
+create_pod_id()
 
 
 from airflow.kubernetes.pod_generator import (
     PodDefaults,
     PodGenerator,
-
     add_pod_suffix,
     datetime_to_label_safe_datestring,
     extend_object_field,
@@ -61,17 +46,15 @@ from airflow.kubernetes.pod_generator import (
     rand_str,
 )
 
+PodDefaults()
+PodGenerator()
+add_pod_suffix()
 datetime_to_label_safe_datestring()
 extend_object_field()
 label_safe_datestring_to_datetime()
 make_safe_label_value()
 merge_objects()
-PodGenerator()
-PodDefaults()
-
-add_pod_suffix()
 rand_str()
-
 
 from airflow.kubernetes.pod_generator_deprecated import (
     PodDefaults,
@@ -87,9 +70,8 @@ PodDefaults()
 PodGenerator()
 make_safe_label_value()
 
-
-
-
+PodLauncher()
+PodStatus()
 
 from airflow.kubernetes.pod_launcher_deprecated import (
     PodDefaults,
@@ -116,20 +98,12 @@ Secret()
 Volume()
 VolumeMount()
 
-
-from airflow.kubernetes.pod import (
-    Port,
-    Resources,
-)
-
-PodLauncher()
-PodStatus()
-
 from airflow.kubernetes.kubernetes_helper_functions import (
     annotations_to_key,
     get_logs_task_metadata,
     rand_str,
 )
+
 annotations_to_key()
 get_logs_task_metadata()
 rand_str()

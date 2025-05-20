@@ -12,59 +12,21 @@ from airflow.macros.hive import (
 )
 from airflow.operators.hive_operator import HiveOperator
 from airflow.operators.hive_stats_operator import HiveStatsCollectionOperator
-from airflow.operators.hive_to_mysql import (
-    HiveToMySqlOperator,
-
-)
+from airflow.operators.hive_to_mysql import HiveToMySqlOperator
 from airflow.operators.hive_to_samba_operator import HiveToSambaOperator
 
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
+HIVE_QUEUE_PRIORITIES
+HiveCliHook()
+HiveMetastoreHook()
+HiveServer2Hook()
 
 closest_ds_partition()
 max_partition()
 
-HiveCliHook()
-HiveMetastoreHook()
-HiveServer2Hook()
-HIVE_QUEUE_PRIORITIES
-
 HiveOperator()
-
 HiveStatsCollectionOperator()
-
 HiveToMySqlOperator()
-
-
 HiveToSambaOperator()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 from airflow.operators.hive_to_mysql import HiveToMySqlTransfer
@@ -104,4 +66,5 @@ from airflow.sensors.metastore_partition_sensor import MetastorePartitionSensor
 MetastorePartitionSensor()
 
 from airflow.sensors.named_hive_partition_sensor import NamedHivePartitionSensor
+
 NamedHivePartitionSensor()
