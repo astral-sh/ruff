@@ -47,8 +47,8 @@ use crate::preview::multiple_with_statements_fix_safe_enabled;
 ///
 /// # Fix safety
 ///
-/// An automatic fix is available in [preview] mode. The fix is only applied when it
-/// does not remove comments.
+/// This fix is marked as always unsafe unless [preview] mode is enabled, in which case it is always
+/// marked as safe. Note that the fix is unavailable if it would remove comments (in either case).
 ///
 /// ## References
 /// - [Python documentation: The `with` statement](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
