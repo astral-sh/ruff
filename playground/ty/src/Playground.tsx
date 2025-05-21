@@ -156,7 +156,7 @@ export default function Playground() {
       <Header
         edit={files.revision}
         theme={theme}
-        logo="ty"
+        tool="ty"
         version={version}
         onChangeTheme={setTheme}
         onShare={handleShare}
