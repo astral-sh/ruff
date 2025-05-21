@@ -546,6 +546,13 @@ impl NodeWithScopeKind {
         }
     }
 
+    pub(crate) const fn as_class(&self) -> Option<&ast::StmtClassDef> {
+        match self {
+            Self::Class(class) => Some(class.node()),
+            _ => None,
+        }
+    }
+
     pub fn expect_function(&self) -> &ast::StmtFunctionDef {
         self.as_function().expect("expected function")
     }

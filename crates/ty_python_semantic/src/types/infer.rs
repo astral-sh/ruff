@@ -333,25 +333,26 @@ fn unpack_cycle_initial<'db>(_db: &'db dyn Db, _unpack: Unpack<'db>) -> UnpackRe
 /// Returns the type of the nearest enclosing class for the given scope.
 ///
 /// This function walks up the ancestor scopes starting from the given scope,
-/// and finds the closest class definition.
+/// and finds the closest class definition. This is different to the behaviour of
+/// [`TypeInferenceBuilder::class_context_of_current_method`], which will only return
+/// `Some(class)` if either the immediate parent scope is a class OR the immediate parent
+/// scope is a type-parameters scope and the grandparent scope is a class.
 ///
-/// Returns `None` if no enclosing class is found.a
-pub(crate) fn enclosing_class_symbol<'db>(
+/// Returns `None` if no enclosing class is found.
+pub(crate) fn nearest_enclosing_class<'db>(
     db: &'db dyn Db,
     semantic: &SemanticIndex<'db>,
     scope: ScopeId,
-) -> Option<Type<'db>> {
+) -> Option<ClassLiteral<'db>> {
     semantic
         .ancestor_scopes(scope.file_scope_id(db))
         .find_map(|(_, ancestor_scope)| {
-            if let NodeWithScopeKind::Class(class) = ancestor_scope.node() {
-                let definition = semantic.expect_single_definition(class.node());
-                let result = infer_definition_types(db, definition);
-
-                Some(result.declaration_type(definition).inner_type())
-            } else {
-                None
-            }
+            let class = ancestor_scope.node().as_class()?;
+            let definition = semantic.expect_single_definition(class);
+            infer_definition_types(db, definition)
+                .declaration_type(definition)
+                .inner_type()
+                .into_class_literal()
         })
 }
 
@@ -1691,43 +1692,39 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::Deferred);
     }
 
-    /// Returns `true` if the current scope is the function body scope of a method of a protocol
-    /// (that is, a class which directly inherits `typing.Protocol`.)
-    fn in_protocol_class(&self) -> bool {
+    /// If the current scope is a method inside an enclosing class,
+    /// return `Some(class)` where `class` represents the enclosing class.
+    ///
+    /// If the current scope is not a method inside an enclosing class,
+    /// return `None`.
+    ///
+    /// Note that this method will only return `Some` if the immediate parent scope
+    /// is a class scope OR the immediate parent scope is an annotation scope
+    /// and the grandparent scope is a class scope. This means it has different
+    /// behaviour to the [`nearest_enclosing_class`] function.
+    fn class_context_of_current_method(&self) -> Option<ClassLiteral<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
-        let Some(parent_scope_id) = current_scope.parent() else {
-            return false;
-        };
+        let parent_scope_id = current_scope.parent()?;
         let parent_scope = self.index.scope(parent_scope_id);
 
         let class_scope = match parent_scope.kind() {
             ScopeKind::Class => parent_scope,
             ScopeKind::Annotation => {
-                let Some(class_scope_id) = parent_scope.parent() else {
-                    return false;
-                };
+                let class_scope_id = parent_scope.parent()?;
                 let potentially_class_scope = self.index.scope(class_scope_id);
 
                 match potentially_class_scope.kind() {
                     ScopeKind::Class => potentially_class_scope,
-                    _ => return false,
+                    _ => return None,
                 }
             }
-            _ => return false,
+            _ => return None,
         };
 
-        let NodeWithScopeKind::Class(node_ref) = class_scope.node() else {
-            return false;
-        };
-
-        let class_definition = self.index.expect_single_definition(node_ref.node());
-
-        let Type::ClassLiteral(class) = binding_type(self.db(), class_definition) else {
-            return false;
-        };
-
-        class.is_protocol(self.db())
+        let class_stmt = class_scope.node().as_class()?;
+        let class_definition = self.index.expect_single_definition(class_stmt);
+        binding_type(self.db(), class_definition).into_class_literal()
     }
 
     /// Returns `true` if the current scope is the function body scope of a function overload (that
@@ -1789,13 +1786,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
-            if (self.in_stub()
-                || self.in_function_overload_or_abstractmethod()
-                || self.in_protocol_class())
-                && self.return_types_and_ranges.is_empty()
-                && is_stub_suite(&function.body)
-            {
-                return;
+            let has_empty_body =
+                self.return_types_and_ranges.is_empty() && is_stub_suite(&function.body);
+
+            let mut enclosing_class_context = None;
+
+            if has_empty_body {
+                if self.in_stub() {
+                    return;
+                }
+                if self.in_function_overload_or_abstractmethod() {
+                    return;
+                }
+                if let Some(class) = self.class_context_of_current_method() {
+                    enclosing_class_context = Some(class);
+                    if class.is_protocol(self.db()) {
+                        return;
+                    }
+                }
             }
 
             let declared_ty = self.file_expression_type(returns);
@@ -1856,7 +1864,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             if use_def.can_implicit_return(self.db())
                 && !Type::none(self.db()).is_assignable_to(self.db(), declared_ty)
             {
-                report_implicit_return_type(&self.context, returns.range(), declared_ty);
+                report_implicit_return_type(
+                    &self.context,
+                    returns.range(),
+                    declared_ty,
+                    has_empty_body,
+                    enclosing_class_context,
+                );
             }
         }
     }
@@ -2139,7 +2153,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 } else if (self.in_stub()
                     || self.in_function_overload_or_abstractmethod()
-                    || self.in_protocol_class())
+                    || self
+                        .class_context_of_current_method()
+                        .is_some_and(|class| class.is_protocol(self.db())))
                     && default
                         .as_ref()
                         .is_some_and(|d| d.is_ellipsis_literal_expr())
@@ -5144,7 +5160,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             [] => {
                                                 let scope = self.scope();
 
-                                                let Some(enclosing_class) = enclosing_class_symbol(
+                                                let Some(enclosing_class) = nearest_enclosing_class(
                                                     self.db(),
                                                     self.index,
                                                     scope,
@@ -5172,7 +5188,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                                                 let bound_super = BoundSuperType::build(
                                                     self.db(),
-                                                    enclosing_class,
+                                                    Type::ClassLiteral(enclosing_class),
                                                     first_param,
                                                 )
                                                 .unwrap_or_else(|err| {
