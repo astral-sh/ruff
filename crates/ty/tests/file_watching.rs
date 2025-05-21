@@ -1449,13 +1449,11 @@ mod unix {
         )
         .expect("Expected bar.baz to exist in site-packages.");
         let baz_project = case.project_path("bar/baz.py");
+        let baz_file = baz.file().unwrap();
 
+        assert_eq!(source_text(case.db(), baz_file).as_str(), "def baz(): ...");
         assert_eq!(
-            source_text(case.db(), baz.file()).as_str(),
-            "def baz(): ..."
-        );
-        assert_eq!(
-            baz.file().path(case.db()).as_system_path(),
+            baz_file.path(case.db()).as_system_path(),
             Some(&*baz_project)
         );
 
@@ -1470,7 +1468,7 @@ mod unix {
         case.apply_changes(changes);
 
         assert_eq!(
-            source_text(case.db(), baz.file()).as_str(),
+            source_text(case.db(), baz_file).as_str(),
             "def baz(): print('Version 2')"
         );
 
@@ -1483,7 +1481,7 @@ mod unix {
         case.apply_changes(changes);
 
         assert_eq!(
-            source_text(case.db(), baz.file()).as_str(),
+            source_text(case.db(), baz_file).as_str(),
             "def baz(): print('Version 3')"
         );
 
@@ -1529,6 +1527,7 @@ mod unix {
             &ModuleName::new_static("bar.baz").unwrap(),
         )
         .expect("Expected bar.baz to exist in site-packages.");
+        let baz_file = baz.file().unwrap();
         let bar_baz = case.project_path("bar/baz.py");
 
         let patched_bar_baz = case.project_path("patched/bar/baz.py");
@@ -1539,11 +1538,8 @@ mod unix {
             "def baz(): ..."
         );
 
-        assert_eq!(
-            source_text(case.db(), baz.file()).as_str(),
-            "def baz(): ..."
-        );
-        assert_eq!(baz.file().path(case.db()).as_system_path(), Some(&*bar_baz));
+        assert_eq!(source_text(case.db(), baz_file).as_str(), "def baz(): ...");
+        assert_eq!(baz_file.path(case.db()).as_system_path(), Some(&*bar_baz));
 
         case.assert_indexed_project_files([patched_bar_baz_file]);
 
@@ -1572,7 +1568,7 @@ mod unix {
         let patched_baz_text = source_text(case.db(), patched_bar_baz_file);
         let did_update_patched_baz = patched_baz_text.as_str() == "def baz(): print('Version 2')";
 
-        let bar_baz_text = source_text(case.db(), baz.file());
+        let bar_baz_text = source_text(case.db(), baz_file);
         let did_update_bar_baz = bar_baz_text.as_str() == "def baz(): print('Version 2')";
 
         assert!(
@@ -1655,7 +1651,7 @@ mod unix {
             "def baz(): ..."
         );
         assert_eq!(
-            baz.file().path(case.db()).as_system_path(),
+            baz.file().unwrap().path(case.db()).as_system_path(),
             Some(&*baz_original)
         );
 
