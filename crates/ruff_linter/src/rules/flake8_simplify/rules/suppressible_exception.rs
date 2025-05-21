@@ -145,15 +145,29 @@ pub(crate) fn suppressible_exception(
                 stmt.start(),
                 checker.semantic(),
             )?;
-            let replace_try = Edit::range_replacement(
-                format!("with {binding}({exception})"),
+            let mut rest: Vec<Edit> = Vec::new();
+            let content: String;
+            if exception == "BaseException" {
+                let (import_exception, binding_exception) =
+                    checker.importer().get_or_import_symbol(
+                        &ImportRequest::import("builtins", &exception),
+                        stmt.start(),
+                        checker.semantic(),
+                    )?;
+                content = format!("with {binding}({binding_exception})");
+                rest.push(import_exception);
+            } else {
+                content = format!("with {binding}({exception})");
+            }
+            rest.push(Edit::range_deletion(
+                checker.locator().full_lines_range(*range),
+            ));
+            rest.push(Edit::range_replacement(
+                content,
                 TextRange::at(stmt.start(), "try".text_len()),
-            );
-            let remove_handler = Edit::range_deletion(checker.locator().full_lines_range(*range));
-            Ok(Fix::unsafe_edits(
-                import_edit,
-                [replace_try, remove_handler],
-            ))
+            ));
+
+            Ok(Fix::unsafe_edits(import_edit, rest))
         });
     }
     checker.report_diagnostic(diagnostic);
