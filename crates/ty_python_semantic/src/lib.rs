@@ -7,7 +7,10 @@ use crate::suppression::{INVALID_IGNORE_COMMENT, UNKNOWN_RULE, UNUSED_IGNORE_COM
 pub use db::Db;
 pub use module_name::ModuleName;
 pub use module_resolver::{KnownModule, Module, resolve_module, system_module_search_paths};
-pub use program::{Program, ProgramSettings, PythonPath, SearchPathSettings};
+pub use program::{
+    Program, ProgramSettings, PythonPath, PythonVersionSource, PythonVersionWithSource,
+    SearchPathSettings,
+};
 pub use python_platform::PythonPlatform;
 pub use semantic_model::{HasType, SemanticModel};
 pub use site_packages::SysPrefixPathOrigin;

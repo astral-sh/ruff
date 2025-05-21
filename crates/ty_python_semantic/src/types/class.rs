@@ -2887,6 +2887,7 @@ mod tests {
     use super::*;
     use crate::db::tests::setup_db;
     use crate::module_resolver::resolve_module;
+    use crate::{PythonVersionSource, PythonVersionWithSource};
     use salsa::Setter;
     use strum::IntoEnumIterator;
 
@@ -2910,8 +2911,11 @@ mod tests {
         let mut db = setup_db();
 
         Program::get(&db)
-            .set_python_version(&mut db)
-            .to(PythonVersion::latest_ty());
+            .set_python_version_with_source(&mut db)
+            .to(PythonVersionWithSource {
+                version: PythonVersion::latest_ty(),
+                source: PythonVersionSource::default(),
+            });
 
         for class in KnownClass::iter() {
             assert_ne!(
@@ -2935,8 +2939,11 @@ mod tests {
             };
 
             Program::get(&db)
-                .set_python_version(&mut db)
-                .to(version_added);
+                .set_python_version_with_source(&mut db)
+                .to(PythonVersionWithSource {
+                    version: version_added,
+                    source: PythonVersionSource::default(),
+                });
 
             assert_ne!(
                 class.to_instance(&db),
