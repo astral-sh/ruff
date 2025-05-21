@@ -70,6 +70,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
     registry.register_lint(&UNRESOLVED_IMPORT);
     registry.register_lint(&UNRESOLVED_REFERENCE);
+    registry.register_lint(&UNSUPPORTED_BASE);
     registry.register_lint(&UNSUPPORTED_OPERATOR);
     registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
     registry.register_lint(&STATIC_ASSERT_ERROR);
@@ -451,9 +452,51 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for class definitions that have bases which are not instances of `type`.
+    ///
+    /// ## Why is this bad?
+    /// Class definitions with bases like this will lead to `TypeError` being raised at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class A(42): ...  # error: [invalid-base]
+    /// ```
     pub(crate) static INVALID_BASE = {
-        summary: "detects invalid bases in class definitions",
+        summary: "detects class bases that will cause the class definition to raise an exception at runtime",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for class definitions that have bases which are unsupported by ty.
+    ///
+    /// ## Why is this bad?
+    /// If a class has a base that is an instance of a complex type such as a union type,
+    /// ty will not be able to resolve the [method resolution order] (MRO) for the class.
+    /// This will lead to an inferior understanding of your codebase and unpredictable
+    /// type-checking behavior.
+    ///
+    /// ## Examples
+    /// ```python
+    /// import datetime
+    ///
+    /// class A: ...
+    /// class B: ...
+    ///
+    /// if datetime.date.today().weekday() != 6:
+    ///     C = A
+    /// else:
+    ///     C = B
+    ///
+    /// class D(C): ...  # error: [unsupported-base]
+    /// ```
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    pub(crate) static UNSUPPORTED_BASE = {
+        summary: "detects class bases that are unsupported as ty could not feasibly calculate the class's MRO",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1975,4 +2018,40 @@ pub(crate) fn report_duplicate_bases(
     }
 
     diagnostic.sub(sub_diagnostic);
+}
+
+pub(crate) fn report_invalid_base(
+    context: &InferContext,
+    base_node: &ast::Expr,
+    base_type: Type,
+    class: ClassLiteral,
+) {
+    let db = context.db();
+
+    if base_type.is_assignable_to(db, KnownClass::Type.to_instance(db)) {
+        let Some(builder) = context.report_lint(&UNSUPPORTED_BASE, base_node) else {
+            return;
+        };
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Unsupported class base with type `{}`",
+            base_type.display(db)
+        ));
+        diagnostic.info(format_args!(
+            "ty cannot resolve a consistent MRO for class `{}` due to this base",
+            class.name(db)
+        ));
+        diagnostic.info("Only class objects or `Any` are supported as class bases");
+    } else {
+        let Some(builder) = context.report_lint(&INVALID_BASE, base_node) else {
+            return;
+        };
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Invalid class base with type `{}`",
+            base_type.display(db)
+        ));
+        diagnostic.info(format_args!(
+            "Definition of class `{}` will raise `TypeError` at runtime",
+            class.name(db)
+        ));
+    }
 }

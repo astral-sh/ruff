@@ -1,0 +1,30 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: mro.md - Method Resolution Order tests - `__bases__` lists that include objects that are not instances of `type`
+mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class Foo(2): ...  # error: [invalid-base]
+```
+
+# Diagnostics
+
+```
+error[invalid-base]: Invalid class base with type `Literal[2]`
+ --> src/mdtest_snippet.py:1:11
+  |
+1 | class Foo(2): ...  # error: [invalid-base]
+  |           ^
+  |
+info: Definition of class `Foo` will raise `TypeError` at runtime
+info: rule `invalid-base` is enabled by default
+
+```
