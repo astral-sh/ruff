@@ -681,6 +681,17 @@ impl SemanticSyntaxContext for Checker<'_> {
         false
     }
 
+    fn in_yield_allowed_context(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            match scope.kind {
+                ScopeKind::Class(_) | ScopeKind::Generator { .. } => return false,
+                ScopeKind::Function(_) | ScopeKind::Lambda(_) => return true,
+                ScopeKind::Module | ScopeKind::Type => {}
+            }
+        }
+        false
+    }
+
     fn in_sync_comprehension(&self) -> bool {
         for scope in self.semantic.current_scopes() {
             if let ScopeKind::Generator {
