@@ -392,21 +392,16 @@ where
     let mut project = ProjectMetadata::discover(&project_path, &system)?;
     project.apply_configuration_files(&system)?;
 
-    let environment_options = project.options().environment.as_ref();
+    let program_settings = project.to_program_settings(&system);
 
-    for path in environment_options
-        .and_then(|env| env.extra_paths.as_ref())
-        .into_iter()
-        .flatten()
-        .chain(
-            environment_options
-                .as_ref()
-                .and_then(|env| env.python.as_ref()),
-        )
-        .chain(environment_options.and_then(|env| env.typeshed.as_ref()))
+    for path in program_settings
+        .search_paths
+        .extra_paths
+        .iter()
+        .chain(program_settings.search_paths.custom_typeshed.as_ref())
     {
-        std::fs::create_dir_all(path.path().as_std_path())
-            .with_context(|| format!("Failed to create search path `{}`", path.path()))?;
+        std::fs::create_dir_all(path.as_std_path())
+            .with_context(|| format!("Failed to create search path `{path}`"))?;
     }
 
     let mut db = ProjectDatabase::new(project, system)?;
