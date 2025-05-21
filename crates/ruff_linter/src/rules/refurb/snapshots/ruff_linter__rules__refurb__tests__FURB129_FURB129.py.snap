@@ -257,7 +257,7 @@ FURB129.py:93:17: FURB129 [*] Instead of calling `readlines()`, iterate over fil
 91 91 | # https://github.com/astral-sh/ruff/issues/18231
 92 92 | with open("furb129.py") as f:
 93    |-    for line in (f).readlines():
-   93 |+    for line in f:
+   93 |+    for line in (f):
 94 94 |         pass
 95 95 | 
 96 96 | with open("furb129.py") as f:
@@ -275,7 +275,7 @@ FURB129.py:97:23: FURB129 [*] Instead of calling `readlines()`, iterate over fil
 95 95 | 
 96 96 | with open("furb129.py") as f:
 97    |-    [line for line in (f).readlines()]
-   97 |+    [line for line in f]
+   97 |+    [line for line in (f)]
 98 98 | 
 99 99 | 
 100 100 | with open("furb129.py") as f:
@@ -286,6 +286,7 @@ FURB129.py:101:17: FURB129 [*] Instead of calling `readlines()`, iterate over fi
 101 |     for line in (((f))).readlines():
     |                 ^^^^^^^^^^^^^^^^^^^ FURB129
 102 |         pass
+103 |     for line in(f).readlines():
     |
     = help: Remove `readlines()`
 
@@ -294,5 +295,25 @@ FURB129.py:101:17: FURB129 [*] Instead of calling `readlines()`, iterate over fi
 99  99  | 
 100 100 | with open("furb129.py") as f:
 101     |-    for line in (((f))).readlines():
-    101 |+    for line in ((f)):
+    101 |+    for line in (((f))):
 102 102 |         pass
+103 103 |     for line in(f).readlines():
+104 104 |         pass
+
+FURB129.py:103:16: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+    |
+101 |     for line in (((f))).readlines():
+102 |         pass
+103 |     for line in(f).readlines():
+    |                ^^^^^^^^^^^^^^^ FURB129
+104 |         pass
+    |
+    = help: Remove `readlines()`
+
+ℹ Unsafe fix
+100 100 | with open("furb129.py") as f:
+101 101 |     for line in (((f))).readlines():
+102 102 |         pass
+103     |-    for line in(f).readlines():
+    103 |+    for line in(f):
+104 104 |         pass

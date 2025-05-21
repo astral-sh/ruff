@@ -91,9 +91,7 @@ fn readlines_in_iter(checker: &Checker, iter_expr: &Expr) {
         checker.comment_ranges(),
         checker.source(),
     ) {
-        let unparenthesized_item_range = parenthesized_range.add_start(1.into()).sub_end(1.into());
-        let item_str = checker.locator().slice(unparenthesized_item_range);
-        Edit::range_replacement(item_str.to_string(), expr_call.range())
+        Edit::range_deletion(expr_call.range().add_start(parenthesized_range.len()))
     } else {
         Edit::range_deletion(expr_call.range().add_start(expr_attr.value.range().len()))
     };

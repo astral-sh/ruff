@@ -100,3 +100,5 @@ with open("furb129.py") as f:
 with open("furb129.py") as f:
     for line in (((f))).readlines():
         pass
+    for line in(f).readlines():
+        pass
