@@ -1,4 +1,4 @@
-use infer::enclosing_class_symbol;
+use infer::nearest_enclosing_class;
 use itertools::Either;
 
 use std::slice::Iter;
@@ -4906,7 +4906,7 @@ impl<'db> Type<'db> {
 
                 KnownInstanceType::TypingSelf => {
                     let index = semantic_index(db, scope_id.file(db));
-                    let Some(class_ty) = enclosing_class_symbol(db, index, scope_id) else {
+                    let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                         return Err(InvalidTypeExpressionError {
                             fallback_type: Type::unknown(),
                             invalid_expressions: smallvec::smallvec![
@@ -4914,24 +4914,13 @@ impl<'db> Type<'db> {
                             ],
                         });
                     };
-                    let Some(TypeDefinition::Class(class_def)) = class_ty.definition(db) else {
-                        debug_assert!(
-                            false,
-                            "enclosing_class_symbol must return a type with class definition"
-                        );
-                        return Ok(Type::unknown());
-                    };
-                    let Some(instance) = class_ty.to_instance(db) else {
-                        debug_assert!(
-                            false,
-                            "enclosing_class_symbol must return type that can be instantiated"
-                        );
-                        return Ok(Type::unknown());
-                    };
+                    let instance = Type::ClassLiteral(class)
+                        .to_instance(db)
+                        .expect("enclosing_class_symbol must return type that can be instantiated");
                     Ok(Type::TypeVar(TypeVarInstance::new(
                         db,
                         ast::name::Name::new("Self"),
-                        Some(class_def),
+                        Some(class.definition(db)),
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
                         None,

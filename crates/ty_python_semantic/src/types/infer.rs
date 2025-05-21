@@ -333,25 +333,26 @@ fn unpack_cycle_initial<'db>(_db: &'db dyn Db, _unpack: Unpack<'db>) -> UnpackRe
 /// Returns the type of the nearest enclosing class for the given scope.
 ///
 /// This function walks up the ancestor scopes starting from the given scope,
-/// and finds the closest class definition.
+/// and finds the closest class definition. This is different to the behaviour of
+/// [`TypeInferenceBuilder::class_context_of_current_method`], which will only return
+/// `Some(class)` if either the immediate parent scope is a class OR the immediate parent
+/// scope is a type-parameters scope and the grandparent scope is a class.
 ///
-/// Returns `None` if no enclosing class is found.a
-pub(crate) fn enclosing_class_symbol<'db>(
+/// Returns `None` if no enclosing class is found.
+pub(crate) fn nearest_enclosing_class<'db>(
     db: &'db dyn Db,
     semantic: &SemanticIndex<'db>,
     scope: ScopeId,
-) -> Option<Type<'db>> {
+) -> Option<ClassLiteral<'db>> {
     semantic
         .ancestor_scopes(scope.file_scope_id(db))
         .find_map(|(_, ancestor_scope)| {
-            if let NodeWithScopeKind::Class(class) = ancestor_scope.node() {
-                let definition = semantic.expect_single_definition(class.node());
-                let result = infer_definition_types(db, definition);
-
-                Some(result.declaration_type(definition).inner_type())
-            } else {
-                None
-            }
+            let class = ancestor_scope.node().as_class()?;
+            let definition = semantic.expect_single_definition(class);
+            infer_definition_types(db, definition)
+                .declaration_type(definition)
+                .inner_type()
+                .into_class_literal()
         })
 }
 
@@ -1696,6 +1697,11 @@ impl<'db> TypeInferenceBuilder<'db> {
     ///
     /// If the current scope is not a method inside an enclosing class,
     /// return `None`.
+    ///
+    /// Note that this method will only return `Some` if the immediate parent scope
+    /// is a class scope OR the immediate parent scope is an annotation scope
+    /// and the grandparent scope is a class scope. This means it has different
+    /// behaviour to the [`nearest_enclosing_class`] function.
     fn class_context_of_current_method(&self) -> Option<ClassLiteral<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
@@ -5154,7 +5160,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             [] => {
                                                 let scope = self.scope();
 
-                                                let Some(enclosing_class) = enclosing_class_symbol(
+                                                let Some(enclosing_class) = nearest_enclosing_class(
                                                     self.db(),
                                                     self.index,
                                                     scope,
@@ -5182,7 +5188,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                                                 let bound_super = BoundSuperType::build(
                                                     self.db(),
-                                                    enclosing_class,
+                                                    Type::ClassLiteral(enclosing_class),
                                                     first_param,
                                                 )
                                                 .unwrap_or_else(|err| {
