@@ -98,7 +98,6 @@ impl Program {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ProgramSettings {
     pub python_version: PythonVersionWithSource,
     pub python_platform: PythonPlatform,
@@ -119,11 +118,9 @@ pub enum PythonVersionSource {
     Default,
 }
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct PythonVersionWithSource {
     pub version: PythonVersion,
-    #[cfg_attr(feature = "serde", serde(skip))]
     pub source: PythonVersionSource,
 }
 
