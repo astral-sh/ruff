@@ -13,12 +13,12 @@
 use std::{collections::HashMap, slice::Iter};
 
 use itertools::EitherOrBoth;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 
-use super::{definition_expression_type, DynamicType, Type};
+use super::{DynamicType, Type, definition_expression_type};
 use crate::semantic_index::definition::Definition;
-use crate::types::generics::{GenericContext, Specialization, TypeMapping};
-use crate::types::{todo_type, ClassLiteral, TypeVarInstance};
+use crate::types::generics::GenericContext;
+use crate::types::{ClassLiteral, TypeMapping, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
@@ -123,7 +123,7 @@ pub(crate) struct CallableSignature<'db> {
     ///
     /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a
     /// non-overloaded callable.
-    overloads: SmallVec<[Signature<'db>; 1]>,
+    pub(crate) overloads: SmallVec<[Signature<'db>; 1]>,
 }
 
 impl<'db> CallableSignature<'db> {
@@ -302,8 +302,8 @@ impl<'db> Signature<'db> {
 
     pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
         Self {
-            generic_context: self.generic_context,
-            inherited_generic_context: self.inherited_generic_context,
+            generic_context: self.generic_context.map(|ctx| ctx.normalized(db)),
+            inherited_generic_context: self.inherited_generic_context.map(|ctx| ctx.normalized(db)),
             parameters: self
                 .parameters
                 .iter()
@@ -313,22 +313,10 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn apply_optional_specialization(
-        self,
-        db: &'db dyn Db,
-        specialization: Option<Specialization<'db>>,
-    ) -> Self {
-        if let Some(specialization) = specialization {
-            self.apply_type_mapping(db, specialization.type_mapping())
-        } else {
-            self
-        }
-    }
-
     pub(crate) fn apply_type_mapping<'a>(
         &self,
         db: &'db dyn Db,
-        type_mapping: TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
         Self {
             generic_context: self.generic_context,
@@ -1091,7 +1079,7 @@ impl<'db> Parameters<'db> {
         )
     }
 
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         Self {
             value: self
                 .value
@@ -1263,7 +1251,7 @@ impl<'db> Parameter<'db> {
         self
     }
 
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         Self {
             annotated_type: self
                 .annotated_type
@@ -1468,7 +1456,7 @@ pub(crate) enum ParameterKind<'db> {
 }
 
 impl<'db> ParameterKind<'db> {
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         match self {
             Self::PositionalOnly { default_type, name } => Self::PositionalOnly {
                 default_type: default_type
@@ -1503,7 +1491,7 @@ pub(crate) enum ParameterForm {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::tests::{setup_db, TestDb};
+    use crate::db::tests::{TestDb, setup_db};
     use crate::symbol::global_symbol;
     use crate::types::{FunctionSignature, FunctionType, KnownClass};
     use ruff_db::system::DbWithWritableSystem as _;
@@ -1528,7 +1516,7 @@ mod tests {
         db.write_dedented("/src/a.py", "def f(): ...").unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let sig = func.internal_signature(&db);
+        let sig = func.internal_signature(&db, None);
 
         assert!(sig.return_ty.is_none());
         assert_params(&sig, &[]);
@@ -1551,7 +1539,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let sig = func.internal_signature(&db);
+        let sig = func.internal_signature(&db, None);
 
         assert_eq!(sig.return_ty.unwrap().display(&db).to_string(), "bytes");
         assert_params(
@@ -1602,13 +1590,15 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let sig = func.internal_signature(&db);
+        let sig = func.internal_signature(&db, None);
 
-        let [Parameter {
-            annotated_type,
-            kind: ParameterKind::PositionalOrKeyword { name, .. },
-            ..
-        }] = &sig.parameters.value[..]
+        let [
+            Parameter {
+                annotated_type,
+                kind: ParameterKind::PositionalOrKeyword { name, .. },
+                ..
+            },
+        ] = &sig.parameters.value[..]
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -1636,13 +1626,15 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.pyi");
 
-        let sig = func.internal_signature(&db);
+        let sig = func.internal_signature(&db, None);
 
-        let [Parameter {
-            annotated_type,
-            kind: ParameterKind::PositionalOrKeyword { name, .. },
-            ..
-        }] = &sig.parameters.value[..]
+        let [
+            Parameter {
+                annotated_type,
+                kind: ParameterKind::PositionalOrKeyword { name, .. },
+                ..
+            },
+        ] = &sig.parameters.value[..]
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -1670,17 +1662,20 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let sig = func.internal_signature(&db);
+        let sig = func.internal_signature(&db, None);
 
-        let [Parameter {
-            annotated_type: a_annotated_ty,
-            kind: ParameterKind::PositionalOrKeyword { name: a_name, .. },
-            ..
-        }, Parameter {
-            annotated_type: b_annotated_ty,
-            kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
-            ..
-        }] = &sig.parameters.value[..]
+        let [
+            Parameter {
+                annotated_type: a_annotated_ty,
+                kind: ParameterKind::PositionalOrKeyword { name: a_name, .. },
+                ..
+            },
+            Parameter {
+                annotated_type: b_annotated_ty,
+                kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
+                ..
+            },
+        ] = &sig.parameters.value[..]
         else {
             panic!("expected two positional-or-keyword parameters");
         };
@@ -1713,17 +1708,20 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.pyi");
 
-        let sig = func.internal_signature(&db);
+        let sig = func.internal_signature(&db, None);
 
-        let [Parameter {
-            annotated_type: a_annotated_ty,
-            kind: ParameterKind::PositionalOrKeyword { name: a_name, .. },
-            ..
-        }, Parameter {
-            annotated_type: b_annotated_ty,
-            kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
-            ..
-        }] = &sig.parameters.value[..]
+        let [
+            Parameter {
+                annotated_type: a_annotated_ty,
+                kind: ParameterKind::PositionalOrKeyword { name: a_name, .. },
+                ..
+            },
+            Parameter {
+                annotated_type: b_annotated_ty,
+                kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
+                ..
+            },
+        ] = &sig.parameters.value[..]
         else {
             panic!("expected two positional-or-keyword parameters");
         };
@@ -1746,7 +1744,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let expected_sig = func.internal_signature(&db);
+        let expected_sig = func.internal_signature(&db, None);
 
         // With no decorators, internal and external signature are the same
         assert_eq!(

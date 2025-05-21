@@ -2,9 +2,9 @@ use std::fmt;
 
 use ast::Stmt;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::{analyze::typing, Scope, SemanticModel};
+use ruff_python_semantic::{Scope, SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;

@@ -1,21 +1,21 @@
 use itertools::Itertools;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt, visitor};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::docstrings::Docstring;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
-use crate::docstrings::Docstring;
 use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
@@ -806,16 +806,24 @@ fn generator_annotation_arguments<'a>(
 ) -> Option<GeneratorOrIteratorArguments<'a>> {
     let qualified_name = semantic.resolve_qualified_name(map_subscript(expr))?;
     match qualified_name.segments() {
-        ["typing" | "typing_extensions", "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator"]
-        | ["collections", "abc", "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator"] => {
-            match expr {
-                Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
-                    Some(GeneratorOrIteratorArguments::Single(slice))
-                }
-                _ => Some(GeneratorOrIteratorArguments::Unparameterized),
+        [
+            "typing" | "typing_extensions",
+            "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator",
+        ]
+        | [
+            "collections",
+            "abc",
+            "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator",
+        ] => match expr {
+            Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
+                Some(GeneratorOrIteratorArguments::Single(slice))
             }
-        }
-        ["typing" | "typing_extensions", "Generator" | "AsyncGenerator"]
+            _ => Some(GeneratorOrIteratorArguments::Unparameterized),
+        },
+        [
+            "typing" | "typing_extensions",
+            "Generator" | "AsyncGenerator",
+        ]
         | ["collections", "abc", "Generator" | "AsyncGenerator"] => match expr {
             Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
                 if let Expr::Tuple(tuple) = &**slice {
@@ -865,8 +873,6 @@ pub(crate) fn check_docstring(
     section_contexts: &SectionContexts,
     convention: Option<Convention>,
 ) {
-    let mut diagnostics = Vec::new();
-
     // Only check function docstrings.
     let Some(function_def) = definition.as_function_def() else {
         return;
@@ -919,7 +925,7 @@ pub(crate) fn check_docstring(
                                     semantic,
                                 )
                             {
-                                diagnostics.push(Diagnostic::new(
+                                checker.report_diagnostic(Diagnostic::new(
                                     DocstringMissingReturns,
                                     docstring.range(),
                                 ));
@@ -930,8 +936,10 @@ pub(crate) fn check_docstring(
                             .iter()
                             .any(|entry| !entry.is_none_return()) =>
                         {
-                            diagnostics
-                                .push(Diagnostic::new(DocstringMissingReturns, docstring.range()));
+                            checker.report_diagnostic(Diagnostic::new(
+                                DocstringMissingReturns,
+                                docstring.range(),
+                            ));
                         }
                         _ => {}
                     }
@@ -950,12 +958,16 @@ pub(crate) fn check_docstring(
                             |arguments| arguments.first().is_none_or(Expr::is_none_literal_expr),
                         ) =>
                     {
-                        diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
+                        checker.report_diagnostic(Diagnostic::new(
+                            DocstringMissingYields,
+                            docstring.range(),
+                        ));
                     }
                     None if body_entries.yields.iter().any(|entry| !entry.is_none_yield) => {
-                        diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
+                        checker.report_diagnostic(Diagnostic::new(
+                            DocstringMissingYields,
+                            docstring.range(),
+                        ));
                     }
                     _ => {}
                 }
@@ -988,7 +1000,7 @@ pub(crate) fn check_docstring(
                     },
                     docstring.range(),
                 );
-                diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -1003,7 +1015,7 @@ pub(crate) fn check_docstring(
                     || body_entries.returns.iter().all(ReturnEntry::is_implicit)
                 {
                     let diagnostic = Diagnostic::new(DocstringExtraneousReturns, docstring.range());
-                    diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
         }
@@ -1013,7 +1025,7 @@ pub(crate) fn check_docstring(
             if docstring_sections.yields.is_some() {
                 if body_entries.yields.is_empty() {
                     let diagnostic = Diagnostic::new(DocstringExtraneousYields, docstring.range());
-                    diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
         }
@@ -1039,11 +1051,9 @@ pub(crate) fn check_docstring(
                         },
                         docstring.range(),
                     );
-                    diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
         }
     }
-
-    checker.report_diagnostics(diagnostics);
 }

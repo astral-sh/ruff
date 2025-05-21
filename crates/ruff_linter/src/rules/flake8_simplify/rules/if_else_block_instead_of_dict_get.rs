@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{
@@ -82,11 +82,13 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
     let [body_stmt] = body.as_slice() else {
         return;
     };
-    let [ElifElseClause {
-        body: else_body,
-        test: None,
-        ..
-    }] = elif_else_clauses.as_slice()
+    let [
+        ElifElseClause {
+            body: else_body,
+            test: None,
+            ..
+        },
+    ] = elif_else_clauses.as_slice()
     else {
         return;
     };

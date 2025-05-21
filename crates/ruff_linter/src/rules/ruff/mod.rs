@@ -18,8 +18,8 @@ mod tests {
 
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
-    use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::settings::LinterSettings;
+    use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 

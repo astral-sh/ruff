@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
@@ -236,10 +236,12 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                 if *i == 0 {
                     if let (
                         [CmpOp::Eq | CmpOp::NotEq],
-                        [Expr::NumberLiteral(ast::ExprNumberLiteral {
-                            value: ast::Number::Int(n),
-                            ..
-                        })],
+                        [
+                            Expr::NumberLiteral(ast::ExprNumberLiteral {
+                                value: ast::Number::Int(n),
+                                ..
+                            }),
+                        ],
                     ) = (ops, comparators)
                     {
                         if *n == 3 && checker.enabled(Rule::SysVersionInfo0Eq3) {
@@ -252,10 +254,12 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                 } else if *i == 1 {
                     if let (
                         [CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE],
-                        [Expr::NumberLiteral(ast::ExprNumberLiteral {
-                            value: ast::Number::Int(_),
-                            ..
-                        })],
+                        [
+                            Expr::NumberLiteral(ast::ExprNumberLiteral {
+                                value: ast::Number::Int(_),
+                                ..
+                            }),
+                        ],
                     ) = (ops, comparators)
                     {
                         if checker.enabled(Rule::SysVersionInfo1CmpInt) {
@@ -274,10 +278,12 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
         {
             if let (
                 [CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE],
-                [Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Int(_),
-                    ..
-                })],
+                [
+                    Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value: ast::Number::Int(_),
+                        ..
+                    }),
+                ],
             ) = (ops, comparators)
             {
                 if checker.enabled(Rule::SysVersionInfoMinorCmpInt) {

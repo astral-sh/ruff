@@ -1,5 +1,5 @@
 use ruff_python_ast::stmt_if::elif_else_range;
-use ruff_python_parser::{parse_module, ParseError};
+use ruff_python_parser::{ParseError, parse_module};
 use ruff_text_size::TextSize;
 
 #[test]

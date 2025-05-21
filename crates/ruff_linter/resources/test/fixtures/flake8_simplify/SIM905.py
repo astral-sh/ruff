@@ -110,3 +110,23 @@ b"TesT.WwW.ExamplE.CoM".split(b".")
 # https://github.com/astral-sh/ruff/issues/18042
 print("a,b".rsplit(","))
 print("a,b,c".rsplit(",", 1))
+
+# https://github.com/astral-sh/ruff/issues/18069
+
+print("".split(maxsplit=0))
+print("".split(sep=None, maxsplit=0))
+print(" ".split(maxsplit=0))
+print(" ".split(sep=None, maxsplit=0))
+print(" x ".split(maxsplit=0))
+print(" x ".split(sep=None, maxsplit=0))
+print("  x  ".split(maxsplit=0))
+print("  x  ".split(sep=None, maxsplit=0))
+print("".rsplit(maxsplit=0))
+print("".rsplit(sep=None, maxsplit=0))
+print(" ".rsplit(maxsplit=0))
+print(" ".rsplit(sep=None, maxsplit=0))
+print(" x ".rsplit(maxsplit=0))
+print(" x ".rsplit(maxsplit=0))
+print(" x ".rsplit(sep=None, maxsplit=0))
+print("  x  ".rsplit(maxsplit=0))
+print("  x  ".rsplit(sep=None, maxsplit=0))

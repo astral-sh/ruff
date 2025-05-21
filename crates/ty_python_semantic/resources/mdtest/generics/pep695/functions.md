@@ -93,12 +93,10 @@ def deeper_list(x: list[set[str]]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: Unknown
 
 def deep_explicit(x: ExplicitlyImplements[str]) -> None:
-    # TODO: revealed: str
-    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+    reveal_type(takes_in_protocol(x))  # revealed: str
 
 def deeper_explicit(x: ExplicitlyImplements[set[str]]) -> None:
-    # TODO: revealed: set[str]
-    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
 
 def takes_in_type[T](x: type[T]) -> type[T]:
     return x
@@ -123,10 +121,8 @@ reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: Unknown
 class ExplicitSub(ExplicitlyImplements[int]): ...
 class ExplicitGenericSub[T](ExplicitlyImplements[T]): ...
 
-# TODO: revealed: int
-reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: Unknown
-# TODO: revealed: str
-reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: Unknown
+reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: int
+reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 ```
 
 ## Inferring a bound typevar
@@ -183,7 +179,7 @@ def good_return[T: int](x: T) -> T:
     return x
 
 def bad_return[T: int](x: T) -> T:
-    # error: [invalid-return-type] "Return type does not match returned value: Expected `T`, found `int`"
+    # error: [invalid-return-type] "Return type does not match returned value: expected `T`, found `int`"
     return x + 1
 ```
 
@@ -196,7 +192,7 @@ def different_types[T, S](cond: bool, t: T, s: S) -> T:
     if cond:
         return t
     else:
-        # error: [invalid-return-type] "Return type does not match returned value: Expected `T`, found `S`"
+        # error: [invalid-return-type] "Return type does not match returned value: expected `T`, found `S`"
         return s
 
 def same_types[T](cond: bool, t1: T, t2: T) -> T:

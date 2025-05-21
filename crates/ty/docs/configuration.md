@@ -22,7 +22,7 @@ respect-ignore-files = false
 
 Configures the enabled rules and their severity.
 
-See [the rules documentation](https://github.com/astral-sh/ty/blob/main/docs/rules.md) for a list of all available rules.
+See [the rules documentation](https://ty.dev/rules) for a list of all available rules.
 
 Valid severities are:
 
@@ -164,7 +164,13 @@ typeshed = "/path/to/custom/typeshed"
 
 The root of the project, used for finding first-party modules.
 
-**Default value**: `[".", "./src"]`
+If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:
+
+* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
+* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
+* otherwise, default to `.` (flat layout)
+
+**Default value**: `null`
 
 **Type**: `str`
 

@@ -1,0 +1,87 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: return_type.md - Function return type - Generator functions
+mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | import types
+ 2 | import typing
+ 3 | 
+ 4 | def f() -> types.GeneratorType:
+ 5 |     yield 42
+ 6 | 
+ 7 | def g() -> typing.Generator:
+ 8 |     yield 42
+ 9 | 
+10 | def h() -> typing.Iterator:
+11 |     yield 42
+12 | 
+13 | def i() -> typing.Iterable:
+14 |     yield 42
+15 | 
+16 | def i2() -> typing.Generator:
+17 |     yield from i()
+18 | 
+19 | def j() -> str:  # error: [invalid-return-type]
+20 |     yield 42
+21 | import types
+22 | import typing
+23 | 
+24 | async def f() -> types.AsyncGeneratorType:
+25 |     yield 42
+26 | 
+27 | async def g() -> typing.AsyncGenerator:
+28 |     yield 42
+29 | 
+30 | async def h() -> typing.AsyncIterator:
+31 |     yield 42
+32 | 
+33 | async def i() -> typing.AsyncIterable:
+34 |     yield 42
+35 | 
+36 | async def j() -> str:  # error: [invalid-return-type]
+37 |     yield 42
+```
+
+# Diagnostics
+
+```
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:19:12
+   |
+17 |     yield from i()
+18 |
+19 | def j() -> str:  # error: [invalid-return-type]
+   |            ^^^ expected `str`, found `types.GeneratorType`
+20 |     yield 42
+21 | import types
+   |
+info: Function is inferred as returning `types.GeneratorType` because it is a generator function
+info: See https://docs.python.org/3/glossary.html#term-generator for more details
+info: rule `invalid-return-type` is enabled by default
+
+```
+
+```
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:36:18
+   |
+34 |     yield 42
+35 |
+36 | async def j() -> str:  # error: [invalid-return-type]
+   |                  ^^^ expected `str`, found `types.AsyncGeneratorType`
+37 |     yield 42
+   |
+info: Function is inferred as returning `types.AsyncGeneratorType` because it is an async generator function
+info: See https://docs.python.org/3/glossary.html#term-asynchronous-generator for more details
+info: rule `invalid-return-type` is enabled by default
+
+```

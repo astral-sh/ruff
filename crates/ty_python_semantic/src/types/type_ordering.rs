@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use crate::db::Db;
 
 use super::{
-    class_base::ClassBase, subclass_of::SubclassOfInner, DynamicType, KnownInstanceType,
-    SuperOwnerKind, TodoType, Type,
+    DynamicType, KnownInstanceType, SuperOwnerKind, TodoType, Type, class_base::ClassBase,
+    subclass_of::SubclassOfInner,
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear

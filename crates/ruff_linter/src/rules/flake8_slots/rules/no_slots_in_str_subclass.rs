@@ -1,8 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{Arguments, Expr, Stmt, StmtClassDef};
-use ruff_python_semantic::{analyze::class::is_enumeration, SemanticModel};
+use ruff_python_semantic::{SemanticModel, analyze::class::is_enumeration};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_slots::rules::helpers::has_slots;

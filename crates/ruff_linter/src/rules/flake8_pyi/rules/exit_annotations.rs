@@ -7,9 +7,9 @@ use ruff_python_ast::{
 use smallvec::SmallVec;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use ruff_python_semantic::{analyze::visibility::is_overload, SemanticModel};
+use ruff_python_semantic::{SemanticModel, analyze::visibility::is_overload};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -59,17 +59,31 @@ impl Violation for BadExitAnnotation {
     fn message(&self) -> String {
         let method_name = self.func_kind.to_string();
         match self.error_kind {
-            ErrorKind::StarArgsNotAnnotated => format!("Star-args in `{method_name}` should be annotated with `object`"),
-            ErrorKind::MissingArgs => format!("If there are no star-args, `{method_name}` should have at least 3 non-keyword-only args (excluding `self`)"),
-            ErrorKind::ArgsAfterFirstFourMustHaveDefault => format!("All arguments after the first four in `{method_name}` must have a default value"),
-            ErrorKind::AllKwargsMustHaveDefault => format!("All keyword-only arguments in `{method_name}` must have a default value"),
-            ErrorKind::FirstArgBadAnnotation => format!("The first argument in `{method_name}` should be annotated with `object` or `type[BaseException] | None`"),
-            ErrorKind::SecondArgBadAnnotation => format!("The second argument in `{method_name}` should be annotated with `object` or `BaseException | None`"),
-            ErrorKind::ThirdArgBadAnnotation => format!("The third argument in `{method_name}` should be annotated with `object` or `types.TracebackType | None`"),
+            ErrorKind::StarArgsNotAnnotated => {
+                format!("Star-args in `{method_name}` should be annotated with `object`")
+            }
+            ErrorKind::MissingArgs => format!(
+                "If there are no star-args, `{method_name}` should have at least 3 non-keyword-only args (excluding `self`)"
+            ),
+            ErrorKind::ArgsAfterFirstFourMustHaveDefault => format!(
+                "All arguments after the first four in `{method_name}` must have a default value"
+            ),
+            ErrorKind::AllKwargsMustHaveDefault => {
+                format!("All keyword-only arguments in `{method_name}` must have a default value")
+            }
+            ErrorKind::FirstArgBadAnnotation => format!(
+                "The first argument in `{method_name}` should be annotated with `object` or `type[BaseException] | None`"
+            ),
+            ErrorKind::SecondArgBadAnnotation => format!(
+                "The second argument in `{method_name}` should be annotated with `object` or `BaseException | None`"
+            ),
+            ErrorKind::ThirdArgBadAnnotation => format!(
+                "The third argument in `{method_name}` should be annotated with `object` or `types.TracebackType | None`"
+            ),
             ErrorKind::UnrecognizedExitOverload => format!(
                 "Annotations for a three-argument `{method_name}` overload (excluding `self`) \
                 should either be `None, None, None` or `type[BaseException], BaseException, types.TracebackType`"
-            )
+            ),
         }
     }
 

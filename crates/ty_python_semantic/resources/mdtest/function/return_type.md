@@ -318,7 +318,7 @@ def f(cond: bool) -> str:
     return "hello" if cond else NotImplemented
 
 def f(cond: bool) -> int:
-    # error: [invalid-return-type] "Return type does not match returned value: Expected `int`, found `Literal["hello"]`"
+    # error: [invalid-return-type] "Return type does not match returned value: expected `int`, found `Literal["hello"]`"
     return "hello" if cond else NotImplemented
 ```
 
@@ -396,4 +396,20 @@ async def i() -> typing.AsyncIterable:
 
 async def j() -> str:  # error: [invalid-return-type]
     yield 42
+```
+
+## Diagnostics for `invalid-return-type` on non-protocol subclasses of protocol classes
+
+<!-- snapshot-diagnostics -->
+
+We emit a nice subdiagnostic in this situation explaining the probable error here:
+
+```py
+from typing_extensions import Protocol
+
+class Abstract(Protocol):
+    def method(self) -> str: ...
+
+class Concrete(Abstract):
+    def method(self) -> str: ...  # error: [invalid-return-type]
 ```

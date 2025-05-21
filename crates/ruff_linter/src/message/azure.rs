@@ -33,8 +33,8 @@ impl Emitter for AzureEmitter {
                 line = location.line,
                 col = location.column,
                 code = message
-                    .rule()
-                    .map_or_else(String::new, |rule| format!("code={};", rule.noqa_code())),
+                    .to_noqa_code()
+                    .map_or_else(String::new, |code| format!("code={code};")),
                 body = message.body(),
             )?;
         }
@@ -47,10 +47,10 @@ impl Emitter for AzureEmitter {
 mod tests {
     use insta::assert_snapshot;
 
+    use crate::message::AzureEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
-    use crate::message::AzureEmitter;
 
     #[test]
     fn output() {

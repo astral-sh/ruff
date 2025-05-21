@@ -24,11 +24,11 @@ use ruff_db::{files::File, parsed::parsed_module};
 use ruff_python_ast::{
     self as ast,
     name::Name,
-    visitor::{walk_expr, walk_pattern, walk_stmt, Visitor},
+    visitor::{Visitor, walk_expr, walk_pattern, walk_stmt},
 };
 use rustc_hash::FxHashMap;
 
-use crate::{module_name::ModuleName, resolve_module, Db};
+use crate::{Db, module_name::ModuleName, resolve_module};
 
 fn exports_cycle_recover(
     _db: &dyn Db,
@@ -244,7 +244,12 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                                     .ok()
                                     .and_then(|module_name| resolve_module(self.db, &module_name))
                                     .iter()
-                                    .flat_map(|module| exported_names(self.db, module.file()))
+                                    .flat_map(|module| {
+                                        module
+                                            .file()
+                                            .map(|file| exported_names(self.db, file))
+                                            .unwrap_or_default()
+                                    })
                             {
                                 self.possibly_add_export(export, PossibleExportKind::Normal);
                             }

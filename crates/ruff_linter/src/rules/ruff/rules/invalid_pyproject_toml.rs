@@ -1,5 +1,5 @@
 use ruff_diagnostics::{FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 /// ## What it does
 /// Checks for any pyproject.toml that does not conform to the schema from the relevant PEPs.

@@ -10,8 +10,8 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 pub use crate::line_index::{LineIndex, OneIndexed, PositionEncoding};
 pub use crate::line_ranges::LineRanges;
 pub use crate::newlines::{
-    find_newline, Line, LineEnding, NewlineWithTrailingNewline, UniversalNewlineIterator,
-    UniversalNewlines,
+    Line, LineEnding, NewlineWithTrailingNewline, UniversalNewlineIterator, UniversalNewlines,
+    find_newline,
 };
 
 mod line_index;
