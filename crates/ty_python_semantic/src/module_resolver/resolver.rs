@@ -773,8 +773,17 @@ fn resolve_name_in_search_path(
 
     // Last resort, check if a folder with the given name exists.
     // If so, then this is a namespace package.
-    // Exclude the standard library because it has conditional modules and we don't
-    // want to mistake them as namespace packages.
+    // We need to skip this check for typeshed because the `resolve_file_module` can also return `None`
+    // if the `__init__.py` exists but isn't available for the current Python version.
+    // Let's assume that the `xml` module is only available on Python 3.11+ and we're resolving for Python 3.10:
+    // * `resolve_file_module("xml/__init__.pyi")` returns `None` even though the file exists but the
+    //   module isn't available for the current Python version.
+    // * The check here would now return `true` because the `xml` directory exists, resulting
+    //   in a false positive for a namespace package.
+    //
+    // Since typeshed doesn't use any namespace packages today (May 2025), simply skip this
+    // check which also helps performance. If typeshed ever uses namespace packages, ensure that
+    // this check also takes the `VERSIONS` file into consideration.
     if !search_path.is_standard_library() && package_path.is_directory(context) {
         if let Some(path) = package_path.to_system_path() {
             let system = context.db.system();
