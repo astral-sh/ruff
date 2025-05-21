@@ -101,8 +101,8 @@ use super::diagnostic::{
     INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
     SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE, report_attempted_protocol_instantiation,
     report_bad_argument_to_get_protocol_members, report_duplicate_bases,
-    report_index_out_of_bounds, report_invalid_base, report_invalid_exception_caught,
-    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
+    report_invalid_exception_raised, report_invalid_or_unsupported_base,
     report_invalid_type_checking_constant, report_non_subscriptable,
     report_possibly_unresolved_reference,
     report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
@@ -903,7 +903,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     MroErrorKind::InvalidBases(bases) => {
                         let base_nodes = class_node.bases();
                         for (index, base_ty) in bases {
-                            report_invalid_base(
+                            report_invalid_or_unsupported_base(
                                 &self.context,
                                 &base_nodes[*index],
                                 *base_ty,

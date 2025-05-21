@@ -50,7 +50,7 @@ info[revealed-type]: Revealed type
 ```
 
 ```
-error[unsupported-base]: Unsupported class base with type `<class 'A'> | <class 'B'>`
+warning[unsupported-base]: Unsupported class base with type `<class 'A'> | <class 'B'>`
   --> src/mdtest_snippet.py:17:11
    |
 16 | # error: 11 [unsupported-base] "Unsupported class base with type `<class 'A'> | <class 'B'>`"

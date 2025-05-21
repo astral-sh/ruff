@@ -357,6 +357,33 @@ reveal_type(Z.__mro__)  # revealed: tuple[<class 'Z'>, Unknown, <class 'object'>
 class Foo(2): ...  # error: [invalid-base]
 ```
 
+A base that is not an instance of `type` but does have an `__mro_entries__` method will not raise an
+exception at runtime, so we issue `unsupported-base` rather than `invalid-base`:
+
+```py
+class Foo:
+    def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
+        return ()
+
+class Bar(Foo()): ...  # error: [unsupported-base]
+```
+
+But for objects that have badly defined `__mro_entries__`, `invalid-base` is emitted rather than
+`unsupported-base`:
+
+```py
+class Bad1:
+    def __mro_entries__(self, bases, extra_arg):
+        return ()
+
+class Bad2:
+    def __mro_entries__(self, bases) -> int:
+        return 42
+
+class BadSub1(Bad1()): ...  # error: [invalid-base]
+class BadSub2(Bad2()): ...  # error: [invalid-base]
+```
+
 ## `__bases__` lists with duplicate bases
 
 <!-- snapshot-diagnostics -->
