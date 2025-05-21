@@ -4821,7 +4821,7 @@ impl<'db> Type<'db> {
     pub fn in_type_expression(
         &self,
         db: &'db dyn Db,
-        scope_id: ScopeId,
+        scope_id: ScopeId<'db>,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
             // Special cases for `float` and `complex`
@@ -4872,7 +4872,9 @@ impl<'db> Type<'db> {
             | Type::BoundSuper(_)
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(*self)],
+                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
+                    *self, scope_id
+                )],
                 fallback_type: Type::unknown(),
             }),
 
@@ -4910,7 +4912,7 @@ impl<'db> Type<'db> {
                         return Err(InvalidTypeExpressionError {
                             fallback_type: Type::unknown(),
                             invalid_expressions: smallvec::smallvec![
-                                InvalidTypeExpression::InvalidType(*self)
+                                InvalidTypeExpression::InvalidType(*self, scope_id)
                             ],
                         });
                     };
@@ -5048,7 +5050,7 @@ impl<'db> Type<'db> {
                 )),
                 _ => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
-                        *self
+                        *self, scope_id
                     )],
                     fallback_type: Type::unknown(),
                 }),
@@ -5762,7 +5764,8 @@ impl<'db> InvalidTypeExpressionError<'db> {
                 let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, node) else {
                     continue;
                 };
-                builder.into_diagnostic(error.reason(context.db()));
+                let diagnostic = builder.into_diagnostic(error.reason(context.db()));
+                error.add_subdiagnostics(context.db(), diagnostic);
             }
         }
         fallback_type
@@ -5789,7 +5792,7 @@ enum InvalidTypeExpression<'db> {
     /// and which would require exactly one argument even if they appeared in an annotation expression
     TypeQualifierRequiresOneArgument(KnownInstanceType<'db>),
     /// Some types are always invalid in type expressions
-    InvalidType(Type<'db>),
+    InvalidType(Type<'db>, ScopeId<'db>),
 }
 
 impl<'db> InvalidTypeExpression<'db> {
@@ -5833,7 +5836,7 @@ impl<'db> InvalidTypeExpression<'db> {
                         "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions, and only with exactly one argument)",
                         q = qualifier.repr(self.db)
                     ),
-                    InvalidTypeExpression::InvalidType(ty) => write!(
+                    InvalidTypeExpression::InvalidType(ty, _) => write!(
                         f,
                         "Variable of type `{ty}` is not allowed in a type expression",
                         ty = ty.display(self.db)
@@ -5843,6 +5846,41 @@ impl<'db> InvalidTypeExpression<'db> {
         }
 
         Display { error: self, db }
+    }
+
+    fn add_subdiagnostics(self, db: &'db dyn Db, mut diagnostic: LintDiagnosticGuard) {
+        let InvalidTypeExpression::InvalidType(ty, scope) = self else {
+            return;
+        };
+        let Type::ModuleLiteral(module_type) = ty else {
+            return;
+        };
+        let module = module_type.module(db);
+        let Some(module_name_final_part) = module.name().components().next_back() else {
+            return;
+        };
+        let Some(module_member_with_same_name) = ty
+            .member(db, module_name_final_part)
+            .symbol
+            .ignore_possibly_unbound()
+        else {
+            return;
+        };
+        if module_member_with_same_name
+            .in_type_expression(db, scope)
+            .is_err()
+        {
+            return;
+        }
+        diagnostic.info(format_args!(
+            "Module `{module_name_final_part}` has a member with a similar name \
+                that is valid in type expressions; perhaps you meant to use that?",
+        ));
+
+        // TODO: showing a diff (and even having an autofix) would be even better
+        diagnostic.info(format_args!(
+            "Try `{module_name_final_part}.{module_name_final_part}`"
+        ));
     }
 }
 
