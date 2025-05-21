@@ -2766,6 +2766,20 @@ impl<'db> Type<'db> {
             instance.display(db),
             owner.display(db)
         );
+        match self {
+            Type::Callable(callable) if callable.is_function_like(db) => {
+                // For "function-like" callables, model the the behavior of `FunctionType.__get__`:
+                return if instance.is_none(db) {
+                    Some((self, AttributeKind::NormalOrNonDataDescriptor))
+                } else {
+                    Some((
+                        Type::Callable(callable.bind_self(db)),
+                        AttributeKind::NormalOrNonDataDescriptor,
+                    ))
+                };
+            }
+            _ => {}
+        }
 
         let descr_get = self.class_member(db, "__get__".into()).symbol;
 
@@ -6905,6 +6919,7 @@ impl<'db> FunctionType<'db> {
         Type::Callable(CallableType::from_overloads(
             db,
             self.signature(db).overloads.iter().cloned(),
+            false,
         ))
     }
 
@@ -7531,6 +7546,7 @@ impl<'db> BoundMethodType<'db> {
                 .overloads
                 .iter()
                 .map(signatures::Signature::bind_self),
+            false,
         ))
     }
 
@@ -7595,12 +7611,21 @@ impl<'db> BoundMethodType<'db> {
 pub struct CallableType<'db> {
     #[returns(deref)]
     signatures: Box<[Signature<'db>]>,
+    /// We use `CallableType` to represent function-like objects, like the synthesized methods
+    /// of dataclasses or NamedTuples. These callables act like real functions when accessed
+    /// as attributes on instances, i.e. they bind `self`.
+    is_function_like: bool,
 }
 
 impl<'db> CallableType<'db> {
     /// Create a non-overloaded callable type with a single signature.
     pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> Self {
-        CallableType::new(db, vec![signature].into_boxed_slice())
+        CallableType::new(db, vec![signature].into_boxed_slice(), false)
+    }
+
+    /// Create a non-overloaded callable type with a single signature.
+    pub(crate) fn function_like(db: &'db dyn Db, signature: Signature<'db>) -> Self {
+        CallableType::new(db, vec![signature].into_boxed_slice(), true)
     }
 
     /// Create an overloaded callable type with multiple signatures.
@@ -7608,7 +7633,7 @@ impl<'db> CallableType<'db> {
     /// # Panics
     ///
     /// Panics if `overloads` is empty.
-    pub(crate) fn from_overloads<I>(db: &'db dyn Db, overloads: I) -> Self
+    pub(crate) fn from_overloads<I>(db: &'db dyn Db, overloads: I, is_function_like: bool) -> Self
     where
         I: IntoIterator<Item = Signature<'db>>,
     {
@@ -7617,7 +7642,7 @@ impl<'db> CallableType<'db> {
             !overloads.is_empty(),
             "CallableType must have at least one signature"
         );
-        CallableType::new(db, overloads)
+        CallableType::new(db, overloads, is_function_like)
     }
 
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
@@ -7625,6 +7650,14 @@ impl<'db> CallableType<'db> {
         CallableType::single(
             db,
             Signature::new(Parameters::unknown(), Some(Type::unknown())),
+        )
+    }
+
+    pub(crate) fn bind_self(self, db: &'db dyn Db) -> Self {
+        CallableType::from_overloads(
+            db,
+            self.signatures(db).iter().map(Signature::bind_self),
+            false,
         )
     }
 
@@ -7646,6 +7679,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db)
                 .iter()
                 .map(|signature| signature.normalized(db)),
+            self.is_function_like(db),
         )
     }
 
@@ -7655,6 +7689,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db)
                 .iter()
                 .map(|signature| signature.apply_type_mapping(db, type_mapping)),
+            self.is_function_like(db),
         )
     }
 
@@ -7790,6 +7825,7 @@ impl<'db> CallableType<'db> {
                 .iter()
                 .cloned()
                 .map(|signature| signature.replace_self_reference(db, class)),
+            self.is_function_like(db),
         )
     }
 }
