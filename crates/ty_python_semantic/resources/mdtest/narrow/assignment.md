@@ -69,14 +69,14 @@ reveal_type(c.desc)  # revealed: int
 
 ## Subscript
 
-### Basic
+### Specialization for builtin types
 
-Type narrowing based on assignment to a subscript expression is generally unsound, because
-`__getitem__`/`__setitem__` of a user-defined class does not guarantee that the passed value is
-stored and can be retrieved as is. Currently, we only perform assignment-based narrowing on a few
-built-in classes (`list`, `dict`, `bytesarray`, `TypedDict` and `collections` types) and their
-subclasses where we are confident that this kind of narrowing can be performed soundly. This is the
-same approach as pyright.
+Type narrowing based on assignment to a subscript expression is generally unsound, because arbitrary
+`__getitem__`/`__setitem__` methods on a class do not necessarily guarantee that the passed-in value
+for `__setitem__` is stored and can be retrieved unmodified via `__getitem__`. Therefore, we
+currently only perform assignment-based narrowing on a few built-in classes (`list`, `dict`,
+`bytesarray`, `TypedDict` and `collections` types) and their subclasses where we are confident that
+this kind of narrowing can be performed soundly. This is the same approach as pyright.
 
 ```py
 from typing import TypedDict
@@ -139,7 +139,7 @@ does["not"]["exist"] = 0
 reveal_type(does["not"]["exist"])  # revealed: Unknown
 ```
 
-### Do not narrow the result type of a customized subscript by assignment
+### No narrowing for custom classes with arbitrary `__getitem__` / `__setitem__`
 
 ```py
 class C:
@@ -150,7 +150,7 @@ class C:
         return self.l[index]
 
     def __setitem__(self, index: int, value: str | int) -> None:
-        if len(self.l) <= index:
+        if len(self.l) == index:
             self.l.append(str(value))
         else:
             self.l[index] = str(value)
