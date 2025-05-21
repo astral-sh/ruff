@@ -133,15 +133,6 @@ impl<T> RangedValue<T> {
     }
 }
 
-impl<T> RangedValue<T>
-where
-    T: Copy,
-{
-    pub fn inner_copied(&self) -> T {
-        self.value
-    }
-}
-
 impl<T> Combine for RangedValue<T> {
     fn combine(self, _other: Self) -> Self
     where

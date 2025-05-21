@@ -98,7 +98,7 @@ impl Options {
             .as_ref()
             .and_then(|env| env.python_version.as_ref())
             .map(|ranged_version| PythonVersionWithSource {
-                version: ranged_version.inner_copied(),
+                version: **ranged_version,
                 source: match ranged_version.source() {
                     ValueSource::Cli => PythonVersionSource::Cli,
                     ValueSource::File(path) => {
