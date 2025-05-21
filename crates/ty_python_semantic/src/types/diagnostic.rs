@@ -1,6 +1,6 @@
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
-use super::{ClassLiteral, KnownClass};
+use super::{ClassBase, ClassLiteral, KnownClass};
 use crate::db::Db;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
@@ -1624,14 +1624,51 @@ pub(super) fn report_implicit_return_type(
     context: &InferContext,
     range: impl Ranged,
     expected_ty: Type,
+    has_empty_body: bool,
+    enclosing_class_of_method: Option<ClassLiteral>,
 ) {
     let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, range) else {
         return;
     };
-    builder.into_diagnostic(format_args!(
+    let db = context.db();
+    let mut diagnostic = builder.into_diagnostic(format_args!(
         "Function can implicitly return `None`, which is not assignable to return type `{}`",
-        expected_ty.display(context.db())
+        expected_ty.display(db)
     ));
+    if !has_empty_body {
+        return;
+    }
+    let Some(class) = enclosing_class_of_method else {
+        return;
+    };
+    if class
+        .iter_mro(db, None)
+        .any(|base| matches!(base, ClassBase::Protocol(_)))
+    {
+        diagnostic.info(
+            "Only functions in stub files, methods on protocol classes, \
+            or methods with `@abstractmethod` are permitted to have empty bodies",
+        );
+        diagnostic.info(format_args!(
+            "Class `{}` has `typing.Protocol` in its MRO, but it is not a protocol class",
+            class.name(db)
+        ));
+
+        let mut sub_diagnostic = SubDiagnostic::new(
+            Severity::Info,
+            "Only classes that directly inherit from `typing.Protocol` \
+            or `typing_extensions.Protocol` are considered protocol classes",
+        );
+        sub_diagnostic.annotate(
+            Annotation::primary(class.header_span(db)).message(format_args!(
+                "`Protocol` not present in `{class}`'s immediate bases",
+                class = class.name(db)
+            )),
+        );
+        diagnostic.sub(sub_diagnostic);
+
+        diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html#");
+    }
 }
 
 pub(super) fn report_invalid_type_checking_constant(context: &InferContext, node: AnyNodeRef) {

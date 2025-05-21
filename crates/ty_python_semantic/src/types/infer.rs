@@ -1691,43 +1691,34 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::Deferred);
     }
 
-    /// Returns `true` if the current scope is the function body scope of a method of a protocol
-    /// (that is, a class which directly inherits `typing.Protocol`.)
-    fn in_protocol_class(&self) -> bool {
+    /// If the current scope is a method inside an enclosing class,
+    /// return `Some(class)` where `class` represents the enclosing class.
+    ///
+    /// If the current scope is not a method inside an enclosing class,
+    /// return `None`.
+    fn class_context_of_current_method(&self) -> Option<ClassLiteral<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
-        let Some(parent_scope_id) = current_scope.parent() else {
-            return false;
-        };
+        let parent_scope_id = current_scope.parent()?;
         let parent_scope = self.index.scope(parent_scope_id);
 
         let class_scope = match parent_scope.kind() {
             ScopeKind::Class => parent_scope,
             ScopeKind::Annotation => {
-                let Some(class_scope_id) = parent_scope.parent() else {
-                    return false;
-                };
+                let class_scope_id = parent_scope.parent()?;
                 let potentially_class_scope = self.index.scope(class_scope_id);
 
                 match potentially_class_scope.kind() {
                     ScopeKind::Class => potentially_class_scope,
-                    _ => return false,
+                    _ => return None,
                 }
             }
-            _ => return false,
+            _ => return None,
         };
 
-        let NodeWithScopeKind::Class(node_ref) = class_scope.node() else {
-            return false;
-        };
-
-        let class_definition = self.index.expect_single_definition(node_ref.node());
-
-        let Type::ClassLiteral(class) = binding_type(self.db(), class_definition) else {
-            return false;
-        };
-
-        class.is_protocol(self.db())
+        let class_stmt = class_scope.node().as_class()?;
+        let class_definition = self.index.expect_single_definition(class_stmt);
+        binding_type(self.db(), class_definition).into_class_literal()
     }
 
     /// Returns `true` if the current scope is the function body scope of a function overload (that
@@ -1789,13 +1780,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
-            if (self.in_stub()
-                || self.in_function_overload_or_abstractmethod()
-                || self.in_protocol_class())
-                && self.return_types_and_ranges.is_empty()
-                && is_stub_suite(&function.body)
-            {
-                return;
+            let has_empty_body =
+                self.return_types_and_ranges.is_empty() && is_stub_suite(&function.body);
+
+            let mut enclosing_class_context = None;
+
+            if has_empty_body {
+                if self.in_stub() {
+                    return;
+                }
+                if self.in_function_overload_or_abstractmethod() {
+                    return;
+                }
+                if let Some(class) = self.class_context_of_current_method() {
+                    enclosing_class_context = Some(class);
+                    if class.is_protocol(self.db()) {
+                        return;
+                    }
+                }
             }
 
             let declared_ty = self.file_expression_type(returns);
@@ -1856,7 +1858,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             if use_def.can_implicit_return(self.db())
                 && !Type::none(self.db()).is_assignable_to(self.db(), declared_ty)
             {
-                report_implicit_return_type(&self.context, returns.range(), declared_ty);
+                report_implicit_return_type(
+                    &self.context,
+                    returns.range(),
+                    declared_ty,
+                    has_empty_body,
+                    enclosing_class_context,
+                );
             }
         }
     }
@@ -2139,7 +2147,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 } else if (self.in_stub()
                     || self.in_function_overload_or_abstractmethod()
-                    || self.in_protocol_class())
+                    || self
+                        .class_context_of_current_method()
+                        .is_some_and(|class| class.is_protocol(self.db())))
                     && default
                         .as_ref()
                         .is_some_and(|d| d.is_ellipsis_literal_expr())
