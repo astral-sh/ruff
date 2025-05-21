@@ -1,6 +1,7 @@
+use super::call::CallErrorKind;
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
-use super::{ClassBase, ClassLiteral, KnownClass};
+use super::{CallArgumentTypes, CallDunderError, ClassBase, ClassLiteral, KnownClass};
 use crate::db::Db;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
@@ -70,6 +71,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
     registry.register_lint(&UNRESOLVED_IMPORT);
     registry.register_lint(&UNRESOLVED_REFERENCE);
+    registry.register_lint(&UNSUPPORTED_BASE);
     registry.register_lint(&UNSUPPORTED_OPERATOR);
     registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
     registry.register_lint(&STATIC_ASSERT_ERROR);
@@ -451,11 +453,53 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for class definitions that have bases which are not instances of `type`.
+    ///
+    /// ## Why is this bad?
+    /// Class definitions with bases like this will lead to `TypeError` being raised at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class A(42): ...  # error: [invalid-base]
+    /// ```
     pub(crate) static INVALID_BASE = {
-        summary: "detects invalid bases in class definitions",
+        summary: "detects class bases that will cause the class definition to raise an exception at runtime",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for class definitions that have bases which are unsupported by ty.
+    ///
+    /// ## Why is this bad?
+    /// If a class has a base that is an instance of a complex type such as a union type,
+    /// ty will not be able to resolve the [method resolution order] (MRO) for the class.
+    /// This will lead to an inferior understanding of your codebase and unpredictable
+    /// type-checking behavior.
+    ///
+    /// ## Examples
+    /// ```python
+    /// import datetime
+    ///
+    /// class A: ...
+    /// class B: ...
+    ///
+    /// if datetime.date.today().weekday() != 6:
+    ///     C = A
+    /// else:
+    ///     C = B
+    ///
+    /// class D(C): ...  # error: [unsupported-base]
+    /// ```
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    pub(crate) static UNSUPPORTED_BASE = {
+        summary: "detects class bases that are unsupported as ty could not feasibly calculate the class's MRO",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
     }
 }
 
@@ -1975,4 +2019,133 @@ pub(crate) fn report_duplicate_bases(
     }
 
     diagnostic.sub(sub_diagnostic);
+}
+
+pub(crate) fn report_invalid_or_unsupported_base(
+    context: &InferContext,
+    base_node: &ast::Expr,
+    base_type: Type,
+    class: ClassLiteral,
+) {
+    let db = context.db();
+    let instance_of_type = KnownClass::Type.to_instance(db);
+
+    if base_type.is_assignable_to(db, instance_of_type) {
+        report_unsupported_base(context, base_node, base_type, class);
+        return;
+    }
+
+    let tuple_of_types = KnownClass::Tuple.to_specialized_instance(db, [instance_of_type]);
+
+    let explain_mro_entries = |diagnostic: &mut LintDiagnosticGuard| {
+        diagnostic.info(
+            "An instance type is only a valid class base \
+            if it has a valid `__mro_entries__` method",
+        );
+    };
+
+    match base_type.try_call_dunder(
+        db,
+        "__mro_entries__",
+        CallArgumentTypes::positional([tuple_of_types]),
+    ) {
+        Ok(ret) => {
+            if ret.return_type(db).is_assignable_to(db, tuple_of_types) {
+                report_unsupported_base(context, base_node, base_type, class);
+            } else {
+                let Some(mut diagnostic) =
+                    report_invalid_base(context, base_node, base_type, class)
+                else {
+                    return;
+                };
+                explain_mro_entries(&mut diagnostic);
+                diagnostic.info(format_args!(
+                    "Type `{}` has an `__mro_entries__` method, but it does not return a tuple of types",
+                    base_type.display(db)
+                ));
+            }
+        }
+        Err(mro_entries_call_error) => {
+            let Some(mut diagnostic) = report_invalid_base(context, base_node, base_type, class)
+            else {
+                return;
+            };
+
+            match mro_entries_call_error {
+                CallDunderError::MethodNotAvailable => {}
+                CallDunderError::PossiblyUnbound(_) => {
+                    explain_mro_entries(&mut diagnostic);
+                    diagnostic.info(format_args!(
+                        "Type `{}` has an `__mro_entries__` attribute, but it is possibly unbound",
+                        base_type.display(db)
+                    ));
+                }
+                CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
+                    explain_mro_entries(&mut diagnostic);
+                    diagnostic.info(format_args!(
+                        "Type `{}` has an `__mro_entries__` attribute, but it is not callable",
+                        base_type.display(db)
+                    ));
+                }
+                CallDunderError::CallError(CallErrorKind::BindingError, _) => {
+                    explain_mro_entries(&mut diagnostic);
+                    diagnostic.info(format_args!(
+                        "Type `{}` has an `__mro_entries__` method, \
+                        but it cannot be called with the expected arguments",
+                        base_type.display(db)
+                    ));
+                    diagnostic.info(
+                        "Expected a signature at least as permissive as \
+                        `def __mro_entries__(self, bases: tuple[type, ...], /) -> tuple[type, ...]`"
+                    );
+                }
+                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _) => {
+                    explain_mro_entries(&mut diagnostic);
+                    diagnostic.info(format_args!(
+                        "Type `{}` has an `__mro_entries__` method, \
+                        but it may not be callable",
+                        base_type.display(db)
+                    ));
+                }
+            }
+        }
+    }
+}
+
+fn report_unsupported_base(
+    context: &InferContext,
+    base_node: &ast::Expr,
+    base_type: Type,
+    class: ClassLiteral,
+) {
+    let Some(builder) = context.report_lint(&UNSUPPORTED_BASE, base_node) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Unsupported class base with type `{}`",
+        base_type.display(context.db())
+    ));
+    diagnostic.info(format_args!(
+        "ty cannot resolve a consistent MRO for class `{}` due to this base",
+        class.name(context.db())
+    ));
+    diagnostic.info("Only class objects or `Any` are supported as class bases");
+}
+
+fn report_invalid_base<'ctx, 'db>(
+    context: &'ctx InferContext<'db>,
+    base_node: &ast::Expr,
+    base_type: Type<'db>,
+    class: ClassLiteral<'db>,
+) -> Option<LintDiagnosticGuard<'ctx, 'db>> {
+    let builder = context.report_lint(&INVALID_BASE, base_node)?;
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Invalid class base with type `{}`",
+        base_type.display(context.db())
+    ));
+    diagnostic.info(format_args!(
+        "Definition of class `{}` will raise `TypeError` at runtime",
+        class.name(context.db())
+    ));
+    Some(diagnostic)
 }

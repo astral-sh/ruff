@@ -102,8 +102,9 @@ use super::diagnostic::{
     SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE, report_attempted_protocol_instantiation,
     report_bad_argument_to_get_protocol_members, report_duplicate_bases,
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_type_checking_constant,
-    report_non_subscriptable, report_possibly_unresolved_reference,
+    report_invalid_exception_raised, report_invalid_or_unsupported_base,
+    report_invalid_type_checking_constant, report_non_subscriptable,
+    report_possibly_unresolved_reference,
     report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
     report_unresolved_reference,
 };
@@ -892,63 +893,51 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // (3) Check that the class's MRO is resolvable
             match class.try_mro(self.db(), None) {
-                Err(mro_error) => {
-                    match mro_error.reason() {
-                        MroErrorKind::DuplicateBases(duplicates) => {
-                            let base_nodes = class_node.bases();
-                            for duplicate in duplicates {
-                                report_duplicate_bases(&self.context, class, duplicate, base_nodes);
-                            }
-                        }
-                        MroErrorKind::InvalidBases(bases) => {
-                            let base_nodes = class_node.bases();
-                            for (index, base_ty) in bases {
-                                if base_ty.is_never() {
-                                    // A class base of type `Never` can appear in unreachable code. It
-                                    // does not indicate a problem, since the actual construction of the
-                                    // class will never happen.
-                                    continue;
-                                }
-                                let Some(builder) =
-                                    self.context.report_lint(&INVALID_BASE, &base_nodes[*index])
-                                else {
-                                    continue;
-                                };
-                                builder.into_diagnostic(format_args!(
-                                    "Invalid class base with type `{}` \
-                                     (all bases must be a class, `Any`, `Unknown` or `Todo`)",
-                                    base_ty.display(self.db())
-                                ));
-                            }
-                        }
-                        MroErrorKind::UnresolvableMro { bases_list } => {
-                            if let Some(builder) =
-                                self.context.report_lint(&INCONSISTENT_MRO, class_node)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Cannot create a consistent method resolution order (MRO) \
-                                     for class `{}` with bases list `[{}]`",
-                                    class.name(self.db()),
-                                    bases_list
-                                        .iter()
-                                        .map(|base| base.display(self.db()))
-                                        .join(", ")
-                                ));
-                            }
-                        }
-                        MroErrorKind::InheritanceCycle => {
-                            if let Some(builder) = self
-                                .context
-                                .report_lint(&CYCLIC_CLASS_DEFINITION, class_node)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Cyclic definition of `{}` (class cannot inherit from itself)",
-                                    class.name(self.db())
-                                ));
-                            }
+                Err(mro_error) => match mro_error.reason() {
+                    MroErrorKind::DuplicateBases(duplicates) => {
+                        let base_nodes = class_node.bases();
+                        for duplicate in duplicates {
+                            report_duplicate_bases(&self.context, class, duplicate, base_nodes);
                         }
                     }
-                }
+                    MroErrorKind::InvalidBases(bases) => {
+                        let base_nodes = class_node.bases();
+                        for (index, base_ty) in bases {
+                            report_invalid_or_unsupported_base(
+                                &self.context,
+                                &base_nodes[*index],
+                                *base_ty,
+                                class,
+                            );
+                        }
+                    }
+                    MroErrorKind::UnresolvableMro { bases_list } => {
+                        if let Some(builder) =
+                            self.context.report_lint(&INCONSISTENT_MRO, class_node)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Cannot create a consistent method resolution order (MRO) \
+                                     for class `{}` with bases list `[{}]`",
+                                class.name(self.db()),
+                                bases_list
+                                    .iter()
+                                    .map(|base| base.display(self.db()))
+                                    .join(", ")
+                            ));
+                        }
+                    }
+                    MroErrorKind::InheritanceCycle => {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&CYCLIC_CLASS_DEFINITION, class_node)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Cyclic definition of `{}` (class cannot inherit from itself)",
+                                class.name(self.db())
+                            ));
+                        }
+                    }
+                },
                 Ok(_) => check_class_slots(&self.context, class, class_node),
             }
 

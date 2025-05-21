@@ -164,8 +164,12 @@ impl<'db> ClassBase<'db> {
                 }
             }
             Type::NominalInstance(_) => None, // TODO -- handle `__mro_entries__`?
-            Type::PropertyInstance(_) => None,
-            Type::Never
+
+            // This likely means that we're in unreachable code,
+            // in which case we want to treat `Never` in a forgiving way and silence diagnostics
+            Type::Never => Some(ClassBase::unknown()),
+
+            Type::PropertyInstance(_)
             | Type::BooleanLiteral(_)
             | Type::FunctionLiteral(_)
             | Type::Callable(..)
