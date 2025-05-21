@@ -838,6 +838,7 @@ python-version = "3.12"
 ```py
 from dataclasses import dataclass
 from typing import Callable
+from types import FunctionType
 from ty_extensions import TypeOf, static_assert, is_subtype_of, is_assignable_to
 
 @dataclass
@@ -859,4 +860,8 @@ static_assert(is_assignable_to(DunderInitType, EquivalentCallableType))
 
 static_assert(not is_subtype_of(EquivalentCallableType, DunderInitType))
 static_assert(not is_assignable_to(EquivalentCallableType, DunderInitType))
+
+# TODO:
+# error: [static-assert-error]
+static_assert(is_subtype_of(DunderInitType, FunctionType))
 ```
