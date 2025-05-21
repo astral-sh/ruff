@@ -6933,7 +6933,7 @@ impl<'db> FunctionType<'db> {
         Type::Callable(CallableType::from_overloads(
             db,
             self.signature(db).overloads.iter().cloned(),
-            false,
+            true,
         ))
     }
 
@@ -7637,7 +7637,9 @@ impl<'db> CallableType<'db> {
         CallableType::new(db, vec![signature].into_boxed_slice(), false)
     }
 
-    /// Create a non-overloaded callable type with a single signature.
+    /// Create a non-overloaded, function-like callable type with a single signature.
+    ///
+    /// A function-like callable will bind `self` when accessed as an attribute on an instance.
     pub(crate) fn function_like(db: &'db dyn Db, signature: Signature<'db>) -> Self {
         CallableType::new(db, vec![signature].into_boxed_slice(), true)
     }

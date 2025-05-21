@@ -830,9 +830,15 @@ reveal_type(Person.__eq__)  # revealed: def __eq__(self, value: object, /) -> bo
 
 Here, we make sure that the synthesized methods of dataclasses behave like proper functions.
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from dataclasses import dataclass
 from typing import Callable
+from ty_extensions import TypeOf, static_assert, is_subtype_of, is_assignable_to
 
 @dataclass
 class C:
@@ -844,4 +850,13 @@ reveal_type(type(C.__init__))  # revealed: <class 'FunctionType'>
 # We can access attributes that are defined on functions:
 reveal_type(type(C.__init__).__code__)  # revealed: CodeType
 reveal_type(C.__init__.__code__)  # revealed: CodeType
+
+type DunderInitType = TypeOf[C.__init__]
+type EquivalentCallableType = Callable[[C, int], None]
+
+static_assert(is_subtype_of(DunderInitType, EquivalentCallableType))
+static_assert(is_assignable_to(DunderInitType, EquivalentCallableType))
+
+static_assert(not is_subtype_of(EquivalentCallableType, DunderInitType))
+static_assert(not is_assignable_to(EquivalentCallableType, DunderInitType))
 ```
