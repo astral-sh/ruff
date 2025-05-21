@@ -825,3 +825,23 @@ reveal_type(Person.__repr__)  # revealed: def __repr__(self) -> str
 
 reveal_type(Person.__eq__)  # revealed: def __eq__(self, value: object, /) -> bool
 ```
+
+## Function-like behavior of synthesized methods
+
+Here, we make sure that the synthesized methods of dataclasses behave like proper functions.
+
+```py
+from dataclasses import dataclass
+from typing import Callable
+
+@dataclass
+class C:
+    x: int
+
+reveal_type(C.__init__)  # revealed: (self: C, x: int) -> None
+reveal_type(type(C.__init__))  # revealed: <class 'FunctionType'>
+
+# We can access attributes that are defined on functions:
+reveal_type(type(C.__init__).__code__)  # revealed: CodeType
+reveal_type(C.__init__.__code__)  # revealed: CodeType
+```
