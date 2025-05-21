@@ -5872,14 +5872,11 @@ impl<'db> InvalidTypeExpression<'db> {
         {
             return;
         }
-        diagnostic.info(format_args!(
-            "Module `{module_name_final_part}` has a member with a similar name \
-                that is valid in type expressions; perhaps you meant to use that?",
-        ));
 
         // TODO: showing a diff (and even having an autofix) would be even better
         diagnostic.info(format_args!(
-            "Try `{module_name_final_part}.{module_name_final_part}`"
+            "Did you mean to use the module's member \
+            `{module_name_final_part}.{module_name_final_part}` instead?"
         ));
     }
 }

@@ -42,8 +42,7 @@ error[invalid-type-form]: Variable of type `<module 'datetime'>` is not allowed 
 3 | def f(x: datetime): ...  # error: [invalid-type-form]
   |          ^^^^^^^^
   |
-info: Module `datetime` has a member with a similar name that is valid in type expressions; perhaps you meant to use that?
-info: Try `datetime.datetime`
+info: Did you mean to use the module's member `datetime.datetime` instead?
 info: rule `invalid-type-form` is enabled by default
 
 ```
@@ -57,8 +56,7 @@ error[invalid-type-form]: Variable of type `<module 'PIL.Image'>` is not allowed
 3 | def g(x: Image): ...  # error: [invalid-type-form]
   |          ^^^^^
   |
-info: Module `Image` has a member with a similar name that is valid in type expressions; perhaps you meant to use that?
-info: Try `Image.Image`
+info: Did you mean to use the module's member `Image.Image` instead?
 info: rule `invalid-type-form` is enabled by default
 
 ```
