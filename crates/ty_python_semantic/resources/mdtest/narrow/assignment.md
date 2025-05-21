@@ -20,6 +20,11 @@ class C:
 
 def _():
     reveal_type(a.x)  # revealed: Unknown | int | None
+
+# error: [unresolved-reference]
+does.nt.exist = 0
+# error: [unresolved-reference]
+reveal_type(does.nt.exist)  # revealed: Unknown
 ```
 
 ### Do not narrow the type of a `property` by assignment
@@ -127,6 +132,11 @@ td = D(x=1, label="a")
 td["x"] = 0
 # TODO: should be Literal[0]
 reveal_type(td["x"])  # revealed: @Todo(TypedDict)
+
+# error: [unresolved-reference]
+does["not"]["exist"] = 0
+# error: [unresolved-reference]
+reveal_type(does["not"]["exist"])  # revealed: Unknown
 ```
 
 ### Do not narrow the result type of a customized subscript by assignment

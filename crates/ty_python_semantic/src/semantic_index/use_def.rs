@@ -14,10 +14,14 @@
 //!   `class` statements to also be declarations, so as to prohibit accidentally shadowing them.
 //!
 //! * A "place" is semantically a location where a value can be read or written,
-//!   and syntactically an expression that can be placed on the left-hand side of an assignment,
+//!   and syntactically, an expression that can be the target of an assignment,
 //!   e.g. `x`, `x[0]`, `x.y` (The term is borrowed from Rust). In Python syntax,
-//!   an expression like `f().x` is also allowed for left-hand side so it can be called a place,
+//!   an expression like `f().x` is also allowed as the target so it can be called a place,
 //!   but we do not record declarations / bindings like `f().x: int`, `f().x = ...`.
+//!   Type checking itself can be done by recording only assignments to names,
+//!   but in order to perform type narrowing by attributes/subscripts assignments, they must also be recorded.
+//!   We also record assignments to invalid places since whether a place expression is valid
+//!   is determined during type inference, but invalid assignments do not affect type narrowing.
 //!
 //! Annotated assignments with a right-hand side, and annotated function parameters, are both
 //! bindings and declarations.

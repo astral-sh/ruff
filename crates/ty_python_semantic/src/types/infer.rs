@@ -5804,6 +5804,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let db = self.db();
 
+        // If `attribute` is a valid reference, we attempt type narrowing by assignment.
         if let Ok(place_expr) = PlaceExpr::try_from(attribute) {
             let member = value_type.class_member(db, attr.id.clone());
             let member_is_property = member.place.ignore_possibly_unbound().is_some_and(|ty| {
@@ -5818,8 +5819,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 value_type,
                 value_type.to_meta_type(db),
             );
-            // If the value class defines `__get__/__set__`, the value most recently assigned
+            // If the member is a property or a descriptor, the value most recently assigned
             // to the attribute may not necessarily be obtained here.
+            // If an attribute is unresolved, its type is `Unknown` and it can be considered as a `DataDescriptor`,
+            // so it will be automatically excluded from narrowing.
             if !member_is_property && !kind.is_data() {
                 let (resolved, _) =
                     self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
@@ -7207,30 +7210,34 @@ impl<'db> TypeInferenceBuilder<'db> {
         let db = self.db();
         let value_ty = self.infer_expression(value);
 
-        if let Ok(expr) = PlaceExpr::try_from(subscript) {
-            // Type narrowing based on assignment to a subscript expression is generally unsound,
-            // because `__getitem__`/`__setitem__` of a user-defined class does not guarantee that the passed value is stored and can be retrieved as is.
-            // Currently, we only perform assignment-based narrowing on a few built-in classes and their subclasses
-            // where we are confident that this kind of narrowing can be performed soundly. This is the same approach as pyright.
-            let safe_mutable_classes = [
-                KnownClass::List.to_instance(db),
-                KnownClass::Dict.to_instance(db),
-                KnownClass::Bytearray.to_instance(db),
-                Type::KnownInstance(KnownInstanceType::ChainMap),
-                Type::KnownInstance(KnownInstanceType::Counter),
-                Type::KnownInstance(KnownInstanceType::DefaultDict),
-                Type::KnownInstance(KnownInstanceType::Deque),
-                Type::KnownInstance(KnownInstanceType::OrderedDict),
-                Type::KnownInstance(KnownInstanceType::TypedDict),
-            ];
-            if safe_mutable_classes
-                .iter()
-                .any(|class| value_ty.is_assignable_to(db, *class))
-            {
-                let (place, _) = self.infer_place_load(&expr, ast::ExprRef::Subscript(subscript));
-                if let Place::Type(ty, Boundness::Bound) = place.place {
-                    self.infer_expression(slice);
-                    return ty;
+        // If `value` is a valid reference, we attempt type narrowing by assignment.
+        if !value_ty.is_unknown() {
+            if let Ok(expr) = PlaceExpr::try_from(subscript) {
+                // Type narrowing based on assignment to a subscript expression is generally unsound,
+                // because `__getitem__`/`__setitem__` of a user-defined class does not guarantee that the passed value is stored and can be retrieved as is.
+                // Currently, we only perform assignment-based narrowing on a few built-in classes and their subclasses
+                // where we are confident that this kind of narrowing can be performed soundly. This is the same approach as pyright.
+                let safe_mutable_classes = [
+                    KnownClass::List.to_instance(db),
+                    KnownClass::Dict.to_instance(db),
+                    KnownClass::Bytearray.to_instance(db),
+                    Type::KnownInstance(KnownInstanceType::ChainMap),
+                    Type::KnownInstance(KnownInstanceType::Counter),
+                    Type::KnownInstance(KnownInstanceType::DefaultDict),
+                    Type::KnownInstance(KnownInstanceType::Deque),
+                    Type::KnownInstance(KnownInstanceType::OrderedDict),
+                    Type::KnownInstance(KnownInstanceType::TypedDict),
+                ];
+                if safe_mutable_classes
+                    .iter()
+                    .any(|class| value_ty.is_assignable_to(db, *class))
+                {
+                    let (place, _) =
+                        self.infer_place_load(&expr, ast::ExprRef::Subscript(subscript));
+                    if let Place::Type(ty, Boundness::Bound) = place.place {
+                        self.infer_expression(slice);
+                        return ty;
+                    }
                 }
             }
         }
