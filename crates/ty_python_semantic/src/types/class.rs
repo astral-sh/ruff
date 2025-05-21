@@ -1738,9 +1738,15 @@ impl<'db> ClassLiteral<'db> {
             let declared_and_qualifiers = symbol_from_declarations(db, declarations);
             match declared_and_qualifiers {
                 Ok(SymbolAndQualifiers {
-                    symbol: declared @ Symbol::Type(declared_ty, declaredness),
+                    symbol: mut declared @ Symbol::Type(declared_ty, declaredness),
                     qualifiers,
                 }) => {
+                    // For the purpose of finding instance attributes, ignore `ClassVar`
+                    // declarations:
+                    if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                        declared = Symbol::Unbound;
+                    }
+
                     // The attribute is declared in the class body.
 
                     let bindings = use_def.public_bindings(symbol_id);
