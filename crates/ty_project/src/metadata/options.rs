@@ -11,7 +11,8 @@ use std::fmt::Debug;
 use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    ProgramSettings, PythonPath, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
+    ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
+    SearchPathSettings,
 };
 
 use super::settings::{Settings, TerminalSettings};
@@ -96,17 +97,14 @@ impl Options {
             .environment
             .as_ref()
             .and_then(|env| env.python_version.as_ref())
-            .map(|ranged_version| {
-                PythonVersionWithSource::new(
-                    ranged_version.inner_copied(),
-                    match ranged_version.source() {
-                        ValueSource::Cli => ty_python_semantic::ValueSource::Cli,
-                        ValueSource::File(path) => ty_python_semantic::ValueSource::File(
-                            path.clone(),
-                            ranged_version.range(),
-                        ),
-                    },
-                )
+            .map(|ranged_version| PythonVersionWithSource {
+                version: ranged_version.inner_copied(),
+                source: match ranged_version.source() {
+                    ValueSource::Cli => PythonVersionSource::Cli,
+                    ValueSource::File(path) => {
+                        PythonVersionSource::File(path.clone(), ranged_version.range())
+                    }
+                },
             })
             .unwrap_or_default();
         let python_platform = self

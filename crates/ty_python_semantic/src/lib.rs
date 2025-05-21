@@ -8,7 +8,8 @@ pub use db::Db;
 pub use module_name::ModuleName;
 pub use module_resolver::{KnownModule, Module, resolve_module, system_module_search_paths};
 pub use program::{
-    Program, ProgramSettings, PythonPath, PythonVersionWithSource, SearchPathSettings, ValueSource,
+    Program, ProgramSettings, PythonPath, PythonVersionSource, PythonVersionWithSource,
+    SearchPathSettings,
 };
 pub use python_platform::PythonPlatform;
 pub use semantic_model::{HasType, SemanticModel};

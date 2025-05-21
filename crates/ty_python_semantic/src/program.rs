@@ -51,10 +51,6 @@ impl Program {
         self.python_version_with_source(db).version
     }
 
-    pub fn python_version_source(self, db: &dyn Db) -> &ValueSource {
-        &self.python_version_with_source(db).source
-    }
-
     pub fn update_from_settings(
         self,
         db: &mut dyn Db,
@@ -110,7 +106,7 @@ pub struct ProgramSettings {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
-pub enum ValueSource {
+pub enum PythonVersionSource {
     /// Value loaded from a project's configuration file.
     File(Arc<SystemPathBuf>, Option<TextRange>),
 
@@ -126,22 +122,16 @@ pub enum ValueSource {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct PythonVersionWithSource {
-    version: PythonVersion,
+    pub version: PythonVersion,
     #[cfg_attr(feature = "serde", serde(skip))]
-    source: ValueSource,
-}
-
-impl PythonVersionWithSource {
-    pub fn new(version: PythonVersion, source: ValueSource) -> Self {
-        Self { version, source }
-    }
+    pub source: PythonVersionSource,
 }
 
 impl Default for PythonVersionWithSource {
     fn default() -> Self {
         Self {
             version: PythonVersion::latest_ty(),
-            source: ValueSource::Default,
+            source: PythonVersionSource::Default,
         }
     }
 }

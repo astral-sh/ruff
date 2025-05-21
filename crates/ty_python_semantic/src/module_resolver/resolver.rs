@@ -1435,7 +1435,9 @@ mod tests {
     fn symlink() -> anyhow::Result<()> {
         use anyhow::Context;
 
-        use crate::{PythonPlatform, PythonVersionWithSource, program::Program};
+        use crate::{
+            PythonPlatform, PythonVersionSource, PythonVersionWithSource, program::Program,
+        };
         use ruff_db::system::{OsSystem, SystemPath};
 
         use crate::db::tests::TestDb;
@@ -1468,10 +1470,10 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersionWithSource::new(
-                    PythonVersion::PY38,
-                    crate::ValueSource::default(),
-                ),
+                python_version: PythonVersionWithSource {
+                    version: PythonVersion::PY38,
+                    source: PythonVersionSource::default(),
+                },
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],

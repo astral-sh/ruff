@@ -11,7 +11,7 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{KnownFunction, KnownInstanceType, Type, protocol_class::ProtocolClassLiteral};
-use crate::{Program, declare_lint};
+use crate::{Program, PythonVersionWithSource, declare_lint};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
 use ruff_db::files::system_path_to_file;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -1672,38 +1672,35 @@ pub(super) fn report_possibly_unbound_attribute(
 
 pub(super) fn add_inferred_python_version_hint(db: &dyn Db, mut diagnostic: LintDiagnosticGuard) {
     let program = Program::get(db);
-    let python_version = program.python_version(db);
-    let python_version_source = program.python_version_source(db);
+    let PythonVersionWithSource { version, source } = program.python_version_with_source(db);
 
-    match python_version_source {
-        crate::ValueSource::Cli => {
+    match source {
+        crate::PythonVersionSource::Cli => {
             diagnostic.info(format_args!(
-                "Python {python_version} was assumed when resolving types because it was specified on the command line",
+                "Python {version} was assumed when resolving types because it was specified on the command line",
             ));
         }
-        crate::ValueSource::File(path, range) => {
+        crate::PythonVersionSource::File(path, range) => {
             if let Ok(file) = system_path_to_file(db.upcast(), &**path) {
                 let mut sub_diagnostic = SubDiagnostic::new(
                     Severity::Info,
-                    format_args!("Python {python_version} was assumed when resolving types"),
+                    format_args!("Python {version} was assumed when resolving types"),
                 );
                 sub_diagnostic.annotate(
                     Annotation::primary(Span::from(file).with_optional_range(*range)).message(
-                        format_args!(
-                            "Python {python_version} assumed due to this configuration setting"
-                        ),
+                        format_args!("Python {version} assumed due to this configuration setting"),
                     ),
                 );
                 diagnostic.sub(sub_diagnostic);
             } else {
                 diagnostic.info(format_args!(
-                    "Python {python_version} was assumed when resolving types because of your configuration file(s)",
+                    "Python {version} was assumed when resolving types because of your configuration file(s)",
                 ));
             }
         }
-        crate::ValueSource::Default => {
+        crate::PythonVersionSource::Default => {
             diagnostic.info(format_args!(
-                "Python {python_version} was assumed when resolving types \
+                "Python {version} was assumed when resolving types \
                 because it is the newest Python version supported by ty, \
                 and neither a command-line argument nor a configuration setting was provided",
             ));

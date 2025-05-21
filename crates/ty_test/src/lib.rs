@@ -19,8 +19,8 @@ use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionWithSource,
-    SearchPathSettings, SysPrefixPathOrigin,
+    Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource,
+    PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
 };
 
 mod assertion;
@@ -261,10 +261,10 @@ fn run_test(
     let configuration = test.configuration();
 
     let settings = ProgramSettings {
-        python_version: PythonVersionWithSource::new(
-            python_version,
-            ty_python_semantic::ValueSource::Cli,
-        ),
+        python_version: PythonVersionWithSource {
+            version: python_version,
+            source: PythonVersionSource::Cli,
+        },
         python_platform: configuration
             .python_platform()
             .unwrap_or(PythonPlatform::Identifier("linux".to_string())),
