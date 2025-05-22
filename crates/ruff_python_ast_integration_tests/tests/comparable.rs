@@ -1,6 +1,7 @@
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_parser::{ParseError, parse_expression};
 
+#[track_caller]
 fn assert_comparable(left: &str, right: &str) -> Result<(), ParseError> {
     let left_parsed = parse_expression(left)?;
     let right_parsed = parse_expression(right)?;
@@ -12,6 +13,7 @@ fn assert_comparable(left: &str, right: &str) -> Result<(), ParseError> {
     Ok(())
 }
 
+#[track_caller]
 fn assert_noncomparable(left: &str, right: &str) -> Result<(), ParseError> {
     let left_parsed = parse_expression(left)?;
     let right_parsed = parse_expression(right)?;
