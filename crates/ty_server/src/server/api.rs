@@ -3,17 +3,19 @@ use crate::session::Session;
 use crate::system::{AnySystemPath, url_to_any_system_path};
 use anyhow::anyhow;
 use lsp_server as server;
+use lsp_server::RequestId;
 use lsp_types::notification::Notification;
+use std::panic::UnwindSafe;
 
 mod diagnostics;
 mod notifications;
 mod requests;
 mod traits;
 
+use self::traits::{NotificationHandler, RequestHandler};
 use notifications as notification;
 use requests as request;
-
-use self::traits::{NotificationHandler, RequestHandler};
+use ruff_db::panic::PanicError;
 
 use super::{Result, client::Responder, schedule::BackgroundSchedule};
 
@@ -103,23 +105,25 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
 
 fn _local_request_task<'a, R: traits::SyncRequestHandler>(
     req: server::Request,
-) -> super::Result<Task<'a>> {
+) -> super::Result<Task<'a>>
+where
+    <<R as RequestHandler>::RequestType as lsp_types::request::Request>::Params: UnwindSafe,
+{
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::local(|session, notifier, requester, responder| {
-        let _span = tracing::trace_span!("request", %id, method = R::METHOD).entered();
+        let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
         let result = R::run(session, notifier, requester, params);
         respond::<R>(id, result, &responder);
     }))
 }
 
-// TODO(micha): Calls to `db` could panic if the db gets mutated while this task is running.
-// We should either wrap `R::run_with_snapshot` with a salsa catch cancellation handler or
-// use `SemanticModel` instead of passing `db` which uses a Result for all it's methods
-// that propagate cancellations.
 fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
     req: server::Request,
     schedule: BackgroundSchedule,
-) -> super::Result<Task<'a>> {
+) -> super::Result<Task<'a>>
+where
+    <<R as RequestHandler>::RequestType as lsp_types::request::Request>::Params: UnwindSafe,
+{
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         let url = R::document_url(&params).into_owned();
@@ -128,6 +132,7 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
             tracing::warn!("Ignoring request for invalid `{url}`");
             return Box::new(|_, _| {});
         };
+
         let db = match &path {
             AnySystemPath::System(path) => match session.project_db_for_path(path.as_std_path()) {
                 Some(db) => db.clone(),
@@ -142,11 +147,47 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
         };
 
         Box::new(move |notifier, responder| {
-            let _span = tracing::trace_span!("request", %id, method = R::METHOD).entered();
-            let result = R::run_with_snapshot(&db, snapshot, notifier, params);
-            respond::<R>(id, result, &responder);
+            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+            let result = ruff_db::panic::catch_unwind(|| {
+                R::run_with_snapshot(&db, snapshot, notifier, params)
+            });
+
+            if let Some(response) = request_result_to_response(&id, &responder, result) {
+                respond::<R>(id, response, &responder);
+            }
         })
     }))
+}
+
+fn request_result_to_response<R>(
+    id: &RequestId,
+    responder: &Responder,
+    result: std::result::Result<Result<R>, PanicError>,
+) -> Option<Result<R>> {
+    match result {
+        Ok(response) => Some(response),
+        Err(error) => {
+            if error.payload.downcast_ref::<salsa::Cancelled>().is_some() {
+                // Request was cancelled by Salsa. TODO: Retry
+                respond_silent_error(
+                    id.clone(),
+                    responder,
+                    Error {
+                        code: lsp_server::ErrorCode::ContentModified,
+                        error: anyhow!("content modified"),
+                    },
+                );
+                None
+            } else {
+                let message = format!("request handler {error}");
+
+                Some(Err(Error {
+                    code: lsp_server::ErrorCode::InternalError,
+                    error: anyhow!(message),
+                }))
+            }
+        }
+    }
 }
 
 fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
@@ -154,7 +195,7 @@ fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::local(move |session, notifier, requester, _| {
-        let _span = tracing::trace_span!("notification", method = N::METHOD).entered();
+        let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
         if let Err(err) = N::run(session, notifier, requester, params) {
             tracing::error!("An error occurred while running {id}: {err}");
             show_err_msg!("ty encountered a problem. Check the logs for more details.");
@@ -163,10 +204,15 @@ fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
 }
 
 #[expect(dead_code)]
-fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationHandler>(
+fn background_notification_thread<'a, N>(
     req: server::Notification,
     schedule: BackgroundSchedule,
-) -> super::Result<Task<'a>> {
+) -> super::Result<Task<'a>>
+where
+    N: traits::BackgroundDocumentNotificationHandler,
+    <<N as NotificationHandler>::NotificationType as lsp_types::notification::Notification>::Params:
+        UnwindSafe,
+{
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         let url = N::document_url(&params);
@@ -177,8 +223,20 @@ fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationH
             return Box::new(|_, _| {});
         };
         Box::new(move |notifier, _| {
-            let _span = tracing::trace_span!("notification", method = N::METHOD).entered();
-            if let Err(err) = N::run_with_snapshot(snapshot, notifier, params) {
+            let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
+
+            let result = match ruff_db::panic::catch_unwind(|| {
+                N::run_with_snapshot(snapshot, notifier, params)
+            }) {
+                Ok(result) => result,
+                Err(panic) => {
+                    tracing::error!("An error occurred while running {id}: {panic}");
+                    show_err_msg!("ty encountered a problem. Check the logs for more details.");
+                    return;
+                }
+            };
+
+            if let Err(err) = result {
                 tracing::error!("An error occurred while running {id}: {err}");
                 show_err_msg!("ty encountered a problem. Check the logs for more details.");
             }
@@ -198,6 +256,7 @@ fn cast_request<Req>(
 )>
 where
     Req: traits::RequestHandler,
+    <<Req as RequestHandler>::RequestType as lsp_types::request::Request>::Params: UnwindSafe,
 {
     request
         .extract(Req::METHOD)
@@ -232,6 +291,14 @@ fn respond<Req>(
     }
 }
 
+/// Sends back an error response to the server using a [`Responder`] without showing a warning
+/// to the user.
+fn respond_silent_error(id: server::RequestId, responder: &Responder, error: Error) {
+    if let Err(err) = responder.respond::<()>(id, Err(error)) {
+        tracing::error!("Failed to send response: {err}");
+    }
+}
+
 /// Tries to cast a serialized request from the server into
 /// a parameter type for a specific request handler.
 fn cast_notification<N>(
@@ -240,7 +307,9 @@ fn cast_notification<N>(
     (
         &'static str,
         <<N as traits::NotificationHandler>::NotificationType as lsp_types::notification::Notification>::Params,
-)> where N: traits::NotificationHandler{
+    )> where
+    N: traits::NotificationHandler,
+{
     Ok((
         N::METHOD,
         notification

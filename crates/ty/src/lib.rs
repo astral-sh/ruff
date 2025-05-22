@@ -243,12 +243,14 @@ impl MainLoop {
                 MainLoopMessage::CheckWorkspace => {
                     let db = db.clone();
                     let sender = self.sender.clone();
-                    let mut reporter = R::default();
 
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
-                        match db.check_with_reporter(&mut reporter) {
+                        match salsa::Cancelled::catch(|| {
+                            let mut reporter = R::default();
+                            db.check_with_reporter(&mut reporter)
+                        }) {
                             Ok(result) => {
                                 // Send the result back to the main loop for printing.
                                 sender

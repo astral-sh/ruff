@@ -131,7 +131,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
     fn setup() -> Case {
         let case = setup_tomllib_case();
 
-        let result: Vec<_> = case.db.check().unwrap();
+        let result: Vec<_> = case.db.check();
 
         assert_diagnostics(&case.db, &result, EXPECTED_TOMLLIB_DIAGNOSTICS);
 
@@ -159,7 +159,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
             None,
         );
 
-        let result = db.check().unwrap();
+        let result = db.check();
 
         assert_eq!(result.len(), EXPECTED_TOMLLIB_DIAGNOSTICS.len());
     }
@@ -179,7 +179,7 @@ fn benchmark_cold(criterion: &mut Criterion) {
             setup_tomllib_case,
             |case| {
                 let Case { db, .. } = case;
-                let result: Vec<_> = db.check().unwrap();
+                let result: Vec<_> = db.check();
 
                 assert_diagnostics(db, &result, EXPECTED_TOMLLIB_DIAGNOSTICS);
             },
@@ -293,7 +293,7 @@ fn benchmark_many_string_assignments(criterion: &mut Criterion) {
             },
             |case| {
                 let Case { db, .. } = case;
-                let result = db.check().unwrap();
+                let result = db.check();
                 assert_eq!(result.len(), 0);
             },
             BatchSize::SmallInput,
@@ -339,7 +339,7 @@ fn benchmark_many_tuple_assignments(criterion: &mut Criterion) {
             },
             |case| {
                 let Case { db, .. } = case;
-                let result = db.check().unwrap();
+                let result = db.check();
                 assert_eq!(result.len(), 0);
             },
             BatchSize::SmallInput,
