@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-ISC.py:9:3: ISC003 Explicitly concatenated string should be implicitly concatenated
+ISC.py:9:3: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
  8 |   _ = (
  9 | /   "abc" +
@@ -9,8 +9,20 @@ ISC.py:9:3: ISC003 Explicitly concatenated string should be implicitly concatena
    | |_______^ ISC003
 11 |   )
    |
+   = help: Remove redundant '+' operator to implicitly concatenate
 
-ISC.py:14:3: ISC003 Explicitly concatenated string should be implicitly concatenated
+ℹ Safe fix
+6  6  |     "def"
+7  7  | 
+8  8  | _ = (
+9     |-  "abc" +
+10    |-  "def"
+   9  |+  "abc" "def"
+11 10 | )
+12 11 | 
+13 12 | _ = (
+
+ISC.py:14:3: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
 13 |   _ = (
 14 | /   f"abc" +
@@ -18,8 +30,20 @@ ISC.py:14:3: ISC003 Explicitly concatenated string should be implicitly concaten
    | |_______^ ISC003
 16 |   )
    |
+   = help: Remove redundant '+' operator to implicitly concatenate
 
-ISC.py:19:3: ISC003 Explicitly concatenated string should be implicitly concatenated
+ℹ Safe fix
+11 11 | )
+12 12 | 
+13 13 | _ = (
+14    |-  f"abc" +
+15    |-  "def"
+   14 |+  f"abc" "def"
+16 15 | )
+17 16 | 
+18 17 | _ = (
+
+ISC.py:19:3: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
 18 |   _ = (
 19 | /   b"abc" +
@@ -27,8 +51,20 @@ ISC.py:19:3: ISC003 Explicitly concatenated string should be implicitly concaten
    | |________^ ISC003
 21 |   )
    |
+   = help: Remove redundant '+' operator to implicitly concatenate
 
-ISC.py:78:10: ISC003 Explicitly concatenated string should be implicitly concatenated
+ℹ Safe fix
+16 16 | )
+17 17 | 
+18 18 | _ = (
+19    |-  b"abc" +
+20    |-  b"def"
+   19 |+  b"abc" b"def"
+21 20 | )
+22 21 | 
+23 22 | _ = (
+
+ISC.py:78:10: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
 77 |   # Explicitly concatenated nested f-strings
 78 |   _ = f"a {f"first"
@@ -38,8 +74,20 @@ ISC.py:78:10: ISC003 Explicitly concatenated string should be implicitly concate
 80 |   _ = f"a {f"first {f"middle"}"
 81 |       + f"second"} d"
    |
+   = help: Remove redundant '+' operator to implicitly concatenate
 
-ISC.py:80:10: ISC003 Explicitly concatenated string should be implicitly concatenated
+ℹ Safe fix
+75 75 |     f"def"} g"
+76 76 | 
+77 77 | # Explicitly concatenated nested f-strings
+78    |-_ = f"a {f"first"
+79    |-    + f"second"} d"
+   78 |+_ = f"a {f"first" f"second"} d"
+80 79 | _ = f"a {f"first {f"middle"}"
+81 80 |     + f"second"} d"
+82 81 | 
+
+ISC.py:80:10: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
 78 |   _ = f"a {f"first"
 79 |       + f"second"} d"
@@ -50,3 +98,15 @@ ISC.py:80:10: ISC003 Explicitly concatenated string should be implicitly concate
 82 |
 83 |   # See https://github.com/astral-sh/ruff/issues/12936
    |
+   = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+77 77 | # Explicitly concatenated nested f-strings
+78 78 | _ = f"a {f"first"
+79 79 |     + f"second"} d"
+80    |-_ = f"a {f"first {f"middle"}"
+81    |-    + f"second"} d"
+   80 |+_ = f"a {f'first {f"middle"}' f"second"} d"
+82 81 | 
+83 82 | # See https://github.com/astral-sh/ruff/issues/12936
+84 83 | _ = "\12""0" # fix should be "\0120"
