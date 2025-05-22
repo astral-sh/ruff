@@ -25,9 +25,17 @@ pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {
 #[derive(Clone)]
 pub struct ProjectDatabase {
     project: Option<Project>,
-    storage: salsa::Storage<ProjectDatabase>,
     files: Files,
+
+    // IMPORTANT: Never return clones of `system` outside `ProjectDatabase` (only return references)
+    // or the "trick" to get a mutable `Arc` in `Self::system_mut` is no longer guaranteed to work.
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
+
+    // IMPORTANT: This field must be the last because we use `zalsa_mut` (drops all other storage references)
+    // to drop all other references to the database, which gives us exclusive access to other `Arc`s stored on this db.
+    // However, for this to work it's important that the `storage` is dropped AFTER any `Arc` that
+    // we try to mutably borrow using `Arc::get_mut` (like `system`).
+    storage: salsa::Storage<ProjectDatabase>,
 }
 
 impl ProjectDatabase {
