@@ -187,14 +187,14 @@ impl Workspace {
     /// Checks a single file.
     #[wasm_bindgen(js_name = "checkFile")]
     pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<Diagnostic>, Error> {
-        let result = self.db.check_file(file_id.file).map_err(into_error)?;
+        let result = self.db.check_file(file_id.file);
 
         Ok(result.into_iter().map(Diagnostic::wrap).collect())
     }
 
     /// Checks all open files
     pub fn check(&self) -> Result<Vec<Diagnostic>, Error> {
-        let result = self.db.check().map_err(into_error)?;
+        let result = self.db.check();
 
         Ok(result.into_iter().map(Diagnostic::wrap).collect())
     }
