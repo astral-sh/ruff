@@ -6,8 +6,9 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FTStringElement, IpyEscapeKind,
-    Number, Operator, OperatorPrecedence, StringFlags, UnaryOp,
+    self as ast, AnyStringFlags, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FString,
+    FTStringElement, FTStringElements, IpyEscapeKind, Number, Operator, OperatorPrecedence,
+    StringFlags, TString, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -15,8 +16,7 @@ use crate::error::{FStringKind, StarTupleKind, UnparenthesizedNamedExprKind};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{FunctionKind, Parser, helpers};
 use crate::string::{
-    FTStringKind, InterpolatedString, StringType, parse_ftstring_literal_element,
-    parse_string_literal,
+    FTStringKind, StringType, parse_ftstring_literal_element, parse_string_literal,
 };
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
@@ -1204,9 +1204,13 @@ impl<'src> Parser<'src> {
             if self.at(TokenKind::String) {
                 strings.push(self.parse_string_or_byte_literal());
             } else if self.at(TokenKind::FStringStart) {
-                strings.push(StringType::FString(self.parse_ftstring()));
+                strings.push(StringType::FString(
+                    self.parse_ftstring(FTStringKind::FString).into(),
+                ));
             } else if self.at(TokenKind::TStringStart) {
-                strings.push(StringType::TString(self.parse_ftstring()));
+                strings.push(StringType::TString(
+                    self.parse_ftstring(FTStringKind::TString).into(),
+                ));
             }
         }
 
@@ -1440,14 +1444,14 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/grammar.html> (Search "fstring:" or "tstring:")
     /// See: <https://docs.python.org/3/reference/lexical_analysis.html#formatted-string-literals>
-    fn parse_ftstring<T: InterpolatedString>(&mut self) -> T {
+    fn parse_ftstring(&mut self, kind: FTStringKind) -> FTStringData {
         let start = self.node_start();
         let flags = self.tokens.current_flags().as_any_string_flags();
 
-        self.bump(T::start_token());
-        let elements = self.parse_ftstring_elements::<T>(flags, FTStringElementsKind::Regular);
+        self.bump(kind.start_token());
+        let elements = self.parse_ftstring_elements(flags, FTStringElementsKind::Regular, kind);
 
-        self.expect(T::end_token());
+        self.expect(kind.end_token());
 
         // test_ok pep701_f_string_py312
         // # parse_options: {"target-version": "3.12"}
@@ -1498,8 +1502,7 @@ impl<'src> Parser<'src> {
 
         let range = self.node_range(start);
 
-        if !self.options.target_version.supports_pep_701()
-            && matches!(T::kind(), FTStringKind::FString)
+        if !self.options.target_version.supports_pep_701() && matches!(kind, FTStringKind::FString)
         {
             let quote_bytes = flags.quote_str().as_bytes();
             let quote_len = flags.quote_len();
@@ -1527,7 +1530,11 @@ impl<'src> Parser<'src> {
             self.check_fstring_comments(range);
         }
 
-        T::new(elements, range, flags)
+        FTStringData {
+            elements,
+            range,
+            flags,
+        }
     }
 
     /// Check `range` for comment tokens and report an `UnsupportedSyntaxError` for each one found.
@@ -1542,68 +1549,74 @@ impl<'src> Parser<'src> {
             }));
     }
 
-    /// Parses a list of f-string elements.
+    /// Parses a list of f/t-string elements.
     ///
     /// # Panics
     ///
-    /// If the parser isn't positioned at a `{` or `FStringMiddle` token.
-    fn parse_ftstring_elements<T: InterpolatedString>(
+    /// If the parser isn't positioned at a `{`, `FStringMiddle`,
+    /// or `TStringMiddle` token.
+    fn parse_ftstring_elements(
         &mut self,
         flags: ast::AnyStringFlags,
-        kind: FTStringElementsKind,
+        elements_kind: FTStringElementsKind,
+        string_kind: FTStringKind,
     ) -> ast::FTStringElements {
         let mut elements = vec![];
-        let middle_token_kind = T::middle_token();
+        let middle_token_kind = string_kind.middle_token();
 
-        self.parse_list(RecoveryContextKind::FTStringElements(kind), |parser| {
-            let element = match parser.current_token_kind() {
-                TokenKind::Lbrace => {
-                    ast::FTStringElement::from(parser.parse_ftstring_expression_element::<T>(flags))
-                }
-                tok if tok == middle_token_kind => {
-                    let range = parser.current_token_range();
-                    let TokenValue::FTStringMiddle(value) = parser.bump_value(middle_token_kind)
-                    else {
-                        unreachable!()
-                    };
-                    FTStringElement::Literal(
-                        parse_ftstring_literal_element(value, flags, range).unwrap_or_else(
-                            |lex_error| {
-                                // test_err invalid_fstring_literal_element
-                                // f'hello \N{INVALID} world'
-                                // f"""hello \N{INVALID} world"""
-                                let location = lex_error.location();
-                                parser.add_error(
-                                    ParseErrorType::Lexical(lex_error.into_error()),
-                                    location,
-                                );
-                                ast::FTStringLiteralElement {
-                                    value: "".into(),
-                                    range,
-                                }
-                            },
-                        ),
-                    )
-                }
-                // `Invalid` tokens are created when there's a lexical error, so
-                // we ignore it here to avoid creating unexpected token errors
-                TokenKind::Unknown => {
-                    parser.bump_any();
-                    return;
-                }
-                tok => {
-                    // This should never happen because the list parsing will only
-                    // call this closure for the above token kinds which are the same
-                    // as in the FIRST set.
-                    unreachable!(
-                        "{}: unexpected token `{tok:?}` at {:?}",
-                        T::kind(),
-                        parser.current_token_range()
-                    );
-                }
-            };
-            elements.push(element);
-        });
+        self.parse_list(
+            RecoveryContextKind::FTStringElements(elements_kind),
+            |parser| {
+                let element = match parser.current_token_kind() {
+                    TokenKind::Lbrace => ast::FTStringElement::from(
+                        parser.parse_ftstring_expression_element(flags, string_kind),
+                    ),
+                    tok if tok == middle_token_kind => {
+                        let range = parser.current_token_range();
+                        let TokenValue::FTStringMiddle(value) =
+                            parser.bump_value(middle_token_kind)
+                        else {
+                            unreachable!()
+                        };
+                        FTStringElement::Literal(
+                            parse_ftstring_literal_element(value, flags, range).unwrap_or_else(
+                                |lex_error| {
+                                    // test_err invalid_fstring_literal_element
+                                    // f'hello \N{INVALID} world'
+                                    // f"""hello \N{INVALID} world"""
+                                    let location = lex_error.location();
+                                    parser.add_error(
+                                        ParseErrorType::Lexical(lex_error.into_error()),
+                                        location,
+                                    );
+                                    ast::FTStringLiteralElement {
+                                        value: "".into(),
+                                        range,
+                                    }
+                                },
+                            ),
+                        )
+                    }
+                    // `Invalid` tokens are created when there's a lexical error, so
+                    // we ignore it here to avoid creating unexpected token errors
+                    TokenKind::Unknown => {
+                        parser.bump_any();
+                        return;
+                    }
+                    tok => {
+                        // This should never happen because the list parsing will only
+                        // call this closure for the above token kinds which are the same
+                        // as in the FIRST set.
+                        unreachable!(
+                            "{}: unexpected token `{tok:?}` at {:?}",
+                            string_kind,
+                            parser.current_token_range()
+                        );
+                    }
+                };
+                elements.push(element);
+            },
+        );
 
         ast::FTStringElements::from(elements)
     }
@@ -1613,9 +1626,10 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `{` token.
-    fn parse_ftstring_expression_element<T: InterpolatedString>(
+    fn parse_ftstring_expression_element(
         &mut self,
         flags: ast::AnyStringFlags,
+        string_kind: FTStringKind,
     ) -> ast::FTStringInterpolatedElement {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
@@ -1657,7 +1671,7 @@ impl<'src> Parser<'src> {
             self.add_error(
                 ParseErrorType::from_ftstring_error(
                     FTStringErrorType::LambdaWithoutParentheses,
-                    T::kind(),
+                    string_kind,
                 ),
                 value.range(),
             );
@@ -1693,7 +1707,7 @@ impl<'src> Parser<'src> {
                         self.add_error(
                             ParseErrorType::from_ftstring_error(
                                 FTStringErrorType::InvalidConversionFlag,
-                                T::kind(),
+                                string_kind,
                             ),
                             conversion_flag_range,
                         );
@@ -1712,7 +1726,7 @@ impl<'src> Parser<'src> {
                 self.add_error(
                     ParseErrorType::from_ftstring_error(
                         FTStringErrorType::InvalidConversionFlag,
-                        T::kind(),
+                        string_kind,
                     ),
                     conversion_flag_range,
                 );
@@ -1727,7 +1741,7 @@ impl<'src> Parser<'src> {
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
             let elements =
-                self.parse_ftstring_elements::<T>(flags, FTStringElementsKind::FormatSpec);
+                self.parse_ftstring_elements(flags, FTStringElementsKind::FormatSpec, string_kind);
             Some(Box::new(ast::FTStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
@@ -1768,7 +1782,7 @@ impl<'src> Parser<'src> {
             // t"hello {x:"
             // t"hello {x:.3f"
             self.add_error(
-                ParseErrorType::from_ftstring_error(FTStringErrorType::UnclosedLbrace, T::kind()),
+                ParseErrorType::from_ftstring_error(FTStringErrorType::UnclosedLbrace, string_kind),
                 self.current_token_range(),
             );
         }
@@ -2853,6 +2867,33 @@ impl ExpressionContext {
             StarredExpressionPrecedence::BitwiseOr
         } else {
             StarredExpressionPrecedence::Conditional
+        }
+    }
+}
+
+#[derive(Debug)]
+struct FTStringData {
+    elements: FTStringElements,
+    range: TextRange,
+    flags: AnyStringFlags,
+}
+
+impl From<FTStringData> for FString {
+    fn from(value: FTStringData) -> Self {
+        Self {
+            elements: value.elements,
+            range: value.range,
+            flags: value.flags.into(),
+        }
+    }
+}
+
+impl From<FTStringData> for TString {
+    fn from(value: FTStringData) -> Self {
+        Self {
+            elements: value.elements,
+            range: value.range,
+            flags: value.flags.into(),
         }
     }
 }

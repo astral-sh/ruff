@@ -514,48 +514,6 @@ pub(crate) fn parse_ftstring_literal_element(
     StringParser::new(source, flags, range.start(), range).parse_ftstring_middle()
 }
 
-pub(crate) trait InterpolatedString {
-    fn kind() -> FTStringKind;
-    fn new(elements: ast::FTStringElements, range: TextRange, flags: ast::AnyStringFlags) -> Self;
-    fn start_token() -> TokenKind {
-        Self::kind().start_token()
-    }
-    fn middle_token() -> TokenKind {
-        Self::kind().middle_token()
-    }
-    fn end_token() -> TokenKind {
-        Self::kind().end_token()
-    }
-}
-
-impl InterpolatedString for ast::FString {
-    fn kind() -> FTStringKind {
-        FTStringKind::FString
-    }
-
-    fn new(elements: ast::FTStringElements, range: TextRange, flags: ast::AnyStringFlags) -> Self {
-        ast::FString {
-            elements,
-            range,
-            flags: flags.into(),
-        }
-    }
-}
-
-impl InterpolatedString for ast::TString {
-    fn kind() -> FTStringKind {
-        FTStringKind::TString
-    }
-
-    fn new(elements: ast::FTStringElements, range: TextRange, flags: ast::AnyStringFlags) -> Self {
-        ast::TString {
-            elements,
-            range,
-            flags: flags.into(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use ruff_python_ast::Suite;
