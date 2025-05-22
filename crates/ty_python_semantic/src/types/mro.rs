@@ -2,12 +2,13 @@ use std::collections::VecDeque;
 use std::ops::Deref;
 
 use indexmap::IndexMap;
+use itertools::Itertools;
 use rustc_hash::FxBuildHasher;
 
 use crate::Db;
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
-use crate::types::{ClassLiteral, ClassType, Type};
+use crate::types::{ClassLiteral, ClassType, KnownInstanceType, Type};
 
 /// The inferred method resolution order of a given class.
 ///
@@ -48,12 +49,12 @@ impl<'db> Mro<'db> {
     /// [`super::infer::TypeInferenceBuilder::infer_region_scope`].)
     pub(super) fn of_class(
         db: &'db dyn Db,
-        class: ClassLiteral<'db>,
+        class_literal: ClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Result<Self, MroError<'db>> {
-        Self::of_class_impl(db, class, specialization).map_err(|err| {
-            err.into_mro_error(db, class.apply_optional_specialization(db, specialization))
-        })
+        let class = class_literal.apply_optional_specialization(db, specialization);
+        Self::of_class_impl(db, class, class_literal.explicit_bases(db), specialization)
+            .map_err(|err| err.into_mro_error(db, class))
     }
 
     pub(super) fn from_error(db: &'db dyn Db, class: ClassType<'db>) -> Self {
@@ -66,17 +67,16 @@ impl<'db> Mro<'db> {
 
     fn of_class_impl(
         db: &'db dyn Db,
-        class: ClassLiteral<'db>,
+        class: ClassType<'db>,
+        bases: &[Type<'db>],
         specialization: Option<Specialization<'db>>,
     ) -> Result<Self, MroErrorKind<'db>> {
-        let class_type = class.apply_optional_specialization(db, specialization);
-
-        match class.explicit_bases(db) {
+        match bases {
             // `builtins.object` is the special case:
             // the only class in Python that has an MRO with length <2
             [] if class.is_object(db) => Ok(Self::from([
                 // object is not generic, so the default specialization should be a no-op
-                ClassBase::Class(class_type),
+                ClassBase::Class(class),
             ])),
 
             // All other classes in Python have an MRO with length >=2.
@@ -92,44 +92,101 @@ impl<'db> Mro<'db> {
             // >>> Foo.__mro__
             // (<class '__main__.Foo'>, <class 'object'>)
             // ```
-            [] => Ok(Self::from([
-                ClassBase::Class(class_type),
-                ClassBase::object(db),
-            ])),
+            [] => Ok(Self::from([ClassBase::Class(class), ClassBase::object(db)])),
 
             // Fast path for a class that has only a single explicit base.
             //
             // This *could* theoretically be handled by the final branch below,
             // but it's a common case (i.e., worth optimizing for),
             // and the `c3_merge` function requires lots of allocations.
-            [single_base] => ClassBase::try_from_type(db, *single_base).map_or_else(
-                || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
-                |single_base| {
-                    if single_base.has_cyclic_mro(db) {
-                        Err(MroErrorKind::InheritanceCycle)
-                    } else {
-                        Ok(std::iter::once(ClassBase::Class(
-                            class.apply_optional_specialization(db, specialization),
-                        ))
-                        .chain(single_base.mro(db, specialization))
-                        .collect())
-                    }
-                },
-            ),
+            [single_base]
+                if !matches!(
+                    single_base,
+                    Type::GenericAlias(_)
+                        | Type::KnownInstance(
+                            KnownInstanceType::Generic(_) | KnownInstanceType::Protocol(_)
+                        )
+                ) =>
+            {
+                ClassBase::try_from_type(db, *single_base).map_or_else(
+                    || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
+                    |single_base| {
+                        if single_base.has_cyclic_mro(db) {
+                            Err(MroErrorKind::InheritanceCycle)
+                        } else {
+                            Ok(std::iter::once(ClassBase::Class(class))
+                                .chain(single_base.mro(db, specialization))
+                                .collect())
+                        }
+                    },
+                )
+            }
 
             // The class has multiple explicit bases.
             //
             // We'll fallback to a full implementation of the C3-merge algorithm to determine
             // what MRO Python will give this class at runtime
             // (if an MRO is indeed resolvable at all!)
-            multiple_bases => {
-                let mut valid_bases = vec![];
+            original_bases => {
+                // First, convert the original bases of the class into the bases that
+                // will actually be used to create the MRO of the class. This emulates
+                // the behavior of `typing._GenericAlias.__mro_entries__` at
+                // <https://github.com/python/cpython/blob/ad42dc1909bdf8ec775b63fb22ed48ff42797a17/Lib/typing.py#L1214-L1244>.
+                let mut resolved_bases = vec![];
                 let mut invalid_bases = vec![];
 
-                for (i, base) in multiple_bases.iter().enumerate() {
-                    match ClassBase::try_from_type(db, *base) {
-                        Some(valid_base) => valid_bases.push(valid_base),
-                        None => invalid_bases.push((i, *base)),
+                for (i, base) in original_bases.iter().enumerate() {
+                    if let Type::KnownInstance(KnownInstanceType::Generic(Some(_))) = base {
+                        if original_bases
+                            .contains(&Type::KnownInstance(KnownInstanceType::Protocol(None)))
+                        {
+                            continue;
+                        }
+                        if original_bases[i + 1..]
+                            .iter()
+                            .any(|b| b.is_generic_alias() && b != base)
+                        {
+                            continue;
+                        }
+                        resolved_bases.push(ClassBase::Generic);
+                        continue;
+                    }
+
+                    let Type::GenericAlias(alias) = base else {
+                        match ClassBase::try_from_type(db, *base) {
+                            Some(valid_base) => resolved_bases.push(valid_base),
+                            None => invalid_bases.push((i, *base)),
+                        }
+                        continue;
+                    };
+
+                    if !original_bases.contains(&Type::ClassLiteral(alias.origin(db))) {
+                        resolved_bases.push(ClassBase::Class(ClassType::Generic(*alias)));
+                    }
+
+                    // Insert `Generic` into the MRO if none of the bases following us in the argument list
+                    // are either generic aliases or classes that have `Generic` in their MRO.
+                    let mut should_insert_generic = true;
+                    for b in &original_bases[i + 1..] {
+                        if b.is_generic_alias() {
+                            should_insert_generic = false;
+                            break;
+                        }
+                        // The MRO will be determined to be invalid; no point doing any more work in this loop.
+                        let Some(b) = ClassBase::try_from_type(db, *b) else {
+                            should_insert_generic = false;
+                            break;
+                        };
+                        if b.has_cyclic_mro(db) {
+                            return Err(MroErrorKind::InheritanceCycle);
+                        }
+                        if b.mro(db, None).contains(&ClassBase::Generic) {
+                            should_insert_generic = false;
+                            break;
+                        }
+                    }
+                    if should_insert_generic {
+                        resolved_bases.push(ClassBase::Generic);
                     }
                 }
 
@@ -137,15 +194,15 @@ impl<'db> Mro<'db> {
                     return Err(MroErrorKind::InvalidBases(invalid_bases.into_boxed_slice()));
                 }
 
-                let mut seqs = vec![VecDeque::from([ClassBase::Class(class_type)])];
-                for base in &valid_bases {
+                let mut seqs = vec![VecDeque::from([ClassBase::Class(class)])];
+                for base in &resolved_bases {
                     if base.has_cyclic_mro(db) {
                         return Err(MroErrorKind::InheritanceCycle);
                     }
                     seqs.push(base.mro(db, specialization).collect());
                 }
                 seqs.push(
-                    valid_bases
+                    resolved_bases
                         .iter()
                         .map(|base| base.apply_optional_specialization(db, specialization))
                         .collect(),
@@ -161,8 +218,11 @@ impl<'db> Mro<'db> {
                     let mut base_to_indices: IndexMap<ClassBase<'db>, Vec<usize>, FxBuildHasher> =
                         IndexMap::default();
 
-                    for (index, base) in valid_bases.iter().enumerate() {
-                        base_to_indices.entry(*base).or_default().push(index);
+                    for (index, base) in original_bases.iter().enumerate() {
+                        let Some(base) = ClassBase::try_from_type(db, *base) else {
+                            continue;
+                        };
+                        base_to_indices.entry(base).or_default().push(index);
                     }
 
                     let mut errors = vec![];
@@ -191,13 +251,10 @@ impl<'db> Mro<'db> {
 
                 if duplicate_bases.is_empty() {
                     if duplicate_dynamic_bases {
-                        Ok(Mro::from_error(
-                            db,
-                            class.apply_optional_specialization(db, specialization),
-                        ))
+                        Ok(Mro::from_error(db, class))
                     } else {
                         Err(MroErrorKind::UnresolvableMro {
-                            bases_list: valid_bases.into_boxed_slice(),
+                            bases_list: original_bases.iter().copied().collect(),
                         })
                     }
                 } else {
@@ -376,7 +433,7 @@ pub(super) enum MroErrorKind<'db> {
     /// The MRO is otherwise unresolvable through the C3-merge algorithm.
     ///
     /// See [`c3_merge`] for more details.
-    UnresolvableMro { bases_list: Box<[ClassBase<'db>]> },
+    UnresolvableMro { bases_list: Box<[Type<'db>]> },
 }
 
 impl<'db> MroErrorKind<'db> {

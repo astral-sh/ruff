@@ -39,31 +39,6 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    pub(crate) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
-        struct Display<'db> {
-            base: ClassBase<'db>,
-            db: &'db dyn Db,
-        }
-
-        impl std::fmt::Display for Display<'_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self.base {
-                    ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
-                    ClassBase::Class(class @ ClassType::NonGeneric(_)) => {
-                        write!(f, "<class '{}'>", class.name(self.db))
-                    }
-                    ClassBase::Class(ClassType::Generic(alias)) => {
-                        write!(f, "<class '{}'>", alias.display(self.db))
-                    }
-                    ClassBase::Protocol => f.write_str("typing.Protocol"),
-                    ClassBase::Generic => f.write_str("typing.Generic"),
-                }
-            }
-        }
-
-        Display { base: self, db }
-    }
-
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
             ClassBase::Class(class) => class.name(db),

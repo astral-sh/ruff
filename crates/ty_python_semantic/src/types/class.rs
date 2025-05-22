@@ -602,11 +602,6 @@ impl<'db> ClassLiteral<'db> {
         )
     }
 
-    /// Return `true` if this class represents the builtin class `object`
-    pub(crate) fn is_object(self, db: &'db dyn Db) -> bool {
-        self.is_known(db, KnownClass::Object)
-    }
-
     fn file(self, db: &dyn Db) -> File {
         self.body_scope(db).file(db)
     }
