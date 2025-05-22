@@ -1,11 +1,8 @@
 #![cfg(any(test, fuzzing))]
 //! Helper functions for the tests of rule implementations.
 
-use std::borrow::Cow;
-use std::path::Path;
-
 #[cfg(not(fuzzing))]
-use anyhow::Result;
+use anyhow::{Context, Result};
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
@@ -19,6 +16,11 @@ use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions};
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::SourceFileBuilder;
+use std::borrow::Cow;
+use std::ffi::OsStr;
+use std::fs;
+use std::path::Path;
+use tempfile::tempdir;
 
 use crate::codes::Rule;
 use crate::fix::{FixResult, fix_file};
@@ -47,6 +49,35 @@ pub(crate) fn test_path(
     let source_type = PySourceType::from(&path);
     let source_kind = SourceKind::from_path(path.as_ref(), source_type)?.expect("valid source");
     Ok(test_contents(&source_kind, &path, settings).0)
+}
+
+/// Like [`test_path`], but first copies the Python file to be the `__init__.py` of a package.
+#[cfg(not(fuzzing))]
+pub(crate) fn test_path_as_package_init(
+    path: impl AsRef<Path>,
+    settings: &LinterSettings,
+) -> Result<Vec<OldDiagnostic>> {
+    let package_name = path
+        .as_ref()
+        .file_stem()
+        .map(OsStr::to_string_lossy)
+        .unwrap_or("my_package".into());
+    let path = test_resource_path("fixtures").join(&path);
+
+    let temp_dir = tempdir().context("creating temp dir")?;
+    let package_dir = temp_dir.path().join(&*package_name);
+    println!("{}", package_dir.to_str().unwrap());
+    println!("{} {}", package_dir.exists(), package_dir.is_dir());
+    let package_init_path = package_dir.join("__init__.py");
+    fs::create_dir_all(&package_dir).context("creating my_package in tmp")?;
+    println!("{} {}", package_dir.exists(), package_dir.is_dir());
+    println!("{} {}", path.exists(), path.is_file());
+    fs::copy(&path, &package_init_path).context("copying into __init__.py in tmp")?;
+
+    let source_type = PySourceType::from(&package_init_path);
+    let source_kind =
+        SourceKind::from_path(package_init_path.as_ref(), source_type)?.expect("valid source");
+    Ok(test_contents(&source_kind, &package_init_path, settings).0)
 }
 
 #[cfg(not(fuzzing))]
