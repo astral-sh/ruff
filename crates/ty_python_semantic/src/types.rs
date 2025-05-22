@@ -65,6 +65,7 @@ mod context;
 mod diagnostic;
 mod display;
 mod generics;
+mod ide_support;
 mod infer;
 mod instance;
 mod mro;
@@ -7642,6 +7643,8 @@ pub enum KnownFunction {
     GenericContext,
     /// `ty_extensions.dunder_all_names`
     DunderAllNames,
+    /// `ty_extensions.all_members`
+    AllMembers,
 }
 
 impl KnownFunction {
@@ -7701,7 +7704,8 @@ impl KnownFunction {
             | Self::IsSubtypeOf
             | Self::GenericContext
             | Self::DunderAllNames
-            | Self::StaticAssert => module.is_ty_extensions(),
+            | Self::StaticAssert
+            | Self::AllMembers => module.is_ty_extensions(),
         }
     }
 }
@@ -9370,7 +9374,8 @@ pub(crate) mod tests {
                 | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
                 | KnownFunction::IsEquivalentTo
-                | KnownFunction::IsGradualEquivalentTo => KnownModule::TyExtensions,
+                | KnownFunction::IsGradualEquivalentTo
+                | KnownFunction::AllMembers => KnownModule::TyExtensions,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)
