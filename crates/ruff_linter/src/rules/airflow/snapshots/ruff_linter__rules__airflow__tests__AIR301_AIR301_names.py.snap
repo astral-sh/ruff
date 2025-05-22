@@ -77,9 +77,9 @@ AIR301_names.py:56:1: AIR301 `airflow.api_connexion.security.requires_access` is
 56 | requires_access
    | ^^^^^^^^^^^^^^^ AIR301
    |
-   = help: Use `airflow.api_connexion.security.requires_access_*` instead
+   = help: Use `airflow.api_fastapi.core_api.security.requires_access_*` instead
 
-AIR301_names.py:60:1: AIR301 `airflow.configuration.get` is removed in Airflow 3.0
+AIR301_names.py:60:1: AIR301 [*] `airflow.configuration.get` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -87,7 +87,25 @@ AIR301_names.py:60:1: AIR301 `airflow.configuration.get` is removed in Airflow 3
    |
    = help: Use `airflow.configuration.conf.get` instead
 
-AIR301_names.py:60:6: AIR301 `airflow.configuration.getboolean` is removed in Airflow 3.0
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+conf.get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
+
+AIR301_names.py:60:6: AIR301 [*] `airflow.configuration.getboolean` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -95,7 +113,25 @@ AIR301_names.py:60:6: AIR301 `airflow.configuration.getboolean` is removed in Ai
    |
    = help: Use `airflow.configuration.conf.getboolean` instead
 
-AIR301_names.py:60:18: AIR301 `airflow.configuration.getfloat` is removed in Airflow 3.0
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+get, conf.getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
+
+AIR301_names.py:60:18: AIR301 [*] `airflow.configuration.getfloat` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -103,7 +139,25 @@ AIR301_names.py:60:18: AIR301 `airflow.configuration.getfloat` is removed in Air
    |
    = help: Use `airflow.configuration.conf.getfloat` instead
 
-AIR301_names.py:60:28: AIR301 `airflow.configuration.getint` is removed in Airflow 3.0
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+get, getboolean, conf.getfloat, getint, has_option, remove_option, as_dict, set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
+
+AIR301_names.py:60:28: AIR301 [*] `airflow.configuration.getint` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -111,7 +165,25 @@ AIR301_names.py:60:28: AIR301 `airflow.configuration.getint` is removed in Airfl
    |
    = help: Use `airflow.configuration.conf.getint` instead
 
-AIR301_names.py:60:36: AIR301 `airflow.configuration.has_option` is removed in Airflow 3.0
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+get, getboolean, getfloat, conf.getint, has_option, remove_option, as_dict, set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
+
+AIR301_names.py:60:36: AIR301 [*] `airflow.configuration.has_option` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -119,7 +191,25 @@ AIR301_names.py:60:36: AIR301 `airflow.configuration.has_option` is removed in A
    |
    = help: Use `airflow.configuration.conf.has_option` instead
 
-AIR301_names.py:60:48: AIR301 `airflow.configuration.remove_option` is removed in Airflow 3.0
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+get, getboolean, getfloat, getint, conf.has_option, remove_option, as_dict, set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
+
+AIR301_names.py:60:48: AIR301 [*] `airflow.configuration.remove_option` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -127,7 +217,25 @@ AIR301_names.py:60:48: AIR301 `airflow.configuration.remove_option` is removed i
    |
    = help: Use `airflow.configuration.conf.remove_option` instead
 
-AIR301_names.py:60:63: AIR301 `airflow.configuration.as_dict` is removed in Airflow 3.0
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+get, getboolean, getfloat, getint, has_option, conf.remove_option, as_dict, set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
+
+AIR301_names.py:60:63: AIR301 [*] `airflow.configuration.as_dict` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -135,13 +243,49 @@ AIR301_names.py:60:63: AIR301 `airflow.configuration.as_dict` is removed in Airf
    |
    = help: Use `airflow.configuration.conf.as_dict` instead
 
-AIR301_names.py:60:72: AIR301 `airflow.configuration.set` is removed in Airflow 3.0
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+get, getboolean, getfloat, getint, has_option, remove_option, conf.as_dict, set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
+
+AIR301_names.py:60:72: AIR301 [*] `airflow.configuration.set` is removed in Airflow 3.0
    |
 59 | # airflow.configuration
 60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
    |                                                                        ^^^ AIR301
    |
    = help: Use `airflow.configuration.conf.set` instead
+
+ℹ Safe fix
+19 19 |     has_option,
+20 20 |     remove_option,
+21 21 |     set,
+   22 |+conf,
+22 23 | )
+23 24 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+24 25 | from airflow.datasets import DatasetAliasEvent
+--------------------------------------------------------------------------------
+57 58 | 
+58 59 | 
+59 60 | # airflow.configuration
+60    |-get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   61 |+get, getboolean, getfloat, getint, has_option, remove_option, as_dict, conf.set
+61 62 | 
+62 63 | 
+63 64 | # airflow.contrib.*
 
 AIR301_names.py:64:1: AIR301 `airflow.contrib.aws_athena_hook.AWSAthenaHook` is removed in Airflow 3.0
    |
@@ -191,20 +335,20 @@ AIR301_names.py:89:1: AIR301 `airflow.triggers.external_task.TaskStateTrigger` i
 91 | # airflow.utils.date
    |
 
-AIR301_names.py:92:7: AIR301 `airflow.utils.dates.date_range` is removed in Airflow 3.0
+AIR301_names.py:92:1: AIR301 `airflow.utils.dates.date_range` is removed in Airflow 3.0
    |
 91 | # airflow.utils.date
 92 | dates.date_range
-   |       ^^^^^^^^^^ AIR301
+   | ^^^^^^^^^^^^^^^^ AIR301
 93 | dates.days_ago
    |
 
-AIR301_names.py:93:7: AIR301 `airflow.utils.dates.days_ago` is removed in Airflow 3.0
+AIR301_names.py:93:1: AIR301 `airflow.utils.dates.days_ago` is removed in Airflow 3.0
    |
 91 | # airflow.utils.date
 92 | dates.date_range
 93 | dates.days_ago
-   |       ^^^^^^^^ AIR301
+   | ^^^^^^^^^^^^^^ AIR301
 94 |
 95 | date_range
    |
@@ -399,20 +543,20 @@ AIR301_names.py:129:1: AIR301 `airflow.utils.state.terminating_states` is remove
 131 | #  airflow.utils.trigger_rule
     |
 
-AIR301_names.py:132:13: AIR301 `airflow.utils.trigger_rule.TriggerRule.DUMMY` is removed in Airflow 3.0
+AIR301_names.py:132:1: AIR301 `airflow.utils.trigger_rule.TriggerRule.DUMMY` is removed in Airflow 3.0
     |
 131 | #  airflow.utils.trigger_rule
 132 | TriggerRule.DUMMY
-    |             ^^^^^ AIR301
+    | ^^^^^^^^^^^^^^^^^ AIR301
 133 | TriggerRule.NONE_FAILED_OR_SKIPPED
     |
 
-AIR301_names.py:133:13: AIR301 `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
+AIR301_names.py:133:1: AIR301 `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
     |
 131 | #  airflow.utils.trigger_rule
 132 | TriggerRule.DUMMY
 133 | TriggerRule.NONE_FAILED_OR_SKIPPED
-    |             ^^^^^^^^^^^^^^^^^^^^^^ AIR301
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
     |
 
 AIR301_names.py:137:1: AIR301 `airflow.www.auth.has_access` is removed in Airflow 3.0
@@ -423,7 +567,6 @@ AIR301_names.py:137:1: AIR301 `airflow.www.auth.has_access` is removed in Airflo
 138 |
 139 | # airflow.www.utils
     |
-    = help: Use `airflow.www.auth.has_access_*` instead
 
 AIR301_names.py:140:1: AIR301 `airflow.www.utils.get_sensitive_variables_fields` is removed in Airflow 3.0
     |
@@ -432,7 +575,6 @@ AIR301_names.py:140:1: AIR301 `airflow.www.utils.get_sensitive_variables_fields`
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
 141 | should_hide_value_for_key
     |
-    = help: Use `airflow.utils.log.secrets_masker.get_sensitive_variables_fields` instead
 
 AIR301_names.py:141:1: AIR301 `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0
     |
@@ -443,7 +585,6 @@ AIR301_names.py:141:1: AIR301 `airflow.www.utils.should_hide_value_for_key` is r
 142 |
 143 | # airflow.operators.python
     |
-    = help: Use `airflow.utils.log.secrets_masker.should_hide_value_for_key` instead
 
 AIR301_names.py:146:1: AIR301 `airflow.operators.python.get_current_context` is removed in Airflow 3.0
     |
@@ -484,5 +625,27 @@ AIR301_names.py:161:1: AIR301 `airflow.providers.trino.datasets.trino.sanitize_u
 160 |
 161 | sanitize_uri
     | ^^^^^^^^^^^^ AIR301
+162 |
+163 | # airflow.notifications.basenotifier
     |
     = help: Use `airflow.providers.trino.assets.trino.sanitize_uri` instead
+
+AIR301_names.py:166:1: AIR301 `airflow.notifications.basenotifier.BaseNotifier` is removed in Airflow 3.0
+    |
+164 | from airflow.notifications.basenotifier import BaseNotifier
+165 |
+166 | BaseNotifier()
+    | ^^^^^^^^^^^^ AIR301
+167 |
+168 | # airflow.auth.manager
+    |
+    = help: Use `airflow.sdk.bases.notifier.BaseNotifier` instead
+
+AIR301_names.py:171:1: AIR301 `airflow.auth.managers.base_auth_manager.BaseAuthManager` is removed in Airflow 3.0
+    |
+169 | from airflow.auth.managers.base_auth_manager import BaseAuthManager
+170 |
+171 | BaseAuthManager()
+    | ^^^^^^^^^^^^^^^ AIR301
+    |
+    = help: Use `airflow.api_fastapi.auth.managers.base_auth_manager.BaseAuthManager` instead

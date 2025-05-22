@@ -34,6 +34,10 @@ use crate::line_width::LineWidthBuilder;
 /// return any(predicate(item) for item in iterable)
 /// ```
 ///
+/// # Fix safety
+///
+/// This fix is always marked as unsafe because it might remove comments.
+///
 /// ## References
 /// - [Python documentation: `any`](https://docs.python.org/3/library/functions.html#any)
 /// - [Python documentation: `all`](https://docs.python.org/3/library/functions.html#all)

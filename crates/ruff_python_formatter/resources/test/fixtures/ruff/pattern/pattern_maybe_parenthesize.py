@@ -288,5 +288,13 @@ match x:
     ]:
         pass
 
-
+match a, b:
+    case [], []:
+        ...
+    case [], _:
+        ...
+    case _, []:
+        ...
+    case _, _:
+        ...
 

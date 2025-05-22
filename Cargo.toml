@@ -3,6 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
+# Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
 rust-version = "1.85"
 homepage = "https://docs.astral.sh/ruff"
@@ -52,7 +53,7 @@ anstyle = { version = "1.0.10" }
 anyhow = { version = "1.0.80" }
 assert_fs = { version = "1.1.0" }
 argfile = { version = "0.2.0" }
-bincode = { version = "1.3.3" }
+bincode = { version = "2.0.0" }
 bitflags = { version = "2.5.0" }
 bstr = { version = "1.9.1" }
 cachedir = { version = "0.3.1" }
@@ -66,7 +67,7 @@ console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
 countme = { version = "3.0.1" }
 compact_str = "0.9.0"
-criterion = { version = "0.5.1", default-features = false }
+criterion = { version = "0.6.0", default-features = false }
 crossbeam = { version = "0.8.4" }
 dashmap = { version = "6.0.1" }
 dir-test = { version = "0.4.0" }
@@ -99,7 +100,7 @@ is-wsl = { version = "0.4.0" }
 itertools = { version = "0.14.0" }
 jiff = { version = "0.2.0" }
 js-sys = { version = "0.3.69" }
-jod-thread = { version = "0.1.2" }
+jod-thread = { version = "1.0.0" }
 libc = { version = "0.2.153" }
 libcst = { version = "1.1.0", default-features = false }
 log = { version = "0.4.17" }
@@ -128,7 +129,7 @@ regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "7edce6e248f35c8114b4b021cdb474a3fb2813b3" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "4818b15f3b7516555d39f5a41cb75970448bee4c" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }

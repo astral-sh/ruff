@@ -159,3 +159,13 @@ sanitize_uri
 from airflow.providers.trino.datasets.trino import sanitize_uri
 
 sanitize_uri
+
+# airflow.notifications.basenotifier
+from airflow.notifications.basenotifier import BaseNotifier
+
+BaseNotifier()
+
+# airflow.auth.manager
+from airflow.auth.managers.base_auth_manager import BaseAuthManager
+
+BaseAuthManager()

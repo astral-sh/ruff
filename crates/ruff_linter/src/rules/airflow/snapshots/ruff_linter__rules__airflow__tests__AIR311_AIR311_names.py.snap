@@ -328,6 +328,16 @@ AIR311_names.py:56:1: AIR311 `airflow.models.baseoperator.cross_downstream` is r
    |
    = help: Use `airflow.sdk.cross_downstream` instead
 
+AIR311_names.py:59:1: AIR311 `airflow.models.baseoperatorlink.BaseOperatorLink` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   |
+58 | # airflow.models.baseoperatolinker
+59 | BaseOperatorLink()
+   | ^^^^^^^^^^^^^^^^ AIR311
+60 |
+61 | # airflow.models.dag
+   |
+   = help: Use `airflow.sdk.definitions.baseoperatorlink.BaseOperatorLink` instead
+
 AIR311_names.py:62:1: AIR311 [*] `airflow.models.dag.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 61 | # airflow.models.dag

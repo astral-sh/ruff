@@ -34,8 +34,8 @@ pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
     ) -> std::borrow::Cow<lsp_types::Url>;
 
     fn run_with_snapshot(
+        db: &ProjectDatabase,
         snapshot: DocumentSnapshot,
-        db: ProjectDatabase,
         notifier: Notifier,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;

@@ -36,6 +36,7 @@ error[unresolved-import]: Cannot resolve imported module `a.foo`
 3 |
 4 | # Topmost component unresolvable:
   |
+info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
 info: rule `unresolved-import` is enabled by default
 
 ```
@@ -48,6 +49,7 @@ error[unresolved-import]: Cannot resolve imported module `b.foo`
 5 | import b.foo  # error: [unresolved-import] "Cannot resolve imported module `b.foo`"
   |        ^^^^^
   |
+info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
 info: rule `unresolved-import` is enabled by default
 
 ```

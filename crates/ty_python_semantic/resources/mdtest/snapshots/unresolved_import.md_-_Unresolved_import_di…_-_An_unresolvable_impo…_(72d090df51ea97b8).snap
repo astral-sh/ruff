@@ -28,6 +28,7 @@ error[unresolved-import]: Cannot resolve imported module `does_not_exist`
 2 |
 3 | x = does_not_exist.foo
   |
+info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
 info: rule `unresolved-import` is enabled by default
 
 ```

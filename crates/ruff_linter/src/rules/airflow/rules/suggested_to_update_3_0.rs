@@ -112,11 +112,14 @@ pub(crate) fn airflow_3_0_suggested_update_expr(checker: &Checker, expr: &Expr) 
 /// Check if the `deprecated` keyword argument is being used and create a diagnostic if so along
 /// with a possible `replacement`.
 fn diagnostic_for_argument(
+    checker: &Checker,
     arguments: &Arguments,
     deprecated: &str,
     replacement: Option<&'static str>,
-) -> Option<Diagnostic> {
-    let keyword = arguments.find_keyword(deprecated)?;
+) {
+    let Some(keyword) = arguments.find_keyword(deprecated) else {
+        return;
+    };
     let mut diagnostic = Diagnostic::new(
         Airflow3SuggestedUpdate {
             deprecated: deprecated.to_string(),
@@ -138,7 +141,7 @@ fn diagnostic_for_argument(
         )));
     }
 
-    Some(diagnostic)
+    checker.report_diagnostic(diagnostic);
 }
 /// Check whether a removed Airflow argument is passed.
 ///
@@ -152,15 +155,11 @@ fn diagnostic_for_argument(
 fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, arguments: &Arguments) {
     match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
-            checker.report_diagnostics(diagnostic_for_argument(
-                arguments,
-                "sla_miss_callback",
-                None,
-            ));
+            diagnostic_for_argument(checker, arguments, "sla_miss_callback", None);
         }
         segments => {
             if is_airflow_builtin_or_provider(segments, "operators", "Operator") {
-                checker.report_diagnostics(diagnostic_for_argument(arguments, "sla", None));
+                diagnostic_for_argument(checker, arguments, "sla", None);
             }
         }
     }
@@ -248,16 +247,18 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.models.baseoperator
-        ["airflow", "models", "baseoperator", rest] => match *rest {
-            "chain" | "chain_linear" | "cross_downstream" => Replacement::SourceModuleMoved {
-                module: "airflow.sdk",
-                name: (*rest).to_string(),
-            },
-            "BaseOperatorLink" => Replacement::AutoImport {
-                module: "airflow.sdk.definitions.baseoperatorlink",
-                name: "BaseOperatorLink",
-            },
-            _ => return,
+        [
+            "airflow",
+            "models",
+            "baseoperator",
+            rest @ ("chain" | "chain_linear" | "cross_downstream"),
+        ] => Replacement::SourceModuleMoved {
+            module: "airflow.sdk",
+            name: (*rest).to_string(),
+        },
+        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => Replacement::AutoImport {
+            module: "airflow.sdk.definitions.baseoperatorlink",
+            name: "BaseOperatorLink",
         },
         // airflow.model..DAG
         ["airflow", "models", .., "DAG"] => Replacement::SourceModuleMoved {

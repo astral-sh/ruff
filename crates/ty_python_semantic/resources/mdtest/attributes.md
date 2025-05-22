@@ -777,6 +777,30 @@ reveal_type(C.variable_with_class_default1)  # revealed: str
 reveal_type(c_instance.variable_with_class_default1)  # revealed: str
 ```
 
+#### Descriptor attributes as class variables
+
+Whether they are explicitly qualified as `ClassVar`, or just have a class level default, we treat
+descriptor attributes as class variables. This test mainly makes sure that we do *not* treat them as
+instance variables. This would lead to a different outcome, since the `__get__` method would not be
+called (the descriptor protocol is not invoked for instance variables).
+
+```py
+from typing import ClassVar
+
+class Descriptor:
+    def __get__(self, instance, owner) -> int:
+        return 42
+
+class C:
+    a: ClassVar[Descriptor]
+    b: Descriptor = Descriptor()
+    c: ClassVar[Descriptor] = Descriptor()
+
+reveal_type(C().a)  # revealed: int
+reveal_type(C().b)  # revealed: int
+reveal_type(C().c)  # revealed: int
+```
+
 ### Inheritance of class/instance attributes
 
 #### Instance variable defined in a base class

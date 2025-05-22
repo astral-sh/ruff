@@ -873,8 +873,6 @@ pub(crate) fn check_docstring(
     section_contexts: &SectionContexts,
     convention: Option<Convention>,
 ) {
-    let mut diagnostics = Vec::new();
-
     // Only check function docstrings.
     let Some(function_def) = definition.as_function_def() else {
         return;
@@ -927,7 +925,7 @@ pub(crate) fn check_docstring(
                                     semantic,
                                 )
                             {
-                                diagnostics.push(Diagnostic::new(
+                                checker.report_diagnostic(Diagnostic::new(
                                     DocstringMissingReturns,
                                     docstring.range(),
                                 ));
@@ -938,8 +936,10 @@ pub(crate) fn check_docstring(
                             .iter()
                             .any(|entry| !entry.is_none_return()) =>
                         {
-                            diagnostics
-                                .push(Diagnostic::new(DocstringMissingReturns, docstring.range()));
+                            checker.report_diagnostic(Diagnostic::new(
+                                DocstringMissingReturns,
+                                docstring.range(),
+                            ));
                         }
                         _ => {}
                     }
@@ -958,12 +958,16 @@ pub(crate) fn check_docstring(
                             |arguments| arguments.first().is_none_or(Expr::is_none_literal_expr),
                         ) =>
                     {
-                        diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
+                        checker.report_diagnostic(Diagnostic::new(
+                            DocstringMissingYields,
+                            docstring.range(),
+                        ));
                     }
                     None if body_entries.yields.iter().any(|entry| !entry.is_none_yield) => {
-                        diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
+                        checker.report_diagnostic(Diagnostic::new(
+                            DocstringMissingYields,
+                            docstring.range(),
+                        ));
                     }
                     _ => {}
                 }
@@ -996,7 +1000,7 @@ pub(crate) fn check_docstring(
                     },
                     docstring.range(),
                 );
-                diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -1011,7 +1015,7 @@ pub(crate) fn check_docstring(
                     || body_entries.returns.iter().all(ReturnEntry::is_implicit)
                 {
                     let diagnostic = Diagnostic::new(DocstringExtraneousReturns, docstring.range());
-                    diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
         }
@@ -1021,7 +1025,7 @@ pub(crate) fn check_docstring(
             if docstring_sections.yields.is_some() {
                 if body_entries.yields.is_empty() {
                     let diagnostic = Diagnostic::new(DocstringExtraneousYields, docstring.range());
-                    diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
         }
@@ -1047,11 +1051,9 @@ pub(crate) fn check_docstring(
                         },
                         docstring.range(),
                     );
-                    diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
         }
     }
-
-    checker.report_diagnostics(diagnostics);
 }

@@ -29,8 +29,10 @@ import parent.child.two
 `from.py`
 
 ```py
-# TODO: This should not be an error
-from parent.child import one, two  # error: [unresolved-import]
+from parent.child import one, two
+
+reveal_type(one)  # revealed: <module 'parent.child.one'>
+reveal_type(two)  # revealed: <module 'parent.child.two'>
 ```
 
 ## Regular package in namespace package
@@ -104,4 +106,43 @@ from foo import x
 reveal_type(x)  # revealed: Unknown | Literal["module"]
 
 import foo.bar  # error: [unresolved-import]
+```
+
+## `from` import with namespace package
+
+Regression test for <https://github.com/astral-sh/ty/issues/363>
+
+`google/cloud/pubsub_v1/__init__.py`:
+
+```py
+class PublisherClient: ...
+```
+
+```py
+from google.cloud import pubsub_v1
+
+reveal_type(pubsub_v1.PublisherClient)  # revealed: <class 'PublisherClient'>
+```
+
+## `from` root importing sub-packages
+
+Regresssion test for <https://github.com/astral-sh/ty/issues/375>
+
+`opentelemetry/trace/__init__.py`:
+
+```py
+class Trace: ...
+```
+
+`opentelemetry/metrics/__init__.py`:
+
+```py
+class Metric: ...
+```
+
+```py
+from opentelemetry import trace, metrics
+
+reveal_type(trace)  # revealed: <module 'opentelemetry.trace'>
+reveal_type(metrics)  # revealed: <module 'opentelemetry.metrics'>
 ```

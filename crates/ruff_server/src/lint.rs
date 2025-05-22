@@ -12,13 +12,13 @@ use crate::{
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
     Locator,
+    codes::Rule,
     directives::{Flags, extract_directives},
     generate_noqa_edits,
     linter::check_path,
-    message::{DiagnosticMessage, Message},
+    message::Message,
     package::PackageRoot,
     packaging::detect_package_root,
-    registry::AsRule,
     settings::flags,
     source_kind::SourceKind,
 };
@@ -32,6 +32,7 @@ use ruff_text_size::{Ranged, TextRange};
 /// This is serialized on the diagnostic `data` field.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct AssociatedDiagnosticData {
+    /// The message describing what the fix does, if it exists, or the diagnostic name otherwise.
     pub(crate) title: String,
     /// Edits to fix the diagnostic. If this is empty, a fix
     /// does not exist.
@@ -165,15 +166,16 @@ pub(crate) fn check(
         messages
             .into_iter()
             .zip(noqa_edits)
-            .filter_map(|(message, noqa_edit)| match message {
-                Message::Diagnostic(diagnostic_message) => Some(to_lsp_diagnostic(
-                    diagnostic_message,
+            .filter_map(|(message, noqa_edit)| match message.to_rule() {
+                Some(rule) => Some(to_lsp_diagnostic(
+                    rule,
+                    &message,
                     noqa_edit,
                     &source_kind,
                     locator.to_index(),
                     encoding,
                 )),
-                Message::SyntaxError(_) => {
+                None => {
                     if show_syntax_errors {
                         Some(syntax_error_to_lsp_diagnostic(
                             &message,
@@ -239,28 +241,24 @@ pub(crate) fn fixes_for_diagnostics(
 /// Generates an LSP diagnostic with an associated cell index for the diagnostic to go in.
 /// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
-    diagnostic: DiagnosticMessage,
+    rule: Rule,
+    diagnostic: &Message,
     noqa_edit: Option<Edit>,
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
 ) -> (usize, lsp_types::Diagnostic) {
-    let rule = diagnostic.rule();
-    let DiagnosticMessage {
-        range: diagnostic_range,
-        fix,
-        name,
-        body,
-        suggestion,
-        ..
-    } = diagnostic;
+    let diagnostic_range = diagnostic.range();
+    let name = diagnostic.name();
+    let body = diagnostic.body().to_string();
+    let fix = diagnostic.fix();
+    let suggestion = diagnostic.suggestion();
 
     let fix = fix.and_then(|fix| fix.applies(Applicability::Unsafe).then_some(fix));
 
     let data = (fix.is_some() || noqa_edit.is_some())
         .then(|| {
             let edits = fix
-                .as_ref()
                 .into_iter()
                 .flat_map(Fix::edits)
                 .map(|edit| lsp_types::TextEdit {
@@ -273,7 +271,7 @@ fn to_lsp_diagnostic(
                 new_text: noqa_edit.into_content().unwrap_or_default().into_string(),
             });
             serde_json::to_value(AssociatedDiagnosticData {
-                title: suggestion.unwrap_or_else(|| name.to_string()),
+                title: suggestion.unwrap_or(name).to_string(),
                 noqa_edit,
                 edits,
                 code: rule.noqa_code().to_string(),

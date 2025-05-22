@@ -22,24 +22,24 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
     }
 
     fn run_with_snapshot(
+        db: &ProjectDatabase,
         snapshot: DocumentSnapshot,
-        db: ProjectDatabase,
         _notifier: Notifier,
         params: InlayHintParams,
     ) -> crate::server::Result<Option<Vec<lsp_types::InlayHint>>> {
-        let Some(file) = snapshot.file(&db) else {
+        let Some(file) = snapshot.file(db) else {
             tracing::debug!("Failed to resolve file for {:?}", params);
             return Ok(None);
         };
 
-        let index = line_index(&db, file);
-        let source = source_text(&db, file);
+        let index = line_index(db, file);
+        let source = source_text(db, file);
 
         let range = params
             .range
             .to_text_range(&source, &index, snapshot.encoding());
 
-        let inlay_hints = inlay_hints(&db, file, range);
+        let inlay_hints = inlay_hints(db, file, range);
 
         let inlay_hints = inlay_hints
             .into_iter()
@@ -47,7 +47,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
                 position: hint
                     .position
                     .to_position(&source, &index, snapshot.encoding()),
-                label: lsp_types::InlayHintLabel::String(hint.display(&db).to_string()),
+                label: lsp_types::InlayHintLabel::String(hint.display(db).to_string()),
                 kind: Some(lsp_types::InlayHintKind::TYPE),
                 tooltip: None,
                 padding_left: None,

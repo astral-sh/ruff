@@ -1,6 +1,7 @@
 doc-valid-idents = [
     "..",
     "CodeQL",
+    "CPython",
     "FastAPI",
     "IPython",
     "LangChain",
@@ -14,7 +15,7 @@ doc-valid-idents = [
     "SNMPv1",
     "SNMPv2",
     "SNMPv3",
-    "PyFlakes"
+    "PyFlakes",
 ]
 
 ignore-interior-mutability = [

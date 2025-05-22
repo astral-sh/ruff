@@ -7,7 +7,6 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::{
     is_immutable_annotation, is_immutable_func, is_immutable_newtype_call, is_mutable_func,
 };
@@ -83,20 +82,15 @@ impl Violation for FunctionCallInDefaultArgument {
 }
 
 struct ArgumentDefaultVisitor<'a, 'b> {
-    semantic: &'a SemanticModel<'b>,
+    checker: &'a Checker<'b>,
     extend_immutable_calls: &'a [QualifiedName<'b>],
-    diagnostics: Vec<Diagnostic>,
 }
 
 impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
-    fn new(
-        semantic: &'a SemanticModel<'b>,
-        extend_immutable_calls: &'a [QualifiedName<'b>],
-    ) -> Self {
+    fn new(checker: &'a Checker<'b>, extend_immutable_calls: &'a [QualifiedName<'b>]) -> Self {
         Self {
-            semantic,
+            checker,
             extend_immutable_calls,
-            diagnostics: Vec::new(),
         }
     }
 }
@@ -105,13 +99,21 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
     fn visit_expr(&mut self, expr: &Expr) {
         match expr {
             Expr::Call(ast::ExprCall { func, .. }) => {
-                if !is_mutable_func(func, self.semantic)
-                    && !is_immutable_func(func, self.semantic, self.extend_immutable_calls)
+                if !is_mutable_func(func, self.checker.semantic())
+                    && !is_immutable_func(
+                        func,
+                        self.checker.semantic(),
+                        self.extend_immutable_calls,
+                    )
                     && !func.as_name_expr().is_some_and(|name| {
-                        is_immutable_newtype_call(name, self.semantic, self.extend_immutable_calls)
+                        is_immutable_newtype_call(
+                            name,
+                            self.checker.semantic(),
+                            self.extend_immutable_calls,
+                        )
                     })
                 {
-                    self.diagnostics.push(Diagnostic::new(
+                    self.checker.report_diagnostic(Diagnostic::new(
                         FunctionCallInDefaultArgument {
                             name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
                         },
@@ -139,7 +141,7 @@ pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: &
         .map(|target| QualifiedName::from_dotted_name(target))
         .collect();
 
-    let mut visitor = ArgumentDefaultVisitor::new(checker.semantic(), &extend_immutable_calls);
+    let mut visitor = ArgumentDefaultVisitor::new(checker, &extend_immutable_calls);
     for parameter in parameters.iter_non_variadic_params() {
         if let Some(default) = parameter.default() {
             if !parameter.annotation().is_some_and(|expr| {
@@ -149,6 +151,4 @@ pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: &
             }
         }
     }
-
-    checker.report_diagnostics(visitor.diagnostics);
 }

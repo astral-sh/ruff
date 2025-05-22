@@ -23,24 +23,24 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
     }
 
     fn run_with_snapshot(
+        db: &ProjectDatabase,
         snapshot: DocumentSnapshot,
-        db: ProjectDatabase,
         _notifier: Notifier,
         params: CompletionParams,
     ) -> crate::server::Result<Option<CompletionResponse>> {
-        let Some(file) = snapshot.file(&db) else {
+        let Some(file) = snapshot.file(db) else {
             tracing::debug!("Failed to resolve file for {:?}", params);
             return Ok(None);
         };
 
-        let source = source_text(&db, file);
-        let line_index = line_index(&db, file);
+        let source = source_text(db, file);
+        let line_index = line_index(db, file);
         let offset = params.text_document_position.position.to_text_size(
             &source,
             &line_index,
             snapshot.encoding(),
         );
-        let completions = completion(&db, file, offset);
+        let completions = completion(db, file, offset);
         if completions.is_empty() {
             return Ok(None);
         }

@@ -341,11 +341,12 @@ mod tests {
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::DbWithWritableSystem as _;
-    use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
-    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, SearchPathSettings};
+    use ty_python_semantic::{
+        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
+    };
 
     struct ExpectedDiagnostic {
         id: DiagnosticId,
@@ -384,7 +385,7 @@ mod tests {
         let mut db = crate::db::Db::setup();
 
         let settings = ProgramSettings {
-            python_version: PythonVersion::default(),
+            python_version: PythonVersionWithSource::default(),
             python_platform: PythonPlatform::default(),
             search_paths: SearchPathSettings::new(Vec::new()),
         };

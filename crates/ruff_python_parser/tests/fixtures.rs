@@ -556,6 +556,10 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         true
     }
 
+    fn in_yield_allowed_context(&self) -> bool {
+        true
+    }
+
     fn in_generator_scope(&self) -> bool {
         true
     }

@@ -5,21 +5,21 @@
 
 use std::sync::{Arc, Mutex, OnceLock};
 
-use libfuzzer_sys::{fuzz_target, Corpus};
+use libfuzzer_sys::{Corpus, fuzz_target};
 
-use ruff_db::files::{system_path_to_file, File, Files};
+use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{
     DbWithTestSystem, DbWithWritableSystem as _, System, SystemPathBuf, TestSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
 use ruff_python_ast::PythonVersion;
-use ruff_python_parser::{parse_unchecked, Mode, ParseOptions};
+use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
 use ty_python_semantic::lint::LintRegistry;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    default_lint_registry, lint::RuleSelection, Db as SemanticDb, Program, ProgramSettings,
-    PythonPlatform, SearchPathSettings,
+    Db as SemanticDb, Program, ProgramSettings, PythonPlatform, SearchPathSettings,
+    default_lint_registry, lint::RuleSelection, PythonVersionWithSource,
 };
 
 /// Database that can be used for testing.
@@ -118,7 +118,7 @@ fn setup_db() -> TestDb {
     Program::from_settings(
         &db,
         ProgramSettings {
-            python_version: PythonVersion::default(),
+            python_version: PythonVersionWithSource::default(),
             python_platform: PythonPlatform::default(),
             search_paths: SearchPathSettings::new(vec![src_root]),
         },

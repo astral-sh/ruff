@@ -397,3 +397,19 @@ async def i() -> typing.AsyncIterable:
 async def j() -> str:  # error: [invalid-return-type]
     yield 42
 ```
+
+## Diagnostics for `invalid-return-type` on non-protocol subclasses of protocol classes
+
+<!-- snapshot-diagnostics -->
+
+We emit a nice subdiagnostic in this situation explaining the probable error here:
+
+```py
+from typing_extensions import Protocol
+
+class Abstract(Protocol):
+    def method(self) -> str: ...
+
+class Concrete(Abstract):
+    def method(self) -> str: ...  # error: [invalid-return-type]
+```

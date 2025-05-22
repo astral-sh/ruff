@@ -38,8 +38,7 @@ impl ResolvedClientCapabilities {
         let document_changes = client_capabilities
             .workspace
             .as_ref()
-            .and_then(|workspace| workspace.workspace_edit.as_ref())
-            .and_then(|workspace_edit| workspace_edit.document_changes)
+            .and_then(|workspace| workspace.workspace_edit.as_ref()?.document_changes)
             .unwrap_or_default();
 
         let declaration_link_support = client_capabilities

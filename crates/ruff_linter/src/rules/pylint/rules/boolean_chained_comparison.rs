@@ -158,7 +158,9 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
             Some(diagnostic)
         });
 
-    checker.report_diagnostics(diagnostics);
+    for diagnostic in diagnostics {
+        checker.report_diagnostic(diagnostic);
+    }
 }
 
 /// Checks whether two compare expressions are simplifiable

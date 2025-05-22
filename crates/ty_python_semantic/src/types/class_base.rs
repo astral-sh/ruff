@@ -1,7 +1,8 @@
 use crate::Db;
-use crate::types::generics::{GenericContext, Specialization, TypeMapping};
+use crate::types::generics::{GenericContext, Specialization};
 use crate::types::{
-    ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, Type, todo_type,
+    ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, Type,
+    TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -28,6 +29,19 @@ pub enum ClassBase<'db> {
 impl<'db> ClassBase<'db> {
     pub(crate) const fn unknown() -> Self {
         Self::Dynamic(DynamicType::Unknown)
+    }
+
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
+            Self::Class(class) => Self::Class(class.normalized(db)),
+            Self::Protocol(generic_context) => {
+                Self::Protocol(generic_context.map(|context| context.normalized(db)))
+            }
+            Self::Generic(generic_context) => {
+                Self::Generic(generic_context.map(|context| context.normalized(db)))
+            }
+        }
     }
 
     pub(crate) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
@@ -150,8 +164,12 @@ impl<'db> ClassBase<'db> {
                 }
             }
             Type::NominalInstance(_) => None, // TODO -- handle `__mro_entries__`?
-            Type::PropertyInstance(_) => None,
-            Type::Never
+
+            // This likely means that we're in unreachable code,
+            // in which case we want to treat `Never` in a forgiving way and silence diagnostics
+            Type::Never => Some(ClassBase::unknown()),
+
+            Type::PropertyInstance(_)
             | Type::BooleanLiteral(_)
             | Type::FunctionLiteral(_)
             | Type::Callable(..)
@@ -254,7 +272,7 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.apply_type_mapping(db, type_mapping)),
             Self::Dynamic(_) | Self::Generic(_) | Self::Protocol(_) => self,
@@ -267,7 +285,7 @@ impl<'db> ClassBase<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         if let Some(specialization) = specialization {
-            self.apply_type_mapping(db, specialization.type_mapping())
+            self.apply_type_mapping(db, &TypeMapping::Specialization(specialization))
         } else {
             self
         }
@@ -302,6 +320,10 @@ impl<'db> ClassBase<'db> {
                 ClassBaseMroIterator::from_class(db, class, additional_specialization)
             }
         }
+    }
+
+    pub(crate) const fn is_dynamic(self) -> bool {
+        matches!(self, Self::Dynamic(_))
     }
 }
 

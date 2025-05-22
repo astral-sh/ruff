@@ -25,8 +25,7 @@ error[unresolved-reference]: Name `aiter` used when not defined
   | ^^^^^
   |
 info: `aiter` was added as a builtin in Python 3.10
-info: The inferred target version of your project is Python 3.9
-info: If using a pyproject.toml file, consider adjusting the `project.requires-python` or `tool.ty.environment.python-version` field
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
 info: rule `unresolved-reference` is enabled by default
 
 ```

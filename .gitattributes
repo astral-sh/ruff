@@ -21,6 +21,7 @@ crates/ruff_linter/resources/test/fixtures/pyupgrade/UP018_LF.py text eol=lf
 crates/ruff_python_parser/resources/inline linguist-generated=true
 
 ruff.schema.json -diff linguist-generated=true text=auto eol=lf
+ty.schema.json -diff linguist-generated=true text=auto eol=lf
 crates/ruff_python_ast/src/generated.rs -diff linguist-generated=true text=auto eol=lf
 crates/ruff_python_formatter/src/generated.rs -diff linguist-generated=true text=auto eol=lf
 *.md.snap linguist-language=Markdown

@@ -1,0 +1,48 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: return_type.md - Function return type - Diagnostics for `invalid-return-type` on non-protocol subclasses of protocol classes
+mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing_extensions import Protocol
+2 | 
+3 | class Abstract(Protocol):
+4 |     def method(self) -> str: ...
+5 | 
+6 | class Concrete(Abstract):
+7 |     def method(self) -> str: ...  # error: [invalid-return-type]
+```
+
+# Diagnostics
+
+```
+error[invalid-return-type]: Function can implicitly return `None`, which is not assignable to return type `str`
+ --> src/mdtest_snippet.py:7:25
+  |
+6 | class Concrete(Abstract):
+7 |     def method(self) -> str: ...  # error: [invalid-return-type]
+  |                         ^^^
+  |
+info: Only functions in stub files, methods on protocol classes, or methods with `@abstractmethod` are permitted to have empty bodies
+info: Class `Concrete` has `typing.Protocol` in its MRO, but it is not a protocol class
+info: Only classes that directly inherit from `typing.Protocol` or `typing_extensions.Protocol` are considered protocol classes
+ --> src/mdtest_snippet.py:6:7
+  |
+4 |     def method(self) -> str: ...
+5 |
+6 | class Concrete(Abstract):
+  |       ^^^^^^^^^^^^^^^^^^ `Protocol` not present in `Concrete`'s immediate bases
+7 |     def method(self) -> str: ...  # error: [invalid-return-type]
+  |
+info: See https://typing.python.org/en/latest/spec/protocol.html#
+info: rule `invalid-return-type` is enabled by default
+
+```

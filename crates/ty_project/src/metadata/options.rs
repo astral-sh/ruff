@@ -10,7 +10,10 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
-use ty_python_semantic::{ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings};
+use ty_python_semantic::{
+    ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
+    SearchPathSettings,
+};
 
 use super::settings::{Settings, TerminalSettings};
 
@@ -87,13 +90,23 @@ impl Options {
     pub(crate) fn to_program_settings(
         &self,
         project_root: &SystemPath,
+        project_name: &str,
         system: &dyn System,
     ) -> ProgramSettings {
         let python_version = self
             .environment
             .as_ref()
-            .and_then(|env| env.python_version.as_deref().copied())
-            .unwrap_or(PythonVersion::latest_ty());
+            .and_then(|env| env.python_version.as_ref())
+            .map(|ranged_version| PythonVersionWithSource {
+                version: **ranged_version,
+                source: match ranged_version.source() {
+                    ValueSource::Cli => PythonVersionSource::Cli,
+                    ValueSource::File(path) => {
+                        PythonVersionSource::File(path.clone(), ranged_version.range())
+                    }
+                },
+            })
+            .unwrap_or_default();
         let python_platform = self
             .environment
             .as_ref()
@@ -106,13 +119,14 @@ impl Options {
         ProgramSettings {
             python_version,
             python_platform,
-            search_paths: self.to_search_path_settings(project_root, system),
+            search_paths: self.to_search_path_settings(project_root, project_name, system),
         }
     }
 
     fn to_search_path_settings(
         &self,
         project_root: &SystemPath,
+        project_name: &str,
         system: &dyn System,
     ) -> SearchPathSettings {
         let src_roots = if let Some(src_root) = self.src.as_ref().and_then(|src| src.root.as_ref())
@@ -121,10 +135,24 @@ impl Options {
         } else {
             let src = project_root.join("src");
 
-            // Default to `src` and the project root if `src` exists and the root hasn't been specified.
             if system.is_directory(&src) {
+                // Default to `src` and the project root if `src` exists and the root hasn't been specified.
+                // This corresponds to the `src-layout`
+                tracing::debug!(
+                    "Including `./src` in `src.root` because a `./src` directory exists"
+                );
                 vec![project_root.to_path_buf(), src]
+            } else if system.is_directory(&project_root.join(project_name).join(project_name)) {
+                // `src-layout` but when the folder isn't called `src` but has the same name as the project.
+                // For example, the "src" folder for `psycopg` is called `psycopg` and the python files are in `psycopg/psycopg/_adapters_map.py`
+                tracing::debug!(
+                    "Including `./{project_name}` in `src.root` because a `./{project_name}/{project_name}` directory exists"
+                );
+
+                vec![project_root.to_path_buf(), project_root.join(project_name)]
             } else {
+                // Default to a [flat project structure](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/).
+                tracing::debug!("Defaulting `src.root` to `.`");
                 vec![project_root.to_path_buf()]
             }
         };
@@ -353,9 +381,15 @@ pub struct EnvironmentOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SrcOptions {
     /// The root of the project, used for finding first-party modules.
+    ///
+    /// If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:
+    ///
+    /// * if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
+    /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
+    /// * otherwise, default to `.` (flat layout)
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
-        default = r#"[".", "./src"]"#,
+        default = r#"null"#,
         value_type = "str",
         example = r#"
             root = "./app"

@@ -153,6 +153,53 @@ impl<'db> KnownInstanceType<'db> {
         }
     }
 
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::Annotated
+            | Self::Literal
+            | Self::LiteralString
+            | Self::Optional
+            | Self::Union
+            | Self::NoReturn
+            | Self::Never
+            | Self::Tuple
+            | Self::Type
+            | Self::TypingSelf
+            | Self::Final
+            | Self::ClassVar
+            | Self::Callable
+            | Self::Concatenate
+            | Self::Unpack
+            | Self::Required
+            | Self::NotRequired
+            | Self::TypeAlias
+            | Self::TypeGuard
+            | Self::TypedDict
+            | Self::TypeIs
+            | Self::List
+            | Self::Dict
+            | Self::DefaultDict
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Counter
+            | Self::Deque
+            | Self::ChainMap
+            | Self::OrderedDict
+            | Self::ReadOnly
+            | Self::Unknown
+            | Self::AlwaysTruthy
+            | Self::AlwaysFalsy
+            | Self::Not
+            | Self::Intersection
+            | Self::TypeOf
+            | Self::CallableTypeOf => self,
+            Self::TypeVar(tvar) => Self::TypeVar(tvar.normalized(db)),
+            Self::Protocol(ctx) => Self::Protocol(ctx.map(|ctx| ctx.normalized(db))),
+            Self::Generic(ctx) => Self::Generic(ctx.map(|ctx| ctx.normalized(db))),
+            Self::TypeAliasType(alias) => Self::TypeAliasType(alias.normalized(db)),
+        }
+    }
+
     /// Return the repr of the symbol at runtime
     pub(crate) fn repr(self, db: &'db dyn Db) -> impl Display + 'db {
         KnownInstanceRepr {

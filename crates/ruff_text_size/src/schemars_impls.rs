@@ -6,7 +6,7 @@
 //! bindings to the Workspace API
 
 use crate::{TextRange, TextSize};
-use schemars::{r#gen::SchemaGenerator, schema::Schema, JsonSchema};
+use schemars::{JsonSchema, r#gen::SchemaGenerator, schema::Schema};
 
 impl JsonSchema for TextSize {
     fn schema_name() -> String {

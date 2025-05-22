@@ -83,11 +83,7 @@ pub(crate) fn bindings(checker: &Checker) {
             }
         }
         if !checker.source_type.is_stub() && checker.enabled(Rule::UnquotedTypeAlias) {
-            if let Some(diagnostics) =
-                flake8_type_checking::rules::unquoted_type_alias(checker, binding)
-            {
-                checker.report_diagnostics(diagnostics);
-            }
+            flake8_type_checking::rules::unquoted_type_alias(checker, binding);
         }
         if checker.enabled(Rule::UnsortedDunderSlots) {
             if let Some(diagnostic) = ruff::rules::sort_dunder_slots(checker, binding) {

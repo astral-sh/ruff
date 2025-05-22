@@ -76,16 +76,20 @@ pub(crate) fn compare_to_hardcoded_password_string(
     left: &Expr,
     comparators: &[Expr],
 ) {
-    checker.report_diagnostics(comparators.iter().filter_map(|comp| {
-        string_literal(comp).filter(|string| !string.is_empty())?;
-        let name = password_target(left)?;
-        Some(Diagnostic::new(
+    for comp in comparators {
+        if string_literal(comp).is_none_or(str::is_empty) {
+            continue;
+        }
+        let Some(name) = password_target(left) else {
+            continue;
+        };
+        checker.report_diagnostic(Diagnostic::new(
             HardcodedPasswordString {
                 name: name.to_string(),
             },
             comp.range(),
-        ))
-    }));
+        ));
+    }
 }
 
 /// S105

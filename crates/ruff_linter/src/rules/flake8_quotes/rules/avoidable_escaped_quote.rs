@@ -9,7 +9,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_quotes;
-use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for strings that include escaped quotes, and suggests changing
@@ -61,11 +60,7 @@ pub(crate) fn avoidable_escaped_quote(checker: &Checker, string_like: StringLike
         return;
     }
 
-    let mut rule_checker = AvoidableEscapedQuoteChecker::new(
-        checker.locator(),
-        checker.settings,
-        checker.target_version(),
-    );
+    let mut rule_checker = AvoidableEscapedQuoteChecker::new(checker, checker.target_version());
 
     for part in string_like.parts() {
         match part {
@@ -78,59 +73,45 @@ pub(crate) fn avoidable_escaped_quote(checker: &Checker, string_like: StringLike
             ast::StringLikePart::FString(f_string) => rule_checker.visit_f_string(f_string),
         }
     }
-
-    checker.report_diagnostics(rule_checker.into_diagnostics());
 }
 
 /// Checks for `Q003` violations using the [`Visitor`] implementation.
-#[derive(Debug)]
-struct AvoidableEscapedQuoteChecker<'a> {
-    locator: &'a Locator<'a>,
+struct AvoidableEscapedQuoteChecker<'a, 'b> {
+    checker: &'a Checker<'b>,
     quotes_settings: &'a flake8_quotes::settings::Settings,
     supports_pep701: bool,
-    diagnostics: Vec<Diagnostic>,
 }
 
-impl<'a> AvoidableEscapedQuoteChecker<'a> {
-    fn new(
-        locator: &'a Locator<'a>,
-        settings: &'a LinterSettings,
-        target_version: PythonVersion,
-    ) -> Self {
+impl<'a, 'b> AvoidableEscapedQuoteChecker<'a, 'b> {
+    fn new(checker: &'a Checker<'b>, target_version: PythonVersion) -> Self {
         Self {
-            locator,
-            quotes_settings: &settings.flake8_quotes,
+            checker,
+            quotes_settings: &checker.settings.flake8_quotes,
             supports_pep701: target_version.supports_pep_701(),
-            diagnostics: vec![],
         }
     }
-
-    /// Consumes the checker and returns a vector of [`Diagnostic`] found during the visit.
-    fn into_diagnostics(self) -> Vec<Diagnostic> {
-        self.diagnostics
-    }
 }
 
-impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_> {
-    fn visit_string_literal(&mut self, string_literal: &'_ ast::StringLiteral) {
+impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_, '_> {
+    fn visit_string_literal(&mut self, string_literal: &ast::StringLiteral) {
         if let Some(diagnostic) = check_string_or_bytes(
-            self.locator,
+            self.checker.locator(),
             self.quotes_settings,
             string_literal.range(),
             AnyStringFlags::from(string_literal.flags),
         ) {
-            self.diagnostics.push(diagnostic);
+            self.checker.report_diagnostic(diagnostic);
         }
     }
 
-    fn visit_bytes_literal(&mut self, bytes_literal: &'_ ast::BytesLiteral) {
+    fn visit_bytes_literal(&mut self, bytes_literal: &ast::BytesLiteral) {
         if let Some(diagnostic) = check_string_or_bytes(
-            self.locator,
+            self.checker.locator(),
             self.quotes_settings,
             bytes_literal.range(),
             AnyStringFlags::from(bytes_literal.flags),
         ) {
-            self.diagnostics.push(diagnostic);
+            self.checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -203,8 +184,10 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_> {
             .literals()
             .any(|literal| contains_quote(literal, opposite_quote_char))
         {
-            if let Some(diagnostic) = check_f_string(self.locator, self.quotes_settings, f_string) {
-                self.diagnostics.push(diagnostic);
+            if let Some(diagnostic) =
+                check_f_string(self.checker.locator(), self.quotes_settings, f_string)
+            {
+                self.checker.report_diagnostic(diagnostic);
             }
         }
 

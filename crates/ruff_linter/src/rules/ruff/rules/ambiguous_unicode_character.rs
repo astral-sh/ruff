@@ -211,7 +211,9 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like:
                     context,
                     checker.settings,
                 );
-                checker.report_diagnostics(diagnostics);
+                for diagnostic in diagnostics {
+                    checker.report_diagnostic(diagnostic);
+                }
             }
             ast::StringLikePart::Bytes(_) => {}
             ast::StringLikePart::FString(f_string) => {
@@ -225,7 +227,9 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like:
                         context,
                         checker.settings,
                     );
-                    checker.report_diagnostics(diagnostics);
+                    for diagnostic in diagnostics {
+                        checker.report_diagnostic(diagnostic);
+                    }
                 }
             }
         }

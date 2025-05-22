@@ -88,6 +88,33 @@ def foo(v: str | int | None, w: str | str | None, x: str | str):
     reveal_type(x)  # revealed: str
 ```
 
+## PEP-604 in non-type-expression context
+
+### In Python 3.10 and later
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+IntOrStr = int | str
+```
+
+### Earlier versions
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+# error: [unsupported-operator]
+IntOrStr = int | str
+```
+
 ## Attribute expressions in type annotations are understood
 
 ```py

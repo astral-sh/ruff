@@ -11,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 use salsa::plumbing::AsId;
 use salsa::{Durability, Setter};
 
+use crate::diagnostic::{Span, UnifiedFile};
 use crate::file_revision::FileRevision;
 use crate::files::file_root::FileRoots;
 use crate::files::private::FileStatus;
@@ -274,7 +275,12 @@ impl fmt::Debug for Files {
 impl std::panic::RefUnwindSafe for Files {}
 
 /// A file that's either stored on the host system's file system or in the vendored file system.
+///
+/// # Ordering
+/// Ordering is based on the file's salsa-assigned id and not on its values.
+/// The id may change between runs.
 #[salsa::input]
+#[derive(PartialOrd, Ord)]
 pub struct File {
     /// The path of the file (immutable).
     #[returns(ref)]
@@ -546,6 +552,29 @@ impl Ranged for FileRange {
     #[inline]
     fn range(&self) -> TextRange {
         self.range
+    }
+}
+
+impl TryFrom<&Span> for FileRange {
+    type Error = ();
+
+    fn try_from(value: &Span) -> Result<Self, Self::Error> {
+        let UnifiedFile::Ty(file) = value.file() else {
+            return Err(());
+        };
+
+        Ok(Self {
+            file: *file,
+            range: value.range().ok_or(())?,
+        })
+    }
+}
+
+impl TryFrom<Span> for FileRange {
+    type Error = ();
+
+    fn try_from(value: Span) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
     }
 }
 

@@ -1078,6 +1078,17 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         },
 
         // apache-airflow-providers-standard
+        [
+            "airflow",
+            "hooks",
+            "subprocess",
+            rest @ ("SubprocessResult" | "working_directory"),
+        ] => ProviderReplacement::SourceModuleMovedToProvider {
+            name: (*rest).to_string(),
+            module: "airflow.providers.standard.hooks.subprocess",
+            provider: "standard",
+            version: "0.0.3",
+        },
         ["airflow", "operators", "bash_operator", "BashOperator"] => {
             ProviderReplacement::AutoImport {
                 module: "airflow.providers.standard.operators.bash",
@@ -1097,6 +1108,25 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.2",
         },
+        [
+            "airflow",
+            "operators",
+            "trigger_dagrun",
+            "TriggerDagRunLink",
+        ] => ProviderReplacement::AutoImport {
+            module: "airflow.providers.standard.operators.trigger_dagrun",
+            name: "TriggerDagRunLink",
+            provider: "standard",
+            version: "0.0.2",
+        },
+        ["airflow", "operators", "datetime", "target_times_as_dates"] => {
+            ProviderReplacement::AutoImport {
+                module: "airflow.providers.standard.operators.datetime",
+                name: "target_times_as_dates",
+                provider: "standard",
+                version: "0.0.1",
+            }
+        }
         [
             "airflow",
             "operators",
@@ -1136,13 +1166,30 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         [
             "airflow",
             "sensors",
+            "external_task",
+            "ExternalTaskSensorLink",
+        ] => ProviderReplacement::AutoImport {
+            module: "airflow.providers.standard.sensors.external_task",
+            name: "ExternalDagLink",
+            provider: "standard",
+            version: "0.0.3",
+        },
+        [
+            "airflow",
+            "sensors",
             "external_task_sensor",
             rest @ ("ExternalTaskMarker" | "ExternalTaskSensor" | "ExternalTaskSensorLink"),
         ] => ProviderReplacement::SourceModuleMovedToProvider {
-            name: (*rest).to_string(),
             module: "airflow.providers.standard.sensors.external_task",
+            name: (*rest).to_string(),
             provider: "standard",
             version: "0.0.3",
+        },
+        ["airflow", "sensors", "time_delta", "WaitSensor"] => ProviderReplacement::AutoImport {
+            module: "airflow.providers.standard.sensors.time_delta",
+            name: "WaitSensor",
+            provider: "standard",
+            version: "0.0.1",
         },
 
         _ => return,

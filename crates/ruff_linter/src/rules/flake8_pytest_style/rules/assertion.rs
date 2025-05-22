@@ -210,23 +210,23 @@ impl Violation for PytestUnittestAssertion {
 
 /// Visitor that tracks assert statements and checks if they reference
 /// the exception name.
-struct ExceptionHandlerVisitor<'a> {
+struct ExceptionHandlerVisitor<'a, 'b> {
     exception_name: &'a str,
     current_assert: Option<&'a Stmt>,
-    errors: Vec<Diagnostic>,
+    checker: &'a Checker<'b>,
 }
 
-impl<'a> ExceptionHandlerVisitor<'a> {
-    const fn new(exception_name: &'a str) -> Self {
+impl<'a, 'b> ExceptionHandlerVisitor<'a, 'b> {
+    const fn new(checker: &'a Checker<'b>, exception_name: &'a str) -> Self {
         Self {
             exception_name,
             current_assert: None,
-            errors: Vec::new(),
+            checker,
         }
     }
 }
 
-impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
+impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Assert(_) => {
@@ -243,7 +243,7 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
             Expr::Name(ast::ExprName { id, .. }) => {
                 if let Some(current_assert) = self.current_assert {
                     if id.as_str() == self.exception_name {
-                        self.errors.push(Diagnostic::new(
+                        self.checker.report_diagnostic(Diagnostic::new(
                             PytestAssertInExcept {
                                 name: id.to_string(),
                             },
@@ -257,13 +257,12 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
     }
 }
 
-fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Diagnostic> {
+fn check_assert_in_except(checker: &Checker, name: &str, body: &[Stmt]) {
     // Walk body to find assert statements that reference the exception name
-    let mut visitor = ExceptionHandlerVisitor::new(name);
+    let mut visitor = ExceptionHandlerVisitor::new(checker, name);
     for stmt in body {
         visitor.visit_stmt(stmt);
     }
-    visitor.errors
 }
 
 /// PT009
@@ -596,15 +595,13 @@ pub(crate) fn assert_falsy(checker: &Checker, stmt: &Stmt, test: &Expr) {
 
 /// PT017
 pub(crate) fn assert_in_exception_handler(checker: &Checker, handlers: &[ExceptHandler]) {
-    checker.report_diagnostics(handlers.iter().flat_map(|handler| match handler {
-        ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, body, .. }) => {
-            if let Some(name) = name {
-                check_assert_in_except(name, body)
-            } else {
-                Vec::new()
-            }
+    for handler in handlers {
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, body, .. }) =
+            handler;
+        if let Some(name) = name {
+            check_assert_in_except(checker, name, body);
         }
-    }));
+    }
 }
 
 #[derive(Copy, Clone)]

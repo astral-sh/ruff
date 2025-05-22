@@ -33,8 +33,8 @@ impl Emitter for AzureEmitter {
                 line = location.line,
                 col = location.column,
                 code = message
-                    .rule()
-                    .map_or_else(String::new, |rule| format!("code={};", rule.noqa_code())),
+                    .to_noqa_code()
+                    .map_or_else(String::new, |code| format!("code={code};")),
                 body = message.body(),
             )?;
         }

@@ -79,9 +79,26 @@ pub(crate) enum SequenceType {
 
 impl SequenceType {
     pub(crate) fn from_pattern(pattern: &PatternMatchSequence, source: &str) -> SequenceType {
-        if source[pattern.range()].starts_with('[') {
+        let before_first_pattern = &source[TextRange::new(
+            pattern.start(),
+            pattern
+                .patterns
+                .first()
+                .map(Ranged::start)
+                .unwrap_or(pattern.end()),
+        )];
+        let after_last_patttern = &source[TextRange::new(
+            pattern.start(),
+            pattern
+                .patterns
+                .first()
+                .map(Ranged::end)
+                .unwrap_or(pattern.end()),
+        )];
+
+        if before_first_pattern.starts_with('[') && !after_last_patttern.ends_with(',') {
             SequenceType::List
-        } else if source[pattern.range()].starts_with('(') {
+        } else if before_first_pattern.starts_with('(') {
             // If the pattern is empty, it must be a parenthesized tuple with no members. (This
             // branch exists to differentiate between a tuple with and without its own parentheses,
             // but a tuple without its own parentheses must have at least one member.)

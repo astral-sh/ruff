@@ -123,7 +123,7 @@ impl SarifResult {
         let end_location = message.compute_end_location();
         let path = normalize_path(&*message.filename());
         Ok(Self {
-            rule: message.rule(),
+            rule: message.to_rule(),
             level: "error".to_string(),
             message: message.body().to_string(),
             uri: url::Url::from_file_path(&path)
@@ -143,7 +143,7 @@ impl SarifResult {
         let end_location = message.compute_end_location();
         let path = normalize_path(&*message.filename());
         Ok(Self {
-            rule: message.rule(),
+            rule: message.to_rule(),
             level: "error".to_string(),
             message: message.body().to_string(),
             uri: path.display().to_string(),

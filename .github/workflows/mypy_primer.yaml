@@ -11,6 +11,7 @@ on:
       - "crates/ruff_python_parser"
       - ".github/workflows/mypy_primer.yaml"
       - ".github/workflows/mypy_primer_comment.yaml"
+      - "Cargo.lock"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
@@ -36,7 +37,7 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca # v6.0.1
 
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
         with:
@@ -69,7 +70,7 @@ jobs:
           echo "Project selector: $PRIMER_SELECTOR"
           # Allow the exit code to be 0 or 1, only fail for actual mypy_primer crashes/bugs
           uvx \
-            --from="git+https://github.com/hauntsaninja/mypy_primer@968b2b61c05f84462d6fcc78d2f5205bbb8b98c2" \
+            --from="git+https://github.com/hauntsaninja/mypy_primer@01a7ca325f674433c58e02416a867178d1571128" \
             mypy_primer \
             --repo ruff \
             --type-checker ty \

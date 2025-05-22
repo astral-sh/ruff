@@ -1,0 +1,33 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: annotations.md - Assignment with annotations - PEP-604 in non-type-expression context - Earlier versions
+mdtest path: crates/ty_python_semantic/resources/mdtest/assignment/annotations.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | # error: [unsupported-operator]
+2 | IntOrStr = int | str
+```
+
+# Diagnostics
+
+```
+error[unsupported-operator]: Operator `|` is unsupported between objects of type `<class 'int'>` and `<class 'str'>`
+ --> src/mdtest_snippet.py:2:12
+  |
+1 | # error: [unsupported-operator]
+2 | IntOrStr = int | str
+  |            ^^^^^^^^^
+  |
+info: Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
+info: rule `unsupported-operator` is enabled by default
+
+```

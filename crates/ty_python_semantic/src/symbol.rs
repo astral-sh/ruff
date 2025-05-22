@@ -342,19 +342,22 @@ pub(crate) fn imported_symbol<'db>(
 /// (e.g. `from builtins import int`).
 pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> SymbolAndQualifiers<'db> {
     resolve_module(db, &KnownModule::Builtins.name())
-        .map(|module| {
-            symbol_impl(
-                db,
-                global_scope(db, module.file()),
-                symbol,
-                RequiresExplicitReExport::Yes,
+        .and_then(|module| {
+            let file = module.file()?;
+            Some(
+                symbol_impl(
+                    db,
+                    global_scope(db, file),
+                    symbol,
+                    RequiresExplicitReExport::Yes,
+                )
+                .or_fall_back_to(db, || {
+                    // We're looking up in the builtins namespace and not the module, so we should
+                    // do the normal lookup in `types.ModuleType` and not the special one as in
+                    // `imported_symbol`.
+                    module_type_implicit_global_symbol(db, symbol)
+                }),
             )
-            .or_fall_back_to(db, || {
-                // We're looking up in the builtins namespace and not the module, so we should
-                // do the normal lookup in `types.ModuleType` and not the special one as in
-                // `imported_symbol`.
-                module_type_implicit_global_symbol(db, symbol)
-            })
         })
         .unwrap_or_default()
 }
@@ -368,7 +371,10 @@ pub(crate) fn known_module_symbol<'db>(
     symbol: &str,
 ) -> SymbolAndQualifiers<'db> {
     resolve_module(db, &known_module.name())
-        .map(|module| imported_symbol(db, module.file(), symbol, None))
+        .and_then(|module| {
+            let file = module.file()?;
+            Some(imported_symbol(db, file, symbol, None))
+        })
         .unwrap_or_default()
 }
 
@@ -403,7 +409,8 @@ pub(crate) fn builtins_module_scope(db: &dyn Db) -> Option<ScopeId<'_>> {
 ///
 /// Can return `None` if a custom typeshed is used that is missing the core module in question.
 fn core_module_scope(db: &dyn Db, core_module: KnownModule) -> Option<ScopeId<'_>> {
-    resolve_module(db, &core_module.name()).map(|module| global_scope(db, module.file()))
+    let module = resolve_module(db, &core_module.name())?;
+    Some(global_scope(db, module.file()?))
 }
 
 /// Infer the combined type from an iterator of bindings, and return it

@@ -4,14 +4,16 @@ use lsp_types::request::DocumentDiagnosticRequest;
 use lsp_types::{
     Diagnostic, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticParams,
     DocumentDiagnosticReport, DocumentDiagnosticReportResult, FullDocumentDiagnosticReport,
-    NumberOrString, Range, RelatedFullDocumentDiagnosticReport, Url,
+    NumberOrString, Range, RelatedFullDocumentDiagnosticReport,
 };
 
-use crate::document::ToRangeExt;
+use crate::PositionEncoding;
+use crate::document::{FileRangeExt, ToRangeExt};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::{Result, client::Notifier};
 use crate::session::DocumentSnapshot;
-use ruff_db::diagnostic::Severity;
+use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
+use ruff_db::files::FileRange;
 use ruff_db::source::{line_index, source_text};
 use ty_project::{Db, ProjectDatabase};
 
@@ -22,17 +24,17 @@ impl RequestHandler for DocumentDiagnosticRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
-    fn document_url(params: &DocumentDiagnosticParams) -> Cow<Url> {
+    fn document_url(params: &DocumentDiagnosticParams) -> Cow<lsp_types::Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
     fn run_with_snapshot(
+        db: &ProjectDatabase,
         snapshot: DocumentSnapshot,
-        db: ProjectDatabase,
         _notifier: Notifier,
         _params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
-        let diagnostics = compute_diagnostics(&snapshot, &db);
+        let diagnostics = compute_diagnostics(&snapshot, db);
 
         Ok(DocumentDiagnosticReportResult::Report(
             DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
@@ -105,15 +107,85 @@ fn to_lsp_diagnostic(
         })
         .filter(|mapped_tags| !mapped_tags.is_empty());
 
+    let code_description = diagnostic
+        .id()
+        .is_lint()
+        .then(|| {
+            Some(lsp_types::CodeDescription {
+                href: lsp_types::Url::parse(&format!("https://ty.dev/rules#{}", diagnostic.id()))
+                    .ok()?,
+            })
+        })
+        .flatten();
+
+    let mut related_information = Vec::new();
+
+    related_information.extend(
+        diagnostic
+            .secondary_annotations()
+            .filter_map(|annotation| annotation_to_related_information(db, annotation, encoding)),
+    );
+
+    for sub_diagnostic in diagnostic.sub_diagnostics() {
+        related_information.extend(sub_diagnostic_to_related_information(
+            db,
+            sub_diagnostic,
+            encoding,
+        ));
+
+        related_information.extend(
+            sub_diagnostic
+                .annotations()
+                .iter()
+                .filter_map(|annotation| {
+                    annotation_to_related_information(db, annotation, encoding)
+                }),
+        );
+    }
+
     Diagnostic {
         range,
         severity: Some(severity),
         tags,
         code: Some(NumberOrString::String(diagnostic.id().to_string())),
-        code_description: None,
+        code_description,
         source: Some("ty".into()),
         message: diagnostic.concise_message().to_string(),
-        related_information: None,
+        related_information: Some(related_information),
         data: None,
     }
+}
+
+fn annotation_to_related_information(
+    db: &dyn Db,
+    annotation: &Annotation,
+    encoding: PositionEncoding,
+) -> Option<lsp_types::DiagnosticRelatedInformation> {
+    let span = annotation.get_span();
+
+    let annotation_message = annotation.get_message()?;
+    let range = FileRange::try_from(span).ok()?;
+    let location = range.to_location(db.upcast(), encoding)?;
+
+    Some(lsp_types::DiagnosticRelatedInformation {
+        location,
+        message: annotation_message.to_string(),
+    })
+}
+
+fn sub_diagnostic_to_related_information(
+    db: &dyn Db,
+    diagnostic: &SubDiagnostic,
+    encoding: PositionEncoding,
+) -> Option<lsp_types::DiagnosticRelatedInformation> {
+    let primary_annotation = diagnostic.primary_annotation()?;
+
+    let span = primary_annotation.get_span();
+    let range = FileRange::try_from(span).ok()?;
+    let location = range.to_location(db.upcast(), encoding)?;
+
+    Some(lsp_types::DiagnosticRelatedInformation {
+        location,
+        message: diagnostic.concise_message().to_string(),
+    })
 }

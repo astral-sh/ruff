@@ -102,7 +102,7 @@ class C[T]:
         return "a"
 
 reveal_type(getattr_static(C[int], "f"))  # revealed: def f(self, x: int) -> str
-reveal_type(getattr_static(C[int], "f").__get__)  # revealed: <method-wrapper `__get__` of `f[int]`>
+reveal_type(getattr_static(C[int], "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
 reveal_type(getattr_static(C[int], "f").__get__(None, C[int]))  # revealed: def f(self, x: int) -> str
 # revealed: bound method C[int].f(x: int) -> str
 reveal_type(getattr_static(C[int], "f").__get__(C[int](), C[int]))

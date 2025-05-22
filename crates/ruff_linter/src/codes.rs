@@ -10,7 +10,7 @@ use crate::registry::{AsRule, Linter};
 use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NoqaCode(&'static str, &'static str);
 
 impl NoqaCode {
@@ -43,6 +43,15 @@ impl PartialEq<&str> for NoqaCode {
             Some(suffix) => suffix == self.1,
             None => false,
         }
+    }
+}
+
+impl serde::Serialize for NoqaCode {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
     }
 }
 
