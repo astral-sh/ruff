@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.11.11
+
+### Preview features
+
+- \[`airflow`\] Add autofixes for `AIR302` and `AIR312` ([#17942](https://github.com/astral-sh/ruff/pull/17942))
+- \[`airflow`\] Move rules from `AIR312` to `AIR302` ([#17940](https://github.com/astral-sh/ruff/pull/17940))
+- \[`airflow`\] Update `AIR301` and `AIR311` with the latest Airflow implementations ([#17985](https://github.com/astral-sh/ruff/pull/17985))
+- \[`flake8-simplify`\] enable fix in preview mode (`SIM117`) ([#18208](https://github.com/astral-sh/ruff/pull/18208))
+
+### Bug fixes
+
+- Match tuple formatting ([#18147](https://github.com/astral-sh/ruff/pull/18147))
+- \[`pylint`\] Fix `PLW1514` not recognizing the `encoding` positional argument of `codecs.open` ([#18109](https://github.com/astral-sh/ruff/pull/18109))
+
+### CLI
+
+- add full option name in formatter warning ([#18217](https://github.com/astral-sh/ruff/pull/18217))
+
+### Documentation
+
+- Fix rendering of admonition in docs ([#18163](https://github.com/astral-sh/ruff/pull/18163))
+- T201/T203 Improve print/pprint docs ([#18130](https://github.com/astral-sh/ruff/pull/18130))
+- \[`flake8-simplify`\] add fix safety section (`SIM110`) ([#18114](https://github.com/astral-sh/ruff/pull/18114))
+- \[`flake8-simplify`\] add fix safety section (`SIM210`) ([#18100](https://github.com/astral-sh/ruff/pull/18100))
+- \[`pylint`\] Fix docs example that produced different output (`PLW0603`) ([#18216](https://github.com/astral-sh/ruff/pull/18216))
+
+### Other changes
+
+- [ty] Use first matching constructor overload when inferring specializations ([#18204](https://github.com/astral-sh/ruff/pull/18204))
+
 ## 0.11.10
 
 ### Preview features
