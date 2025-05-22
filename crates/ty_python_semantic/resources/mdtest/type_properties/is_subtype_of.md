@@ -1157,6 +1157,63 @@ def f(fn: Callable[[int], int]) -> None: ...
 f(a)
 ```
 
+### Classes with `__call__` defined as attribute
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Callable, Any, Self
+from ty_extensions import static_assert, is_subtype_of
+
+class A:
+    def method1(self, a: int) -> int:
+        return a
+
+    def __init__(self):
+        self.__call__ = self.method1
+
+class B:
+    def method1(self, b: int) -> int:
+        return b
+    __call__ = method1
+
+class C:
+    def method1(self, c: int) -> int:
+        return c
+    __call__: Callable[[Self, int], int] = method1
+
+class D:
+    __call__: Callable[[Self, int], int] = lambda self, d: d
+
+static_assert(not is_subtype_of(A, Callable[[int], int]))
+static_assert(not is_subtype_of(A, Callable[[int, int], int]))
+static_assert(not is_subtype_of(A, Callable[[int], str]))
+static_assert(not is_subtype_of(A, Callable[[str], int]))
+static_assert(not is_subtype_of(A, Callable[[str], str]))
+
+# __call__ is not declared, so we infer a union with Unknown, which is not fully static
+static_assert(not is_subtype_of(B, Callable[[int], int]))
+static_assert(not is_subtype_of(B, Callable[[int, int], int]))
+static_assert(not is_subtype_of(B, Callable[[int], str]))
+static_assert(not is_subtype_of(B, Callable[[str], int]))
+static_assert(not is_subtype_of(B, Callable[[str], str]))
+
+static_assert(is_subtype_of(C, Callable[[int], int]))
+static_assert(not is_subtype_of(C, Callable[[C, int], int]))
+static_assert(not is_subtype_of(C, Callable[[int], str]))
+static_assert(not is_subtype_of(C, Callable[[str], int]))
+static_assert(not is_subtype_of(C, Callable[[str], str]))
+
+static_assert(is_subtype_of(D, Callable[[int], int]))
+static_assert(not is_subtype_of(D, Callable[[D, int], int]))
+static_assert(not is_subtype_of(D, Callable[[int], str]))
+static_assert(not is_subtype_of(D, Callable[[str], int]))
+static_assert(not is_subtype_of(D, Callable[[str], str]))
+```
+
 ### Class literals
 
 #### Classes with metaclasses
