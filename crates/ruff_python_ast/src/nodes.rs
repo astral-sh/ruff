@@ -839,6 +839,11 @@ bitflags! {
 /// Flags that can be queried to obtain information
 /// regarding the prefixes and quotes used for an f-string.
 ///
+/// Note: This is identical to [`TStringFlags`] except that
+/// the implementation of the `prefix` method of the
+/// [`StringFlags`] trait returns a variant of
+/// `AnyStringPrefix::Format`.
+///
 /// ## Notes on usage
 ///
 /// If you're using a `Generator` from the `ruff_python_codegen` crate to generate a lint-rule fix
@@ -904,17 +909,38 @@ impl FStringFlags {
     }
 }
 
+// TODO(dylan): the documentation about using
+// `Checker::default_tstring_flags` is not yet
+// correct. This method does not yet exist because
+// introducing it would emit a dead code warning
+// until we call it in lint rules.
+/// Flags that can be queried to obtain information
+/// regarding the prefixes and quotes used for an f-string.
+///
+/// Note: This is identical to [`FStringFlags`] except that
+/// the implementation of the `prefix` method of the
+/// [`StringFlags`] trait returns a variant of
+/// `AnyStringPrefix::Template`.
+///
+/// ## Notes on usage
+///
+/// If you're using a `Generator` from the `ruff_python_codegen` crate to generate a lint-rule fix
+/// from an existing t-string literal, consider passing along the [`FString::flags`] field. If you
+/// don't have an existing literal but have a `Checker` from the `ruff_linter` crate available,
+/// consider using `Checker::default_tstring_flags` to create instances of this struct; this method
+/// will properly handle nested t-strings. For usage that doesn't fit into one of these categories,
+/// the public constructor [`TStringFlags::empty`] can be used.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct TStringFlags(FTStringFlagsInner);
 
 impl TStringFlags {
-    /// Construct a new [`FStringFlags`] with **no flags set**.
+    /// Construct a new [`TStringFlags`] with **no flags set**.
     ///
-    /// See [`FStringFlags::with_quote_style`], [`FStringFlags::with_triple_quotes`], and
-    /// [`FStringFlags::with_prefix`] for ways of setting the quote style (single or double),
+    /// See [`TStringFlags::with_quote_style`], [`TStringFlags::with_triple_quotes`], and
+    /// [`TStringFlags::with_prefix`] for ways of setting the quote style (single or double),
     /// enabling triple quotes, and adding prefixes (such as `r`), respectively.
     ///
-    /// See the documentation for [`FStringFlags`] for additional caveats on this constructor, and
+    /// See the documentation for [`TStringFlags`] for additional caveats on this constructor, and
     /// situations in which alternative ways to construct this struct should be used, especially
     /// when writing lint rules.
     pub fn empty() -> Self {
@@ -1001,9 +1027,9 @@ impl fmt::Debug for FStringFlags {
 }
 
 impl StringFlags for TStringFlags {
-    /// Return `true` if the f-string is triple-quoted, i.e.,
+    /// Return `true` if the t-string is triple-quoted, i.e.,
     /// it begins and ends with three consecutive quote characters.
-    /// For example: `f"""{bar}"""`
+    /// For example: `t"""{bar}"""`
     fn triple_quotes(self) -> TripleQuotes {
         if self.0.contains(FTStringFlagsInner::TRIPLE_QUOTED) {
             TripleQuotes::Yes
@@ -1013,9 +1039,9 @@ impl StringFlags for TStringFlags {
     }
 
     /// Return the quoting style (single or double quotes)
-    /// used by the f-string's opener and closer:
-    /// - `f"{"a"}"` -> `QuoteStyle::Double`
-    /// - `f'{"a"}'` -> `QuoteStyle::Single`
+    /// used by the t-string's opener and closer:
+    /// - `t"{"a"}"` -> `QuoteStyle::Double`
+    /// - `t'{"a"}'` -> `QuoteStyle::Single`
     fn quote_style(self) -> Quote {
         if self.0.contains(FTStringFlagsInner::DOUBLE) {
             Quote::Double
