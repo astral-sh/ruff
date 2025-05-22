@@ -57,13 +57,7 @@ fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &ProjectDatabase) -> Vec
         return vec![];
     };
 
-    let diagnostics = match db.check_file(file) {
-        Ok(diagnostics) => diagnostics,
-        Err(cancelled) => {
-            tracing::info!("Diagnostics computation {cancelled}");
-            return vec![];
-        }
-    };
+    let diagnostics = db.check_file(file);
 
     diagnostics
         .as_slice()
