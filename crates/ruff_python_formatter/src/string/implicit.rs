@@ -19,9 +19,8 @@ use crate::prelude::*;
 use crate::string::docstring::needs_chaperone_space;
 use crate::string::normalize::{
     QuoteMetadata, is_fstring_with_quoted_debug_expression,
-    is_fstring_with_quoted_format_spec_and_debug,
     is_fstring_with_triple_quoted_literal_expression_containing_quotes,
-    is_tstring_with_quoted_format_spec_and_debug,
+    is_ftstring_with_quoted_format_spec_and_debug,
 };
 use crate::string::{StringLikeExtensions, StringNormalizer, StringQuotes, normalize_string};
 
@@ -175,7 +174,11 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                             return None;
                         }
                         if context.options().target_version().supports_pep_701() {
-                            if is_fstring_with_quoted_format_spec_and_debug(fstring, context) {
+                            if is_ftstring_with_quoted_format_spec_and_debug(
+                                &fstring.elements,
+                                fstring.flags.into(),
+                                context,
+                            ) {
                                 if preserve_quotes_requirement
                                     .is_some_and(|quote| quote != part.flags().quote_style())
                                 {
@@ -201,7 +204,11 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                         }
                     }
                     StringLikePart::TString(tstring) => {
-                        if is_tstring_with_quoted_format_spec_and_debug(tstring, context) {
+                        if is_ftstring_with_quoted_format_spec_and_debug(
+                            &tstring.elements,
+                            tstring.flags.into(),
+                            context,
+                        ) {
                             if preserve_quotes_requirement
                                 .is_some_and(|quote| quote != part.flags().quote_style())
                             {
