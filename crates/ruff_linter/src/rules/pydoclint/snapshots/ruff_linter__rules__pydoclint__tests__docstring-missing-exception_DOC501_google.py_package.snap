@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC501_google.py:54:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
+__init__.py:54:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
    |
 52 |   # DOC501
 53 |   def calculate_speed(distance: float, time: float) -> float:
@@ -20,7 +20,7 @@ DOC501_google.py:54:5: DOC501 Raised exception `FasterThanLightError` missing fr
    |
    = help: Add `FasterThanLightError` to the docstring
 
-DOC501_google.py:71:5: DOC501 Raised exception `ValueError` missing from docstring
+__init__.py:71:5: DOC501 Raised exception `ValueError` missing from docstring
    |
 69 |   # DOC501
 70 |   def calculate_speed(distance: float, time: float) -> float:
@@ -39,7 +39,7 @@ DOC501_google.py:71:5: DOC501 Raised exception `ValueError` missing from docstri
    |
    = help: Add `ValueError` to the docstring
 
-DOC501_google.py:71:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
+__init__.py:71:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
    |
 69 |   # DOC501
 70 |   def calculate_speed(distance: float, time: float) -> float:
@@ -58,7 +58,7 @@ DOC501_google.py:71:5: DOC501 Raised exception `FasterThanLightError` missing fr
    |
    = help: Add `FasterThanLightError` to the docstring
 
-DOC501_google.py:126:5: DOC501 Raised exception `AnotherError` missing from docstring
+__init__.py:126:5: DOC501 Raised exception `AnotherError` missing from docstring
     |
 124 |   # DOC501
 125 |   def calculate_speed(distance: float, time: float) -> float:
@@ -76,7 +76,7 @@ DOC501_google.py:126:5: DOC501 Raised exception `AnotherError` missing from docs
     |
     = help: Add `AnotherError` to the docstring
 
-DOC501_google.py:140:5: DOC501 Raised exception `AnotherError` missing from docstring
+__init__.py:140:5: DOC501 Raised exception `AnotherError` missing from docstring
     |
 138 |   # DOC501
 139 |   def calculate_speed(distance: float, time: float) -> float:
@@ -94,7 +94,7 @@ DOC501_google.py:140:5: DOC501 Raised exception `AnotherError` missing from docs
     |
     = help: Add `AnotherError` to the docstring
 
-DOC501_google.py:154:5: DOC501 Raised exception `SomeError` missing from docstring
+__init__.py:154:5: DOC501 Raised exception `SomeError` missing from docstring
     |
 152 |   # DOC501
 153 |   def foo(bar: int):
@@ -108,7 +108,7 @@ DOC501_google.py:154:5: DOC501 Raised exception `SomeError` missing from docstri
     |
     = help: Add `SomeError` to the docstring
 
-DOC501_google.py:217:5: DOC501 Raised exception `ZeroDivisionError` missing from docstring
+__init__.py:217:5: DOC501 Raised exception `ZeroDivisionError` missing from docstring
     |
 215 |   # DOC501
 216 |   def calculate_speed(distance: float, time: float) -> float:
@@ -130,7 +130,7 @@ DOC501_google.py:217:5: DOC501 Raised exception `ZeroDivisionError` missing from
     |
     = help: Add `ZeroDivisionError` to the docstring
 
-DOC501_google.py:258:5: DOC501 Raised exception `TypeError` missing from docstring
+__init__.py:258:5: DOC501 Raised exception `TypeError` missing from docstring
     |
 257 |   def foo():
 258 | /     """Foo.
@@ -144,7 +144,7 @@ DOC501_google.py:258:5: DOC501 Raised exception `TypeError` missing from docstri
     |
     = help: Add `TypeError` to the docstring
 
-DOC501_google.py:258:5: DOC501 Raised exception `ValueError` missing from docstring
+__init__.py:258:5: DOC501 Raised exception `ValueError` missing from docstring
     |
 257 |   def foo():
 258 | /     """Foo.
