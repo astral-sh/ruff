@@ -1,0 +1,59 @@
+---
+source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
+assertion_line: 178
+---
+TID254.py:5:1: TID254 `os.system` is banned: Use subprocess.run instead
+  |
+4 | # These should trigger
+5 | os.system("ls")  # TID254
+  | ^^^^^^^^^^^^^^^ TID254
+6 | os.popen("ls")  # TID254
+  |
+
+TID254.py:6:1: TID254 `os.popen` is banned: Use subprocess.run instead
+  |
+4 | # These should trigger
+5 | os.system("ls")  # TID254
+6 | os.popen("ls")  # TID254
+  | ^^^^^^^^^^^^^^ TID254
+7 |
+8 | # These should not trigger
+  |
+
+TID254.py:14:1: TID254 `os.system` is banned: Use subprocess.run instead
+   |
+12 | # Test with aliased imports
+13 | from os import system
+14 | system("ls")  # TID254
+   | ^^^^^^^^^^^^ TID254
+15 |
+16 | # Test with renamed imports
+   |
+
+TID254.py:18:1: TID254 `os.system` is banned: Use subprocess.run instead
+   |
+16 | # Test with renamed imports
+17 | from os import system as run_cmd
+18 | run_cmd("ls")  # TID254
+   | ^^^^^^^^^^^^^ TID254
+19 |
+20 | # Test with module alias
+   |
+
+TID254.py:22:1: TID254 `os.system` is banned: Use subprocess.run instead
+   |
+20 | # Test with module alias
+21 | import os as operating_system
+22 | operating_system.system("ls")  # TID254
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID254
+23 |
+24 | # Test with third-party modules that may not be semantically resolvable
+   |
+
+TID254.py:26:1: TID254 `example.function` is banned: Do not use example.function
+   |
+24 | # Test with third-party modules that may not be semantically resolvable
+25 | import example
+26 | example.function("argument")  # TID254
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID254
+   |
