@@ -6,11 +6,11 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ruff_diagnostics::{Edit, Fix, IsolationLevel, SourceMap};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::linter::FixTable;
-use crate::message::{DiagnosticMessage, Message};
-use crate::registry::{AsRule, Rule};
-use crate::settings::types::UnsafeFixes;
 use crate::Locator;
+use crate::linter::FixTable;
+use crate::message::Message;
+use crate::registry::Rule;
+use crate::settings::types::UnsafeFixes;
 
 pub(crate) mod codemods;
 pub(crate) mod edits;
@@ -35,11 +35,9 @@ pub(crate) fn fix_file(
 
     let mut with_fixes = messages
         .iter()
-        .filter_map(Message::as_diagnostic_message)
         .filter(|message| {
             message
-                .fix
-                .as_ref()
+                .fix()
                 .is_some_and(|fix| fix.applies(required_applicability))
         })
         .peekable();
@@ -53,7 +51,7 @@ pub(crate) fn fix_file(
 
 /// Apply a series of fixes.
 fn apply_fixes<'a>(
-    diagnostics: impl Iterator<Item = &'a DiagnosticMessage>,
+    diagnostics: impl Iterator<Item = &'a Message>,
     locator: &'a Locator<'a>,
 ) -> FixResult {
     let mut output = String::with_capacity(locator.len());
@@ -64,12 +62,8 @@ fn apply_fixes<'a>(
     let mut source_map = SourceMap::default();
 
     for (rule, fix) in diagnostics
-        .filter_map(|diagnostic| {
-            diagnostic
-                .fix
-                .as_ref()
-                .map(|fix| (diagnostic.kind.rule(), fix))
-        })
+        .filter_map(|msg| msg.to_rule().map(|rule| (rule, msg)))
+        .filter_map(|(rule, diagnostic)| diagnostic.fix().map(|fix| (rule, fix)))
         .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
     {
         let mut edits = fix
@@ -163,29 +157,29 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
 
 #[cfg(test)]
 mod tests {
-    use ruff_diagnostics::{Edit, Fix, SourceMarker};
+    use ruff_diagnostics::{Diagnostic, Edit, Fix, SourceMarker};
     use ruff_source_file::SourceFileBuilder;
     use ruff_text_size::{Ranged, TextSize};
 
-    use crate::fix::{apply_fixes, FixResult};
-    use crate::message::DiagnosticMessage;
-    use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
     use crate::Locator;
+    use crate::fix::{FixResult, apply_fixes};
+    use crate::message::Message;
+    use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
 
     fn create_diagnostics(
         filename: &str,
         source: &str,
         edit: impl IntoIterator<Item = Edit>,
-    ) -> Vec<DiagnosticMessage> {
+    ) -> Vec<Message> {
         edit.into_iter()
-            .map(|edit| DiagnosticMessage {
+            .map(|edit| {
                 // The choice of rule here is arbitrary.
-                kind: MissingNewlineAtEndOfFile.into(),
-                range: edit.range(),
-                fix: Some(Fix::safe_edit(edit)),
-                parent: None,
-                file: SourceFileBuilder::new(filename, source).finish(),
-                noqa_offset: TextSize::default(),
+                let diagnostic = Diagnostic::new(MissingNewlineAtEndOfFile, edit.range());
+                Message::from_diagnostic(
+                    diagnostic.with_fix(Fix::safe_edit(edit)),
+                    SourceFileBuilder::new(filename, source).finish(),
+                    None,
+                )
             })
             .collect()
     }

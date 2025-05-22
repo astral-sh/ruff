@@ -13,7 +13,7 @@ use ruff_python_ast::PythonVersion;
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::module_resolver::typeshed::{vendored_typeshed_versions, TypeshedVersions};
+use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::site_packages::{PythonEnvironment, SitePackagesDiscoveryError, SysPrefixPathOrigin};
 use crate::{Program, PythonPath, SearchPathSettings};
 
@@ -39,22 +39,24 @@ pub(crate) fn resolve_module_query<'db>(
     let name = module_name.name(db);
     let _span = tracing::trace_span!("resolve_module", %name).entered();
 
-    let Some((search_path, resolved_module)) = resolve_name(db, name) else {
+    let Some(resolved) = resolve_name(db, name) else {
         tracing::debug!("Module `{name}` not found in search paths");
         return None;
     };
 
-    tracing::trace!(
-        "Resolved module `{name}` to `{path}`",
-        path = resolved_module.file.path(db)
-    );
-
-    let module = Module::new(
-        name.clone(),
-        resolved_module.kind,
-        search_path,
-        resolved_module.file,
-    );
+    let module = match resolved {
+        ResolvedName::FileModule(module) => {
+            tracing::trace!(
+                "Resolved module `{name}` to `{path}`",
+                path = module.file.path(db)
+            );
+            Module::file_module(name.clone(), module.kind, module.search_path, module.file)
+        }
+        ResolvedName::NamespacePackage => {
+            tracing::trace!("Module `{name}` is a namespace package");
+            Module::namespace_package(name.clone())
+        }
+    };
 
     Some(module)
 }
@@ -117,8 +119,9 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     // root paths, but that the module corresponding to `path` is in a lower priority search path,
     // in which case we ignore it.
     let module = resolve_module(db, &module_name)?;
+    let module_file = module.file()?;
 
-    if file.path(db) == module.file().path(db) {
+    if file.path(db) == module_file.path(db) {
         Some(module)
     } else {
         // This path is for a module with the same name but with a different precedence. For example:
@@ -616,7 +619,7 @@ struct ModuleNameIngredient<'db> {
 
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
-fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, ResolvedModule)> {
+fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<ResolvedName> {
     let program = Program::get(db);
     let python_version = program.python_version(db);
     let resolver_state = ResolverContext::new(db, python_version);
@@ -625,6 +628,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, ResolvedM
 
     let name = RelaxedModuleName::new(name);
     let stub_name = name.to_stub_package();
+    let mut is_namespace_package = false;
 
     for search_path in search_paths(db) {
         // When a builtin module is imported, standard module resolution is bypassed:
@@ -636,13 +640,18 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, ResolvedM
         }
 
         if !search_path.is_standard_library() {
-            match resolve_module_in_search_path(&resolver_state, &stub_name, search_path) {
-                Ok(resolved_module) => {
-                    if resolved_module.package_kind.is_root() && resolved_module.kind.is_module() {
-                        tracing::trace!("Search path '{search_path} contains a module named `{stub_name}` but a standalone module isn't a valid stub.");
+            match resolve_name_in_search_path(&resolver_state, &stub_name, search_path) {
+                Ok((package_kind, ResolvedName::FileModule(module))) => {
+                    if package_kind.is_root() && module.kind.is_module() {
+                        tracing::trace!(
+                            "Search path '{search_path} contains a module named `{stub_name}` but a standalone module isn't a valid stub."
+                        );
                     } else {
-                        return Some((search_path.clone(), resolved_module));
+                        return Some(ResolvedName::FileModule(module));
                     }
+                }
+                Ok((_, ResolvedName::NamespacePackage)) => {
+                    is_namespace_package = true;
                 }
                 Err(PackageKind::Root) => {
                     tracing::trace!(
@@ -668,8 +677,13 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, ResolvedM
             }
         }
 
-        match resolve_module_in_search_path(&resolver_state, &name, search_path) {
-            Ok(resolved_module) => return Some((search_path.clone(), resolved_module)),
+        match resolve_name_in_search_path(&resolver_state, &name, search_path) {
+            Ok((_, ResolvedName::FileModule(module))) => {
+                return Some(ResolvedName::FileModule(module));
+            }
+            Ok((_, ResolvedName::NamespacePackage)) => {
+                is_namespace_package = true;
+            }
             Err(kind) => match kind {
                 PackageKind::Root => {
                     tracing::trace!(
@@ -691,21 +705,36 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, ResolvedM
         }
     }
 
+    if is_namespace_package {
+        return Some(ResolvedName::NamespacePackage);
+    }
+
     None
 }
 
 #[derive(Debug)]
-struct ResolvedModule {
+enum ResolvedName {
+    /// A module that resolves to a file.
+    FileModule(ResolvedFileModule),
+
+    /// The module name resolved to a namespace package.
+    ///
+    /// For example, `from opentelemetry import trace, metrics` where `opentelemetry` is a namespace package (and `trace` and `metrics` are sub packages).
+    NamespacePackage,
+}
+
+#[derive(Debug)]
+struct ResolvedFileModule {
     kind: ModuleKind,
-    package_kind: PackageKind,
+    search_path: SearchPath,
     file: File,
 }
 
-fn resolve_module_in_search_path(
+fn resolve_name_in_search_path(
     context: &ResolverContext,
     name: &RelaxedModuleName,
     search_path: &SearchPath,
-) -> Result<ResolvedModule, PackageKind> {
+) -> Result<(PackageKind, ResolvedName), PackageKind> {
     let mut components = name.components();
     let module_name = components.next_back().unwrap();
 
@@ -718,22 +747,55 @@ fn resolve_module_in_search_path(
     // Check for a regular package first (highest priority)
     package_path.push("__init__");
     if let Some(regular_package) = resolve_file_module(&package_path, context) {
-        return Ok(ResolvedModule {
-            file: regular_package,
-            kind: ModuleKind::Package,
-            package_kind: resolved_package.kind,
-        });
+        return Ok((
+            resolved_package.kind,
+            ResolvedName::FileModule(ResolvedFileModule {
+                search_path: search_path.clone(),
+                kind: ModuleKind::Package,
+                file: regular_package,
+            }),
+        ));
     }
 
     // Check for a file module next
     package_path.pop();
 
     if let Some(file_module) = resolve_file_module(&package_path, context) {
-        return Ok(ResolvedModule {
-            file: file_module,
-            kind: ModuleKind::Module,
-            package_kind: resolved_package.kind,
-        });
+        return Ok((
+            resolved_package.kind,
+            ResolvedName::FileModule(ResolvedFileModule {
+                file: file_module,
+                kind: ModuleKind::Module,
+                search_path: search_path.clone(),
+            }),
+        ));
+    }
+
+    // Last resort, check if a folder with the given name exists.
+    // If so, then this is a namespace package.
+    // We need to skip this check for typeshed because the `resolve_file_module` can also return `None`
+    // if the `__init__.py` exists but isn't available for the current Python version.
+    // Let's assume that the `xml` module is only available on Python 3.11+ and we're resolving for Python 3.10:
+    // * `resolve_file_module("xml/__init__.pyi")` returns `None` even though the file exists but the
+    //   module isn't available for the current Python version.
+    // * The check here would now return `true` because the `xml` directory exists, resulting
+    //   in a false positive for a namespace package.
+    //
+    // Since typeshed doesn't use any namespace packages today (May 2025), simply skip this
+    // check which also helps performance. If typeshed ever uses namespace packages, ensure that
+    // this check also takes the `VERSIONS` file into consideration.
+    if !search_path.is_standard_library() && package_path.is_directory(context) {
+        if let Some(path) = package_path.to_system_path() {
+            let system = context.db.system();
+            if system.case_sensitivity().is_case_sensitive()
+                || system.path_exists_case_sensitive(
+                    &path,
+                    package_path.search_path().as_system_path().unwrap(),
+                )
+            {
+                return Ok((resolved_package.kind, ResolvedName::NamespacePackage));
+            }
+        }
     }
 
     Err(resolved_package.kind)
@@ -904,19 +966,19 @@ impl fmt::Display for RelaxedModuleName {
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::files::{system_path_to_file, File, FilePath};
+    use ruff_db::Db;
+    use ruff_db::files::{File, FilePath, system_path_to_file};
     use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _};
     use ruff_db::testing::{
         assert_const_function_query_was_not_run, assert_function_query_was_not_run,
     };
-    use ruff_db::Db;
     use ruff_python_ast::PythonVersion;
 
     use crate::db::tests::TestDb;
     use crate::module_name::ModuleName;
     use crate::module_resolver::module::ModuleKind;
     use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
-    use crate::{ProgramSettings, PythonPlatform};
+    use crate::{ProgramSettings, PythonPlatform, PythonVersionWithSource};
 
     use super::*;
 
@@ -935,11 +997,11 @@ mod tests {
         );
 
         assert_eq!("foo", foo_module.name());
-        assert_eq!(&src, foo_module.search_path());
+        assert_eq!(&src, foo_module.search_path().unwrap());
         assert_eq!(ModuleKind::Module, foo_module.kind());
 
         let expected_foo_path = src.join("foo.py");
-        assert_eq!(&expected_foo_path, foo_module.file().path(&db));
+        assert_eq!(&expected_foo_path, foo_module.file().unwrap().path(&db));
         assert_eq!(
             Some(foo_module),
             path_to_module(&db, &FilePath::System(expected_foo_path))
@@ -956,7 +1018,10 @@ mod tests {
         let builtins_module_name = ModuleName::new_static("builtins").unwrap();
         let builtins = resolve_module(&db, &builtins_module_name).expect("builtins to resolve");
 
-        assert_eq!(builtins.file().path(&db), &stdlib.join("builtins.pyi"));
+        assert_eq!(
+            builtins.file().unwrap().path(&db),
+            &stdlib.join("builtins.pyi")
+        );
     }
 
     #[test]
@@ -977,7 +1042,10 @@ mod tests {
         let builtins_module_name = ModuleName::new_static("builtins").unwrap();
         let builtins = resolve_module(&db, &builtins_module_name).expect("builtins to resolve");
 
-        assert_eq!(builtins.file().path(&db), &stdlib.join("builtins.pyi"));
+        assert_eq!(
+            builtins.file().unwrap().path(&db),
+            &stdlib.join("builtins.pyi")
+        );
     }
 
     #[test]
@@ -1000,11 +1068,14 @@ mod tests {
             resolve_module(&db, &functools_module_name).as_ref()
         );
 
-        assert_eq!(&stdlib, functools_module.search_path());
+        assert_eq!(&stdlib, functools_module.search_path().unwrap());
         assert_eq!(ModuleKind::Module, functools_module.kind());
 
         let expected_functools_path = stdlib.join("functools.pyi");
-        assert_eq!(&expected_functools_path, functools_module.file().path(&db));
+        assert_eq!(
+            &expected_functools_path,
+            functools_module.file().unwrap().path(&db)
+        );
 
         assert_eq!(
             Some(functools_module),
@@ -1050,7 +1121,7 @@ mod tests {
             let resolved_module = resolve_module(&db, &module_name).unwrap_or_else(|| {
                 panic!("Expected module {module_name} to exist in the mock stdlib")
             });
-            let search_path = resolved_module.search_path();
+            let search_path = resolved_module.search_path().unwrap();
             assert_eq!(
                 &stdlib, search_path,
                 "Search path for {module_name} was unexpectedly {search_path:?}"
@@ -1146,7 +1217,7 @@ mod tests {
             let resolved_module = resolve_module(&db, &module_name).unwrap_or_else(|| {
                 panic!("Expected module {module_name} to exist in the mock stdlib")
             });
-            let search_path = resolved_module.search_path();
+            let search_path = resolved_module.search_path().unwrap();
             assert_eq!(
                 &stdlib, search_path,
                 "Search path for {module_name} was unexpectedly {search_path:?}"
@@ -1207,9 +1278,12 @@ mod tests {
             Some(&functools_module),
             resolve_module(&db, &functools_module_name).as_ref()
         );
-        assert_eq!(&src, functools_module.search_path());
+        assert_eq!(&src, functools_module.search_path().unwrap());
         assert_eq!(ModuleKind::Module, functools_module.kind());
-        assert_eq!(&src.join("functools.py"), functools_module.file().path(&db));
+        assert_eq!(
+            &src.join("functools.py"),
+            functools_module.file().unwrap().path(&db)
+        );
 
         assert_eq!(
             Some(functools_module),
@@ -1228,9 +1302,9 @@ mod tests {
         let pydoc_data_topics = resolve_module(&db, &pydoc_data_topics_name).unwrap();
 
         assert_eq!("pydoc_data.topics", pydoc_data_topics.name());
-        assert_eq!(pydoc_data_topics.search_path(), &stdlib);
+        assert_eq!(pydoc_data_topics.search_path().unwrap(), &stdlib);
         assert_eq!(
-            pydoc_data_topics.file().path(&db),
+            pydoc_data_topics.file().unwrap().path(&db),
             &stdlib.join("pydoc_data/topics.pyi")
         );
     }
@@ -1245,8 +1319,8 @@ mod tests {
         let foo_module = resolve_module(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
 
         assert_eq!("foo", foo_module.name());
-        assert_eq!(&src, foo_module.search_path());
-        assert_eq!(&foo_path, foo_module.file().path(&db));
+        assert_eq!(&src, foo_module.search_path().unwrap());
+        assert_eq!(&foo_path, foo_module.file().unwrap().path(&db));
 
         assert_eq!(
             Some(&foo_module),
@@ -1272,8 +1346,8 @@ mod tests {
         let foo_module = resolve_module(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
         let foo_init_path = src.join("foo/__init__.py");
 
-        assert_eq!(&src, foo_module.search_path());
-        assert_eq!(&foo_init_path, foo_module.file().path(&db));
+        assert_eq!(&src, foo_module.search_path().unwrap());
+        assert_eq!(&foo_init_path, foo_module.file().unwrap().path(&db));
         assert_eq!(ModuleKind::Package, foo_module.kind());
 
         assert_eq!(
@@ -1287,25 +1361,6 @@ mod tests {
     }
 
     #[test]
-    fn single_file_takes_priority_over_namespace_package() {
-        //const SRC: &[FileSpec] = &[("foo.py", "x = 1")];
-        const SRC: &[FileSpec] = &[("foo.py", "x = 1"), ("foo/bar.py", "x = 2")];
-
-        let TestCase { db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
-
-        let foo_module_name = ModuleName::new_static("foo").unwrap();
-        let foo_bar_module_name = ModuleName::new_static("foo.bar").unwrap();
-
-        // `foo.py` takes priority over the `foo` namespace package
-        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
-        assert_eq!(foo_module.file().path(&db), &src.join("foo.py"));
-
-        // `foo.bar` isn't recognised as a module
-        let foo_bar_module = resolve_module(&db, &foo_bar_module_name);
-        assert_eq!(foo_bar_module, None);
-    }
-
-    #[test]
     fn typing_stub_over_module() {
         const SRC: &[FileSpec] = &[("foo.py", "print('Hello, world!')"), ("foo.pyi", "x: int")];
 
@@ -1314,8 +1369,8 @@ mod tests {
         let foo = resolve_module(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
         let foo_stub = src.join("foo.pyi");
 
-        assert_eq!(&src, foo.search_path());
-        assert_eq!(&foo_stub, foo.file().path(&db));
+        assert_eq!(&src, foo.search_path().unwrap());
+        assert_eq!(&foo_stub, foo.file().unwrap().path(&db));
 
         assert_eq!(Some(foo), path_to_module(&db, &FilePath::System(foo_stub)));
         assert_eq!(
@@ -1338,88 +1393,12 @@ mod tests {
             resolve_module(&db, &ModuleName::new_static("foo.bar.baz").unwrap()).unwrap();
         let baz_path = src.join("foo/bar/baz.py");
 
-        assert_eq!(&src, baz_module.search_path());
-        assert_eq!(&baz_path, baz_module.file().path(&db));
+        assert_eq!(&src, baz_module.search_path().unwrap());
+        assert_eq!(&baz_path, baz_module.file().unwrap().path(&db));
 
         assert_eq!(
             Some(baz_module),
             path_to_module(&db, &FilePath::System(baz_path))
-        );
-    }
-
-    #[test]
-    fn namespace_package() {
-        // From [PEP420](https://peps.python.org/pep-0420/#nested-namespace-packages).
-        // But uses `src` for `project1` and `site-packages` for `project2`.
-        // ```
-        // src
-        //   parent
-        //     child
-        //       one.py
-        // site_packages
-        //   parent
-        //     child
-        //       two.py
-        // ```
-        let TestCase {
-            db,
-            src,
-            site_packages,
-            ..
-        } = TestCaseBuilder::new()
-            .with_src_files(&[("parent/child/one.py", "print('Hello, world!')")])
-            .with_site_packages_files(&[("parent/child/two.py", "print('Hello, world!')")])
-            .build();
-
-        let one_module_name = ModuleName::new_static("parent.child.one").unwrap();
-        let one_module_path = FilePath::System(src.join("parent/child/one.py"));
-        assert_eq!(
-            resolve_module(&db, &one_module_name),
-            path_to_module(&db, &one_module_path)
-        );
-
-        let two_module_name = ModuleName::new_static("parent.child.two").unwrap();
-        let two_module_path = FilePath::System(site_packages.join("parent/child/two.py"));
-        assert_eq!(
-            resolve_module(&db, &two_module_name),
-            path_to_module(&db, &two_module_path)
-        );
-    }
-
-    #[test]
-    fn regular_package_in_namespace_package() {
-        // Adopted test case from the [PEP420 examples](https://peps.python.org/pep-0420/#nested-namespace-packages).
-        // The `src/parent/child` package is a regular package. Therefore, `site_packages/parent/child/two.py` should not be resolved.
-        // ```
-        // src
-        //   parent
-        //     child
-        //       one.py
-        // site_packages
-        //   parent
-        //     child
-        //       two.py
-        // ```
-        const SRC: &[FileSpec] = &[
-            ("parent/child/__init__.py", "print('Hello, world!')"),
-            ("parent/child/one.py", "print('Hello, world!')"),
-        ];
-
-        const SITE_PACKAGES: &[FileSpec] = &[("parent/child/two.py", "print('Hello, world!')")];
-
-        let TestCase { db, src, .. } = TestCaseBuilder::new()
-            .with_src_files(SRC)
-            .with_site_packages_files(SITE_PACKAGES)
-            .build();
-
-        let one_module_path = FilePath::System(src.join("parent/child/one.py"));
-        let one_module_name =
-            resolve_module(&db, &ModuleName::new_static("parent.child.one").unwrap());
-        assert_eq!(one_module_name, path_to_module(&db, &one_module_path));
-
-        assert_eq!(
-            None,
-            resolve_module(&db, &ModuleName::new_static("parent.child.two").unwrap())
         );
     }
 
@@ -1438,8 +1417,8 @@ mod tests {
         let foo_module = resolve_module(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
         let foo_src_path = src.join("foo.py");
 
-        assert_eq!(&src, foo_module.search_path());
-        assert_eq!(&foo_src_path, foo_module.file().path(&db));
+        assert_eq!(&src, foo_module.search_path().unwrap());
+        assert_eq!(&foo_src_path, foo_module.file().unwrap().path(&db));
         assert_eq!(
             Some(foo_module),
             path_to_module(&db, &FilePath::System(foo_src_path))
@@ -1456,7 +1435,9 @@ mod tests {
     fn symlink() -> anyhow::Result<()> {
         use anyhow::Context;
 
-        use crate::{program::Program, PythonPlatform};
+        use crate::{
+            PythonPlatform, PythonVersionSource, PythonVersionWithSource, program::Program,
+        };
         use ruff_db::system::{OsSystem, SystemPath};
 
         use crate::db::tests::TestDb;
@@ -1489,7 +1470,10 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersion::PY38,
+                python_version: PythonVersionWithSource {
+                    version: PythonVersion::PY38,
+                    source: PythonVersionSource::default(),
+                },
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -1506,14 +1490,14 @@ mod tests {
 
         assert_ne!(foo_module, bar_module);
 
-        assert_eq!(&src, foo_module.search_path());
-        assert_eq!(&foo, foo_module.file().path(&db));
+        assert_eq!(&src, foo_module.search_path().unwrap());
+        assert_eq!(&foo, foo_module.file().unwrap().path(&db));
 
         // `foo` and `bar` shouldn't resolve to the same file
 
-        assert_eq!(&src, bar_module.search_path());
-        assert_eq!(&bar, bar_module.file().path(&db));
-        assert_eq!(&foo, foo_module.file().path(&db));
+        assert_eq!(&src, bar_module.search_path().unwrap());
+        assert_eq!(&bar, bar_module.file().unwrap().path(&db));
+        assert_eq!(&foo, foo_module.file().unwrap().path(&db));
 
         assert_ne!(&foo_module, &bar_module);
 
@@ -1553,17 +1537,18 @@ mod tests {
 
         let foo_module2 = resolve_module(&db, &foo_module_name);
 
-        assert!(!db
-            .take_salsa_events()
-            .iter()
-            .any(|event| { matches!(event.kind, salsa::EventKind::WillExecute { .. }) }));
+        assert!(
+            !db.take_salsa_events()
+                .iter()
+                .any(|event| { matches!(event.kind, salsa::EventKind::WillExecute { .. }) })
+        );
 
         assert_eq!(Some(foo_module), foo_module2);
     }
 
     #[test]
-    fn adding_file_on_which_module_resolution_depends_invalidates_previously_failing_query_that_now_succeeds(
-    ) -> anyhow::Result<()> {
+    fn adding_file_on_which_module_resolution_depends_invalidates_previously_failing_query_that_now_succeeds()
+    -> anyhow::Result<()> {
         let TestCase { mut db, src, .. } = TestCaseBuilder::new().build();
         let foo_path = src.join("foo.py");
 
@@ -1576,14 +1561,14 @@ mod tests {
         let foo_file = system_path_to_file(&db, &foo_path).expect("foo.py to exist");
 
         let foo_module = resolve_module(&db, &foo_module_name).expect("Foo module to resolve");
-        assert_eq!(foo_file, foo_module.file());
+        assert_eq!(foo_file, foo_module.file().unwrap());
 
         Ok(())
     }
 
     #[test]
-    fn removing_file_on_which_module_resolution_depends_invalidates_previously_successful_query_that_now_fails(
-    ) -> anyhow::Result<()> {
+    fn removing_file_on_which_module_resolution_depends_invalidates_previously_successful_query_that_now_fails()
+    -> anyhow::Result<()> {
         const SRC: &[FileSpec] = &[("foo.py", "x = 1"), ("foo/__init__.py", "x = 2")];
 
         let TestCase { mut db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
@@ -1592,7 +1577,7 @@ mod tests {
         let foo_module = resolve_module(&db, &foo_module_name).expect("foo module to exist");
         let foo_init_path = src.join("foo/__init__.py");
 
-        assert_eq!(&foo_init_path, foo_module.file().path(&db));
+        assert_eq!(&foo_init_path, foo_module.file().unwrap().path(&db));
 
         // Delete `foo/__init__.py` and the `foo` folder. `foo` should now resolve to `foo.py`
         db.memory_file_system().remove_file(&foo_init_path)?;
@@ -1602,7 +1587,7 @@ mod tests {
         File::sync_path(&mut db, foo_init_path.parent().unwrap());
 
         let foo_module = resolve_module(&db, &foo_module_name).expect("Foo module to resolve");
-        assert_eq!(&src.join("foo.py"), foo_module.file().path(&db));
+        assert_eq!(&src.join("foo.py"), foo_module.file().unwrap().path(&db));
 
         Ok(())
     }
@@ -1628,9 +1613,9 @@ mod tests {
         let stdlib_functools_path = stdlib.join("functools.pyi");
 
         let functools_module = resolve_module(&db, &functools_module_name).unwrap();
-        assert_eq!(functools_module.search_path(), &stdlib);
+        assert_eq!(functools_module.search_path().unwrap(), &stdlib);
         assert_eq!(
-            Ok(functools_module.file()),
+            Ok(functools_module.file().unwrap()),
             system_path_to_file(&db, &stdlib_functools_path)
         );
 
@@ -1648,9 +1633,9 @@ mod tests {
             ModuleNameIngredient::new(&db, functools_module_name),
             &events,
         );
-        assert_eq!(functools_module.search_path(), &stdlib);
+        assert_eq!(functools_module.search_path().unwrap(), &stdlib);
         assert_eq!(
-            Ok(functools_module.file()),
+            Ok(functools_module.file().unwrap()),
             system_path_to_file(&db, &stdlib_functools_path)
         );
     }
@@ -1674,9 +1659,9 @@ mod tests {
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
         let functools_module = resolve_module(&db, &functools_module_name).unwrap();
-        assert_eq!(functools_module.search_path(), &stdlib);
+        assert_eq!(functools_module.search_path().unwrap(), &stdlib);
         assert_eq!(
-            Ok(functools_module.file()),
+            Ok(functools_module.file().unwrap()),
             system_path_to_file(&db, stdlib.join("functools.pyi"))
         );
 
@@ -1685,9 +1670,9 @@ mod tests {
         let src_functools_path = src.join("functools.py");
         db.write_file(&src_functools_path, "FOO: int").unwrap();
         let functools_module = resolve_module(&db, &functools_module_name).unwrap();
-        assert_eq!(functools_module.search_path(), &src);
+        assert_eq!(functools_module.search_path().unwrap(), &src);
         assert_eq!(
-            Ok(functools_module.file()),
+            Ok(functools_module.file().unwrap()),
             system_path_to_file(&db, &src_functools_path)
         );
     }
@@ -1716,9 +1701,9 @@ mod tests {
         let src_functools_path = src.join("functools.py");
 
         let functools_module = resolve_module(&db, &functools_module_name).unwrap();
-        assert_eq!(functools_module.search_path(), &src);
+        assert_eq!(functools_module.search_path().unwrap(), &src);
         assert_eq!(
-            Ok(functools_module.file()),
+            Ok(functools_module.file().unwrap()),
             system_path_to_file(&db, &src_functools_path)
         );
 
@@ -1729,9 +1714,9 @@ mod tests {
             .unwrap();
         File::sync_path(&mut db, &src_functools_path);
         let functools_module = resolve_module(&db, &functools_module_name).unwrap();
-        assert_eq!(functools_module.search_path(), &stdlib);
+        assert_eq!(functools_module.search_path().unwrap(), &stdlib);
         assert_eq!(
-            Ok(functools_module.file()),
+            Ok(functools_module.file().unwrap()),
             system_path_to_file(&db, stdlib.join("functools.pyi"))
         );
     }
@@ -1754,11 +1739,11 @@ mod tests {
         let foo_bar_module = resolve_module(&db, &foo_bar_module_name).unwrap();
 
         assert_eq!(
-            foo_module.file().path(&db),
+            foo_module.file().unwrap().path(&db),
             &FilePath::system("/x/src/foo/__init__.py")
         );
         assert_eq!(
-            foo_bar_module.file().path(&db),
+            foo_bar_module.file().unwrap().path(&db),
             &FilePath::system("/x/src/foo/bar.py")
         );
     }
@@ -1785,7 +1770,7 @@ mod tests {
         let bar_module_name = ModuleName::new_static("bar").unwrap();
         let bar_module = resolve_module(&db, &bar_module_name).unwrap();
         assert_eq!(
-            bar_module.file().path(&db),
+            bar_module.file().unwrap().path(&db),
             &FilePath::system("/y/src/bar.py")
         );
     }
@@ -1805,7 +1790,7 @@ mod tests {
         let foo_module = resolve_module(&db, &foo_module_name).unwrap();
 
         assert_eq!(
-            foo_module.file().path(&db),
+            foo_module.file().unwrap().path(&db),
             &FilePath::system("/x/y/src/foo.pyi")
         );
     }
@@ -1856,13 +1841,19 @@ not_a_directory
         let spam_module = resolve_module(&db, &spam_module_name).unwrap();
 
         assert_eq!(
-            foo_module.file().path(&db),
+            foo_module.file().unwrap().path(&db),
             &FilePath::system("/x/y/src/foo.pyi")
         );
-        assert_eq!(a_module.file().path(&db), &FilePath::system("/a.py"));
-        assert_eq!(b_module.file().path(&db), &FilePath::system("/baz/b.py"));
         assert_eq!(
-            spam_module.file().path(&db),
+            a_module.file().unwrap().path(&db),
+            &FilePath::system("/a.py")
+        );
+        assert_eq!(
+            b_module.file().unwrap().path(&db),
+            &FilePath::system("/baz/b.py")
+        );
+        assert_eq!(
+            spam_module.file().unwrap().path(&db),
             &FilePath::System(site_packages.join("spam/spam.py"))
         );
     }
@@ -1883,14 +1874,14 @@ not_a_directory
 
         let foo_module = resolve_module(&db, &foo_module_name).unwrap();
         assert_eq!(
-            foo_module.file().path(&db),
+            foo_module.file().unwrap().path(&db),
             &FilePath::system("/x/src/foo.py")
         );
 
         db.clear_salsa_events();
         let bar_module = resolve_module(&db, &bar_module_name).unwrap();
         assert_eq!(
-            bar_module.file().path(&db),
+            bar_module.file().unwrap().path(&db),
             &FilePath::system("/y/src/bar.py")
         );
         let events = db.take_salsa_events();
@@ -1915,7 +1906,7 @@ not_a_directory
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_module = resolve_module(&db, &foo_module_name).unwrap();
         assert_eq!(
-            foo_module.file().path(&db),
+            foo_module.file().unwrap().path(&db),
             &FilePath::system("/x/src/foo.py")
         );
 
@@ -1943,7 +1934,7 @@ not_a_directory
         let foo_module = resolve_module(&db, &foo_module_name).unwrap();
         let src_path = SystemPathBuf::from("/x/src");
         assert_eq!(
-            foo_module.file().path(&db),
+            foo_module.file().unwrap().path(&db),
             &FilePath::System(src_path.join("foo.py"))
         );
 
@@ -1968,8 +1959,11 @@ not_a_directory
         assert!(search_paths.contains(
             &&SearchPath::first_party(db.system(), SystemPathBuf::from("/src")).unwrap()
         ));
-        assert!(!search_paths
-            .contains(&&SearchPath::editable(db.system(), SystemPathBuf::from("/src")).unwrap()));
+        assert!(
+            !search_paths.contains(
+                &&SearchPath::editable(db.system(), SystemPathBuf::from("/src")).unwrap()
+            )
+        );
     }
 
     #[test]
@@ -1995,7 +1989,7 @@ not_a_directory
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersion::default(),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -2014,7 +2008,10 @@ not_a_directory
         // take precedence over the second `site-packages` directory...
         let a_module_name = ModuleName::new_static("a").unwrap();
         let a_module = resolve_module(&db, &a_module_name).unwrap();
-        assert_eq!(a_module.file().path(&db), &editable_install_location);
+        assert_eq!(
+            a_module.file().unwrap().path(&db),
+            &editable_install_location
+        );
 
         db.memory_file_system()
             .remove_file(&site_packages_pth)
@@ -2025,7 +2022,10 @@ not_a_directory
         // the editable install no longer exists, so the module now resolves to the file in the
         // second `site-packages` directory
         let a_module = resolve_module(&db, &a_module_name).unwrap();
-        assert_eq!(a_module.file().path(&db), &system_site_packages_location);
+        assert_eq!(
+            a_module.file().unwrap().path(&db),
+            &system_site_packages_location
+        );
     }
 
     #[test]
@@ -2068,7 +2068,7 @@ not_a_directory
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersion::default(),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -2087,11 +2087,14 @@ not_a_directory
         // Now lookup the same module using the lowercase `a` and it should resolve to the file in the system site-packages
         let a_module_name = ModuleName::new_static("a").unwrap();
         let a_module = resolve_module(&db, &a_module_name).expect("a.py to resolve");
-        assert!(a_module
-            .file()
-            .path(&db)
-            .as_str()
-            .ends_with("src/a/__init__.py"),);
+        assert!(
+            a_module
+                .file()
+                .unwrap()
+                .path(&db)
+                .as_str()
+                .ends_with("src/a/__init__.py"),
+        );
 
         Ok(())
     }
@@ -2108,7 +2111,7 @@ not_a_directory
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersion::default(),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -2122,6 +2125,6 @@ not_a_directory
 
         let foo_module_file = File::new(&db, FilePath::System(installed_foo_module));
         let module = file_to_module(&db, foo_module_file).unwrap();
-        assert_eq!(module.search_path(), &site_packages);
+        assert_eq!(module.search_path().unwrap(), &site_packages);
     }
 }

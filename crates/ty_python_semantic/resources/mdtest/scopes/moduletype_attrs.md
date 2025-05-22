@@ -15,6 +15,15 @@ reveal_type(__package__)  # revealed: str | None
 reveal_type(__doc__)  # revealed: str | None
 reveal_type(__spec__)  # revealed: ModuleSpec | None
 reveal_type(__path__)  # revealed: MutableSequence[str]
+reveal_type(__builtins__)  # revealed: Any
+
+import sys
+
+reveal_type(sys.__builtins__)  # revealed: Any
+
+from builtins import __builtins__ as __bi__
+
+reveal_type(__bi__)  # revealed: Any
 
 class X:
     reveal_type(__name__)  # revealed: str

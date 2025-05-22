@@ -9,8 +9,8 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::PreviewMode;
     use crate::settings::LinterSettings;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -59,6 +59,7 @@ mod tests {
     }
 
     #[test_case(Rule::IfElseBlockInsteadOfIfExp, Path::new("SIM108.py"))]
+    #[test_case(Rule::MultipleWithStatements, Path::new("SIM117.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

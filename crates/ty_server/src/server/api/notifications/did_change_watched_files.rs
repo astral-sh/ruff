@@ -1,15 +1,15 @@
-use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
+use crate::server::Result;
 use crate::server::api::LSPResult;
+use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::server::client::{Notifier, Requester};
 use crate::server::schedule::Task;
-use crate::server::Result;
 use crate::session::Session;
-use crate::system::{url_to_any_system_path, AnySystemPath};
+use crate::system::{AnySystemPath, url_to_any_system_path};
 use lsp_types as types;
-use lsp_types::{notification as notif, FileChangeType};
+use lsp_types::{FileChangeType, notification as notif};
 use rustc_hash::FxHashMap;
-use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::Db;
+use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 
 pub(crate) struct DidChangeWatchedFiles;
 

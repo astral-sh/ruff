@@ -1,0 +1,62 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid.md - Tests for invalid types in type expressions - Diagnostics for common errors - Module-literal used when you meant to use a class from that module
+mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/invalid.md
+---
+
+# Python source files
+
+## foo.py
+
+```
+1 | import datetime
+2 | 
+3 | def f(x: datetime): ...  # error: [invalid-type-form]
+```
+
+## PIL/Image.py
+
+```
+1 | class Image: ...
+```
+
+## bar.py
+
+```
+1 | from PIL import Image
+2 | 
+3 | def g(x: Image): ...  # error: [invalid-type-form]
+```
+
+# Diagnostics
+
+```
+error[invalid-type-form]: Variable of type `<module 'datetime'>` is not allowed in a type expression
+ --> src/foo.py:3:10
+  |
+1 | import datetime
+2 |
+3 | def f(x: datetime): ...  # error: [invalid-type-form]
+  |          ^^^^^^^^
+  |
+info: Did you mean to use the module's member `datetime.datetime` instead?
+info: rule `invalid-type-form` is enabled by default
+
+```
+
+```
+error[invalid-type-form]: Variable of type `<module 'PIL.Image'>` is not allowed in a type expression
+ --> src/bar.py:3:10
+  |
+1 | from PIL import Image
+2 |
+3 | def g(x: Image): ...  # error: [invalid-type-form]
+  |          ^^^^^
+  |
+info: Did you mean to use the module's member `Image.Image` instead?
+info: rule `invalid-type-form` is enabled by default
+
+```

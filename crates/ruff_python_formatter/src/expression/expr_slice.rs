@@ -1,10 +1,10 @@
-use ruff_formatter::{write, FormatError};
+use ruff_formatter::{FormatError, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprSlice, ExprUnaryOp, UnaryOp};
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::comments::{dangling_comments, SourceComment};
+use crate::comments::{SourceComment, dangling_comments};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 

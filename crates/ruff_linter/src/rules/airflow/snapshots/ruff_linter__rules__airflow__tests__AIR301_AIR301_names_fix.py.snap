@@ -10,25 +10,19 @@ AIR301_names_fix.py:19:1: AIR301 [*] `airflow.api_connexion.security.requires_ac
 20 |
 21 | DatasetDetails()
    |
-   = help: Use `airflow.api_connexion.security.requires_access_asset` instead
+   = help: Use `airflow.api_fastapi.core_api.security.requires_access_asset` instead
 
 ℹ Safe fix
-1  1  | from __future__ import annotations
-2  2  | 
-3     |-from airflow.api_connexion.security import requires_access_dataset
-   3  |+from airflow.api_connexion.security import requires_access_dataset, requires_access_asset
-4  4  | from airflow.auth.managers.models.resource_details import (
-5  5  |     DatasetDetails,
-6  6  |     is_authorized_dataset,
---------------------------------------------------------------------------------
+15 15 | from airflow.secrets.local_filesystm import load_connections
 16 16 | from airflow.security.permissions import RESOURCE_DATASET
 17 17 | from airflow.www.auth import has_access_dataset
-18 18 | 
+   18 |+from airflow.api_fastapi.core_api.security import requires_access_asset
+18 19 | 
 19    |-requires_access_dataset()
-   19 |+requires_access_asset()
-20 20 | 
-21 21 | DatasetDetails()
-22 22 | is_authorized_dataset()
+   20 |+requires_access_asset()
+20 21 | 
+21 22 | DatasetDetails()
+22 23 | 
 
 AIR301_names_fix.py:21:1: AIR301 [*] `airflow.auth.managers.models.resource_details.DatasetDetails` is removed in Airflow 3.0
    |
@@ -36,7 +30,6 @@ AIR301_names_fix.py:21:1: AIR301 [*] `airflow.auth.managers.models.resource_deta
 20 |
 21 | DatasetDetails()
    | ^^^^^^^^^^^^^^ AIR301
-22 | is_authorized_dataset()
    |
    = help: Use `airflow.api_fastapi.auth.managers.models.resource_details.AssetDetails` instead
 
@@ -50,14 +43,12 @@ AIR301_names_fix.py:21:1: AIR301 [*] `airflow.auth.managers.models.resource_deta
 20 21 | 
 21    |-DatasetDetails()
    22 |+AssetDetails()
-22 23 | is_authorized_dataset()
+22 23 | 
 23 24 | 
 24 25 | DatasetManager()
 
 AIR301_names_fix.py:24:1: AIR301 [*] `airflow.datasets.manager.DatasetManager` is removed in Airflow 3.0
    |
-22 | is_authorized_dataset()
-23 |
 24 | DatasetManager()
    | ^^^^^^^^^^^^^^ AIR301
 25 | dataset_manager()
@@ -74,7 +65,7 @@ AIR301_names_fix.py:24:1: AIR301 [*] `airflow.datasets.manager.DatasetManager` i
 19 20 | requires_access_dataset()
 20 21 | 
 21 22 | DatasetDetails()
-22 23 | is_authorized_dataset()
+22 23 | 
 23 24 | 
 24    |-DatasetManager()
    25 |+AssetManager()
@@ -100,7 +91,7 @@ AIR301_names_fix.py:25:1: AIR301 [*] `airflow.datasets.manager.dataset_manager` 
 19 20 | requires_access_dataset()
 20 21 | 
 --------------------------------------------------------------------------------
-22 23 | is_authorized_dataset()
+22 23 | 
 23 24 | 
 24 25 | DatasetManager()
 25    |-dataset_manager()
@@ -256,7 +247,7 @@ AIR301_names_fix.py:35:1: AIR301 [*] `airflow.security.permissions.RESOURCE_DATA
 37 37 | has_access_dataset()
 38 38 | 
 
-AIR301_names_fix.py:37:1: AIR301 [*] `airflow.www.auth.has_access_dataset` is removed in Airflow 3.0
+AIR301_names_fix.py:37:1: AIR301 `airflow.www.auth.has_access_dataset` is removed in Airflow 3.0
    |
 35 | RESOURCE_DATASET
 36 |
@@ -265,26 +256,6 @@ AIR301_names_fix.py:37:1: AIR301 [*] `airflow.www.auth.has_access_dataset` is re
 38 |
 39 | from airflow.listeners.spec.dataset import (
    |
-   = help: Use `airflow.www.auth.has_access_asset` instead
-
-ℹ Safe fix
-14 14 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
-15 15 | from airflow.secrets.local_filesystm import load_connections
-16 16 | from airflow.security.permissions import RESOURCE_DATASET
-17    |-from airflow.www.auth import has_access_dataset
-   17 |+from airflow.www.auth import has_access_dataset, has_access_asset
-18 18 | 
-19 19 | requires_access_dataset()
-20 20 | 
---------------------------------------------------------------------------------
-34 34 | 
-35 35 | RESOURCE_DATASET
-36 36 | 
-37    |-has_access_dataset()
-   37 |+has_access_asset()
-38 38 | 
-39 39 | from airflow.listeners.spec.dataset import (
-40 40 |     on_dataset_changed,
 
 AIR301_names_fix.py:44:1: AIR301 [*] `airflow.listeners.spec.dataset.on_dataset_created` is removed in Airflow 3.0
    |

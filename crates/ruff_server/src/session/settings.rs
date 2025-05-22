@@ -6,9 +6,9 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 use thiserror::Error;
 
+use ruff_linter::RuleSelector;
 use ruff_linter::line_width::LineLength;
 use ruff_linter::rule_selector::ParseError;
-use ruff_linter::RuleSelector;
 use ruff_workspace::options::Options;
 
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
@@ -52,7 +52,7 @@ pub(crate) struct ResolvedEditorSettings {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) enum ResolvedConfiguration {
     FilePath(PathBuf),
-    Inline(Options),
+    Inline(Box<Options>),
 }
 
 impl TryFrom<&ClientConfiguration> for ResolvedConfiguration {
@@ -68,7 +68,7 @@ impl TryFrom<&ClientConfiguration> for ResolvedConfiguration {
                 if options.extend.is_some() {
                     Err(ResolvedConfigurationError::ExtendNotSupported)
                 } else {
-                    Ok(ResolvedConfiguration::Inline(options))
+                    Ok(ResolvedConfiguration::Inline(Box::new(options)))
                 }
             }
         }
@@ -441,11 +441,7 @@ impl ResolvedClientSettings {
             *contains_invalid_settings = true;
             tracing::error!("Unknown rule selectors found in `{key}`: {unknown:?}");
         }
-        if known.is_empty() {
-            None
-        } else {
-            Some(known)
-        }
+        if known.is_empty() { None } else { Some(known) }
     }
 
     /// Attempts to resolve a setting using a list of available client settings as sources.
@@ -991,7 +987,7 @@ mod tests {
                 fix_violation_enable: true,
                 show_syntax_errors: true,
                 editor_settings: ResolvedEditorSettings {
-                    configuration: Some(ResolvedConfiguration::Inline(Options {
+                    configuration: Some(ResolvedConfiguration::Inline(Box::new(Options {
                         line_length: Some(LineLength::try_from(100).unwrap()),
                         lint: Some(LintOptions {
                             common: LintCommonOptions {
@@ -1005,7 +1001,7 @@ mod tests {
                             ..Default::default()
                         }),
                         ..Default::default()
-                    })),
+                    }))),
                     extend_select: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
                     ..Default::default()
                 }

@@ -28,7 +28,7 @@ _bz2: 3.3-
 _codecs: 3.0-
 _collections_abc: 3.3-
 _compat_pickle: 3.1-
-_compression: 3.5-
+_compression: 3.5-3.13
 _contextvars: 3.7-
 _csv: 3.0-
 _ctypes: 3.0-
@@ -78,6 +78,7 @@ _weakrefset: 3.0-
 _winapi: 3.3-
 abc: 3.0-
 aifc: 3.0-3.12
+annotationlib: 3.14-
 antigravity: 3.0-
 argparse: 3.0-
 array: 3.0-
@@ -86,6 +87,7 @@ asynchat: 3.0-3.11
 asyncio: 3.4-
 asyncio.exceptions: 3.8-
 asyncio.format_helpers: 3.7-
+asyncio.graph: 3.14-
 asyncio.mixins: 3.10-
 asyncio.runners: 3.7-
 asyncio.staggered: 3.8-
@@ -117,7 +119,9 @@ collections: 3.0-
 collections.abc: 3.3-
 colorsys: 3.0-
 compileall: 3.0-
+compression: 3.14-
 concurrent: 3.2-
+concurrent.futures.interpreter: 3.14-
 configparser: 3.0-
 contextlib: 3.0-
 contextvars: 3.7-
@@ -226,6 +230,7 @@ os: 3.0-
 ossaudiodev: 3.0-3.12
 parser: 3.0-3.9
 pathlib: 3.4-
+pathlib.types: 3.14-
 pdb: 3.0-
 pickle: 3.0-
 pickletools: 3.0-
@@ -278,6 +283,7 @@ ssl: 3.0-
 stat: 3.0-
 statistics: 3.4-
 string: 3.0-
+string.templatelib: 3.14-
 stringprep: 3.0-
 struct: 3.0-
 subprocess: 3.0-

@@ -2,7 +2,7 @@ import dis
 import enum
 import sys
 import types
-from _typeshed import StrPath
+from _typeshed import AnnotationForm, StrPath
 from collections import OrderedDict
 from collections.abc import AsyncGenerator, Awaitable, Callable, Coroutine, Generator, Mapping, Sequence, Set as AbstractSet
 from types import (
@@ -27,6 +27,9 @@ from types import (
 )
 from typing import Any, ClassVar, Final, Literal, NamedTuple, Protocol, TypeVar, overload
 from typing_extensions import ParamSpec, Self, TypeAlias, TypeGuard, TypeIs
+
+if sys.version_info >= (3, 14):
+    from annotationlib import Format
 
 if sys.version_info >= (3, 11):
     __all__ = [
@@ -139,6 +142,8 @@ if sys.version_info >= (3, 11):
             "getasyncgenstate",
             "BufferFlags",
         ]
+    if sys.version_info >= (3, 14):
+        __all__ += ["CO_HAS_DOCSTRING", "CO_METHOD", "ispackage"]
 
 _P = ParamSpec("_P")
 _T = TypeVar("_T")
@@ -172,6 +177,9 @@ CO_COROUTINE: Final = 128
 CO_ITERABLE_COROUTINE: Final = 256
 CO_ASYNC_GENERATOR: Final = 512
 TPFLAGS_IS_ABSTRACT: Final = 1048576
+if sys.version_info >= (3, 14):
+    CO_HAS_DOCSTRING: Final = 67108864
+    CO_METHOD: Final = 134217728
 
 modulesbyfile: dict[str, Any]
 
@@ -199,6 +207,11 @@ def getmodulename(path: StrPath) -> str | None: ...
 def ismodule(object: object) -> TypeIs[ModuleType]: ...
 def isclass(object: object) -> TypeIs[type[Any]]: ...
 def ismethod(object: object) -> TypeIs[MethodType]: ...
+
+if sys.version_info >= (3, 14):
+    # Not TypeIs because it does not return True for all modules
+    def ispackage(object: object) -> TypeGuard[ModuleType]: ...
+
 def isfunction(object: object) -> TypeIs[FunctionType]: ...
 
 if sys.version_info >= (3, 12):
@@ -294,7 +307,18 @@ _IntrospectableCallable: TypeAlias = Callable[..., Any]
 #
 # Introspecting callables with the Signature object
 #
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 14):
+    def signature(
+        obj: _IntrospectableCallable,
+        *,
+        follow_wrapped: bool = True,
+        globals: Mapping[str, Any] | None = None,
+        locals: Mapping[str, Any] | None = None,
+        eval_str: bool = False,
+        annotation_format: Format = Format.VALUE,  # noqa: Y011
+    ) -> Signature: ...
+
+elif sys.version_info >= (3, 10):
     def signature(
         obj: _IntrospectableCallable,
         *,
@@ -323,7 +347,19 @@ class Signature:
     def bind_partial(self, *args: Any, **kwargs: Any) -> BoundArguments: ...
     def replace(self, *, parameters: Sequence[Parameter] | type[_void] | None = ..., return_annotation: Any = ...) -> Self: ...
     __replace__ = replace
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 14):
+        @classmethod
+        def from_callable(
+            cls,
+            obj: _IntrospectableCallable,
+            *,
+            follow_wrapped: bool = True,
+            globals: Mapping[str, Any] | None = None,
+            locals: Mapping[str, Any] | None = None,
+            eval_str: bool = False,
+            annotation_format: Format = Format.VALUE,  # noqa: Y011
+        ) -> Self: ...
+    elif sys.version_info >= (3, 10):
         @classmethod
         def from_callable(
             cls,
@@ -337,20 +373,24 @@ class Signature:
     else:
         @classmethod
         def from_callable(cls, obj: _IntrospectableCallable, *, follow_wrapped: bool = True) -> Self: ...
-    if sys.version_info >= (3, 13):
+    if sys.version_info >= (3, 14):
+        def format(self, *, max_width: int | None = None, quote_annotation_strings: bool = True) -> str: ...
+    elif sys.version_info >= (3, 13):
         def format(self, *, max_width: int | None = None) -> str: ...
 
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 14):
+    from annotationlib import get_annotations as get_annotations
+elif sys.version_info >= (3, 10):
     def get_annotations(
         obj: Callable[..., object] | type[object] | ModuleType,  # any callable, class, or module
         *,
         globals: Mapping[str, Any] | None = None,  # value types depend on the key
         locals: Mapping[str, Any] | None = None,  # value types depend on the key
         eval_str: bool = False,
-    ) -> dict[str, Any]: ...  # values are type expressions
+    ) -> dict[str, AnnotationForm]: ...  # values are type expressions
 
 # The name is the same as the enum's name in CPython
 class _ParameterKind(enum.IntEnum):
@@ -461,7 +501,13 @@ class ArgInfo(NamedTuple):
     locals: dict[str, Any]
 
 def getargvalues(frame: FrameType) -> ArgInfo: ...
-def formatannotation(annotation: object, base_module: str | None = None) -> str: ...
+
+if sys.version_info >= (3, 14):
+    def formatannotation(annotation: object, base_module: str | None = None, *, quote_annotation_strings: bool = True) -> str: ...
+
+else:
+    def formatannotation(annotation: object, base_module: str | None = None) -> str: ...
+
 def formatannotationrelativeto(object: object) -> Callable[[object], str]: ...
 
 if sys.version_info < (3, 11):

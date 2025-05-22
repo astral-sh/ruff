@@ -11,14 +11,14 @@ use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::comments::{leading_comments, trailing_comments, Comments, SourceComment};
+use crate::comments::{Comments, SourceComment, leading_comments, trailing_comments};
+use crate::expression::OperatorPrecedence;
 use crate::expression::parentheses::{
-    in_parentheses_only_group, in_parentheses_only_if_group_breaks,
+    Parentheses, in_parentheses_only_group, in_parentheses_only_if_group_breaks,
     in_parentheses_only_soft_line_break, in_parentheses_only_soft_line_break_or_space,
     is_expression_parenthesized, write_in_parentheses_only_group_end_tag,
-    write_in_parentheses_only_group_start_tag, Parentheses,
+    write_in_parentheses_only_group_start_tag,
 };
-use crate::expression::OperatorPrecedence;
 use crate::prelude::*;
 use crate::string::implicit::FormatImplicitConcatenatedString;
 

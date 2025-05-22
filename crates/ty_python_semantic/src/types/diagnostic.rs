@@ -1,17 +1,20 @@
+use super::call::CallErrorKind;
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
-use super::{ClassLiteral, KnownClass};
+use super::{CallArgumentTypes, CallDunderError, ClassBase, ClassLiteral, KnownClass};
 use crate::db::Db;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
+use crate::types::LintDiagnosticGuard;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{protocol_class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
-use crate::{declare_lint, Program};
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
+use crate::types::{KnownFunction, KnownInstanceType, Type, protocol_class::ProtocolClassLiteral};
+use crate::{Program, PythonVersionWithSource, declare_lint};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
+use ruff_db::files::system_path_to_file;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
@@ -40,6 +43,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
     registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
+    registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
@@ -67,6 +71,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
     registry.register_lint(&UNRESOLVED_IMPORT);
     registry.register_lint(&UNRESOLVED_REFERENCE);
+    registry.register_lint(&UNSUPPORTED_BASE);
     registry.register_lint(&UNSUPPORTED_OPERATOR);
     registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
     registry.register_lint(&STATIC_ASSERT_ERROR);
@@ -230,7 +235,7 @@ declare_lint! {
     pub(crate) static DIVISION_BY_ZERO = {
         summary: "detects division by zero",
         status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
+        default_level: Level::Ignore,
     }
 }
 
@@ -448,11 +453,53 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for class definitions that have bases which are not instances of `type`.
+    ///
+    /// ## Why is this bad?
+    /// Class definitions with bases like this will lead to `TypeError` being raised at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class A(42): ...  # error: [invalid-base]
+    /// ```
     pub(crate) static INVALID_BASE = {
-        summary: "detects invalid bases in class definitions",
+        summary: "detects class bases that will cause the class definition to raise an exception at runtime",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for class definitions that have bases which are unsupported by ty.
+    ///
+    /// ## Why is this bad?
+    /// If a class has a base that is an instance of a complex type such as a union type,
+    /// ty will not be able to resolve the [method resolution order] (MRO) for the class.
+    /// This will lead to an inferior understanding of your codebase and unpredictable
+    /// type-checking behavior.
+    ///
+    /// ## Examples
+    /// ```python
+    /// import datetime
+    ///
+    /// class A: ...
+    /// class B: ...
+    ///
+    /// if datetime.date.today().weekday() != 6:
+    ///     C = A
+    /// else:
+    ///     C = B
+    ///
+    /// class D(C): ...  # error: [unsupported-base]
+    /// ```
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    pub(crate) static UNSUPPORTED_BASE = {
+        summary: "detects class bases that are unsupported as ty could not feasibly calculate the class's MRO",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
     }
 }
 
@@ -585,6 +632,27 @@ declare_lint! {
     /// - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
     pub(crate) static INVALID_LEGACY_TYPE_VARIABLE = {
         summary: "detects invalid legacy type variables",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for the creation of invalid `TypeAliasType`s
+    ///
+    /// ## Why is this bad?
+    /// There are several requirements that you must follow when creating a `TypeAliasType`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeAliasType
+    ///
+    /// IntOrStr = TypeAliasType("IntOrStr", int | str)  # okay
+    /// NewAlias = TypeAliasType(get_name(), int)        # error: TypeAliasType name must be a string literal
+    /// ```
+    pub(crate) static INVALID_TYPE_ALIAS_TYPE = {
+        summary: "detects invalid TypeAliasType definitions",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -788,7 +856,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for expressions that are used as type expressions
+    /// Checks for expressions that are used as [type expressions]
     /// but cannot validly be interpreted as such.
     ///
     /// ## Why is this bad?
@@ -802,6 +870,7 @@ declare_lint! {
     /// a: type[1]  # `1` is not a type
     /// b: Annotated[int]  # `Annotated` expects at least two arguments
     /// ```
+    /// [type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
     pub(crate) static INVALID_TYPE_FORM = {
         summary: "detects invalid type forms",
         status: LintStatus::preview("1.0.0"),
@@ -1599,14 +1668,51 @@ pub(super) fn report_implicit_return_type(
     context: &InferContext,
     range: impl Ranged,
     expected_ty: Type,
+    has_empty_body: bool,
+    enclosing_class_of_method: Option<ClassLiteral>,
 ) {
     let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, range) else {
         return;
     };
-    builder.into_diagnostic(format_args!(
+    let db = context.db();
+    let mut diagnostic = builder.into_diagnostic(format_args!(
         "Function can implicitly return `None`, which is not assignable to return type `{}`",
-        expected_ty.display(context.db())
+        expected_ty.display(db)
     ));
+    if !has_empty_body {
+        return;
+    }
+    let Some(class) = enclosing_class_of_method else {
+        return;
+    };
+    if class
+        .iter_mro(db, None)
+        .any(|base| matches!(base, ClassBase::Protocol(_)))
+    {
+        diagnostic.info(
+            "Only functions in stub files, methods on protocol classes, \
+            or methods with `@abstractmethod` are permitted to have empty bodies",
+        );
+        diagnostic.info(format_args!(
+            "Class `{}` has `typing.Protocol` in its MRO, but it is not a protocol class",
+            class.name(db)
+        ));
+
+        let mut sub_diagnostic = SubDiagnostic::new(
+            Severity::Info,
+            "Only classes that directly inherit from `typing.Protocol` \
+            or `typing_extensions.Protocol` are considered protocol classes",
+        );
+        sub_diagnostic.annotate(
+            Annotation::primary(class.header_span(db)).message(format_args!(
+                "`Protocol` not present in `{class}`'s immediate bases",
+                class = class.name(db)
+            )),
+        );
+        diagnostic.sub(sub_diagnostic);
+
+        diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html#");
+    }
 }
 
 pub(super) fn report_invalid_type_checking_constant(context: &InferContext, node: AnyNodeRef) {
@@ -1645,6 +1751,44 @@ pub(super) fn report_possibly_unbound_attribute(
     ));
 }
 
+pub(super) fn add_inferred_python_version_hint(db: &dyn Db, mut diagnostic: LintDiagnosticGuard) {
+    let program = Program::get(db);
+    let PythonVersionWithSource { version, source } = program.python_version_with_source(db);
+
+    match source {
+        crate::PythonVersionSource::Cli => {
+            diagnostic.info(format_args!(
+                "Python {version} was assumed when resolving types because it was specified on the command line",
+            ));
+        }
+        crate::PythonVersionSource::File(path, range) => {
+            if let Ok(file) = system_path_to_file(db.upcast(), &**path) {
+                let mut sub_diagnostic = SubDiagnostic::new(
+                    Severity::Info,
+                    format_args!("Python {version} was assumed when resolving types"),
+                );
+                sub_diagnostic.annotate(
+                    Annotation::primary(Span::from(file).with_optional_range(*range)).message(
+                        format_args!("Python {version} assumed due to this configuration setting"),
+                    ),
+                );
+                diagnostic.sub(sub_diagnostic);
+            } else {
+                diagnostic.info(format_args!(
+                    "Python {version} was assumed when resolving types because of your configuration file(s)",
+                ));
+            }
+        }
+        crate::PythonVersionSource::Default => {
+            diagnostic.info(format_args!(
+                "Python {version} was assumed when resolving types \
+                because it is the newest Python version supported by ty, \
+                and neither a command-line argument nor a configuration setting was provided",
+            ));
+        }
+    }
+}
+
 pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
     let Some(builder) = context.report_lint(&UNRESOLVED_REFERENCE, expr_name_node) else {
         return;
@@ -1656,18 +1800,7 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
         diagnostic.info(format_args!(
             "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
         ));
-
-        // TODO: can we tell the user *why* we're inferring this target version?
-        // CLI flag? pyproject.toml? Python environment?
-        diagnostic.info(format_args!(
-            "The inferred target version of your project is Python {}",
-            Program::get(context.db()).python_version(context.db())
-        ));
-
-        diagnostic.info(
-            "If using a pyproject.toml file, \
-            consider adjusting the `project.requires-python` or `tool.ty.environment.python-version` field"
-        );
+        add_inferred_python_version_hint(context.db(), diagnostic);
     }
 }
 
@@ -1772,6 +1905,13 @@ pub(crate) fn report_invalid_arguments_to_callable(
         "Special form `{}` expected exactly two arguments (parameter types and return type)",
         KnownInstanceType::Callable.repr(db)
     ));
+}
+
+pub(crate) fn add_type_expression_reference_link(mut diag: LintDiagnosticGuard) {
+    diag.info("See the following page for a reference on valid type expressions:");
+    diag.info(
+        "https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
+    );
 }
 
 pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
@@ -1879,4 +2019,133 @@ pub(crate) fn report_duplicate_bases(
     }
 
     diagnostic.sub(sub_diagnostic);
+}
+
+pub(crate) fn report_invalid_or_unsupported_base(
+    context: &InferContext,
+    base_node: &ast::Expr,
+    base_type: Type,
+    class: ClassLiteral,
+) {
+    let db = context.db();
+    let instance_of_type = KnownClass::Type.to_instance(db);
+
+    if base_type.is_assignable_to(db, instance_of_type) {
+        report_unsupported_base(context, base_node, base_type, class);
+        return;
+    }
+
+    let tuple_of_types = KnownClass::Tuple.to_specialized_instance(db, [instance_of_type]);
+
+    let explain_mro_entries = |diagnostic: &mut LintDiagnosticGuard| {
+        diagnostic.info(
+            "An instance type is only a valid class base \
+            if it has a valid `__mro_entries__` method",
+        );
+    };
+
+    match base_type.try_call_dunder(
+        db,
+        "__mro_entries__",
+        CallArgumentTypes::positional([tuple_of_types]),
+    ) {
+        Ok(ret) => {
+            if ret.return_type(db).is_assignable_to(db, tuple_of_types) {
+                report_unsupported_base(context, base_node, base_type, class);
+            } else {
+                let Some(mut diagnostic) =
+                    report_invalid_base(context, base_node, base_type, class)
+                else {
+                    return;
+                };
+                explain_mro_entries(&mut diagnostic);
+                diagnostic.info(format_args!(
+                    "Type `{}` has an `__mro_entries__` method, but it does not return a tuple of types",
+                    base_type.display(db)
+                ));
+            }
+        }
+        Err(mro_entries_call_error) => {
+            let Some(mut diagnostic) = report_invalid_base(context, base_node, base_type, class)
+            else {
+                return;
+            };
+
+            match mro_entries_call_error {
+                CallDunderError::MethodNotAvailable => {}
+                CallDunderError::PossiblyUnbound(_) => {
+                    explain_mro_entries(&mut diagnostic);
+                    diagnostic.info(format_args!(
+                        "Type `{}` has an `__mro_entries__` attribute, but it is possibly unbound",
+                        base_type.display(db)
+                    ));
+                }
+                CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
+                    explain_mro_entries(&mut diagnostic);
+                    diagnostic.info(format_args!(
+                        "Type `{}` has an `__mro_entries__` attribute, but it is not callable",
+                        base_type.display(db)
+                    ));
+                }
+                CallDunderError::CallError(CallErrorKind::BindingError, _) => {
+                    explain_mro_entries(&mut diagnostic);
+                    diagnostic.info(format_args!(
+                        "Type `{}` has an `__mro_entries__` method, \
+                        but it cannot be called with the expected arguments",
+                        base_type.display(db)
+                    ));
+                    diagnostic.info(
+                        "Expected a signature at least as permissive as \
+                        `def __mro_entries__(self, bases: tuple[type, ...], /) -> tuple[type, ...]`"
+                    );
+                }
+                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _) => {
+                    explain_mro_entries(&mut diagnostic);
+                    diagnostic.info(format_args!(
+                        "Type `{}` has an `__mro_entries__` method, \
+                        but it may not be callable",
+                        base_type.display(db)
+                    ));
+                }
+            }
+        }
+    }
+}
+
+fn report_unsupported_base(
+    context: &InferContext,
+    base_node: &ast::Expr,
+    base_type: Type,
+    class: ClassLiteral,
+) {
+    let Some(builder) = context.report_lint(&UNSUPPORTED_BASE, base_node) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Unsupported class base with type `{}`",
+        base_type.display(context.db())
+    ));
+    diagnostic.info(format_args!(
+        "ty cannot resolve a consistent MRO for class `{}` due to this base",
+        class.name(context.db())
+    ));
+    diagnostic.info("Only class objects or `Any` are supported as class bases");
+}
+
+fn report_invalid_base<'ctx, 'db>(
+    context: &'ctx InferContext<'db>,
+    base_node: &ast::Expr,
+    base_type: Type<'db>,
+    class: ClassLiteral<'db>,
+) -> Option<LintDiagnosticGuard<'ctx, 'db>> {
+    let builder = context.report_lint(&INVALID_BASE, base_node)?;
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Invalid class base with type `{}`",
+        base_type.display(context.db())
+    ));
+    diagnostic.info(format_args!(
+        "Definition of class `{}` will raise `TypeError` at runtime",
+        class.name(context.db())
+    ));
+    Some(diagnostic)
 }

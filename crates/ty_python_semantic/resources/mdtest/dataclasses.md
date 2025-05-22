@@ -369,7 +369,65 @@ To do
 
 ### `frozen`
 
-To do
+If true (the default is False), assigning to fields will generate a diagnostic.
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int
+
+frozen_instance = MyFrozenClass(1)
+frozen_instance.x = 2  # error: [invalid-assignment]
+```
+
+If `__setattr__()` or `__delattr__()` is defined in the class, we should emit a diagnostic.
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int
+
+    # TODO: Emit a diagnostic here
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+    # TODO: Emit a diagnostic here
+    def __delattr__(self, name: str) -> None: ...
+```
+
+This also works for generic dataclasses:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenGeneric[T]:
+    x: T
+
+frozen_instance = MyFrozenGeneric[int](1)
+frozen_instance.x = 2  # error: [invalid-assignment]
+```
+
+When attempting to mutate an unresolved attribute on a frozen dataclass, only `unresolved-attribute`
+is emitted:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass: ...
+
+frozen = MyFrozenClass()
+frozen.x = 2  # error: [unresolved-attribute]
+```
 
 ### `match_args`
 
@@ -618,21 +676,43 @@ To do
 
 ## `dataclass.fields`
 
-Dataclasses have `__dataclass_fields__` in them, which makes them a subtype of the
-`DataclassInstance` protocol.
-
-Here, we verify that dataclasses can be passed to `dataclasses.fields` without any errors, and that
-the return type of `dataclasses.fields` is correct.
+Dataclasses have a special `__dataclass_fields__` class variable member. The `DataclassInstance`
+protocol checks for the presence of this attribute. It is used in the `dataclasses.fields` and
+`dataclasses.asdict` functions, for example:
 
 ```py
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, asdict
 
 @dataclass
 class Foo:
     x: int
 
-reveal_type(Foo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+foo = Foo(1)
+
+reveal_type(foo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
 reveal_type(fields(Foo))  # revealed: tuple[Field[Any], ...]
+reveal_type(asdict(foo))  # revealed: dict[str, Any]
+```
+
+The class objects themselves also have a `__dataclass_fields__` attribute:
+
+```py
+reveal_type(Foo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+```
+
+They can be passed into `fields` as well, because it also accepts `type[DataclassInstance]`
+arguments:
+
+```py
+reveal_type(fields(Foo))  # revealed: tuple[Field[Any], ...]
+```
+
+But calling `asdict` on the class object is not allowed:
+
+```py
+# TODO: this should be a invalid-argument-type error, but we don't properly check the
+# types (and more importantly, the `ClassVar` type qualifier) of protocol members yet.
+asdict(Foo)
 ```
 
 ## Other special cases

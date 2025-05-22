@@ -118,6 +118,23 @@ class R: ...
 static_assert(is_equivalent_to(Intersection[tuple[P | Q], R], Intersection[tuple[Q | P], R]))
 ```
 
+## Unions containing generic instances parameterized by unions
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import is_equivalent_to, static_assert
+
+class A: ...
+class B: ...
+class Foo[T]: ...
+
+static_assert(is_equivalent_to(A | Foo[A | B], Foo[B | A] | A))
+```
+
 ## Callable
 
 ### Equivalent
@@ -315,6 +332,32 @@ from overloaded import pg, cpg
 
 static_assert(is_equivalent_to(CallableTypeOf[pg], CallableTypeOf[cpg]))
 static_assert(is_equivalent_to(CallableTypeOf[cpg], CallableTypeOf[pg]))
+```
+
+## Function-literal types and bound-method types
+
+Function-literal types and bound-method types are always considered self-equivalent, even if they
+have unannotated parameters, or parameters with not-fully-static annotations.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import is_equivalent_to, TypeOf, static_assert
+
+def f(): ...
+
+static_assert(is_equivalent_to(TypeOf[f], TypeOf[f]))
+
+class A:
+    def method(self) -> int:
+        return 42
+
+static_assert(is_equivalent_to(TypeOf[A.method], TypeOf[A.method]))
+type X = TypeOf[A.method]
+static_assert(is_equivalent_to(X, X))
 ```
 
 [the equivalence relation]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent

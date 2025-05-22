@@ -1,10 +1,10 @@
 use crate::checkers::ast::{Checker, TypingImporter};
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::PythonVersion;
 use ruff_python_semantic::analyze;
 use ruff_python_semantic::analyze::class::might_be_generic;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_final, is_overload};
@@ -106,7 +106,9 @@ impl Violation for NonSelfReturnType {
         if matches!(class_name.as_str(), "__new__") {
             "`__new__` methods usually return `self` at runtime".to_string()
         } else {
-            format!("`{method_name}` methods in classes like `{class_name}` usually return `self` at runtime")
+            format!(
+                "`{method_name}` methods in classes like `{class_name}` usually return `self` at runtime"
+            )
         }
     }
 

@@ -1,12 +1,13 @@
 use std::collections::VecDeque;
 use std::ops::Deref;
 
-use rustc_hash::FxHashMap;
+use indexmap::IndexMap;
+use rustc_hash::FxBuildHasher;
 
+use crate::Db;
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
 use crate::types::{ClassLiteral, ClassType, Type};
-use crate::Db;
 
 /// The inferred method resolution order of a given class.
 ///
@@ -157,8 +158,8 @@ impl<'db> Mro<'db> {
                 let mut duplicate_dynamic_bases = false;
 
                 let duplicate_bases: Vec<DuplicateBaseError<'db>> = {
-                    let mut base_to_indices: FxHashMap<ClassBase<'db>, Vec<usize>> =
-                        FxHashMap::default();
+                    let mut base_to_indices: IndexMap<ClassBase<'db>, Vec<usize>, FxBuildHasher> =
+                        IndexMap::default();
 
                     for (index, base) in valid_bases.iter().enumerate() {
                         base_to_indices.entry(*base).or_default().push(index);

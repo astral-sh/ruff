@@ -1,11 +1,11 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{LineRanges, UniversalNewlineIterator};
 use ruff_text_size::TextRange;
 
-use crate::settings::LinterSettings;
 use crate::Locator;
+use crate::settings::LinterSettings;
 
 use super::super::detection::comment_contains_code;
 
@@ -161,8 +161,8 @@ mod tests {
     use ruff_source_file::LineRanges;
     use ruff_text_size::TextSize;
 
-    use crate::rules::eradicate::rules::commented_out_code::skip_script_comments;
     use crate::Locator;
+    use crate::rules::eradicate::rules::commented_out_code::skip_script_comments;
 
     #[test]
     fn script_comment() {
