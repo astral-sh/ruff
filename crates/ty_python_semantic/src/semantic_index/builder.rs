@@ -2,6 +2,7 @@ use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
+use hashbrown::HashSet;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
@@ -1483,10 +1484,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.record_reachability_constraint(last_predicate);
                 self.visit_body(&node.body);
 
-                let visibility_constraint_id = self.record_visibility_constraint(last_predicate);
-                let mut vis_constraints = vec![visibility_constraint_id];
+                let mut visibility_constraint_id =
+                    self.record_visibility_constraint(last_predicate);
 
-                let mut post_clauses: Vec<FlowSnapshot> = vec![];
+                let mut post_clauses: Vec<FlowSnapshot> = vec![self.flow_snapshot()];
                 let elif_else_clauses = node
                     .elif_else_clauses
                     .iter()
@@ -1502,7 +1503,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // if there's no `else` branch, we should add a no-op `else` branch
                     Some((None, Default::default()))
                 });
+                let mut last = false;
+                let mut negated_recorded = HashSet::new();
                 for (clause_test, clause_body) in elif_else_clauses {
+                    debug_assert!(!last);
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
                     post_clauses.push(self.flow_snapshot());
@@ -1511,30 +1515,33 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.flow_restore(no_branch_taken.clone());
                     self.record_negated_narrowing_constraint(last_predicate);
                     self.record_negated_reachability_constraint(reachability_constraint);
+                    self.record_negated_visibility_constraint(visibility_constraint_id);
+                    negated_recorded.insert(visibility_constraint_id);
 
                     let elif_predicate = if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
                         // A test expression is evaluated whether the branch is taken or not
                         no_branch_taken = self.flow_snapshot();
-                        reachability_constraint =
-                            self.record_reachability_constraint(last_predicate);
                         let predicate = self.record_expression_narrowing_constraint(elif_test);
+                        reachability_constraint = self.record_reachability_constraint(predicate);
                         Some(predicate)
                     } else {
+                        no_branch_taken = self.flow_snapshot();
                         None
                     };
 
                     self.visit_body(clause_body);
 
-                    for id in &vis_constraints {
-                        self.record_negated_visibility_constraint(*id);
-                    }
                     if let Some(elif_predicate) = elif_predicate {
                         last_predicate = elif_predicate;
-                        let id = self.record_visibility_constraint(elif_predicate);
-                        vis_constraints.push(id);
+                        visibility_constraint_id =
+                            self.record_visibility_constraint(elif_predicate);
+                    } else {
+                        last = true;
                     }
                 }
+
+                self.record_negated_visibility_constraint(visibility_constraint_id);
 
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
@@ -1722,10 +1729,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         match_success_guard_failure
                     });
 
-                    self.record_visibility_constraint_id(vis_constraint_id);
-
                     self.visit_body(&case.body);
-
+                    self.record_visibility_constraint_id(vis_constraint_id);
                     post_case_snapshots.push(self.flow_snapshot());
 
                     if i != cases.len() - 1 || !has_catchall {
@@ -1737,7 +1742,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         if let Some(match_success_guard_failure) = match_success_guard_failure {
                             self.flow_merge(match_success_guard_failure);
                         } else {
-                            assert!(case.guard.is_none());
+                            debug_assert!(case.guard.is_none());
                         }
                     } else {
                         debug_assert!(match_success_guard_failure.is_none());
