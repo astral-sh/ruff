@@ -147,7 +147,7 @@ pub(crate) fn suppressible_exception(
             )?;
             let mut rest: Vec<Edit> = Vec::new();
             let content: String;
-            if exception == "BaseException" {
+            if exception == "BaseException" && handler_names.is_empty() {
                 let (import_exception, binding_exception) =
                     checker.importer().get_or_import_symbol(
                         &ImportRequest::import("builtins", &exception),

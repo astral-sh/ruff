@@ -313,3 +313,32 @@ SIM105_0.py:133:1: SIM105 [*] Use `contextlib.suppress()` instead of `try`-`exce
 134 135 |     1 / 0
 135     |-except ():
 136     |-    pass
+137 136 | 
+138 137 | 
+139 138 | BaseException = ValueError
+
+SIM105_0.py:140:1: SIM105 [*] Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`pass`
+    |
+139 |   BaseException = ValueError
+140 | / try:
+141 | |     int("a")
+142 | | except BaseException:
+143 | |     pass
+    | |________^ SIM105
+    |
+    = help: Replace with `contextlib.suppress(BaseException)`
+
+ℹ Unsafe fix
+    1   |+import contextlib
+1   2   | def foo():
+2   3   |     pass
+3   4   | 
+--------------------------------------------------------------------------------
+137 138 | 
+138 139 | 
+139 140 | BaseException = ValueError
+140     |-try:
+    141 |+with contextlib.suppress(BaseException):
+141 142 |     int("a")
+142     |-except BaseException:
+143     |-    pass
