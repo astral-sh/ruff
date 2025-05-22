@@ -20,7 +20,7 @@ impl FormatNodeRule<FString> for FormatFString {
 
         let context = FTStringContext::new(
             string_kind,
-            FTStringLayout::from_f_string(item, f.context().source()),
+            FTStringLayout::from_ft_string_elements(&item.elements, f.context().source()),
         );
 
         // Starting prefix and quote

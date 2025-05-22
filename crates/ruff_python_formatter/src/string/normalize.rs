@@ -47,12 +47,10 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
         let supports_pep_701 = self.context.options().target_version().supports_pep_701();
 
         // For f-strings and t-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
-        if let Some(parent_flags) = match self.context.ft_string_state() {
-            FTStringState::InsideInterpolatedElement(parent_context) => {
-                Some(parent_context.ft_string().flags())
-            }
-            FTStringState::Outside => None,
-        } {
+        if let FTStringState::InsideInterpolatedElement(parent_context) =
+            self.context.ft_string_state()
+        {
+            let parent_flags = parent_context.ft_string().flags();
             if !parent_flags.is_triple_quoted() || string.flags().is_triple_quoted() {
                 // This logic is even necessary when using preserve and the target python version doesn't support PEP701 because
                 // we might end up joining two f-strings that have different quote styles, in which case we need to alternate the quotes

@@ -977,7 +977,7 @@ fn format_f_string_assignment<'a>(
     // If the f-string is flat, there are no breakpoints from which it can be made multiline.
     // This is the case when the f-string has no expressions or if it does then the expressions
     // are flat (no newlines).
-    if FTStringLayout::from_f_string(f_string, context.source()).is_flat() {
+    if FTStringLayout::from_ft_string_elements(&f_string.elements, context.source()).is_flat() {
         return None;
     }
 
@@ -1057,7 +1057,7 @@ fn format_t_string_assignment<'a>(
     // If the t-string is flat, there are no breakpoints from which it can be made multiline.
     // This is the case when the t-string has no expressions or if it does then the expressions
     // are flat (no newlines).
-    if FTStringLayout::from_t_string(t_string, context.source()).is_flat() {
+    if FTStringLayout::from_ft_string_elements(&t_string.elements, context.source()).is_flat() {
         return None;
     }
 

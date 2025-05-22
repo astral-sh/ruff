@@ -320,6 +320,7 @@ fn handle_enclosed_comment<'a>(
             _ => CommentPlacement::Default(comment),
         },
         AnyNodeRef::FString(fstring) => CommentPlacement::dangling(fstring, comment),
+        AnyNodeRef::TString(tstring) => CommentPlacement::dangling(tstring, comment),
         AnyNodeRef::FTStringInterpolatedElement(_) => {
             // Handle comments after the format specifier (should be rare):
             //
@@ -343,7 +344,6 @@ fn handle_enclosed_comment<'a>(
                 handle_bracketed_end_of_line_comment(comment, source)
             }
         }
-        AnyNodeRef::TString(tstring) => CommentPlacement::dangling(tstring, comment),
 
         AnyNodeRef::ExprList(_)
         | AnyNodeRef::ExprSet(_)

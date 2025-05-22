@@ -5,10 +5,10 @@ use crate::string::{StringNormalizer, StringQuotes};
 use ruff_formatter::write;
 use ruff_python_ast::{StringFlags, TString};
 
-/// Formats an f-string which is part of a larger f-string expression.
+/// Formats a t-string which is part of a larger t-string expression.
 ///
-/// For example, this would be used to format the f-string part in `"foo" f"bar {x}"`
-/// or the standalone f-string in `f"foo {x} bar"`.
+/// For example, this would be used to format the t-string part in `"foo" t"bar {x}"`
+/// or the standalone t-string in `t"foo {x} bar"`.
 #[derive(Default)]
 pub struct FormatTString;
 
@@ -20,7 +20,7 @@ impl FormatNodeRule<TString> for FormatTString {
 
         let context = FTStringContext::new(
             string_kind,
-            FTStringLayout::from_t_string(item, f.context().source()),
+            FTStringLayout::from_ft_string_elements(&item.elements, f.context().source()),
         );
 
         // Starting prefix and quote

@@ -146,10 +146,6 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
             // Some if a part requires preserving its quotes.
             let mut preserve_quotes_requirement: Option<Quote> = None;
 
-            // Whether one of the parts of a t-string is an
-            // f-string, e.g. t"{this}"f"{that}"
-            let mut seen_fstring_part_in_tstring = false;
-
             // Early exit if it's known that this string can't be joined
             for part in string.parts() {
                 // Similar to Black, don't collapse triple quoted and raw strings.
@@ -173,7 +169,8 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 match part {
                     StringLikePart::FString(fstring) => {
                         if matches!(string, StringLike::TString(_)) {
-                            seen_fstring_part_in_tstring = true;
+                            // Don't concatenate t-strings and f-strings
+                            return None;
                         }
                         if context.options().target_version().supports_pep_701() {
                             if is_fstring_with_quoted_format_spec_and_debug(fstring, context) {
@@ -212,11 +209,6 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                         }
                     }
                     StringLikePart::Bytes(_) | StringLikePart::String(_) => {}
-                }
-
-                // Don't concatenate t-strings and f-strings
-                if seen_fstring_part_in_tstring {
-                    return None;
                 }
             }
 
@@ -346,7 +338,10 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                             FTStringElement::Expression(expression) => {
                                 let context = FTStringContext::new(
                                     self.flags,
-                                    FTStringLayout::from_f_string(f_string, f.context().source()),
+                                    FTStringLayout::from_ft_string_elements(
+                                        &f_string.elements,
+                                        f.context().source(),
+                                    ),
                                 );
 
                                 FormatFTStringInterpolatedElement::new(expression, context)
@@ -373,7 +368,10 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                             FTStringElement::Expression(expression) => {
                                 let context = FTStringContext::new(
                                     self.flags,
-                                    FTStringLayout::from_t_string(f_string, f.context().source()),
+                                    FTStringLayout::from_ft_string_elements(
+                                        &f_string.elements,
+                                        f.context().source(),
+                                    ),
                                 );
 
                                 FormatFTStringInterpolatedElement::new(expression, context)

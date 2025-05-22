@@ -41,7 +41,8 @@ impl NeedsParentheses for ExprTString {
         if let Some(tstring_part) = self.as_single_part_tstring() {
             // The t-string is not implicitly concatenated
             if StringLike::TString(self).is_multiline(context)
-                || FTStringLayout::from_t_string(tstring_part, context.source()).is_multiline()
+                || FTStringLayout::from_ft_string_elements(&tstring_part.elements, context.source())
+                    .is_multiline()
             {
                 OptionalParentheses::Never
             } else {
