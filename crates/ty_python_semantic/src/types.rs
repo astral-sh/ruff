@@ -8,7 +8,7 @@ use bitflags::bitflags;
 use call::{CallDunderError, CallError, CallErrorKind};
 use context::InferContext;
 use diagnostic::{
-    CALL_POSSIBLY_UNBOUND_METHOD, INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE,
+    INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE, POSSIBLY_UNBOUND_IMPLICIT_CALL,
     UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
 };
 use ruff_db::diagnostic::{
@@ -1291,12 +1291,20 @@ impl<'db> Type<'db> {
             }
 
             (Type::NominalInstance(_) | Type::ProtocolInstance(_), Type::Callable(_)) => {
-                let call_symbol = self.member(db, "__call__").symbol;
-                match call_symbol {
-                    Symbol::Type(Type::BoundMethod(call_function), _) => call_function
-                        .into_callable_type(db)
-                        .is_subtype_of(db, target),
-                    _ => false,
+                let call_symbol = self
+                    .member_lookup_with_policy(
+                        db,
+                        Name::new_static("__call__"),
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .symbol;
+                // If the type of __call__ is a subtype of a callable type, this instance is.
+                // Don't add other special cases here; our subtyping of a callable type
+                // shouldn't get out of sync with the calls we will actually allow.
+                if let Symbol::Type(t, Boundness::Bound) = call_symbol {
+                    t.is_subtype_of(db, target)
+                } else {
+                    false
                 }
             }
             (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
@@ -1641,12 +1649,20 @@ impl<'db> Type<'db> {
             }
 
             (Type::NominalInstance(_) | Type::ProtocolInstance(_), Type::Callable(_)) => {
-                let call_symbol = self.member(db, "__call__").symbol;
-                match call_symbol {
-                    Symbol::Type(Type::BoundMethod(call_function), _) => call_function
-                        .into_callable_type(db)
-                        .is_assignable_to(db, target),
-                    _ => false,
+                let call_symbol = self
+                    .member_lookup_with_policy(
+                        db,
+                        Name::new_static("__call__"),
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .symbol;
+                // If the type of __call__ is assignable to a callable type, this instance is.
+                // Don't add other special cases here; our assignability to a callable type
+                // shouldn't get out of sync with the calls we will actually allow.
+                if let Symbol::Type(t, Boundness::Bound) = call_symbol {
+                    t.is_assignable_to(db, target)
+                } else {
+                    false
                 }
             }
 
@@ -2746,6 +2762,7 @@ impl<'db> Type<'db> {
             instance.display(db),
             owner.display(db)
         );
+
         let descr_get = self.class_member(db, "__get__".into()).symbol;
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
@@ -6652,7 +6669,7 @@ impl<'db> ConstructorCallError<'db> {
         let report_init_error = |call_dunder_error: &CallDunderError<'db>| match call_dunder_error {
             CallDunderError::MethodNotAvailable => {
                 if let Some(builder) =
-                    context.report_lint(&CALL_POSSIBLY_UNBOUND_METHOD, context_expression_node)
+                    context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, context_expression_node)
                 {
                     // If we are using vendored typeshed, it should be impossible to have missing
                     // or unbound `__init__` method on a class, as all classes have `object` in MRO.
@@ -6666,7 +6683,7 @@ impl<'db> ConstructorCallError<'db> {
             }
             CallDunderError::PossiblyUnbound(bindings) => {
                 if let Some(builder) =
-                    context.report_lint(&CALL_POSSIBLY_UNBOUND_METHOD, context_expression_node)
+                    context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, context_expression_node)
                 {
                     builder.into_diagnostic(format_args!(
                         "Method `__init__` on type `{}` is possibly unbound.",
@@ -6684,7 +6701,7 @@ impl<'db> ConstructorCallError<'db> {
         let report_new_error = |error: &DunderNewCallError<'db>| match error {
             DunderNewCallError::PossiblyUnbound(call_error) => {
                 if let Some(builder) =
-                    context.report_lint(&CALL_POSSIBLY_UNBOUND_METHOD, context_expression_node)
+                    context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, context_expression_node)
                 {
                     builder.into_diagnostic(format_args!(
                         "Method `__new__` on type `{}` is possibly unbound.",

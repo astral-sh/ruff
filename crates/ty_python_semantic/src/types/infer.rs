@@ -67,12 +67,12 @@ use crate::symbol::{
 use crate::types::call::{Argument, Bindings, CallArgumentTypes, CallArguments, CallError};
 use crate::types::class::{MetaclassErrorKind, SliceLiteral};
 use crate::types::diagnostic::{
-    self, CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS,
-    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, INCONSISTENT_MRO,
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics,
+    self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
+    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
+    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
+    INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMETER_DEFAULT,
+    INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
     report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
@@ -3077,6 +3077,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => {
+                let is_read_only = || {
+                    let dataclass_params = match object_ty {
+                        Type::NominalInstance(instance) => match instance.class {
+                            ClassType::NonGeneric(cls) => cls.dataclass_params(self.db()),
+                            ClassType::Generic(cls) => {
+                                cls.origin(self.db()).dataclass_params(self.db())
+                            }
+                        },
+                        _ => None,
+                    };
+
+                    dataclass_params.is_some_and(|params| params.contains(DataclassParams::FROZEN))
+                };
+
                 match object_ty.class_member(db, attribute.into()) {
                     meta_attr @ SymbolAndQualifiers { .. } if meta_attr.is_class_var() => {
                         if emit_diagnostics {
@@ -3096,68 +3110,83 @@ impl<'db> TypeInferenceBuilder<'db> {
                         symbol: Symbol::Type(meta_attr_ty, meta_attr_boundness),
                         qualifiers: _,
                     } => {
-                        let assignable_to_meta_attr = if let Symbol::Type(meta_dunder_set, _) =
-                            meta_attr_ty.class_member(db, "__set__".into()).symbol
-                        {
-                            let successful_call = meta_dunder_set
-                                .try_call(
-                                    db,
-                                    &CallArgumentTypes::positional([
-                                        meta_attr_ty,
-                                        object_ty,
-                                        value_ty,
-                                    ]),
-                                )
-                                .is_ok();
-
-                            if !successful_call && emit_diagnostics {
+                        if is_read_only() {
+                            if emit_diagnostics {
                                 if let Some(builder) =
                                     self.context.report_lint(&INVALID_ASSIGNMENT, target)
                                 {
-                                    // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
                                     builder.into_diagnostic(format_args!(
-                                        "Invalid assignment to data descriptor attribute \
-                                         `{attribute}` on type `{}` with custom `__set__` method",
-                                        object_ty.display(db)
+                                        "Property `{attribute}` defined in `{ty}` is read-only",
+                                        ty = object_ty.display(self.db()),
                                     ));
                                 }
                             }
-
-                            successful_call
+                            false
                         } else {
-                            ensure_assignable_to(meta_attr_ty)
-                        };
-
-                        let assignable_to_instance_attribute = if meta_attr_boundness
-                            == Boundness::PossiblyUnbound
-                        {
-                            let (assignable, boundness) =
-                                if let Symbol::Type(instance_attr_ty, instance_attr_boundness) =
-                                    object_ty.instance_member(db, attribute).symbol
-                                {
-                                    (
-                                        ensure_assignable_to(instance_attr_ty),
-                                        instance_attr_boundness,
+                            let assignable_to_meta_attr = if let Symbol::Type(meta_dunder_set, _) =
+                                meta_attr_ty.class_member(db, "__set__".into()).symbol
+                            {
+                                let successful_call = meta_dunder_set
+                                    .try_call(
+                                        db,
+                                        &CallArgumentTypes::positional([
+                                            meta_attr_ty,
+                                            object_ty,
+                                            value_ty,
+                                        ]),
                                     )
+                                    .is_ok();
+
+                                if !successful_call && emit_diagnostics {
+                                    if let Some(builder) =
+                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                    {
+                                        // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
+                                        builder.into_diagnostic(format_args!(
+                                            "Invalid assignment to data descriptor attribute \
+                                         `{attribute}` on type `{}` with custom `__set__` method",
+                                            object_ty.display(db)
+                                        ));
+                                    }
+                                }
+
+                                successful_call
+                            } else {
+                                ensure_assignable_to(meta_attr_ty)
+                            };
+
+                            let assignable_to_instance_attribute =
+                                if meta_attr_boundness == Boundness::PossiblyUnbound {
+                                    let (assignable, boundness) = if let Symbol::Type(
+                                        instance_attr_ty,
+                                        instance_attr_boundness,
+                                    ) =
+                                        object_ty.instance_member(db, attribute).symbol
+                                    {
+                                        (
+                                            ensure_assignable_to(instance_attr_ty),
+                                            instance_attr_boundness,
+                                        )
+                                    } else {
+                                        (true, Boundness::PossiblyUnbound)
+                                    };
+
+                                    if boundness == Boundness::PossiblyUnbound {
+                                        report_possibly_unbound_attribute(
+                                            &self.context,
+                                            target,
+                                            attribute,
+                                            object_ty,
+                                        );
+                                    }
+
+                                    assignable
                                 } else {
-                                    (true, Boundness::PossiblyUnbound)
+                                    true
                                 };
 
-                            if boundness == Boundness::PossiblyUnbound {
-                                report_possibly_unbound_attribute(
-                                    &self.context,
-                                    target,
-                                    attribute,
-                                    object_ty,
-                                );
-                            }
-
-                            assignable
-                        } else {
-                            true
-                        };
-
-                        assignable_to_meta_attr && assignable_to_instance_attribute
+                            assignable_to_meta_attr && assignable_to_instance_attribute
+                        }
                     }
 
                     SymbolAndQualifiers {
@@ -3176,7 +3205,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 );
                             }
 
-                            ensure_assignable_to(instance_attr_ty)
+                            if is_read_only() {
+                                if emit_diagnostics {
+                                    if let Some(builder) =
+                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                    {
+                                        builder.into_diagnostic(format_args!(
+                                            "Property `{attribute}` defined in `{ty}` is read-only",
+                                            ty = object_ty.display(self.db()),
+                                        ));
+                                    }
+                                }
+                                false
+                            } else {
+                                ensure_assignable_to(instance_attr_ty)
+                            }
                         } else {
                             let result = object_ty.try_call_dunder_with_policy(
                                 db,
@@ -6065,17 +6108,29 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Some(KnownClass::Float.to_instance(self.db()))
             }
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => Some(
-                n.checked_div(m)
-                    .map(Type::IntLiteral)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-            ),
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => Some({
+                let mut q = n.checked_div(m);
+                let r = n.checked_rem(m);
+                // Division works differently in Python than in Rust. If the result is negative and
+                // there is a remainder, the division rounds down (instead of towards zero):
+                if n.is_negative() != m.is_negative() && r.unwrap_or(0) != 0 {
+                    q = q.map(|q| q - 1);
+                }
+                q.map(Type::IntLiteral)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
+            }),
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => Some(
-                n.checked_rem(m)
-                    .map(Type::IntLiteral)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-            ),
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => Some({
+                let mut r = n.checked_rem(m);
+                // Division works differently in Python than in Rust. If the result is negative and
+                // there is a remainder, the division rounds down (instead of towards zero). Adjust
+                // the remainder to compensate so that q * m + r == n:
+                if n.is_negative() != m.is_negative() && r.unwrap_or(0) != 0 {
+                    r = r.map(|x| x + m);
+                }
+                r.map(Type::IntLiteral)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
+            }),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Pow) => Some({
                 if m < 0 {
@@ -7373,7 +7428,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
                         if let Some(builder) = self
                             .context
-                            .report_lint(&CALL_POSSIBLY_UNBOUND_METHOD, value_node)
+                            .report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, value_node)
                         {
                             builder.into_diagnostic(format_args!(
                                 "Method `__getitem__` of type `{}` is possibly unbound",
@@ -7421,7 +7476,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             if boundness == Boundness::PossiblyUnbound {
                                 if let Some(builder) = self
                                     .context
-                                    .report_lint(&CALL_POSSIBLY_UNBOUND_METHOD, value_node)
+                                    .report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, value_node)
                                 {
                                     builder.into_diagnostic(format_args!(
                                         "Method `__class_getitem__` of type `{}` \
