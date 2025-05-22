@@ -672,6 +672,28 @@ def f(x: int, y: str) -> None: ...
 c1: Callable[[int], None] = partial(f, y="a")
 ```
 
+### Classes with `__call__` as attribute
+
+A class with a callable `__call__` attribute is assignable to a compatible callable type.
+
+TODO: for the moment, we don't consider the callable type as a bound-method descriptor, but this may
+change for better compatibility with mypy/pyright.
+
+```py
+from typing import Callable
+from ty_extensions import static_assert, is_assignable_to
+
+def call_impl(a: int) -> str:
+    return ""
+
+class A:
+    __call__: Callable[[int], str] = call_impl
+
+static_assert(is_assignable_to(A, Callable[[int], str]))
+static_assert(not is_assignable_to(A, Callable[[int], int]))
+reveal_type(A()(1))  # revealed: str
+```
+
 ## Generics
 
 ### Assignability of generic types parameterized by gradual types

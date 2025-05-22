@@ -1291,12 +1291,20 @@ impl<'db> Type<'db> {
             }
 
             (Type::NominalInstance(_) | Type::ProtocolInstance(_), Type::Callable(_)) => {
-                let call_symbol = self.member(db, "__call__").symbol;
-                match call_symbol {
-                    Symbol::Type(Type::BoundMethod(call_function), _) => call_function
-                        .into_callable_type(db)
-                        .is_subtype_of(db, target),
-                    _ => false,
+                let call_symbol = self
+                    .member_lookup_with_policy(
+                        db,
+                        Name::new_static("__call__"),
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .symbol;
+                // If the type of __call__ is a subtype of a callable type, this instance is.
+                // Don't add other special cases here; our subtyping of a callable type
+                // shouldn't get out of sync with the calls we will actually allow.
+                if let Symbol::Type(t, Boundness::Bound) = call_symbol {
+                    t.is_subtype_of(db, target)
+                } else {
+                    false
                 }
             }
             (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
@@ -1641,12 +1649,20 @@ impl<'db> Type<'db> {
             }
 
             (Type::NominalInstance(_) | Type::ProtocolInstance(_), Type::Callable(_)) => {
-                let call_symbol = self.member(db, "__call__").symbol;
-                match call_symbol {
-                    Symbol::Type(Type::BoundMethod(call_function), _) => call_function
-                        .into_callable_type(db)
-                        .is_assignable_to(db, target),
-                    _ => false,
+                let call_symbol = self
+                    .member_lookup_with_policy(
+                        db,
+                        Name::new_static("__call__"),
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .symbol;
+                // If the type of __call__ is assignable to a callable type, this instance is.
+                // Don't add other special cases here; our assignability to a callable type
+                // shouldn't get out of sync with the calls we will actually allow.
+                if let Symbol::Type(t, Boundness::Bound) = call_symbol {
+                    t.is_assignable_to(db, target)
+                } else {
+                    false
                 }
             }
 
@@ -2746,6 +2762,7 @@ impl<'db> Type<'db> {
             instance.display(db),
             owner.display(db)
         );
+
         let descr_get = self.class_member(db, "__get__".into()).symbol;
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
