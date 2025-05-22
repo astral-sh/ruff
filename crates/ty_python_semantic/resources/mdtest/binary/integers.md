@@ -76,7 +76,7 @@ reveal_type((-1) ** (-1))  # revealed: float
 
 Division works differently in Python than in Rust. If the result is negative and there is a
 remainder, the division rounds down (instead of towards zero). The remainder needs to be adjusted to
-compensate so that  `(lhs // rhs) * rhs + (lhs % rhs) == lhs`:
+compensate so that `(lhs // rhs) * rhs + (lhs % rhs) == lhs`:
 
 ```py
 reveal_type(256 % 129)  # revealed: Literal[127]
