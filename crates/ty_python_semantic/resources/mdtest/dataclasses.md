@@ -413,7 +413,7 @@ class MyFrozenGeneric[T]:
     x: T
 
 frozen_instance = MyFrozenGeneric[int](1)
-frozen_instance.x = 2  # TODO
+frozen_instance.x = 2  # error: [invalid-assignment]
 ```
 
 When attempting to mutate an unresolved attribute on a frozen dataclass, only `unresolved-attribute`

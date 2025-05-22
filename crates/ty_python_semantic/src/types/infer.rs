@@ -3088,18 +3088,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => {
-                let dataclass_params = match object_ty {
-                    Type::NominalInstance(instance) => match instance.class() {
-                        ClassType::NonGeneric(cls) => cls.dataclass_params(self.db()),
-                        ClassType::Generic(cls) => {
-                            cls.origin(self.db()).dataclass_params(self.db())
-                        }
-                    },
-                    _ => None,
-                };
+                let is_read_only = || {
+                    let dataclass_params = match object_ty {
+                        Type::NominalInstance(instance) => match instance.class {
+                            ClassType::NonGeneric(cls) => cls.dataclass_params(self.db()),
+                            ClassType::Generic(cls) => {
+                                cls.origin(self.db()).dataclass_params(self.db())
+                            }
+                        },
+                        _ => None,
+                    };
 
-                let read_only =
-                    dataclass_params.is_some_and(|params| params.contains(DataclassParams::FROZEN));
+                    dataclass_params.is_some_and(|params| params.contains(DataclassParams::FROZEN))
+                };
 
                 match object_ty.class_member(db, attribute.into()) {
                     meta_attr @ SymbolAndQualifiers { .. } if meta_attr.is_class_var() => {
@@ -3120,7 +3121,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         symbol: Symbol::Type(meta_attr_ty, meta_attr_boundness),
                         qualifiers: _,
                     } => {
-                        if read_only {
+                        if is_read_only() {
                             if emit_diagnostics {
                                 if let Some(builder) =
                                     self.context.report_lint(&INVALID_ASSIGNMENT, target)
@@ -3215,18 +3216,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 );
                             }
 
-                            if read_only {
-                                // TODO(thejchap): illustrating missing diagnostic
-                                // if emit_diagnostics {
-                                //     if let Some(builder) =
-                                //         self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                                //     {
-                                //         builder.into_diagnostic(format_args!(
-                                //             "Property `{attribute}` defined in `{ty}` is read-only",
-                                //             ty = object_ty.display(self.db()),
-                                //         ));
-                                //     }
-                                // }
+                            if is_read_only() {
+                                if emit_diagnostics {
+                                    if let Some(builder) =
+                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                    {
+                                        builder.into_diagnostic(format_args!(
+                                            "Property `{attribute}` defined in `{ty}` is read-only",
+                                            ty = object_ty.display(self.db()),
+                                        ));
+                                    }
+                                }
                                 false
                             } else {
                                 ensure_assignable_to(instance_attr_ty)
