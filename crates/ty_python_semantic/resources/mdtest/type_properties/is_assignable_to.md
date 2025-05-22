@@ -703,13 +703,11 @@ class C:
 class D:
     __call__: Callable[[Self, int], int] = lambda self, d: d
 
-static_assert(is_assignable_to(A, Callable[[int], int]))
-
-# TODO these tests should fail, but for now A.__call__ is Dynamic thus always return True.
-static_assert(not is_assignable_to(A, Callable[[int, int], int]))  # error: [static-assert-error]
-static_assert(not is_assignable_to(A, Callable[[int], str]))  # error: [static-assert-error]
-static_assert(not is_assignable_to(A, Callable[[str], int]))  # error: [static-assert-error]
-static_assert(not is_assignable_to(A, Callable[[str], str]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(A, Callable[[int], int]))
+static_assert(not is_assignable_to(A, Callable[[int, int], int]))
+static_assert(not is_assignable_to(A, Callable[[int], str]))
+static_assert(not is_assignable_to(A, Callable[[str], int]))
+static_assert(not is_assignable_to(A, Callable[[str], str]))
 
 static_assert(is_assignable_to(B, Callable[[int], int]))
 static_assert(not is_assignable_to(B, Callable[[int, int], int]))
@@ -736,7 +734,7 @@ d = D()
 
 def f(fn: Callable[[int], int]) -> None: ...
 
-f(a)
+f(a)  # error: [invalid-argument-type]
 f(b)
 f(c)
 f(d)
