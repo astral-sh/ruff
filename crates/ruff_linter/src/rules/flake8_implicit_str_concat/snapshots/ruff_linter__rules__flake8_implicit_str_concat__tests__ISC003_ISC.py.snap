@@ -110,3 +110,86 @@ ISC.py:80:10: ISC003 [*] Explicitly concatenated string should be implicitly con
 82 81 | 
 83 82 | # See https://github.com/astral-sh/ruff/issues/12936
 84 83 | _ = "\12""0" # fix should be "\0120"
+
+ISC.py:110:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+109 |   _ = (
+110 | /     rf"raw_f{x}" +
+111 | |     r"raw_normal"
+    | |_________________^ ISC003
+112 |   )
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+107 107 | )
+108 108 | 
+109 109 | _ = (
+110     |-    rf"raw_f{x}" +
+111     |-    r"raw_normal"
+    110 |+    rf"raw_f{x}" r"raw_normal"
+112 111 | )
+113 112 | 
+114 113 | 
+
+ISC.py:117:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+115 |   # Different prefix combinations
+116 |   _ = (
+117 | /     u"unicode" +
+118 | |     r"raw"
+    | |__________^ ISC003
+119 |   )
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+114 114 | 
+115 115 | # Different prefix combinations
+116 116 | _ = (
+117     |-    u"unicode" +
+118     |-    r"raw"
+    117 |+    u"unicode" r"raw"
+119 118 | )
+120 119 | 
+121 120 | _ = (
+
+ISC.py:122:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+121 |   _ = (
+122 | /     rb"raw_bytes" +
+123 | |     b"normal_bytes"
+    | |___________________^ ISC003
+124 |   )
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+119 119 | )
+120 120 | 
+121 121 | _ = (
+122     |-    rb"raw_bytes" +
+123     |-    b"normal_bytes"
+    122 |+    rb"raw_bytes" b"normal_bytes"
+124 123 | )
+125 124 | 
+126 125 | _ = (
+
+ISC.py:127:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+126 |   _ = (
+127 | /     b"bytes" +
+128 | |     b"with_bytes"
+    | |_________________^ ISC003
+129 |   )
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+124 124 | )
+125 125 | 
+126 126 | _ = (
+127     |-    b"bytes" +
+128     |-    b"with_bytes"
+    127 |+    b"bytes" b"with_bytes"
+129 128 | )

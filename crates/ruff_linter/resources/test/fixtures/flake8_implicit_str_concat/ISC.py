@@ -91,3 +91,39 @@ _ = "\8""0" # fix should be "\80"
 _ = "\12""8" # fix should be "\128"
 _ = "\12""foo" # fix should be "\12foo"
 _ = "\12" ""  # fix should be "\12"
+
+
+# Mixed literal + non-literal scenarios
+_ = (
+    "start" +
+    variable +
+    "end"
+)
+
+_ = (
+    f"format" +
+    func_call() +
+    "literal"
+)
+
+_ = (
+    rf"raw_f{x}" +
+    r"raw_normal"
+)
+
+
+# Different prefix combinations
+_ = (
+    u"unicode" +
+    r"raw"
+)
+
+_ = (
+    rb"raw_bytes" +
+    b"normal_bytes"
+)
+
+_ = (
+    b"bytes" +
+    b"with_bytes"
+)
