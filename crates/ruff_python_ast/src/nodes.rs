@@ -556,12 +556,6 @@ impl Ranged for FStringPart {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct TStringFormatSpec {
-    pub range: TextRange,
-    pub elements: FTStringElements,
-}
-
 impl ExprTString {
     /// Returns the single [`TString`] if the t-string isn't implicitly concatenated, [`None`]
     /// otherwise.
