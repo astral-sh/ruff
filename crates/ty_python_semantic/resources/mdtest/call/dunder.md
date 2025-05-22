@@ -112,7 +112,7 @@ def _(flag: bool):
 
     this_fails = ThisFails()
 
-    # error: [call-possibly-unbound-method]
+    # error: [possibly-unbound-implicit-call]
     reveal_type(this_fails[0])  # revealed: Unknown | str
 ```
 
@@ -236,6 +236,6 @@ def _(flag: bool):
                 return str(key)
 
     c = C()
-    # error: [call-possibly-unbound-method]
+    # error: [possibly-unbound-implicit-call]
     reveal_type(c[0])  # revealed: str
 ```
