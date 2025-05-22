@@ -611,7 +611,7 @@ impl<'src> Lexer<'src> {
 
     /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
     fn lex_identifier(&mut self, first: char) -> TokenKind {
-        // Detect potential string like rb'' b'' f'' u'' r''
+        // Detect potential string like rb'' b'' f'' t'' u'' r''
         let quote = match (first, self.cursor.first()) {
             (_, quote @ ('\'' | '"')) => self.try_single_char_prefix(first).then(|| {
                 self.cursor.bump();
@@ -629,7 +629,9 @@ impl<'src> Lexer<'src> {
 
         if let Some(quote) = quote {
             if self.current_flags.is_ft_string() {
-                return self.lex_ftstring_start(quote);
+                if let Some(kind) = self.lex_ftstring_start(quote) {
+                    return kind;
+                }
             }
 
             return self.lex_string(quote);
@@ -749,8 +751,8 @@ impl<'src> Lexer<'src> {
         true
     }
 
-    /// Lex a f-string or t-string start token.
-    fn lex_ftstring_start(&mut self, quote: char) -> TokenKind {
+    /// Lex a f-string or t-string start token if positioned at the start of an f-string or t-string.
+    fn lex_ftstring_start(&mut self, quote: char) -> Option<TokenKind> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
 
@@ -762,14 +764,13 @@ impl<'src> Lexer<'src> {
             self.current_flags |= TokenFlags::TRIPLE_QUOTED_STRING;
         }
 
-        let ftcontext = FTStringContext::new(self.current_flags, self.nesting)
-            .expect("Expect to have f or t-string flag set");
+        let ftcontext = FTStringContext::new(self.current_flags, self.nesting)?;
 
         let kind = ftcontext.kind();
 
         self.ftstrings.push(ftcontext);
 
-        kind.start_token()
+        Some(kind.start_token())
     }
 
     /// Lex a f-string middle or end token.
