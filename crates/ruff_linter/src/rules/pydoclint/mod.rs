@@ -13,7 +13,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::pydocstyle;
     use crate::rules::pydocstyle::settings::Convention;
-    use crate::test::test_path;
+    use crate::test::{test_path, test_path_as_package_init};
     use crate::{assert_messages, settings};
 
     use super::settings::Settings;
@@ -29,15 +29,29 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::DocstringMissingReturns, Path::new("DOC201_google.py"))]
-    #[test_case(Rule::DocstringExtraneousReturns, Path::new("DOC202_google.py"))]
-    #[test_case(Rule::DocstringMissingYields, Path::new("DOC402_google.py"))]
-    #[test_case(Rule::DocstringExtraneousYields, Path::new("DOC403_google.py"))]
-    #[test_case(Rule::DocstringMissingException, Path::new("DOC501_google.py"))]
-    #[test_case(Rule::DocstringExtraneousException, Path::new("DOC502_google.py"))]
-    fn rules_google_style(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
-        let diagnostics = test_path(
+    #[test_case(Rule::DocstringMissingReturns, Path::new("DOC201_google.py"), false)]
+    #[test_case(Rule::DocstringExtraneousReturns, Path::new("DOC202_google.py"), false)]
+    #[test_case(Rule::DocstringMissingYields, Path::new("DOC402_google.py"), false)]
+    #[test_case(Rule::DocstringExtraneousYields, Path::new("DOC403_google.py"), false)]
+    #[test_case(Rule::DocstringMissingException, Path::new("DOC501_google.py"), false)]
+    #[test_case(Rule::DocstringMissingException, Path::new("DOC501_google.py"), true)]
+    #[test_case(
+        Rule::DocstringExtraneousException,
+        Path::new("DOC502_google.py"),
+        false
+    )]
+    fn rules_google_style(rule_code: Rule, path: &Path, in_package: bool) -> Result<()> {
+        let test = match in_package {
+            true => test_path_as_package_init,
+            false => test_path,
+        };
+        let snapshot = format!(
+            "{}_{}{}",
+            rule_code.as_ref(),
+            path.to_string_lossy(),
+            if in_package { "_package" } else { "" }
+        );
+        let diagnostics = test(
             Path::new("pydoclint").join(path).as_path(),
             &settings::LinterSettings {
                 pydocstyle: pydocstyle::settings::Settings {
@@ -51,15 +65,29 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::DocstringMissingReturns, Path::new("DOC201_numpy.py"))]
-    #[test_case(Rule::DocstringExtraneousReturns, Path::new("DOC202_numpy.py"))]
-    #[test_case(Rule::DocstringMissingYields, Path::new("DOC402_numpy.py"))]
-    #[test_case(Rule::DocstringExtraneousYields, Path::new("DOC403_numpy.py"))]
-    #[test_case(Rule::DocstringMissingException, Path::new("DOC501_numpy.py"))]
-    #[test_case(Rule::DocstringExtraneousException, Path::new("DOC502_numpy.py"))]
-    fn rules_numpy_style(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
-        let diagnostics = test_path(
+    #[test_case(Rule::DocstringMissingReturns, Path::new("DOC201_numpy.py"), false)]
+    #[test_case(Rule::DocstringExtraneousReturns, Path::new("DOC202_numpy.py"), false)]
+    #[test_case(Rule::DocstringMissingYields, Path::new("DOC402_numpy.py"), false)]
+    #[test_case(Rule::DocstringExtraneousYields, Path::new("DOC403_numpy.py"), false)]
+    #[test_case(Rule::DocstringMissingException, Path::new("DOC501_numpy.py"), false)]
+    #[test_case(Rule::DocstringMissingException, Path::new("DOC501_numpy.py"), true)]
+    #[test_case(
+        Rule::DocstringExtraneousException,
+        Path::new("DOC502_numpy.py"),
+        false
+    )]
+    fn rules_numpy_style(rule_code: Rule, path: &Path, in_package: bool) -> Result<()> {
+        let test = match in_package {
+            true => test_path_as_package_init,
+            false => test_path,
+        };
+        let snapshot = format!(
+            "{}_{}{}",
+            rule_code.as_ref(),
+            path.to_string_lossy(),
+            if in_package { "_package" } else { "" }
+        );
+        let diagnostics = test(
             Path::new("pydoclint").join(path).as_path(),
             &settings::LinterSettings {
                 pydocstyle: pydocstyle::settings::Settings {
@@ -73,16 +101,26 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::DocstringMissingReturns, Path::new("DOC201_google.py"))]
-    #[test_case(Rule::DocstringMissingYields, Path::new("DOC402_google.py"))]
-    #[test_case(Rule::DocstringMissingException, Path::new("DOC501_google.py"))]
-    fn rules_google_style_ignore_one_line(rule_code: Rule, path: &Path) -> Result<()> {
+    #[test_case(Rule::DocstringMissingReturns, Path::new("DOC201_google.py"), false)]
+    #[test_case(Rule::DocstringMissingYields, Path::new("DOC402_google.py"), false)]
+    #[test_case(Rule::DocstringMissingException, Path::new("DOC501_google.py"), false)]
+    #[test_case(Rule::DocstringMissingException, Path::new("DOC501_google.py"), true)]
+    fn rules_google_style_ignore_one_line(
+        rule_code: Rule,
+        path: &Path,
+        in_package: bool,
+    ) -> Result<()> {
+        let test = match in_package {
+            true => test_path_as_package_init,
+            false => test_path,
+        };
         let snapshot = format!(
-            "{}_{}_ignore_one_line",
+            "{}_{}{}_ignore_one_line",
             rule_code.as_ref(),
-            path.to_string_lossy()
+            path.to_string_lossy(),
+            if in_package { "_package" } else { "" }
         );
-        let diagnostics = test_path(
+        let diagnostics = test(
             Path::new("pydoclint").join(path).as_path(),
             &settings::LinterSettings {
                 pydoclint: Settings {
