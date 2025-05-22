@@ -9,25 +9,26 @@ use ruff_text_size::Ranged;
 /// on Python 3.10+ and Python < 3.10 with `typing_extensions` enabled.
 ///
 /// ## Why is this bad?
-/// On Python 3.10 and newer, `<identifier>.__dict__.get("__annotations__" [, <default>])`
-/// can be unreliable, especially with the introduction of stringized annotations
-/// and features like `from __future__ import annotations`. For Python 3.14+, this
-/// approach is more strongly discouraged.
+/// Starting with Python 3.14, directly accessing `__annotations__` via
+/// `<identifier>.__dict__.get("__annotations__")` will only return annotations
+/// if the class is defined under `from __future__ import annotations`.
+///
+/// Therefore, it is better to use dedicated library functions like
+/// `inspect.get_annotations` (Python 3.10+),
+/// `typing_extensions.get_annotations` (for older Python versions if
+/// `typing_extensions` is available), or `annotationlib.get_annotations`
+/// (Python 3.14+).
+///
+/// The benefits of using these functions include:
+/// 1.  **Avoiding Undocumented Internals:** They provide a stable, public API,
+///     unlike direct `__dict__` access which relies on implementation details.
+/// 2.  **Forward-Compatibility:** They are designed to handle changes in
+///     Python's annotation system across versions, ensuring your code remains
+///     robust (e.g., correctly handling the Python 3.14 behavior mentioned
+///     above).
 ///
 /// See [Python Annotations Best Practices](https://docs.python.org/3.14/howto/annotations.html)
 /// for alternatives.
-///
-/// TLDR:
-///
-/// If you use a class with a custom metaclass and access `__annotations__`
-/// on the class, you may observe unexpected behavior; see
-/// [PEP 749](https://peps.python.org/pep-0749/#pep749-metaclasses) for some
-/// examples.
-///
-/// You can avoid these quirks by using `annotationlib.get_annotations()` on
-/// Python 3.14+, `inspect.get_annotations()` on Python 3.10+, or
-/// `typing_extensions.get_annotations(cls)` on Python < 3.10 with
-/// `typing_extensions` enabled.
 ///
 /// ## Example
 ///
@@ -74,7 +75,11 @@ impl Violation for ClassDictAnnotations {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Use `typing_extensions.get_annotations` (Python < 3.10 with `typing_extensions` enabled), `inspect.get_annotations` (Python 3.10+), or `annotationlib.get_annotations` (Python 3.14+) instead of `__dict__.get('__annotations__')`".to_string()
+        "Use `typing_extensions.get_annotations` (Python < 3.10 with \
+        `typing_extensions` enabled), `inspect.get_annotations` \
+        (Python 3.10+), or `annotationlib.get_annotations` (Python 3.14+) \
+        instead of `__dict__.get('__annotations__')`"
+            .to_string()
     }
 }
 
@@ -95,20 +100,14 @@ pub(crate) fn class_dict_annotations(checker: &Checker, call: &ExprCall) {
     };
 
     // 2. Check that the `get_attribute.value` is `__dict__`
-    let dict_attribute = match get_attribute.value.as_ref() {
-        Expr::Attribute(attr) if attr.attr.as_str() == "__dict__" => attr,
+    match get_attribute.value.as_ref() {
+        Expr::Attribute(attr) if attr.attr.as_str() == "__dict__" => {}
         _ => return, // The object of ".get" is not an attribute named "__dict__"
-    };
+    }
 
-    // 3. Check that the `dict_attribute.value` is an Expr::Name (e.g., `cls`, `obj`)
-    let Expr::Name(_object_name_expr) = dict_attribute.value.as_ref() else {
-        return; // Not <identifier>.__dict__.get
-    };
-    // `_object_name_expr` is now an &ruff_python_ast::ExprName
+    // At this point, we have `<identifier>.__dict__.get`.
 
-    // At this point, we have `<identifier>.__dict__.get`. Now check arguments.
-
-    // 4. Check arguments to `.get()`:
+    // 3. Check arguments to `.get()`:
     //    - No keyword arguments.
     //    - One or two positional arguments.
     //    - First positional argument must be the string literal "__annotations__".
