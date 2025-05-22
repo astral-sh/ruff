@@ -6060,17 +6060,29 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Some(KnownClass::Float.to_instance(self.db()))
             }
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => Some(
-                n.checked_div(m)
-                    .map(Type::IntLiteral)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-            ),
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => Some({
+                let mut q = n.checked_div(m);
+                let r = n.checked_rem(m);
+                // Division works differently in Python than in Rust. If the result is negative and
+                // there is a remainder, the division rounds down (instead of towards zero):
+                if n.is_negative() != m.is_negative() && r.unwrap_or(0) != 0 {
+                    q = q.map(|q| q - 1);
+                }
+                q.map(Type::IntLiteral)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
+            }),
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => Some(
-                n.checked_rem(m)
-                    .map(Type::IntLiteral)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-            ),
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => Some({
+                let mut r = n.checked_rem(m);
+                // Division works differently in Python than in Rust. If the result is negative and
+                // there is a remainder, the division rounds down (instead of towards zero). Adjust
+                // the remainder to compensate so that q * m + r == n:
+                if n.is_negative() != m.is_negative() && r.unwrap_or(0) != 0 {
+                    r = r.map(|x| x + m);
+                }
+                r.map(Type::IntLiteral)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
+            }),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Pow) => Some({
                 if m < 0 {
