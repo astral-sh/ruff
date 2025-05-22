@@ -1159,7 +1159,8 @@ f(a)
 
 ### Classes with `__call__` as attribute
 
-An instance type can be a subtype of a compatible callable type if the instance type's class has a callable `__call__` attribute.
+An instance type can be a subtype of a compatible callable type if the instance type's class has a
+callable `__call__` attribute.
 
 TODO: for the moment, we don't consider the callable type as a bound-method descriptor, but this may
 change for better compatibility with mypy/pyright.
