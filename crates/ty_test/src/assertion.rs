@@ -37,7 +37,7 @@
 use crate::db::Db;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_db::source::{line_index, source_text, SourceText};
+use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_python_trivia::{CommentRanges, Cursor};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -482,7 +482,9 @@ pub(crate) enum ErrorAssertionParseError<'a> {
     MultipleRuleCodes,
     #[error("expected '\"' to be the final character in an assertion with an error message")]
     UnclosedMessage,
-    #[error("unexpected character `{character}` at offset {offset} (relative to the `:` in the assertion comment)")]
+    #[error(
+        "unexpected character `{character}` at offset {offset} (relative to the `:` in the assertion comment)"
+    )]
     UnexpectedCharacter { character: char, offset: usize },
 }
 
@@ -491,16 +493,17 @@ mod tests {
     use super::*;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem as _;
-    use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
-    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, SearchPathSettings};
+    use ty_python_semantic::{
+        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
+    };
 
     fn get_assertions(source: &str) -> InlineFileAssertions {
         let mut db = Db::setup();
 
         let settings = ProgramSettings {
-            python_version: PythonVersion::default(),
+            python_version: PythonVersionWithSource::default(),
             python_platform: PythonPlatform::default(),
             search_paths: SearchPathSettings::new(Vec::new()),
         };
@@ -681,8 +684,10 @@ mod tests {
         assert_eq!(line1.line_number, OneIndexed::from_zero_indexed(2));
         assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(3));
 
-        let [UnparsedAssertion::Error(error1), UnparsedAssertion::Revealed(expected_ty)] =
-            &line1.assertions[..]
+        let [
+            UnparsedAssertion::Error(error1),
+            UnparsedAssertion::Revealed(expected_ty),
+        ] = &line1.assertions[..]
         else {
             panic!("expected one error assertion and one Revealed assertion");
         };

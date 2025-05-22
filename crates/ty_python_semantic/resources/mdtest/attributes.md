@@ -777,6 +777,30 @@ reveal_type(C.variable_with_class_default1)  # revealed: str
 reveal_type(c_instance.variable_with_class_default1)  # revealed: str
 ```
 
+#### Descriptor attributes as class variables
+
+Whether they are explicitly qualified as `ClassVar`, or just have a class level default, we treat
+descriptor attributes as class variables. This test mainly makes sure that we do *not* treat them as
+instance variables. This would lead to a different outcome, since the `__get__` method would not be
+called (the descriptor protocol is not invoked for instance variables).
+
+```py
+from typing import ClassVar
+
+class Descriptor:
+    def __get__(self, instance, owner) -> int:
+        return 42
+
+class C:
+    a: ClassVar[Descriptor]
+    b: Descriptor = Descriptor()
+    c: ClassVar[Descriptor] = Descriptor()
+
+reveal_type(C().a)  # revealed: int
+reveal_type(C().b)  # revealed: int
+reveal_type(C().c)  # revealed: int
+```
+
 ### Inheritance of class/instance attributes
 
 #### Instance variable defined in a base class
@@ -1460,6 +1484,14 @@ Instance attributes also take precedence over the `__getattr__` method:
 # attempt to determine if instance attributes are always bound or not. Neither mypy nor pyright do this,
 # so it's not a priority.
 reveal_type(c.instance_attr)  # revealed: str
+```
+
+Importantly, `__getattr__` is only called if attributes are accessed on instances, not if they are
+accessed on the class itself:
+
+```py
+# error: [unresolved-attribute]
+CustomGetAttr.whatever
 ```
 
 ### Type of the `name` parameter

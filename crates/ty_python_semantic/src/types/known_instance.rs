@@ -11,9 +11,9 @@
 use std::fmt::Display;
 
 use super::generics::GenericContext;
-use super::{class::KnownClass, ClassType, Truthiness, Type, TypeAliasType, TypeVarInstance};
+use super::{ClassType, Truthiness, Type, TypeAliasType, TypeVarInstance, class::KnownClass};
 use crate::db::Db;
-use crate::module_resolver::{file_to_module, KnownModule};
+use crate::module_resolver::{KnownModule, file_to_module};
 use ruff_db::files::File;
 
 /// Enumeration of specific runtime symbols that are special enough
@@ -150,6 +150,53 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Intersection
             | Self::TypeOf
             | Self::CallableTypeOf => Truthiness::AlwaysTrue,
+        }
+    }
+
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::Annotated
+            | Self::Literal
+            | Self::LiteralString
+            | Self::Optional
+            | Self::Union
+            | Self::NoReturn
+            | Self::Never
+            | Self::Tuple
+            | Self::Type
+            | Self::TypingSelf
+            | Self::Final
+            | Self::ClassVar
+            | Self::Callable
+            | Self::Concatenate
+            | Self::Unpack
+            | Self::Required
+            | Self::NotRequired
+            | Self::TypeAlias
+            | Self::TypeGuard
+            | Self::TypedDict
+            | Self::TypeIs
+            | Self::List
+            | Self::Dict
+            | Self::DefaultDict
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Counter
+            | Self::Deque
+            | Self::ChainMap
+            | Self::OrderedDict
+            | Self::ReadOnly
+            | Self::Unknown
+            | Self::AlwaysTruthy
+            | Self::AlwaysFalsy
+            | Self::Not
+            | Self::Intersection
+            | Self::TypeOf
+            | Self::CallableTypeOf => self,
+            Self::TypeVar(tvar) => Self::TypeVar(tvar.normalized(db)),
+            Self::Protocol(ctx) => Self::Protocol(ctx.map(|ctx| ctx.normalized(db))),
+            Self::Generic(ctx) => Self::Generic(ctx.map(|ctx| ctx.normalized(db))),
+            Self::TypeAliasType(alias) => Self::TypeAliasType(alias.normalized(db)),
         }
     }
 

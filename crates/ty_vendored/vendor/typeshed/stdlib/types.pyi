@@ -1,5 +1,5 @@
 import sys
-from _typeshed import MaybeNone, SupportsKeysAndGetItem
+from _typeshed import AnnotationForm, MaybeNone, SupportsKeysAndGetItem
 from _typeshed.importlib import LoaderProtocol
 from collections.abc import (
     AsyncGenerator,
@@ -18,6 +18,9 @@ from collections.abc import (
 from importlib.machinery import ModuleSpec
 from typing import Any, ClassVar, Literal, TypeVar, final, overload
 from typing_extensions import ParamSpec, Self, TypeAliasType, TypeVarTuple, deprecated
+
+if sys.version_info >= (3, 14):
+    from _typeshed import AnnotateFunc
 
 __all__ = [
     "FunctionType",
@@ -77,7 +80,9 @@ class FunctionType:
     def __globals__(self) -> dict[str, Any]: ...
     __name__: str
     __qualname__: str
-    __annotations__: dict[str, Any]
+    __annotations__: dict[str, AnnotationForm]
+    if sys.version_info >= (3, 14):
+        __annotate__: AnnotateFunc | None
     __kwdefaults__: dict[str, Any] | None
     if sys.version_info >= (3, 10):
         @property
@@ -352,6 +357,10 @@ class ModuleType:
     # Redeclaring `__doc__` here helps some type checkers understand that `__doc__` is available
     # as an implicit global in all modules, similar to `__name__`, `__file__`, `__spec__`, etc.
     __doc__: str | None
+    __annotations__: dict[str, AnnotationForm]
+    if sys.version_info >= (3, 14):
+        __annotate__: AnnotateFunc | None
+
     def __init__(self, name: str, doc: str | None = ...) -> None: ...
     # __getattr__ doesn't exist at runtime,
     # but having it here in typeshed makes dynamic imports

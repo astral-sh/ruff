@@ -192,7 +192,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::ExpectedToken { found, expected } => {
                 write!(f, "Expected {expected}, found {found}",)
             }
-            ParseErrorType::Lexical(ref lex_error) => write!(f, "{lex_error}"),
+            ParseErrorType::Lexical(lex_error) => write!(f, "{lex_error}"),
             ParseErrorType::SimpleStatementsOnSameLine => {
                 f.write_str("Simple statements must be separated by newlines or semicolons")
             }
@@ -289,7 +289,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::UnexpectedIpythonEscapeCommand => {
                 f.write_str("IPython escape commands are only allowed in `Mode::Ipython`")
             }
-            ParseErrorType::FStringError(ref fstring_error) => {
+            ParseErrorType::FStringError(fstring_error) => {
                 write!(f, "f-string: {fstring_error}")
             }
             ParseErrorType::UnexpectedExpressionToken => {
@@ -864,7 +864,9 @@ impl Display for UnsupportedSyntaxError {
             ) => "Cannot use unparenthesized assignment expression as an element in a set literal",
             UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
                 UnparenthesizedNamedExprKind::SetComprehension,
-            ) => "Cannot use unparenthesized assignment expression as an element in a set comprehension",
+            ) => {
+                "Cannot use unparenthesized assignment expression as an element in a set comprehension"
+            }
             UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
                 "Cannot use parenthesized keyword argument name"
             }
@@ -894,7 +896,7 @@ impl Display for UnsupportedSyntaxError {
                         self.target_version,
                         changed = self.kind.changed_version(),
                     ),
-                }
+                };
             }
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 "Cannot use positional-only parameter separator"

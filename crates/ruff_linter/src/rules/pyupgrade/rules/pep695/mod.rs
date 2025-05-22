@@ -6,11 +6,10 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 use ruff_python_ast::{
-    self as ast,
+    self as ast, Arguments, Expr, ExprCall, ExprName, ExprSubscript, Identifier, Stmt, StmtAssign,
+    TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
     name::Name,
     visitor::{self, Visitor},
-    Arguments, Expr, ExprCall, ExprName, ExprSubscript, Identifier, Stmt, StmtAssign, TypeParam,
-    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
@@ -282,7 +281,7 @@ pub(crate) fn expr_name_to_type_var<'a>(
 
     match value.as_ref() {
         Expr::Subscript(ExprSubscript {
-            value: ref subscript_value,
+            value: subscript_value,
             ..
         }) => {
             if semantic.match_typing_expr(subscript_value, "TypeVar") {

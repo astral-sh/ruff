@@ -1,12 +1,11 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::{Parameter, Parameters, Stmt, StmtExpr, StmtFunctionDef, StmtRaise};
 
-use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -223,13 +222,13 @@ enum Argumentable {
 }
 
 impl Argumentable {
-    fn check_for(self, name: String) -> DiagnosticKind {
+    fn check_for(self, name: String, range: TextRange) -> Diagnostic {
         match self {
-            Self::Function => UnusedFunctionArgument { name }.into(),
-            Self::Method => UnusedMethodArgument { name }.into(),
-            Self::ClassMethod => UnusedClassMethodArgument { name }.into(),
-            Self::StaticMethod => UnusedStaticMethodArgument { name }.into(),
-            Self::Lambda => UnusedLambdaArgument { name }.into(),
+            Self::Function => Diagnostic::new(UnusedFunctionArgument { name }, range),
+            Self::Method => Diagnostic::new(UnusedMethodArgument { name }, range),
+            Self::ClassMethod => Diagnostic::new(UnusedClassMethodArgument { name }, range),
+            Self::StaticMethod => Diagnostic::new(UnusedStaticMethodArgument { name }, range),
+            Self::Lambda => Diagnostic::new(UnusedLambdaArgument { name }, range),
         }
     }
 
@@ -305,22 +304,21 @@ fn call<'a>(
 ) {
     let semantic = checker.semantic();
     let dummy_variable_rgx = &checker.settings.dummy_variable_rgx;
-    checker.report_diagnostics(parameters.filter_map(|arg| {
-        let binding = scope
+    for arg in parameters {
+        let Some(binding) = scope
             .get(arg.name())
-            .map(|binding_id| semantic.binding(binding_id))?;
+            .map(|binding_id| semantic.binding(binding_id))
+        else {
+            continue;
+        };
         if binding.kind.is_argument()
             && binding.is_unused()
             && !dummy_variable_rgx.is_match(arg.name())
         {
-            Some(Diagnostic::new(
-                argumentable.check_for(arg.name.to_string()),
-                binding.range(),
-            ))
-        } else {
-            None
+            checker
+                .report_diagnostic(argumentable.check_for(arg.name.to_string(), binding.range()));
         }
-    }));
+    }
 }
 
 /// Returns `true` if a function appears to be a base class stub. In other
@@ -346,10 +344,13 @@ pub(crate) fn is_not_implemented_stub_with_variable(
         _ => &function_def.body,
     };
 
-    let [Stmt::Assign(ast::StmtAssign { targets, value, .. }), Stmt::Raise(StmtRaise {
-        exc: Some(exception),
-        ..
-    })] = statements
+    let [
+        Stmt::Assign(ast::StmtAssign { targets, value, .. }),
+        Stmt::Raise(StmtRaise {
+            exc: Some(exception),
+            ..
+        }),
+    ] = statements
     else {
         return false;
     };

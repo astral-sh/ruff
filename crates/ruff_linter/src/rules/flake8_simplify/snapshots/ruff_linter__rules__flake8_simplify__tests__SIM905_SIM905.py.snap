@@ -890,6 +890,8 @@ SIM905.py:111:7: SIM905 [*] Consider using a list literal instead of `str.split`
 111     |-print("a,b".rsplit(","))
     111 |+print(["a", "b"])
 112 112 | print("a,b,c".rsplit(",", 1))
+113 113 | 
+114 114 | # https://github.com/astral-sh/ruff/issues/18069
 
 SIM905.py:112:7: SIM905 [*] Consider using a list literal instead of `str.split`
     |
@@ -897,6 +899,8 @@ SIM905.py:112:7: SIM905 [*] Consider using a list literal instead of `str.split`
 111 | print("a,b".rsplit(","))
 112 | print("a,b,c".rsplit(",", 1))
     |       ^^^^^^^^^^^^^^^^^^^^^^ SIM905
+113 |
+114 | # https://github.com/astral-sh/ruff/issues/18069
     |
     = help: Replace with list literal
 
@@ -906,3 +910,353 @@ SIM905.py:112:7: SIM905 [*] Consider using a list literal instead of `str.split`
 111 111 | print("a,b".rsplit(","))
 112     |-print("a,b,c".rsplit(",", 1))
     112 |+print(["a,b", "c"])
+113 113 | 
+114 114 | # https://github.com/astral-sh/ruff/issues/18069
+115 115 | 
+
+SIM905.py:116:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+114 | # https://github.com/astral-sh/ruff/issues/18069
+115 |
+116 | print("".split(maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^ SIM905
+117 | print("".split(sep=None, maxsplit=0))
+118 | print(" ".split(maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+113 113 | 
+114 114 | # https://github.com/astral-sh/ruff/issues/18069
+115 115 | 
+116     |-print("".split(maxsplit=0))
+    116 |+print([])
+117 117 | print("".split(sep=None, maxsplit=0))
+118 118 | print(" ".split(maxsplit=0))
+119 119 | print(" ".split(sep=None, maxsplit=0))
+
+SIM905.py:117:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+116 | print("".split(maxsplit=0))
+117 | print("".split(sep=None, maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+118 | print(" ".split(maxsplit=0))
+119 | print(" ".split(sep=None, maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+114 114 | # https://github.com/astral-sh/ruff/issues/18069
+115 115 | 
+116 116 | print("".split(maxsplit=0))
+117     |-print("".split(sep=None, maxsplit=0))
+    117 |+print([])
+118 118 | print(" ".split(maxsplit=0))
+119 119 | print(" ".split(sep=None, maxsplit=0))
+120 120 | print(" x ".split(maxsplit=0))
+
+SIM905.py:118:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+116 | print("".split(maxsplit=0))
+117 | print("".split(sep=None, maxsplit=0))
+118 | print(" ".split(maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^ SIM905
+119 | print(" ".split(sep=None, maxsplit=0))
+120 | print(" x ".split(maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+115 115 | 
+116 116 | print("".split(maxsplit=0))
+117 117 | print("".split(sep=None, maxsplit=0))
+118     |-print(" ".split(maxsplit=0))
+    118 |+print([])
+119 119 | print(" ".split(sep=None, maxsplit=0))
+120 120 | print(" x ".split(maxsplit=0))
+121 121 | print(" x ".split(sep=None, maxsplit=0))
+
+SIM905.py:119:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+117 | print("".split(sep=None, maxsplit=0))
+118 | print(" ".split(maxsplit=0))
+119 | print(" ".split(sep=None, maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+120 | print(" x ".split(maxsplit=0))
+121 | print(" x ".split(sep=None, maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+116 116 | print("".split(maxsplit=0))
+117 117 | print("".split(sep=None, maxsplit=0))
+118 118 | print(" ".split(maxsplit=0))
+119     |-print(" ".split(sep=None, maxsplit=0))
+    119 |+print([])
+120 120 | print(" x ".split(maxsplit=0))
+121 121 | print(" x ".split(sep=None, maxsplit=0))
+122 122 | print("  x  ".split(maxsplit=0))
+
+SIM905.py:120:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+118 | print(" ".split(maxsplit=0))
+119 | print(" ".split(sep=None, maxsplit=0))
+120 | print(" x ".split(maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+121 | print(" x ".split(sep=None, maxsplit=0))
+122 | print("  x  ".split(maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+117 117 | print("".split(sep=None, maxsplit=0))
+118 118 | print(" ".split(maxsplit=0))
+119 119 | print(" ".split(sep=None, maxsplit=0))
+120     |-print(" x ".split(maxsplit=0))
+    120 |+print(["x "])
+121 121 | print(" x ".split(sep=None, maxsplit=0))
+122 122 | print("  x  ".split(maxsplit=0))
+123 123 | print("  x  ".split(sep=None, maxsplit=0))
+
+SIM905.py:121:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+119 | print(" ".split(sep=None, maxsplit=0))
+120 | print(" x ".split(maxsplit=0))
+121 | print(" x ".split(sep=None, maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+122 | print("  x  ".split(maxsplit=0))
+123 | print("  x  ".split(sep=None, maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+118 118 | print(" ".split(maxsplit=0))
+119 119 | print(" ".split(sep=None, maxsplit=0))
+120 120 | print(" x ".split(maxsplit=0))
+121     |-print(" x ".split(sep=None, maxsplit=0))
+    121 |+print(["x "])
+122 122 | print("  x  ".split(maxsplit=0))
+123 123 | print("  x  ".split(sep=None, maxsplit=0))
+124 124 | print("".rsplit(maxsplit=0))
+
+SIM905.py:122:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+120 | print(" x ".split(maxsplit=0))
+121 | print(" x ".split(sep=None, maxsplit=0))
+122 | print("  x  ".split(maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+123 | print("  x  ".split(sep=None, maxsplit=0))
+124 | print("".rsplit(maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+119 119 | print(" ".split(sep=None, maxsplit=0))
+120 120 | print(" x ".split(maxsplit=0))
+121 121 | print(" x ".split(sep=None, maxsplit=0))
+122     |-print("  x  ".split(maxsplit=0))
+    122 |+print(["x  "])
+123 123 | print("  x  ".split(sep=None, maxsplit=0))
+124 124 | print("".rsplit(maxsplit=0))
+125 125 | print("".rsplit(sep=None, maxsplit=0))
+
+SIM905.py:123:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+121 | print(" x ".split(sep=None, maxsplit=0))
+122 | print("  x  ".split(maxsplit=0))
+123 | print("  x  ".split(sep=None, maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+124 | print("".rsplit(maxsplit=0))
+125 | print("".rsplit(sep=None, maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+120 120 | print(" x ".split(maxsplit=0))
+121 121 | print(" x ".split(sep=None, maxsplit=0))
+122 122 | print("  x  ".split(maxsplit=0))
+123     |-print("  x  ".split(sep=None, maxsplit=0))
+    123 |+print(["x  "])
+124 124 | print("".rsplit(maxsplit=0))
+125 125 | print("".rsplit(sep=None, maxsplit=0))
+126 126 | print(" ".rsplit(maxsplit=0))
+
+SIM905.py:124:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+122 | print("  x  ".split(maxsplit=0))
+123 | print("  x  ".split(sep=None, maxsplit=0))
+124 | print("".rsplit(maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^ SIM905
+125 | print("".rsplit(sep=None, maxsplit=0))
+126 | print(" ".rsplit(maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+121 121 | print(" x ".split(sep=None, maxsplit=0))
+122 122 | print("  x  ".split(maxsplit=0))
+123 123 | print("  x  ".split(sep=None, maxsplit=0))
+124     |-print("".rsplit(maxsplit=0))
+    124 |+print([])
+125 125 | print("".rsplit(sep=None, maxsplit=0))
+126 126 | print(" ".rsplit(maxsplit=0))
+127 127 | print(" ".rsplit(sep=None, maxsplit=0))
+
+SIM905.py:125:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+123 | print("  x  ".split(sep=None, maxsplit=0))
+124 | print("".rsplit(maxsplit=0))
+125 | print("".rsplit(sep=None, maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+126 | print(" ".rsplit(maxsplit=0))
+127 | print(" ".rsplit(sep=None, maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+122 122 | print("  x  ".split(maxsplit=0))
+123 123 | print("  x  ".split(sep=None, maxsplit=0))
+124 124 | print("".rsplit(maxsplit=0))
+125     |-print("".rsplit(sep=None, maxsplit=0))
+    125 |+print([])
+126 126 | print(" ".rsplit(maxsplit=0))
+127 127 | print(" ".rsplit(sep=None, maxsplit=0))
+128 128 | print(" x ".rsplit(maxsplit=0))
+
+SIM905.py:126:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+124 | print("".rsplit(maxsplit=0))
+125 | print("".rsplit(sep=None, maxsplit=0))
+126 | print(" ".rsplit(maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^ SIM905
+127 | print(" ".rsplit(sep=None, maxsplit=0))
+128 | print(" x ".rsplit(maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+123 123 | print("  x  ".split(sep=None, maxsplit=0))
+124 124 | print("".rsplit(maxsplit=0))
+125 125 | print("".rsplit(sep=None, maxsplit=0))
+126     |-print(" ".rsplit(maxsplit=0))
+    126 |+print([])
+127 127 | print(" ".rsplit(sep=None, maxsplit=0))
+128 128 | print(" x ".rsplit(maxsplit=0))
+129 129 | print(" x ".rsplit(maxsplit=0))
+
+SIM905.py:127:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+125 | print("".rsplit(sep=None, maxsplit=0))
+126 | print(" ".rsplit(maxsplit=0))
+127 | print(" ".rsplit(sep=None, maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+128 | print(" x ".rsplit(maxsplit=0))
+129 | print(" x ".rsplit(maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+124 124 | print("".rsplit(maxsplit=0))
+125 125 | print("".rsplit(sep=None, maxsplit=0))
+126 126 | print(" ".rsplit(maxsplit=0))
+127     |-print(" ".rsplit(sep=None, maxsplit=0))
+    127 |+print([])
+128 128 | print(" x ".rsplit(maxsplit=0))
+129 129 | print(" x ".rsplit(maxsplit=0))
+130 130 | print(" x ".rsplit(sep=None, maxsplit=0))
+
+SIM905.py:128:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+126 | print(" ".rsplit(maxsplit=0))
+127 | print(" ".rsplit(sep=None, maxsplit=0))
+128 | print(" x ".rsplit(maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+129 | print(" x ".rsplit(maxsplit=0))
+130 | print(" x ".rsplit(sep=None, maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+125 125 | print("".rsplit(sep=None, maxsplit=0))
+126 126 | print(" ".rsplit(maxsplit=0))
+127 127 | print(" ".rsplit(sep=None, maxsplit=0))
+128     |-print(" x ".rsplit(maxsplit=0))
+    128 |+print([" x"])
+129 129 | print(" x ".rsplit(maxsplit=0))
+130 130 | print(" x ".rsplit(sep=None, maxsplit=0))
+131 131 | print("  x  ".rsplit(maxsplit=0))
+
+SIM905.py:129:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+127 | print(" ".rsplit(sep=None, maxsplit=0))
+128 | print(" x ".rsplit(maxsplit=0))
+129 | print(" x ".rsplit(maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+130 | print(" x ".rsplit(sep=None, maxsplit=0))
+131 | print("  x  ".rsplit(maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+126 126 | print(" ".rsplit(maxsplit=0))
+127 127 | print(" ".rsplit(sep=None, maxsplit=0))
+128 128 | print(" x ".rsplit(maxsplit=0))
+129     |-print(" x ".rsplit(maxsplit=0))
+    129 |+print([" x"])
+130 130 | print(" x ".rsplit(sep=None, maxsplit=0))
+131 131 | print("  x  ".rsplit(maxsplit=0))
+132 132 | print("  x  ".rsplit(sep=None, maxsplit=0))
+
+SIM905.py:130:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+128 | print(" x ".rsplit(maxsplit=0))
+129 | print(" x ".rsplit(maxsplit=0))
+130 | print(" x ".rsplit(sep=None, maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+131 | print("  x  ".rsplit(maxsplit=0))
+132 | print("  x  ".rsplit(sep=None, maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+127 127 | print(" ".rsplit(sep=None, maxsplit=0))
+128 128 | print(" x ".rsplit(maxsplit=0))
+129 129 | print(" x ".rsplit(maxsplit=0))
+130     |-print(" x ".rsplit(sep=None, maxsplit=0))
+    130 |+print([" x"])
+131 131 | print("  x  ".rsplit(maxsplit=0))
+132 132 | print("  x  ".rsplit(sep=None, maxsplit=0))
+
+SIM905.py:131:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+129 | print(" x ".rsplit(maxsplit=0))
+130 | print(" x ".rsplit(sep=None, maxsplit=0))
+131 | print("  x  ".rsplit(maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+132 | print("  x  ".rsplit(sep=None, maxsplit=0))
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+128 128 | print(" x ".rsplit(maxsplit=0))
+129 129 | print(" x ".rsplit(maxsplit=0))
+130 130 | print(" x ".rsplit(sep=None, maxsplit=0))
+131     |-print("  x  ".rsplit(maxsplit=0))
+    131 |+print(["  x"])
+132 132 | print("  x  ".rsplit(sep=None, maxsplit=0))
+
+SIM905.py:132:7: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+130 | print(" x ".rsplit(sep=None, maxsplit=0))
+131 | print("  x  ".rsplit(maxsplit=0))
+132 | print("  x  ".rsplit(sep=None, maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+129 129 | print(" x ".rsplit(maxsplit=0))
+130 130 | print(" x ".rsplit(sep=None, maxsplit=0))
+131 131 | print("  x  ".rsplit(maxsplit=0))
+132     |-print("  x  ".rsplit(sep=None, maxsplit=0))
+    132 |+print(["  x"])

@@ -1,7 +1,7 @@
 #![allow(clippy::print_stdout)]
 
 use std::fs::File;
-use std::io::{self, stdout, BufWriter, Write};
+use std::io::{self, BufWriter, Write, stdout};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -11,10 +11,10 @@ use anyhow::Result;
 use clap::CommandFactory;
 use colored::Colorize;
 use log::warn;
-use notify::{recommended_watcher, RecursiveMode, Watcher};
+use notify::{RecursiveMode, Watcher, recommended_watcher};
 
 use args::{GlobalConfigArgs, ServerCommand};
-use ruff_linter::logging::{set_up_logging, LogLevel};
+use ruff_linter::logging::{LogLevel, set_up_logging};
 use ruff_linter::settings::flags::FixMode;
 use ruff_linter::settings::types::OutputFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
@@ -488,7 +488,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 mod test_file_change_detector {
     use std::path::PathBuf;
 
-    use crate::{change_detected, ChangeKind};
+    use crate::{ChangeKind, change_detected};
 
     #[test]
     fn detect_correct_file_change() {

@@ -1,10 +1,14 @@
-import _compression
 import sys
 import zlib
 from _typeshed import ReadableBuffer, SizedBuffer, StrOrBytesPath
 from io import FileIO, TextIOWrapper
 from typing import Final, Literal, Protocol, overload
 from typing_extensions import TypeAlias
+
+if sys.version_info >= (3, 14):
+    from compression._common._streams import BaseStream, DecompressReader
+else:
+    from _compression import BaseStream, DecompressReader
 
 __all__ = ["BadGzipFile", "GzipFile", "open", "compress", "decompress"]
 
@@ -84,7 +88,7 @@ class _PaddedFile:
 
 class BadGzipFile(OSError): ...
 
-class GzipFile(_compression.BaseStream):
+class GzipFile(BaseStream):
     myfileobj: FileIO | None
     mode: object
     name: str
@@ -153,7 +157,7 @@ class GzipFile(_compression.BaseStream):
     def seek(self, offset: int, whence: int = 0) -> int: ...
     def readline(self, size: int | None = -1) -> bytes: ...
 
-class _GzipReader(_compression.DecompressReader):
+class _GzipReader(DecompressReader):
     def __init__(self, fp: _ReadableFileobj) -> None: ...
 
 def compress(data: SizedBuffer, compresslevel: int = 9, *, mtime: float | None = None) -> bytes: ...

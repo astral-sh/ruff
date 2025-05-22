@@ -1,5 +1,5 @@
-use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
+use crate::server::client::{Notifier, Requester};
 use crate::session::Session;
 use lsp_types as types;
 use lsp_types::notification as notif;

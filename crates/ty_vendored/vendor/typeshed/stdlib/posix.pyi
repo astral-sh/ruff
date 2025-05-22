@@ -250,6 +250,12 @@ if sys.platform != "win32":
             timerfd_settime_ns as timerfd_settime_ns,
         )
 
+    if sys.version_info >= (3, 14):
+        from os import readinto as readinto
+
+    if sys.version_info >= (3, 14) and sys.platform == "linux":
+        from os import SCHED_DEADLINE as SCHED_DEADLINE, SCHED_NORMAL as SCHED_NORMAL
+
     if sys.platform != "linux":
         from os import O_EXLOCK as O_EXLOCK, O_SHLOCK as O_SHLOCK, chflags as chflags, lchflags as lchflags, lchmod as lchmod
 

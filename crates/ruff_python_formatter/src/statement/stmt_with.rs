@@ -1,4 +1,4 @@
-use ruff_formatter::{format_args, write, FormatContext, FormatError};
+use ruff_formatter::{FormatContext, FormatError, format_args, write};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{StmtWith, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
@@ -13,7 +13,7 @@ use crate::expression::parentheses::{
 use crate::other::commas;
 use crate::other::with_item::WithItemLayout;
 use crate::prelude::*;
-use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
+use crate::statement::clause::{ClauseHeader, clause_body, clause_header};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use ruff_formatter::{format_args, write, Buffer, RemoveSoftLinesBuffer};
+use ruff_formatter::{Buffer, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{
     AnyStringFlags, ConversionFlag, Expr, FStringElement, FStringExpressionElement,
     FStringLiteralElement, StringFlags,

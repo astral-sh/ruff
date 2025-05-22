@@ -5,7 +5,7 @@ use clap::Parser;
 use colored::Colorize;
 
 use ruff::args::Args;
-use ruff::{run, ExitStatus};
+use ruff::{ExitStatus, run};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]

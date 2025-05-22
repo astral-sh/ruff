@@ -1,7 +1,7 @@
 use ruff_python_ast::{Expr, ExprCall};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;

@@ -1,17 +1,17 @@
 use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::Context;
 use ignore::{WalkBuilder, WalkState};
 
 use ruff_linter::settings::types::GlobPath;
 use ruff_linter::{settings::types::FilePattern, settings::types::PreviewMode};
+use ruff_workspace::Settings;
 use ruff_workspace::pyproject::find_fallback_target_version;
 use ruff_workspace::resolver::match_exclusion;
-use ruff_workspace::Settings;
 use ruff_workspace::{
     configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
     pyproject::{find_user_settings_toml, settings_toml},
@@ -462,7 +462,7 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
                     tracing::debug!(
                         "Combining settings from editor-specified inline configuration"
                     );
-                    match Configuration::from_options(options, None, project_root) {
+                    match Configuration::from_options(*options, None, project_root) {
                         Ok(configuration) => editor_configuration.combine(configuration),
                         Err(err) => {
                             tracing::error!(
@@ -516,10 +516,10 @@ mod tests {
     #[test]
     fn inline_settings() {
         let editor_settings = ResolvedEditorSettings {
-            configuration: Some(ResolvedConfiguration::Inline(Options {
+            configuration: Some(ResolvedConfiguration::Inline(Box::new(Options {
                 line_length: Some(LineLength::try_from(120).unwrap()),
                 ..Default::default()
-            })),
+            }))),
             ..Default::default()
         };
 
@@ -534,10 +534,10 @@ mod tests {
     #[test]
     fn inline_and_specific_settings_resolution_order() {
         let editor_settings = ResolvedEditorSettings {
-            configuration: Some(ResolvedConfiguration::Inline(Options {
+            configuration: Some(ResolvedConfiguration::Inline(Box::new(Options {
                 line_length: Some(LineLength::try_from(120).unwrap()),
                 ..Default::default()
-            })),
+            }))),
             line_length: Some(LineLength::try_from(100).unwrap()),
             ..Default::default()
         };

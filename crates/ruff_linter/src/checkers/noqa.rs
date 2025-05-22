@@ -9,6 +9,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
+use crate::Locator;
 use crate::fix::edits::delete_comment;
 use crate::noqa::{
     Code, Directive, FileExemption, FileNoqaDirectives, NoqaDirectives, NoqaMapping,
@@ -20,7 +21,6 @@ use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
-use crate::Locator;
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(
@@ -47,9 +47,13 @@ pub(crate) fn check_noqa(
 
     // Remove any ignored diagnostics.
     'outer: for (index, diagnostic) in diagnostics.iter().enumerate() {
-        if matches!(diagnostic.kind.rule(), Rule::BlanketNOQA) {
+        let rule = diagnostic.rule();
+
+        if matches!(rule, Rule::BlanketNOQA) {
             continue;
         }
+
+        let code = rule.noqa_code();
 
         match &exemption {
             FileExemption::All(_) => {
@@ -59,7 +63,7 @@ pub(crate) fn check_noqa(
             }
             FileExemption::Codes(codes) => {
                 // If the diagnostic is ignored by a global exemption, ignore it.
-                if codes.contains(&&diagnostic.kind.rule().noqa_code()) {
+                if codes.contains(&&code) {
                     ignored_diagnostics.push(index);
                     continue;
                 }
@@ -78,17 +82,13 @@ pub(crate) fn check_noqa(
             {
                 let suppressed = match &directive_line.directive {
                     Directive::All(_) => {
-                        directive_line
-                            .matches
-                            .push(diagnostic.kind.rule().noqa_code());
+                        directive_line.matches.push(code);
                         ignored_diagnostics.push(index);
                         true
                     }
                     Directive::Codes(directive) => {
-                        if directive.includes(diagnostic.kind.rule()) {
-                            directive_line
-                                .matches
-                                .push(diagnostic.kind.rule().noqa_code());
+                        if directive.includes(code) {
+                            directive_line.matches.push(code);
                             ignored_diagnostics.push(index);
                             true
                         } else {
@@ -161,7 +161,7 @@ pub(crate) fn check_noqa(
                             let is_code_used = if is_file_level {
                                 diagnostics
                                     .iter()
-                                    .any(|diag| diag.kind.rule().noqa_code() == code)
+                                    .any(|diag| diag.rule().noqa_code() == code)
                             } else {
                                 matches.iter().any(|match_| *match_ == code)
                             } || settings
