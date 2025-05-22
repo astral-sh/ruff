@@ -642,7 +642,7 @@
         },
         "possibly-unbound-implicit-call": {
           "title": "detects implicit calls to possibly unbound methods",
-          "description": "## What it does\nChecks for implicit calls to possibly unbound methods.\n\n## Why is this bad?\nExpressions such as `x[y]` and `x * y` call methods\nunder the hood (`__getitem__` and `__mul__` respectively).\nCalling an unbound method will raise an `AttributeError` at runtime.\n\n## Examples\n```python\nclass A:\n    if b:  # False\n        def __getitem__(self, v): ...\n\nA()[0]  # TypeError: 'A' object is not subscriptable\n```",
+          "description": "## What it does\nChecks for implicit calls to possibly unbound methods.\n\n## Why is this bad?\nExpressions such as `x[y]` and `x * y` call methods\nunder the hood (`__getitem__` and `__mul__` respectively).\nCalling an unbound method will raise an `AttributeError` at runtime.\n\n## Examples\n```python\nimport datetime\n\nclass A:\n    if datetime.date.today().weekday() != 6:\n        def __getitem__(self, v): ...\n\nA()[0]  # TypeError: 'A' object is not subscriptable\n```",
           "default": "warn",
           "oneOf": [
             {

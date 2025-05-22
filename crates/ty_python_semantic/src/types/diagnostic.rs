@@ -116,8 +116,10 @@ declare_lint! {
     ///
     /// ## Examples
     /// ```python
+    /// import datetime
+    ///
     /// class A:
-    ///     if b:  # False
+    ///     if datetime.date.today().weekday() != 6:
     ///         def __getitem__(self, v): ...
     ///
     /// A()[0]  # TypeError: 'A' object is not subscriptable
