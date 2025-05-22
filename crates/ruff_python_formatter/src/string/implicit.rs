@@ -4,7 +4,9 @@ use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
 };
-use ruff_python_ast::{AnyStringFlags, FTStringElement, StringFlags, StringLike, StringLikePart};
+use ruff_python_ast::{
+    AnyStringFlags, FString, FTStringElement, StringFlags, StringLike, StringLikePart, TString,
+};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 use std::borrow::Cow;
@@ -320,8 +322,9 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                     }
                 }
 
-                StringLikePart::FString(f_string) => {
-                    for element in &f_string.elements {
+                StringLikePart::FString(FString { elements, .. })
+                | StringLikePart::TString(TString { elements, .. }) => {
+                    for element in elements {
                         match element {
                             FTStringElement::Literal(literal) => {
                                 FormatLiteralContent {
@@ -334,42 +337,12 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                                 .fmt(f)?;
                             }
                             // Formatting the expression here and in the expanded version is safe **only**
-                            // because we assert that the f-string never contains any comments.
+                            // because we assert that the f/t-string never contains any comments.
                             FTStringElement::Expression(expression) => {
                                 let context = FTStringContext::new(
                                     self.flags,
                                     FTStringLayout::from_ft_string_elements(
-                                        &f_string.elements,
-                                        f.context().source(),
-                                    ),
-                                );
-
-                                FormatFTStringInterpolatedElement::new(expression, context)
-                                    .fmt(f)?;
-                            }
-                        }
-                    }
-                }
-                StringLikePart::TString(f_string) => {
-                    for element in &f_string.elements {
-                        match element {
-                            FTStringElement::Literal(literal) => {
-                                FormatLiteralContent {
-                                    range: literal.range(),
-                                    flags: self.flags,
-                                    is_ftstring: true,
-                                    trim_end: false,
-                                    trim_start: false,
-                                }
-                                .fmt(f)?;
-                            }
-                            // Formatting the expression here and in the expanded version is safe **only**
-                            // because we assert that the t-string never contains any comments.
-                            FTStringElement::Expression(expression) => {
-                                let context = FTStringContext::new(
-                                    self.flags,
-                                    FTStringLayout::from_ft_string_elements(
-                                        &f_string.elements,
+                                        elements,
                                         f.context().source(),
                                     ),
                                 );
