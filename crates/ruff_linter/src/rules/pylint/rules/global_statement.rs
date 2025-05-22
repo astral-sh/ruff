@@ -31,8 +31,9 @@ use crate::checkers::ast::Checker;
 ///
 ///
 /// def foo():
+///     var = 10
 ///     print(var)
-///     return 10
+///     return var
 ///
 ///
 /// var = foo()
