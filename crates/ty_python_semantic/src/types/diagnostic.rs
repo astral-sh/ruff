@@ -24,7 +24,7 @@ use std::fmt::Formatter;
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CALL_NON_CALLABLE);
-    registry.register_lint(&CALL_POSSIBLY_UNBOUND_METHOD);
+    registry.register_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL);
     registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
@@ -107,12 +107,23 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for calls to possibly unbound methods.
+    /// Checks for implicit calls to possibly unbound methods.
     ///
     /// ## Why is this bad?
+    /// Expressions such as `x[y]` and `x * y` call methods
+    /// under the hood (`__getitem__` and `__mul__` respectively).
     /// Calling an unbound method will raise an `AttributeError` at runtime.
-    pub(crate) static CALL_POSSIBLY_UNBOUND_METHOD = {
-        summary: "detects calls to possibly unbound methods",
+    ///
+    /// ## Examples
+    /// ```python
+    /// class A:
+    ///     if b:  # False
+    ///         def __getitem__(self, v): ...
+    ///
+    /// A()[0]  # TypeError: 'A' object is not subscriptable
+    /// ```
+    pub(crate) static POSSIBLY_UNBOUND_IMPLICIT_CALL = {
+        summary: "detects implicit calls to possibly unbound methods",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
     }

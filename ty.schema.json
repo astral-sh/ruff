@@ -240,16 +240,6 @@
             }
           ]
         },
-        "call-possibly-unbound-method": {
-          "title": "detects calls to possibly unbound methods",
-          "description": "## What it does\nChecks for calls to possibly unbound methods.\n\n## Why is this bad?\nCalling an unbound method will raise an `AttributeError` at runtime.",
-          "default": "warn",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "conflicting-argument-forms": {
           "title": "detects when an argument is used as both a value and a type form in a call",
           "description": "## What it does\nChecks whether an argument is used as both a value and a type form in a call.\n\n## Why is this bad?\nSuch calls have confusing semantics and often indicate a logic error.\n\n## Examples\n```python\nfrom typing import reveal_type\nfrom ty_extensions import is_fully_static\n\nif flag:\n    f = repr  # Expects a value\nelse:\n    f = is_fully_static  # Expects a type form\n\nf(int)  # error\n```",
@@ -643,6 +633,16 @@
         "possibly-unbound-attribute": {
           "title": "detects references to possibly unbound attributes",
           "description": "## What it does\nChecks for possibly unbound attributes.\n\n## Why is this bad?\nAttempting to access an unbound attribute will raise an `AttributeError` at runtime.\n\n## Examples\n```python\nclass A:\n    if b:\n        c = 0\n\nA.c  # AttributeError: type object 'A' has no attribute 'c'\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "possibly-unbound-implicit-call": {
+          "title": "detects implicit calls to possibly unbound methods",
+          "description": "## What it does\nChecks for implicit calls to possibly unbound methods.\n\n## Why is this bad?\nExpressions such as `x[y]` and `x * y` call methods\nunder the hood (`__getitem__` and `__mul__` respectively).\nCalling an unbound method will raise an `AttributeError` at runtime.\n\n## Examples\n```python\nclass A:\n    if b:  # False\n        def __getitem__(self, v): ...\n\nA()[0]  # TypeError: 'A' object is not subscriptable\n```",
           "default": "warn",
           "oneOf": [
             {
