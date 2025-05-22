@@ -2,7 +2,6 @@ use std::collections::VecDeque;
 use std::ops::Deref;
 
 use indexmap::IndexMap;
-use itertools::Itertools;
 use rustc_hash::FxBuildHasher;
 
 use crate::Db;
@@ -92,7 +91,18 @@ impl<'db> Mro<'db> {
             // >>> Foo.__mro__
             // (<class '__main__.Foo'>, <class 'object'>)
             // ```
-            [] => Ok(Self::from([ClassBase::Class(class), ClassBase::object(db)])),
+            [] => {
+                // e.g. `class Foo[T]: ...` implicitly has `Generic` inserted into its bases
+                if class.is_generic() {
+                    Ok(Self::from([
+                        ClassBase::Class(class),
+                        ClassBase::Generic,
+                        ClassBase::object(db),
+                    ]))
+                } else {
+                    Ok(Self::from([ClassBase::Class(class), ClassBase::object(db)]))
+                }
+            }
 
             // Fast path for a class that has only a single explicit base.
             //
@@ -128,14 +138,17 @@ impl<'db> Mro<'db> {
             // what MRO Python will give this class at runtime
             // (if an MRO is indeed resolvable at all!)
             original_bases => {
-                // First, convert the original bases of the class into the bases that
-                // will actually be used to create the MRO of the class. This emulates
-                // the behavior of `typing._GenericAlias.__mro_entries__` at
-                // <https://github.com/python/cpython/blob/ad42dc1909bdf8ec775b63fb22ed48ff42797a17/Lib/typing.py#L1214-L1244>.
                 let mut resolved_bases = vec![];
                 let mut invalid_bases = vec![];
 
                 for (i, base) in original_bases.iter().enumerate() {
+                    // This emulates the behavior of `typing._GenericAlias.__mro_entries__` at
+                    // <https://github.com/python/cpython/blob/ad42dc1909bdf8ec775b63fb22ed48ff42797a17/Lib/typing.py#L1487-L1500>.
+                    //
+                    // Note that emit a diagnostic for inheriting from bare (unsubscripted) `Generic` elsewhere
+                    // (see `infer::TypeInferenceBuilder::check_class_definitions`),
+                    // which is why we only care about `KnownInstanceType::Generic(Some(_))`,
+                    // not `KnownInstanceType::Generic(None)`.
                     if let Type::KnownInstance(KnownInstanceType::Generic(Some(_))) = base {
                         if original_bases
                             .contains(&Type::KnownInstance(KnownInstanceType::Protocol(None)))
@@ -149,44 +162,11 @@ impl<'db> Mro<'db> {
                             continue;
                         }
                         resolved_bases.push(ClassBase::Generic);
-                        continue;
-                    }
-
-                    let Type::GenericAlias(alias) = base else {
+                    } else {
                         match ClassBase::try_from_type(db, *base) {
                             Some(valid_base) => resolved_bases.push(valid_base),
                             None => invalid_bases.push((i, *base)),
                         }
-                        continue;
-                    };
-
-                    if !original_bases.contains(&Type::ClassLiteral(alias.origin(db))) {
-                        resolved_bases.push(ClassBase::Class(ClassType::Generic(*alias)));
-                    }
-
-                    // Insert `Generic` into the MRO if none of the bases following us in the argument list
-                    // are either generic aliases or classes that have `Generic` in their MRO.
-                    let mut should_insert_generic = true;
-                    for b in &original_bases[i + 1..] {
-                        if b.is_generic_alias() {
-                            should_insert_generic = false;
-                            break;
-                        }
-                        // The MRO will be determined to be invalid; no point doing any more work in this loop.
-                        let Some(b) = ClassBase::try_from_type(db, *b) else {
-                            should_insert_generic = false;
-                            break;
-                        };
-                        if b.has_cyclic_mro(db) {
-                            return Err(MroErrorKind::InheritanceCycle);
-                        }
-                        if b.mro(db, None).contains(&ClassBase::Generic) {
-                            should_insert_generic = false;
-                            break;
-                        }
-                    }
-                    if should_insert_generic {
-                        resolved_bases.push(ClassBase::Generic);
                     }
                 }
 
@@ -218,6 +198,15 @@ impl<'db> Mro<'db> {
                     let mut base_to_indices: IndexMap<ClassBase<'db>, Vec<usize>, FxBuildHasher> =
                         IndexMap::default();
 
+                    // We need to iterate over `original_bases` here rather than `resolved_bases`
+                    // so that we get the correct index of the duplicate bases if there were any
+                    // (`resolved_bases` may be a longer list than `original_bases`!). However, we
+                    // need to use a `ClassBase` rather than a `Type` as the key type for the
+                    // `base_to_indices` map so that a class such as
+                    // `class Foo(Protocol[T], Protocol): ...` correctly causes us to emit a
+                    // `duplicate-base` diagnostic (matching the runtime behaviour) rather than an
+                    // `inconsistent-mro` diagnostic (which would be accurate -- but not nearly as
+                    // precise!).
                     for (index, base) in original_bases.iter().enumerate() {
                         let Some(base) = ClassBase::try_from_type(db, *base) else {
                             continue;

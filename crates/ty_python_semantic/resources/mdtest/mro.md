@@ -543,6 +543,13 @@ class peekable2(Iterator[T], Generic[T]): ...
 
 # revealed: tuple[<class 'peekable2[Unknown]'>, <class 'Iterator[T]'>, <class 'Iterable[T]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(peekable2.__mro__)
+
+class Base: ...
+class Intermediate(Base, Generic[T]): ...
+class Sub(Intermediate[T], Base): ...
+
+# revealed: tuple[<class 'Sub[Unknown]'>, <class 'Intermediate[T]'>, <class 'Base'>, typing.Generic, <class 'object'>]
+reveal_type(Sub.__mro__)
 ```
 
 ## Unresolvable MROs involving generics have the original bases reported in the error message, not the resolved bases

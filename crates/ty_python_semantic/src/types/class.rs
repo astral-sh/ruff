@@ -223,6 +223,10 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    pub(super) const fn is_generic(self) -> bool {
+        matches!(self, Self::Generic(_))
+    }
+
     /// Returns the class literal and specialization for this class. For a non-generic class, this
     /// is the class itself. For a generic alias, this is the alias's origin.
     pub(crate) fn class_literal(
