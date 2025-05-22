@@ -18,7 +18,7 @@ use super::{ClientSender, client::Client};
 /// _actual_ main thread. This secondary thread has a larger stack size
 /// than some OS defaults (Windows, for example) and is also designated as
 /// high-priority.
-pub(crate) fn event_loop_thread(
+pub(crate) fn spawn_main_loop(
     func: impl FnOnce() -> crate::Result<()> + Send + 'static,
 ) -> crate::Result<thread::JoinHandle<crate::Result<()>>> {
     // Override OS defaults to avoid stack overflows on platforms with low stack size defaults.
@@ -32,22 +32,16 @@ pub(crate) fn event_loop_thread(
     )
 }
 
-pub(crate) struct Scheduler<'s> {
-    session: &'s mut Session,
+pub(crate) struct Scheduler {
     client: Client,
     fmt_pool: thread::Pool,
     background_pool: thread::Pool,
 }
 
-impl<'s> Scheduler<'s> {
-    pub(super) fn new(
-        session: &'s mut Session,
-        worker_threads: NonZeroUsize,
-        sender: ClientSender,
-    ) -> Self {
+impl Scheduler {
+    pub(super) fn new(worker_threads: NonZeroUsize, sender: ClientSender) -> Self {
         const FMT_THREADS: usize = 1;
         Self {
-            session,
             fmt_pool: thread::Pool::new(NonZeroUsize::try_from(FMT_THREADS).unwrap()),
             background_pool: thread::Pool::new(worker_threads),
             client: Client::new(sender),
@@ -75,23 +69,18 @@ impl<'s> Scheduler<'s> {
 
     /// Dispatches a `task` by either running it as a blocking function or
     /// executing it on a background thread pool.
-    pub(super) fn dispatch(&mut self, task: task::Task) {
+    pub(super) fn dispatch(&mut self, task: task::Task, session: &mut Session) {
         match task {
             Task::Sync(SyncTask { func }) => {
                 let notifier = self.client.notifier();
                 let responder = self.client.responder();
-                func(
-                    self.session,
-                    notifier,
-                    &mut self.client.requester,
-                    responder,
-                );
+                func(session, notifier, &mut self.client.requester, responder);
             }
             Task::Background(BackgroundTaskBuilder {
                 schedule,
                 builder: func,
             }) => {
-                let static_func = func(self.session);
+                let static_func = func(session);
                 let notifier = self.client.notifier();
                 let responder = self.client.responder();
                 let task = move || static_func(notifier, responder);
