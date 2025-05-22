@@ -37,16 +37,16 @@ use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
-use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
+use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
     ExprContext, FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern,
     PythonVersion, Stmt, Suite, UnaryOp,
 };
-use ruff_python_ast::{helpers, str, visitor, PySourceType};
+use ruff_python_ast::{PySourceType, helpers, str, visitor};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
-use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind, ParsedAnnotation};
+use ruff_python_parser::typing::{AnnotationKind, ParsedAnnotation, parse_type_annotation};
 use ruff_python_parser::{ParseError, Parsed, Tokens};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
@@ -55,7 +55,7 @@ use ruff_python_semantic::{
     Import, Module, ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel,
     SemanticModelFlags, StarImport, SubmoduleImport,
 };
-use ruff_python_stdlib::builtins::{python_builtins, MAGIC_GLOBALS};
+use ruff_python_stdlib::builtins::{MAGIC_GLOBALS, python_builtins};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{OneIndexed, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -72,8 +72,8 @@ use crate::rules::pyflakes::rules::{
 };
 use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
-use crate::settings::{flags, LinterSettings, TargetVersion};
-use crate::{docstrings, noqa, Locator};
+use crate::settings::{LinterSettings, TargetVersion, flags};
+use crate::{Locator, docstrings, noqa};
 
 mod analyze;
 mod annotation;
@@ -385,15 +385,6 @@ impl<'a> Checker<'a> {
         diagnostics.push(diagnostic);
     }
 
-    /// Extend the collection of [`Diagnostic`] objects in the [`Checker`]
-    pub(crate) fn report_diagnostics<I>(&self, diagnostics: I)
-    where
-        I: IntoIterator<Item = Diagnostic>,
-    {
-        let mut checker_diagnostics = self.diagnostics.borrow_mut();
-        checker_diagnostics.extend(diagnostics);
-    }
-
     /// Adds a [`TextRange`] to the set of ranges of variable names
     /// flagged in `flake8-bugbear` violations so far.
     ///
@@ -685,6 +676,17 @@ impl SemanticSyntaxContext for Checker<'_> {
                 ScopeKind::Class(_) => return false,
                 ScopeKind::Function(_) | ScopeKind::Lambda(_) => return true,
                 ScopeKind::Generator { .. } | ScopeKind::Module | ScopeKind::Type => {}
+            }
+        }
+        false
+    }
+
+    fn in_yield_allowed_context(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            match scope.kind {
+                ScopeKind::Class(_) | ScopeKind::Generator { .. } => return false,
+                ScopeKind::Function(_) | ScopeKind::Lambda(_) => return true,
+                ScopeKind::Module | ScopeKind::Type => {}
             }
         }
         false
@@ -2160,7 +2162,9 @@ impl<'a> Checker<'a> {
         self.visit_expr(&generator.iter);
         self.semantic.push_scope(ScopeKind::Generator {
             kind,
-            is_async: generators.iter().any(|gen| gen.is_async),
+            is_async: generators
+                .iter()
+                .any(|comprehension| comprehension.is_async),
         });
 
         self.visit_expr(&generator.target);

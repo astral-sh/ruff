@@ -5,16 +5,16 @@ use std::iter::FusedIterator;
 use ruff_formatter::FormatContext;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{
-    str::{Quote, TripleQuotes},
     AnyStringFlags, BytesLiteral, FString, FStringElement, FStringElements, FStringFlags,
     StringFlags, StringLikePart, StringLiteral,
+    str::{Quote, TripleQuotes},
 };
 use ruff_text_size::{Ranged, TextRange, TextSlice};
 
+use crate::QuoteStyle;
 use crate::context::FStringState;
 use crate::prelude::*;
 use crate::string::StringQuotes;
-use crate::QuoteStyle;
 
 pub(crate) struct StringNormalizer<'a, 'src> {
     preferred_quote_style: Option<QuoteStyle>,
@@ -1057,9 +1057,9 @@ mod tests {
     use std::borrow::Cow;
 
     use ruff_python_ast::{
+        AnyStringFlags,
         str::{Quote, TripleQuotes},
         str_prefix::{AnyStringPrefix, ByteStringPrefix},
-        AnyStringFlags,
     };
 
     use crate::string::normalize_string;

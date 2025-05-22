@@ -4,7 +4,7 @@ use insta::assert_snapshot;
 
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, BoolOp, CmpOp, Operator, Singleton, UnaryOp};
-use ruff_python_parser::{parse, Mode, ParseOptions};
+use ruff_python_parser::{Mode, ParseOptions, parse};
 
 #[test]
 fn function_arguments() {

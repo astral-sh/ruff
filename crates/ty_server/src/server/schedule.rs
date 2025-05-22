@@ -12,7 +12,7 @@ use self::{
     thread::ThreadPriority,
 };
 
-use super::{client::Client, ClientSender};
+use super::{ClientSender, client::Client};
 
 /// The event loop thread is actually a secondary thread that we spawn from the
 /// _actual_ main thread. This secondary thread has a larger stack size

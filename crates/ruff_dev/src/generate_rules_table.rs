@@ -48,7 +48,9 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
                 format!("<span title='Automatic fix available'>{FIX_SYMBOL}</span>")
             }
             FixAvailability::None => {
-                format!("<span title='Automatic fix not available' style='opacity: 0.1' aria-hidden='true'>{FIX_SYMBOL}</span>")
+                format!(
+                    "<span title='Automatic fix not available' style='opacity: 0.1' aria-hidden='true'>{FIX_SYMBOL}</span>"
+                )
             }
         };
 
@@ -108,22 +110,26 @@ pub(crate) fn generate() -> String {
     );
     table_out.push_str("<br />");
 
-    let _ = write!(&mut table_out,
+    let _ = write!(
+        &mut table_out,
         "{SPACER}{PREVIEW_SYMBOL}{SPACER} The rule is unstable and is in [\"preview\"](faq.md#what-is-preview)."
     );
     table_out.push_str("<br />");
 
-    let _ = write!(&mut table_out,
+    let _ = write!(
+        &mut table_out,
         "{SPACER}{WARNING_SYMBOL}{SPACER} The rule has been deprecated and will be removed in a future release."
     );
     table_out.push_str("<br />");
 
-    let _ = write!(&mut table_out,
+    let _ = write!(
+        &mut table_out,
         "{SPACER}{REMOVED_SYMBOL}{SPACER} The rule has been removed only the documentation is available."
     );
     table_out.push_str("<br />");
 
-    let _ = write!(&mut table_out,
+    let _ = write!(
+        &mut table_out,
         "{SPACER}{FIX_SYMBOL}{SPACER} The rule is automatically fixable by the `--fix` command-line option."
     );
     table_out.push_str("<br />");

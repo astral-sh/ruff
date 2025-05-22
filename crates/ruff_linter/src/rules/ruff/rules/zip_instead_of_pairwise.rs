@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr, Int};
 use ruff_text_size::Ranged;
 
@@ -28,6 +28,14 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// letters = "ABCD"
 /// pairwise(letters)  # ("A", "B"), ("B", "C"), ("C", "D")
 /// ```
+///
+/// ## Fix safety
+///
+/// The fix is always marked unsafe because it assumes that slicing an object
+/// (e.g., `obj[1:]`) produces a value with the same type and iteration behavior
+/// as the original object, which is not guaranteed for user-defined types that
+/// override `__getitem__` without properly handling slices. Moreover, the fix
+/// could delete comments.
 ///
 /// ## References
 /// - [Python documentation: `itertools.pairwise`](https://docs.python.org/3/library/itertools.html#itertools.pairwise)

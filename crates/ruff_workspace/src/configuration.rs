@@ -5,12 +5,12 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::env::VarError;
-use std::num::{NonZeroU16, NonZeroU8};
+use std::num::{NonZeroU8, NonZeroU16};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::{anyhow, Context, Result};
-use glob::{glob, GlobError, Paths, PatternError};
+use anyhow::{Context, Result, anyhow};
+use glob::{GlobError, Paths, PatternError, glob};
 use itertools::Itertools;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -23,7 +23,7 @@ use ruff_formatter::IndentStyle;
 use ruff_graph::{AnalyzeSettings, Direction};
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::RuleNamespace;
-use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
+use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleSet};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
 use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
@@ -34,11 +34,11 @@ use ruff_linter::settings::types::{
     RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{
-    LinterSettings, TargetVersion, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS,
+    DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, TASK_TAGS, TargetVersion,
 };
 use ruff_linter::{
-    fs, warn_user_once, warn_user_once_by_id, warn_user_once_by_message, RuleSelector,
-    RUFF_PKG_VERSION,
+    RUFF_PKG_VERSION, RuleSelector, fs, warn_user_once, warn_user_once_by_id,
+    warn_user_once_by_message,
 };
 use ruff_python_ast as ast;
 use ruff_python_formatter::{
@@ -56,7 +56,7 @@ use crate::options::{
     PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
 };
 use crate::settings::{
-    FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
+    EXCLUDE, FileResolverSettings, FormatterSettings, INCLUDE, LineEnding, Settings,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -690,7 +690,9 @@ impl LintConfiguration {
         #[expect(deprecated)]
         let ignore_init_module_imports = {
             if options.common.ignore_init_module_imports.is_some() {
-                warn_user_once!("The `ignore-init-module-imports` option is deprecated and will be removed in a future release. Ruff's handling of imports in `__init__.py` files has been improved (in preview) and unused imports will always be flagged.");
+                warn_user_once!(
+                    "The `ignore-init-module-imports` option is deprecated and will be removed in a future release. Ruff's handling of imports in `__init__.py` files has been improved (in preview) and unused imports will always be flagged."
+                );
             }
             options.common.ignore_init_module_imports
         };
@@ -1046,7 +1048,9 @@ impl LintConfiguration {
                 [] => (),
                 [selection] => {
                     let (prefix, code) = selection.prefix_and_code();
-                    return Err(anyhow!("Selection of deprecated rule `{prefix}{code}` is not allowed when preview is enabled."));
+                    return Err(anyhow!(
+                        "Selection of deprecated rule `{prefix}{code}` is not allowed when preview is enabled."
+                    ));
                 }
                 [..] => {
                     let mut message = "Selection of deprecated rules is not allowed when preview is enabled. Remove selection of:".to_string();
@@ -1632,11 +1636,11 @@ mod tests {
 
     use anyhow::Result;
 
+    use ruff_linter::RuleSelector;
     use ruff_linter::codes::{Flake8Copyright, Pycodestyle, Refurb};
     use ruff_linter::registry::{Linter, Rule, RuleSet};
     use ruff_linter::rule_selector::PreviewOptions;
     use ruff_linter::settings::types::PreviewMode;
-    use ruff_linter::RuleSelector;
 
     use crate::configuration::{LintConfiguration, RuleSelection};
     use crate::options::PydocstyleOptions;

@@ -29,7 +29,7 @@ use ruff_linter::rules::{
 use ruff_linter::settings::types::{
     IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
 };
-use ruff_linter::{warn_user_once, RuleSelector};
+use ruff_linter::{RuleSelector, warn_user_once};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_options_metadata::{OptionsMetadata, Visit};
 use ruff_python_ast::name::Name;
@@ -556,10 +556,10 @@ impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
             "DeprecatedTopLevelLintOptions"
         ))
     }
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::Schema;
 
-        let common_schema = LintCommonOptions::json_schema(gen);
+        let common_schema = LintCommonOptions::json_schema(generator);
         let mut schema_obj = common_schema.into_object();
 
         if let Some(object) = schema_obj.object.as_mut() {
@@ -2670,7 +2670,9 @@ impl IsortOptions {
         let force_sort_within_sections = self.force_sort_within_sections.unwrap_or_default();
         let lines_between_types = self.lines_between_types.unwrap_or_default();
         if force_sort_within_sections && lines_between_types != 0 {
-            warn_user_once!("`lines-between-types` is ignored when `force-sort-within-sections` is set to `true`");
+            warn_user_once!(
+                "`lines-between-types` is ignored when `force-sort-within-sections` is set to `true`"
+            );
         }
 
         // Extract any configuration options that deal with user-defined sections.

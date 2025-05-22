@@ -2,20 +2,20 @@ use std::collections::HashSet;
 use std::io::Write;
 use std::time::{Duration, Instant};
 
-use anyhow::{anyhow, Context};
-use ruff_db::files::{system_path_to_file, File, FileError};
+use anyhow::{Context, anyhow};
+use ruff_db::files::{File, FileError, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{
-    file_time_now, OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard,
+    OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard, file_time_now,
 };
 use ruff_db::{Db as _, Upcast};
 use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
-use ty_project::watch::{directory_watcher, ChangeEvent, ProjectWatcher};
+use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
-use ty_python_semantic::{resolve_module, ModuleName, PythonPlatform};
+use ty_python_semantic::{ModuleName, PythonPlatform, resolve_module};
 
 struct TestCase {
     db: ProjectDatabase,
@@ -806,11 +806,13 @@ fn directory_moved_to_project() -> anyhow::Result<()> {
         .expect("a.py to exist");
 
     // `import sub.a` should now resolve
-    assert!(resolve_module(
-        case.db().upcast(),
-        &ModuleName::new_static("sub.a").unwrap()
-    )
-    .is_some());
+    assert!(
+        resolve_module(
+            case.db().upcast(),
+            &ModuleName::new_static("sub.a").unwrap()
+        )
+        .is_some()
+    );
 
     case.assert_indexed_project_files([bar, init_file, a_file]);
 
@@ -826,11 +828,13 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
     ])?;
     let bar = case.system_file(case.project_path("bar.py")).unwrap();
 
-    assert!(resolve_module(
-        case.db().upcast(),
-        &ModuleName::new_static("sub.a").unwrap()
-    )
-    .is_some());
+    assert!(
+        resolve_module(
+            case.db().upcast(),
+            &ModuleName::new_static("sub.a").unwrap()
+        )
+        .is_some()
+    );
 
     let sub_path = case.project_path("sub");
     let init_file = case
@@ -852,11 +856,13 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
     case.apply_changes(changes);
 
     // `import sub.a` should no longer resolve
-    assert!(resolve_module(
-        case.db().upcast(),
-        &ModuleName::new_static("sub.a").unwrap()
-    )
-    .is_none());
+    assert!(
+        resolve_module(
+            case.db().upcast(),
+            &ModuleName::new_static("sub.a").unwrap()
+        )
+        .is_none()
+    );
 
     assert!(!init_file.exists(case.db()));
     assert!(!a_file.exists(case.db()));
@@ -876,16 +882,20 @@ fn directory_renamed() -> anyhow::Result<()> {
 
     let bar = case.system_file(case.project_path("bar.py")).unwrap();
 
-    assert!(resolve_module(
-        case.db().upcast(),
-        &ModuleName::new_static("sub.a").unwrap()
-    )
-    .is_some());
-    assert!(resolve_module(
-        case.db().upcast(),
-        &ModuleName::new_static("foo.baz").unwrap()
-    )
-    .is_none());
+    assert!(
+        resolve_module(
+            case.db().upcast(),
+            &ModuleName::new_static("sub.a").unwrap()
+        )
+        .is_some()
+    );
+    assert!(
+        resolve_module(
+            case.db().upcast(),
+            &ModuleName::new_static("foo.baz").unwrap()
+        )
+        .is_none()
+    );
 
     let sub_path = case.project_path("sub");
     let sub_init = case
@@ -909,17 +919,21 @@ fn directory_renamed() -> anyhow::Result<()> {
     case.apply_changes(changes);
 
     // `import sub.a` should no longer resolve
-    assert!(resolve_module(
-        case.db().upcast(),
-        &ModuleName::new_static("sub.a").unwrap()
-    )
-    .is_none());
+    assert!(
+        resolve_module(
+            case.db().upcast(),
+            &ModuleName::new_static("sub.a").unwrap()
+        )
+        .is_none()
+    );
     // `import foo.baz` should now resolve
-    assert!(resolve_module(
-        case.db().upcast(),
-        &ModuleName::new_static("foo.baz").unwrap()
-    )
-    .is_some());
+    assert!(
+        resolve_module(
+            case.db().upcast(),
+            &ModuleName::new_static("foo.baz").unwrap()
+        )
+        .is_some()
+    );
 
     // The old paths are no longer tracked
     assert!(!sub_init.exists(case.db()));
@@ -952,11 +966,13 @@ fn directory_deleted() -> anyhow::Result<()> {
 
     let bar = case.system_file(case.project_path("bar.py")).unwrap();
 
-    assert!(resolve_module(
-        case.db().upcast(),
-        &ModuleName::new_static("sub.a").unwrap()
-    )
-    .is_some());
+    assert!(
+        resolve_module(
+            case.db().upcast(),
+            &ModuleName::new_static("sub.a").unwrap()
+        )
+        .is_some()
+    );
 
     let sub_path = case.project_path("sub");
 
@@ -976,11 +992,13 @@ fn directory_deleted() -> anyhow::Result<()> {
     case.apply_changes(changes);
 
     // `import sub.a` should no longer resolve
-    assert!(resolve_module(
-        case.db().upcast(),
-        &ModuleName::new_static("sub.a").unwrap()
-    )
-    .is_none());
+    assert!(
+        resolve_module(
+            case.db().upcast(),
+            &ModuleName::new_static("sub.a").unwrap()
+        )
+        .is_none()
+    );
 
     assert!(!init_file.exists(case.db()));
     assert!(!a_file.exists(case.db()));
@@ -1426,13 +1444,11 @@ mod unix {
         )
         .expect("Expected bar.baz to exist in site-packages.");
         let baz_project = case.project_path("bar/baz.py");
+        let baz_file = baz.file().unwrap();
 
+        assert_eq!(source_text(case.db(), baz_file).as_str(), "def baz(): ...");
         assert_eq!(
-            source_text(case.db(), baz.file()).as_str(),
-            "def baz(): ..."
-        );
-        assert_eq!(
-            baz.file().path(case.db()).as_system_path(),
+            baz_file.path(case.db()).as_system_path(),
             Some(&*baz_project)
         );
 
@@ -1447,7 +1463,7 @@ mod unix {
         case.apply_changes(changes);
 
         assert_eq!(
-            source_text(case.db(), baz.file()).as_str(),
+            source_text(case.db(), baz_file).as_str(),
             "def baz(): print('Version 2')"
         );
 
@@ -1460,7 +1476,7 @@ mod unix {
         case.apply_changes(changes);
 
         assert_eq!(
-            source_text(case.db(), baz.file()).as_str(),
+            source_text(case.db(), baz_file).as_str(),
             "def baz(): print('Version 3')"
         );
 
@@ -1506,6 +1522,7 @@ mod unix {
             &ModuleName::new_static("bar.baz").unwrap(),
         )
         .expect("Expected bar.baz to exist in site-packages.");
+        let baz_file = baz.file().unwrap();
         let bar_baz = case.project_path("bar/baz.py");
 
         let patched_bar_baz = case.project_path("patched/bar/baz.py");
@@ -1516,11 +1533,8 @@ mod unix {
             "def baz(): ..."
         );
 
-        assert_eq!(
-            source_text(case.db(), baz.file()).as_str(),
-            "def baz(): ..."
-        );
-        assert_eq!(baz.file().path(case.db()).as_system_path(), Some(&*bar_baz));
+        assert_eq!(source_text(case.db(), baz_file).as_str(), "def baz(): ...");
+        assert_eq!(baz_file.path(case.db()).as_system_path(), Some(&*bar_baz));
 
         case.assert_indexed_project_files([patched_bar_baz_file]);
 
@@ -1549,7 +1563,7 @@ mod unix {
         let patched_baz_text = source_text(case.db(), patched_bar_baz_file);
         let did_update_patched_baz = patched_baz_text.as_str() == "def baz(): print('Version 2')";
 
-        let bar_baz_text = source_text(case.db(), baz.file());
+        let bar_baz_text = source_text(case.db(), baz_file);
         let did_update_bar_baz = bar_baz_text.as_str() == "def baz(): print('Version 2')";
 
         assert!(
@@ -1632,7 +1646,7 @@ mod unix {
             "def baz(): ..."
         );
         assert_eq!(
-            baz.file().path(case.db()).as_system_path(),
+            baz.file().unwrap().path(case.db()).as_system_path(),
             Some(&*baz_original)
         );
 

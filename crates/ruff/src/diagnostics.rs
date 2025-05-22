@@ -14,18 +14,18 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::codes::Rule;
-use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult, ParseSource};
+use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
 use ruff_linter::message::Message;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::settings::types::UnsafeFixes;
-use ruff_linter::settings::{flags, LinterSettings};
+use ruff_linter::settings::{LinterSettings, flags};
 use ruff_linter::source_kind::{SourceError, SourceKind};
-use ruff_linter::{fs, IOError};
+use ruff_linter::{IOError, fs};
 use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 use ruff_workspace::Settings;
 
 use crate::cache::{Cache, FileCacheKey, LintCacheData};
@@ -71,7 +71,7 @@ impl Diagnostics {
                                 TextRange::default(),
                             ),
                             source_file,
-                            TextSize::default(),
+                            None,
                         )],
                         FxHashMap::default(),
                     )

@@ -9,8 +9,8 @@ use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
 use ty_project::metadata::Options;
 
 use crate::{
-    generate_all::{Mode, REGENERATE_ALL_COMMAND},
     ROOT_DIR,
+    generate_all::{Mode, REGENERATE_ALL_COMMAND},
 };
 
 #[derive(clap::Args)]
@@ -247,7 +247,7 @@ mod tests {
 
     use crate::generate_all::Mode;
 
-    use super::{main, Args};
+    use super::{Args, main};
 
     #[test]
     fn ty_configuration_markdown_up_to_date() -> Result<()> {

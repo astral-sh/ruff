@@ -1,7 +1,7 @@
 use ruff_python_ast::{Expr, ExprNumberLiteral, ExprSlice, ExprSubscript, Number};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 use std::fmt;
 
@@ -41,7 +41,9 @@ impl Violation for InvalidIndexType {
             is_slice,
         } = self;
         if *is_slice {
-            format!("Slice in indexed access to type `{value_type}` uses type `{index_type}` instead of an integer")
+            format!(
+                "Slice in indexed access to type `{value_type}` uses type `{index_type}` instead of an integer"
+            )
         } else {
             format!(
                 "Indexed access to type `{value_type}` uses type `{index_type}` instead of an integer or slice"

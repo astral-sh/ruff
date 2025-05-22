@@ -6,10 +6,10 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
-use ruff_db::source::{source_text, SourceText};
+use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
+use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
 use ruff_python_ast::{self as ast, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
@@ -20,8 +20,9 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
 use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
-use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
+use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
+use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionKind, AnnotatedAssignmentDefinitionNodeRef,
     AssignmentDefinitionKind, AssignmentDefinitionNodeRef, ComprehensionDefinitionKind,
@@ -47,7 +48,6 @@ use crate::semantic_index::use_def::{
 use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraintsBuilder,
 };
-use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
@@ -438,8 +438,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let (definition, num_definitions) =
             self.push_additional_definition(symbol, definition_node);
         debug_assert_eq!(
-            num_definitions,
-            1,
+            num_definitions, 1,
             "Attempted to create multiple `Definition`s associated with AST node {definition_node:?}"
         );
         definition
@@ -1337,7 +1336,9 @@ where
                             continue;
                         };
 
-                        let referenced_module = module.file();
+                        let Some(referenced_module) = module.file() else {
+                            continue;
+                        };
 
                         // In order to understand the visibility of definitions created by a `*` import,
                         // we need to know the visibility of the global-scope definitions in the
@@ -2480,6 +2481,18 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
         false
     }
 
+    fn in_yield_allowed_context(&self) -> bool {
+        for scope_info in self.scope_stack.iter().rev() {
+            let scope = &self.scopes[scope_info.file_scope_id];
+            match scope.kind() {
+                ScopeKind::Class | ScopeKind::Comprehension => return false,
+                ScopeKind::Function | ScopeKind::Lambda => return true,
+                ScopeKind::Module | ScopeKind::TypeAlias | ScopeKind::Annotation => {}
+            }
+        }
+        false
+    }
+
     fn in_sync_comprehension(&self) -> bool {
         for scope_info in self.scope_stack.iter().rev() {
             let scope = &self.scopes[scope_info.file_scope_id];
@@ -2489,7 +2502,10 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
                 NodeWithScopeKind::DictComprehension(node) => &node.generators,
                 _ => continue,
             };
-            if generators.iter().all(|gen| !gen.is_async) {
+            if generators
+                .iter()
+                .all(|comprehension| !comprehension.is_async)
+            {
                 return true;
             }
         }

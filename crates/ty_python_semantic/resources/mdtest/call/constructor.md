@@ -47,7 +47,7 @@ class Foo: ...
 
 reveal_type(Foo())  # revealed: Foo
 
-# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 0, got 1"
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
 reveal_type(Foo(1))  # revealed: Foo
 ```
 
@@ -62,7 +62,7 @@ reveal_type(Foo(1))  # revealed: Foo
 
 # error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
 reveal_type(Foo())  # revealed: Foo
-# error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 1, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 2, got 3"
 reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
@@ -84,7 +84,7 @@ reveal_type(Foo(1))  # revealed: Foo
 
 # error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
 reveal_type(Foo())  # revealed: Foo
-# error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 1, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 2, got 3"
 reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
@@ -105,7 +105,7 @@ def _(flag: bool) -> None:
     # error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
     # error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
     reveal_type(Foo())  # revealed: Foo
-    # error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 1, got 2"
+    # error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 2, got 3"
     reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
@@ -198,7 +198,7 @@ reveal_type(Foo(1))  # revealed: Foo
 
 # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
 reveal_type(Foo())  # revealed: Foo
-# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 2, got 3"
 reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
@@ -217,7 +217,7 @@ reveal_type(Foo(1))  # revealed: Foo
 
 # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
 reveal_type(Foo())  # revealed: Foo
-# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 2, got 3"
 reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
@@ -238,7 +238,7 @@ def _(flag: bool) -> None:
     # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
     # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
     reveal_type(Foo())  # revealed: Foo
-    # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+    # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 2, got 3"
     reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
@@ -344,7 +344,7 @@ class Foo:
 reveal_type(Foo())  # revealed: Foo
 reveal_type(Foo(1))  # revealed: Foo
 
-# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 2, got 3"
 reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
@@ -363,7 +363,7 @@ class Foo:
 # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
 reveal_type(Foo())  # revealed: Foo
 
-# error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 0, got 1"
+# error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 1, got 2"
 reveal_type(Foo(42))  # revealed: Foo
 
 class Foo2:
@@ -376,7 +376,7 @@ class Foo2:
 # error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
 reveal_type(Foo2())  # revealed: Foo2
 
-# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 0, got 1"
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
 reveal_type(Foo2(42))  # revealed: Foo2
 
 class Foo3(metaclass=abc.ABCMeta):
@@ -389,7 +389,7 @@ class Foo3(metaclass=abc.ABCMeta):
 # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
 reveal_type(Foo3())  # revealed: Foo3
 
-# error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 0, got 1"
+# error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 1, got 2"
 reveal_type(Foo3(42))  # revealed: Foo3
 
 class Foo4(metaclass=abc.ABCMeta):
@@ -402,7 +402,7 @@ class Foo4(metaclass=abc.ABCMeta):
 # error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
 reveal_type(Foo4())  # revealed: Foo4
 
-# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 0, got 1"
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
 reveal_type(Foo4(42))  # revealed: Foo4
 ```
 

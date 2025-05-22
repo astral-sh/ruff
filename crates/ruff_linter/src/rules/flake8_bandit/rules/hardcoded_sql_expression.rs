@@ -3,13 +3,13 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
 use crate::Locator;
+use crate::checkers::ast::Checker;
 
 static SQL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
@@ -198,7 +198,7 @@ fn is_explicit_concatenation(expr: &Expr) -> Option<bool> {
                 .iter()
                 .map(is_explicit_concatenation)
                 .collect::<Vec<_>>();
-            if values.iter().any(|v| *v == Some(true)) {
+            if values.contains(&Some(true)) {
                 Some(true)
             } else if values.iter().all(|v| *v == Some(false)) {
                 Some(false)

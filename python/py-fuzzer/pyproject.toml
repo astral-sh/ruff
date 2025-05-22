@@ -5,10 +5,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "pysource-codegen>=0.6.0",
-    "pysource-minimize>=0.7.0",
-    "rich-argparse>=1.6.0",
-    "ruff>=0.8.0",
-    "termcolor>=2.5.0",
+    "pysource-minimize>=0.8.0",
+    "rich-argparse>=1.7.0",
+    "ruff>=0.11.9",
+    "termcolor>=3.1.0",
 ]
 
 [project.scripts]

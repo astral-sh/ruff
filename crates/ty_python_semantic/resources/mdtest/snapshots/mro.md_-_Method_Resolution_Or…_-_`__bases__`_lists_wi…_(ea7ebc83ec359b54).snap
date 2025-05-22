@@ -141,43 +141,6 @@ info[revealed-type]: Revealed type
 ```
 
 ```
-error[duplicate-base]: Duplicate base class `Eggs`
-  --> src/mdtest_snippet.py:16:7
-   |
-14 |   # error: [duplicate-base] "Duplicate base class `Spam`"
-15 |   # error: [duplicate-base] "Duplicate base class `Eggs`"
-16 |   class Ham(
-   |  _______^
-17 | |     Spam,
-18 | |     Eggs,
-19 | |     Bar,
-20 | |     Baz,
-21 | |     Spam,
-22 | |     Eggs,
-23 | | ): ...
-   | |_^
-24 |
-25 |   # fmt: on
-   |
-info: The definition of class `Ham` will raise `TypeError` at runtime
-  --> src/mdtest_snippet.py:18:5
-   |
-16 | class Ham(
-17 |     Spam,
-18 |     Eggs,
-   |     ---- Class `Eggs` first included in bases list here
-19 |     Bar,
-20 |     Baz,
-21 |     Spam,
-22 |     Eggs,
-   |     ^^^^ Class `Eggs` later repeated here
-23 | ): ...
-   |
-info: rule `duplicate-base` is enabled by default
-
-```
-
-```
 error[duplicate-base]: Duplicate base class `Spam`
   --> src/mdtest_snippet.py:16:7
    |
@@ -209,6 +172,43 @@ info: The definition of class `Ham` will raise `TypeError` at runtime
 21 |     Spam,
    |     ^^^^ Class `Spam` later repeated here
 22 |     Eggs,
+23 | ): ...
+   |
+info: rule `duplicate-base` is enabled by default
+
+```
+
+```
+error[duplicate-base]: Duplicate base class `Eggs`
+  --> src/mdtest_snippet.py:16:7
+   |
+14 |   # error: [duplicate-base] "Duplicate base class `Spam`"
+15 |   # error: [duplicate-base] "Duplicate base class `Eggs`"
+16 |   class Ham(
+   |  _______^
+17 | |     Spam,
+18 | |     Eggs,
+19 | |     Bar,
+20 | |     Baz,
+21 | |     Spam,
+22 | |     Eggs,
+23 | | ): ...
+   | |_^
+24 |
+25 |   # fmt: on
+   |
+info: The definition of class `Ham` will raise `TypeError` at runtime
+  --> src/mdtest_snippet.py:18:5
+   |
+16 | class Ham(
+17 |     Spam,
+18 |     Eggs,
+   |     ---- Class `Eggs` first included in bases list here
+19 |     Bar,
+20 |     Baz,
+21 |     Spam,
+22 |     Eggs,
+   |     ^^^^ Class `Eggs` later repeated here
 23 | ): ...
    |
 info: rule `duplicate-base` is enabled by default

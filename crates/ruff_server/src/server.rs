@@ -26,13 +26,13 @@ use types::WorkspaceFoldersServerCapabilities;
 
 use self::connection::Connection;
 use self::connection::ConnectionInitializer;
-use self::schedule::event_loop_thread;
 use self::schedule::Scheduler;
 use self::schedule::Task;
+use self::schedule::event_loop_thread;
+use crate::PositionEncoding;
 use crate::session::AllSettings;
 use crate::session::Session;
 use crate::workspace::Workspaces;
-use crate::PositionEncoding;
 
 mod api;
 mod client;
@@ -248,10 +248,14 @@ impl Server {
             if let Err(err) = scheduler
                 .request::<lsp_types::request::RegisterCapability>(params, response_handler)
             {
-                tracing::error!("An error occurred when trying to register the configuration file watcher: {err}");
+                tracing::error!(
+                    "An error occurred when trying to register the configuration file watcher: {err}"
+                );
             }
         } else {
-            tracing::warn!("LSP client does not support dynamic capability registration - automatic configuration reloading will not be available.");
+            tracing::warn!(
+                "LSP client does not support dynamic capability registration - automatic configuration reloading will not be available."
+            );
         }
     }
 

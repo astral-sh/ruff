@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
 use ruff_python_semantic::analyze::typing::traverse_literal;
@@ -109,5 +109,7 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
         }
     }
 
-    checker.report_diagnostics(diagnostics);
+    for diagnostic in diagnostics {
+        checker.report_diagnostic(diagnostic);
+    }
 }

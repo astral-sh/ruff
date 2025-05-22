@@ -8,13 +8,20 @@ use ruff_python_semantic::SemanticModel;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Replacement {
+    // There's no replacement or suggestion other than removal
     None,
-    Name(&'static str),
+    // The attribute name of a class has been changed.
+    AttrName(&'static str),
+    // Additional information. Used when there's replacement but they're not direct mapping.
     Message(&'static str),
+    // Symbols updated in Airflow 3 with replacement
+    // e.g., `airflow.datasets.Dataset` to `airflow.sdk.Asset`
     AutoImport {
         module: &'static str,
         name: &'static str,
     },
+    // Symbols updated in Airflow 3 with only module changed. Used when we want to match multiple names.
+    // e.g., `airflow.configuration.as_dict | get` to `airflow.configuration.conf.as_dict | get`
     SourceModuleMoved {
         module: &'static str,
         name: String,
@@ -24,11 +31,6 @@ pub(crate) enum Replacement {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ProviderReplacement {
     None,
-    ProviderName {
-        name: &'static str,
-        provider: &'static str,
-        version: &'static str,
-    },
     AutoImport {
         module: &'static str,
         name: &'static str,

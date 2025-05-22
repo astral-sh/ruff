@@ -8,10 +8,10 @@ pub(crate) use shebang_missing_python::*;
 pub(crate) use shebang_not_executable::*;
 pub(crate) use shebang_not_first_line::*;
 
+use crate::Locator;
 use crate::codes::Rule;
 use crate::comments::shebang::ShebangDirective;
 use crate::settings::LinterSettings;
-use crate::Locator;
 
 mod shebang_leading_whitespace;
 mod shebang_missing_executable_file;

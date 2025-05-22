@@ -170,31 +170,15 @@ impl Display for DisplayRepresentation<'_> {
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 write!(
                     f,
-                    "<method-wrapper `__get__` of `{function}{specialization}`>",
+                    "<method-wrapper `__get__` of `{function}`>",
                     function = function.name(self.db),
-                    specialization = if let Some(specialization) = function.specialization(self.db)
-                    {
-                        specialization
-                            .display_short(self.db, TupleSpecialization::No)
-                            .to_string()
-                    } else {
-                        String::new()
-                    },
                 )
             }
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)) => {
                 write!(
                     f,
-                    "<method-wrapper `__call__` of `{function}{specialization}`>",
+                    "<method-wrapper `__call__` of `{function}`>",
                     function = function.name(self.db),
-                    specialization = if let Some(specialization) = function.specialization(self.db)
-                    {
-                        specialization
-                            .display_short(self.db, TupleSpecialization::No)
-                            .to_string()
-                    } else {
-                        String::new()
-                    },
                 )
             }
             Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(_)) => {
@@ -768,10 +752,10 @@ impl Display for DisplayStringLiteralType<'_> {
 mod tests {
     use ruff_python_ast::name::Name;
 
+    use crate::Db;
     use crate::db::tests::setup_db;
     use crate::symbol::typing_extensions_symbol;
     use crate::types::{KnownClass, Parameter, Parameters, Signature, StringLiteralType, Type};
-    use crate::Db;
 
     #[test]
     fn string_literal_display() {

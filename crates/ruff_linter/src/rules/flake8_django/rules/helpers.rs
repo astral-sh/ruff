@@ -1,6 +1,6 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_python_semantic::{analyze, SemanticModel};
+use ruff_python_semantic::{SemanticModel, analyze};
 
 /// Return `true` if a Python class appears to be a Django model, based on its base classes.
 pub(super) fn is_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {

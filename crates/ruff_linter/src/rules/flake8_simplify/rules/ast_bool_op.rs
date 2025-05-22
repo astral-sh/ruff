@@ -7,9 +7,9 @@ use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, 
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::{contains_effect, Truthiness};
+use ruff_python_ast::helpers::{Truthiness, contains_effect};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_codegen::Generator;
