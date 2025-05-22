@@ -2,18 +2,18 @@ use std::fmt;
 
 use bitflags::bitflags;
 
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, StringLike};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::preview::is_unicode_to_unicode_confusables_enabled;
 use crate::registry::AsRule;
-use crate::rules::ruff::rules::confusables::confusable;
 use crate::rules::ruff::rules::Context;
+use crate::rules::ruff::rules::confusables::confusable;
 use crate::settings::LinterSettings;
-use crate::Locator;
 
 /// ## What it does
 /// Checks for ambiguous Unicode characters in strings.
@@ -211,7 +211,9 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like:
                     context,
                     checker.settings,
                 );
-                checker.report_diagnostics(diagnostics);
+                for diagnostic in diagnostics {
+                    checker.report_diagnostic(diagnostic);
+                }
             }
             ast::StringLikePart::Bytes(_) => {}
             ast::StringLikePart::FString(f_string) => {
@@ -225,7 +227,9 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like:
                         context,
                         checker.settings,
                     );
-                    checker.report_diagnostics(diagnostics);
+                    for diagnostic in diagnostics {
+                        checker.report_diagnostic(diagnostic);
+                    }
                 }
             }
         }
@@ -355,27 +359,30 @@ impl Candidate {
     fn into_diagnostic(self, context: Context, settings: &LinterSettings) -> Option<Diagnostic> {
         if !settings.allowed_confusables.contains(&self.confusable) {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());
-            let diagnostic = Diagnostic::new::<DiagnosticKind>(
-                match context {
-                    Context::String => AmbiguousUnicodeCharacterString {
+            let diagnostic = match context {
+                Context::String => Diagnostic::new(
+                    AmbiguousUnicodeCharacterString {
                         confusable: self.confusable,
                         representant: self.representant,
-                    }
-                    .into(),
-                    Context::Docstring => AmbiguousUnicodeCharacterDocstring {
+                    },
+                    char_range,
+                ),
+                Context::Docstring => Diagnostic::new(
+                    AmbiguousUnicodeCharacterDocstring {
                         confusable: self.confusable,
                         representant: self.representant,
-                    }
-                    .into(),
-                    Context::Comment => AmbiguousUnicodeCharacterComment {
+                    },
+                    char_range,
+                ),
+                Context::Comment => Diagnostic::new(
+                    AmbiguousUnicodeCharacterComment {
                         confusable: self.confusable,
                         representant: self.representant,
-                    }
-                    .into(),
-                },
-                char_range,
-            );
-            if settings.rules.enabled(diagnostic.kind.rule()) {
+                    },
+                    char_range,
+                ),
+            };
+            if settings.rules.enabled(diagnostic.rule()) {
                 return Some(diagnostic);
             }
         }

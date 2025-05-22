@@ -24,6 +24,7 @@ error[unresolved-import]: Cannot resolve imported module `zqzqzqzqzqzqzq`
 1 | import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve imported module `zqzqzqzqzqzqzq`"
   |        ^^^^^^^^^^^^^^
   |
+info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
 info: rule `unresolved-import` is enabled by default
 
 ```

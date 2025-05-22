@@ -1,13 +1,13 @@
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
-use super::helpers::{get_mark_decorators, Parentheses};
+use super::helpers::{Parentheses, get_mark_decorators};
 
 /// ## What it does
 /// Checks for argument-free `@pytest.mark.<marker>()` decorators with or

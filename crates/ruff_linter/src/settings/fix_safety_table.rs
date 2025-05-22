@@ -6,10 +6,9 @@ use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
 
 use crate::{
-    display_settings,
+    RuleSelector, display_settings,
     registry::{Rule, RuleSet},
     rule_selector::{PreviewOptions, Specificity},
-    RuleSelector,
 };
 
 /// A table to keep track of which rules fixes should have

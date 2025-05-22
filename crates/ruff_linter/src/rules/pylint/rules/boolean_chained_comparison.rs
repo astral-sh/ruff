@@ -1,9 +1,9 @@
 use itertools::Itertools;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    parenthesize::{parentheses_iterator, parenthesized_range},
     BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare,
+    parenthesize::{parentheses_iterator, parenthesized_range},
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -158,7 +158,9 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
             Some(diagnostic)
         });
 
-    checker.report_diagnostics(diagnostics);
+    for diagnostic in diagnostics {
+        checker.report_diagnostic(diagnostic);
+    }
 }
 
 /// Checks whether two compare expressions are simplifiable

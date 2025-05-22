@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use ruff_diagnostics::{AlwaysFixableViolation, FixAvailability, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
@@ -12,19 +12,19 @@ use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Decorator, ElifElseClause, Expr, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_semantic::analyze::visibility::is_property;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::{is_python_whitespace, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_semantic::analyze::visibility::is_property;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, is_python_whitespace};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
 use crate::fix::edits::adjust_indentation;
 use crate::preview::is_only_add_return_none_at_end_enabled;
 use crate::registry::{AsRule, Rule};
 use crate::rules::flake8_return::helpers::end_of_last_statement;
-use crate::Locator;
 
 use super::super::branch::Branch;
 use super::super::helpers::result_exists;
@@ -674,7 +674,7 @@ fn superfluous_else_node(
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
-            if checker.enabled(diagnostic.kind.rule()) {
+            if checker.enabled(diagnostic.rule()) {
                 diagnostic.try_set_fix(|| {
                     remove_else(
                         elif_else,
@@ -692,7 +692,7 @@ fn superfluous_else_node(
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
-            if checker.enabled(diagnostic.kind.rule()) {
+            if checker.enabled(diagnostic.rule()) {
                 diagnostic.try_set_fix(|| {
                     remove_else(
                         elif_else,
@@ -711,7 +711,7 @@ fn superfluous_else_node(
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
-            if checker.enabled(diagnostic.kind.rule()) {
+            if checker.enabled(diagnostic.rule()) {
                 diagnostic.try_set_fix(|| {
                     remove_else(
                         elif_else,
@@ -730,7 +730,7 @@ fn superfluous_else_node(
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
-            if checker.enabled(diagnostic.kind.rule()) {
+            if checker.enabled(diagnostic.rule()) {
                 diagnostic.try_set_fix(|| {
                     remove_else(
                         elif_else,

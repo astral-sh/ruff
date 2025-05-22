@@ -36,15 +36,31 @@ Ruff Language Server in Neovim. To set it up, install
 [configuration](https://github.com/neovim/nvim-lspconfig#configuration) documentation, and add the
 following to your `init.lua`:
 
-```lua
-require('lspconfig').ruff.setup({
-  init_options = {
-    settings = {
-      -- Ruff language server settings go here
-    }
-  }
-})
-```
+=== "Neovim 0.10 (with [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig))"
+
+    ```lua
+    require('lspconfig').ruff.setup({
+      init_options = {
+        settings = {
+          -- Ruff language server settings go here
+        }
+      }
+    })
+    ```
+
+=== "Neovim 0.11+ (with [`vim.lsp.config`](https://neovim.io/doc/user/lsp.html#vim.lsp.config()))"
+
+    ```lua
+    vim.lsp.config('ruff', {
+      init_options = {
+        settings = {
+          -- Ruff language server settings go here
+        }
+      }
+    })
+
+    vim.lsp.enable('ruff')
+    ```
 
 !!! note
 

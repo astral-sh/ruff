@@ -93,6 +93,9 @@ if sys.version_info >= (3, 12):
 if sys.version_info >= (3, 13):
     __all__ += ["TokenError", "open"]
 
+if sys.version_info >= (3, 14):
+    __all__ += ["TSTRING_START", "TSTRING_MIDDLE", "TSTRING_END"]
+
 cookie_re: Pattern[str]
 blank_re: Pattern[bytes]
 

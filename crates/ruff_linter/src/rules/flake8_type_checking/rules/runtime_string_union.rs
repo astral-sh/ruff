@@ -1,14 +1,14 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, ExprContext, Operator, PythonVersion};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::Ranged;
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_type_checking::helpers::quote_annotation;
-use crate::Locator;
 
 /// ## What it does
 /// Checks for the presence of string literals in `X | Y`-style union types.

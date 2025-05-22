@@ -9,11 +9,11 @@ use std::process::ExitCode;
 use std::time::{Duration, Instant};
 use std::{fmt, fs, io, iter};
 
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use clap::{CommandFactory, FromArgMatches};
 use imara_diff::intern::InternedInput;
 use imara_diff::sink::Counter;
-use imara_diff::{diff, Algorithm};
+use imara_diff::{Algorithm, diff};
 use indicatif::ProgressStyle;
 #[cfg_attr(feature = "singlethreaded", allow(unused_imports))]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -21,11 +21,11 @@ use serde::Deserialize;
 use similar::{ChangeTag, TextDiff};
 use tempfile::NamedTempFile;
 use tracing::{debug, error, info, info_span};
-use tracing_indicatif::span_ext::IndicatifSpanExt;
 use tracing_indicatif::IndicatifLayer;
+use tracing_indicatif::span_ext::IndicatifSpanExt;
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::EnvFilter;
 
 use ruff::args::{ConfigArguments, FormatArguments, FormatCommand, GlobalConfigArgs, LogLevelArgs};
 use ruff::resolve::resolve;
@@ -33,10 +33,10 @@ use ruff_formatter::{FormatError, LineWidth, PrintError};
 use ruff_linter::logging::LogLevel;
 use ruff_linter::settings::types::{FilePattern, FilePatternSet};
 use ruff_python_formatter::{
-    format_module_source, FormatModuleError, MagicTrailingComma, PreviewMode, PyFormatOptions,
+    FormatModuleError, MagicTrailingComma, PreviewMode, PyFormatOptions, format_module_source,
 };
 use ruff_python_parser::ParseError;
-use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile, Resolver};
+use ruff_workspace::resolver::{PyprojectConfig, ResolvedFile, Resolver, python_files_in_path};
 
 fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArguments)> {
     let args_matches = FormatCommand::command()

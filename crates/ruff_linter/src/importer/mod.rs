@@ -18,11 +18,11 @@ use ruff_python_semantic::{
 use ruff_python_trivia::textwrap::indent;
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::Locator;
 use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
 use crate::fix;
 use crate::fix::codemods::CodegenStylist;
 use crate::importer::insertion::Insertion;
-use crate::Locator;
 
 mod insertion;
 
