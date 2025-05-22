@@ -12,7 +12,7 @@ use self::{
     thread::ThreadPriority,
 };
 
-use super::{ClientSender, client::Client};
+use super::{ClientSender, client_old::ClientOld};
 
 /// The event loop thread is actually a secondary thread that we spawn from the
 /// _actual_ main thread. This secondary thread has a larger stack size
@@ -33,7 +33,7 @@ pub(crate) fn spawn_main_loop(
 }
 
 pub(crate) struct Scheduler {
-    client: Client,
+    client: ClientOld,
     fmt_pool: thread::Pool,
     background_pool: thread::Pool,
 }
@@ -44,7 +44,7 @@ impl Scheduler {
         Self {
             fmt_pool: thread::Pool::new(NonZeroUsize::try_from(FMT_THREADS).unwrap()),
             background_pool: thread::Pool::new(worker_threads),
-            client: Client::new(sender),
+            client: ClientOld::new(sender),
         }
     }
 

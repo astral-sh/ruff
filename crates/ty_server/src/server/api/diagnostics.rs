@@ -2,7 +2,7 @@ use lsp_server::ErrorCode;
 use lsp_types::{PublishDiagnosticsParams, Url, notification::PublishDiagnostics};
 
 use crate::server::Result;
-use crate::server::client::Notifier;
+use crate::server::client_old::Notifier;
 
 use super::LSPResult;
 

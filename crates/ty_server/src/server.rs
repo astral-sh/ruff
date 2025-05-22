@@ -16,7 +16,7 @@ use crate::PositionEncoding;
 use crate::session::{AllSettings, ClientSettings, Experimental, Session};
 
 mod api;
-mod client;
+mod client_old;
 mod connection;
 mod main_loop;
 mod schedule;

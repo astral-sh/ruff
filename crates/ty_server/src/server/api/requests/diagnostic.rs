@@ -10,7 +10,7 @@ use lsp_types::{
 use crate::PositionEncoding;
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
-use crate::server::{Result, client::Notifier};
+use crate::server::{Result, client_old::Notifier};
 use crate::session::DocumentSnapshot;
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::FileRange;

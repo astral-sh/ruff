@@ -8,7 +8,7 @@ use super::{ClientSender, schedule::Task};
 
 type ResponseBuilder = Box<dyn FnOnce(lsp_server::Response) -> Task>;
 
-pub(crate) struct Client {
+pub(crate) struct ClientOld {
     notifier: Notifier,
     responder: Responder,
     pub(super) requester: Requester,
@@ -26,7 +26,7 @@ pub(crate) struct Requester {
     response_handlers: FxHashMap<lsp_server::RequestId, ResponseBuilder>,
 }
 
-impl Client {
+impl ClientOld {
     pub(super) fn new(sender: ClientSender) -> Self {
         Self {
             notifier: Notifier(sender.clone()),

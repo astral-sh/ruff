@@ -17,7 +17,7 @@ use notifications as notification;
 use requests as request;
 use ruff_db::panic::PanicError;
 
-use super::{Result, client::Responder, schedule::BackgroundSchedule};
+use super::{Result, client_old::Responder, schedule::BackgroundSchedule};
 
 pub(super) fn request(req: server::Request) -> Task {
     let id = req.id.clone();
