@@ -6,12 +6,12 @@ use serde_json::Value;
 
 use super::{ClientSender, schedule::Task};
 
-type ResponseBuilder<'s> = Box<dyn FnOnce(lsp_server::Response) -> Task<'s>>;
+type ResponseBuilder = Box<dyn FnOnce(lsp_server::Response) -> Task>;
 
-pub(crate) struct Client<'s> {
+pub(crate) struct Client {
     notifier: Notifier,
     responder: Responder,
-    pub(super) requester: Requester<'s>,
+    pub(super) requester: Requester,
 }
 
 #[derive(Clone)]
@@ -20,13 +20,13 @@ pub(crate) struct Notifier(ClientSender);
 #[derive(Clone)]
 pub(crate) struct Responder(ClientSender);
 
-pub(crate) struct Requester<'s> {
+pub(crate) struct Requester {
     sender: ClientSender,
     next_request_id: i32,
-    response_handlers: FxHashMap<lsp_server::RequestId, ResponseBuilder<'s>>,
+    response_handlers: FxHashMap<lsp_server::RequestId, ResponseBuilder>,
 }
 
-impl Client<'_> {
+impl Client {
     pub(super) fn new(sender: ClientSender) -> Self {
         Self {
             notifier: Notifier(sender.clone()),
@@ -91,14 +91,14 @@ impl Responder {
     }
 }
 
-impl<'s> Requester<'s> {
+impl Requester {
     /// Sends a request of kind `R` to the client, with associated parameters.
     /// The task provided by `response_handler` will be dispatched as soon as the response
     /// comes back from the client.
     pub(crate) fn request<R>(
         &mut self,
         params: R::Params,
-        response_handler: impl Fn(R::Result) -> Task<'s> + 'static,
+        response_handler: impl Fn(R::Result) -> Task + 'static,
     ) -> crate::Result<()>
     where
         R: lsp_types::request::Request,
@@ -155,7 +155,7 @@ impl<'s> Requester<'s> {
         Ok(())
     }
 
-    pub(crate) fn pop_response_task(&mut self, response: lsp_server::Response) -> Task<'s> {
+    pub(crate) fn pop_response_task(&mut self, response: lsp_server::Response) -> Task {
         if let Some(handler) = self.response_handlers.remove(&response.id) {
             handler(response)
         } else {
