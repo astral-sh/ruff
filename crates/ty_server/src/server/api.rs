@@ -16,7 +16,7 @@ mod traits;
 use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, client::Responder, schedule::BackgroundSchedule};
 
-pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
+pub(super) fn request(req: server::Request) -> Task {
     let id = req.id.clone();
 
     match req.method.as_str() {
@@ -61,7 +61,7 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
     })
 }
 
-pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
+pub(super) fn notification(notif: server::Notification) -> Task {
     match notif.method.as_str() {
         notifications::DidCloseTextDocumentHandler::METHOD => {
             local_notification_task::<notifications::DidCloseTextDocumentHandler>(notif)
@@ -100,9 +100,7 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
     })
 }
 
-fn _local_request_task<'a, R: traits::SyncRequestHandler>(
-    req: server::Request,
-) -> super::Result<Task<'a>>
+fn _local_request_task<R: traits::SyncRequestHandler>(req: server::Request) -> super::Result<Task>
 where
     <<R as RequestHandler>::RequestType as lsp_types::request::Request>::Params: UnwindSafe,
 {
@@ -114,10 +112,10 @@ where
     }))
 }
 
-fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
+fn background_request_task<R: traits::BackgroundDocumentRequestHandler>(
     req: server::Request,
     schedule: BackgroundSchedule,
-) -> super::Result<Task<'a>>
+) -> super::Result<Task>
 where
     <<R as RequestHandler>::RequestType as lsp_types::request::Request>::Params: UnwindSafe,
 {
@@ -187,9 +185,9 @@ fn request_result_to_response<R>(
     }
 }
 
-fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
+fn local_notification_task<N: traits::SyncNotificationHandler>(
     notif: server::Notification,
-) -> super::Result<Task<'a>> {
+) -> super::Result<Task> {
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::local(move |session, notifier, requester, _| {
         let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
@@ -201,10 +199,10 @@ fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
 }
 
 #[expect(dead_code)]
-fn background_notification_thread<'a, N>(
+fn background_notification_thread<N>(
     req: server::Notification,
     schedule: BackgroundSchedule,
-) -> super::Result<Task<'a>>
+) -> super::Result<Task>
 where
     N: traits::BackgroundDocumentNotificationHandler,
     <<N as NotificationHandler>::NotificationType as lsp_types::notification::Notification>::Params:
