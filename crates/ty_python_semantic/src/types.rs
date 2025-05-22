@@ -574,6 +574,13 @@ impl<'db> Type<'db> {
         matches!(self, Type::Callable(..))
     }
 
+    pub const fn into_callable_type(self) -> Option<CallableType<'db>> {
+        match self {
+            Type::Callable(callable_type) => Some(callable_type),
+            _ => None,
+        }
+    }
+
     fn is_none(&self, db: &'db dyn Db) -> bool {
         self.into_nominal_instance()
             .is_some_and(|instance| instance.class.is_known(db, KnownClass::NoneType))
@@ -1291,11 +1298,15 @@ impl<'db> Type<'db> {
             }
 
             (Type::NominalInstance(_) | Type::ProtocolInstance(_), Type::Callable(_)) => {
-                let call_symbol = self.member(db, "__call__").symbol;
+                let call_symbol = self
+                    .member_lookup_with_policy(
+                        db,
+                        Name::new_static("__call__"),
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .symbol;
                 match call_symbol {
-                    Symbol::Type(Type::BoundMethod(call_function), _) => call_function
-                        .into_callable_type(db)
-                        .is_subtype_of(db, target),
+                    Symbol::Type(t, Boundness::Bound) => t.is_subtype_of(db, target),
                     _ => false,
                 }
             }
@@ -1641,14 +1652,14 @@ impl<'db> Type<'db> {
             }
 
             (Type::NominalInstance(_) | Type::ProtocolInstance(_), Type::Callable(_)) => {
-                let call_symbol = self.member(db, "__call__").symbol;
+                let call_symbol = self
+                    .member_lookup_with_policy(
+                        db,
+                        Name::new_static("__call__"),
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .symbol;
                 match call_symbol {
-                    Symbol::Type(Type::BoundMethod(call_function), _) => call_function
-                        .into_callable_type(db)
-                        .is_assignable_to(db, target),
-                    Symbol::Type(Self::Callable(self_callable), Boundness::Bound) => {
-                        Type::Callable(self_callable.bind_self(db)).is_assignable_to(db, target)
-                    }
                     Symbol::Type(t, Boundness::Bound) => t.is_assignable_to(db, target),
                     _ => false,
                 }
@@ -2750,6 +2761,7 @@ impl<'db> Type<'db> {
             instance.display(db),
             owner.display(db)
         );
+
         let descr_get = self.class_member(db, "__get__".into()).symbol;
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
@@ -7773,15 +7785,6 @@ impl<'db> CallableType<'db> {
                 .iter()
                 .cloned()
                 .map(|signature| signature.replace_self_reference(db, class)),
-        )
-    }
-
-    pub(crate) fn bind_self(self, db: &'db dyn Db) -> Self {
-        CallableType::from_overloads(
-            db,
-            self.signatures(db)
-                .iter()
-                .map(signatures::Signature::bind_self),
         )
     }
 }
