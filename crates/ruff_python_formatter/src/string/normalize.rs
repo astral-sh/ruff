@@ -1026,7 +1026,7 @@ pub(super) fn is_ftstring_with_quoted_format_spec_and_debug(
             FTStringElement::Literal(literal) => {
                 let content = context.source().slice(literal);
 
-                in_debug && contains_opposite_quote(content, flags.into())
+                in_debug && contains_opposite_quote(content, flags)
             }
             FTStringElement::Expression(expression) => {
                 expression.format_spec.as_deref().is_some_and(|spec| {
