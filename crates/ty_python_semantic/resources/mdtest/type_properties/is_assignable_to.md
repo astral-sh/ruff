@@ -674,7 +674,7 @@ c1: Callable[[int], None] = partial(f, y="a")
 
 ### Classes with `__call__` as attribute
 
-A class with a callable `__call__` attribute is assignable to a compatible callable type.
+An instance type is assignable to a compatible callable type if the instance type's class has a callable `__call__` attribute.
 
 TODO: for the moment, we don't consider the callable type as a bound-method descriptor, but this may
 change for better compatibility with mypy/pyright.
