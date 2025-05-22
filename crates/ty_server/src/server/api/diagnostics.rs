@@ -13,7 +13,7 @@ use ty_project::{Db, ProjectDatabase};
 
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::server::Result;
-use crate::server::client::Notifier;
+use crate::server::client_old::Notifier;
 use crate::system::url_to_any_system_path;
 use crate::{DocumentSnapshot, PositionEncoding, Session};
 

@@ -8,7 +8,7 @@ use lsp_types::{
 
 use crate::server::api::diagnostics::{Diagnostics, compute_diagnostics};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
-use crate::server::{Result, client::Notifier};
+use crate::server::{Result, client_old::Notifier};
 use crate::session::DocumentSnapshot;
 use ty_project::ProjectDatabase;
 

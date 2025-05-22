@@ -2,7 +2,7 @@ use lsp_server::RequestId;
 use serde::Serialize;
 
 use crate::{
-    server::client::{Notifier, Requester, Responder},
+    server::client_old::{Notifier, Requester, Responder},
     session::Session,
 };
 
