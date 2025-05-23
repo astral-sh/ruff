@@ -75,9 +75,9 @@ impl Violation for ClassDictAnnotations {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Use `typing_extensions.get_annotations` (Python < 3.10 with \
-        `typing_extensions` enabled), `inspect.get_annotations` \
-        (Python 3.10+), or `annotationlib.get_annotations` (Python 3.14+) \
+        "Use `annotationlib.get_annotations` (Py3.14+), \
+        `inspect.get_annotations` (Py3.10+), or \
+        `typing_extensions.get_annotations` (Py<3.10 w/ `typing-extensions`) \
         instead of `__dict__.get('__annotations__')`"
             .to_string()
     }
