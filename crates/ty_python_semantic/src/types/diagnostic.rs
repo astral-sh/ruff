@@ -13,6 +13,7 @@ use crate::types::string_annotation::{
 };
 use crate::types::{KnownFunction, KnownInstanceType, Type, protocol_class::ProtocolClassLiteral};
 use crate::{Program, PythonVersionWithSource, declare_lint};
+use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
 use ruff_db::files::system_path_to_file;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -1698,10 +1699,7 @@ pub(super) fn report_implicit_return_type(
     let Some(class) = enclosing_class_of_method else {
         return;
     };
-    if class
-        .iter_mro(db, None)
-        .any(|base| matches!(base, ClassBase::Protocol(_)))
-    {
+    if class.iter_mro(db, None).contains(&ClassBase::Protocol) {
         diagnostic.info(
             "Only functions in stub files, methods on protocol classes, \
             or methods with `@abstractmethod` are permitted to have empty bodies",
