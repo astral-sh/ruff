@@ -110,14 +110,14 @@ class C:
     reveal_type(d[0])  # revealed: Literal[0]
     reveal_type(b[0])  # revealed: Literal[0]
     reveal_type(dd[0])  # revealed: Literal[0]
-    # TODO
+    # TODO: should be Literal[0]
     reveal_type(cm[0])  # revealed: Unknown
 
 [reveal_type(l[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(d[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(b[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(dd[0]) for _ in range(1)]  # revealed: Literal[0]
-# TODO
+# TODO: should be Literal[0]
 [reveal_type(cm[0]) for _ in range(1)]  # revealed: Unknown
 
 def _():
