@@ -12,7 +12,8 @@ use crate::rules::{
     flake8_builtins, flake8_debugger, flake8_django, flake8_errmsg, flake8_import_conventions,
     flake8_pie, flake8_pyi, flake8_pytest_style, flake8_raise, flake8_return, flake8_simplify,
     flake8_slots, flake8_tidy_imports, flake8_type_checking, mccabe, pandas_vet, pep8_naming,
-    perflint, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops,
+    perflint, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, sqlalchemy,
+    tryceratops,
 };
 use ruff_python_ast::PythonVersion;
 
@@ -411,6 +412,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::DjangoUnorderedBodyContentInModel) {
                 flake8_django::rules::unordered_body_content_in_model(checker, class_def);
+            }
+            if checker.enabled(Rule::SQLAlchemyMissingMappedTypeAnnotation) {
+                sqlalchemy::rules::missing_mapped_type_annotation(checker, body);
             }
             if !checker.source_type.is_stub() {
                 if checker.enabled(Rule::DjangoModelWithoutDunderStr) {
