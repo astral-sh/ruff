@@ -109,23 +109,50 @@ def _(o: object):
 
 ### Unsupported operators for positive contributions
 
-Raise an error if any of the positive contributions to the intersection type are unsupported for the
-given operator:
+Raise an error if the given operator is unsupported for all positive contributions to the
+intersection type:
+
+```py
+class NonContainer1: ...
+class NonContainer2: ...
+
+def _(x: object):
+    if isinstance(x, NonContainer1):
+        if isinstance(x, NonContainer2):
+            reveal_type(x)  # revealed: NonContainer1 & NonContainer2
+
+            # error: [unsupported-operator] "Operator `in` is not supported for types `int` and `NonContainer1`"
+            reveal_type(2 in x)  # revealed: bool
+```
+
+Do not raise an error if at least one of the positive contributions to the intersection type support
+the operator:
 
 ```py
 class Container:
     def __contains__(self, x) -> bool:
         return False
 
-class NonContainer: ...
-
 def _(x: object):
-    if isinstance(x, Container):
-        if isinstance(x, NonContainer):
-            reveal_type(x)  # revealed: Container & NonContainer
+    if isinstance(x, NonContainer1):
+        if isinstance(x, Container):
+            if isinstance(x, NonContainer2):
+                reveal_type(x)  # revealed: NonContainer1 & Container & NonContainer2
+                reveal_type(2 in x)  # revealed: bool
+```
 
-            # error: [unsupported-operator] "Operator `in` is not supported for types `int` and `NonContainer`"
-            reveal_type(2 in x)  # revealed: bool
+Do also raise an error if the intersection has no positive contributions at all, unless the operator
+is supported on `object`:
+
+```py
+def _(x: object):
+    if not isinstance(x, NonContainer1):
+        reveal_type(x)  # revealed: ~NonContainer1
+
+        # error: [unsupported-operator] "Operator `in` is not supported for types `int` and `object`, in comparing `Literal[2]` with `~NonContainer1`"
+        reveal_type(2 in x)  # revealed: bool
+
+        reveal_type(2 is x)  # revealed: bool
 ```
 
 ### Unsupported operators for negative contributions
