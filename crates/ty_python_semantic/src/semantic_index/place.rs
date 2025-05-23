@@ -19,11 +19,11 @@ use crate::semantic_index::{PlaceSet, SemanticIndex, semantic_index};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) enum PlaceExprSubSegment {
-    /// A member access, e.g. `y` in `x.y`.
+    /// A member access, e.g. `.y` in `x.y`
     Member(ast::name::Name),
-    /// An integer index access, e.g. `1` in `x[1]`.
+    /// An integer-based index access, e.g. `[1]` in `x[1]`
     IntSubscript(ast::Int),
-    /// A string index access, e.g. `"foo"` in `x["foo"]`.
+    /// A string-based index access, e.g. `["foo"]` in `x["foo"]`
     StringSubscript(String),
 }
 
