@@ -174,13 +174,12 @@ impl Options {
                         .ok()
                         .map(PythonPath::from_virtual_env_var)
                 })
-                .or_else(|| Some(PythonPath::Discover(project_root.to_path_buf())))
-                .unwrap_or_else(|| {
+                .or_else(|| {
                     std::env::var("CONDA_PREFIX")
                         .ok()
                         .map(PythonPath::from_conda_prefix_var)
-                        .unwrap()
-                }),
+                })
+                .unwrap_or_else(|| PythonPath::Discover(project_root.to_path_buf())),
         }
     }
 
