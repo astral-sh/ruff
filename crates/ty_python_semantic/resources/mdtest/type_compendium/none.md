@@ -62,7 +62,10 @@ def f(x: T | None):
 
 ## `NoneType`
 
-The form `NoneType` is only available since Python 3.10. `NoneType` is equivalent to `None`:
+`None` is special in that the name of the instance at runtime can be used as a type as well: The
+object `None` is an instance of type `None`. When a distinction between the two is needed, the
+spelling `NoneType` can be used, which is available since Python 3.10. `NoneType` is equivalent to
+`None`:
 
 ```toml
 [environment]
