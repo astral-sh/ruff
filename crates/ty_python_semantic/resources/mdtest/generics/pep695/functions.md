@@ -101,7 +101,8 @@ def deeper_explicit(x: ExplicitlyImplements[set[str]]) -> None:
 def takes_in_type[T](x: type[T]) -> type[T]:
     return x
 
-reveal_type(takes_in_type(int))  # revealed: @Todo(unsupported type[X] special form)
+# error: [invalid-argument-type]
+reveal_type(takes_in_type(int))  # revealed: T'meta
 ```
 
 This also works when passing in arguments that are subclasses of the parameter type.
