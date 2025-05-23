@@ -144,7 +144,8 @@ This duality is also reflected in other facts:
 
 ## Lists of `Never`
 
-`list[Never]` is a reasonable type. It has one inhabitant, the empty list:
+`list[Never]` is a reasonable type that is *not* equivalent to `Never`. The empty list inhabits this
+type:
 
 ```py
 from typing_extensions import Never
