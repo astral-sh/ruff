@@ -1527,6 +1527,31 @@ def _(ns: argparse.Namespace):
     reveal_type(ns.whatever)  # revealed: Any
 ```
 
+## Classes with custom `__getattribute__` methods
+
+If a type provides a custom `__getattribute__`, we use its return type as the type for unknown
+attributes. Note that this behavior differs from runtime, where `__getattribute__` is called
+unconditionally, even for known attributes. This prevents `__getattribute__` from shadowing the
+inferred type for all attributes.
+
+```py
+class Foo:
+    x: str
+    def __getattribute__(self, attr: str) -> int:
+        return 42
+
+reveal_type(Foo().x)  # revealed: str
+reveal_type(Foo().y)  # revealed: int
+```
+
+```py
+from types import SimpleNamespace
+
+sn = SimpleNamespace(a="a")
+
+reveal_type(sn.a)  # revealed: Any
+```
+
 ## Classes with custom `__setattr__` methods
 
 ### Basic
