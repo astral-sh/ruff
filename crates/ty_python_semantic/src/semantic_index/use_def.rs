@@ -874,7 +874,7 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
-    /// This method resets the visibility constraints for all symbols to a previous state
+    /// This method resets the visibility constraints for all places to a previous state
     /// *if* there have been no new declarations or bindings since then. Consider the
     /// following example:
     /// ```py

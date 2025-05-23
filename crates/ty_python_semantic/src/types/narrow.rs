@@ -234,7 +234,7 @@ fn merge_constraints_or<'db>(
 }
 
 fn negate_if<'db>(constraints: &mut NarrowingConstraints<'db>, db: &'db dyn Db, yes: bool) {
-    for (_symbol, ty) in constraints.iter_mut() {
+    for (_place, ty) in constraints.iter_mut() {
         *ty = ty.negate_if(db, yes);
     }
 }

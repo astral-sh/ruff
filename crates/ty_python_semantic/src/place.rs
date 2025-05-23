@@ -44,7 +44,7 @@ impl Boundness {
 ///     possibly_unbound = 2
 /// ```
 ///
-/// If we look up symbols in this scope, we would get the following results:
+/// If we look up places in this scope, we would get the following results:
 /// ```rs
 /// bound:             Place::Type(Type::IntLiteral(1), Boundness::Bound),
 /// possibly_unbound:  Place::Type(Type::IntLiteral(2), Boundness::PossiblyUnbound),
@@ -77,10 +77,10 @@ impl<'db> Place<'db> {
         matches!(self, Place::Unbound)
     }
 
-    /// Returns the type of the symbol, ignoring possible unboundness.
+    /// Returns the type of the place, ignoring possible unboundness.
     ///
-    /// If the symbol is *definitely* unbound, this function will return `None`. Otherwise,
-    /// if there is at least one control-flow path where the symbol is bound, return the type.
+    /// If the place is *definitely* unbound, this function will return `None`. Otherwise,
+    /// if there is at least one control-flow path where the place is bound, return the type.
     pub(crate) fn ignore_possibly_unbound(&self) -> Option<Type<'db>> {
         match self {
             Place::Type(ty, _) => Some(*ty),
@@ -92,7 +92,7 @@ impl<'db> Place<'db> {
     #[track_caller]
     pub(crate) fn expect_type(self) -> Type<'db> {
         self.ignore_possibly_unbound()
-            .expect("Expected a (possibly unbound) type, not an unbound symbol")
+            .expect("Expected a (possibly unbound) type, not an unbound place")
     }
 
     #[must_use]
@@ -111,8 +111,8 @@ impl<'db> Place<'db> {
         }
     }
 
-    /// Try to call `__get__(None, owner)` on the type of this symbol (not on the meta type).
-    /// If it succeeds, return the `__get__` return type. Otherwise, returns the original symbol.
+    /// Try to call `__get__(None, owner)` on the type of this place (not on the meta type).
+    /// If it succeeds, return the `__get__` return type. Otherwise, returns the original place.
     /// This is used to resolve (potential) descriptor attributes.
     pub(crate) fn try_call_dunder_get(self, db: &'db dyn Db, owner: Type<'db>) -> Place<'db> {
         match self {
@@ -156,7 +156,7 @@ impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {
     }
 }
 
-/// Possible ways in which a symbol lookup can (possibly or definitely) fail.
+/// Possible ways in which a place lookup can (possibly or definitely) fail.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub(crate) enum LookupError<'db> {
     Unbound(TypeQualifiers),
@@ -188,8 +188,8 @@ impl<'db> LookupError<'db> {
     }
 }
 
-/// A [`Result`] type in which the `Ok` variant represents a definitely bound symbol
-/// and the `Err` variant represents a symbol that is either definitely or possibly unbound.
+/// A [`Result`] type in which the `Ok` variant represents a definitely bound place
+/// and the `Err` variant represents a place that is either definitely or possibly unbound.
 ///
 /// Note that this type is exactly isomorphic to [`Place`].
 /// In the future, we could possibly consider removing `Place` and using this type everywhere instead.
@@ -506,7 +506,7 @@ impl<'db> PlaceAndQualifiers<'db> {
         }
     }
 
-    /// Returns `true` if the symbol has a `ClassVar` type qualifier.
+    /// Returns `true` if the place has a `ClassVar` type qualifier.
     pub(crate) fn is_class_var(&self) -> bool {
         self.qualifiers.contains(TypeQualifiers::CLASS_VAR)
     }
@@ -522,9 +522,9 @@ impl<'db> PlaceAndQualifiers<'db> {
         }
     }
 
-    /// Transform symbol and qualifiers into a [`LookupResult`],
-    /// a [`Result`] type in which the `Ok` variant represents a definitely bound symbol
-    /// and the `Err` variant represents a symbol that is either definitely or possibly unbound.
+    /// Transform place and qualifiers into a [`LookupResult`],
+    /// a [`Result`] type in which the `Ok` variant represents a definitely bound place
+    /// and the `Err` variant represents a place that is either definitely or possibly unbound.
     pub(crate) fn into_lookup_result(self) -> LookupResult<'db> {
         match self {
             PlaceAndQualifiers {
@@ -544,12 +544,12 @@ impl<'db> PlaceAndQualifiers<'db> {
         }
     }
 
-    /// Safely unwrap the symbol and the qualifiers into a [`TypeQualifiers`].
+    /// Safely unwrap the place and the qualifiers into a [`TypeQualifiers`].
     ///
-    /// If the symbol is definitely unbound or possibly unbound, it will be transformed into a
+    /// If the place is definitely unbound or possibly unbound, it will be transformed into a
     /// [`LookupError`] and `diagnostic_fn` will be applied to the error value before returning
     /// the result of `diagnostic_fn` (which will be a [`TypeQualifiers`]). This allows the caller
-    /// to ensure that a diagnostic is emitted if the symbol is possibly or definitely unbound.
+    /// to ensure that a diagnostic is emitted if the place is possibly or definitely unbound.
     pub(crate) fn unwrap_with_diagnostic(
         self,
         diagnostic_fn: impl FnOnce(LookupError<'db>) -> TypeAndQualifiers<'db>,
@@ -557,7 +557,7 @@ impl<'db> PlaceAndQualifiers<'db> {
         self.into_lookup_result().unwrap_or_else(diagnostic_fn)
     }
 
-    /// Fallback (partially or fully) to another symbol if `self` is partially or fully unbound.
+    /// Fallback (partially or fully) to another place if `self` is partially or fully unbound.
     ///
     /// 1. If `self` is definitely bound, return `self` without evaluating `fallback_fn()`.
     /// 2. Else, evaluate `fallback_fn()`:
@@ -670,18 +670,12 @@ fn place_by_id<'db>(
             // `TYPE_CHECKING` is a special variable that should only be assigned `False`
             // at runtime, but is always considered `True` in type checking.
             // See mdtest/known_constants.md#user-defined-type_checking for details.
-            let is_considered_non_modifiable =
-                place_table(db, scope).place_expr(place_id).is_name()
-                    && matches!(
-                        place_table(db, scope)
-                            .place_expr(place_id)
-                            .expect_name()
-                            .as_str(),
-                        "__slots__" | "TYPE_CHECKING"
-                    );
+            let is_considered_non_modifiable = place_table(db, scope)
+                .place_expr(place_id)
+                .is_name_and(|name| matches!(name, "__slots__" | "TYPE_CHECKING"));
 
             if scope.file(db).is_stub(db.upcast()) {
-                // We generally trust module-level undeclared symbols in stubs and do not union
+                // We generally trust module-level undeclared places in stubs and do not union
                 // with `Unknown`. If we don't do this, simple aliases like `IOError = OSError` in
                 // stubs would result in `IOError` being a union of `OSError` and `Unknown`, which
                 // leads to all sorts of downstream problems. Similarly, type variables are often
@@ -703,7 +697,7 @@ fn place_by_id<'db>(
 
     // TODO (ticket: https://github.com/astral-sh/ruff/issues/14297) Our handling of boundness
     // currently only depends on bindings, and ignores declarations. This is inconsistent, since
-    // we only look at bindings if the symbol may be undeclared. Consider the following example:
+    // we only look at bindings if the place may be undeclared. Consider the following example:
     // ```py
     // x: int
     //
@@ -712,7 +706,7 @@ fn place_by_id<'db>(
     // else
     //     y = 3
     // ```
-    // If we import from this module, we will currently report `x` as a definitely-bound symbol
+    // If we import from this module, we will currently report `x` as a definitely-bound place
     // (even though it has no bindings at all!) but report `y` as possibly-unbound (even though
     // every path has either a binding or a declaration for it.)
 }
@@ -852,7 +846,7 @@ fn place_from_bindings_impl<'db>(
 
             if static_visibility.is_always_false() {
                 // We found a binding that we have statically determined to not be visible from
-                // the use of the symbol that we are investigating. There are three interesting
+                // the use of the place that we are investigating. There are three interesting
                 // cases to consider:
                 //
                 // ```py

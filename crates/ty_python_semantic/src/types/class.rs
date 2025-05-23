@@ -1389,7 +1389,7 @@ impl<'db> ClassLiteral<'db> {
                 continue;
             }
 
-            let symbol = table.place_expr(place_id);
+            let place_expr = table.place_expr(place_id);
 
             if let Ok(attr) = place_from_declarations(db, declarations) {
                 if attr.is_class_var() {
@@ -1400,7 +1400,7 @@ impl<'db> ClassLiteral<'db> {
                     let bindings = use_def.public_bindings(place_id);
                     let default_ty = place_from_bindings(db, bindings).ignore_possibly_unbound();
 
-                    attributes.insert(symbol.expect_name().clone(), (attr_ty, default_ty));
+                    attributes.insert(place_expr.expect_name().clone(), (attr_ty, default_ty));
                 }
             }
         }
@@ -1463,7 +1463,7 @@ impl<'db> ClassLiteral<'db> {
         if union.is_empty() {
             Place::Unbound.with_qualifiers(TypeQualifiers::empty())
         } else {
-            // If we have reached this point, we know that we have only seen possibly-unbound symbols.
+            // If we have reached this point, we know that we have only seen possibly-unbound places.
             // This means that the final result is still possibly-unbound.
 
             Place::Type(union.build(), Boundness::PossiblyUnbound).with_qualifiers(union_qualifiers)
@@ -1499,9 +1499,9 @@ impl<'db> ClassLiteral<'db> {
             // The attribute assignment inherits the visibility of the method which contains it
             let is_method_visible = if let Some(method_def) = method_scope.node(db).as_function() {
                 let method = index.expect_single_definition(method_def);
-                let method_symbol = class_table.place_id_by_name(&method_def.name).unwrap();
+                let method_place = class_table.place_id_by_name(&method_def.name).unwrap();
                 class_map
-                    .public_bindings(method_symbol)
+                    .public_bindings(method_place)
                     .find_map(|bind| {
                         (bind.binding == Some(method))
                             .then(|| class_map.is_binding_visible(db, &bind))

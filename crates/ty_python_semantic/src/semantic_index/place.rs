@@ -218,6 +218,10 @@ impl PlaceExpr {
         self.sub_segments.is_empty()
     }
 
+    pub fn is_name_and(&self, f: impl FnOnce(&str) -> bool) -> bool {
+        self.is_name() && f(&self.root_name)
+    }
+
     /// Does the place expression have the form `<object>.member`?
     pub fn is_member(&self) -> bool {
         self.sub_segments

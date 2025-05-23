@@ -5,15 +5,15 @@
 //! everything in that file's scopes, or give a linter access to types of arbitrary expressions
 //! (via the [`HasType`](crate::semantic_model::HasType) trait).
 //!
-//! Definition-level inference allows us to look up the types of symbols in other scopes (e.g. for
-//! imports) with the minimum inference necessary, so that if we're looking up one symbol from a
+//! Definition-level inference allows us to look up the types of places in other scopes (e.g. for
+//! imports) with the minimum inference necessary, so that if we're looking up one place from a
 //! very large module, we can avoid a bunch of unnecessary work. Definition-level inference also
 //! allows us to handle import cycles without getting into a cycle of scope-level inference
 //! queries.
 //!
 //! The expression-level inference query is needed in only a few cases. Since some assignments can
 //! have multiple targets (via `x = y = z` or unpacking `(x, y) = z`, they can be associated with
-//! multiple definitions (one per assigned symbol). In order to avoid inferring the type of the
+//! multiple definitions (one per assigned place). In order to avoid inferring the type of the
 //! right-hand side once per definition, we infer it as a standalone query, so its result will be
 //! cached by Salsa. We also need the expression-level query for inferring types in type guard
 //! expressions (e.g. the test clause of an `if` statement.)
@@ -146,7 +146,7 @@ fn scope_cycle_initial<'db>(_db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInfere
 }
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
-/// Use when resolving a symbol name use or public type of a symbol.
+/// Use when resolving a place use or public type of a place.
 #[salsa::tracked(returns(ref), cycle_fn=definition_cycle_recover, cycle_initial=definition_cycle_initial)]
 pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
@@ -1069,10 +1069,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// For (1), this has the consequence of not checking an overloaded function that is being
     /// shadowed by another function with the same name in this scope.
     fn check_overloaded_functions(&mut self, scope: &NodeWithScopeKind) {
-        // Collect all the unique overloaded function symbols in this scope. This requires a set
-        // because an overloaded function uses the same symbol for each of the overloads and the
+        // Collect all the unique overloaded function places in this scope. This requires a set
+        // because an overloaded function uses the same place for each of the overloads and the
         // implementation.
-        let overloaded_function_symbols: FxHashSet<_> = self
+        let overloaded_function_places: FxHashSet<_> = self
             .types
             .declarations
             .iter()
@@ -1097,9 +1097,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let mut public_functions = FxHashSet::default();
 
-        for symbol in overloaded_function_symbols {
+        for place in overloaded_function_places {
             if let Place::Type(Type::FunctionLiteral(function), Boundness::Bound) =
-                place_from_bindings(self.db(), use_def.public_bindings(symbol))
+                place_from_bindings(self.db(), use_def.public_bindings(place))
             {
                 if function.file(self.db()) != self.file() {
                     // If the function is not in this file, we don't need to check it.
@@ -1589,7 +1589,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if let Some(module_type_implicit_declaration) =
                         module_type_implicit_global_declaration(self.db(), expr)
                             .ok()
-                            .and_then(|sym| sym.place.ignore_possibly_unbound())
+                            .and_then(|place| place.place.ignore_possibly_unbound())
                     {
                         let declared_type = declared_ty.inner_type();
                         if !declared_type
@@ -5638,8 +5638,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let mut constraint_keys = vec![];
         // If we're inferring types of deferred expressions, always treat them as public symbols
-        let (local_scope_symbol, use_id) = if self.is_deferred() {
-            let symbol = if let Some(place_id) = place_table.place_id_by_expr(expr) {
+        let (local_scope_place, use_id) = if self.is_deferred() {
+            let place = if let Some(place_id) = place_table.place_id_by_expr(expr) {
                 place_from_bindings(db, use_def.public_bindings(place_id))
             } else {
                 assert!(
@@ -5648,14 +5648,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Place::Unbound
             };
-            (symbol, None)
+            (place, None)
         } else {
             let use_id = expr_ref.scoped_use_id(db, scope);
             let place = place_from_bindings(db, use_def.bindings_at_use(use_id));
             (place, Some(use_id))
         };
 
-        let place = PlaceAndQualifiers::from(local_scope_symbol).or_fall_back_to(db, || {
+        let place = PlaceAndQualifiers::from(local_scope_place).or_fall_back_to(db, || {
             let has_bindings_in_this_scope = match place_table.place_by_expr(expr) {
                 Some(place_expr) => place_expr.is_bound(),
                 None => {
@@ -5699,7 +5699,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
             // Note that we skip the scope containing the use that we are resolving, since we
-            // already looked for the symbol there up above.
+            // already looked for the place there up above.
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
@@ -5714,7 +5714,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         .parent()
                         .is_some_and(|parent| parent == enclosing_scope_file_id);
 
-                // If the reference is in a nested eager scope, we need to look for the symbol at
+                // If the reference is in a nested eager scope, we need to look for the place at
                 // the point where the previous enclosing scope was defined, instead of at the end
                 // of the scope. (Note that the semantic index builder takes care of only
                 // registering eager bindings for nested scopes that are actually eager, and for
@@ -5748,7 +5748,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 .into();
                         }
                         // There are no visible bindings / constraint here.
-                        // Don't fall back to non-eager symbol resolution.
+                        // Don't fall back to non-eager place resolution.
                         EagerSnapshotResult::NotFound => {
                             continue;
                         }

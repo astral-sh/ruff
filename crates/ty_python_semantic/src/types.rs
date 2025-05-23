@@ -2730,12 +2730,12 @@ impl<'db> Type<'db> {
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Place<'db> {
         if let Type::ModuleLiteral(module) = self {
             module.static_member(db, name)
-        } else if let symbol @ Place::Type(_, _) = self.class_member(db, name.into()).place {
-            symbol
-        } else if let Some(symbol @ Place::Type(_, _)) =
+        } else if let place @ Place::Type(_, _) = self.class_member(db, name.into()).place {
+            place
+        } else if let Some(place @ Place::Type(_, _)) =
             self.find_name_in_mro(db, name).map(|inner| inner.place)
         {
-            symbol
+            place
         } else {
             self.instance_member(db, name).place
         }
@@ -4931,9 +4931,9 @@ impl<'db> Type<'db> {
                             ],
                         });
                     };
-                    let instance = Type::ClassLiteral(class)
-                        .to_instance(db)
-                        .expect("enclosing_class_symbol must return type that can be instantiated");
+                    let instance = Type::ClassLiteral(class).to_instance(db).expect(
+                        "nearest_enclosing_class must return type that can be instantiated",
+                    );
                     Ok(Type::TypeVar(TypeVarInstance::new(
                         db,
                         ast::name::Name::new("Self"),
@@ -5694,7 +5694,7 @@ bitflags! {
 
 /// When inferring the type of an annotation expression, we can also encounter type qualifiers
 /// such as `ClassVar` or `Final`. These do not affect the inferred type itself, but rather
-/// control how a particular symbol can be accessed or modified. This struct holds a type and
+/// control how a particular place can be accessed or modified. This struct holds a type and
 /// a set of type qualifiers.
 ///
 /// Example: `Annotated[ClassVar[tuple[int]], "metadata"]` would have type `tuple[int]` and the

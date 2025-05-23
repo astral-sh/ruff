@@ -328,13 +328,13 @@ fn cached_protocol_interface<'db>(
             use_def_map
                 .all_public_declarations()
                 .flat_map(|(place_id, declarations)| {
-                    place_from_declarations(db, declarations).map(|symbol| (place_id, symbol))
+                    place_from_declarations(db, declarations).map(|place| (place_id, place))
                 })
-                .filter_map(|(place_id, symbol)| {
-                    symbol
+                .filter_map(|(place_id, place)| {
+                    place
                         .place
                         .ignore_possibly_unbound()
-                        .map(|ty| (place_id, ty, symbol.qualifiers))
+                        .map(|ty| (place_id, ty, place.qualifiers))
                 })
                 // Bindings in the class body that are not declared in the class body
                 // are not valid protocol members, and we plan to emit diagnostics for them

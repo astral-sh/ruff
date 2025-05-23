@@ -28,7 +28,7 @@ use crate::semantic_index::semantic_index;
 pub(crate) struct AstIds {
     /// Maps expressions to their expression id.
     expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
-    /// Maps expressions which "use" a symbol (that is, [`ast::ExprName`]) to a use id.
+    /// Maps expressions which "use" a place (that is, [`ast::ExprName`], [`ast::ExprAttribute`] or [`ast::ExprSubscript`]) to a use id.
     uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
 }
 
