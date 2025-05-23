@@ -2,7 +2,7 @@ use crate::Db;
 use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, Severity, Span};
 use ruff_db::files::system_path_to_file;
-use ruff_db::system::{System, SystemPath};
+use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::{Combine, OptionsMetadata};
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
@@ -547,6 +547,23 @@ impl OptionDiagnostic {
             diag
         } else {
             Diagnostic::new(self.id, self.severity, &self.message)
+        }
+    }
+}
+
+/// This is a wrapper for options that actually get loaded from configuration files
+/// and the CLI, which also includes a `config_file_override` option that overrides
+/// default configuration discovery with an explicitly-provided path to a configuration file
+pub struct MetaOptions {
+    pub config_file_override: Option<SystemPathBuf>,
+    pub cli_options: Options,
+}
+
+impl MetaOptions {
+    pub fn new(config_file_override: Option<SystemPathBuf>, cli_options: Options) -> Self {
+        Self {
+            config_file_override,
+            cli_options,
         }
     }
 }

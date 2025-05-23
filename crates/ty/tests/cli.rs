@@ -1555,6 +1555,39 @@ fn cli_config_args_invalid_option() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn config_file_override() -> anyhow::Result<()> {
+    let case = TestCase::with_files(vec![
+        ("test.py", r"print(x)  # [unresolved-reference]"),
+        (
+            "ty-override.toml",
+            r#"
+            [terminal]
+            error-on-warning = true
+            "#,
+        ),
+    ])?;
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config-file").arg("ty-override.toml"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       ^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
 struct TestCase {
     _temp_dir: TempDir,
     _settings_scope: SettingsBindDropGuard,

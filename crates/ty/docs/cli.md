@@ -44,6 +44,8 @@ ty check [OPTIONS] [PATH]...
 <li><code>always</code>:  Always display colors</li>
 <li><code>never</code>:  Never display colors</li>
 </ul></dd><dt id="ty-check--config"><a href="#ty-check--config"><code>--config</code></a>, <code>-c</code> <i>config-option</i></dt><dd><p>A TOML <code>&lt;KEY&gt; = &lt;VALUE&gt;</code> pair</p>
+</dd><dt id="ty-check--config-file"><a href="#ty-check--config-file"><code>--config-file</code></a> <i>config-file</i></dt><dd><p>A path to a <code>ty.toml</code> configuration file</p>
+<p><code>pyproject.toml</code> files are not accepted. When provided, this file will be used in place of any discovered configuration (including user-level configuration). ty will skip project discovery and default to the current working directory. Paths are anchored at the current working directory.</p>
 </dd><dt id="ty-check--error"><a href="#ty-check--error"><code>--error</code></a> <i>rule</i></dt><dd><p>Treat the given rule as having severity 'error'. Can be specified multiple times.</p>
 </dd><dt id="ty-check--error-on-warning"><a href="#ty-check--error-on-warning"><code>--error-on-warning</code></a></dt><dd><p>Use exit code 1 if there are any warning-level diagnostics</p>
 </dd><dt id="ty-check--exit-zero"><a href="#ty-check--exit-zero"><code>--exit-zero</code></a></dt><dd><p>Always use exit code 0, even when there are error-level diagnostics</p>
