@@ -99,7 +99,6 @@ impl AllSettings {
             serde_json::from_value(options)
                 .map_err(|err| {
                     tracing::error!("Failed to deserialize initialization options: {err}. Falling back to default client settings...");
-                    show_err_msg!("ty received invalid client settings - falling back to default client settings.");
                 })
                 .unwrap_or_default(),
         )

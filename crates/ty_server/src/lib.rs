@@ -1,12 +1,10 @@
-use crate::server::Server;
+use crate::server::{ConnectionInitializer, Server};
 use anyhow::Context;
 pub use document::{DocumentKey, NotebookDocument, PositionEncoding, TextDocument};
 pub use session::{ClientSettings, DocumentQuery, DocumentSnapshot, Session};
 use std::num::NonZeroUsize;
 
-#[macro_use]
-mod message;
-
+mod client;
 mod document;
 mod logging;
 mod server;
@@ -30,11 +28,20 @@ pub fn run_server() -> anyhow::Result<()> {
     // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
     let worker_threads = std::thread::available_parallelism()
         .unwrap_or(four)
-        .min(four);
+        .max(four);
 
-    Server::new(worker_threads)
+    let (connection, io_threads) = ConnectionInitializer::stdio();
+
+    let server_result = Server::new(worker_threads, connection)
         .context("Failed to start server")?
-        .run()?;
+        .run();
 
-    Ok(())
+    let io_result = io_threads.join();
+
+    match (server_result, io_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(server), Err(io)) => Err(server).context(format!("IO thread error: {io}")),
+        (Err(server), _) => Err(server),
+        (_, Err(io)) => Err(io).context("IO thread error"),
+    }
 }

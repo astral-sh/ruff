@@ -1,0 +1,207 @@
+use crate::Session;
+use crate::server::{Action, ConnectionSender};
+use crate::server::{Event, MainLoopSender};
+use anyhow::{Context, anyhow};
+use lsp_server::{Message, Notification, RequestId};
+use serde_json::Value;
+use std::any::TypeId;
+use std::fmt::Display;
+
+pub(crate) type ClientResponseHandler = Box<dyn FnOnce(&Session, lsp_server::Response) + Send>;
+
+#[derive(Debug)]
+pub(crate) struct Client {
+    /// Channel to send messages back to the main loop.
+    main_loop_sender: MainLoopSender,
+    /// Channel to send messages directly to the LSP client without going through the main loop.
+    ///
+    /// This is generally preferred because it reduces pressure on the main loop but it may not always be
+    /// possible if access to data on [`Session`] is required, which background tasks don't have.
+    client_sender: ConnectionSender,
+}
+
+impl Client {
+    pub(crate) fn new(main_loop_sender: MainLoopSender, client_sender: ConnectionSender) -> Self {
+        Self {
+            main_loop_sender,
+            client_sender,
+        }
+    }
+
+    /// Sends a request of kind `R` to the client, with associated parameters.
+    ///
+    /// The request is sent immediately.
+    /// The `response_handler` will be dispatched as soon as the client response
+    /// is processed on the main-loop. The handler always runs on the main-loop thread.
+    ///
+    /// # Note
+    /// This method takes a `session` so that we can register the pending-request
+    /// and send the response directly to the client. If this ever becomes too limiting (because we
+    /// need to send a request from somewhere where we don't have access to session), consider introducing
+    /// a new `send_deferred_request` method that doesn't take a session and instead sends
+    /// an `Action` to the main loop to send the request (the main loop has always access to session).
+    pub(crate) fn send_request<R>(
+        &self,
+        session: &Session,
+        params: R::Params,
+        response_handler: impl FnOnce(&Session, R::Result) + Send + 'static,
+    ) -> crate::Result<()>
+    where
+        R: lsp_types::request::Request,
+    {
+        let response_handler =
+            Box::new(move |session: &Session, response: lsp_server::Response| {
+                match (response.error, response.result) {
+                    (Some(err), _) => {
+                        tracing::error!(
+                            "Got an error from the client (code {}): {}",
+                            err.code,
+                            err.message
+                        );
+                    }
+                    (None, Some(response)) => match serde_json::from_value(response) {
+                        Ok(response) => response_handler(session, response),
+                        Err(error) => {
+                            tracing::error!("Failed to deserialize response from server: {error}");
+                        }
+                    },
+                    (None, None) => {
+                        if TypeId::of::<R::Result>() == TypeId::of::<()>() {
+                            // We can't call `response_handler(())` directly here, but
+                            // since we _know_ the type expected is `()`, we can use
+                            // `from_value(Value::Null)`. `R::Result` implements `DeserializeOwned`,
+                            // so this branch works in the general case but we'll only
+                            // hit it if the concrete type is `()`, so the `unwrap()` is safe here.
+                            response_handler(session, serde_json::from_value(Value::Null).unwrap());
+                        } else {
+                            tracing::error!(
+                                "Server response was invalid: did not contain a result or error"
+                            );
+                        }
+                    }
+                }
+            });
+
+        let id = session
+            .request_queue()
+            .outgoing()
+            .register(response_handler);
+
+        self.client_sender
+            .send(Message::Request(lsp_server::Request {
+                id,
+                method: R::METHOD.to_string(),
+                params: serde_json::to_value(params).context("Failed to serialize params")?,
+            }))?;
+
+        Ok(())
+    }
+
+    /// Sends a notification to the client.
+    pub(crate) fn send_notification<N>(&self, params: N::Params) -> crate::Result<()>
+    where
+        N: lsp_types::notification::Notification,
+    {
+        let method = N::METHOD.to_string();
+
+        self.client_sender
+            .send(lsp_server::Message::Notification(Notification::new(
+                method, params,
+            )))
+            .map_err(|error| anyhow!("Failed to send notification: {error}"))
+    }
+
+    /// Sends a notification without any parameters to the client.
+    ///
+    /// This is useful for notifications that don't require any data.
+    #[expect(dead_code)]
+    pub(crate) fn send_notification_no_params(&self, method: String) -> crate::Result<()> {
+        self.client_sender
+            .send(lsp_server::Message::Notification(Notification::new(
+                method,
+                Value::Null,
+            )))
+            .map_err(|error| anyhow!("Failed to send notification: {error}"))
+    }
+
+    /// Sends a response to the client for a given request ID.
+    ///
+    /// The response isn't sent immediately. Instead, it's queued up in the main loop
+    /// and checked for cancellation (each request must have exactly one response).
+    pub(crate) fn respond<R>(
+        &self,
+        id: RequestId,
+        result: crate::server::Result<R>,
+    ) -> crate::Result<()>
+    where
+        R: serde::Serialize,
+    {
+        let response = match result {
+            Ok(res) => lsp_server::Response::new_ok(id, res),
+            Err(crate::server::Error { code, error }) => {
+                lsp_server::Response::new_err(id, code as i32, error.to_string())
+            }
+        };
+
+        self.main_loop_sender
+            .send(Event::Action(Action::SendResponse(response)))
+            .map_err(|error| anyhow!("Failed to send response: {error}"))
+    }
+
+    /// Sends an error response to the client for a given request ID.
+    ///
+    /// The response isn't sent immediately. Instead, it's queued up in the main loop.
+    pub(crate) fn respond_err(
+        &self,
+        id: RequestId,
+        error: lsp_server::ResponseError,
+    ) -> crate::Result<()> {
+        let response = lsp_server::Response {
+            id,
+            result: None,
+            error: Some(error),
+        };
+
+        self.main_loop_sender
+            .send(Event::Action(Action::SendResponse(response)))
+            .map_err(|error| anyhow!("Failed to send response: {error}"))
+    }
+
+    /// Shows a message to the user.
+    ///
+    /// This opens a pop up in VS Code showing `message`.
+    pub(crate) fn show_message(
+        &self,
+        message: impl Display,
+        message_type: lsp_types::MessageType,
+    ) -> crate::Result<()> {
+        self.send_notification::<lsp_types::notification::ShowMessage>(
+            lsp_types::ShowMessageParams {
+                typ: message_type,
+                message: message.to_string(),
+            },
+        )
+    }
+
+    /// Re-queues this request after a salsa cancellation for a retry.
+    ///
+    /// The main loop will skip the retry if the client cancelled the request in the  meantime.
+    pub(crate) fn retry(&self, request: lsp_server::Request) -> crate::Result<()> {
+        self.main_loop_sender
+            .send(Event::Action(Action::RetryRequest(request)))
+            .map_err(|error| anyhow!("Failed to send retry request: {error}"))
+    }
+}
+
+/// Sends an error to the client with a formatted message. The error is sent in a
+/// `window/showMessage` notification.
+#[macro_export]
+macro_rules! show_err_msg {
+    ($client:expr, $msg:expr$(, $($arg:tt)*)?) => {{
+        let result = $client.show_message(::core::format_args!($msg$(, $($arg)*)?), lsp_types::MessageType::ERROR);
+
+        if let Err(err) = result {
+            tracing::error!("Failed to send error message to client: {err}");
+        }
+    }};
+}
