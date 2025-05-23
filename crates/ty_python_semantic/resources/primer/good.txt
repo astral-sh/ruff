@@ -8,7 +8,6 @@ aiohttp-devtools
 aioredis
 aiortc
 alectryon
-alerta
 altair
 anyio
 apprise
@@ -41,10 +40,8 @@ flake8-pyi
 git-revise
 graphql-core
 httpx-caching
-hydra-zen
 ignite
 imagehash
-isort
 itsdangerous
 janus
 jinja
@@ -53,13 +50,11 @@ kopf
 kornia
 manticore
 materialize
-meson
 mitmproxy
 mkdocs
 mkosi
 mongo-python-driver
 more-itertools
-mypy
 mypy-protobuf
 mypy_primer
 nionutils
@@ -74,11 +69,9 @@ pegen
 poetry
 porcupine
 ppb-vector
-psycopg
 pwndbg
 pybind11
 pycryptodome
-pydantic
 pyinstrument
 pyjwt
 pylox
@@ -93,7 +86,6 @@ rclip
 rich
 rotki
 schema_salad
-scipy
 scrapy
 sockeye
 speedrun.com_global_scoreboard_webapp
@@ -101,7 +93,6 @@ sphinx
 starlette
 static-frame
 stone
-strawberry
 streamlit
 sympy
 tornado

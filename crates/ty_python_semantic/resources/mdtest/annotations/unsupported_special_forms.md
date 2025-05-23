@@ -16,7 +16,8 @@ Alias: TypeAlias = int
 
 def f(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
-    reveal_type(Alias)  # revealed: @Todo(Support for `typing.TypeAlias`)
+    # TODO: this is not correct. At runtime, this is `type` (`Alias` is just `<class 'int'>`).
+    reveal_type(Alias)  # revealed: typing.TypeAliasType
 
 def g() -> TypeGuard[int]: ...
 def h() -> TypeIs[int]: ...
