@@ -1454,10 +1454,10 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
 }
 
 #[test]
-fn cli_config_args_overrides_knot_toml() -> anyhow::Result<()> {
+fn cli_config_args_overrides_ty_toml() -> anyhow::Result<()> {
     let case = TestCase::with_files(vec![
         (
-            "knot.toml",
+            "ty.toml",
             r#"
             [terminal]
             error-on-warning = true
@@ -1465,6 +1465,27 @@ fn cli_config_args_overrides_knot_toml() -> anyhow::Result<()> {
         ),
         ("test.py", r"print(x)  # [unresolved-reference]"),
     ])?;
+
+    // Exit code of 1 due to the setting in `ty.toml`
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       ^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // Exit code of 0 because the `ty.toml` setting is overwritten by `--config`
     assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=false"), @r"
     success: true
     exit_code: 0
