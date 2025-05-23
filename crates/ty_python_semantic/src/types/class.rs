@@ -1779,6 +1779,8 @@ impl<'db> ClassLiteral<'db> {
                         // might never be called).
                         if !implicit.is_unbound() {
                             return implicit.into();
+                        } else {
+                            return Symbol::Unbound.into();
                         }
                     }
 
