@@ -1740,13 +1740,47 @@ impl<'db> ClassLiteral<'db> {
                     symbol: mut declared @ Symbol::Type(declared_ty, declaredness),
                     qualifiers,
                 }) => {
+                    let implicit = Self::implicit_instance_attribute(db, body_scope, name);
+
                     // For the purpose of finding instance attributes, ignore `ClassVar`
                     // declarations:
                     if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
                         declared = Symbol::Unbound;
                     }
 
-                    // The attribute is declared in the class body.
+                    // Invoke the descriptor protocol on the declared type, to check
+                    // if it is a descriptor attribute.
+                    let declared_resolved = Type::try_call_dunder_get_on_attribute(
+                        db,
+                        SymbolAndQualifiers {
+                            symbol: declared.clone(),
+                            qualifiers,
+                        },
+                        Type::instance(db, self.apply_optional_specialization(db, None)),
+                        Type::ClassLiteral(self),
+                    )
+                    .0
+                    .symbol;
+
+                    if declared != declared_resolved {
+                        // If we end up here, it means that the class-level attribute is a
+                        // non-data descriptor (a data descriptor would have taken precedence
+                        // over the instance attribute). In this method, we look at declared
+                        // types on the class body because they might indicate the declared
+                        // type of implicit instance attributes. However, if the class-level
+                        // attribute is a non-data descriptor, it can not possibly be the
+                        // correct type of the implicit instance attribute. If there are any
+                        // attribute assignments in methods of this class, they would overwrite
+                        // the non-data descriptor. In this case, we just return the type
+                        // inferred from attribute assignments in methods. The descriptor
+                        // protocol implementation in `Type::invoke_descriptor_protocol` will
+                        // take care of unioning with the non-data descriptor type (because we
+                        // account for the fact that the methods containing these assignments
+                        // might never be called).
+                        if !implicit.is_unbound() {
+                            return implicit.into();
+                        }
+                    }
 
                     let bindings = use_def.public_bindings(symbol_id);
                     let inferred = symbol_from_bindings(db, bindings);
@@ -1755,10 +1789,7 @@ impl<'db> ClassLiteral<'db> {
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
-                        if let Some(implicit_ty) =
-                            Self::implicit_instance_attribute(db, body_scope, name)
-                                .ignore_possibly_unbound()
-                        {
+                        if let Some(implicit_ty) = implicit.ignore_possibly_unbound() {
                             if declaredness == Boundness::Bound {
                                 // If a symbol is definitely declared, and we see
                                 // attribute assignments in methods of the class,
@@ -1790,10 +1821,7 @@ impl<'db> ClassLiteral<'db> {
                         if declaredness == Boundness::Bound {
                             declared.with_qualifiers(qualifiers)
                         } else {
-                            if let Some(implicit_ty) =
-                                Self::implicit_instance_attribute(db, body_scope, name)
-                                    .ignore_possibly_unbound()
-                            {
+                            if let Some(implicit_ty) = implicit.ignore_possibly_unbound() {
                                 Symbol::Type(
                                     UnionType::from_elements(db, [declared_ty, implicit_ty]),
                                     declaredness,
