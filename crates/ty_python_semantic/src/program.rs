@@ -164,7 +164,7 @@ impl PythonPath {
     }
     
     pub fn from_conda_prefix_var(path: impl Into<SystemPathBuf>) -> Self {
-        Self::Resolve(path.into(), SysPrefixPathOrigin::PythonCliFlag)
+        Self::Resolve(path.into(), SysPrefixPathOrigin::CondaPrefixVar)
     }
 
     pub fn from_cli_flag(path: SystemPathBuf) -> Self {
