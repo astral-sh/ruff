@@ -1492,6 +1492,12 @@ fn cli_config_args_invalid_option() -> anyhow::Result<()> {
 /// And the command is run in the `project` directory.
 #[test]
 fn check_conda_prefix_var_to_resolve_path() -> anyhow::Result<()> {
+    let conda_package1_path = if cfg!(windows) {
+        "conda-env/Lib/site-packages/package1/__init__.py"
+    } else {
+        "conda-env/lib/python3.13/site-packages/package1/__init__.py"
+    };
+
     let case = TestCase::with_files([
         (
             "project/test.py",
@@ -1500,7 +1506,7 @@ fn check_conda_prefix_var_to_resolve_path() -> anyhow::Result<()> {
             "#,
         ),
         (
-            "conda-env/lib/python3.13/site-packages/package1/__init__.py",
+            conda_package1_path,
             r#"
             "#,
         ),
