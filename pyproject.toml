@@ -53,9 +53,6 @@ exclude = [
     "crates/ruff_linter/resources/test/fixtures/**/*",
     "crates/ruff_linter/src/rules/*/snapshots/**/*"
 ]
-include = [
-    "rust-toolchain.toml"
-]
 
 [tool.ruff]
 target-version = "py38"
