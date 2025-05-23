@@ -275,7 +275,12 @@ impl fmt::Debug for Files {
 impl std::panic::RefUnwindSafe for Files {}
 
 /// A file that's either stored on the host system's file system or in the vendored file system.
+///
+/// # Ordering
+/// Ordering is based on the file's salsa-assigned id and not on its values.
+/// The id may change between runs.
 #[salsa::input]
+#[derive(PartialOrd, Ord)]
 pub struct File {
     /// The path of the file (immutable).
     #[returns(ref)]

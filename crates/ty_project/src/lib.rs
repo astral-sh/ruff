@@ -663,10 +663,11 @@ mod tests {
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
-    use ruff_python_ast::PythonVersion;
     use ruff_python_ast::name::Name;
     use ty_python_semantic::types::check_types;
-    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, SearchPathSettings};
+    use ty_python_semantic::{
+        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
+    };
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
@@ -677,7 +678,7 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersion::default(),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings::new(vec![SystemPathBuf::from(".")]),
             },

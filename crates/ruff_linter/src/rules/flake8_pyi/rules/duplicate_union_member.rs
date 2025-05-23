@@ -139,7 +139,9 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
     }
 
     // Add all diagnostics to the checker
-    checker.report_diagnostics(diagnostics);
+    for diagnostic in diagnostics {
+        checker.report_diagnostic(diagnostic);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

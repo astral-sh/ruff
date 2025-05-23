@@ -1,0 +1,27 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/pattern_match_regression_brackets.py
+---
+## Input
+```python
+# Ruff in some cases added brackets around tuples in some cases; deviating from Black.
+# Ensure we don't revert already-applied formats with the fix.
+# See https://github.com/astral-sh/ruff/pull/18147
+match a, b:
+    case [[], []]:
+        ...
+    case [[], _]:
+        ...
+```
+
+## Output
+```python
+# Ruff in some cases added brackets around tuples in some cases; deviating from Black.
+# Ensure we don't revert already-applied formats with the fix.
+# See https://github.com/astral-sh/ruff/pull/18147
+match a, b:
+    case [[], []]:
+        ...
+    case [[], _]:
+        ...
+```

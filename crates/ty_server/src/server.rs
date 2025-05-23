@@ -96,10 +96,20 @@ impl Server {
                 anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
             })?;
 
-        if workspaces.len() > 1 {
-            // TODO(dhruvmanila): Support multi-root workspaces
-            anyhow::bail!("Multi-root workspaces are not supported yet");
-        }
+        let workspaces = if workspaces.len() > 1 {
+            let first_workspace = workspaces.into_iter().next().unwrap();
+            tracing::warn!(
+                "Multiple workspaces are not yet supported, using the first workspace: {}",
+                &first_workspace.0
+            );
+            show_warn_msg!(
+                "Multiple workspaces are not yet supported, using the first workspace: {}",
+                &first_workspace.0
+            );
+            vec![first_workspace]
+        } else {
+            workspaces
+        };
 
         Ok(Self {
             connection,

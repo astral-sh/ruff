@@ -304,19 +304,21 @@ fn call<'a>(
 ) {
     let semantic = checker.semantic();
     let dummy_variable_rgx = &checker.settings.dummy_variable_rgx;
-    checker.report_diagnostics(parameters.filter_map(|arg| {
-        let binding = scope
+    for arg in parameters {
+        let Some(binding) = scope
             .get(arg.name())
-            .map(|binding_id| semantic.binding(binding_id))?;
+            .map(|binding_id| semantic.binding(binding_id))
+        else {
+            continue;
+        };
         if binding.kind.is_argument()
             && binding.is_unused()
             && !dummy_variable_rgx.is_match(arg.name())
         {
-            Some(argumentable.check_for(arg.name.to_string(), binding.range()))
-        } else {
-            None
+            checker
+                .report_diagnostic(argumentable.check_for(arg.name.to_string(), binding.range()));
         }
-    }));
+    }
 }
 
 /// Returns `true` if a function appears to be a base class stub. In other

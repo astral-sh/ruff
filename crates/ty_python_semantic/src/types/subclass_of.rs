@@ -122,6 +122,12 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        Self {
+            subclass_of: self.subclass_of.normalized(db),
+        }
+    }
+
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Type::instance(db, class),
@@ -170,6 +176,13 @@ impl<'db> SubclassOfInner<'db> {
         match self {
             Self::Class(_) => None,
             Self::Dynamic(dynamic) => Some(dynamic),
+        }
+    }
+
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::Class(class) => Self::Class(class.normalized(db)),
+            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
         }
     }
 

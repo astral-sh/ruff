@@ -302,8 +302,8 @@ impl<'db> Signature<'db> {
 
     pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
         Self {
-            generic_context: self.generic_context,
-            inherited_generic_context: self.inherited_generic_context,
+            generic_context: self.generic_context.map(|ctx| ctx.normalized(db)),
+            inherited_generic_context: self.inherited_generic_context.map(|ctx| ctx.normalized(db)),
             parameters: self
                 .parameters
                 .iter()

@@ -24,9 +24,7 @@ class:
 
 ```py
 class Bad(Generic[T], Generic[T]): ...  # error: [duplicate-base]
-
-# TODO: should emit an error (fails at runtime)
-class AlsoBad(Generic[T], Generic[S]): ...
+class AlsoBad(Generic[T], Generic[S]): ...  # error: [duplicate-base]
 ```
 
 You cannot use the same typevar more than once.

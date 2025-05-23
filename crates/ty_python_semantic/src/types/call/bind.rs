@@ -611,8 +611,12 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(match ty {
                                     Type::ModuleLiteral(module_literal) => {
-                                        match dunder_all_names(db, module_literal.module(db).file())
-                                        {
+                                        let all_names = module_literal
+                                            .module(db)
+                                            .file()
+                                            .map(|file| dunder_all_names(db, file))
+                                            .unwrap_or_default();
+                                        match all_names {
                                             Some(names) => {
                                                 let mut names = names.iter().collect::<Vec<_>>();
                                                 names.sort();

@@ -173,7 +173,7 @@ if hasattr(DoesNotExist, "__mro__"):
 if not isinstance(DoesNotExist, type):
     reveal_type(DoesNotExist)  # revealed: Unknown & ~type
 
-    class Foo(DoesNotExist): ...  # error: [invalid-base]
+    class Foo(DoesNotExist): ...  # error: [unsupported-base]
     reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
 ```
 
@@ -232,11 +232,15 @@ reveal_type(AA.__mro__)  # revealed: tuple[<class 'AA'>, <class 'Z'>, Unknown, <
 
 ## `__bases__` includes a `Union`
 
+<!-- snapshot-diagnostics -->
+
 We don't support union types in a class's bases; a base must resolve to a single `ClassType`. If we
 find a union type in a class's bases, we infer the class's `__mro__` as being
 `[<class>, Unknown, object]`, the same as for MROs that cause errors at runtime.
 
 ```py
+from typing_extensions import reveal_type
+
 def returns_bool() -> bool:
     return True
 
@@ -250,7 +254,7 @@ else:
 
 reveal_type(x)  # revealed: <class 'A'> | <class 'B'>
 
-# error: 11 [invalid-base] "Invalid class base with type `<class 'A'> | <class 'B'>` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 11 [unsupported-base] "Unsupported class base with type `<class 'A'> | <class 'B'>`"
 class Foo(x): ...
 
 reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
@@ -259,8 +263,8 @@ reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'obje
 ## `__bases__` is a union of a dynamic type and valid bases
 
 If a dynamic type such as `Any` or `Unknown` is one of the elements in the union, and all other
-types *would be* valid class bases, we do not emit an `invalid-base` diagnostic and use the dynamic
-type as a base to prevent further downstream errors.
+types *would be* valid class bases, we do not emit an `invalid-base` or `unsupported-base`
+diagnostic, and we use the dynamic type as a base to prevent further downstream errors.
 
 ```py
 from typing import Any
@@ -299,8 +303,8 @@ else:
 reveal_type(x)  # revealed: <class 'A'> | <class 'B'>
 reveal_type(y)  # revealed: <class 'C'> | <class 'D'>
 
-# error: 11 [invalid-base] "Invalid class base with type `<class 'A'> | <class 'B'>` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
-# error: 14 [invalid-base] "Invalid class base with type `<class 'C'> | <class 'D'>` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 11 [unsupported-base] "Unsupported class base with type `<class 'A'> | <class 'B'>`"
+# error: 14 [unsupported-base] "Unsupported class base with type `<class 'C'> | <class 'D'>`"
 class Foo(x, y): ...
 
 reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
@@ -321,7 +325,7 @@ if returns_bool():
 else:
     foo = object
 
-# error: 21 [invalid-base] "Invalid class base with type `<class 'Y'> | <class 'object'>` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 21 [unsupported-base] "Unsupported class base with type `<class 'Y'> | <class 'object'>`"
 class PossibleError(foo, X): ...
 
 reveal_type(PossibleError.__mro__)  # revealed: tuple[<class 'PossibleError'>, Unknown, <class 'object'>]
@@ -339,10 +343,45 @@ else:
 # revealed: tuple[<class 'B'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>] | tuple[<class 'B'>, <class 'Y'>, <class 'X'>, <class 'O'>, <class 'object'>]
 reveal_type(B.__mro__)
 
-# error: 12 [invalid-base] "Invalid class base with type `<class 'B'> | <class 'B'>` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 12 [unsupported-base] "Unsupported class base with type `<class 'B'> | <class 'B'>`"
 class Z(A, B): ...
 
 reveal_type(Z.__mro__)  # revealed: tuple[<class 'Z'>, Unknown, <class 'object'>]
+```
+
+## `__bases__` lists that include objects that are not instances of `type`
+
+<!-- snapshot-diagnostics -->
+
+```py
+class Foo(2): ...  # error: [invalid-base]
+```
+
+A base that is not an instance of `type` but does have an `__mro_entries__` method will not raise an
+exception at runtime, so we issue `unsupported-base` rather than `invalid-base`:
+
+```py
+class Foo:
+    def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
+        return ()
+
+class Bar(Foo()): ...  # error: [unsupported-base]
+```
+
+But for objects that have badly defined `__mro_entries__`, `invalid-base` is emitted rather than
+`unsupported-base`:
+
+```py
+class Bad1:
+    def __mro_entries__(self, bases, extra_arg):
+        return ()
+
+class Bad2:
+    def __mro_entries__(self, bases) -> int:
+        return 42
+
+class BadSub1(Bad1()): ...  # error: [invalid-base]
+class BadSub2(Bad2()): ...  # error: [invalid-base]
 ```
 
 ## `__bases__` lists with duplicate bases
@@ -486,6 +525,45 @@ from does_not_exist import unknown_object  # error: [unresolved-import]
 
 reveal_type(unknown_object)  # revealed: Unknown
 reveal_type(unknown_object.__mro__)  # revealed: Unknown
+```
+
+## MROs of classes that use multiple inheritance with generic aliases and subscripted `Generic`
+
+```py
+from typing import Generic, TypeVar, Iterator
+
+T = TypeVar("T")
+
+class peekable(Generic[T], Iterator[T]): ...
+
+# revealed: tuple[<class 'peekable[Unknown]'>, <class 'Iterator[T]'>, <class 'Iterable[T]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_type(peekable.__mro__)
+
+class peekable2(Iterator[T], Generic[T]): ...
+
+# revealed: tuple[<class 'peekable2[Unknown]'>, <class 'Iterator[T]'>, <class 'Iterable[T]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_type(peekable2.__mro__)
+
+class Base: ...
+class Intermediate(Base, Generic[T]): ...
+class Sub(Intermediate[T], Base): ...
+
+# revealed: tuple[<class 'Sub[Unknown]'>, <class 'Intermediate[T]'>, <class 'Base'>, typing.Generic, <class 'object'>]
+reveal_type(Sub.__mro__)
+```
+
+## Unresolvable MROs involving generics have the original bases reported in the error message, not the resolved bases
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing_extensions import Protocol, TypeVar, Generic
+
+T = TypeVar("T")
+
+class Foo(Protocol): ...
+class Bar(Protocol[T]): ...
+class Baz(Protocol[T], Foo, Bar[T]): ...  # error: [inconsistent-mro]
 ```
 
 ## Classes that inherit from themselves

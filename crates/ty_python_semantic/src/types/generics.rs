@@ -18,7 +18,12 @@ use crate::{Db, FxOrderSet};
 ///
 /// TODO: Handle nested generic contexts better, with actual parent links to the lexically
 /// containing context.
+///
+/// # Ordering
+/// Ordering is based on the context's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the context was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub struct GenericContext<'db> {
     #[returns(ref)]
     pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
@@ -231,6 +236,15 @@ impl<'db> GenericContext<'db> {
         }
 
         Specialization::new(db, self, expanded.into_boxed_slice())
+    }
+
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        let variables: FxOrderSet<_> = self
+            .variables(db)
+            .iter()
+            .map(|ty| ty.normalized(db))
+            .collect();
+        Self::new(db, variables, self.origin(db))
     }
 }
 
@@ -554,6 +568,16 @@ impl<'db> PartialSpecialization<'_, 'db> {
         PartialSpecialization {
             generic_context: self.generic_context,
             types: Cow::from(self.types.clone().into_owned()),
+        }
+    }
+
+    pub(crate) fn normalized(&self, db: &'db dyn Db) -> PartialSpecialization<'db, 'db> {
+        let generic_context = self.generic_context.normalized(db);
+        let types: Cow<_> = self.types.iter().map(|ty| ty.normalized(db)).collect();
+
+        PartialSpecialization {
+            generic_context,
+            types,
         }
     }
 }

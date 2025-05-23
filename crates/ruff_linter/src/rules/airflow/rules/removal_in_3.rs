@@ -190,24 +190,12 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
     match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
             // with replacement
-            checker.report_diagnostics(diagnostic_for_argument(
-                arguments,
-                "fail_stop",
-                Some("fail_fast"),
-            ));
-            checker.report_diagnostics(diagnostic_for_argument(
-                arguments,
-                "schedule_interval",
-                Some("schedule"),
-            ));
-            checker.report_diagnostics(diagnostic_for_argument(
-                arguments,
-                "timetable",
-                Some("schedule"),
-            ));
+            diagnostic_for_argument(checker, arguments, "fail_stop", Some("fail_fast"));
+            diagnostic_for_argument(checker, arguments, "schedule_interval", Some("schedule"));
+            diagnostic_for_argument(checker, arguments, "timetable", Some("schedule"));
             // without replacement
-            checker.report_diagnostics(diagnostic_for_argument(arguments, "default_view", None));
-            checker.report_diagnostics(diagnostic_for_argument(arguments, "orientation", None));
+            diagnostic_for_argument(checker, arguments, "default_view", None);
+            diagnostic_for_argument(checker, arguments, "orientation", None);
         }
         segments => {
             if is_airflow_auth_manager(segments) {
@@ -223,17 +211,14 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                     ));
                 }
             } else if is_airflow_task_handler(segments) {
-                checker.report_diagnostics(diagnostic_for_argument(
-                    arguments,
-                    "filename_template",
-                    None,
-                ));
+                diagnostic_for_argument(checker, arguments, "filename_template", None);
             } else if is_airflow_builtin_or_provider(segments, "operators", "Operator") {
-                checker.report_diagnostics(diagnostic_for_argument(
+                diagnostic_for_argument(
+                    checker,
                     arguments,
                     "task_concurrency",
                     Some("max_active_tis_per_dag"),
-                ));
+                );
                 match segments {
                     [
                         "airflow",
@@ -242,11 +227,12 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                         "trigger_dagrun",
                         "TriggerDagRunOperator",
                     ] => {
-                        checker.report_diagnostics(diagnostic_for_argument(
+                        diagnostic_for_argument(
+                            checker,
                             arguments,
                             "execution_date",
                             Some("logical_date"),
-                        ));
+                        );
                     }
                     [
                         "airflow",
@@ -263,11 +249,12 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                         "BranchDayOfWeekOperator",
                     ]
                     | ["airflow", .., "sensors", "weekday", "DayOfWeekSensor"] => {
-                        checker.report_diagnostics(diagnostic_for_argument(
+                        diagnostic_for_argument(
+                            checker,
                             arguments,
                             "use_task_execution_day",
                             Some("use_task_logical_date"),
-                        ));
+                        );
                     }
                     _ => {}
                 }
@@ -1057,11 +1044,14 @@ fn check_airflow_plugin_extension(
 /// Check if the `deprecated` keyword argument is being used and create a diagnostic if so along
 /// with a possible `replacement`.
 fn diagnostic_for_argument(
+    checker: &Checker,
     arguments: &Arguments,
     deprecated: &str,
     replacement: Option<&'static str>,
-) -> Option<Diagnostic> {
-    let keyword = arguments.find_keyword(deprecated)?;
+) {
+    let Some(keyword) = arguments.find_keyword(deprecated) else {
+        return;
+    };
     let mut diagnostic = Diagnostic::new(
         Airflow3Removal {
             deprecated: deprecated.to_string(),
@@ -1083,7 +1073,7 @@ fn diagnostic_for_argument(
         )));
     }
 
-    Some(diagnostic)
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Check whether the symbol is coming from the `secrets` builtin or provider module which ends

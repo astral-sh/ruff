@@ -158,9 +158,9 @@ mod tests {
     use crate::db::tests::TestDb;
 
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
-    use ruff_python_ast::PythonVersion;
     use ty_python_semantic::{
-        Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
+        Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionWithSource,
+        SearchPathSettings,
     };
 
     pub(super) fn inlay_hint_test(source: &str) -> InlayHintTest {
@@ -191,7 +191,7 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersion::latest_ty(),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
