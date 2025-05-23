@@ -6537,6 +6537,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         intersection_on: IntersectionOn,
         range: TextRange,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
+        enum State<'db> {
+            // We have not seen any positive elements (yet)
+            NoPositiveElements,
+            // The operator was unsupported on all elements that we have seen so far.
+            // Contains the first error we encountered.
+            UnsupportedOnAllElements(CompareUnsupportedError<'db>),
+            // The operator was supported on at least one positive element.
+            Supported,
+        }
+
         // If a comparison yields a definitive true/false answer on a (positive) part
         // of an intersection type, it will also yield a definitive answer on the full
         // intersection type, which is even more specific.
@@ -6546,8 +6556,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 IntersectionOn::Right => self.infer_binary_type_comparison(other, op, *pos, range),
             };
 
-            if let Ok(Type::BooleanLiteral(b)) = result {
-                return Ok(Type::BooleanLiteral(b));
+            if let Ok(Type::BooleanLiteral(_)) = result {
+                return result;
             }
         }
 
@@ -6616,8 +6626,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         builder = builder.add_positive(KnownClass::Bool.to_instance(self.db()));
 
-        let mut has_success = None;
-        let mut first_error = None;
+        let mut state = State::NoPositiveElements;
 
         for pos in intersection.positive(self.db()) {
             let result = match intersection_on {
@@ -6627,36 +6636,44 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             match result {
                 Ok(ty) => {
-                    has_success = Some(true);
+                    state = State::Supported;
                     builder = builder.add_positive(ty);
                 }
                 Err(error) => {
-                    has_success = has_success.or(Some(false));
-                    first_error = first_error.or(Some(error));
+                    match state {
+                        State::NoPositiveElements => {
+                            // This is the first positive element, but the operation is not supported.
+                            // Store the error and continue.
+                            state = State::UnsupportedOnAllElements(error);
+                        }
+                        State::UnsupportedOnAllElements(_) => {
+                            // We already have an error stored, and continue to see elements on which
+                            // the operator is not supported. Continue with the same state (only keep
+                            // the first error).
+                        }
+                        State::Supported => {
+                            // We previously saw a positive element that supported the operator,
+                            // so the overall operation is still supported.
+                        }
+                    }
                 }
             }
         }
 
-        match has_success {
-            Some(true) | None => Ok(builder.build()),
-            Some(false) => match first_error {
-                Some(error) => Err(error),
-                None => {
-                    // This should be unreachable
-                    debug_assert!(false);
-
-                    let (left_ty, right_ty) = match intersection_on {
-                        IntersectionOn::Left => (Type::Intersection(intersection), other),
-                        IntersectionOn::Right => (other, Type::Intersection(intersection)),
-                    };
-
-                    Err(CompareUnsupportedError {
-                        op,
-                        left_ty,
-                        right_ty,
-                    })
+        match state {
+            State::Supported => Ok(builder.build()),
+            State::NoPositiveElements => {
+                // We didn't see any positive elements, check if the operation is supported on `object`:
+                match intersection_on {
+                    IntersectionOn::Left => {
+                        self.infer_binary_type_comparison(Type::object(self.db()), op, other, range)
+                    }
+                    IntersectionOn::Right => {
+                        self.infer_binary_type_comparison(other, op, Type::object(self.db()), range)
+                    }
                 }
-            },
+            }
+            State::UnsupportedOnAllElements(error) => Err(error),
         }
     }
 
