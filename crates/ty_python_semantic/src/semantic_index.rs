@@ -519,7 +519,7 @@ pub struct ChildrenIter<'a> {
 }
 
 impl<'a> ChildrenIter<'a> {
-    fn new(module_symbol_table: &'a SemanticIndex, parent: FileScopeId) -> Self {
+    pub(crate) fn new(module_symbol_table: &'a SemanticIndex, parent: FileScopeId) -> Self {
         let descendants = DescendantsIter::new(module_symbol_table, parent);
 
         Self {
