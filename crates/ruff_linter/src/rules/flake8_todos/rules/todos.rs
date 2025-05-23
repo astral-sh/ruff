@@ -3,12 +3,12 @@ use std::sync::LazyLock;
 use regex::RegexSet;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use crate::directives::{TodoComment, TodoDirective, TodoDirectiveKind};
 use crate::Locator;
+use crate::directives::{TodoComment, TodoDirective, TodoDirectiveKind};
 
 /// ## What it does
 /// Checks that a TODO comment is labelled with "TODO".
@@ -299,7 +299,7 @@ pub(crate) fn todos(
                 has_issue_link = true;
             }
 
-            // If the next_comment isn't a tag or an issue, it's worthles in the context of this
+            // If the next_comment isn't a tag or an issue, it's worthless in the context of this
             // linter. We can increment here instead of waiting for the next iteration of the outer
             // loop.
             curr_range = next_range;

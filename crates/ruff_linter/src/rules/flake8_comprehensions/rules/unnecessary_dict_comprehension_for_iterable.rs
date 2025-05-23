@@ -1,6 +1,6 @@
 use ast::ExprName;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprCall, ExprContext};
@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// Prefer `dict.fromkeys(iterable)` over `{value: None for value in iterable}`,
 /// as `dict.fromkeys` is more readable and efficient.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// {a: None for a in iterable}
 /// {a: 1 for a in iterable}

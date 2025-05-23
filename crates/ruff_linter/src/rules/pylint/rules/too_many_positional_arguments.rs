@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, identifier::Identifier};
 use ruff_python_semantic::analyze::{function_type, visibility};
 
@@ -97,7 +97,9 @@ pub(crate) fn too_many_positional_arguments(
             &checker.settings.pep8_naming.classmethod_decorators,
             &checker.settings.pep8_naming.staticmethod_decorators,
         ),
-        function_type::FunctionType::Method | function_type::FunctionType::ClassMethod
+        function_type::FunctionType::Method
+            | function_type::FunctionType::ClassMethod
+            | function_type::FunctionType::NewMethod
     ) {
         // If so, we need to subtract one from the number of positional arguments, since the first
         // argument is always `self` or `cls`.

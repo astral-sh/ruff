@@ -11,7 +11,7 @@ use ruff_linter::source_kind::SourceKind;
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{
-    match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile,
+    PyprojectConfig, ResolvedFile, match_exclusion, python_files_in_path,
 };
 
 use crate::args::ConfigArguments;
@@ -26,7 +26,7 @@ pub(crate) fn add_noqa(
     let start = Instant::now();
     let (paths, resolver) = python_files_in_path(files, pyproject_config, config_arguments)?;
     let duration = start.elapsed();
-    debug!("Identified files to lint in: {:?}", duration);
+    debug!("Identified files to lint in: {duration:?}");
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
@@ -87,7 +87,7 @@ pub(crate) fn add_noqa(
         .sum();
 
     let duration = start.elapsed();
-    debug!("Added noqa to files in: {:?}", duration);
+    debug!("Added noqa to files in: {duration:?}");
 
     Ok(modifications)
 }

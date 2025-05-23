@@ -1,0 +1,81 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+sys_exit_alias_16.py:3:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
+  |
+1 | def test_case_1():
+2 |     # comments preserved with a positional argument
+3 |     exit(  # comment
+  |     ^^^^ PLR1722
+4 |         1,  # 2
+5 |     )  # 3
+  |
+  = help: Replace `exit` with `sys.exit()`
+
+ℹ Unsafe fix
+  1 |+import sys
+1 2 | def test_case_1():
+2 3 |     # comments preserved with a positional argument
+3   |-    exit(  # comment
+  4 |+    sys.exit(  # comment
+4 5 |         1,  # 2
+5 6 |     )  # 3
+6 7 | 
+
+sys_exit_alias_16.py:10:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
+   |
+ 8 | def test_case_2():
+ 9 |     # comments preserved with a single keyword argument
+10 |     exit(  # comment
+   |     ^^^^ PLR1722
+11 |         code=1,  # 2
+12 |     )  # 3
+   |
+   = help: Replace `exit` with `sys.exit()`
+
+ℹ Unsafe fix
+   1  |+import sys
+1  2  | def test_case_1():
+2  3  |     # comments preserved with a positional argument
+3  4  |     exit(  # comment
+--------------------------------------------------------------------------------
+7  8  | 
+8  9  | def test_case_2():
+9  10 |     # comments preserved with a single keyword argument
+10    |-    exit(  # comment
+11    |-        code=1,  # 2
+   11 |+    sys.exit(  # comment
+   12 |+        1,  # 2
+12 13 |     )  # 3
+13 14 | 
+14 15 | 
+
+sys_exit_alias_16.py:17:5: PLR1722 Use `sys.exit()` instead of `exit`
+   |
+15 | def test_case_3():
+16 |     # no diagnostic for multiple arguments
+17 |     exit(2, 3, 4)
+   |     ^^^^ PLR1722
+   |
+   = help: Replace `exit` with `sys.exit()`
+
+sys_exit_alias_16.py:23:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
+   |
+21 |     # this should now be fixable
+22 |     codes = [1]
+23 |     exit(*codes)
+   |     ^^^^ PLR1722
+   |
+   = help: Replace `exit` with `sys.exit()`
+
+ℹ Unsafe fix
+   1  |+import sys
+1  2  | def test_case_1():
+2  3  |     # comments preserved with a positional argument
+3  4  |     exit(  # comment
+--------------------------------------------------------------------------------
+20 21 | def test_case_4():
+21 22 |     # this should now be fixable
+22 23 |     codes = [1]
+23    |-    exit(*codes)
+   24 |+    sys.exit(*codes)

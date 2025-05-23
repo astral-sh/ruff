@@ -2,11 +2,11 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Number, Operator, Pattern, Singleton};
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::ParseErrorType;
 use crate::parser::progress::ParserProgress;
-use crate::parser::{recovery, Parser, RecoveryContextKind, SequenceMatchPatternParentheses};
+use crate::parser::{Parser, RecoveryContextKind, SequenceMatchPatternParentheses, recovery};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::ParseErrorType;
 
 use super::expression::ExpressionContext;
 
@@ -488,13 +488,16 @@ impl Parser<'_> {
                         // test_ok match_as_pattern_soft_keyword
                         // match foo:
                         //     case case: ...
+                        // match foo:
                         //     case match: ...
+                        // match foo:
                         //     case type: ...
                         let ident = self.parse_identifier();
 
                         // test_ok match_as_pattern
                         // match foo:
                         //     case foo_bar: ...
+                        // match foo:
                         //     case _: ...
                         Pattern::MatchAs(ast::PatternMatchAs {
                             range: ident.range,

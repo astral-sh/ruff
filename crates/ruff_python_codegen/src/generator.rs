@@ -1070,12 +1070,14 @@ impl<'a> Generator<'a> {
                 self.unparse_expr(func, precedence::MAX);
                 self.p("(");
                 if let (
-                    [Expr::Generator(ast::ExprGenerator {
-                        elt,
-                        generators,
-                        range: _,
-                        parenthesized: _,
-                    })],
+                    [
+                        Expr::Generator(ast::ExprGenerator {
+                            elt,
+                            generators,
+                            range: _,
+                            parenthesized: _,
+                        }),
+                    ],
                     [],
                 ) = (arguments.args.as_ref(), arguments.keywords.as_ref())
                 {
@@ -1170,7 +1172,7 @@ impl<'a> Generator<'a> {
                 } else {
                     self.unparse_expr(value, precedence::MAX);
                     self.p(".");
-                };
+                }
                 self.p_id(attr);
             }
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
@@ -1365,7 +1367,7 @@ impl<'a> Generator<'a> {
 
         if !conversion.is_none() {
             self.p("!");
-            #[allow(clippy::cast_possible_truncation)]
+
             self.p(&format!("{}", conversion as u8 as char));
         }
 
@@ -1435,7 +1437,7 @@ impl<'a> Generator<'a> {
 #[cfg(test)]
 mod tests {
     use ruff_python_ast::{Mod, ModModule};
-    use ruff_python_parser::{self, parse_module, Mode};
+    use ruff_python_parser::{self, Mode, ParseOptions, parse_module};
     use ruff_source_file::LineEnding;
 
     use crate::stylist::Indentation;
@@ -1467,7 +1469,8 @@ mod tests {
     fn jupyter_round_trip(contents: &str) -> String {
         let indentation = Indentation::default();
         let line_ending = LineEnding::default();
-        let parsed = ruff_python_parser::parse(contents, Mode::Ipython).unwrap();
+        let parsed =
+            ruff_python_parser::parse(contents, ParseOptions::from(Mode::Ipython)).unwrap();
         let Mod::Module(ModModule { body, .. }) = parsed.into_syntax() else {
             panic!("Source code didn't return ModModule")
         };

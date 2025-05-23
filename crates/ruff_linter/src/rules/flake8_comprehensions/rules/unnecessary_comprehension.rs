@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Comprehension, Expr};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -15,7 +15,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// It's unnecessary to use a dict/list/set comprehension to build a data structure if the
 /// elements are unchanged. Wrap the iterable with `dict()`, `list()`, or `set()` instead.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// {a: b for a, b in iterable}
 /// [x for x in iterable]
@@ -115,9 +115,12 @@ pub(crate) fn unnecessary_dict_comprehension(
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = &generator.target else {
         return;
     };
-    let [Expr::Name(ast::ExprName { id: target_key, .. }), Expr::Name(ast::ExprName {
-        id: target_value, ..
-    })] = elts.as_slice()
+    let [
+        Expr::Name(ast::ExprName { id: target_key, .. }),
+        Expr::Name(ast::ExprName {
+            id: target_value, ..
+        }),
+    ] = elts.as_slice()
     else {
         return;
     };
@@ -158,14 +161,19 @@ pub(crate) fn unnecessary_list_set_comprehension(
                 }),
                 Expr::Tuple(ast::ExprTuple { elts, .. }),
             ) => {
-                let [Expr::Name(ast::ExprName { id: target_key, .. }), Expr::Name(ast::ExprName {
-                    id: target_value, ..
-                })] = target_elts.as_slice()
+                let [
+                    Expr::Name(ast::ExprName { id: target_key, .. }),
+                    Expr::Name(ast::ExprName {
+                        id: target_value, ..
+                    }),
+                ] = target_elts.as_slice()
                 else {
                     return;
                 };
-                let [Expr::Name(ast::ExprName { id: key, .. }), Expr::Name(ast::ExprName { id: value, .. })] =
-                    elts.as_slice()
+                let [
+                    Expr::Name(ast::ExprName { id: key, .. }),
+                    Expr::Name(ast::ExprName { id: value, .. }),
+                ] = elts.as_slice()
                 else {
                     return;
                 };

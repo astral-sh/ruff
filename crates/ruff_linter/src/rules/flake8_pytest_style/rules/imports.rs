@@ -1,7 +1,7 @@
 use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -59,7 +59,7 @@ pub(crate) fn import_from(
     // If level is not zero or module is none, return
     if level != 0 {
         return None;
-    };
+    }
 
     if let Some(module) = module {
         if is_pytest_or_subpackage(module) {
@@ -68,7 +68,7 @@ pub(crate) fn import_from(
                 import_from.range(),
             ));
         }
-    };
+    }
 
     None
 }

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::{Scope, SemanticModel};
@@ -26,9 +26,8 @@ use crate::fix;
 /// _Ts = typing_extensions.TypeVarTuple("_Ts")
 /// ```
 ///
-/// ## Fix safety and availability
-/// This rule's fix is available when [`preview`] mode is enabled.
-/// It is always marked as unsafe, as it would break your code if the type
+/// ## Fix safety
+/// The fix is always marked as unsafe, as it would break your code if the type
 /// variable is imported by another module.
 #[derive(ViolationMetadata)]
 pub(crate) struct UnusedPrivateTypeVar {
@@ -225,18 +224,19 @@ pub(crate) fn unused_private_type_var(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let diagnostic = Diagnostic::new(
             UnusedPrivateTypeVar {
                 type_var_like_name: id.to_string(),
                 type_var_like_kind: type_var_like_kind.to_string(),
             },
             binding.range(),
-        );
-
-        if checker.settings.preview.is_enabled() {
-            let edit = fix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
-            diagnostic.set_fix(Fix::unsafe_edit(edit));
-        }
+        )
+        .with_fix(Fix::unsafe_edit(fix::edits::delete_stmt(
+            stmt,
+            None,
+            checker.locator(),
+            checker.indexer(),
+        )));
 
         checker.report_diagnostic(diagnostic);
     }
@@ -405,11 +405,7 @@ fn extract_typeddict_name<'a>(stmt: &'a Stmt, semantic: &SemanticModel) -> Optio
             };
             let ast::ExprName { id, .. } = target.as_name_expr()?;
             let ast::ExprCall { func, .. } = value.as_call_expr()?;
-            if is_typeddict(func) {
-                Some(id)
-            } else {
-                None
-            }
+            if is_typeddict(func) { Some(id) } else { None }
         }
         _ => None,
     }

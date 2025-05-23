@@ -1,19 +1,17 @@
 use std::collections::HashSet;
 
-use anyhow::Result;
-
-use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, ExprTuple, Operator};
+use ruff_python_ast::{Expr, ExprBinOp, Operator, PythonVersion};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
+
+use super::generate_union_fix;
 
 /// ## What it does
 /// Checks for duplicate union members.
@@ -117,7 +115,19 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
                 applicability,
             )),
             UnionKind::TypingUnion => {
-                generate_union_fix(checker, unique_nodes, expr, applicability).ok()
+                // Request `typing.Union`
+                let Some(importer) = checker.typing_importer("Union", PythonVersion::lowest())
+                else {
+                    return;
+                };
+                generate_union_fix(
+                    checker.generator(),
+                    &importer,
+                    unique_nodes,
+                    expr,
+                    applicability,
+                )
+                .ok()
             }
         }
     };
@@ -129,7 +139,9 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
     }
 
     // Add all diagnostics to the checker
-    checker.report_diagnostics(diagnostics);
+    for diagnostic in diagnostics {
+        checker.report_diagnostic(diagnostic);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -169,44 +181,4 @@ fn generate_pep604_fix(
         Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range()),
         applicability,
     )
-}
-
-/// Generate a [`Fix`] for two or more type expressions, e.g. `typing.Union[int, float, complex]`.
-fn generate_union_fix(
-    checker: &Checker,
-    nodes: Vec<&Expr>,
-    annotation: &Expr,
-    applicability: Applicability,
-) -> Result<Fix> {
-    debug_assert!(nodes.len() >= 2, "At least two nodes required");
-
-    // Request `typing.Union`
-    let (import_edit, binding) = checker.importer().get_or_import_symbol(
-        &ImportRequest::import_from("typing", "Union"),
-        annotation.start(),
-        checker.semantic(),
-    )?;
-
-    // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
-    let new_expr = Expr::Subscript(ExprSubscript {
-        range: TextRange::default(),
-        value: Box::new(Expr::Name(ExprName {
-            id: Name::new(binding),
-            ctx: ExprContext::Store,
-            range: TextRange::default(),
-        })),
-        slice: Box::new(Expr::Tuple(ExprTuple {
-            elts: nodes.into_iter().cloned().collect(),
-            range: TextRange::default(),
-            ctx: ExprContext::Load,
-            parenthesized: false,
-        })),
-        ctx: ExprContext::Load,
-    });
-
-    Ok(Fix::applicable_edits(
-        Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range()),
-        [import_edit],
-        applicability,
-    ))
 }

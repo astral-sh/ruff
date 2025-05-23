@@ -1,19 +1,21 @@
+use std::fmt::Write;
+
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Parameter};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
-use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
 use crate::Locator;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for uses of mutable objects as function argument defaults.
@@ -131,7 +133,7 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
 
 /// Generate a [`Fix`] to move a mutable argument default initialization
 /// into the function body.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn move_initialization(
     function_def: &ast::StmtFunctionDef,
     parameter: &Parameter,
@@ -160,14 +162,15 @@ fn move_initialization(
 
     // Add an `if`, to set the argument to its original value if still `None`.
     let mut content = String::new();
-    content.push_str(&format!("if {} is None:", parameter.name()));
+    let _ = write!(&mut content, "if {} is None:", parameter.name());
     content.push_str(stylist.line_ending().as_str());
     content.push_str(stylist.indentation());
-    content.push_str(&format!(
+    let _ = write!(
+        &mut content,
         "{} = {}",
         parameter.name(),
         generator.expr(default)
-    ));
+    );
     content.push_str(stylist.line_ending().as_str());
 
     // Determine the indentation depth of the function body.
@@ -204,7 +207,7 @@ fn move_initialization(
             }
         } else {
             break;
-        };
+        }
     }
 
     let initialization_edit = Edit::insertion(content, pos);

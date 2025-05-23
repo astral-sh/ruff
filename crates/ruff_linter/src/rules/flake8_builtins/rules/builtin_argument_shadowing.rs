@@ -1,6 +1,6 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, Parameter};
 use ruff_python_semantic::analyze::visibility::{is_overload, is_override};
 use ruff_text_size::Ranged;
@@ -19,7 +19,7 @@ use super::super::helpers::shadows_builtin;
 /// builtin and vice versa.
 ///
 /// Builtins can be marked as exceptions to this rule via the
-/// [`lint.flake8-builtins.builtins-ignorelist`] configuration option.
+/// [`lint.flake8-builtins.ignorelist`] configuration option.
 ///
 /// ## Example
 /// ```python
@@ -44,7 +44,7 @@ use super::super::helpers::shadows_builtin;
 /// ```
 ///
 /// ## Options
-/// - `lint.flake8-builtins.builtins-ignorelist`
+/// - `lint.flake8-builtins.ignorelist`
 ///
 /// ## References
 /// - [_Is it bad practice to use a built-in function name as an attribute or method identifier?_](https://stackoverflow.com/questions/9109333/is-it-bad-practice-to-use-a-built-in-function-name-as-an-attribute-or-method-ide)
@@ -67,8 +67,8 @@ pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Paramete
     if shadows_builtin(
         parameter.name(),
         checker.source_type,
-        &checker.settings.flake8_builtins.builtins_ignorelist,
-        checker.settings.target_version,
+        &checker.settings.flake8_builtins.ignorelist,
+        checker.target_version(),
     ) {
         // Ignore parameters in lambda expressions.
         // (That is the domain of A006.)

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprCall};
 use ruff_python_semantic::Modules;
 use ruff_text_size::{Ranged, TextRange};
@@ -78,7 +78,7 @@ pub(crate) fn sync_call(checker: &Checker, call: &ExprCall) {
         .is_some_and(Expr::is_await_expr)
     {
         return;
-    };
+    }
 
     let mut diagnostic = Diagnostic::new(TrioSyncCall { method_name }, call.range);
     if checker.semantic().in_async_context() {

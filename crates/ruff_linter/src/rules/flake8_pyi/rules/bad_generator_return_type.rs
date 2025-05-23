@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
@@ -209,7 +209,7 @@ pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, che
                 _ => return,
             }
         }
-    };
+    }
     let mut diagnostic = Diagnostic::new(
         GeneratorReturnFromIterMethod {
             return_type: member.to_iter(),

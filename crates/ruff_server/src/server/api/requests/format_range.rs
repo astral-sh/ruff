@@ -1,10 +1,10 @@
 use anyhow::Context;
-use lsp_types::{self as types, request as req, Range};
+use lsp_types::{self as types, Range, request as req};
 
 use crate::edit::{RangeExt, ToRangeExt};
 use crate::resolve::is_document_excluded_for_formatting;
 use crate::server::api::LSPResult;
-use crate::server::{client::Notifier, Result};
+use crate::server::{Result, client::Notifier};
 use crate::session::{DocumentQuery, DocumentSnapshot};
 use crate::{PositionEncoding, TextDocument};
 
@@ -49,9 +49,10 @@ fn format_text_document_range(
     let settings = query.settings();
 
     // If the document is excluded, return early.
-    if let Some(file_path) = query.file_path() {
+    let file_path = query.file_path();
+    if let Some(file_path) = &file_path {
         if is_document_excluded_for_formatting(
-            &file_path,
+            file_path,
             &settings.file_resolver,
             &settings.formatter,
             text_document.language_id(),
@@ -68,6 +69,7 @@ fn format_text_document_range(
         query.source_type(),
         &settings.formatter,
         range,
+        file_path.as_deref(),
     )
     .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 

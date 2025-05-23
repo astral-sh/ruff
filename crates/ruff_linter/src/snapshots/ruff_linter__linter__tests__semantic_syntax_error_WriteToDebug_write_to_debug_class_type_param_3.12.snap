@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+<filename>:2:15: SyntaxError: cannot assign to `__debug__`
+  |
+2 | class Generic[__debug__]:
+  |               ^^^^^^^^^
+3 |     pass
+  |

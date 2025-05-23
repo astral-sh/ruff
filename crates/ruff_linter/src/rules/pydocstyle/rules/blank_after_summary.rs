@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::Ranged;
 
@@ -69,7 +69,7 @@ impl Violation for MissingBlankLineAfterSummary {
 pub(crate) fn blank_after_summary(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
-    if !docstring.triple_quoted() {
+    if !docstring.is_triple_quoted() {
         return;
     }
 

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextSize};
 
@@ -39,6 +39,11 @@ use crate::checkers::ast::Checker;
 ///     def bar(self):
 ///         super().foo()
 /// ```
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing the arguments from a call
+/// may delete comments that are attached to the arguments.
 ///
 /// ## References
 /// - [Python documentation: `super`](https://docs.python.org/3/library/functions.html#super)

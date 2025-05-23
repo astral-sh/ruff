@@ -3,17 +3,16 @@ use std::fmt::{Debug, Write};
 use insta::assert_snapshot;
 
 use ruff_python_ast::visitor::{
-    walk_alias, walk_bytes_literal, walk_comprehension, walk_except_handler, walk_expr,
+    Visitor, walk_alias, walk_bytes_literal, walk_comprehension, walk_except_handler, walk_expr,
     walk_f_string, walk_f_string_element, walk_keyword, walk_match_case, walk_parameter,
     walk_parameters, walk_pattern, walk_stmt, walk_string_literal, walk_type_param, walk_with_item,
-    Visitor,
 };
 use ruff_python_ast::{
     self as ast, Alias, AnyNodeRef, BoolOp, BytesLiteral, CmpOp, Comprehension, ExceptHandler,
     Expr, FString, FStringElement, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
     Stmt, StringLiteral, TypeParam, UnaryOp, WithItem,
 };
-use ruff_python_parser::{parse, Mode};
+use ruff_python_parser::{Mode, ParseOptions, parse};
 
 #[test]
 fn function_arguments() {
@@ -156,7 +155,7 @@ fn f_strings() {
 }
 
 fn trace_visitation(source: &str) -> String {
-    let parsed = parse(source, Mode::Module).unwrap();
+    let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
 
     let mut visitor = RecordVisitor::default();
     walk_module(&mut visitor, parsed.syntax());

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
 use ruff_python_semantic::analyze::typing::traverse_union;
@@ -26,6 +26,22 @@ use crate::checkers::ast::Checker;
 /// from typing import Literal
 ///
 /// field: Literal[1, 2] | str
+/// ```
+///
+/// ## Fix safety
+/// This fix is marked unsafe if it would delete any comments within the replacement range.
+///
+/// An example to illustrate where comments are preserved and where they are not:
+///
+/// ```pyi
+/// from typing import Literal
+///
+/// field: (
+///     # deleted comment
+///     Literal["a", "b"]  # deleted comment
+///     # deleted comment
+///     | Literal["c", "d"]  # preserved comment
+/// )
 /// ```
 ///
 /// ## References
@@ -131,12 +147,8 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
             ctx: ExprContext::Load,
         });
 
-        if other_exprs.is_empty() {
-            // if the union is only literals, we just replace the whole thing with a single literal
-            Fix::safe_edit(Edit::range_replacement(
-                checker.generator().expr(&literal),
-                expr.range(),
-            ))
+        let edit = if other_exprs.is_empty() {
+            Edit::range_replacement(checker.generator().expr(&literal), expr.range())
         } else {
             let elts: Vec<Expr> = std::iter::once(literal)
                 .chain(other_exprs.into_iter().cloned())
@@ -159,8 +171,13 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
             } else {
                 checker.generator().expr(&pep_604_union(&elts))
             };
+            Edit::range_replacement(content, expr.range())
+        };
 
-            Fix::safe_edit(Edit::range_replacement(content, expr.range()))
+        if checker.comment_ranges().intersects(expr.range()) {
+            Fix::unsafe_edit(edit)
+        } else {
+            Fix::safe_edit(edit)
         }
     });
 

@@ -1,0 +1,133 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/decorator_named_expression_py37.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..85,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 45..84,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 45..69,
+                            expression: Call(
+                                ExprCall {
+                                    range: 46..69,
+                                    func: Named(
+                                        ExprNamed {
+                                            range: 47..63,
+                                            target: Name(
+                                                ExprName {
+                                                    range: 47..48,
+                                                    id: Name("x"),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            value: Lambda(
+                                                ExprLambda {
+                                                    range: 52..63,
+                                                    parameters: Some(
+                                                        Parameters {
+                                                            range: 59..60,
+                                                            posonlyargs: [],
+                                                            args: [
+                                                                ParameterWithDefault {
+                                                                    range: 59..60,
+                                                                    parameter: Parameter {
+                                                                        range: 59..60,
+                                                                        name: Identifier {
+                                                                            id: Name("x"),
+                                                                            range: 59..60,
+                                                                        },
+                                                                        annotation: None,
+                                                                    },
+                                                                    default: None,
+                                                                },
+                                                            ],
+                                                            vararg: None,
+                                                            kwonlyargs: [],
+                                                            kwarg: None,
+                                                        },
+                                                    ),
+                                                    body: Name(
+                                                        ExprName {
+                                                            range: 62..63,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 64..69,
+                                        args: [
+                                            Name(
+                                                ExprName {
+                                                    range: 65..68,
+                                                    id: Name("foo"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("bar"),
+                        range: 74..77,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 77..79,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 81..84,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 81..84,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: { "target-version": "3.7" }
+2 | @(x := lambda x: x)(foo)
+  |   ^^^^^^^^^^^^^^^^ Syntax Error: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
+3 | def bar(): ...
+  |
+
+
+  |
+1 | # parse_options: { "target-version": "3.7" }
+2 | @(x := lambda x: x)(foo)
+  |   ^^^^^^^^^^^^^^^^ Syntax Error: Cannot use assignment expression outside function call arguments in a decorator on Python 3.7 (syntax was added in Python 3.9)
+3 | def bar(): ...
+  |

@@ -3,16 +3,16 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use clap::{command, Parser, ValueEnum};
+use clap::{Parser, ValueEnum, command};
 
 use ruff_formatter::SourceCode;
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::{parse, AsMode};
+use ruff_python_parser::{ParseOptions, parse};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::comments::collect_comments;
-use crate::{format_module_ast, MagicTrailingComma, PreviewMode, PyFormatOptions};
+use crate::{MagicTrailingComma, PreviewMode, PyFormatOptions, format_module_ast};
 
 #[derive(ValueEnum, Clone, Debug)]
 pub enum Emit {
@@ -24,7 +24,7 @@ pub enum Emit {
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
-#[allow(clippy::struct_excessive_bools)] // It's only the dev cli anyways
+#[expect(clippy::struct_excessive_bools)] // It's only the dev cli anyways
 pub struct Cli {
     /// Python files to format. If there are none, stdin will be used. `-` as stdin is not supported
     pub files: Vec<PathBuf>,
@@ -48,7 +48,7 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Re
     let source_type = PySourceType::from(source_path);
 
     // Parse the AST.
-    let parsed = parse(source, source_type.as_mode()).context("Syntax error in input")?;
+    let parsed = parse(source, ParseOptions::from(source_type)).context("Syntax error in input")?;
 
     let options = PyFormatOptions::from_extension(source_path)
         .with_preview(if cli.preview {

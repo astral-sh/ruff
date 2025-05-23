@@ -1,5 +1,5 @@
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 /// ## What it does
 /// Checks for uses of `os.path.getmtime`.
@@ -12,7 +12,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 /// improve readability over the `os.path` module's counterparts (e.g.,
 /// `os.path.getmtime()`).
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// import os
 ///

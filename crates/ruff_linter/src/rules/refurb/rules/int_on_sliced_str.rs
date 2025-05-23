@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprCall, Identifier};
 use ruff_text_size::Ranged;
 
@@ -106,12 +106,12 @@ pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ExprCall) {
     if expr_slice.upper.is_some() || expr_slice.step.is_some() {
         return;
     }
-    if !expr_slice
+    if expr_slice
         .lower
         .as_ref()
         .and_then(|expr| expr.as_number_literal_expr())
         .and_then(|expr| expr.value.as_int())
-        .is_some_and(|expr| expr.as_u8() == Some(2))
+        .is_none_or(|expr| expr.as_u8() != Some(2))
     {
         return;
     }

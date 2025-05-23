@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF045.py:8:5: RUF045 Assignment without annotation found in dataclass body
+   |
+ 6 | class C:
+ 7 |     # Errors
+ 8 |     no_annotation = r"foo"
+   |     ^^^^^^^^^^^^^ RUF045
+ 9 |     missing = MISSING
+10 |     field = field()
+   |
+   = help: Use `ClassVar[...]`
+
+RUF045.py:9:5: RUF045 Assignment without annotation found in dataclass body
+   |
+ 7 |     # Errors
+ 8 |     no_annotation = r"foo"
+ 9 |     missing = MISSING
+   |     ^^^^^^^ RUF045
+10 |     field = field()
+   |
+   = help: Use `ClassVar[...]`
+
+RUF045.py:10:5: RUF045 Assignment without annotation found in dataclass body
+   |
+ 8 |     no_annotation = r"foo"
+ 9 |     missing = MISSING
+10 |     field = field()
+   |     ^^^^^ RUF045
+11 |
+12 |     # No errors
+   |
+   = help: Use `ClassVar[...]`

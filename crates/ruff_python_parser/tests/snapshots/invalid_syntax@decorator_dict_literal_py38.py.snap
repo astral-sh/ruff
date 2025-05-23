@@ -1,0 +1,87 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/decorator_dict_literal_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..68,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 45..67,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 45..52,
+                            expression: Dict(
+                                ExprDict {
+                                    range: 46..52,
+                                    items: [
+                                        DictItem {
+                                            key: Some(
+                                                NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 47..48,
+                                                        value: Int(
+                                                            3,
+                                                        ),
+                                                    },
+                                                ),
+                                            ),
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 50..51,
+                                                    value: Int(
+                                                        3,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ],
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("bar"),
+                        range: 57..60,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 60..62,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 64..67,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 64..67,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: { "target-version": "3.8" }
+2 | @{3: 3}
+  |  ^^^^^^ Syntax Error: Cannot use a dict literal outside function call arguments in a decorator on Python 3.8 (syntax was added in Python 3.9)
+3 | def bar(): ...
+  |

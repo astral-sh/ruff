@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
@@ -27,6 +27,10 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// ```python
 /// from example import myclassname
 /// ```
+///
+/// ## Options
+/// - `lint.pep8-naming.ignore-names`
+/// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]

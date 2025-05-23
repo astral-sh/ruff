@@ -4,14 +4,14 @@ use smallvec::SmallVec;
 
 use ast::{StmtClassDef, StmtFunctionDef};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, helpers::comment_indentation_after, AnyNodeRef};
-use ruff_python_trivia::{indentation_at_offset, SuppressionKind};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, AnyNodeRef, helpers::comment_indentation_after};
+use ruff_python_trivia::{SuppressionKind, indentation_at_offset};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_comment;
-use crate::Locator;
 
 use super::suppression_comment_visitor::{
     CaptureSuppressionComment, SuppressionComment, SuppressionCommentData,
@@ -26,7 +26,7 @@ use super::suppression_comment_visitor::{
 /// Suppression comments that do not actually prevent formatting could cause unintended changes
 /// when the formatter is run.
 ///
-/// ## Examples
+/// ## Example
 /// In the following example, all suppression comments would cause
 /// a rule violation.
 ///
@@ -49,6 +49,12 @@ use super::suppression_comment_visitor::{
 ///     # fmt: on
 ///     # yapf: enable
 /// ```
+///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because it deletes the invalid suppression comment,
+/// rather than trying to move it to a valid position, which the user more likely intended.
+///
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidFormatterSuppressionComment {
     reason: IgnoredReason,

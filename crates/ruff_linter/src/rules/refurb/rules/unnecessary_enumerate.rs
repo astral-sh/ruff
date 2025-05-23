@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{Arguments, Expr, Int};
@@ -179,7 +179,7 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) 
                 // If the `start` argument is set to something other than the `range` default,
                 // there's no clear fix.
                 let start = arguments.find_argument_value("start", 1);
-                if start.map_or(true, |start| {
+                if start.is_none_or(|start| {
                     matches!(
                         start,
                         Expr::NumberLiteral(ast::ExprNumberLiteral {

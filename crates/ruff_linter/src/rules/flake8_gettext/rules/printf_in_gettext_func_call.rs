@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Expr, Operator};
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -26,7 +26,7 @@ use ruff_text_size::Ranged;
 /// from gettext import gettext as _
 ///
 /// name = "Maria"
-/// _("Hello, {}!".format(name))  # Looks for "Hello, Maria!".
+/// _("Hello, %s!" % name)  # Looks for "Hello, Maria!".
 /// ```
 ///
 /// Use instead:
@@ -54,7 +54,7 @@ impl Violation for PrintfInGetTextFuncCall {
 pub(crate) fn printf_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
     if let Some(first) = args.first() {
         if let Expr::BinOp(ast::ExprBinOp {
-            op: Operator::Mod { .. },
+            op: Operator::Mod,
             left,
             ..
         }) = &first

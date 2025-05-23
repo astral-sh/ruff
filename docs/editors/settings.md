@@ -11,16 +11,47 @@ as per the editor.
 
 ### `configuration`
 
-Path to a `ruff.toml` or `pyproject.toml` file to use for configuration.
+The `configuration` setting allows you to configure editor-specific Ruff behavior. This can be done
+in one of the following ways:
 
-By default, Ruff will discover configuration for each project from the filesystem, mirroring the
-behavior of the Ruff CLI.
+1. **Configuration file path:** Specify the path to a `ruff.toml` or `pyproject.toml` file that
+    contains the configuration. User home directory and environment variables will be expanded.
+1. **Inline JSON configuration:** Directly provide the configuration as a JSON object.
+
+!!! note "Added in Ruff `0.9.8`"
+
+    The **Inline JSON configuration** option was introduced in Ruff `0.9.8`.
+
+The default behavior, if `configuration` is unset, is to load the settings from the project's
+configuration (a `ruff.toml` or `pyproject.toml` in the project's directory), consistent with when
+running Ruff on the command-line.
+
+The [`configurationPreference`](#configurationpreference) setting controls the precedence if both an
+editor-provided configuration (`configuration`) and a project level configuration file are present.
+
+#### Resolution order {: #configuration_resolution_order }
+
+In an editor, Ruff supports three sources of configuration, prioritized as follows (from highest to
+lowest):
+
+1. **Specific settings:** Individual settings like [`lineLength`](#linelength) or
+    [`lint.select`](#select) defined in the editor
+1. [**`ruff.configuration`**](#configuration): Settings provided via the
+    [`configuration`](#configuration) field (either a path to a configuration file or an inline
+    configuration object)
+1. **Configuration file:** Settings defined in a `ruff.toml` or `pyproject.toml` file in the
+    project's directory (if present)
+
+For example, if the line length is specified in all three sources, Ruff will use the value from the
+[`lineLength`](#linelength) setting.
 
 **Default value**: `null`
 
 **Type**: `string`
 
 **Example usage**:
+
+_Using configuration file path:_
 
 === "VS Code"
 
@@ -35,9 +66,7 @@ behavior of the Ruff CLI.
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
-        settings = {
-          configuration = "~/path/to/ruff.toml"
-        }
+        configuration = "~/path/to/ruff.toml"
       }
     }
     ```
@@ -51,6 +80,87 @@ behavior of the Ruff CLI.
           "initialization_options": {
             "settings": {
               "configuration": "~/path/to/ruff.toml"
+            }
+          }
+        }
+      }
+    }
+    ```
+
+_Using inline configuration:_
+
+=== "VS Code"
+
+    ```json
+    {
+        "ruff.configuration": {
+            "lint": {
+                "unfixable": ["F401"],
+                "extend-select": ["TID251"],
+                "flake8-tidy-imports": {
+                    "banned-api": {
+                        "typing.TypedDict": {
+                            "msg": "Use `typing_extensions.TypedDict` instead",
+                        }
+                    }
+                }
+            },
+            "format": {
+                "quote-style": "single"
+            }
+        }
+    }
+    ```
+
+=== "Neovim"
+
+    ```lua
+    require('lspconfig').ruff.setup {
+      init_options = {
+        configuration = {
+          lint = {
+            unfixable = {"F401"},
+            ["extend-select"] = {"TID251"},
+            ["flake8-tidy-imports"] = {
+              ["banned-api"] = {
+                ["typing.TypedDict"] = {
+                  msg = "Use `typing_extensions.TypedDict` instead"
+                }
+              }
+            }
+          },
+          format = {
+            ["quote-style"] = "single"
+          }
+        }
+      }
+    }
+    ```
+
+=== "Zed"
+
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "configuration": {
+                "lint": {
+                  "unfixable": ["F401"],
+                  "extend-select": ["TID251"],
+                  "flake8-tidy-imports": {
+                    "banned-api": {
+                      "typing.TypedDict": {
+                        "msg": "Use `typing_extensions.TypedDict` instead"
+                      }
+                    }
+                  }
+                },
+                "format": {
+                  "quote-style": "single"
+                }
+              }
             }
           }
         }
@@ -594,9 +704,7 @@ Whether to enable linting. Set to `false` to use Ruff exclusively as a formatter
           "initialization_options": {
             "settings": {
               "lint": {
-                "enable" = {
-                  "enable": false
-                }
+                "enable": false
               }
             }
           }

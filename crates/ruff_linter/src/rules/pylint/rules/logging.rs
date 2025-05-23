@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
@@ -105,7 +105,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
             if LoggingLevel::from_attribute(attr).is_none() {
                 return;
-            };
+            }
             if !logging::is_logger_candidate(
                 &call.func,
                 checker.semantic(),
@@ -126,10 +126,10 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
             };
             if LoggingLevel::from_attribute(attribute).is_none() {
                 return;
-            };
+            }
         }
         _ => return,
-    };
+    }
 
     let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) =
         call.arguments.find_positional(0)

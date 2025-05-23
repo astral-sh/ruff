@@ -2,12 +2,12 @@ use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ruff_python_ast::{ModModule, PySourceType};
-use ruff_python_parser::{parse_unchecked_source, Parsed};
+use ruff_python_ast::ModModule;
+use ruff_python_parser::{ParseOptions, Parsed, parse_unchecked};
 
-use crate::files::{File, FilePath};
-use crate::source::source_text;
 use crate::Db;
+use crate::files::File;
+use crate::source::source_text;
 
 /// Returns the parsed AST of `file`, including its token stream.
 ///
@@ -20,24 +20,20 @@ use crate::Db;
 /// reflected in the changed AST offsets.
 /// The other reason is that Ruff's AST doesn't implement `Eq` which Sala requires
 /// for determining if a query result is unchanged.
-#[salsa::tracked(return_ref, no_eq)]
+#[salsa::tracked(returns(ref), no_eq)]
 pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
-    let _span = tracing::trace_span!("parsed_module", file = %file.path(db)).entered();
+    let _span = tracing::trace_span!("parsed_module", ?file).entered();
 
     let source = source_text(db, file);
-    let path = file.path(db);
+    let ty = file.source_type(db);
 
-    let ty = match path {
-        FilePath::System(path) => path
-            .extension()
-            .map_or(PySourceType::Python, PySourceType::from_extension),
-        FilePath::Vendored(_) => PySourceType::Stub,
-        FilePath::SystemVirtual(path) => path
-            .extension()
-            .map_or(PySourceType::Python, PySourceType::from_extension),
-    };
+    let target_version = db.python_version();
+    let options = ParseOptions::from(ty).with_target_version(target_version);
+    let parsed = parse_unchecked(&source, options)
+        .try_into_module()
+        .expect("PySourceType always parses into a module");
 
-    ParsedModule::new(parse_unchecked_source(&source, ty))
+    ParsedModule::new(parsed)
 }
 
 /// Cheap cloneable wrapper around the parsed module.
@@ -83,12 +79,14 @@ impl Eq for ParsedModule {}
 
 #[cfg(test)]
 mod tests {
+    use crate::Db;
     use crate::files::{system_path_to_file, vendored_path_to_file};
     use crate::parsed::parsed_module;
-    use crate::system::{DbWithTestSystem, SystemPath, SystemVirtualPath};
+    use crate::system::{
+        DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemVirtualPath,
+    };
     use crate::tests::TestDb;
     use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
-    use crate::Db;
     use zip::CompressionMethod;
 
     #[test]
@@ -96,13 +94,13 @@ mod tests {
         let mut db = TestDb::new();
         let path = "test.py";
 
-        db.write_file(path, "x = 10".to_string())?;
+        db.write_file(path, "x = 10")?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
         let parsed = parsed_module(&db, file);
 
-        assert!(parsed.is_valid());
+        assert!(parsed.has_valid_syntax());
 
         Ok(())
     }
@@ -112,13 +110,13 @@ mod tests {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.ipynb");
 
-        db.write_file(path, "%timeit a = b".to_string())?;
+        db.write_file(path, "%timeit a = b")?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
         let parsed = parsed_module(&db, file);
 
-        assert!(parsed.is_valid());
+        assert!(parsed.has_valid_syntax());
 
         Ok(())
     }
@@ -134,7 +132,7 @@ mod tests {
 
         let parsed = parsed_module(&db, virtual_file.file());
 
-        assert!(parsed.is_valid());
+        assert!(parsed.has_valid_syntax());
 
         Ok(())
     }
@@ -150,7 +148,7 @@ mod tests {
 
         let parsed = parsed_module(&db, virtual_file.file());
 
-        assert!(parsed.is_valid());
+        assert!(parsed.has_valid_syntax());
 
         Ok(())
     }
@@ -181,6 +179,6 @@ else:
 
         let parsed = parsed_module(&db, file);
 
-        assert!(parsed.is_valid());
+        assert!(parsed.has_valid_syntax());
     }
 }

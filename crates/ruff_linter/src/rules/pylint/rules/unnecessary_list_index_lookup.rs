@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Int, Number, StmtFor};
 use ruff_python_semantic::SemanticModel;
@@ -154,7 +154,7 @@ fn enumerate_items<'a>(
     // If the `enumerate` call has a non-zero `start`, don't omit.
     if !arguments
         .find_argument_value("start", 1)
-        .map_or(true, |expr| {
+        .is_none_or(|expr| {
             matches!(
                 expr,
                 Expr::NumberLiteral(ast::ExprNumberLiteral {

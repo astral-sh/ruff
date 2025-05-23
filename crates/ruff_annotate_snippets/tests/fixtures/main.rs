@@ -2,12 +2,11 @@ mod deserialize;
 
 use crate::deserialize::Fixture;
 use ruff_annotate_snippets::{Message, Renderer};
-use snapbox::data::DataFormat;
 use snapbox::Data;
+use snapbox::data::DataFormat;
 use std::error::Error;
 
 fn main() {
-    #[cfg(not(windows))]
     tryfn::Harness::new("tests/fixtures/", setup, test)
         .select(["*/*.toml"])
         .test();

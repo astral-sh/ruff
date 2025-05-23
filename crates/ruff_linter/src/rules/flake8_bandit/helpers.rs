@@ -20,7 +20,7 @@ pub(super) fn matches_password_name(string: &str) -> bool {
 }
 
 pub(super) fn is_untyped_exception(type_: Option<&Expr>, semantic: &SemanticModel) -> bool {
-    type_.map_or(true, |type_| {
+    type_.is_none_or(|type_| {
         if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &type_ {
             elts.iter().any(|type_| {
                 semantic

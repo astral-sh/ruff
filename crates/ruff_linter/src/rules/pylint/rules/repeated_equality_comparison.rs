@@ -3,20 +3,24 @@ use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ast::ExprContext;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::Locator;
 
 /// ## What it does
-/// Checks for repeated equality comparisons that can rewritten as a membership
+/// Checks for repeated equality comparisons that can be rewritten as a membership
 /// test.
+///
+/// This rule will try to determine if the values are hashable
+/// and the fix will use a `set` if they are. If unable to determine, the fix
+/// will use a `tuple` and suggest the use of a `set`.
 ///
 /// ## Why is this bad?
 /// To check if a variable is equal to one of many values, it is common to
@@ -27,10 +31,6 @@ use crate::Locator;
 /// operator to check for membership, which is more performant and succinct.
 /// If the items are hashable, use a `set` for efficiency; otherwise, use a
 /// `tuple`.
-///
-/// In [preview], this rule will try to determine if the values are hashable
-/// and the fix will use a `set` if they are. If unable to determine, the fix
-/// will use a `tuple` and continue to suggest the use of a `set`.
 ///
 /// ## Example
 /// ```python
@@ -46,8 +46,6 @@ use crate::Locator;
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct RepeatedEqualityComparison {
     expression: SourceCodeSnippet,
@@ -59,7 +57,9 @@ impl AlwaysFixableViolation for RepeatedEqualityComparison {
     fn message(&self) -> String {
         match (self.expression.full_display(), self.all_hashable) {
             (Some(expression), false) => {
-                format!("Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable.")
+                format!(
+                    "Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable."
+                )
             }
             (Some(expression), true) => {
                 format!("Consider merging multiple comparisons: `{expression}`.")
@@ -135,10 +135,9 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
 
             // if we can determine that all the values are hashable, we can use a set
             // TODO: improve with type inference
-            let all_hashable = checker.settings.preview.is_enabled()
-                && comparators
-                    .iter()
-                    .all(|comparator| comparator.is_literal_expr());
+            let all_hashable = comparators
+                .iter()
+                .all(|comparator| comparator.is_literal_expr());
 
             let mut diagnostic = Diagnostic::new(
                 RepeatedEqualityComparison {

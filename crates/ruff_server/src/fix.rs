@@ -3,16 +3,16 @@ use std::borrow::Cow;
 use rustc_hash::FxHashMap;
 
 use crate::{
+    PositionEncoding,
     edit::{Replacement, ToRangeExt},
     resolve::is_document_excluded_for_linting,
     session::DocumentQuery,
-    PositionEncoding,
 };
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{
-    linter::{FixerResult, LinterResult},
+    linter::FixerResult,
     packaging::detect_package_root,
-    settings::{flags, LinterSettings},
+    settings::{LinterSettings, flags},
 };
 use ruff_notebook::SourceValue;
 use ruff_source_file::LineIndex;
@@ -62,9 +62,7 @@ pub(crate) fn fix_all(
     // which is inconsistent with how `ruff check --fix` works.
     let FixerResult {
         transformed,
-        result: LinterResult {
-            has_syntax_error, ..
-        },
+        result,
         ..
     } = ruff_linter::linter::lint_fix(
         &query.virtual_file_path(),
@@ -76,7 +74,7 @@ pub(crate) fn fix_all(
         source_type,
     )?;
 
-    if has_syntax_error {
+    if result.has_invalid_syntax() {
         // If there's a syntax error, then there won't be any fixes to apply.
         return Ok(Fixes::default());
     }

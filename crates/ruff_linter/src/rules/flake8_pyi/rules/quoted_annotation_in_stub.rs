@@ -1,7 +1,7 @@
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
 
@@ -27,7 +27,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html)
+/// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.python.org/en/latest/guides/writing_stubs.html)
 #[derive(ViolationMetadata)]
 pub(crate) struct QuotedAnnotationInStub;
 

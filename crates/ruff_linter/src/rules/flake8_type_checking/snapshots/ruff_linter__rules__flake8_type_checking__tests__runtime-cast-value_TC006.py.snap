@@ -212,3 +212,37 @@ TC006.py:89:9: TC006 [*] Add quotes to type expression in `typing.cast()`
    89 |+        "int"  # TC006
 90 90 |         , 6.0
 91 91 |     )
+92 92 | 
+
+TC006.py:98:14: TC006 [*] Add quotes to type expression in `typing.cast()`
+   |
+96 |     from typing import cast
+97 |
+98 |     cast(typ=int, val=3.0)  # TC006
+   |              ^^^ TC006
+99 |     cast(val=3.0, typ=int)  # TC006
+   |
+   = help: Add quotes
+
+ℹ Safe fix
+95 95 |     # Keyword arguments
+96 96 |     from typing import cast
+97 97 | 
+98    |-    cast(typ=int, val=3.0)  # TC006
+   98 |+    cast(typ="int", val=3.0)  # TC006
+99 99 |     cast(val=3.0, typ=int)  # TC006
+
+TC006.py:99:23: TC006 [*] Add quotes to type expression in `typing.cast()`
+   |
+98 |     cast(typ=int, val=3.0)  # TC006
+99 |     cast(val=3.0, typ=int)  # TC006
+   |                       ^^^ TC006
+   |
+   = help: Add quotes
+
+ℹ Safe fix
+96 96 |     from typing import cast
+97 97 | 
+98 98 |     cast(typ=int, val=3.0)  # TC006
+99    |-    cast(val=3.0, typ=int)  # TC006
+   99 |+    cast(val=3.0, typ="int")  # TC006

@@ -1,6 +1,9 @@
 // This is a generated file. Don't modify it by hand!
 // Run `crates/ruff_python_ast/generate.py` to re-generate the file.
 
+use crate::name::Name;
+use crate::visitor::source_order::SourceOrderVisitor;
+
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq)]
 pub enum Mod {
@@ -5048,6 +5051,17 @@ impl<'a> From<ModRef<'a>> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> AnyNodeRef<'a> {
+    pub fn as_mod_ref(self) -> Option<ModRef<'a>> {
+        match self {
+            Self::ModModule(node) => Some(ModRef::Module(node)),
+            Self::ModExpression(node) => Some(ModRef::Expression(node)),
+
+            _ => None,
+        }
+    }
+}
+
 impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
     fn from(node: &'a Stmt) -> AnyNodeRef<'a> {
         match node {
@@ -5108,6 +5122,40 @@ impl<'a> From<StmtRef<'a>> for AnyNodeRef<'a> {
             StmtRef::Break(node) => AnyNodeRef::StmtBreak(node),
             StmtRef::Continue(node) => AnyNodeRef::StmtContinue(node),
             StmtRef::IpyEscapeCommand(node) => AnyNodeRef::StmtIpyEscapeCommand(node),
+        }
+    }
+}
+
+impl<'a> AnyNodeRef<'a> {
+    pub fn as_stmt_ref(self) -> Option<StmtRef<'a>> {
+        match self {
+            Self::StmtFunctionDef(node) => Some(StmtRef::FunctionDef(node)),
+            Self::StmtClassDef(node) => Some(StmtRef::ClassDef(node)),
+            Self::StmtReturn(node) => Some(StmtRef::Return(node)),
+            Self::StmtDelete(node) => Some(StmtRef::Delete(node)),
+            Self::StmtTypeAlias(node) => Some(StmtRef::TypeAlias(node)),
+            Self::StmtAssign(node) => Some(StmtRef::Assign(node)),
+            Self::StmtAugAssign(node) => Some(StmtRef::AugAssign(node)),
+            Self::StmtAnnAssign(node) => Some(StmtRef::AnnAssign(node)),
+            Self::StmtFor(node) => Some(StmtRef::For(node)),
+            Self::StmtWhile(node) => Some(StmtRef::While(node)),
+            Self::StmtIf(node) => Some(StmtRef::If(node)),
+            Self::StmtWith(node) => Some(StmtRef::With(node)),
+            Self::StmtMatch(node) => Some(StmtRef::Match(node)),
+            Self::StmtRaise(node) => Some(StmtRef::Raise(node)),
+            Self::StmtTry(node) => Some(StmtRef::Try(node)),
+            Self::StmtAssert(node) => Some(StmtRef::Assert(node)),
+            Self::StmtImport(node) => Some(StmtRef::Import(node)),
+            Self::StmtImportFrom(node) => Some(StmtRef::ImportFrom(node)),
+            Self::StmtGlobal(node) => Some(StmtRef::Global(node)),
+            Self::StmtNonlocal(node) => Some(StmtRef::Nonlocal(node)),
+            Self::StmtExpr(node) => Some(StmtRef::Expr(node)),
+            Self::StmtPass(node) => Some(StmtRef::Pass(node)),
+            Self::StmtBreak(node) => Some(StmtRef::Break(node)),
+            Self::StmtContinue(node) => Some(StmtRef::Continue(node)),
+            Self::StmtIpyEscapeCommand(node) => Some(StmtRef::IpyEscapeCommand(node)),
+
+            _ => None,
         }
     }
 }
@@ -5190,6 +5238,47 @@ impl<'a> From<ExprRef<'a>> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> AnyNodeRef<'a> {
+    pub fn as_expr_ref(self) -> Option<ExprRef<'a>> {
+        match self {
+            Self::ExprBoolOp(node) => Some(ExprRef::BoolOp(node)),
+            Self::ExprNamed(node) => Some(ExprRef::Named(node)),
+            Self::ExprBinOp(node) => Some(ExprRef::BinOp(node)),
+            Self::ExprUnaryOp(node) => Some(ExprRef::UnaryOp(node)),
+            Self::ExprLambda(node) => Some(ExprRef::Lambda(node)),
+            Self::ExprIf(node) => Some(ExprRef::If(node)),
+            Self::ExprDict(node) => Some(ExprRef::Dict(node)),
+            Self::ExprSet(node) => Some(ExprRef::Set(node)),
+            Self::ExprListComp(node) => Some(ExprRef::ListComp(node)),
+            Self::ExprSetComp(node) => Some(ExprRef::SetComp(node)),
+            Self::ExprDictComp(node) => Some(ExprRef::DictComp(node)),
+            Self::ExprGenerator(node) => Some(ExprRef::Generator(node)),
+            Self::ExprAwait(node) => Some(ExprRef::Await(node)),
+            Self::ExprYield(node) => Some(ExprRef::Yield(node)),
+            Self::ExprYieldFrom(node) => Some(ExprRef::YieldFrom(node)),
+            Self::ExprCompare(node) => Some(ExprRef::Compare(node)),
+            Self::ExprCall(node) => Some(ExprRef::Call(node)),
+            Self::ExprFString(node) => Some(ExprRef::FString(node)),
+            Self::ExprStringLiteral(node) => Some(ExprRef::StringLiteral(node)),
+            Self::ExprBytesLiteral(node) => Some(ExprRef::BytesLiteral(node)),
+            Self::ExprNumberLiteral(node) => Some(ExprRef::NumberLiteral(node)),
+            Self::ExprBooleanLiteral(node) => Some(ExprRef::BooleanLiteral(node)),
+            Self::ExprNoneLiteral(node) => Some(ExprRef::NoneLiteral(node)),
+            Self::ExprEllipsisLiteral(node) => Some(ExprRef::EllipsisLiteral(node)),
+            Self::ExprAttribute(node) => Some(ExprRef::Attribute(node)),
+            Self::ExprSubscript(node) => Some(ExprRef::Subscript(node)),
+            Self::ExprStarred(node) => Some(ExprRef::Starred(node)),
+            Self::ExprName(node) => Some(ExprRef::Name(node)),
+            Self::ExprList(node) => Some(ExprRef::List(node)),
+            Self::ExprTuple(node) => Some(ExprRef::Tuple(node)),
+            Self::ExprSlice(node) => Some(ExprRef::Slice(node)),
+            Self::ExprIpyEscapeCommand(node) => Some(ExprRef::IpyEscapeCommand(node)),
+
+            _ => None,
+        }
+    }
+}
+
 impl<'a> From<&'a ExceptHandler> for AnyNodeRef<'a> {
     fn from(node: &'a ExceptHandler) -> AnyNodeRef<'a> {
         match node {
@@ -5202,6 +5291,16 @@ impl<'a> From<ExceptHandlerRef<'a>> for AnyNodeRef<'a> {
     fn from(node: ExceptHandlerRef<'a>) -> AnyNodeRef<'a> {
         match node {
             ExceptHandlerRef::ExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
+        }
+    }
+}
+
+impl<'a> AnyNodeRef<'a> {
+    pub fn as_except_handler_ref(self) -> Option<ExceptHandlerRef<'a>> {
+        match self {
+            Self::ExceptHandlerExceptHandler(node) => Some(ExceptHandlerRef::ExceptHandler(node)),
+
+            _ => None,
         }
     }
 }
@@ -5220,6 +5319,17 @@ impl<'a> From<FStringElementRef<'a>> for AnyNodeRef<'a> {
         match node {
             FStringElementRef::Expression(node) => AnyNodeRef::FStringExpressionElement(node),
             FStringElementRef::Literal(node) => AnyNodeRef::FStringLiteralElement(node),
+        }
+    }
+}
+
+impl<'a> AnyNodeRef<'a> {
+    pub fn as_f_string_element_ref(self) -> Option<FStringElementRef<'a>> {
+        match self {
+            Self::FStringExpressionElement(node) => Some(FStringElementRef::Expression(node)),
+            Self::FStringLiteralElement(node) => Some(FStringElementRef::Literal(node)),
+
+            _ => None,
         }
     }
 }
@@ -5254,6 +5364,23 @@ impl<'a> From<PatternRef<'a>> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> AnyNodeRef<'a> {
+    pub fn as_pattern_ref(self) -> Option<PatternRef<'a>> {
+        match self {
+            Self::PatternMatchValue(node) => Some(PatternRef::MatchValue(node)),
+            Self::PatternMatchSingleton(node) => Some(PatternRef::MatchSingleton(node)),
+            Self::PatternMatchSequence(node) => Some(PatternRef::MatchSequence(node)),
+            Self::PatternMatchMapping(node) => Some(PatternRef::MatchMapping(node)),
+            Self::PatternMatchClass(node) => Some(PatternRef::MatchClass(node)),
+            Self::PatternMatchStar(node) => Some(PatternRef::MatchStar(node)),
+            Self::PatternMatchAs(node) => Some(PatternRef::MatchAs(node)),
+            Self::PatternMatchOr(node) => Some(PatternRef::MatchOr(node)),
+
+            _ => None,
+        }
+    }
+}
+
 impl<'a> From<&'a TypeParam> for AnyNodeRef<'a> {
     fn from(node: &'a TypeParam) -> AnyNodeRef<'a> {
         match node {
@@ -5270,6 +5397,18 @@ impl<'a> From<TypeParamRef<'a>> for AnyNodeRef<'a> {
             TypeParamRef::TypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
             TypeParamRef::TypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
             TypeParamRef::ParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
+        }
+    }
+}
+
+impl<'a> AnyNodeRef<'a> {
+    pub fn as_type_param_ref(self) -> Option<TypeParamRef<'a>> {
+        match self {
+            Self::TypeParamTypeVar(node) => Some(TypeParamRef::TypeVar(node)),
+            Self::TypeParamTypeVarTuple(node) => Some(TypeParamRef::TypeVarTuple(node)),
+            Self::TypeParamParamSpec(node) => Some(TypeParamRef::ParamSpec(node)),
+
+            _ => None,
         }
     }
 }
@@ -6025,7 +6164,7 @@ impl AnyNodeRef<'_> {
 }
 
 impl<'a> AnyNodeRef<'a> {
-    pub fn visit_preorder<'b, V>(self, visitor: &mut V)
+    pub fn visit_source_order<'b, V>(self, visitor: &mut V)
     where
         V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
         'a: 'b,
@@ -6443,5 +6582,1403 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::BytesLiteral(_) => NodeKind::BytesLiteral,
             AnyNodeRef::Identifier(_) => NodeKind::Identifier,
         }
+    }
+}
+
+/// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModModule {
+    pub range: ruff_text_size::TextRange,
+    pub body: Vec<Stmt>,
+}
+
+/// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModExpression {
+    pub range: ruff_text_size::TextRange,
+    pub body: Box<Expr>,
+}
+
+/// See also [FunctionDef](https://docs.python.org/3/library/ast.html#ast.FunctionDef)
+/// and [AsyncFunctionDef](https://docs.python.org/3/library/ast.html#ast.AsyncFunctionDef).
+///
+/// This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type.
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtFunctionDef {
+    pub range: ruff_text_size::TextRange,
+    pub is_async: bool,
+    pub decorator_list: Vec<crate::Decorator>,
+    pub name: crate::Identifier,
+    pub type_params: Option<Box<crate::TypeParams>>,
+    pub parameters: Box<crate::Parameters>,
+    pub returns: Option<Box<Expr>>,
+    pub body: Vec<Stmt>,
+}
+
+/// See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtClassDef {
+    pub range: ruff_text_size::TextRange,
+    pub decorator_list: Vec<crate::Decorator>,
+    pub name: crate::Identifier,
+    pub type_params: Option<Box<crate::TypeParams>>,
+    pub arguments: Option<Box<crate::Arguments>>,
+    pub body: Vec<Stmt>,
+}
+
+/// See also [Return](https://docs.python.org/3/library/ast.html#ast.Return)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtReturn {
+    pub range: ruff_text_size::TextRange,
+    pub value: Option<Box<Expr>>,
+}
+
+/// See also [Delete](https://docs.python.org/3/library/ast.html#ast.Delete)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtDelete {
+    pub range: ruff_text_size::TextRange,
+    pub targets: Vec<Expr>,
+}
+
+/// See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtTypeAlias {
+    pub range: ruff_text_size::TextRange,
+    pub name: Box<Expr>,
+    pub type_params: Option<Box<crate::TypeParams>>,
+    pub value: Box<Expr>,
+}
+
+/// See also [Assign](https://docs.python.org/3/library/ast.html#ast.Assign)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtAssign {
+    pub range: ruff_text_size::TextRange,
+    pub targets: Vec<Expr>,
+    pub value: Box<Expr>,
+}
+
+/// See also [AugAssign](https://docs.python.org/3/library/ast.html#ast.AugAssign)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtAugAssign {
+    pub range: ruff_text_size::TextRange,
+    pub target: Box<Expr>,
+    pub op: crate::Operator,
+    pub value: Box<Expr>,
+}
+
+/// See also [AnnAssign](https://docs.python.org/3/library/ast.html#ast.AnnAssign)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtAnnAssign {
+    pub range: ruff_text_size::TextRange,
+    pub target: Box<Expr>,
+    pub annotation: Box<Expr>,
+    pub value: Option<Box<Expr>>,
+    pub simple: bool,
+}
+
+/// See also [For](https://docs.python.org/3/library/ast.html#ast.For)
+/// and [AsyncFor](https://docs.python.org/3/library/ast.html#ast.AsyncFor).
+///
+/// This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type.
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtFor {
+    pub range: ruff_text_size::TextRange,
+    pub is_async: bool,
+    pub target: Box<Expr>,
+    pub iter: Box<Expr>,
+    pub body: Vec<Stmt>,
+    pub orelse: Vec<Stmt>,
+}
+
+/// See also [While](https://docs.python.org/3/library/ast.html#ast.While)
+/// and [AsyncWhile](https://docs.python.org/3/library/ast.html#ast.AsyncWhile).
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtWhile {
+    pub range: ruff_text_size::TextRange,
+    pub test: Box<Expr>,
+    pub body: Vec<Stmt>,
+    pub orelse: Vec<Stmt>,
+}
+
+/// See also [If](https://docs.python.org/3/library/ast.html#ast.If)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtIf {
+    pub range: ruff_text_size::TextRange,
+    pub test: Box<Expr>,
+    pub body: Vec<Stmt>,
+    pub elif_else_clauses: Vec<crate::ElifElseClause>,
+}
+
+/// See also [With](https://docs.python.org/3/library/ast.html#ast.With)
+/// and [AsyncWith](https://docs.python.org/3/library/ast.html#ast.AsyncWith).
+///
+/// This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type.
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtWith {
+    pub range: ruff_text_size::TextRange,
+    pub is_async: bool,
+    pub items: Vec<crate::WithItem>,
+    pub body: Vec<Stmt>,
+}
+
+/// See also [Match](https://docs.python.org/3/library/ast.html#ast.Match)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtMatch {
+    pub range: ruff_text_size::TextRange,
+    pub subject: Box<Expr>,
+    pub cases: Vec<crate::MatchCase>,
+}
+
+/// See also [Raise](https://docs.python.org/3/library/ast.html#ast.Raise)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtRaise {
+    pub range: ruff_text_size::TextRange,
+    pub exc: Option<Box<Expr>>,
+    pub cause: Option<Box<Expr>>,
+}
+
+/// See also [Try](https://docs.python.org/3/library/ast.html#ast.Try)
+/// and [TryStar](https://docs.python.org/3/library/ast.html#ast.TryStar)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtTry {
+    pub range: ruff_text_size::TextRange,
+    pub body: Vec<Stmt>,
+    pub handlers: Vec<ExceptHandler>,
+    pub orelse: Vec<Stmt>,
+    pub finalbody: Vec<Stmt>,
+    pub is_star: bool,
+}
+
+/// See also [Assert](https://docs.python.org/3/library/ast.html#ast.Assert)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtAssert {
+    pub range: ruff_text_size::TextRange,
+    pub test: Box<Expr>,
+    pub msg: Option<Box<Expr>>,
+}
+
+/// See also [Import](https://docs.python.org/3/library/ast.html#ast.Import)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtImport {
+    pub range: ruff_text_size::TextRange,
+    pub names: Vec<crate::Alias>,
+}
+
+/// See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtImportFrom {
+    pub range: ruff_text_size::TextRange,
+    pub module: Option<crate::Identifier>,
+    pub names: Vec<crate::Alias>,
+    pub level: u32,
+}
+
+/// See also [Global](https://docs.python.org/3/library/ast.html#ast.Global)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtGlobal {
+    pub range: ruff_text_size::TextRange,
+    pub names: Vec<crate::Identifier>,
+}
+
+/// See also [Nonlocal](https://docs.python.org/3/library/ast.html#ast.Nonlocal)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtNonlocal {
+    pub range: ruff_text_size::TextRange,
+    pub names: Vec<crate::Identifier>,
+}
+
+/// See also [Expr](https://docs.python.org/3/library/ast.html#ast.Expr)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtExpr {
+    pub range: ruff_text_size::TextRange,
+    pub value: Box<Expr>,
+}
+
+/// See also [Pass](https://docs.python.org/3/library/ast.html#ast.Pass)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtPass {
+    pub range: ruff_text_size::TextRange,
+}
+
+/// See also [Break](https://docs.python.org/3/library/ast.html#ast.Break)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtBreak {
+    pub range: ruff_text_size::TextRange,
+}
+
+/// See also [Continue](https://docs.python.org/3/library/ast.html#ast.Continue)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtContinue {
+    pub range: ruff_text_size::TextRange,
+}
+
+/// An AST node used to represent a IPython escape command at the statement level.
+///
+/// For example,
+/// ```python
+/// %matplotlib inline
+/// ```
+///
+/// ## Terminology
+///
+/// Escape commands are special IPython syntax which starts with a token to identify
+/// the escape kind followed by the command value itself. [Escape kind] are the kind
+/// of escape commands that are recognized by the token: `%`, `%%`, `!`, `!!`,
+/// `?`, `??`, `/`, `;`, and `,`.
+///
+/// Help command (or Dynamic Object Introspection as it's called) are the escape commands
+/// of the kind `?` and `??`. For example, `?str.replace`. Help end command are a subset
+/// of Help command where the token can be at the end of the line i.e., after the value.
+/// For example, `str.replace?`.
+///
+/// Here's where things get tricky. I'll divide the help end command into two types for
+/// better understanding:
+/// 1. Strict version: The token is _only_ at the end of the line. For example,
+///    `str.replace?` or `str.replace??`.
+/// 2. Combined version: Along with the `?` or `??` token, which are at the end of the
+///    line, there are other escape kind tokens that are present at the start as well.
+///    For example, `%matplotlib?` or `%%timeit?`.
+///
+/// Priority comes into picture for the "Combined version" mentioned above. How do
+/// we determine the escape kind if there are tokens on both side of the value, i.e., which
+/// token to choose? The Help end command always takes priority over any other token which
+/// means that if there is `?`/`??` at the end then that is used to determine the kind.
+/// For example, in `%matplotlib?` the escape kind is determined using the `?` token
+/// instead of `%` token.
+///
+/// ## Syntax
+///
+/// `<IpyEscapeKind><Command value>`
+///
+/// The simplest form is an escape kind token followed by the command value. For example,
+/// `%matplotlib inline`, `/foo`, `!pwd`, etc.
+///
+/// `<Command value><IpyEscapeKind ("?" or "??")>`
+///
+/// The help end escape command would be the reverse of the above syntax. Here, the
+/// escape kind token can only be either `?` or `??` and it is at the end of the line.
+/// For example, `str.replace?`, `math.pi??`, etc.
+///
+/// `<IpyEscapeKind><Command value><EscapeKind ("?" or "??")>`
+///
+/// The final syntax is the combined version of the above two. For example, `%matplotlib?`,
+/// `%%timeit??`, etc.
+///
+/// [Escape kind]: crate::IpyEscapeKind
+///
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtIpyEscapeCommand {
+    pub range: ruff_text_size::TextRange,
+    pub kind: crate::IpyEscapeKind,
+    pub value: Box<str>,
+}
+
+/// See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprBoolOp {
+    pub range: ruff_text_size::TextRange,
+    pub op: crate::BoolOp,
+    pub values: Vec<Expr>,
+}
+
+/// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprNamed {
+    pub range: ruff_text_size::TextRange,
+    pub target: Box<Expr>,
+    pub value: Box<Expr>,
+}
+
+/// See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprBinOp {
+    pub range: ruff_text_size::TextRange,
+    pub left: Box<Expr>,
+    pub op: crate::Operator,
+    pub right: Box<Expr>,
+}
+
+/// See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprUnaryOp {
+    pub range: ruff_text_size::TextRange,
+    pub op: crate::UnaryOp,
+    pub operand: Box<Expr>,
+}
+
+/// See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprLambda {
+    pub range: ruff_text_size::TextRange,
+    pub parameters: Option<Box<crate::Parameters>>,
+    pub body: Box<Expr>,
+}
+
+/// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprIf {
+    pub range: ruff_text_size::TextRange,
+    pub test: Box<Expr>,
+    pub body: Box<Expr>,
+    pub orelse: Box<Expr>,
+}
+
+/// See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprDict {
+    pub range: ruff_text_size::TextRange,
+    pub items: Vec<crate::DictItem>,
+}
+
+/// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprSet {
+    pub range: ruff_text_size::TextRange,
+    pub elts: Vec<Expr>,
+}
+
+/// See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprListComp {
+    pub range: ruff_text_size::TextRange,
+    pub elt: Box<Expr>,
+    pub generators: Vec<crate::Comprehension>,
+}
+
+/// See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprSetComp {
+    pub range: ruff_text_size::TextRange,
+    pub elt: Box<Expr>,
+    pub generators: Vec<crate::Comprehension>,
+}
+
+/// See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprDictComp {
+    pub range: ruff_text_size::TextRange,
+    pub key: Box<Expr>,
+    pub value: Box<Expr>,
+    pub generators: Vec<crate::Comprehension>,
+}
+
+/// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprGenerator {
+    pub range: ruff_text_size::TextRange,
+    pub elt: Box<Expr>,
+    pub generators: Vec<crate::Comprehension>,
+    pub parenthesized: bool,
+}
+
+/// See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprAwait {
+    pub range: ruff_text_size::TextRange,
+    pub value: Box<Expr>,
+}
+
+/// See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprYield {
+    pub range: ruff_text_size::TextRange,
+    pub value: Option<Box<Expr>>,
+}
+
+/// See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprYieldFrom {
+    pub range: ruff_text_size::TextRange,
+    pub value: Box<Expr>,
+}
+
+/// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprCompare {
+    pub range: ruff_text_size::TextRange,
+    pub left: Box<Expr>,
+    pub ops: Box<[crate::CmpOp]>,
+    pub comparators: Box<[Expr]>,
+}
+
+/// See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprCall {
+    pub range: ruff_text_size::TextRange,
+    pub func: Box<Expr>,
+    pub arguments: crate::Arguments,
+}
+
+/// An AST node that represents either a single-part f-string literal
+/// or an implicitly concatenated f-string literal.
+///
+/// This type differs from the original Python AST `JoinedStr` in that it
+/// doesn't join the implicitly concatenated parts into a single string. Instead,
+/// it keeps them separate and provide various methods to access the parts.
+///
+/// See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprFString {
+    pub range: ruff_text_size::TextRange,
+    pub value: crate::FStringValue,
+}
+
+/// An AST node that represents either a single-part string literal
+/// or an implicitly concatenated string literal.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprStringLiteral {
+    pub range: ruff_text_size::TextRange,
+    pub value: crate::StringLiteralValue,
+}
+
+/// An AST node that represents either a single-part bytestring literal
+/// or an implicitly concatenated bytestring literal.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprBytesLiteral {
+    pub range: ruff_text_size::TextRange,
+    pub value: crate::BytesLiteralValue,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprNumberLiteral {
+    pub range: ruff_text_size::TextRange,
+    pub value: crate::Number,
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct ExprBooleanLiteral {
+    pub range: ruff_text_size::TextRange,
+    pub value: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct ExprNoneLiteral {
+    pub range: ruff_text_size::TextRange,
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct ExprEllipsisLiteral {
+    pub range: ruff_text_size::TextRange,
+}
+
+/// See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprAttribute {
+    pub range: ruff_text_size::TextRange,
+    pub value: Box<Expr>,
+    pub attr: crate::Identifier,
+    pub ctx: crate::ExprContext,
+}
+
+/// See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprSubscript {
+    pub range: ruff_text_size::TextRange,
+    pub value: Box<Expr>,
+    pub slice: Box<Expr>,
+    pub ctx: crate::ExprContext,
+}
+
+/// See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprStarred {
+    pub range: ruff_text_size::TextRange,
+    pub value: Box<Expr>,
+    pub ctx: crate::ExprContext,
+}
+
+/// See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprName {
+    pub range: ruff_text_size::TextRange,
+    pub id: Name,
+    pub ctx: crate::ExprContext,
+}
+
+/// See also [List](https://docs.python.org/3/library/ast.html#ast.List)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprList {
+    pub range: ruff_text_size::TextRange,
+    pub elts: Vec<Expr>,
+    pub ctx: crate::ExprContext,
+}
+
+/// See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprTuple {
+    pub range: ruff_text_size::TextRange,
+    pub elts: Vec<Expr>,
+    pub ctx: crate::ExprContext,
+    pub parenthesized: bool,
+}
+
+/// See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprSlice {
+    pub range: ruff_text_size::TextRange,
+    pub lower: Option<Box<Expr>>,
+    pub upper: Option<Box<Expr>>,
+    pub step: Option<Box<Expr>>,
+}
+
+/// An AST node used to represent a IPython escape command at the expression level.
+///
+/// For example,
+/// ```python
+/// dir = !pwd
+/// ```
+///
+/// Here, the escape kind can only be `!` or `%` otherwise it is a syntax error.
+///
+/// For more information related to terminology and syntax of escape commands,
+/// see [`StmtIpyEscapeCommand`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprIpyEscapeCommand {
+    pub range: ruff_text_size::TextRange,
+    pub kind: crate::IpyEscapeKind,
+    pub value: Box<str>,
+}
+
+impl ModModule {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ModModule { body, range: _ } = self;
+        visitor.visit_body(body);
+    }
+}
+
+impl ModExpression {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ModExpression { body, range: _ } = self;
+        visitor.visit_expr(body);
+    }
+}
+
+impl StmtFunctionDef {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtFunctionDef {
+            is_async: _,
+            decorator_list,
+            name,
+            type_params,
+            parameters,
+            returns,
+            body,
+            range: _,
+        } = self;
+
+        for elm in decorator_list {
+            visitor.visit_decorator(elm);
+        }
+        visitor.visit_identifier(name);
+
+        if let Some(type_params) = type_params {
+            visitor.visit_type_params(type_params);
+        }
+
+        visitor.visit_parameters(parameters);
+
+        if let Some(returns) = returns {
+            visitor.visit_annotation(returns);
+        }
+
+        visitor.visit_body(body);
+    }
+}
+
+impl StmtClassDef {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtClassDef {
+            decorator_list,
+            name,
+            type_params,
+            arguments,
+            body,
+            range: _,
+        } = self;
+
+        for elm in decorator_list {
+            visitor.visit_decorator(elm);
+        }
+        visitor.visit_identifier(name);
+
+        if let Some(type_params) = type_params {
+            visitor.visit_type_params(type_params);
+        }
+
+        if let Some(arguments) = arguments {
+            visitor.visit_arguments(arguments);
+        }
+
+        visitor.visit_body(body);
+    }
+}
+
+impl StmtReturn {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtReturn { value, range: _ } = self;
+
+        if let Some(value) = value {
+            visitor.visit_expr(value);
+        }
+    }
+}
+
+impl StmtDelete {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtDelete { targets, range: _ } = self;
+
+        for elm in targets {
+            visitor.visit_expr(elm);
+        }
+    }
+}
+
+impl StmtTypeAlias {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtTypeAlias {
+            name,
+            type_params,
+            value,
+            range: _,
+        } = self;
+        visitor.visit_expr(name);
+
+        if let Some(type_params) = type_params {
+            visitor.visit_type_params(type_params);
+        }
+
+        visitor.visit_expr(value);
+    }
+}
+
+impl StmtAssign {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtAssign {
+            targets,
+            value,
+            range: _,
+        } = self;
+
+        for elm in targets {
+            visitor.visit_expr(elm);
+        }
+        visitor.visit_expr(value);
+    }
+}
+
+impl StmtAugAssign {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtAugAssign {
+            target,
+            op,
+            value,
+            range: _,
+        } = self;
+        visitor.visit_expr(target);
+        visitor.visit_operator(op);
+        visitor.visit_expr(value);
+    }
+}
+
+impl StmtAnnAssign {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtAnnAssign {
+            target,
+            annotation,
+            value,
+            simple: _,
+            range: _,
+        } = self;
+        visitor.visit_expr(target);
+        visitor.visit_annotation(annotation);
+
+        if let Some(value) = value {
+            visitor.visit_expr(value);
+        }
+    }
+}
+
+impl StmtFor {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtFor {
+            is_async: _,
+            target,
+            iter,
+            body,
+            orelse,
+            range: _,
+        } = self;
+        visitor.visit_expr(target);
+        visitor.visit_expr(iter);
+        visitor.visit_body(body);
+        visitor.visit_body(orelse);
+    }
+}
+
+impl StmtWhile {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtWhile {
+            test,
+            body,
+            orelse,
+            range: _,
+        } = self;
+        visitor.visit_expr(test);
+        visitor.visit_body(body);
+        visitor.visit_body(orelse);
+    }
+}
+
+impl StmtIf {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtIf {
+            test,
+            body,
+            elif_else_clauses,
+            range: _,
+        } = self;
+        visitor.visit_expr(test);
+        visitor.visit_body(body);
+
+        for elm in elif_else_clauses {
+            visitor.visit_elif_else_clause(elm);
+        }
+    }
+}
+
+impl StmtWith {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtWith {
+            is_async: _,
+            items,
+            body,
+            range: _,
+        } = self;
+
+        for elm in items {
+            visitor.visit_with_item(elm);
+        }
+        visitor.visit_body(body);
+    }
+}
+
+impl StmtMatch {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtMatch {
+            subject,
+            cases,
+            range: _,
+        } = self;
+        visitor.visit_expr(subject);
+
+        for elm in cases {
+            visitor.visit_match_case(elm);
+        }
+    }
+}
+
+impl StmtRaise {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtRaise {
+            exc,
+            cause,
+            range: _,
+        } = self;
+
+        if let Some(exc) = exc {
+            visitor.visit_expr(exc);
+        }
+
+        if let Some(cause) = cause {
+            visitor.visit_expr(cause);
+        }
+    }
+}
+
+impl StmtTry {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtTry {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            is_star: _,
+            range: _,
+        } = self;
+        visitor.visit_body(body);
+
+        for elm in handlers {
+            visitor.visit_except_handler(elm);
+        }
+        visitor.visit_body(orelse);
+        visitor.visit_body(finalbody);
+    }
+}
+
+impl StmtAssert {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtAssert {
+            test,
+            msg,
+            range: _,
+        } = self;
+        visitor.visit_expr(test);
+
+        if let Some(msg) = msg {
+            visitor.visit_expr(msg);
+        }
+    }
+}
+
+impl StmtImport {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtImport { names, range: _ } = self;
+
+        for elm in names {
+            visitor.visit_alias(elm);
+        }
+    }
+}
+
+impl StmtImportFrom {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtImportFrom {
+            module,
+            names,
+            level: _,
+            range: _,
+        } = self;
+
+        if let Some(module) = module {
+            visitor.visit_identifier(module);
+        }
+
+        for elm in names {
+            visitor.visit_alias(elm);
+        }
+    }
+}
+
+impl StmtGlobal {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtGlobal { names, range: _ } = self;
+
+        for elm in names {
+            visitor.visit_identifier(elm);
+        }
+    }
+}
+
+impl StmtNonlocal {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtNonlocal { names, range: _ } = self;
+
+        for elm in names {
+            visitor.visit_identifier(elm);
+        }
+    }
+}
+
+impl StmtExpr {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtExpr { value, range: _ } = self;
+        visitor.visit_expr(value);
+    }
+}
+
+impl StmtPass {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtPass { range: _ } = self;
+    }
+}
+
+impl StmtBreak {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtBreak { range: _ } = self;
+    }
+}
+
+impl StmtContinue {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtContinue { range: _ } = self;
+    }
+}
+
+impl StmtIpyEscapeCommand {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtIpyEscapeCommand {
+            kind: _,
+            value: _,
+            range: _,
+        } = self;
+    }
+}
+
+impl ExprNamed {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprNamed {
+            target,
+            value,
+            range: _,
+        } = self;
+        visitor.visit_expr(target);
+        visitor.visit_expr(value);
+    }
+}
+
+impl ExprBinOp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprBinOp {
+            left,
+            op,
+            right,
+            range: _,
+        } = self;
+        visitor.visit_expr(left);
+        visitor.visit_operator(op);
+        visitor.visit_expr(right);
+    }
+}
+
+impl ExprUnaryOp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprUnaryOp {
+            op,
+            operand,
+            range: _,
+        } = self;
+        visitor.visit_unary_op(op);
+        visitor.visit_expr(operand);
+    }
+}
+
+impl ExprLambda {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprLambda {
+            parameters,
+            body,
+            range: _,
+        } = self;
+
+        if let Some(parameters) = parameters {
+            visitor.visit_parameters(parameters);
+        }
+
+        visitor.visit_expr(body);
+    }
+}
+
+impl ExprIf {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprIf {
+            test,
+            body,
+            orelse,
+            range: _,
+        } = self;
+        visitor.visit_expr(body);
+        visitor.visit_expr(test);
+        visitor.visit_expr(orelse);
+    }
+}
+
+impl ExprSet {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprSet { elts, range: _ } = self;
+
+        for elm in elts {
+            visitor.visit_expr(elm);
+        }
+    }
+}
+
+impl ExprListComp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprListComp {
+            elt,
+            generators,
+            range: _,
+        } = self;
+        visitor.visit_expr(elt);
+
+        for elm in generators {
+            visitor.visit_comprehension(elm);
+        }
+    }
+}
+
+impl ExprSetComp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprSetComp {
+            elt,
+            generators,
+            range: _,
+        } = self;
+        visitor.visit_expr(elt);
+
+        for elm in generators {
+            visitor.visit_comprehension(elm);
+        }
+    }
+}
+
+impl ExprDictComp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprDictComp {
+            key,
+            value,
+            generators,
+            range: _,
+        } = self;
+        visitor.visit_expr(key);
+        visitor.visit_expr(value);
+
+        for elm in generators {
+            visitor.visit_comprehension(elm);
+        }
+    }
+}
+
+impl ExprGenerator {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprGenerator {
+            elt,
+            generators,
+            parenthesized: _,
+            range: _,
+        } = self;
+        visitor.visit_expr(elt);
+
+        for elm in generators {
+            visitor.visit_comprehension(elm);
+        }
+    }
+}
+
+impl ExprAwait {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprAwait { value, range: _ } = self;
+        visitor.visit_expr(value);
+    }
+}
+
+impl ExprYield {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprYield { value, range: _ } = self;
+
+        if let Some(value) = value {
+            visitor.visit_expr(value);
+        }
+    }
+}
+
+impl ExprYieldFrom {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprYieldFrom { value, range: _ } = self;
+        visitor.visit_expr(value);
+    }
+}
+
+impl ExprCall {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprCall {
+            func,
+            arguments,
+            range: _,
+        } = self;
+        visitor.visit_expr(func);
+        visitor.visit_arguments(arguments);
+    }
+}
+
+impl ExprNumberLiteral {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprNumberLiteral { value: _, range: _ } = self;
+    }
+}
+
+impl ExprBooleanLiteral {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprBooleanLiteral { value: _, range: _ } = self;
+    }
+}
+
+impl ExprNoneLiteral {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprNoneLiteral { range: _ } = self;
+    }
+}
+
+impl ExprEllipsisLiteral {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprEllipsisLiteral { range: _ } = self;
+    }
+}
+
+impl ExprAttribute {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprAttribute {
+            value,
+            attr,
+            ctx: _,
+            range: _,
+        } = self;
+        visitor.visit_expr(value);
+        visitor.visit_identifier(attr);
+    }
+}
+
+impl ExprSubscript {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprSubscript {
+            value,
+            slice,
+            ctx: _,
+            range: _,
+        } = self;
+        visitor.visit_expr(value);
+        visitor.visit_expr(slice);
+    }
+}
+
+impl ExprStarred {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprStarred {
+            value,
+            ctx: _,
+            range: _,
+        } = self;
+        visitor.visit_expr(value);
+    }
+}
+
+impl ExprName {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprName {
+            id: _,
+            ctx: _,
+            range: _,
+        } = self;
+    }
+}
+
+impl ExprList {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprList {
+            elts,
+            ctx: _,
+            range: _,
+        } = self;
+
+        for elm in elts {
+            visitor.visit_expr(elm);
+        }
+    }
+}
+
+impl ExprTuple {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprTuple {
+            elts,
+            ctx: _,
+            parenthesized: _,
+            range: _,
+        } = self;
+
+        for elm in elts {
+            visitor.visit_expr(elm);
+        }
+    }
+}
+
+impl ExprSlice {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprSlice {
+            lower,
+            upper,
+            step,
+            range: _,
+        } = self;
+
+        if let Some(lower) = lower {
+            visitor.visit_expr(lower);
+        }
+
+        if let Some(upper) = upper {
+            visitor.visit_expr(upper);
+        }
+
+        if let Some(step) = step {
+            visitor.visit_expr(step);
+        }
+    }
+}
+
+impl ExprIpyEscapeCommand {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprIpyEscapeCommand {
+            kind: _,
+            value: _,
+            range: _,
+        } = self;
     }
 }

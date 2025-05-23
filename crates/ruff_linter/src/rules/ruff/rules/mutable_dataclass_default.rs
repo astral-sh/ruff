@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::Ranged;
 
@@ -22,7 +22,7 @@ use crate::rules::ruff::rules::helpers::{dataclass_kind, is_class_var_annotation
 /// If the default value is intended to be mutable, it must be annotated with
 /// `typing.ClassVar`; otherwise, a `ValueError` will be raised.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// from dataclasses import dataclass
 ///
@@ -70,7 +70,7 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
 
     if dataclass_kind(class_def, semantic).is_none() {
         return;
-    };
+    }
 
     for statement in &class_def.body {
         let Stmt::AnnAssign(ast::StmtAnnAssign {

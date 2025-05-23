@@ -1,5 +1,5 @@
-use crate::slice::IndexSlice;
 use crate::Idx;
+use crate::slice::IndexSlice;
 use std::borrow::{Borrow, BorrowMut};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
@@ -179,18 +179,18 @@ impl<I: Idx, T, const N: usize> From<[T; N]> for IndexVec<I, T> {
 
 // Whether `IndexVec` is `Send` depends only on the data,
 // not the phantom data.
-#[allow(unsafe_code)]
+#[expect(unsafe_code)]
 unsafe impl<I: Idx, T> Send for IndexVec<I, T> where T: Send {}
 
-#[allow(unsafe_code)]
+#[expect(unsafe_code)]
 #[cfg(feature = "salsa")]
 unsafe impl<I, T> salsa::Update for IndexVec<I, T>
 where
     T: salsa::Update,
 {
-    #[allow(unsafe_code)]
+    #[expect(unsafe_code)]
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
         let old_vec: &mut IndexVec<I, T> = unsafe { &mut *old_pointer };
-        salsa::Update::maybe_update(&mut old_vec.raw, new_value.raw)
+        unsafe { salsa::Update::maybe_update(&mut old_vec.raw, new_value.raw) }
     }
 }

@@ -1,0 +1,52 @@
+[package]
+name = "ty"
+version = "0.0.0"
+# required for correct pypi metadata
+homepage = "https://github.com/astral-sh/ty/"
+documentation = "https://github.com/astral-sh/ty/"
+# Releases occur in this other repository!
+repository = "https://github.com/astral-sh/ty/"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ruff_db = { workspace = true, features = ["os", "cache"] }
+ruff_python_ast = { workspace = true }
+ty_python_semantic = { workspace = true }
+ty_project = { workspace = true, features = ["zstd"] }
+ty_server = { workspace = true }
+
+anyhow = { workspace = true }
+argfile = { workspace = true }
+clap = { workspace = true, features = ["wrap_help", "string"] }
+clap_complete_command = { workspace = true }
+colored = { workspace = true }
+countme = { workspace = true, features = ["enable"] }
+crossbeam = { workspace = true }
+ctrlc = { version = "3.4.4" }
+indicatif = { workspace = true }
+jiff = { workspace = true }
+rayon = { workspace = true }
+salsa = { workspace = true }
+tracing = { workspace = true, features = ["release_max_level_debug"] }
+tracing-subscriber = { workspace = true }
+tracing-flame = { workspace = true }
+wild = { workspace = true }
+
+[dev-dependencies]
+ruff_db = { workspace = true, features = ["testing"] }
+ruff_python_trivia = { workspace = true }
+
+insta = { workspace = true, features = ["filters"] }
+insta-cmd = { workspace = true }
+filetime = { workspace = true }
+regex = { workspace = true }
+tempfile = { workspace = true }
+toml = { workspace = true }
+
+[lints]
+workspace = true

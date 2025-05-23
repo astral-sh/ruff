@@ -1,0 +1,79 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/decorator_expression_dotted_ident_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..86,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 45..85,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 45..69,
+                            expression: Attribute(
+                                ExprAttribute {
+                                    range: 46..69,
+                                    value: Attribute(
+                                        ExprAttribute {
+                                            range: 46..61,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 46..53,
+                                                    id: Name("buttons"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("clicked"),
+                                                range: 54..61,
+                                            },
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: Name("connect"),
+                                        range: 62..69,
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("spam"),
+                        range: 74..78,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 78..80,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 82..85,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 82..85,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

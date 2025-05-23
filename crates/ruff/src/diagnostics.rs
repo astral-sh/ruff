@@ -14,18 +14,18 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::codes::Rule;
-use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult, ParseSource};
-use ruff_linter::message::{Message, SyntaxErrorMessage};
+use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
+use ruff_linter::message::Message;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::settings::types::UnsafeFixes;
-use ruff_linter::settings::{flags, LinterSettings};
+use ruff_linter::settings::{LinterSettings, flags};
 use ruff_linter::source_kind::{SourceError, SourceKind};
-use ruff_linter::{fs, IOError};
+use ruff_linter::{IOError, fs};
 use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 use ruff_workspace::Settings;
 
 use crate::cache::{Cache, FileCacheKey, LintCacheData};
@@ -71,7 +71,7 @@ impl Diagnostics {
                                 TextRange::default(),
                             ),
                             source_file,
-                            TextSize::default(),
+                            None,
                         )],
                         FxHashMap::default(),
                     )
@@ -102,11 +102,7 @@ impl Diagnostics {
                 let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
                 let dummy = SourceFileBuilder::new(name, "").finish();
                 Self::new(
-                    vec![Message::SyntaxError(SyntaxErrorMessage {
-                        message: err.to_string(),
-                        range: TextRange::default(),
-                        file: dummy,
-                    })],
+                    vec![Message::syntax_error(err, TextRange::default(), dummy)],
                     FxHashMap::default(),
                 )
             }
@@ -263,48 +259,56 @@ pub(crate) fn lint_path(
     };
 
     // Lint the file.
-    let (
-        LinterResult {
-            messages,
-            has_syntax_error: has_error,
-        },
-        transformed,
-        fixed,
-    ) = if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
-        if let Ok(FixerResult {
-            result,
-            transformed,
-            fixed,
-        }) = lint_fix(
-            path,
-            package,
-            noqa,
-            unsafe_fixes,
-            settings,
-            &source_kind,
-            source_type,
-        ) {
-            if !fixed.is_empty() {
-                match fix_mode {
-                    flags::FixMode::Apply => transformed.write(&mut File::create(path)?)?,
-                    flags::FixMode::Diff => {
-                        write!(
-                            &mut io::stdout().lock(),
-                            "{}",
-                            source_kind.diff(&transformed, Some(path)).unwrap()
-                        )?;
+    let (result, transformed, fixed) =
+        if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
+            if let Ok(FixerResult {
+                result,
+                transformed,
+                fixed,
+            }) = lint_fix(
+                path,
+                package,
+                noqa,
+                unsafe_fixes,
+                settings,
+                &source_kind,
+                source_type,
+            ) {
+                if !fixed.is_empty() {
+                    match fix_mode {
+                        flags::FixMode::Apply => transformed.write(&mut File::create(path)?)?,
+                        flags::FixMode::Diff => {
+                            write!(
+                                &mut io::stdout().lock(),
+                                "{}",
+                                source_kind.diff(&transformed, Some(path)).unwrap()
+                            )?;
+                        }
+                        flags::FixMode::Generate => {}
                     }
-                    flags::FixMode::Generate => {}
                 }
-            }
-            let transformed = if let Cow::Owned(transformed) = transformed {
-                transformed
+                let transformed = if let Cow::Owned(transformed) = transformed {
+                    transformed
+                } else {
+                    source_kind
+                };
+                (result, transformed, fixed)
             } else {
-                source_kind
-            };
-            (result, transformed, fixed)
+                // If we fail to fix, lint the original source code.
+                let result = lint_only(
+                    path,
+                    package,
+                    settings,
+                    noqa,
+                    &source_kind,
+                    source_type,
+                    ParseSource::None,
+                );
+                let transformed = source_kind;
+                let fixed = FxHashMap::default();
+                (result, transformed, fixed)
+            }
         } else {
-            // If we fail to fix, lint the original source code.
             let result = lint_only(
                 path,
                 package,
@@ -317,21 +321,10 @@ pub(crate) fn lint_path(
             let transformed = source_kind;
             let fixed = FxHashMap::default();
             (result, transformed, fixed)
-        }
-    } else {
-        let result = lint_only(
-            path,
-            package,
-            settings,
-            noqa,
-            &source_kind,
-            source_type,
-            ParseSource::None,
-        );
-        let transformed = source_kind;
-        let fixed = FxHashMap::default();
-        (result, transformed, fixed)
-    };
+        };
+
+    let has_error = result.has_syntax_errors();
+    let messages = result.messages;
 
     if let Some((cache, relative_path, key)) = caching {
         // We don't cache parsing errors.
@@ -370,8 +363,7 @@ pub(crate) fn lint_path(
     })
 }
 
-/// Generate `Diagnostic`s from source code content derived from
-/// stdin.
+/// Generate `Diagnostic`s from source code content derived from stdin.
 pub(crate) fn lint_stdin(
     path: Option<&Path>,
     package: Option<PackageRoot<'_>>,
@@ -380,13 +372,37 @@ pub(crate) fn lint_stdin(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
-    // TODO(charlie): Support `pyproject.toml`.
     let source_type = match path.and_then(|path| settings.linter.extension.get(path)) {
         None => match path.map(SourceType::from).unwrap_or_default() {
             SourceType::Python(source_type) => source_type,
-            SourceType::Toml(_) => {
-                return Ok(Diagnostics::default());
+
+            SourceType::Toml(source_type) if source_type.is_pyproject() => {
+                if !settings
+                    .linter
+                    .rules
+                    .iter_enabled()
+                    .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+                {
+                    return Ok(Diagnostics::default());
+                }
+
+                let path = path.unwrap();
+                let source_file =
+                    SourceFileBuilder::new(path.to_string_lossy(), contents.clone()).finish();
+
+                match fix_mode {
+                    flags::FixMode::Diff | flags::FixMode::Generate => {}
+                    flags::FixMode::Apply => write!(&mut io::stdout().lock(), "{contents}")?,
+                }
+
+                return Ok(Diagnostics {
+                    messages: lint_pyproject_toml(source_file, &settings.linter),
+                    fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
+                    notebook_indexes: FxHashMap::default(),
+                });
             }
+
+            SourceType::Toml(_) => return Ok(Diagnostics::default()),
         },
         Some(language) => PySourceType::from(language),
     };

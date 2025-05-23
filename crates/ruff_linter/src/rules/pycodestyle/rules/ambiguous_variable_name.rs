@@ -1,7 +1,7 @@
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;

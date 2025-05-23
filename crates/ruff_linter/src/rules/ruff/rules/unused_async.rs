@@ -1,10 +1,10 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr, Stmt};
-use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::Modules;
+use ruff_python_semantic::analyze::function_type::is_stub;
 
 use crate::checkers::ast::Checker;
 use crate::rules::fastapi::rules::is_fastapi_route;
@@ -18,7 +18,7 @@ use crate::rules::fastapi::rules::is_fastapi_route;
 /// contexts where that function may be called. In some cases, labeling a function `async` is
 /// semantically meaningful (e.g. with the trio library).
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// async def foo():
 ///     bar()

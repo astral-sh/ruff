@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
 
@@ -18,7 +18,7 @@ use super::helpers;
 /// there are equivalent comprehensions for these types. Using a
 /// comprehension is clearer and more idiomatic.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict((x, f(x)) for x in foo)
 /// ```

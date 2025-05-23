@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::{Diagnostic, Fix, Violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
 use ruff_python_codegen::Stylist;
-use ruff_python_semantic::analyze::class::{is_metaclass, IsMetaclass};
+use ruff_python_semantic::analyze::class::{IsMetaclass, is_metaclass};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -82,6 +82,10 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// Checks for class methods that use a name other than `cls` for their
 /// first argument.
 ///
+/// The method `__new__` is exempted from this
+/// check and the corresponding violation is caught by
+/// [`bad-staticmethod-argument`][PLW0211].
+///
 /// ## Why is this bad?
 /// [PEP 8] recommends the use of `cls` as the first argument for all class
 /// methods:
@@ -124,9 +128,12 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
+/// [PLW0211]: https://docs.astral.sh/ruff/rules/bad-staticmethod-argument/
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidFirstArgumentNameForClassMethod {
     argument_name: String,
+    // Whether the method is `__new__`
+    is_new: bool,
 }
 
 impl Violation for InvalidFirstArgumentNameForClassMethod {
@@ -134,12 +141,19 @@ impl Violation for InvalidFirstArgumentNameForClassMethod {
         ruff_diagnostics::FixAvailability::Sometimes;
 
     #[derive_message_formats]
+    // The first string below is what shows up in the documentation
+    // in the rule table, and it is the more common case.
+    #[expect(clippy::if_not_else)]
     fn message(&self) -> String {
-        "First argument of a class method should be named `cls`".to_string()
+        if !self.is_new {
+            "First argument of a class method should be named `cls`".to_string()
+        } else {
+            "First argument of `__new__` method should be named `cls`".to_string()
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let Self { argument_name } = self;
+        let Self { argument_name, .. } = self;
         Some(format!("Rename `{argument_name}` to `cls`"))
     }
 }
@@ -153,10 +167,18 @@ enum FunctionType {
 }
 
 impl FunctionType {
-    fn diagnostic_kind(self, argument_name: String) -> DiagnosticKind {
+    fn diagnostic_kind(self, argument_name: String, range: TextRange) -> Diagnostic {
         match self {
-            Self::Method => InvalidFirstArgumentNameForMethod { argument_name }.into(),
-            Self::ClassMethod => InvalidFirstArgumentNameForClassMethod { argument_name }.into(),
+            Self::Method => {
+                Diagnostic::new(InvalidFirstArgumentNameForMethod { argument_name }, range)
+            }
+            Self::ClassMethod => Diagnostic::new(
+                InvalidFirstArgumentNameForClassMethod {
+                    argument_name,
+                    is_new: false,
+                },
+                range,
+            ),
         }
     }
 
@@ -214,6 +236,10 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
             IsMetaclass::Maybe => return,
         },
         function_type::FunctionType::ClassMethod => FunctionType::ClassMethod,
+        // This violation is caught by `PLW0211` instead
+        function_type::FunctionType::NewMethod => {
+            return;
+        }
     };
     if !checker.enabled(function_type.rule()) {
         return;
@@ -240,10 +266,8 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
-        function_type.diagnostic_kind(self_or_cls.name.to_string()),
-        self_or_cls.range(),
-    );
+    let mut diagnostic =
+        function_type.diagnostic_kind(self_or_cls.name.to_string(), self_or_cls.range());
     diagnostic.try_set_optional_fix(|| {
         rename_parameter(
             scope,

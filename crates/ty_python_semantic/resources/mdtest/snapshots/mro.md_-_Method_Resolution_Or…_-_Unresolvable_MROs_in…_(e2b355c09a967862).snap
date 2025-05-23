@@ -1,0 +1,37 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: mro.md - Method Resolution Order tests - Unresolvable MROs involving generics have the original bases reported in the error message, not the resolved bases
+mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing_extensions import Protocol, TypeVar, Generic
+2 | 
+3 | T = TypeVar("T")
+4 | 
+5 | class Foo(Protocol): ...
+6 | class Bar(Protocol[T]): ...
+7 | class Baz(Protocol[T], Foo, Bar[T]): ...  # error: [inconsistent-mro]
+```
+
+# Diagnostics
+
+```
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Baz` with bases list `[typing.Protocol[T], <class 'Foo'>, <class 'Bar[T]'>]`
+ --> src/mdtest_snippet.py:7:1
+  |
+5 | class Foo(Protocol): ...
+6 | class Bar(Protocol[T]): ...
+7 | class Baz(Protocol[T], Foo, Bar[T]): ...  # error: [inconsistent-mro]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+info: rule `inconsistent-mro` is enabled by default
+
+```

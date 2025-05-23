@@ -1,7 +1,7 @@
 use anyhow::Context;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
@@ -10,7 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
-use super::helpers::{dataclass_kind, DataclassKind};
+use super::helpers::{DataclassKind, dataclass_kind};
 
 /// ## What it does
 /// Checks for `__post_init__` dataclass methods with parameter defaults.
@@ -61,6 +61,12 @@ use super::helpers::{dataclass_kind, DataclassKind};
 /// foo = Foo()  # Prints '1 2'.
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because, although switching to `InitVar` is usually correct,
+/// it is incorrect when the parameter is not intended to be part of the public API or when the value
+/// is meant to be shared across all instances.
+///
 /// ## References
 /// - [Python documentation: Post-init processing](https://docs.python.org/3/library/dataclasses.html#post-init-processing)
 /// - [Python documentation: Init-only variables](https://docs.python.org/3/library/dataclasses.html#init-only-variables)
@@ -102,7 +108,6 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
     }
 
     let mut stopped_fixes = false;
-    let mut diagnostics = vec![];
 
     for parameter in function_def.parameters.iter_non_variadic_params() {
         let Some(default) = parameter.default() else {
@@ -126,10 +131,8 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
             stopped_fixes |= diagnostic.fix.is_none();
         }
 
-        diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
-
-    checker.report_diagnostics(diagnostics);
 }
 
 /// Generate a [`Fix`] to transform a `__post_init__` default argument into a

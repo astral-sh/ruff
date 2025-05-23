@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_stdlib::open_mode::OpenMode;
@@ -91,17 +91,11 @@ fn create_diagnostic(
     mode: OpenMode,
     checker: &Checker,
 ) -> Diagnostic {
-    let range = if checker.settings.preview.is_enabled() {
-        mode_arg.range()
-    } else {
-        call.range
-    };
-
     let mut diagnostic = Diagnostic::new(
         RedundantOpenModes {
             replacement: mode.to_string(),
         },
-        range,
+        mode_arg.range(),
     );
 
     if mode.is_empty() {

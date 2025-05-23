@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
 use ruff_python_ast::{self as ast, Arguments, ElifElseClause, Expr, ExprContext, Stmt};
@@ -14,37 +14,44 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// ## Why is this bad?
 /// `if` statements that return `True` for a truthy condition and `False` for
-/// a falsey condition can be replaced with boolean casts.
+/// a falsy condition can be replaced with boolean casts.
 ///
 /// ## Example
 /// Given:
 /// ```python
-/// if x > 0:
-///     return True
-/// else:
+/// def foo(x: int) -> bool:
+///     if x > 0:
+///         return True
+///     else:
+///         return False
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(x: int) -> bool:
+///     return x > 0
+/// ```
+///
+/// Or, given:
+/// ```python
+/// def foo(x: int) -> bool:
+///     if x > 0:
+///         return True
 ///     return False
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// return x > 0
+/// def foo(x: int) -> bool:
+///     return x > 0
 /// ```
 ///
-/// Or, given:
-/// ```python
-/// if x > 0:
-///     return True
-/// return False
-/// ```
+/// ## Fix safety
 ///
-/// Use instead:
-/// ```python
-/// return x > 0
-/// ```
-///
-/// ## Preview
-/// In preview, double negations such as `not a != b`, `not a not in b`, `not a is not b`
-/// will be simplified to `a == b`, `a in b` and `a is b`, respectively.
+/// This fix is marked as unsafe because it may change the program’s behavior if the condition does not
+/// return a proper Boolean. While the fix will try to wrap non-boolean values in a call to bool,
+/// custom implementations of comparison functions like `__eq__` can avoid the bool call and still
+/// lead to altered behavior.
 ///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
@@ -100,11 +107,13 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         // else:
         //     return False
         // ```
-        [ElifElseClause {
-            body: else_body,
-            test: None,
-            ..
-        }] => (
+        [
+            ElifElseClause {
+                body: else_body,
+                test: None,
+                ..
+            },
+        ] => (
             if_test.as_ref(),
             if_body,
             else_body.as_slice(),
@@ -117,15 +126,19 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         // elif x < 0:
         //     return False
         // ```
-        [.., ElifElseClause {
-            body: elif_body,
-            test: Some(elif_test),
-            range: elif_range,
-        }, ElifElseClause {
-            body: else_body,
-            test: None,
-            range: else_range,
-        }] => (
+        [
+            ..,
+            ElifElseClause {
+                body: elif_body,
+                test: Some(elif_test),
+                range: elif_range,
+            },
+            ElifElseClause {
+                body: else_body,
+                test: None,
+                range: else_range,
+            },
+        ] => (
             elif_test,
             elif_body,
             else_body.as_slice(),
@@ -222,16 +235,15 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                     left,
                     comparators,
                     ..
-                }) if checker.settings.preview.is_enabled()
-                    && matches!(
-                        ops.as_ref(),
-                        [ast::CmpOp::Eq
-                            | ast::CmpOp::NotEq
-                            | ast::CmpOp::In
-                            | ast::CmpOp::NotIn
-                            | ast::CmpOp::Is
-                            | ast::CmpOp::IsNot]
-                    ) =>
+                }) if matches!(
+                    ops.as_ref(),
+                    [ast::CmpOp::Eq
+                        | ast::CmpOp::NotEq
+                        | ast::CmpOp::In
+                        | ast::CmpOp::NotIn
+                        | ast::CmpOp::Is
+                        | ast::CmpOp::IsNot]
+                ) =>
                 {
                     let ([op], [right]) = (ops.as_ref(), comparators.as_ref()) else {
                         unreachable!("Single comparison with multiple comparators");
@@ -317,11 +329,7 @@ enum Bool {
 
 impl From<bool> for Bool {
     fn from(value: bool) -> Self {
-        if value {
-            Bool::True
-        } else {
-            Bool::False
-        }
+        if value { Bool::True } else { Bool::False }
     }
 }
 

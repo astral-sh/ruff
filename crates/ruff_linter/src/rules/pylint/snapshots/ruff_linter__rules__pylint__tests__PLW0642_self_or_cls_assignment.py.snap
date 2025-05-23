@@ -150,3 +150,12 @@ self_or_cls_assignment.py:26:9: PLW0642 Reassigned `self` variable in instance m
 28 |     def ok(self) -> None:
    |
    = help: Consider using a different variable name
+
+self_or_cls_assignment.py:50:9: PLW0642 Reassigned `cls` variable in `__new__` method
+   |
+48 | class Foo:
+49 |     def __new__(cls):
+50 |         cls = "apple" # PLW0642
+   |         ^^^ PLW0642
+   |
+   = help: Consider using a different variable name

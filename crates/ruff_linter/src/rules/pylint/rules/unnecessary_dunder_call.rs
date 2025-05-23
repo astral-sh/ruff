@@ -1,12 +1,12 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, OperatorPrecedence, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::is_known_dunder_method;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for explicit use of dunder methods, like `__str__` and `__add__`.
@@ -14,6 +14,34 @@ use crate::settings::types::PythonVersion;
 /// ## Why is this bad?
 /// Dunder names are not meant to be called explicitly and, in most cases, can
 /// be replaced with builtins or operators.
+///
+/// ## Fix safety
+/// This fix is always unsafe. When replacing dunder method calls with operators
+/// or builtins, the behavior can change in the following ways:
+///
+/// 1. Types may implement only a subset of related dunder methods. Calling a
+///    missing dunder method directly returns `NotImplemented`, but using the
+///    equivalent operator raises a `TypeError`.
+///    ```python
+///    class C: pass
+///    c = C()
+///    c.__gt__(1)  # before fix: NotImplemented
+///    c > 1        # after fix: raises TypeError
+///    ```
+/// 2. Instance-assigned dunder methods are ignored by operators and builtins.
+///    ```python
+///    class C: pass
+///    c = C()
+///    c.__bool__ = lambda: False
+///    c.__bool__() # before fix: False
+///    bool(c)      # after fix: True
+///    ```
+///
+/// 3. Even with built-in types, behavior can differ.
+///    ```python
+///    (1).__gt__(1.0)  # before fix: NotImplemented
+///    1 > 1.0          # after fix: False
+///    ```
 ///
 /// ## Example
 /// ```python
@@ -76,7 +104,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // If this is an allowed dunder method, abort.
-    if allowed_dunder_constants(attr, checker.settings.target_version) {
+    if allowed_dunder_constants(attr, checker.target_version()) {
         return;
     }
 
@@ -208,7 +236,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
             fixed,
             call.range(),
         )));
-    };
+    }
 
     checker.report_diagnostic(diagnostic);
 }
@@ -248,7 +276,7 @@ fn allowed_dunder_constants(dunder_method: &str, target_version: PythonVersion) 
         return true;
     }
 
-    if target_version < PythonVersion::Py310 && matches!(dunder_method, "__aiter__" | "__anext__") {
+    if target_version < PythonVersion::PY310 && matches!(dunder_method, "__aiter__" | "__anext__") {
         return true;
     }
 
@@ -398,7 +426,7 @@ impl DunderReplacement {
             "__or__" => Some(Self::Operator(
                 "|",
                 "Use `|` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitOr,
             )),
             "__rshift__" => Some(Self::Operator(
                 ">>",
@@ -418,7 +446,7 @@ impl DunderReplacement {
             "__xor__" => Some(Self::Operator(
                 "^",
                 "Use `^` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitXor,
             )),
 
             "__radd__" => Some(Self::ROperator(
@@ -454,7 +482,7 @@ impl DunderReplacement {
             "__ror__" => Some(Self::ROperator(
                 "|",
                 "Use `|` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitOr,
             )),
             "__rrshift__" => Some(Self::ROperator(
                 ">>",
@@ -474,7 +502,7 @@ impl DunderReplacement {
             "__rxor__" => Some(Self::ROperator(
                 "^",
                 "Use `^` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitXor,
             )),
 
             "__aiter__" => Some(Self::Builtin("aiter", "Use `aiter()` builtin")),

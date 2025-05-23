@@ -276,10 +276,10 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         }) => {
             if let Some(expr) = exc {
                 visitor.visit_expr(expr);
-            };
+            }
             if let Some(expr) = cause {
                 visitor.visit_expr(expr);
-            };
+            }
         }
         Stmt::Try(ast::StmtTry {
             body,
@@ -590,7 +590,7 @@ pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
 }
 
 pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &'a Arguments) {
-    // Note that the there might be keywords before the last arg, e.g. in
+    // Note that there might be keywords before the last arg, e.g. in
     // f(*args, a=2, *args2, **kwargs)`, but we follow Python in evaluating first `args` and then
     // `keywords`. See also [Arguments::arguments_source_order`].
     for arg in &*arguments.args {

@@ -1,9 +1,9 @@
 use std::fmt;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::helpers::pep_604_union;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
+use ruff_python_ast::helpers::pep_604_union;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -33,6 +33,12 @@ impl CallKind {
     }
 }
 
+/// ## Deprecation
+/// This rule was deprecated as using [PEP 604] syntax in `isinstance` and `issubclass` calls
+/// isn't recommended practice, and it incorrectly suggests that other typing syntaxes like [PEP 695]
+/// would be supported by `isinstance` and `issubclass`. Using the [PEP 604] syntax
+/// is also slightly slower.
+///
 /// ## What it does
 /// Checks for uses of `isinstance` and `issubclass` that take a tuple
 /// of types for comparison.
@@ -64,6 +70,7 @@ impl CallKind {
 /// - [Python documentation: `issubclass`](https://docs.python.org/3/library/functions.html#issubclass)
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
+/// [PEP 695]: https://peps.python.org/pep-0695/
 #[derive(ViolationMetadata)]
 pub(crate) struct NonPEP604Isinstance {
     kind: CallKind,

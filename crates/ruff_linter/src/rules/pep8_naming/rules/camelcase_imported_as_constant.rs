@@ -1,7 +1,7 @@
 use ruff_python_ast::{Alias, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_stdlib::str::{self};
 use ruff_text_size::Ranged;
 
@@ -43,6 +43,10 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 ///
 /// A common example of a single uppercase character being used for a class
 /// name can be found in Django's `django.db.models.Q` class.
+///
+/// ## Options
+/// - `lint.pep8-naming.ignore-names`
+/// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]

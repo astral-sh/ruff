@@ -418,6 +418,12 @@ impl TokenKind {
         matches!(self, TokenKind::Comment | TokenKind::NonLogicalNewline)
     }
 
+    /// Returns `true` if this is a comment token.
+    #[inline]
+    pub const fn is_comment(&self) -> bool {
+        matches!(self, TokenKind::Comment)
+    }
+
     #[inline]
     pub const fn is_arithmetic(self) -> bool {
         matches!(

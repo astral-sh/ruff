@@ -1,44 +1,66 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/nonlocal_stmt_trailing_comma.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..38,
+        range: 0..59,
         body: [
-            Nonlocal(
-                StmtNonlocal {
-                    range: 0..10,
-                    names: [],
-                },
-            ),
-            Nonlocal(
-                StmtNonlocal {
-                    range: 11..22,
-                    names: [
-                        Identifier {
-                            id: Name("x"),
-                            range: 20..21,
-                        },
-                    ],
-                },
-            ),
-            Nonlocal(
-                StmtNonlocal {
-                    range: 23..37,
-                    names: [
-                        Identifier {
-                            id: Name("x"),
-                            range: 32..33,
-                        },
-                        Identifier {
-                            id: Name("y"),
-                            range: 35..36,
-                        },
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..58,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("_"),
+                        range: 4..5,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 5..7,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Nonlocal(
+                            StmtNonlocal {
+                                range: 13..23,
+                                names: [],
+                            },
+                        ),
+                        Nonlocal(
+                            StmtNonlocal {
+                                range: 28..39,
+                                names: [
+                                    Identifier {
+                                        id: Name("x"),
+                                        range: 37..38,
+                                    },
+                                ],
+                            },
+                        ),
+                        Nonlocal(
+                            StmtNonlocal {
+                                range: 44..58,
+                                names: [
+                                    Identifier {
+                                        id: Name("x"),
+                                        range: 53..54,
+                                    },
+                                    Identifier {
+                                        id: Name("y"),
+                                        range: 56..57,
+                                    },
+                                ],
+                            },
+                        ),
                     ],
                 },
             ),
@@ -49,32 +71,35 @@ Module(
 ## Errors
 
   |
-1 | nonlocal ,
-  |          ^ Syntax Error: Expected an identifier
-2 | nonlocal x,
-3 | nonlocal x, y,
+1 | def _():
+2 |     nonlocal ,
+  |              ^ Syntax Error: Expected an identifier
+3 |     nonlocal x,
+4 |     nonlocal x, y,
   |
 
 
   |
-1 | nonlocal ,
-  |           ^ Syntax Error: Nonlocal statement must have at least one name
-2 | nonlocal x,
-3 | nonlocal x, y,
+1 | def _():
+2 |     nonlocal ,
+  |               ^ Syntax Error: Nonlocal statement must have at least one name
+3 |     nonlocal x,
+4 |     nonlocal x, y,
   |
 
 
   |
-1 | nonlocal ,
-2 | nonlocal x,
-  |           ^ Syntax Error: Trailing comma not allowed
-3 | nonlocal x, y,
+1 | def _():
+2 |     nonlocal ,
+3 |     nonlocal x,
+  |               ^ Syntax Error: Trailing comma not allowed
+4 |     nonlocal x, y,
   |
 
 
   |
-1 | nonlocal ,
-2 | nonlocal x,
-3 | nonlocal x, y,
-  |              ^ Syntax Error: Trailing comma not allowed
+2 |     nonlocal ,
+3 |     nonlocal x,
+4 |     nonlocal x, y,
+  |                  ^ Syntax Error: Trailing comma not allowed
   |

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
@@ -63,7 +63,7 @@ pub(crate) fn no_surrounding_whitespace(checker: &Checker, docstring: &Docstring
         return;
     }
     let mut diagnostic = Diagnostic::new(SurroundingWhitespace, docstring.range());
-    let quote = docstring.contents.chars().last().unwrap();
+    let quote = docstring.quote_style().as_char();
     // If removing whitespace would lead to an invalid string of quote
     // characters, avoid applying the fix.
     if !trimmed.ends_with(quote) && !trimmed.starts_with(quote) && !ends_with_backslash(trimmed) {

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextSize};
 
@@ -16,7 +16,7 @@ use super::helpers;
 /// It's unnecessary to use a list or tuple literal within a call to `set()`.
 /// Instead, the expression can be rewritten as a set literal.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// set([1, 2])
 /// set((1, 2))

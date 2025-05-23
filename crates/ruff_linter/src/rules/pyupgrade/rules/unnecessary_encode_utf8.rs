@@ -1,12 +1,14 @@
+use std::fmt::Write as _;
+
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::Checker;
-use crate::fix::edits::{pad, remove_argument, Parentheses};
 use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::fix::edits::{Parentheses, pad, remove_argument};
 
 /// ## What it does
 /// Checks for unnecessary calls to `encode` as UTF-8.
@@ -129,10 +131,11 @@ fn replace_with_bytes_literal(locator: &Locator, call: &ast::ExprCall, tokens: &
             TokenKind::String => {
                 replacement.push_str(locator.slice(TextRange::new(prev, token.start())));
                 let string = locator.slice(token);
-                replacement.push_str(&format!(
+                let _ = write!(
+                    &mut replacement,
                     "b{}",
                     &string.trim_start_matches('u').trim_start_matches('U')
-                ));
+                );
             }
             _ => {
                 replacement.push_str(locator.slice(TextRange::new(prev, token.end())));

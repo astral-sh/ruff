@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing::find_binding_value;
@@ -9,12 +9,11 @@ use ruff_python_semantic::{BindingId, SemanticModel};
 use ruff_text_size::Ranged;
 
 /// ## What it does
-/// Checks for usage of call of 'len' on sequences
-/// in boolean test context.
+/// Checks for `len` calls on sequences in a boolean test context.
 ///
 /// ## Why is this bad?
 /// Empty sequences are considered false in a boolean context.
-/// You can either remove the call to 'len'
+/// You can either remove the call to `len`
 /// or compare the length against a scalar.
 ///
 /// ## Example
@@ -32,6 +31,7 @@ use ruff_text_size::Ranged;
 /// Use instead:
 /// ```python
 /// fruits = ["orange", "apple"]
+/// vegetables = []
 ///
 /// if fruits:
 ///     print(fruits)

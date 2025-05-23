@@ -226,7 +226,6 @@ pub struct PatternMatchOr<'a> {
     patterns: Vec<ComparablePattern<'a>>,
 }
 
-#[allow(clippy::enum_variant_names)]
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ComparablePattern<'a> {
     MatchValue(PatternMatchValue<'a>),

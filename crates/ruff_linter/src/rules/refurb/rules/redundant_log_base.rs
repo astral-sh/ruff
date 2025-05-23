@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Number};
 use ruff_text_size::Ranged;
 
@@ -129,7 +129,7 @@ fn is_number_literal(expr: &Expr, value: i8) -> bool {
         if let Number::Int(number) = &number_literal.value {
             return number.as_i8().is_some_and(|number| number == value);
         } else if let Number::Float(number) = number_literal.value {
-            #[allow(clippy::float_cmp)]
+            #[expect(clippy::float_cmp)]
             return number == f64::from(value);
         }
     }

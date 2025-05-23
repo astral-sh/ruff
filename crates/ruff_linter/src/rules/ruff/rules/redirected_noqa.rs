@@ -1,8 +1,8 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
-use crate::noqa::{Codes, Directive, FileNoqaDirectives, NoqaDirectives, ParsedFileExemption};
+use crate::noqa::{Codes, Directive, FileNoqaDirectives, NoqaDirectives};
 use crate::rule_redirects::get_redirect_target;
 
 /// ## What it does
@@ -59,7 +59,7 @@ pub(crate) fn redirected_file_noqa(
     noqa_directives: &FileNoqaDirectives,
 ) {
     for line in noqa_directives.lines() {
-        let ParsedFileExemption::Codes(codes) = &line.parsed_file_exemption else {
+        let Directive::Codes(codes) = &line.parsed_file_exemption else {
             continue;
         };
 

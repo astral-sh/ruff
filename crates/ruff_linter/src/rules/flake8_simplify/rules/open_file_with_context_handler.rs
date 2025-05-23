@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -112,6 +112,28 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
         }
     }
     false
+}
+
+/// Return `true` if the current expression is nested in a call to one of the
+/// unittest context manager methods: `cls.enterClassContext()`,
+/// `self.enterContext()`, or `self.enterAsyncContext()`.
+fn match_unittest_context_methods(semantic: &SemanticModel) -> bool {
+    let Some(expr) = semantic.current_expression_parent() else {
+        return false;
+    };
+    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+        return false;
+    };
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
+        return false;
+    };
+    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+        return false;
+    };
+    matches!(
+        (id.as_str(), attr.as_str()),
+        ("cls", "enterClassContext") | ("self", "enterContext" | "enterAsyncContext")
+    )
 }
 
 /// Return `true` if the expression is a call to `open()`,
@@ -226,6 +248,11 @@ pub(crate) fn open_file_with_context_handler(checker: &Checker, call: &ast::Expr
 
     // Ex) `with contextlib.AsyncExitStack() as exit_stack: ...`
     if match_async_exit_stack(semantic) {
+        return;
+    }
+
+    // Ex) `self.enterContext(open("foo.txt"))`
+    if match_unittest_context_methods(semantic) {
         return;
     }
 

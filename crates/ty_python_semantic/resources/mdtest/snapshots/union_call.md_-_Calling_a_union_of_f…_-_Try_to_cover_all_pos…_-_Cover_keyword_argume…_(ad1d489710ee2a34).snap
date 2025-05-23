@@ -1,0 +1,61 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: union_call.md - Calling a union of function types - Try to cover all possible reasons - Cover keyword argument related reasons
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def any(*args, **kwargs) -> int:
+ 2 |     return 0
+ 3 | 
+ 4 | def f1(name: str) -> int:
+ 5 |     return 0
+ 6 | 
+ 7 | def _(n: int):
+ 8 |     if n == 0:
+ 9 |         f = f1
+10 |     else:
+11 |         f = any
+12 |     # error: [parameter-already-assigned]
+13 |     # error: [unknown-argument]
+14 |     y = f("foo", name="bar", unknown="quux")
+```
+
+# Diagnostics
+
+```
+error[parameter-already-assigned]: Multiple values provided for parameter `name` of function `f1`
+  --> src/mdtest_snippet.py:14:18
+   |
+12 |     # error: [parameter-already-assigned]
+13 |     # error: [unknown-argument]
+14 |     y = f("foo", name="bar", unknown="quux")
+   |                  ^^^^^^^^^^
+   |
+info: Union variant `def f1(name: str) -> int` is incompatible with this call site
+info: Attempted to call union type `(def f1(name: str) -> int) | (def any(*args, **kwargs) -> int)`
+info: rule `parameter-already-assigned` is enabled by default
+
+```
+
+```
+error[unknown-argument]: Argument `unknown` does not match any known parameter of function `f1`
+  --> src/mdtest_snippet.py:14:30
+   |
+12 |     # error: [parameter-already-assigned]
+13 |     # error: [unknown-argument]
+14 |     y = f("foo", name="bar", unknown="quux")
+   |                              ^^^^^^^^^^^^^^
+   |
+info: Union variant `def f1(name: str) -> int` is incompatible with this call site
+info: Attempted to call union type `(def f1(name: str) -> int) | (def any(*args, **kwargs) -> int)`
+info: rule `unknown-argument` is enabled by default
+
+```

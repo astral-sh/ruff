@@ -4,9 +4,9 @@
 use itertools::Itertools;
 use std::fmt::Write;
 
+use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
 use ruff_python_trivia::textwrap;
 use ruff_workspace::options::Options;
-use ruff_workspace::options_base::{OptionField, OptionSet, OptionsMetadata, Visit};
 
 pub(crate) fn generate() -> String {
     let mut output = String::new();
@@ -98,17 +98,16 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     let parents_anchor = parents.iter().filter_map(|parent| parent.name()).join("_");
 
     if parents_anchor.is_empty() {
-        output.push_str(&format!(
-            "{header_level} [`{name}`](#{name}) {{: #{name} }}\n"
-        ));
+        let _ = writeln!(output, "{header_level} [`{name}`](#{name}) {{: #{name} }}");
     } else {
-        output.push_str(&format!(
-            "{header_level} [`{name}`](#{parents_anchor}_{name}) {{: #{parents_anchor}_{name} }}\n"
-        ));
+        let _ = writeln!(
+            output,
+            "{header_level} [`{name}`](#{parents_anchor}_{name}) {{: #{parents_anchor}_{name} }}"
+        );
 
         // the anchor used to just be the name, but now it's the group name
         // for backwards compatibility, we need to keep the old anchor
-        output.push_str(&format!("<span id=\"{name}\"></span>\n"));
+        let _ = writeln!(output, "<span id=\"{name}\"></span>");
     }
 
     output.push('\n');
@@ -132,9 +131,9 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
 
     output.push_str(field.doc);
     output.push_str("\n\n");
-    output.push_str(&format!("**Default value**: `{}`\n", field.default));
+    let _ = writeln!(output, "**Default value**: `{}`", field.default);
     output.push('\n');
-    output.push_str(&format!("**Type**: `{}`\n", field.value_type));
+    let _ = writeln!(output, "**Type**: `{}`", field.value_type);
     output.push('\n');
     output.push_str("**Example usage**:\n\n");
     output.push_str(&format_tab(

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextSize};
 
@@ -19,7 +19,7 @@ use super::helpers;
 /// removed. Otherwise, if a tuple literal is passed in, then it should be
 /// rewritten as a list literal.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// list([1, 2])
 /// list((1, 2))

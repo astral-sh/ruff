@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_text_size::Ranged;
@@ -124,7 +124,7 @@ pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDef)
     // If the class does not inherit both `str` and `enum.Enum`, exit early.
     if !inherits_str || !inherits_enum {
         return;
-    };
+    }
 
     let mut diagnostic = Diagnostic::new(
         ReplaceStrEnum {

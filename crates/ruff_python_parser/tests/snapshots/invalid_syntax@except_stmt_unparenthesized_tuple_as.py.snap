@@ -1,0 +1,154 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/except_stmt_unparenthesized_tuple_as.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..86,
+        body: [
+            Try(
+                StmtTry {
+                    range: 0..42,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 9..13,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 14..42,
+                                type_: Some(
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 21..25,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 21..22,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 24..25,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: Name("exc"),
+                                        range: 29..32,
+                                    },
+                                ),
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 38..42,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 43..85,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 52..56,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 57..85,
+                                type_: Some(
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 65..69,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 65..66,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 68..69,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: Name("eg"),
+                                        range: 73..75,
+                                    },
+                                ),
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 81..85,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: true,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | try:
+2 |     pass
+3 | except x, y as exc:
+  |        ^^^^ Syntax Error: Multiple exception types must be parenthesized when using `as`
+4 |     pass
+5 | try:
+  |
+
+
+  |
+5 | try:
+6 |     pass
+7 | except* x, y as eg:
+  |         ^^^^ Syntax Error: Multiple exception types must be parenthesized when using `as`
+8 |     pass
+  |

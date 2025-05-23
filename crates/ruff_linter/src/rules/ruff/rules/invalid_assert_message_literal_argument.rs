@@ -1,12 +1,12 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, StmtAssert};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for invalid use of literals in assert message argument.
+/// Checks for invalid use of literals in assert message arguments.
 ///
 /// ## Why is this bad?
 /// An assert message which is a non-string literal was likely intended

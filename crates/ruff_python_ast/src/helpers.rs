@@ -3,7 +3,7 @@ use std::path::Path;
 
 use rustc_hash::FxHashMap;
 
-use ruff_python_trivia::{indentation_at_offset, CommentRanges, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{CommentRanges, SimpleTokenKind, SimpleTokenizer, indentation_at_offset};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -546,6 +546,13 @@ pub fn any_over_body(body: &[Stmt], func: &dyn Fn(&Expr) -> bool) -> bool {
 
 pub fn is_dunder(id: &str) -> bool {
     id.starts_with("__") && id.ends_with("__")
+}
+
+/// Whether a name starts and ends with a single underscore.
+///
+/// `_a__` is considered neither a dunder nor a sunder name.
+pub fn is_sunder(id: &str) -> bool {
+    id.starts_with('_') && id.ends_with('_') && !id.starts_with("__") && !id.ends_with("__")
 }
 
 /// Return `true` if the [`Stmt`] is an assignment to a dunder (like `__all__`).
@@ -1615,10 +1622,10 @@ mod tests {
         });
         let type_alias = Stmt::TypeAlias(StmtTypeAlias {
             name: Box::new(name.clone()),
-            type_params: Some(TypeParams {
+            type_params: Some(Box::new(TypeParams {
                 type_params: vec![type_var_one, type_var_two],
                 range: TextRange::default(),
-            }),
+            })),
             value: Box::new(constant_three.clone()),
             range: TextRange::default(),
         });

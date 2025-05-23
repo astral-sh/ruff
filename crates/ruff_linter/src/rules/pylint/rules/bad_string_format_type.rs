@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 
 use crate::checkers::ast::Checker;
@@ -230,7 +230,7 @@ pub(crate) fn bad_string_format_type(
         // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
         if let Ok(format_string) = CFormatString::from_str(string) {
             format_strings.push(format_string);
-        };
+        }
     }
 
     // Parse the parameters.

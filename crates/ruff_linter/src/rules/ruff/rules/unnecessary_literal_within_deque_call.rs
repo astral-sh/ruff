@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -10,7 +10,7 @@ use ruff_text_size::Ranged;
 /// ## Why is this bad?
 /// It's unnecessary to use an empty literal as a deque's iterable, since this is already the default behavior.
 ///
-/// ## Examples
+/// ## Example
 ///
 /// ```python
 /// from collections import deque

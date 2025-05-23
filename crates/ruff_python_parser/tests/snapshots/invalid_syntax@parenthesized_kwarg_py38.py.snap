@@ -1,0 +1,161 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/parenthesized_kwarg_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..77,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 43..51,
+                    value: Call(
+                        ExprCall {
+                            range: 43..51,
+                            func: Name(
+                                ExprName {
+                                    range: 43..44,
+                                    id: Name("f"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 44..51,
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 45..50,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("a"),
+                                                range: 46..47,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 49..50,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 52..62,
+                    value: Call(
+                        ExprCall {
+                            range: 52..62,
+                            func: Name(
+                                ExprName {
+                                    range: 52..53,
+                                    id: Name("f"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 53..62,
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 54..61,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("a"),
+                                                range: 55..56,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 60..61,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 63..76,
+                    value: Call(
+                        ExprCall {
+                            range: 63..76,
+                            func: Name(
+                                ExprName {
+                                    range: 63..64,
+                                    id: Name("f"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 64..76,
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 66..75,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("a"),
+                                                range: 68..69,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 74..75,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.8"}
+2 | f((a)=1)
+  |   ^^^ Syntax Error: Cannot use parenthesized keyword argument name on Python 3.8 (syntax was removed in Python 3.8)
+3 | f((a) = 1)
+4 | f( ( a ) = 1)
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.8"}
+2 | f((a)=1)
+3 | f((a) = 1)
+  |   ^^^ Syntax Error: Cannot use parenthesized keyword argument name on Python 3.8 (syntax was removed in Python 3.8)
+4 | f( ( a ) = 1)
+  |
+
+
+  |
+2 | f((a)=1)
+3 | f((a) = 1)
+4 | f( ( a ) = 1)
+  |    ^^^^^ Syntax Error: Cannot use parenthesized keyword argument name on Python 3.8 (syntax was removed in Python 3.8)
+  |

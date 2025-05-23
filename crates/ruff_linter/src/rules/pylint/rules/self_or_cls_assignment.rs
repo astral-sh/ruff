@@ -1,14 +1,17 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::analyze::function_type::{self as function_type, FunctionType};
 use ruff_python_semantic::ScopeKind;
+use ruff_python_semantic::analyze::function_type::{self as function_type, FunctionType};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for assignment of `self` and `cls` in instance and class methods respectively.
+///
+/// This check also applies to `__new__` even though this is technically
+/// a static method.
 ///
 /// ## Why is this bad?
 /// The identifiers `self` and `cls` are conventional in Python for the first parameter of instance
@@ -100,8 +103,9 @@ pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
     );
 
     let method_type = match (function_type, self_or_cls.name().as_str()) {
-        (FunctionType::Method { .. }, "self") => MethodType::Instance,
-        (FunctionType::ClassMethod { .. }, "cls") => MethodType::Class,
+        (FunctionType::Method, "self") => MethodType::Instance,
+        (FunctionType::ClassMethod, "cls") => MethodType::Class,
+        (FunctionType::NewMethod, "cls") => MethodType::New,
         _ => return,
     };
 
@@ -134,6 +138,7 @@ fn check_expr(checker: &Checker, target: &Expr, method_type: MethodType) {
 enum MethodType {
     Instance,
     Class,
+    New,
 }
 
 impl MethodType {
@@ -141,6 +146,7 @@ impl MethodType {
         match self {
             MethodType::Instance => "self",
             MethodType::Class => "cls",
+            MethodType::New => "cls",
         }
     }
 }
@@ -150,6 +156,7 @@ impl std::fmt::Display for MethodType {
         match self {
             MethodType::Instance => f.write_str("instance"),
             MethodType::Class => f.write_str("class"),
+            MethodType::New => f.write_str("`__new__`"),
         }
     }
 }

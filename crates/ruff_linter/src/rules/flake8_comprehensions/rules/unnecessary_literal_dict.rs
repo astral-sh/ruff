@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
 
@@ -16,7 +16,7 @@ use super::helpers;
 /// It's unnecessary to use a list or tuple literal within a call to `dict()`.
 /// It can be rewritten as a dict literal (`{}`).
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict([(1, 2), (3, 4)])
 /// dict(((1, 2), (3, 4)))

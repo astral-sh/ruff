@@ -2,20 +2,18 @@ use ruff_python_ast::ExprBytesLiteral;
 use ruff_python_ast::{AnyNodeRef, StringLike};
 
 use crate::expression::parentheses::{
-    in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, in_parentheses_only_group,
 };
 use crate::prelude::*;
 use crate::string::implicit::FormatImplicitConcatenatedStringFlat;
-use crate::string::{implicit::FormatImplicitConcatenatedString, StringLikeExtensions};
+use crate::string::{StringLikeExtensions, implicit::FormatImplicitConcatenatedString};
 
 #[derive(Default)]
 pub struct FormatExprBytesLiteral;
 
 impl FormatNodeRule<ExprBytesLiteral> for FormatExprBytesLiteral {
     fn fmt_fields(&self, item: &ExprBytesLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprBytesLiteral { value, .. } = item;
-
-        if let [bytes_literal] = value.as_slice() {
+        if let Some(bytes_literal) = item.as_single_part_bytestring() {
             bytes_literal.format().fmt(f)
         } else {
             // Always join byte literals that aren't parenthesized and thus, always on a single line.

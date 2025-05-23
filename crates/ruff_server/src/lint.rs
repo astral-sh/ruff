@@ -4,34 +4,36 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    DIAGNOSTIC_NAME, PositionEncoding,
     edit::{NotebookRange, ToRangeExt},
     resolve::is_document_excluded_for_linting,
     session::DocumentQuery,
-    PositionEncoding, DIAGNOSTIC_NAME,
 };
-use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
-use ruff_linter::package::PackageRoot;
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
-    directives::{extract_directives, Flags},
+    Locator,
+    codes::Rule,
+    directives::{Flags, extract_directives},
     generate_noqa_edits,
     linter::check_path,
+    message::Message,
+    package::PackageRoot,
     packaging::detect_package_root,
-    registry::AsRule,
     settings::flags,
     source_kind::SourceKind,
-    Locator,
 };
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::ParseError;
+use ruff_python_parser::ParseOptions;
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
 
 /// This is serialized on the diagnostic `data` field.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct AssociatedDiagnosticData {
-    pub(crate) kind: DiagnosticKind,
+    /// The message describing what the fix does, if it exists, or the diagnostic name otherwise.
+    pub(crate) title: String,
     /// Edits to fix the diagnostic. If this is empty, a fix
     /// does not exist.
     pub(crate) edits: Vec<lsp_types::TextEdit>,
@@ -94,8 +96,19 @@ pub(crate) fn check(
 
     let source_type = query.source_type();
 
+    let target_version = if let Some(path) = &document_path {
+        settings.linter.resolve_target_version(path)
+    } else {
+        settings.linter.unresolved_target_version
+    };
+
+    let parse_options =
+        ParseOptions::from(source_type).with_target_version(target_version.parser_version());
+
     // Parse once.
-    let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
+    let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), parse_options)
+        .try_into_module()
+        .expect("PySourceType always parses to a ModModule");
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -110,7 +123,7 @@ pub(crate) fn check(
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
     // Generate checks.
-    let diagnostics = check_path(
+    let messages = check_path(
         &query.virtual_file_path(),
         package,
         &locator,
@@ -122,11 +135,12 @@ pub(crate) fn check(
         &source_kind,
         source_type,
         &parsed,
+        target_version,
     );
 
     let noqa_edits = generate_noqa_edits(
         &query.virtual_file_path(),
-        &diagnostics,
+        &messages,
         &locator,
         indexer.comment_ranges(),
         &settings.linter.external,
@@ -148,34 +162,32 @@ pub(crate) fn check(
             .or_default();
     }
 
-    let lsp_diagnostics = diagnostics
-        .into_iter()
-        .zip(noqa_edits)
-        .map(|(diagnostic, noqa_edit)| {
-            to_lsp_diagnostic(
-                diagnostic,
-                noqa_edit,
-                &source_kind,
-                locator.to_index(),
-                encoding,
-            )
-        });
-
-    let lsp_diagnostics = lsp_diagnostics.chain(
-        show_syntax_errors
-            .then(|| {
-                parsed.errors().iter().map(|parse_error| {
-                    parse_error_to_lsp_diagnostic(
-                        parse_error,
-                        &source_kind,
-                        locator.to_index(),
-                        encoding,
-                    )
-                })
-            })
+    let lsp_diagnostics =
+        messages
             .into_iter()
-            .flatten(),
-    );
+            .zip(noqa_edits)
+            .filter_map(|(message, noqa_edit)| match message.to_rule() {
+                Some(rule) => Some(to_lsp_diagnostic(
+                    rule,
+                    &message,
+                    noqa_edit,
+                    &source_kind,
+                    locator.to_index(),
+                    encoding,
+                )),
+                None => {
+                    if show_syntax_errors {
+                        Some(syntax_error_to_lsp_diagnostic(
+                            &message,
+                            &source_kind,
+                            locator.to_index(),
+                            encoding,
+                        ))
+                    } else {
+                        None
+                    }
+                }
+            });
 
     if let Some(notebook) = query.as_notebook() {
         for (index, diagnostic) in lsp_diagnostics {
@@ -217,10 +229,7 @@ pub(crate) fn fixes_for_diagnostics(
             Ok(Some(DiagnosticFix {
                 fixed_diagnostic,
                 code: associated_data.code,
-                title: associated_data
-                    .kind
-                    .suggestion
-                    .unwrap_or(associated_data.kind.name),
+                title: associated_data.title,
                 noqa_edit: associated_data.noqa_edit,
                 edits: associated_data.edits,
             }))
@@ -232,27 +241,24 @@ pub(crate) fn fixes_for_diagnostics(
 /// Generates an LSP diagnostic with an associated cell index for the diagnostic to go in.
 /// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
-    diagnostic: Diagnostic,
+    rule: Rule,
+    diagnostic: &Message,
     noqa_edit: Option<Edit>,
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
 ) -> (usize, lsp_types::Diagnostic) {
-    let Diagnostic {
-        kind,
-        range: diagnostic_range,
-        fix,
-        ..
-    } = diagnostic;
-
-    let rule = kind.rule();
+    let diagnostic_range = diagnostic.range();
+    let name = diagnostic.name();
+    let body = diagnostic.body().to_string();
+    let fix = diagnostic.fix();
+    let suggestion = diagnostic.suggestion();
 
     let fix = fix.and_then(|fix| fix.applies(Applicability::Unsafe).then_some(fix));
 
     let data = (fix.is_some() || noqa_edit.is_some())
         .then(|| {
             let edits = fix
-                .as_ref()
                 .into_iter()
                 .flat_map(Fix::edits)
                 .map(|edit| lsp_types::TextEdit {
@@ -265,7 +271,7 @@ fn to_lsp_diagnostic(
                 new_text: noqa_edit.into_content().unwrap_or_default().into_string(),
             });
             serde_json::to_value(AssociatedDiagnosticData {
-                kind: kind.clone(),
+                title: suggestion.unwrap_or(name).to_string(),
                 noqa_edit,
                 edits,
                 code: rule.noqa_code().to_string(),
@@ -304,15 +310,15 @@ fn to_lsp_diagnostic(
                 })
             }),
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: kind.body,
+            message: body,
             related_information: None,
             data,
         },
     )
 }
 
-fn parse_error_to_lsp_diagnostic(
-    parse_error: &ParseError,
+fn syntax_error_to_lsp_diagnostic(
+    syntax_error: &Message,
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
@@ -321,7 +327,7 @@ fn parse_error_to_lsp_diagnostic(
     let cell: usize;
 
     if let Some(notebook_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
-        NotebookRange { cell, range } = parse_error.location.to_notebook_range(
+        NotebookRange { cell, range } = syntax_error.range().to_notebook_range(
             source_kind.source_code(),
             index,
             notebook_index,
@@ -329,8 +335,8 @@ fn parse_error_to_lsp_diagnostic(
         );
     } else {
         cell = usize::default();
-        range = parse_error
-            .location
+        range = syntax_error
+            .range()
             .to_range(source_kind.source_code(), index, encoding);
     }
 
@@ -343,7 +349,7 @@ fn parse_error_to_lsp_diagnostic(
             code: None,
             code_description: None,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: format!("SyntaxError: {}", &parse_error.error),
+            message: syntax_error.body().to_string(),
             related_information: None,
             data: None,
         },
@@ -378,7 +384,8 @@ fn tags(code: &str) -> Option<Vec<lsp_types::DiagnosticTag>> {
     match code {
         // F401: <module> imported but unused
         // F841: local variable <name> is assigned to but never used
-        "F401" | "F841" => Some(vec![lsp_types::DiagnosticTag::UNNECESSARY]),
+        // RUF059: Unused unpacked variable
+        "F401" | "F841" | "RUF059" => Some(vec![lsp_types::DiagnosticTag::UNNECESSARY]),
         _ => None,
     }
 }

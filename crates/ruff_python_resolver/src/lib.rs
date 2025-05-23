@@ -15,7 +15,7 @@ mod search;
 
 #[cfg(test)]
 mod tests {
-    use std::fs::{create_dir_all, File};
+    use std::fs::{File, create_dir_all};
     use std::io::{self, Write};
     use std::path::{Path, PathBuf};
 
@@ -625,7 +625,7 @@ mod tests {
 
         let result = resolve_options(file2, "file1", root, ResolverOptions::default());
 
-        debug!("result: {:?}", result);
+        debug!("result: {result:?}");
 
         assert!(!result.is_import_found);
 

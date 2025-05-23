@@ -1,0 +1,31 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: unresolved_reference.md - Diagnostics for unresolved references - New builtin used on old Python version
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unresolved_reference.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | aiter  # error: [unresolved-reference]
+```
+
+# Diagnostics
+
+```
+error[unresolved-reference]: Name `aiter` used when not defined
+ --> src/mdtest_snippet.py:1:1
+  |
+1 | aiter  # error: [unresolved-reference]
+  | ^^^^^
+  |
+info: `aiter` was added as a builtin in Python 3.10
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
+info: rule `unresolved-reference` is enabled by default
+
+```

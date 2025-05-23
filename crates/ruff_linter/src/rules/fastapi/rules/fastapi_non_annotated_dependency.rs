@@ -1,14 +1,13 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::Modules;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
 use crate::rules::fastapi::rules::is_fastapi_route;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Identifies FastAPI routes with deprecated uses of `Depends` or similar.
@@ -60,6 +59,16 @@ use crate::settings::types::PythonVersion;
 ///     return commons
 /// ```
 ///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for Python versions
+/// before 3.9, its diagnostic will not be emitted, and no fix will be offered, if
+/// `typing_extensions` imports have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
+///
 /// [FastAPI documentation]: https://fastapi.tiangolo.com/tutorial/query-params-str-validations/?h=annotated#advantages-of-annotated
 /// [typing-annotated]: https://docs.python.org/3/library/typing.html#typing.Annotated
 /// [typing-extensions]: https://typing-extensions.readthedocs.io/en/stable/
@@ -77,7 +86,7 @@ impl Violation for FastApiNonAnnotatedDependency {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let title = if self.py_version >= PythonVersion::Py39 {
+        let title = if self.py_version >= PythonVersion::PY39 {
             "Replace with `typing.Annotated`"
         } else {
             "Replace with `typing_extensions.Annotated`"
@@ -224,24 +233,19 @@ fn create_diagnostic(
     dependency_call: Option<DependencyCall>,
     mut seen_default: bool,
 ) -> bool {
+    let Some(importer) = checker.typing_importer("Annotated", PythonVersion::PY39) else {
+        return seen_default;
+    };
+
     let mut diagnostic = Diagnostic::new(
         FastApiNonAnnotatedDependency {
-            py_version: checker.settings.target_version,
+            py_version: checker.target_version(),
         },
         parameter.range,
     );
 
     let try_generate_fix = || {
-        let module = if checker.settings.target_version >= PythonVersion::Py39 {
-            "typing"
-        } else {
-            "typing_extensions"
-        };
-        let (import_edit, binding) = checker.importer().get_or_import_symbol(
-            &ImportRequest::import_from(module, "Annotated"),
-            parameter.range.start(),
-            checker.semantic(),
-        )?;
+        let (import_edit, binding) = importer.import(parameter.range.start())?;
 
         // Each of these classes takes a single, optional default
         // argument, followed by kw-only arguments

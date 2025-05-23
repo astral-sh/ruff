@@ -1,7 +1,7 @@
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, ExprCall, ExprContext, StringLiteralFlags};
@@ -92,7 +92,9 @@ impl Violation for PytestParametrizeNamesWrongType {
                 }
             }
         };
-        format!("Wrong type passed to first argument of `pytest.mark.parametrize`; expected {expected_string}")
+        format!(
+            "Wrong type passed to first argument of `pytest.mark.parametrize`; expected {expected_string}"
+        )
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -458,7 +460,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                         checker.report_diagnostic(diagnostic);
                     }
                 }
-            };
+            }
         }
         Expr::List(ast::ExprList { elts, .. }) => {
             if elts.len() == 1 {
@@ -505,7 +507,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                         checker.report_diagnostic(diagnostic);
                     }
                 }
-            };
+            }
         }
         _ => {}
     }

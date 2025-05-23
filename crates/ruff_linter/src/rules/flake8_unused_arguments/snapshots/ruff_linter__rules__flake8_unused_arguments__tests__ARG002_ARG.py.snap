@@ -58,11 +58,11 @@ ARG.py:66:17: ARG002 Unused method argument: `x`
 68 |         raise NotImplementedError("must use msg")
    |
 
-ARG.py:213:24: ARG002 Unused method argument: `x`
+ARG.py:216:24: ARG002 Unused method argument: `x`
     |
-211 | ###
-212 | class C:
-213 |     def __init__(self, x) -> None:
-    |                        ^ ARG002
 214 |         print("Hello, world!")
+215 |
+216 |     def __init__(self, x) -> None:
+    |                        ^ ARG002
+217 |         print("Hello, world!")
     |

@@ -3,20 +3,20 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::{ModModule, PySourceType};
+use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Parsed;
 
+use crate::Locator;
 use crate::directives::IsortDirectives;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
 use crate::rules::isort;
 use crate::rules::isort::block::{Block, BlockBuilder};
 use crate::settings::LinterSettings;
-use crate::Locator;
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn check_imports(
     parsed: &Parsed<ModModule>,
     locator: &Locator,
@@ -27,6 +27,7 @@ pub(crate) fn check_imports(
     package: Option<PackageRoot<'_>>,
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
+    target_version: PythonVersion,
 ) -> Vec<Diagnostic> {
     // Extract all import blocks from the AST.
     let tracker = {
@@ -52,6 +53,7 @@ pub(crate) fn check_imports(
                     package,
                     source_type,
                     parsed.tokens(),
+                    target_version,
                 ) {
                     diagnostics.push(diagnostic);
                 }

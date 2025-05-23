@@ -377,7 +377,7 @@ PYI030.pyi:63:10: PYI030 [*] Multiple literal members in a union. Use a single l
    |
    = help: Replace with a single `Literal`
 
-ℹ Safe fix
+ℹ Unsafe fix
 60 60 | field19: typing.Literal[1] | typing.Literal[2]  # Error
 61 61 | 
 62 62 | # Should emit in cases with newlines
@@ -517,6 +517,8 @@ PYI030.pyi:89:10: PYI030 [*] Multiple literal members in a union. Use a single l
 88 | # Should use the first literal subscript attribute when fixing
 89 | field25: typing.Union[typing_extensions.Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]], str]  # Error
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+90 |
+91 | # Should use unsafe fix when comments are deleted
    |
    = help: Replace with a single `Literal`
 
@@ -526,3 +528,51 @@ PYI030.pyi:89:10: PYI030 [*] Multiple literal members in a union. Use a single l
 88 88 | # Should use the first literal subscript attribute when fixing
 89    |-field25: typing.Union[typing_extensions.Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]], str]  # Error
    89 |+field25: typing.Union[typing_extensions.Literal[1, 2, 3, 4], str]  # Error
+90 90 | 
+91 91 | # Should use unsafe fix when comments are deleted
+92 92 | field26: (
+
+PYI030.pyi:94:5: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal["a", "b", "c", "d"]`
+   |
+92 |   field26: (
+93 |       # First comment
+94 | /     Literal["a", "b"]
+95 | |     # Second comment
+96 | |     | Literal["c", "d"]
+   | |_______________________^ PYI030
+97 |   )
+98 |   field27: (
+   |
+   = help: Replace with a single `Literal`
+
+ℹ Unsafe fix
+91 91 | # Should use unsafe fix when comments are deleted
+92 92 | field26: (
+93 93 |     # First comment
+94    |-    Literal["a", "b"]
+95    |-    # Second comment
+96    |-    | Literal["c", "d"]
+   94 |+    Literal["a", "b", "c", "d"]
+97 95 | )
+98 96 | field27: (
+99 97 |     Literal["a", "b"]  # First comment
+
+PYI030.pyi:99:5: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal["a", "b", "c", "d"]`
+    |
+ 97 |   )
+ 98 |   field27: (
+ 99 | /     Literal["a", "b"]  # First comment
+100 | |     | Literal["c", "d"]  # Second comment
+    | |_______________________^ PYI030
+101 |   )
+    |
+    = help: Replace with a single `Literal`
+
+ℹ Unsafe fix
+96  96  |     | Literal["c", "d"]
+97  97  | )
+98  98  | field27: (
+99      |-    Literal["a", "b"]  # First comment
+100     |-    | Literal["c", "d"]  # Second comment
+    99  |+    Literal["a", "b", "c", "d"]  # Second comment
+101 100 | )

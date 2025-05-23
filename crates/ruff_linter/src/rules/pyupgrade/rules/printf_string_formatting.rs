@@ -1,9 +1,10 @@
 use std::borrow::Cow;
+use std::fmt::Write;
 use std::str::FromStr;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, whitespace::indentation, AnyStringFlags, Expr, StringFlags};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags, whitespace::indentation};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
@@ -13,9 +14,9 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::pyupgrade::helpers::curly_escape;
-use crate::Locator;
 
 /// ## What it does
 /// Checks for `printf`-style string formatting, and offers to replace it with
@@ -302,7 +303,7 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
 /// [`Expr`] can be converted.
 fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
     for (.., format_part) in format_string.iter() {
-        let CFormatPart::Spec(ref fmt) = format_part else {
+        let CFormatPart::Spec(fmt) = format_part else {
             continue;
         };
 
@@ -390,7 +391,7 @@ pub(crate) fn printf_string_formatting(
 
         // Count the number of positional and keyword arguments.
         for (.., format_part) in format_string.iter() {
-            let CFormatPart::Spec(ref fmt) = format_part else {
+            let CFormatPart::Spec(fmt) = format_part else {
                 continue;
             };
             if fmt.mapping_key.is_none() {
@@ -501,7 +502,7 @@ pub(crate) fn printf_string_formatting(
     }
 
     // Add the `.format` call.
-    contents.push_str(&format!(".format{params_string}"));
+    let _ = write!(&mut contents, ".format{params_string}");
 
     let mut diagnostic = Diagnostic::new(PrintfStringFormatting, bin_op.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

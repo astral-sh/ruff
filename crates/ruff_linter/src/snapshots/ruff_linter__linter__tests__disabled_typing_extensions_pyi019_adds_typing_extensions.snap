@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+<filename>:7:13: PYI019 [*] Use `Self` instead of custom TypeVar `T`
+  |
+6 | class C:
+7 |     def __new__(cls: type[T]) -> T:
+  |                ^^^^^^^^^^^^^^^^^^^ PYI019
+8 |               return cls
+  |
+  = help: Replace TypeVar `T` with `Self`
+
+ℹ Safe fix
+1 1 | 
+2 2 | from typing import TypeVar
+  3 |+from typing_extensions import Self
+3 4 | 
+4 5 | T = TypeVar("T", bound="_NiceReprEnum")
+5 6 | 
+6 7 | class C:
+7   |-	def __new__(cls: type[T]) -> T:
+  8 |+	def __new__(cls) -> Self:
+8 9 |               return cls

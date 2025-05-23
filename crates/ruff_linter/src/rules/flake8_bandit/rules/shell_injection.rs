@@ -1,7 +1,8 @@
 //! Checks relating to shell injection.
 
+use crate::preview::is_shell_injection_only_trusted_input_enabled;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -287,6 +288,19 @@ impl Violation for UnixCommandWildcardInjection {
     }
 }
 
+/// Check if an expression is a trusted input for subprocess.run.
+/// We assume that any str, list[str] or tuple[str] literal can be trusted.
+fn is_trusted_input(arg: &Expr) -> bool {
+    match arg {
+        Expr::StringLiteral(_) => true,
+        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.iter().all(|elt| matches!(elt, Expr::StringLiteral(_)))
+        }
+        Expr::Named(named) => is_trusted_input(&named.value),
+        _ => false,
+    }
+}
+
 /// S602, S603, S604, S605, S606, S607, S609
 pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     let call_kind = get_call_kind(&call.func, checker.semantic());
@@ -310,24 +324,16 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                     }
                 }
                 // S603
-                Some(ShellKeyword {
-                    truthiness:
-                        Truthiness::False | Truthiness::Falsey | Truthiness::None | Truthiness::Unknown,
-                }) => {
-                    if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                        checker.report_diagnostic(Diagnostic::new(
-                            SubprocessWithoutShellEqualsTrue,
-                            call.func.range(),
-                        ));
-                    }
-                }
-                // S603
-                None => {
-                    if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                        checker.report_diagnostic(Diagnostic::new(
-                            SubprocessWithoutShellEqualsTrue,
-                            call.func.range(),
-                        ));
+                _ => {
+                    if !is_trusted_input(arg)
+                        || !is_shell_injection_only_trusted_input_enabled(checker.settings)
+                    {
+                        if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
+                            checker.report_diagnostic(Diagnostic::new(
+                                SubprocessWithoutShellEqualsTrue,
+                                call.func.range(),
+                            ));
+                        }
                     }
                 }
             }

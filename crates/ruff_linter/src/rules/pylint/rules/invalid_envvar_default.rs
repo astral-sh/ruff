@@ -1,8 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_python_semantic::Modules;
+use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -52,14 +52,10 @@ pub(crate) fn invalid_envvar_default(checker: &Checker, call: &ast::ExprCall) {
         .semantic()
         .resolve_qualified_name(&call.func)
         .is_some_and(|qualified_name| {
-            if checker.settings.preview.is_enabled() {
-                matches!(
-                    qualified_name.segments(),
-                    ["os", "getenv"] | ["os", "environ", "get"]
-                )
-            } else {
-                matches!(qualified_name.segments(), ["os", "getenv"])
-            }
+            matches!(
+                qualified_name.segments(),
+                ["os", "getenv"] | ["os", "environ", "get"]
+            )
         })
     {
         // Find the `default` argument, if it exists.

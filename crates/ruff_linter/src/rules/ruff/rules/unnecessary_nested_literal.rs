@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{AnyNodeRef, Expr, ExprContext, ExprSubscript, ExprTuple};
 use ruff_python_semantic::analyze::typing::traverse_literal;
 use ruff_text_size::{Ranged, TextRange};
@@ -55,7 +55,7 @@ use crate::checkers::ast::Checker;
 /// across multiple lines and some of the lines have trailing comments.
 ///
 /// ## References
-/// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
+/// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.python.org/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 ///
 /// [PEP 586](https://peps.python.org/pep-0586/)
 #[derive(ViolationMetadata)]
@@ -84,7 +84,7 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
             // If the parent is not equal to the `literal_expr` then we know we are traversing recursively.
             if !AnyNodeRef::ptr_eq(parent.into(), literal_expr.into()) {
                 is_nested = true;
-            };
+            }
         },
         checker.semantic(),
         literal_expr,
@@ -133,7 +133,7 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
             },
         );
         diagnostic.set_fix(fix);
-    };
+    }
 
     checker.report_diagnostic(diagnostic);
 }

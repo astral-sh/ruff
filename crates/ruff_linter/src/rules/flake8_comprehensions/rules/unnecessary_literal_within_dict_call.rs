@@ -3,7 +3,7 @@ use std::fmt;
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -19,7 +19,7 @@ use super::helpers;
 /// call, since the literal or comprehension syntax already returns a
 /// dictionary.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict({})
 /// dict({"a": 1})

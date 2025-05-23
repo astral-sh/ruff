@@ -1,15 +1,15 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{ExprSubscript, StmtClassDef};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::{remove_argument, Parentheses};
-use crate::settings::types::PythonVersion;
+use crate::fix::edits::{Parentheses, remove_argument};
+use ruff_python_ast::PythonVersion;
 
 use super::{
-    check_type_vars, find_generic, in_nested_context, DisplayTypeVars, TypeVarReferenceVisitor,
+    DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, find_generic, in_nested_context,
 };
 
 /// ## What it does
@@ -106,7 +106,7 @@ impl Violation for NonPEP695GenericClass {
 /// UP046
 pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassDef) {
     // PEP-695 syntax is only available on Python 3.12+
-    if checker.settings.target_version < PythonVersion::Py312 {
+    if checker.target_version() < PythonVersion::PY312 {
         return;
     }
 

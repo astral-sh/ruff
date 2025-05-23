@@ -1,9 +1,9 @@
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, StringFlags};
-use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -16,7 +16,7 @@ use ruff_text_size::Ranged;
 /// if the given suffix is not prefixed with a dot
 /// or it is a single dot `"."`.
 ///
-/// ## Examples
+/// ## Example
 ///
 /// ```python
 /// path.with_suffix("py")

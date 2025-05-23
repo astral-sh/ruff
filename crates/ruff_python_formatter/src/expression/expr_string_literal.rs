@@ -1,6 +1,6 @@
 use crate::builders::parenthesize_if_expands;
 use crate::expression::parentheses::{
-    in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, in_parentheses_only_group,
 };
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
@@ -8,7 +8,7 @@ use crate::string::implicit::{
     FormatImplicitConcatenatedStringExpanded, FormatImplicitConcatenatedStringFlat,
     ImplicitConcatenatedLayout,
 };
-use crate::string::{implicit::FormatImplicitConcatenatedString, StringLikeExtensions};
+use crate::string::{StringLikeExtensions, implicit::FormatImplicitConcatenatedString};
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::{AnyNodeRef, ExprStringLiteral, StringLike};
 
@@ -28,9 +28,7 @@ impl FormatRuleWithOptions<ExprStringLiteral, PyFormatContext<'_>> for FormatExp
 
 impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
     fn fmt_fields(&self, item: &ExprStringLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprStringLiteral { value, .. } = item;
-
-        if let [string_literal] = value.as_slice() {
+        if let Some(string_literal) = item.as_single_part_string() {
             string_literal.format().with_options(self.kind).fmt(f)
         } else {
             // Always join strings that aren't parenthesized and thus, always on a single line.

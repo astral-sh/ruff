@@ -40,6 +40,17 @@
     enabled: true,
   },
   packageRules: [
+    // Pin GitHub Actions to immutable SHAs.
+    {
+      matchDepTypes: ["action"],
+      pinDigests: true,
+    },
+    // Annotate GitHub Actions SHAs with a SemVer version.
+    {
+      extends: ["helpers:pinGitHubActionDigests"],
+      extractVersion: "^(?<version>v?\\d+\\.\\d+\\.\\d+)$",
+      versioning: "regex:^v?(?<major>\\d+)(\\.(?<minor>\\d+)\\.(?<patch>\\d+))?$",
+    },
     {
       // Group upload/download artifact updates, the versions are dependent
       groupName: "Artifact GitHub Actions dependencies",
@@ -56,12 +67,6 @@
       matchManagers: ["github-actions"],
       matchDatasources: ["github-runners"],
       description: "Disable PRs updating GitHub runners (e.g. 'runs-on: macos-14')",
-      enabled: false,
-    },
-    {
-      // TODO: Remove this once the codebase is upgrade to v4 (https://github.com/astral-sh/ruff/pull/16069)
-      matchPackageNames: ["tailwindcss"],
-      matchManagers: ["npm"],
       enabled: false,
     },
     {
@@ -101,14 +106,7 @@
       matchManagers: ["cargo"],
       matchPackageNames: ["strum"],
       description: "Weekly update of strum dependencies",
-    },
-    {
-      groupName: "ESLint",
-      matchManagers: ["npm"],
-      matchPackageNames: ["eslint"],
-      allowedVersions: "<9",
-      description: "Constraint ESLint to version 8 until TypeScript-eslint supports ESLint 9", // https://github.com/typescript-eslint/typescript-eslint/issues/8211
-    },
+    }
   ],
   vulnerabilityAlerts: {
     commitMessageSuffix: "",

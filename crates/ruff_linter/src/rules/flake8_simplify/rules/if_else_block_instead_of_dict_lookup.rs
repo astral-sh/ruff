@@ -1,7 +1,7 @@
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableLiteral;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Stmt};
@@ -114,7 +114,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
                     contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
                 }) {
                     return;
-                };
+                }
             }
             // `elif`
             Some(Expr::Compare(ast::ExprCompare {
@@ -140,7 +140,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
                     contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
                 }) {
                     return;
-                };
+                }
 
                 // The `expr` was checked to be a literal above, so this is safe.
                 literals.insert(literal_expr.into());

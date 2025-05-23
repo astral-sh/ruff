@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -60,8 +60,8 @@ pub(crate) fn jinja2_autoescape_false(checker: &Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
         .resolve_qualified_name(&call.func)
-        .is_some_and(|qualifieed_name| {
-            matches!(qualifieed_name.segments(), ["jinja2", "Environment"])
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["jinja2", "Environment"])
         })
     {
         if let Some(keyword) = call.arguments.find_keyword("autoescape") {

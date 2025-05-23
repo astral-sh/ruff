@@ -11,13 +11,13 @@ use thiserror::Error;
 pub(crate) use ruff_settings::RuffSettings;
 
 use crate::edit::LanguageId;
-use crate::server::{Workspace, Workspaces};
+use crate::workspace::{Workspace, Workspaces};
 use crate::{
-    edit::{DocumentKey, DocumentVersion, NotebookDocument},
     PositionEncoding, TextDocument,
+    edit::{DocumentKey, DocumentVersion, NotebookDocument},
 };
 
-use super::{settings::ResolvedClientSettings, ClientSettings};
+use super::{ClientSettings, settings::ResolvedClientSettings};
 
 mod ruff_settings;
 
@@ -175,21 +175,6 @@ impl Index {
         // TODO(jane): Find a way for workspace client settings to be added or changed dynamically.
         self.settings
             .register_workspace(&Workspace::new(url), global_settings)
-    }
-
-    pub(super) fn num_documents(&self) -> usize {
-        self.documents.len()
-    }
-
-    pub(super) fn num_workspaces(&self) -> usize {
-        self.settings.len()
-    }
-
-    pub(super) fn list_config_files(&self) -> Vec<&Path> {
-        self.settings
-            .values()
-            .flat_map(|WorkspaceSettings { ruff_settings, .. }| ruff_settings.list_files())
-            .collect()
     }
 
     pub(super) fn close_workspace_folder(&mut self, workspace_url: &Url) -> crate::Result<()> {
@@ -404,6 +389,23 @@ impl Index {
             .next_back()
             .map(|(_, settings)| settings)
     }
+
+    /// Returns an iterator over the workspace root folders contained in this index.
+    pub(super) fn workspace_root_folders(&self) -> impl Iterator<Item = &Path> {
+        self.settings.keys().map(PathBuf::as_path)
+    }
+
+    /// Returns the number of open documents.
+    pub(super) fn open_documents_len(&self) -> usize {
+        self.documents.len()
+    }
+
+    /// Returns an iterator over the paths to the configuration files in the index.
+    pub(super) fn config_file_paths(&self) -> impl Iterator<Item = &Path> {
+        self.settings
+            .values()
+            .flat_map(|WorkspaceSettings { ruff_settings, .. }| ruff_settings.config_file_paths())
+    }
 }
 
 /// Maps a workspace folder root to its settings.
@@ -515,7 +517,6 @@ impl DocumentController {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn as_text(&self) -> Option<&TextDocument> {
         match self {
             Self::Text(document) => Some(document),
@@ -558,7 +559,7 @@ impl DocumentQuery {
                 ruff_linter::source_kind::SourceKind::Python(document.contents().to_string())
             }
             Self::Notebook { notebook, .. } => {
-                ruff_linter::source_kind::SourceKind::IpyNotebook(notebook.make_ruff_notebook())
+                ruff_linter::source_kind::SourceKind::ipy_notebook(notebook.make_ruff_notebook())
             }
         }
     }

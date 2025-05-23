@@ -2,18 +2,18 @@ use rustc_hash::FxHashSet;
 use std::iter;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     Arguments, Expr, ExprStarred, ExprSubscript, ExprTuple, StmtClassDef, TypeParams,
 };
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::{remove_argument, Parentheses};
+use crate::fix::edits::{Parentheses, remove_argument};
 use crate::rules::pyupgrade::rules::pep695::{
-    expr_name_to_type_var, find_generic, DisplayTypeVars, TypeParamKind, TypeVar,
+    DisplayTypeVars, TypeParamKind, TypeVar, expr_name_to_type_var, find_generic,
 };
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for classes that have [PEP 695] [type parameter lists]
@@ -79,7 +79,7 @@ impl Violation for ClassWithMixedTypeVars {
 
 /// RUF053
 pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: &StmtClassDef) {
-    if checker.settings.target_version < PythonVersion::Py312 {
+    if checker.target_version() < PythonVersion::PY312 {
         return;
     }
 

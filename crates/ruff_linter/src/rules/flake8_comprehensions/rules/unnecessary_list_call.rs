@@ -1,7 +1,7 @@
 use ruff_python_ast::{Arguments, Expr, ExprCall};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -16,7 +16,7 @@ use super::helpers;
 /// ## Why is this bad?
 /// It is redundant to use a `list()` call around a list comprehension.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// list([f(x) for x in foo])
 /// ```

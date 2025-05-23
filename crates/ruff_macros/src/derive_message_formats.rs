@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{ToTokens, quote, quote_spanned};
 use syn::spanned::Spanned;
 use syn::token::{Dot, Paren};
 use syn::{Block, Expr, ExprLit, ExprMethodCall, ItemFn, Lit, Stmt};
@@ -44,8 +44,8 @@ fn parse_expr(expr: &Expr, strings: &mut TokenStream) -> Result<(), TokenStream>
                     return Err(
                         quote_spanned!(expr.span() => compile_error!("prefer `String::to_string` over `format!` without arguments")),
                     );
-                };
-            };
+                }
+            }
             strings.extend(quote! {#first_token,});
             Ok(())
         }

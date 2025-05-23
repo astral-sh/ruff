@@ -2,7 +2,7 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_text_size::Ranged;
@@ -17,7 +17,7 @@ use crate::checkers::ast::Checker;
 /// without having to check if the dictionary contains the relevant key,
 /// returning `None` if the key is not present.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// if "key" in dct and dct["key"]:
 ///     ...

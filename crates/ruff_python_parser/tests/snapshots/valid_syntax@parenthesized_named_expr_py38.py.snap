@@ -1,0 +1,132 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/parenthesized_named_expr_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..92,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 43..59,
+                    value: Set(
+                        ExprSet {
+                            range: 43..59,
+                            elts: [
+                                Named(
+                                    ExprNamed {
+                                        range: 45..51,
+                                        target: Name(
+                                            ExprName {
+                                                range: 45..46,
+                                                id: Name("x"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 50..51,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 54..55,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 57..58,
+                                        value: Int(
+                                            3,
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 60..91,
+                    value: SetComp(
+                        ExprSetComp {
+                            range: 60..91,
+                            elt: Named(
+                                ExprNamed {
+                                    range: 62..71,
+                                    target: Name(
+                                        ExprName {
+                                            range: 62..66,
+                                            id: Name("last"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 70..71,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 73..90,
+                                    target: Name(
+                                        ExprName {
+                                            range: 77..78,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Call(
+                                        ExprCall {
+                                            range: 82..90,
+                                            func: Name(
+                                                ExprName {
+                                                    range: 82..87,
+                                                    id: Name("range"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 87..90,
+                                                args: [
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 88..89,
+                                                            value: Int(
+                                                                3,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

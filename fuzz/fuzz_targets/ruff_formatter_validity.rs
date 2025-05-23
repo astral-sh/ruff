@@ -37,7 +37,7 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         ParseSource::None,
     );
 
-    if linter_result.has_syntax_error {
+    if linter_result.has_syntax_errors() {
         return Corpus::Keep; // keep, but don't continue
     }
 
@@ -63,7 +63,7 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         );
 
         assert!(
-            !linter_result.has_syntax_error,
+            !linter_result.has_syntax_errors(),
             "formatter introduced a parse error"
         );
 
