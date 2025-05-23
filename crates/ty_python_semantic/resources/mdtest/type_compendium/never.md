@@ -101,7 +101,10 @@ static_assert(is_disjoint_from(Never, Never))
 from ty_extensions import static_assert, is_equivalent_to
 from typing_extensions import Never
 
-static_assert(is_equivalent_to(int | Never | str | None, int | str | None))
+class P: ...
+class Q: ...
+
+static_assert(is_equivalent_to(P | Never | Q | None, P | Q | None))
 ```
 
 ## Intersections with `Never`
@@ -112,7 +115,10 @@ Intersecting with `Never` results in `Never`:
 from ty_extensions import static_assert, is_equivalent_to, Intersection
 from typing_extensions import Never
 
-static_assert(is_equivalent_to(int | Never | str | None, int | str | None))
+class P: ...
+class Q: ...
+
+static_assert(is_equivalent_to(Intersection[P, Never, Q], Never))
 ```
 
 ## `Never` is the complement of `object`
