@@ -69,6 +69,33 @@ T = TypeVar("T")
 class BothGenericSyntaxes[U](Generic[T]): ...
 ```
 
+Generic classes implicitly inherit from `Generic`:
+
+```py
+class Foo[T]: ...
+
+# revealed: tuple[<class 'Foo[Unknown]'>, typing.Generic, <class 'object'>]
+reveal_type(Foo.__mro__)
+# revealed: tuple[<class 'Foo[int]'>, typing.Generic, <class 'object'>]
+reveal_type(Foo[int].__mro__)
+
+class A: ...
+class Bar[T](A): ...
+
+# revealed: tuple[<class 'Bar[Unknown]'>, <class 'A'>, typing.Generic, <class 'object'>]
+reveal_type(Bar.__mro__)
+# revealed: tuple[<class 'Bar[int]'>, <class 'A'>, typing.Generic, <class 'object'>]
+reveal_type(Bar[int].__mro__)
+
+class B: ...
+class Baz[T](A, B): ...
+
+# revealed: tuple[<class 'Baz[Unknown]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>]
+reveal_type(Baz.__mro__)
+# revealed: tuple[<class 'Baz[int]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>]
+reveal_type(Baz[int].__mro__)
+```
+
 ## Specializing generic classes explicitly
 
 The type parameter can be specified explicitly:

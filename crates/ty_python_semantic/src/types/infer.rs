@@ -912,18 +912,27 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
                     MroErrorKind::UnresolvableMro { bases_list } => {
-                        if let Some(builder) =
-                            self.context.report_lint(&INCONSISTENT_MRO, class_node)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Cannot create a consistent method resolution order (MRO) \
+                        let has_conflicting_generic_contexts = class
+                            .has_pep_695_type_params(self.db())
+                            && class.has_legacy_generic_context(self.db());
+
+                        // Skip reporting the error if the class has conflicting generic contexts.
+                        // We'll report an error below for that with a nicer error message;
+                        // there's not much need to have two diagnostics for the same underlying problem.
+                        if !has_conflicting_generic_contexts {
+                            if let Some(builder) =
+                                self.context.report_lint(&INCONSISTENT_MRO, class_node)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Cannot create a consistent method resolution order (MRO) \
                                      for class `{}` with bases list `[{}]`",
-                                class.name(self.db()),
-                                bases_list
-                                    .iter()
-                                    .map(|base| base.display(self.db()))
-                                    .join(", ")
-                            ));
+                                    class.name(self.db()),
+                                    bases_list
+                                        .iter()
+                                        .map(|base| base.display(self.db()))
+                                        .join(", ")
+                                ));
+                            }
                         }
                     }
                     MroErrorKind::InheritanceCycle => {
