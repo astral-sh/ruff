@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprSubscript, PythonVersion};
 use ruff_text_size::Ranged;
@@ -111,11 +111,10 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &Checker, subscript: &
     };
     let edit = Edit::range_replacement(new_source, source_range);
 
-    checker.report_diagnostic(
-        Diagnostic::new(
+    checker
+        .report_diagnostic(
             IncorrectlyParenthesizedTupleInSubscript { prefer_parentheses },
             source_range,
         )
-        .with_fix(Fix::safe_edit(edit)),
-    );
+        .set_fix(Fix::safe_edit(edit));
 }

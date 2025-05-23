@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
@@ -91,7 +91,7 @@ pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnspecifiedEncoding {
             function_name,
             mode,
@@ -99,7 +99,6 @@ pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCall) {
         call.func.range(),
     );
     diagnostic.set_fix(generate_keyword_fix(checker, call));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Represents the path of the function or method being called.

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr};
@@ -99,7 +99,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
         }
         (true, false) => {
             // The key is unused, so replace with `dict.values()`.
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 IncorrectDictIterator {
                     subset: DictSubset::Values,
                 },
@@ -115,11 +115,10 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
                 stmt_for.target.range(),
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
-            checker.report_diagnostic(diagnostic);
         }
         (false, true) => {
             // The value is unused, so replace with `dict.keys()`.
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 IncorrectDictIterator {
                     subset: DictSubset::Keys,
                 },
@@ -135,7 +134,6 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
                 stmt_for.target.range(),
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

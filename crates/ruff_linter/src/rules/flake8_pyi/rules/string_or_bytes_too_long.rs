@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::{self as ast, StringLike};
@@ -72,12 +72,11 @@ pub(crate) fn string_or_bytes_too_long(checker: &Checker, string: StringLike) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(StringOrBytesTooLong, string.range());
+    let mut diagnostic = checker.report_diagnostic(StringOrBytesTooLong, string.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         string.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Count the number of visible characters in an f-string. This accounts for

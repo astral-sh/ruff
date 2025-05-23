@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::Ranged;
@@ -84,7 +84,7 @@ pub(crate) fn blank_after_summary(checker: &Checker, docstring: &Docstring) {
         }
     }
     if lines_count > 1 && blanks_count != 1 {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             MissingBlankLineAfterSummary {
                 num_lines: blanks_count,
             },
@@ -118,6 +118,5 @@ pub(crate) fn blank_after_summary(checker: &Checker, docstring: &Docstring) {
                 blank_end,
             )));
         }
-        checker.report_diagnostic(diagnostic);
     }
 }

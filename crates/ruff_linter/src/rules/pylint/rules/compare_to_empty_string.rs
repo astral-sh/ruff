@@ -2,7 +2,7 @@ use anyhow::bail;
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
@@ -89,13 +89,13 @@ pub(crate) fn compare_to_empty_string(
                         let expr = checker.generator().expr(rhs);
                         let existing = format!("{literal} {op} {expr}");
                         let replacement = format!("{}{expr}", op.into_unary());
-                        checker.report_diagnostic(Diagnostic::new(
+                        checker.report_diagnostic(
                             CompareToEmptyString {
                                 existing,
                                 replacement,
                             },
                             lhs.range(),
-                        ));
+                        );
                     }
                 }
             }
@@ -107,13 +107,13 @@ pub(crate) fn compare_to_empty_string(
                     let literal = checker.generator().expr(rhs);
                     let existing = format!("{expr} {op} {literal}");
                     let replacement = format!("{}{expr}", op.into_unary());
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(
                         CompareToEmptyString {
                             existing,
                             replacement,
                         },
                         rhs.range(),
-                    ));
+                    );
                 }
             }
         }

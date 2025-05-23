@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
@@ -84,12 +84,11 @@ pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCal
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(InvalidGetLoggerArgument, expr.range());
+    let mut diagnostic = checker.report_diagnostic(InvalidGetLoggerArgument, expr.range());
     if checker.semantic().has_builtin_binding("__name__") {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             "__name__".to_string(),
             expr.range(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }

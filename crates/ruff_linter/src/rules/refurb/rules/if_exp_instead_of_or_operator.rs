@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
@@ -67,7 +67,7 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &Checker, if_expr: &ast::Ex
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(IfExpInsteadOfOrOperator, *range);
+    let mut diagnostic = checker.report_diagnostic(IfExpInsteadOfOrOperator, *range);
 
     // Replace with `{test} or {orelse}`.
     diagnostic.set_fix(Fix::applicable_edit(
@@ -85,8 +85,6 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &Checker, if_expr: &ast::Ex
             Applicability::Safe
         },
     ));
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Parenthesize an expression for use in an `or` operator (e.g., parenthesize `x` in `x or y`),

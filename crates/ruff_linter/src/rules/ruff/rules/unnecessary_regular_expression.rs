@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     Arguments, CmpOp, Expr, ExprAttribute, ExprCall, ExprCompare, ExprContext, ExprStringLiteral,
@@ -116,7 +116,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
     let new_expr = re_func.replacement();
 
     let repl = new_expr.map(|expr| checker.generator().expr(&expr));
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryRegularExpression {
             replacement: repl.clone(),
         },
@@ -133,8 +133,6 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
             },
         ));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// The `re` functions supported by this rule.

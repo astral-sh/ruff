@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextSize};
@@ -157,12 +157,11 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(SuperCallWithParameters, call.arguments.range());
+    let mut diagnostic = checker.report_diagnostic(SuperCallWithParameters, call.arguments.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
         call.arguments.start() + TextSize::new(1),
         call.arguments.end() - TextSize::new(1),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.

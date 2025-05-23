@@ -1,5 +1,5 @@
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
@@ -50,6 +50,6 @@ pub(crate) fn mako_templates(checker: &Checker, call: &ast::ExprCall) {
             matches!(qualified_name.segments(), ["mako", "template", "Template"])
         })
     {
-        checker.report_diagnostic(Diagnostic::new(MakoTemplates, call.func.range()));
+        checker.report_diagnostic(MakoTemplates, call.func.range());
     }
 }

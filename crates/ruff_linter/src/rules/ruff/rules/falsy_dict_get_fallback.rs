@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprAttribute, helpers::Truthiness};
 use ruff_python_semantic::analyze::typing;
@@ -86,7 +86,7 @@ pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(FalsyDictGetFallback, fallback_arg.range());
+    let mut diagnostic = checker.report_diagnostic(FalsyDictGetFallback, fallback_arg.range());
 
     let comment_ranges = checker.comment_ranges();
 
@@ -106,6 +106,4 @@ pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
         )
         .map(|edit| Fix::applicable_edit(edit, applicability))
     });
-
-    checker.report_diagnostic(diagnostic);
 }

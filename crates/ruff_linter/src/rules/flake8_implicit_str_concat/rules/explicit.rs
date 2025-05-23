@@ -1,11 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
-use crate::Locator;
-use crate::settings::LinterSettings;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for string literals that are explicitly concatenated (using the
@@ -42,17 +41,13 @@ impl Violation for ExplicitStringConcatenation {
 }
 
 /// ISC003
-pub(crate) fn explicit(
-    expr: &Expr,
-    locator: &Locator,
-    settings: &LinterSettings,
-) -> Option<Diagnostic> {
+pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
     // If the user sets `allow-multiline` to `false`, then we should allow explicitly concatenated
     // strings that span multiple lines even if this rule is enabled. Otherwise, there's no way
     // for the user to write multiline strings, and that setting is "more explicit" than this rule
     // being enabled.
-    if !settings.flake8_implicit_str_concat.allow_multiline {
-        return None;
+    if !checker.settings.flake8_implicit_str_concat.allow_multiline {
+        return;
     }
 
     if let Expr::BinOp(ast::ExprBinOp {
@@ -69,11 +64,10 @@ pub(crate) fn explicit(
             ) && matches!(
                 right.as_ref(),
                 Expr::FString(_) | Expr::StringLiteral(_) | Expr::BytesLiteral(_)
-            ) && locator.contains_line_break(*range)
+            ) && checker.locator().contains_line_break(*range)
             {
-                return Some(Diagnostic::new(ExplicitStringConcatenation, expr.range()));
+                checker.report_diagnostic(ExplicitStringConcatenation, expr.range());
             }
         }
     }
-    None
 }

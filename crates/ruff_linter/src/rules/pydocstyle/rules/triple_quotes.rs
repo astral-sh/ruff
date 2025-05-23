@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::str::Quote;
 use ruff_text_size::Ranged;
@@ -79,8 +79,8 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
     match expected_quote {
         Quote::Single => {
             if !opener.ends_with("'''") {
-                let mut diagnostic =
-                    Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
+                let mut diagnostic = checker
+                    .report_diagnostic(TripleSingleQuotes { expected_quote }, docstring.range());
 
                 let body = docstring.body().as_str();
                 if !body.ends_with('\'') {
@@ -89,14 +89,12 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
                         docstring.range(),
                     )));
                 }
-
-                checker.report_diagnostic(diagnostic);
             }
         }
         Quote::Double => {
             if !opener.ends_with("\"\"\"") {
-                let mut diagnostic =
-                    Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
+                let mut diagnostic = checker
+                    .report_diagnostic(TripleSingleQuotes { expected_quote }, docstring.range());
 
                 let body = docstring.body().as_str();
                 if !body.ends_with('"') {
@@ -105,8 +103,6 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
                         docstring.range(),
                     )));
                 }
-
-                checker.report_diagnostic(diagnostic);
             }
         }
     }

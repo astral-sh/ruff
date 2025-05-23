@@ -1,7 +1,7 @@
 use rustc_hash::FxHashSet;
 use std::iter;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     Arguments, Expr, ExprStarred, ExprSubscript, ExprTuple, StmtClassDef, TypeParams,
@@ -103,7 +103,7 @@ pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: &StmtClas
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(ClassWithMixedTypeVars, generic_base.range);
+    let mut diagnostic = checker.report_diagnostic(ClassWithMixedTypeVars, generic_base.range);
 
     diagnostic.try_set_optional_fix(|| {
         convert_type_vars(
@@ -114,8 +114,6 @@ pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: &StmtClas
             checker,
         )
     });
-
-    checker.report_diagnostic(diagnostic);
 }
 
 fn typing_generic_base_and_arguments<'a>(

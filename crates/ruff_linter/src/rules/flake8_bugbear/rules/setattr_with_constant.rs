@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
@@ -90,12 +90,11 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     }) = checker.semantic().current_statement()
     {
         if expr == child.as_ref() {
-            let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());
+            let mut diagnostic = checker.report_diagnostic(SetAttrWithConstant, expr.range());
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 assignment(obj, name.to_str(), value, checker.generator()),
                 expr.range(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

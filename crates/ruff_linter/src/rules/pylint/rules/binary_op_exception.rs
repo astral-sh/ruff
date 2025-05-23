@@ -1,6 +1,6 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
@@ -76,8 +76,5 @@ pub(crate) fn binary_op_exception(checker: &Checker, except_handler: &ExceptHand
         return;
     };
 
-    checker.report_diagnostic(Diagnostic::new(
-        BinaryOpException { op: op.into() },
-        type_.range(),
-    ));
+    checker.report_diagnostic(BinaryOpException { op: op.into() }, type_.range());
 }

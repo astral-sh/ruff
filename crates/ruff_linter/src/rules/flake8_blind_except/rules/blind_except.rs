@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
@@ -107,12 +107,12 @@ pub(crate) fn blind_except(
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         BlindExcept {
             name: builtin_exception_type.to_string(),
         },
         type_.range(),
-    ));
+    );
 }
 
 /// A visitor to detect whether the exception with the given name was re-raised.

@@ -1,6 +1,6 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -56,7 +56,7 @@ pub(crate) fn typing_text_str_alias(checker: &Checker, expr: &Expr) {
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["typing", "Text"]))
     {
-        let mut diagnostic = Diagnostic::new(TypingTextStrAlias, expr.range());
+        let mut diagnostic = checker.report_diagnostic(TypingTextStrAlias, expr.range());
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
                 "str",
@@ -68,6 +68,5 @@ pub(crate) fn typing_text_str_alias(checker: &Checker, expr: &Expr) {
                 import_edit,
             ))
         });
-        checker.report_diagnostic(diagnostic);
     }
 }

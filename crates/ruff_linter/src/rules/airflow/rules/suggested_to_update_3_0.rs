@@ -3,7 +3,7 @@ use crate::importer::ImportRequest;
 use crate::rules::airflow::helpers::{
     Replacement, is_airflow_builtin_or_provider, is_guarded_by_try_except,
 };
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall, ExprName, name::QualifiedName};
 use ruff_python_semantic::Modules;
@@ -120,7 +120,11 @@ fn diagnostic_for_argument(
     let Some(keyword) = arguments.find_keyword(deprecated) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(
+    let range = keyword
+        .arg
+        .as_ref()
+        .map_or_else(|| keyword.range(), Ranged::range);
+    let mut diagnostic = checker.report_diagnostic(
         Airflow3SuggestedUpdate {
             deprecated: deprecated.to_string(),
             replacement: match replacement {
@@ -128,20 +132,15 @@ fn diagnostic_for_argument(
                 None => Replacement::None,
             },
         },
-        keyword
-            .arg
-            .as_ref()
-            .map_or_else(|| keyword.range(), Ranged::range),
+        range,
     );
 
     if let Some(replacement) = replacement {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             replacement.to_string(),
-            diagnostic.range,
+            range,
         )));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 /// Check whether a removed Airflow argument is passed.
 ///
@@ -284,7 +283,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         _ => return,
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         Airflow3SuggestedUpdate {
             deprecated: qualified_name.to_string(),
             replacement: replacement.clone(),
@@ -299,6 +298,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         _ => None,
     } {
         if is_guarded_by_try_except(expr, module, name, semantic) {
+            diagnostic.defuse();
             return;
         }
         diagnostic.try_set_fix(|| {
@@ -311,6 +311,4 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             Ok(Fix::safe_edits(import_edit, [replacement_edit]))
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }

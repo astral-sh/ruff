@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 use ruff_text_size::Ranged;
@@ -79,7 +79,7 @@ pub(crate) fn redundant_tuple_in_exception_handler(checker: &Checker, handlers: 
         if elt.is_starred_expr() {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             RedundantTupleInExceptionHandler {
                 name: checker.generator().expr(elt),
             },
@@ -100,6 +100,5 @@ pub(crate) fn redundant_tuple_in_exception_handler(checker: &Checker, handlers: 
             ),
             type_.range(),
         )));
-        checker.report_diagnostic(diagnostic);
     }
 }

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
@@ -77,5 +77,5 @@ pub(crate) fn attr(checker: &Checker, attribute: &ast::ExprAttribute) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(PandasUseOfDotValues, attribute.range()));
+    checker.report_diagnostic(PandasUseOfDotValues, attribute.range());
 }

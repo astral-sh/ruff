@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashMap;
 use std::sync::LazyLock;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
@@ -91,7 +91,7 @@ pub(crate) fn deprecated_unittest_alias(checker: &Checker, expr: &Expr) {
     if id != "self" {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         DeprecatedUnittestAlias {
             alias: attr.to_string(),
             target: (*target).to_string(),
@@ -102,5 +102,4 @@ pub(crate) fn deprecated_unittest_alias(checker: &Checker, expr: &Expr) {
         format!("self.{target}"),
         expr.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

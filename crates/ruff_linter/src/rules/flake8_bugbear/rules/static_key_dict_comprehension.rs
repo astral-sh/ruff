@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::StoredNameFinder;
 use ruff_python_ast::visitor::Visitor;
@@ -58,12 +58,12 @@ pub(crate) fn static_key_dict_comprehension(checker: &Checker, dict_comp: &ast::
     };
 
     if is_constant(&dict_comp.key, &names) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             StaticKeyDictComprehension {
                 key: SourceCodeSnippet::from_str(checker.locator().slice(dict_comp.key.as_ref())),
             },
             dict_comp.key.range(),
-        ));
+        );
     }
 }
 

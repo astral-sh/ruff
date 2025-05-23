@@ -2,7 +2,7 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{self as ast, Expr, Operator};
@@ -113,7 +113,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
     };
 
     if SQL_REGEX.is_match(&content) {
-        checker.report_diagnostic(Diagnostic::new(HardcodedSQLExpression, expr.range()));
+        checker.report_diagnostic(HardcodedSQLExpression, expr.range());
     }
 }
 

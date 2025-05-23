@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Stmt};
@@ -107,7 +107,7 @@ pub(crate) fn try_except_in_loop(checker: &Checker, body: &[Stmt]) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(TryExceptInLoop, handler.range()));
+    checker.report_diagnostic(TryExceptInLoop, handler.range());
 }
 
 /// Returns `true` if a `break` or `continue` statement is present in `body`.

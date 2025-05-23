@@ -1,7 +1,7 @@
 use anyhow::bail;
 use ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::Fix;
 use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt, WithItem};
@@ -171,7 +171,7 @@ pub(crate) fn multiple_with_statements(
             return;
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             MultipleWithStatements,
             TextRange::new(with_stmt.start(), colon.end()),
         );
@@ -208,6 +208,5 @@ pub(crate) fn multiple_with_statements(
                 }
             });
         }
-        checker.report_diagnostic(diagnostic);
     }
 }

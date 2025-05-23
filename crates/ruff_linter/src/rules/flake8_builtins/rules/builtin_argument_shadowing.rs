@@ -1,4 +1,3 @@
-use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, Parameter};
@@ -92,11 +91,11 @@ pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Paramete
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             BuiltinArgumentShadowing {
                 name: parameter.name.to_string(),
             },
             parameter.name.range(),
-        ));
+        );
     }
 }

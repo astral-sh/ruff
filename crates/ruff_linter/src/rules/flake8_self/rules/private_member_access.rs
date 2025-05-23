@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_dunder, is_sunder};
 use ruff_python_ast::name::UnqualifiedName;
@@ -144,12 +144,12 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         }
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         PrivateMemberAccess {
             access: attr.to_string(),
         },
         expr.range(),
-    ));
+    );
 }
 
 /// Check for the following cases:

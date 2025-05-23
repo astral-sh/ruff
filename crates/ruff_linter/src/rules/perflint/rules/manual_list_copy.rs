@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
@@ -119,5 +119,5 @@ pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &ast::StmtFor) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(ManualListCopy, *range));
+    checker.report_diagnostic(ManualListCopy, *range);
 }

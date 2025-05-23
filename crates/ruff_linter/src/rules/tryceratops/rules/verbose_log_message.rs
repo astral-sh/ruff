@@ -1,6 +1,6 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -78,7 +78,7 @@ pub(crate) fn verbose_log_message(checker: &Checker, handlers: &[ExceptHandler])
                     };
                     let binding = checker.semantic().binding(id);
                     if binding.kind.is_bound_exception() {
-                        checker.report_diagnostic(Diagnostic::new(VerboseLogMessage, expr.range()));
+                        checker.report_diagnostic(VerboseLogMessage, expr.range());
                     }
                 }
             }

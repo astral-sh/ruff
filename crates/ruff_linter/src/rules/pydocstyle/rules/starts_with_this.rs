@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
@@ -64,5 +64,5 @@ pub(crate) fn starts_with_this(checker: &Checker, docstring: &Docstring) {
     if normalize_word(first_word) != "this" {
         return;
     }
-    checker.report_diagnostic(Diagnostic::new(DocstringStartsWithThis, docstring.range()));
+    checker.report_diagnostic(DocstringStartsWithThis, docstring.range());
 }

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
@@ -107,12 +107,10 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
     let arguments = &call.arguments;
     let source = checker.source();
 
-    let mut diagnostic = Diagnostic::new(ExcInfoOutsideExceptHandler, exc_info.range);
+    let mut diagnostic = checker.report_diagnostic(ExcInfoOutsideExceptHandler, exc_info.range);
 
     diagnostic.try_set_fix(|| {
         let edit = remove_argument(exc_info, arguments, Parentheses::Preserve, source)?;
         Ok(Fix::unsafe_edit(edit))
     });
-
-    checker.report_diagnostic(diagnostic);
 }

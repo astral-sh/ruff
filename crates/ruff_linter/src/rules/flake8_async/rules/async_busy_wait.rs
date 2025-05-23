@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
@@ -74,11 +74,11 @@ pub(crate) fn async_busy_wait(checker: &Checker, while_stmt: &ast::StmtWhile) {
         qualified_name.segments(),
         ["trio" | "anyio", "sleep" | "sleep_until"] | ["asyncio", "sleep"]
     ) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             AsyncBusyWait {
                 module: AsyncModule::try_from(&qualified_name).unwrap(),
             },
             while_stmt.range(),
-        ));
+        );
     }
 }

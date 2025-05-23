@@ -1,6 +1,6 @@
 use ruff_python_ast::Parameters;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
@@ -84,7 +84,7 @@ pub(crate) fn any_eq_ne_annotation(checker: &Checker, name: &str, parameters: &P
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         AnyEqNeAnnotation {
             method_name: name.to_string(),
         },
@@ -100,5 +100,4 @@ pub(crate) fn any_eq_ne_annotation(checker: &Checker, name: &str, parameters: &P
         let binding_edit = Edit::range_replacement(binding, annotation.range());
         Ok(Fix::safe_edits(binding_edit, import_edit))
     });
-    checker.report_diagnostic(diagnostic);
 }

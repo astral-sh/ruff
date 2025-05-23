@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
@@ -82,10 +82,10 @@ pub(crate) fn bad_dunder_method_name(checker: &Checker, method: &ast::StmtFuncti
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         BadDunderMethodName {
             name: method.name.to_string(),
         },
         method.identifier(),
-    ));
+    );
 }

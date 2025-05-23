@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 use ruff_text_size::{Ranged, TextSize};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
@@ -50,10 +50,9 @@ pub(crate) fn numeric_literal_too_long(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(NumericLiteralTooLong, expr.range());
+    let mut diagnostic = checker.report_diagnostic(NumericLiteralTooLong, expr.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         expr.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

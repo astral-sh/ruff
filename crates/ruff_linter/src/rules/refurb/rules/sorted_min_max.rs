@@ -1,4 +1,3 @@
-use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
 use ruff_diagnostics::FixAvailability;
@@ -178,7 +177,7 @@ pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) 
         (Index::Last, true) => MinMax::Min,
     };
 
-    let mut diagnostic = Diagnostic::new(SortedMinMax { min_max }, subscript.range());
+    let mut diagnostic = checker.report_diagnostic(SortedMinMax { min_max }, subscript.range());
 
     if checker.semantic().has_builtin_binding(min_max.as_str()) {
         diagnostic.set_fix({
@@ -200,8 +199,6 @@ pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) 
             }
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

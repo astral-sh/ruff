@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use ast::whitespace::indentation;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, ElifElseClause, Stmt};
 use ruff_python_codegen::Stylist;
@@ -82,7 +82,7 @@ pub(crate) fn collapsible_else_if(checker: &Checker, stmt: &Stmt) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         CollapsibleElseIf,
         TextRange::new(else_clause.start(), first.start()),
     );
@@ -95,7 +95,6 @@ pub(crate) fn collapsible_else_if(checker: &Checker, stmt: &Stmt) {
             checker.stylist(),
         )
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Generate [`Fix`] to convert an `else` block to an `elif` block.

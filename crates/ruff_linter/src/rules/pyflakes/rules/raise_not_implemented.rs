@@ -1,6 +1,6 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
@@ -74,7 +74,7 @@ pub(crate) fn raise_not_implemented(checker: &Checker, expr: &Expr) {
     let Some(expr) = match_not_implemented(expr) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(RaiseNotImplemented, expr.range());
+    let mut diagnostic = checker.report_diagnostic(RaiseNotImplemented, expr.range());
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
             "NotImplementedError",
@@ -86,5 +86,4 @@ pub(crate) fn raise_not_implemented(checker: &Checker, expr: &Expr) {
             import_edit,
         ))
     });
-    checker.report_diagnostic(diagnostic);
 }

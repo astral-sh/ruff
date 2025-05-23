@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
@@ -78,9 +78,6 @@ pub(crate) fn ssh_no_host_key_verification(checker: &Checker, call: &ExprCall) {
             ["paramiko", "client", "SSHClient"] | ["paramiko", "SSHClient"]
         )
     }) {
-        checker.report_diagnostic(Diagnostic::new(
-            SSHNoHostKeyVerification,
-            policy_argument.range(),
-        ));
+        checker.report_diagnostic(SSHNoHostKeyVerification, policy_argument.range());
     }
 }

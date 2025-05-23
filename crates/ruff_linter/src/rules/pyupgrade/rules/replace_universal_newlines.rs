@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
@@ -67,7 +67,7 @@ pub(crate) fn replace_universal_newlines(checker: &Checker, call: &ast::ExprCall
             return;
         };
 
-        let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, arg.range());
+        let mut diagnostic = checker.report_diagnostic(ReplaceUniversalNewlines, arg.range());
 
         if call.arguments.find_keyword("text").is_some() {
             diagnostic.try_set_fix(|| {
@@ -85,6 +85,5 @@ pub(crate) fn replace_universal_newlines(checker: &Checker, call: &ast::ExprCall
                 arg.range(),
             )));
         }
-        checker.report_diagnostic(diagnostic);
     }
 }

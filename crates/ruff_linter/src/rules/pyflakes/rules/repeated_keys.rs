@@ -1,7 +1,7 @@
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use std::collections::hash_map::Entry;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::{ComparableExpr, HashableExpr};
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -177,7 +177,7 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                     | Expr::Tuple(_)
                     | Expr::FString(_) => {
                         if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
-                            let mut diagnostic = Diagnostic::new(
+                            let mut diagnostic = checker.report_diagnostic(
                                 MultiValueRepeatedKeyLiteral {
                                     name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
                                     existing: SourceCodeSnippet::from_str(
@@ -206,12 +206,11 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                                     .end(),
                                 )));
                             }
-                            checker.report_diagnostic(diagnostic);
                         }
                     }
                     Expr::Name(_) => {
                         if checker.enabled(Rule::MultiValueRepeatedKeyVariable) {
-                            let mut diagnostic = Diagnostic::new(
+                            let mut diagnostic = checker.report_diagnostic(
                                 MultiValueRepeatedKeyVariable {
                                     name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
                                 },
@@ -238,7 +237,6 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                                     .end(),
                                 )));
                             }
-                            checker.report_diagnostic(diagnostic);
                         }
                     }
                     _ => {}

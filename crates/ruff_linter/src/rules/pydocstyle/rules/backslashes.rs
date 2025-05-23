@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
@@ -96,7 +96,8 @@ pub(crate) fn backslashes(checker: &Checker, docstring: &Docstring) {
 
         // Only allow continuations (backslashes followed by newlines) and Unicode escapes.
         if !matches!(*escaped_char, '\r' | '\n' | 'u' | 'U' | 'N') {
-            let mut diagnostic = Diagnostic::new(EscapeSequenceInDocstring, docstring.range());
+            let mut diagnostic =
+                checker.report_diagnostic(EscapeSequenceInDocstring, docstring.range());
 
             if !docstring.is_u_string() {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
@@ -105,7 +106,6 @@ pub(crate) fn backslashes(checker: &Checker, docstring: &Docstring) {
                 )));
             }
 
-            checker.report_diagnostic(diagnostic);
             break;
         }
     }

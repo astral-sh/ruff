@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::UnqualifiedName;
@@ -131,10 +131,7 @@ pub(crate) fn boolean_default_value_positional_argument(
                 return;
             }
 
-            checker.report_diagnostic(Diagnostic::new(
-                BooleanDefaultValuePositionalArgument,
-                param.identifier(),
-            ));
+            checker.report_diagnostic(BooleanDefaultValuePositionalArgument, param.identifier());
         }
     }
 }

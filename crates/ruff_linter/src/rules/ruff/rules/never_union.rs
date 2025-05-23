@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprBinOp, Operator};
 use ruff_python_semantic::{SemanticModel, analyze::typing::traverse_union};
@@ -77,7 +77,7 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
         }) => {
             // Analyze the left-hand side of the `|` operator.
             if let Some(never_like) = NeverLike::from_expr(left, checker.semantic()) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     NeverUnion {
                         never_like,
                         union_like: UnionLike::PEP604,
@@ -95,12 +95,11 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                         expr.range(),
                     )));
                 }
-                checker.report_diagnostic(diagnostic);
             }
 
             // Analyze the right-hand side of the `|` operator.
             if let Some(never_like) = NeverLike::from_expr(right, checker.semantic()) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     NeverUnion {
                         never_like,
                         union_like: UnionLike::PEP604,
@@ -113,7 +112,6 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                         expr.range(),
                     )));
                 }
-                checker.report_diagnostic(diagnostic);
             }
         }
 
@@ -143,7 +141,7 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                         return;
                     }
 
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         NeverUnion {
                             never_like,
                             union_like: UnionLike::TypingUnion,
@@ -172,7 +170,6 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                         },
                         expr.range(),
                     )));
-                    checker.report_diagnostic(diagnostic);
                 }
             }
         }

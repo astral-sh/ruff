@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
@@ -64,5 +64,5 @@ pub(crate) fn misplaced_bare_raise(checker: &Checker, raise: &ast::StmtRaise) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(MisplacedBareRaise, raise.range()));
+    checker.report_diagnostic(MisplacedBareRaise, raise.range());
 }

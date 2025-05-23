@@ -5,7 +5,7 @@ use ruff_python_ast::{Identifier, Stmt};
 use ruff_python_semantic::cfg::graph::{BlockId, Condition, ControlFlowGraph, build_cfg};
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
@@ -64,12 +64,12 @@ pub(crate) fn in_function(checker: &Checker, name: &Identifier, body: &[Stmt]) {
         let start = cfg.range(start_block).start();
         let end = cfg.range(end_block).end();
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             UnreachableCode {
                 name: name.to_string(),
             },
             TextRange::new(start, end),
-        ));
+        );
     }
 }
 

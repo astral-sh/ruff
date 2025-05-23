@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
@@ -88,10 +88,9 @@ pub(crate) fn shallow_copy_environ(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(ShallowCopyEnviron, call.range());
+    let mut diagnostic = checker.report_diagnostic(ShallowCopyEnviron, call.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         format!("{}.copy()", checker.locator().slice(arg)),
         call.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

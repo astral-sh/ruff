@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -66,6 +66,6 @@ pub(crate) fn potential_index_error(checker: &Checker, value: &Expr, slice: &Exp
     // Emit a diagnostic if the index is out of bounds. If the index can't be represented as an
     // `i64`, but the length _can_, then the index is definitely out of bounds.
     if index.is_none_or(|index| index >= length || index < -length) {
-        checker.report_diagnostic(Diagnostic::new(PotentialIndexError, slice.range()));
+        checker.report_diagnostic(PotentialIndexError, slice.range());
     }
 }

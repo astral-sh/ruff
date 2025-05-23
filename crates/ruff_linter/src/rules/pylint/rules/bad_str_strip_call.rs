@@ -3,7 +3,7 @@ use std::fmt;
 use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing;
@@ -211,7 +211,5 @@ pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
         None
     };
 
-    let diagnostic = Diagnostic::new(BadStrStripCall { strip, removal }, arg.range());
-
-    checker.report_diagnostic(diagnostic);
+    checker.report_diagnostic(BadStrStripCall { strip, removal }, arg.range());
 }

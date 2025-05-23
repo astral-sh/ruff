@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::analyze::typing;
@@ -101,7 +101,7 @@ pub(crate) fn literal_membership(checker: &Checker, compare: &ast::ExprCompare) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(LiteralMembership, right.range());
+    let mut diagnostic = checker.report_diagnostic(LiteralMembership, right.range());
 
     let literal = checker.locator().slice(right);
     let set = format!("{{{}}}", &literal[1..literal.len() - 1]);
@@ -109,6 +109,4 @@ pub(crate) fn literal_membership(checker: &Checker, compare: &ast::ExprCompare) 
         set,
         right.range(),
     )));
-
-    checker.report_diagnostic(diagnostic);
 }

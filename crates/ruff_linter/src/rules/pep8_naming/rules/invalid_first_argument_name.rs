@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use ruff_diagnostics::{Diagnostic, Fix, Violation};
+use ruff_diagnostics::{Fix, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
@@ -10,7 +10,7 @@ use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, DiagnosticGuard};
 use crate::registry::Rule;
 use crate::renamer::Renamer;
 
@@ -167,12 +167,16 @@ enum FunctionType {
 }
 
 impl FunctionType {
-    fn diagnostic_kind(self, argument_name: String, range: TextRange) -> Diagnostic {
+    fn diagnostic_kind<'a, 'b>(
+        self,
+        checker: &'a Checker<'b>,
+        argument_name: String,
+        range: TextRange,
+    ) -> DiagnosticGuard<'a, 'b> {
         match self {
-            Self::Method => {
-                Diagnostic::new(InvalidFirstArgumentNameForMethod { argument_name }, range)
-            }
-            Self::ClassMethod => Diagnostic::new(
+            Self::Method => checker
+                .report_diagnostic(InvalidFirstArgumentNameForMethod { argument_name }, range),
+            Self::ClassMethod => checker.report_diagnostic(
                 InvalidFirstArgumentNameForClassMethod {
                     argument_name,
                     is_new: false,
@@ -267,7 +271,7 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
     }
 
     let mut diagnostic =
-        function_type.diagnostic_kind(self_or_cls.name.to_string(), self_or_cls.range());
+        function_type.diagnostic_kind(checker, self_or_cls.name.to_string(), self_or_cls.range());
     diagnostic.try_set_optional_fix(|| {
         rename_parameter(
             scope,
@@ -278,7 +282,6 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
             checker.stylist(),
         )
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Rename the first parameter to `self` or `cls`, if no other parameter has the target name.
