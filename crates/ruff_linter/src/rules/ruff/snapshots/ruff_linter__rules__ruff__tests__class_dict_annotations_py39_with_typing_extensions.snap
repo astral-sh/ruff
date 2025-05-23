@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF061.py:4:1: RUF061 Use `typing_extensions.get_annotations` (Python < 3.10 with `typing_extensions` enabled), `inspect.get_annotations` (Python 3.10+), or `annotationlib.get_annotations` (Python 3.14+) instead of `__dict__.get('__annotations__')`
+RUF061.py:4:1: RUF061 Use `annotationlib.get_annotations` (Py3.14+), `inspect.get_annotations` (Py3.10+), or `typing_extensions.get_annotations` (Py<3.10 w/ `typing-extensions`) instead of `__dict__.get('__annotations__')`
   |
 2 | # Cases that should trigger the violation
 3 |
@@ -11,7 +11,7 @@ RUF061.py:4:1: RUF061 Use `typing_extensions.get_annotations` (Python < 3.10 wit
 6 | foo.__dict__.get("__annotations__", {})  # RUF061
   |
 
-RUF061.py:5:1: RUF061 Use `typing_extensions.get_annotations` (Python < 3.10 with `typing_extensions` enabled), `inspect.get_annotations` (Python 3.10+), or `annotationlib.get_annotations` (Python 3.14+) instead of `__dict__.get('__annotations__')`
+RUF061.py:5:1: RUF061 Use `annotationlib.get_annotations` (Py3.14+), `inspect.get_annotations` (Py3.10+), or `typing_extensions.get_annotations` (Py<3.10 w/ `typing-extensions`) instead of `__dict__.get('__annotations__')`
   |
 4 | foo.__dict__.get("__annotations__")  # RUF061
 5 | foo.__dict__.get("__annotations__", None)  # RUF061
@@ -19,7 +19,7 @@ RUF061.py:5:1: RUF061 Use `typing_extensions.get_annotations` (Python < 3.10 wit
 6 | foo.__dict__.get("__annotations__", {})  # RUF061
   |
 
-RUF061.py:6:1: RUF061 Use `typing_extensions.get_annotations` (Python < 3.10 with `typing_extensions` enabled), `inspect.get_annotations` (Python 3.10+), or `annotationlib.get_annotations` (Python 3.14+) instead of `__dict__.get('__annotations__')`
+RUF061.py:6:1: RUF061 Use `annotationlib.get_annotations` (Py3.14+), `inspect.get_annotations` (Py3.10+), or `typing_extensions.get_annotations` (Py<3.10 w/ `typing-extensions`) instead of `__dict__.get('__annotations__')`
   |
 4 | foo.__dict__.get("__annotations__")  # RUF061
 5 | foo.__dict__.get("__annotations__", None)  # RUF061
