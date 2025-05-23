@@ -162,7 +162,7 @@ impl PythonPath {
     pub fn from_virtual_env_var(path: impl Into<SystemPathBuf>) -> Self {
         Self::SysPrefix(path.into(), SysPrefixPathOrigin::VirtualEnvVar)
     }
-    
+
     pub fn from_conda_prefix_var(path: impl Into<SystemPathBuf>) -> Self {
         Self::Resolve(path.into(), SysPrefixPathOrigin::CondaPrefixVar)
     }
