@@ -120,6 +120,11 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
             continue;
         };
 
+        // Allow documented private names like `os._exit`.
+        if matches!(import_info.qualified_name.segments(), ["os", "_exit"]) {
+            continue;
+        }
+
         // Ignore private imports used exclusively for typing.
         if !binding.references.is_empty()
             && binding
