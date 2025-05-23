@@ -13,6 +13,9 @@ a.x = 0
 
 reveal_type(a.x)  # revealed: Literal[0]
 
+# Make sure that we infer the narrowed type for eager
+# scopes (class, comprehension) and the non-narrowed
+# public type for lazy scopes (function)
 class C:
     reveal_type(a.x)  # revealed: Literal[0]
 
