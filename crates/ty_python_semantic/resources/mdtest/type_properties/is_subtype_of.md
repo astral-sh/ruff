@@ -21,10 +21,7 @@ See the [typing documentation] for more information.
     as `int | float` and `int | float | complex`, respectively.
 
 ```py
-from ty_extensions import is_subtype_of, static_assert, TypeOf
-
-type JustFloat = TypeOf[1.0]
-type JustComplex = TypeOf[1j]
+from ty_extensions import is_subtype_of, static_assert, JustFloat, JustComplex
 
 static_assert(is_subtype_of(bool, bool))
 static_assert(is_subtype_of(bool, int))
@@ -88,9 +85,7 @@ static_assert(is_subtype_of(C, object))
 
 ```py
 from typing_extensions import Literal, LiteralString
-from ty_extensions import is_subtype_of, static_assert, TypeOf
-
-type JustFloat = TypeOf[1.0]
+from ty_extensions import is_subtype_of, static_assert, TypeOf, JustFloat
 
 # Boolean literals
 static_assert(is_subtype_of(Literal[True], bool))
