@@ -258,7 +258,7 @@ class C:
         self.w += None
 
 # TODO: Mypy and pyright do not support this, but it would be great if we could
-# infer `Unknown | str` here.
+# infer `Unknown | str` here (`Weird` is not a possible type for the `w` attribute).
 reveal_type(C().w)  # revealed: Unknown
 ```
 
