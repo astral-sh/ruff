@@ -1258,6 +1258,14 @@ impl<'db> Type<'db> {
             ) => (self.literal_fallback_instance(db))
                 .is_some_and(|instance| instance.is_subtype_of(db, target)),
 
+            // Function-like callables are subtypes of `FunctionType`
+            (Type::Callable(callable), Type::NominalInstance(target))
+                if callable.is_function_like(db)
+                    && target.class.is_known(db, KnownClass::FunctionType) =>
+            {
+                true
+            }
+
             (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
                 self_function_literal
                     .into_callable_type(db)
@@ -6933,7 +6941,7 @@ impl<'db> FunctionType<'db> {
         Type::Callable(CallableType::from_overloads(
             db,
             self.signature(db).overloads.iter().cloned(),
-            true,
+            false,
         ))
     }
 
@@ -7754,6 +7762,13 @@ impl<'db> CallableType<'db> {
     where
         F: Fn(&Signature<'db>, &Signature<'db>) -> bool,
     {
+        let self_is_function_like = self.is_function_like(db);
+        let other_is_function_like = other.is_function_like(db);
+
+        if !self_is_function_like && other_is_function_like {
+            return false;
+        }
+
         match (self.signatures(db), other.signatures(db)) {
             ([self_signature], [other_signature]) => {
                 // Base case: both callable types contain a single signature.
@@ -7796,6 +7811,10 @@ impl<'db> CallableType<'db> {
     ///
     /// See [`Type::is_equivalent_to`] for more details.
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        if self.is_function_like(db) != other.is_function_like(db) {
+            return false;
+        }
+
         match (self.signatures(db), other.signatures(db)) {
             ([self_signature], [other_signature]) => {
                 // Common case: both callable types contain a single signature, use the custom
@@ -7822,6 +7841,10 @@ impl<'db> CallableType<'db> {
     ///
     /// See [`Type::is_gradual_equivalent_to`] for more details.
     fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        if self.is_function_like(db) != other.is_function_like(db) {
+            return false;
+        }
+
         match (self.signatures(db), other.signatures(db)) {
             ([self_signature], [other_signature]) => {
                 self_signature.is_gradual_equivalent_to(db, other_signature)

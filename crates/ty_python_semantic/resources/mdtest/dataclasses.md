@@ -839,7 +839,7 @@ python-version = "3.12"
 from dataclasses import dataclass
 from typing import Callable
 from types import FunctionType
-from ty_extensions import TypeOf, static_assert, is_subtype_of, is_assignable_to
+from ty_extensions import CallableTypeOf, TypeOf, static_assert, is_subtype_of, is_assignable_to
 
 @dataclass
 class C:
@@ -852,16 +852,24 @@ reveal_type(type(C.__init__))  # revealed: <class 'FunctionType'>
 reveal_type(type(C.__init__).__code__)  # revealed: CodeType
 reveal_type(C.__init__.__code__)  # revealed: CodeType
 
+def equivalent_signature(self: C, x: int) -> None:
+    pass
+
 type DunderInitType = TypeOf[C.__init__]
-type EquivalentCallableType = Callable[[C, int], None]
+type EquivalentPureCallableType = Callable[[C, int], None]
+type EquivalentFunctionLikeCallableType = CallableTypeOf[equivalent_signature]
 
-static_assert(is_subtype_of(DunderInitType, EquivalentCallableType))
-static_assert(is_assignable_to(DunderInitType, EquivalentCallableType))
+static_assert(is_subtype_of(DunderInitType, EquivalentPureCallableType))
+static_assert(is_assignable_to(DunderInitType, EquivalentPureCallableType))
 
-static_assert(not is_subtype_of(EquivalentCallableType, DunderInitType))
-static_assert(not is_assignable_to(EquivalentCallableType, DunderInitType))
+static_assert(not is_subtype_of(EquivalentPureCallableType, DunderInitType))
+static_assert(not is_assignable_to(EquivalentPureCallableType, DunderInitType))
 
-# TODO:
-# error: [static-assert-error]
+static_assert(is_subtype_of(DunderInitType, EquivalentFunctionLikeCallableType))
+static_assert(is_assignable_to(DunderInitType, EquivalentFunctionLikeCallableType))
+
+static_assert(not is_subtype_of(EquivalentFunctionLikeCallableType, DunderInitType))
+static_assert(not is_assignable_to(EquivalentFunctionLikeCallableType, DunderInitType))
+
 static_assert(is_subtype_of(DunderInitType, FunctionType))
 ```
