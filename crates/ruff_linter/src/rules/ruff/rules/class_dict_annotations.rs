@@ -6,7 +6,9 @@ use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for uses of `<identifier>.__dict__.get("__annotations__" [, <default>])`
-/// on Python 3.10+ and Python < 3.10 with `typing_extensions` enabled.
+/// on Python 3.10+ and Python < 3.10 when
+/// [typing-extensions](https://docs.astral.sh/ruff/settings/#lint_typing-extensions)
+/// is enabled.
 ///
 /// ## Why is this bad?
 /// Starting with Python 3.14, directly accessing `__annotations__` via
@@ -14,10 +16,10 @@ use ruff_text_size::Ranged;
 /// if the class is defined under `from __future__ import annotations`.
 ///
 /// Therefore, it is better to use dedicated library functions like
-/// `inspect.get_annotations` (Python 3.10+),
-/// `typing_extensions.get_annotations` (for older Python versions if
-/// `typing_extensions` is available), or `annotationlib.get_annotations`
-/// (Python 3.14+).
+/// `annotationlib.get_annotations` (Python 3.14+), `inspect.get_annotations`
+/// (Python 3.10+), or `typing_extensions.get_annotations` (for Python < 3.10 if
+/// [typing-extensions](https://pypi.org/project/typing-extensions/) is
+/// available).
 ///
 /// The benefits of using these functions include:
 /// 1.  **Avoiding Undocumented Internals:** They provide a stable, public API,
@@ -50,7 +52,8 @@ use ruff_text_size::Ranged;
 /// inspect.get_annotations(cls)
 /// ```
 ///
-/// On Python < 3.10 with `typing_extensions` enabled, use instead:
+/// On Python < 3.10 with [typing-extensions](https://pypi.org/project/typing-extensions/)
+/// installed, use instead:
 /// ```python
 /// import typing_extensions
 ///
@@ -85,7 +88,7 @@ impl Violation for ClassDictAnnotations {
 
 /// RUF061
 pub(crate) fn class_dict_annotations(checker: &Checker, call: &ExprCall) {
-    // Only apply this rule for Python 3.10 and newer unless `typing_extensions` is enabled.
+    // Only apply this rule for Python 3.10 and newer unless `typing-extensions` is enabled.
     if checker.target_version() < PythonVersion::PY310 && !checker.settings.typing_extensions {
         return;
     }
