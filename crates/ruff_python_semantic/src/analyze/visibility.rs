@@ -4,7 +4,7 @@ use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{self as ast, Decorator, Expr, StmtClassDef};
 
-use crate::analyze::class::{traverse_base_classes, TraversalContinuation};
+use crate::analyze::class::{TraversalContinuation, traverse_base_classes};
 use crate::model::SemanticModel;
 use crate::{Module, ModuleSource};
 
@@ -298,7 +298,7 @@ impl<'a> InspectableClass<'a> {
 
         if let Some(class_def) = binding.statement(semantic)?.as_class_def_stmt() {
             return Some(Self::ClassDef(class_def));
-        };
+        }
 
         let qualified_name = semantic.resolve_qualified_name(expr)?;
         Some(Self::Imported(qualified_name))
@@ -374,7 +374,7 @@ impl ABCLikeliness {
             if let Some(likeliness) = Self::from_metaclass(&metaclass.value, semantic, true) {
                 return likeliness;
             }
-        };
+        }
 
         for base_expr in class_def.bases() {
             let Some(base) = InspectableClass::from(base_expr, semantic) else {
@@ -401,7 +401,7 @@ impl ABCLikeliness {
                 if let Some(likeliness) = Self::from_metaclass(&metaclass.value, semantic, false) {
                     return likeliness;
                 }
-            };
+            }
         }
 
         let mut likeliness = Self::LikelyNo;
