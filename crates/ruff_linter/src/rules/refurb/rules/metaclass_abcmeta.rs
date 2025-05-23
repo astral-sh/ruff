@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -30,6 +31,9 @@ use crate::importer::ImportRequest;
 /// class C(ABC):
 ///     pass
 /// ```
+///
+/// ## Options
+/// - `lint.refurb.allow-abc-meta-bases`
 ///
 /// ## References
 /// - [Python documentation: `abc.ABC`](https://docs.python.org/3/library/abc.html#abc.ABC)
@@ -67,6 +71,23 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["abc", "ABCMeta"]))
     {
         return;
+    }
+
+    // Determine if all base classes are in the configured list of exceptions.
+    let bases: Option<FxHashSet<String>> = class_def
+        .bases()
+        .iter()
+        .map(|base| {
+            checker
+                .semantic()
+                .resolve_qualified_name(base)
+                .map(|qualified_name| qualified_name.to_string())
+        })
+        .collect();
+    if let Some(bases) = &bases {
+        if !bases.is_empty() && bases.is_subset(&checker.settings.refurb.allow_abc_meta_bases) {
+            return;
+        }
     }
 
     let mut diagnostic = Diagnostic::new(MetaClassABCMeta, keyword.range);
