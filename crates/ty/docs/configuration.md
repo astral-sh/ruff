@@ -1,3 +1,5 @@
+<!-- WARNING: This file is auto-generated (cargo dev generate-all). Update the doc comments on the 'Options' struct in 'crates/ty_project/src/metadata/options.rs' if you want to change anything here. -->
+
 # Configuration
 #### `respect-ignore-files`
 
