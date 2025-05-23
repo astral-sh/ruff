@@ -1,10 +1,10 @@
-use ruff_python_ast::Stmt;
-
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Stmt;
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
+
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for functions or methods with too many return statements.

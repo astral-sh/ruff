@@ -3,7 +3,6 @@ use std::borrow::Cow;
 use anyhow::Result;
 use rustc_hash::FxHashMap;
 
-use crate::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{Imported, NodeId, Scope, ScopeId};
 use ruff_text_size::Ranged;
@@ -14,6 +13,7 @@ use crate::fix;
 use crate::importer::ImportedMembers;
 use crate::rules::flake8_type_checking::helpers::{filter_contained, quote_annotation};
 use crate::rules::flake8_type_checking::imports::ImportBinding;
+use crate::{Diagnostic, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for imports that are required at runtime but are only defined in

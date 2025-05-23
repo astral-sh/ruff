@@ -1,4 +1,3 @@
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::whitespace;
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
@@ -9,6 +8,7 @@ use ruff_text_size::Ranged;
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the use of string literals in exception constructors.

@@ -1,4 +1,3 @@
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -6,6 +5,7 @@ use ruff_python_semantic::analyze::typing::{is_dict, is_list};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::refurb::helpers::generate_method_call;
 

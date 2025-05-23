@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -9,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for the use of a classmethod being made without the decorator.

@@ -1,4 +1,3 @@
-use crate::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
@@ -10,6 +9,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix::edits::pad;
 use crate::preview::is_defer_optional_to_up045_enabled;
+use crate::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Check for type annotations that can be rewritten based on [PEP 604] syntax.

@@ -1,8 +1,8 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use crate::{Diagnostic, Violation};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::identifier::Identifier;
 
 /// ## What it does
 /// Checks for functions or methods with too many branches, including (nested)

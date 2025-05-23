@@ -1,6 +1,5 @@
 use std::fmt;
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{self as ast, Expr};
@@ -8,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::type_param_name;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for type names that do not match the variance of their associated

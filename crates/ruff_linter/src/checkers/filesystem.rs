@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use crate::Diagnostic;
 use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::CommentRanges;
 
+use crate::Diagnostic;
 use crate::Locator;
 use crate::package::PackageRoot;
 use crate::preview::is_allow_nested_roots_enabled;

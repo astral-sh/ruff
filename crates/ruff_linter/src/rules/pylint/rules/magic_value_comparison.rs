@@ -1,12 +1,12 @@
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::settings::ConstantType;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for the use of unnamed numerical constants ("magic") values in

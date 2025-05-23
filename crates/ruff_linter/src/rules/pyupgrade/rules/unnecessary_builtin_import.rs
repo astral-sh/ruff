@@ -1,12 +1,12 @@
 use itertools::Itertools;
 use ruff_python_ast::{Alias, Stmt};
 
-use crate::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Diagnostic, Fix};
 
 /// ## What it does
 /// Checks for unnecessary imports of builtins.

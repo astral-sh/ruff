@@ -1,6 +1,3 @@
-use crate::importer::ImportRequest;
-use crate::rules::airflow::helpers::{ProviderReplacement, is_guarded_by_try_except};
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
@@ -8,6 +5,9 @@ use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::rules::airflow::helpers::{ProviderReplacement, is_guarded_by_try_except};
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of Airflow functions and values that have been moved to it providers.

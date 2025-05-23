@@ -1,11 +1,11 @@
 use ruff_python_ast::{ExceptHandler, Expr, Stmt};
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_bandit::helpers::is_untyped_exception;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of the `try`-`except`-`continue` pattern.

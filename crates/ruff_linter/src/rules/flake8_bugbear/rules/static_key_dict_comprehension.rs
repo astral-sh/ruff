@@ -1,6 +1,5 @@
 use rustc_hash::FxHashMap;
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::StoredNameFinder;
 use ruff_python_ast::visitor::Visitor;
@@ -9,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for dictionary comprehensions that use a static key, like a string

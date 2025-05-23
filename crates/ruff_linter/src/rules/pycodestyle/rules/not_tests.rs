@@ -1,12 +1,12 @@
-use crate::fix::edits::pad;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::generate_comparison;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
 use crate::registry::Rule;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for membership tests using `not {element} in {collection}`.

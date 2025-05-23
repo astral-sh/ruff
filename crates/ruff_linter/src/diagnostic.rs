@@ -1,10 +1,10 @@
 use anyhow::Result;
 use log::debug;
 
-use crate::{Fix, codes::Rule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::violation::Violation;
+use crate::{Fix, codes::Rule};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Diagnostic {

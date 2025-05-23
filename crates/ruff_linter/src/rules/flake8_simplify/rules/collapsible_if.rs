@@ -3,7 +3,6 @@ use std::borrow::Cow;
 use anyhow::{Result, bail};
 use libcst_native::ParenthesizedNode;
 
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt, whitespace};
@@ -19,6 +18,7 @@ use crate::cst::helpers::space;
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};
 use crate::fix::codemods::CodegenStylist;
 use crate::fix::edits::fits;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for nested `if` statements that can be collapsed into a single `if`

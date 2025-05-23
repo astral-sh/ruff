@@ -1,10 +1,10 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtClassDef;
 use ruff_python_semantic::analyze::class::is_enumeration;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{DataclassKind, dataclass_kind};
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for enum classes which are also decorated with `@dataclass`.

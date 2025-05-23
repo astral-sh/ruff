@@ -2,7 +2,6 @@ use std::fmt::Display;
 
 use smallvec::SmallVec;
 
-use crate::{AlwaysFixableViolation, Diagnostic, Fix};
 use ast::{StmtClassDef, StmtFunctionDef};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, AnyNodeRef, helpers::comment_indentation_after};
@@ -12,6 +11,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_comment;
+use crate::{AlwaysFixableViolation, Diagnostic, Fix};
 
 use super::suppression_comment_visitor::{
     CaptureSuppressionComment, SuppressionComment, SuppressionCommentData,

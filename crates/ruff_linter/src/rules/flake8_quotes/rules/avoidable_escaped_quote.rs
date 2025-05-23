@@ -1,4 +1,3 @@
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use flake8_quotes::helpers::{contains_escaped_quote, raw_contents, unescape_string};
 use flake8_quotes::settings::Quote;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -9,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_quotes;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for strings that include escaped quotes, and suggests changing

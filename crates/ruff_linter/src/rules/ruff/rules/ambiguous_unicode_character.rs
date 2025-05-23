@@ -2,7 +2,6 @@ use std::fmt;
 
 use bitflags::bitflags;
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, StringLike};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -14,6 +13,7 @@ use crate::registry::AsRule;
 use crate::rules::ruff::rules::Context;
 use crate::rules::ruff::rules::confusables::confusable;
 use crate::settings::LinterSettings;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for ambiguous Unicode characters in strings.

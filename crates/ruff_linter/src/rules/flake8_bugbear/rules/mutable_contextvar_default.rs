@@ -1,4 +1,3 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
@@ -8,6 +7,7 @@ use ruff_python_semantic::analyze::typing::{is_immutable_func, is_mutable_expr, 
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of mutable objects as `ContextVar` defaults.

@@ -1,10 +1,10 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 
 use crate::rules::pep8_naming::{helpers, settings::IgnoreNames};
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for constant imports that are aliased to non-constant-style

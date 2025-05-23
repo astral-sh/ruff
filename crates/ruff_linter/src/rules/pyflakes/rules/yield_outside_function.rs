@@ -1,8 +1,9 @@
 use std::fmt;
 
-use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::semantic_errors::YieldOutsideFunctionKind;
+
+use crate::Violation;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum DeferralKeyword {

@@ -1,4 +1,3 @@
-use crate::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprList, ExprName, ExprTuple, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
@@ -6,6 +5,7 @@ use ruff_python_semantic::{Binding, ScopeId, SemanticModel, TypingOnlyBindingsSt
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 
 use super::helpers::parenthesize_loop_iter_if_necessary;
 

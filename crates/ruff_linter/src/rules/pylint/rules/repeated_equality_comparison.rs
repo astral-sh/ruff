@@ -1,7 +1,6 @@
 use itertools::Itertools;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ast::ExprContext;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
@@ -13,6 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for repeated equality comparisons that can be rewritten as a membership

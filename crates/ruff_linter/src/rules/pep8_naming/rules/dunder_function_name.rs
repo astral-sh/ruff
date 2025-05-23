@@ -1,12 +1,12 @@
 use ruff_python_ast::Stmt;
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Scope, ScopeKind};
 
 use crate::rules::pep8_naming::settings::IgnoreNames;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for functions with "dunder" names (that is, names with two

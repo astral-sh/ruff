@@ -2,7 +2,6 @@ use std::fmt;
 
 use rustc_hash::FxHashSet;
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, LiteralExpressionRef};
 use ruff_python_semantic::SemanticModel;
@@ -11,6 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for redundant unions between a `Literal` and a builtin supertype of

@@ -1,7 +1,6 @@
 //! Check for calls to suspicious functions, or calls into suspicious modules.
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
-use crate::{Diagnostic, Violation};
 use itertools::Either;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operator};
@@ -10,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::preview::is_suspicious_function_reference_enabled;
 use crate::registry::AsRule;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for calls to `pickle` functions or modules that wrap them.

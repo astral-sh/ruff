@@ -1,10 +1,10 @@
 use ruff_python_ast::Expr;
 use ruff_text_size::{Ranged, TextSize};
 
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for numeric literals with a string representation longer than ten

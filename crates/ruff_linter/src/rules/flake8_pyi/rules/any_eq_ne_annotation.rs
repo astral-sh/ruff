@@ -1,10 +1,10 @@
 use ruff_python_ast::Parameters;
 
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for `__eq__` and `__ne__` implementations that use `typing.Any` as

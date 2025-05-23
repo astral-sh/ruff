@@ -1,9 +1,9 @@
-use crate::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary default type arguments for `Generator` and

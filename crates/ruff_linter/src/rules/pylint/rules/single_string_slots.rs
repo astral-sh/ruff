@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtClassDef};
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for single strings assigned to `__slots__`.

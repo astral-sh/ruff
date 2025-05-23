@@ -4,7 +4,6 @@ use anyhow::{Result, anyhow};
 use libcst_native::{Arg, Expression};
 use regex::Regex;
 
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Stylist;
@@ -17,6 +16,7 @@ use crate::cst::matchers::{
 };
 use crate::fix::codemods::CodegenStylist;
 use crate::rules::pyflakes::format::FormatSummary;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unnecessary positional indices in format strings.

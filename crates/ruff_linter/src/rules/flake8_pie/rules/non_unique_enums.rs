@@ -1,13 +1,13 @@
 use ruff_python_semantic::SemanticModel;
 use rustc_hash::FxHashSet;
 
-use crate::Diagnostic;
-use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Expr, ExprCall, Stmt};
 use ruff_text_size::Ranged;
 
+use crate::Diagnostic;
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does

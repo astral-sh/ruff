@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr};
 
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 use super::helpers::{Parentheses, get_mark_decorators};
 

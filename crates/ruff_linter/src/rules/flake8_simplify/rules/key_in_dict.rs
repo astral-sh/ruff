@@ -1,5 +1,3 @@
-use crate::{AlwaysFixableViolation, Diagnostic, Fix};
-use crate::{Applicability, Edit};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -9,6 +7,8 @@ use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Diagnostic, Fix};
+use crate::{Applicability, Edit};
 
 /// ## What it does
 /// Checks for key-existence checks against `dict.keys()` calls.

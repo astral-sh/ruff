@@ -1,9 +1,10 @@
-use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprStringLiteral;
 use ruff_text_size::TextRange;
+
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of hardcoded charsets, which are defined in Python string module.

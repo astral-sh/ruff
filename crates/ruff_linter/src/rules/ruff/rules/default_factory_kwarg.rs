@@ -1,6 +1,5 @@
 use anyhow::Result;
 
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ast::Keyword;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_constant;
@@ -11,6 +10,7 @@ use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for incorrect usages of `default_factory` as a keyword argument when

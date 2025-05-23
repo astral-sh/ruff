@@ -1,4 +1,3 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::{self as ast, Expr, ExprCall};
@@ -7,6 +6,7 @@ use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of `logging.exception()` with `exc_info` set to `False`.

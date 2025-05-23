@@ -1,10 +1,10 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for function docstrings that include the function's signature in

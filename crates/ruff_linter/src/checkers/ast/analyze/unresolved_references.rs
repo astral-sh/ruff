@@ -1,7 +1,7 @@
-use crate::Diagnostic;
 use ruff_python_semantic::Exceptions;
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 
+use crate::Diagnostic;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::rules::pyflakes;

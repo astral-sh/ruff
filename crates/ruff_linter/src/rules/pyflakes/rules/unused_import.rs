@@ -4,7 +4,6 @@ use std::iter;
 use anyhow::{Result, anyhow, bail};
 use std::collections::BTreeMap;
 
-use crate::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Stmt};
@@ -22,6 +21,7 @@ use crate::preview::{
 use crate::registry::Rule;
 use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::{isort, isort::ImportSection, isort::ImportType};
+use crate::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unused imports.

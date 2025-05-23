@@ -1,4 +1,3 @@
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
@@ -13,6 +12,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::flake8_annotations::helpers::auto_return_type;
 use crate::rules::ruff::typing::type_hint_resolves_to_any;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks that function arguments have type annotations.

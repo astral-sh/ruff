@@ -1,8 +1,6 @@
 use anyhow::bail;
 use ast::Expr;
 
-use crate::{Diagnostic, Fix};
-use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
@@ -12,6 +10,8 @@ use super::fix_with;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
 use crate::preview::multiple_with_statements_fix_safe_enabled;
+use crate::{Diagnostic, Fix};
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the unnecessary nesting of multiple consecutive context

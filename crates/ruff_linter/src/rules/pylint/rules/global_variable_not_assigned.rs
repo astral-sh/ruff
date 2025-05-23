@@ -1,5 +1,6 @@
-use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::Violation;
 
 /// ## What it does
 /// Checks for `global` variables that are not assigned a value in the current

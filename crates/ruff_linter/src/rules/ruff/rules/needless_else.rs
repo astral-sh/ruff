@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::comment_indentation_after;
 use ruff_python_ast::whitespace::indentation;
@@ -10,6 +9,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for `else` clauses that only contains `pass` and `...` statements.

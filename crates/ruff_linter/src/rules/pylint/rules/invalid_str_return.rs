@@ -1,4 +1,3 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
@@ -10,6 +9,7 @@ use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonTy
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `__str__` implementations that return a type other than `str`.

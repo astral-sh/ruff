@@ -1,4 +1,3 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_source_file::LineRanges;
@@ -6,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::settings::LinterSettings;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for string literals that are explicitly concatenated (using the

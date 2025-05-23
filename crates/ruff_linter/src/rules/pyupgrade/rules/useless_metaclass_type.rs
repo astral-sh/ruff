@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
-use crate::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Diagnostic, Fix};
 
 /// ## What it does
 /// Checks for the use of `__metaclass__ = type` in class definitions.

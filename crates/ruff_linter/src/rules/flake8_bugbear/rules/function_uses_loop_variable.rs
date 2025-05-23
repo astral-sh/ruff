@@ -1,4 +1,3 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::types::Node;
 use ruff_python_ast::visitor;
@@ -7,6 +6,7 @@ use ruff_python_ast::{self as ast, Comprehension, Expr, ExprContext, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for function definitions that use a loop variable.

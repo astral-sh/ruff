@@ -1,12 +1,12 @@
 use itertools::Itertools;
 
-use crate::fix::snippet::SourceCodeSnippet;
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for operations that compare a name to itself.

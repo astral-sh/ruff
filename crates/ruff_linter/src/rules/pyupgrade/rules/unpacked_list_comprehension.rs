@@ -1,5 +1,6 @@
-use crate::Violation;
 use ruff_macros::ViolationMetadata;
+
+use crate::Violation;
 
 /// ## Removed
 /// There's no [evidence](https://github.com/astral-sh/ruff/issues/12754) that generators are

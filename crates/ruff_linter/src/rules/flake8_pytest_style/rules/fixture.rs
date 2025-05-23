@@ -1,5 +1,3 @@
-use crate::{AlwaysFixableViolation, Violation};
-use crate::{Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Decorator;
 use ruff_python_ast::helpers::map_callable;
@@ -17,6 +15,8 @@ use rustc_hash::FxHashSet;
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
 use crate::registry::Rule;
+use crate::{AlwaysFixableViolation, Violation};
+use crate::{Diagnostic, Edit, Fix};
 
 use super::helpers::{
     Parentheses, get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture,

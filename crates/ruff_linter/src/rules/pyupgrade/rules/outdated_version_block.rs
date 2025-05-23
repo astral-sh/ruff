@@ -2,7 +2,6 @@ use std::cmp::Ordering;
 
 use anyhow::Result;
 
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::stmt_if::{BranchKind, IfElifBranch, if_elif_branches};
@@ -13,6 +12,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{adjust_indentation, delete_stmt};
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does

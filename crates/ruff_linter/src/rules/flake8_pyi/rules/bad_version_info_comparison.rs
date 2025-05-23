@@ -1,12 +1,12 @@
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_bad_version_info_in_non_stub_enabled;
 use crate::registry::Rule;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of comparators other than `<` and `>=` for

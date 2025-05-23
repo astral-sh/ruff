@@ -1,12 +1,13 @@
-use crate::checkers::ast::Checker;
-use crate::fix::snippet::SourceCodeSnippet;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_python_semantic::{BindingId, SemanticModel};
 use ruff_text_size::Ranged;
+
+use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for `len` calls on sequences in a boolean test context.

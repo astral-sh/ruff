@@ -1,10 +1,10 @@
-use crate::{AlwaysFixableViolation, Diagnostic};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::rules::refurb::helpers::replace_with_identity_check;
+use crate::{AlwaysFixableViolation, Diagnostic};
 
 /// ## What it does
 /// Checks for uses of `type` that compare the type of an object to the type of `None`.

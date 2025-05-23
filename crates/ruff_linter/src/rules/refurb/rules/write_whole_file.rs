@@ -1,4 +1,3 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::visitor::{self, Visitor};
@@ -8,6 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Diagnostic, Violation};
 
 use super::super::helpers::{FileOpen, find_file_opens};
 

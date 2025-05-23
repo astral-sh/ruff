@@ -1,5 +1,3 @@
-use crate::{Diagnostic, FixAvailability};
-use crate::{Edit, Fix, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr, Keyword};
@@ -8,6 +6,8 @@ use ruff_text_size::{Ranged, TextSize};
 use crate::checkers::ast::Checker;
 use crate::preview::is_comprehension_with_min_max_sum_enabled;
 use crate::rules::flake8_comprehensions::fixes;
+use crate::{Diagnostic, FixAvailability};
+use crate::{Edit, Fix, Violation};
 
 /// ## What it does
 /// Checks for unnecessary list or set comprehensions passed to builtin functions that take an iterable.

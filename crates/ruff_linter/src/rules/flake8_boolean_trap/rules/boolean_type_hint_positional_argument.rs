@@ -1,5 +1,3 @@
-use crate::Diagnostic;
-use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::UnqualifiedName;
@@ -10,6 +8,7 @@ use ruff_python_semantic::analyze::visibility;
 use crate::checkers::ast::Checker;
 use crate::preview::is_bool_subtype_of_annotation_enabled;
 use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for the use of boolean positional arguments in function definitions,

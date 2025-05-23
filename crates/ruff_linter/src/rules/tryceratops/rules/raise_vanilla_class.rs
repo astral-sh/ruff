@@ -1,11 +1,11 @@
 use ruff_python_ast::Expr;
 use ruff_python_ast::helpers::map_callable;
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for code that raises `Exception` or `BaseException` directly.

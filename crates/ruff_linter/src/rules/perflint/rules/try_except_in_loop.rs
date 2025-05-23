@@ -1,11 +1,10 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast, PythonVersion, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use ruff_python_ast::PythonVersion;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of except handling via `try`-`except` within `for` and

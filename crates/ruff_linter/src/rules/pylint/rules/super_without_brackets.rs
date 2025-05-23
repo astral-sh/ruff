@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{ScopeKind, analyze::function_type};
 
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Detects attempts to use `super` without parentheses.

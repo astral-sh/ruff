@@ -1,6 +1,5 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_semantic::analyze::typing::{
@@ -13,6 +12,7 @@ use crate::rules::ruff::rules::helpers::{
     AttrsAutoAttribs, DataclassKind, dataclass_kind, is_class_var_annotation, is_dataclass_field,
     is_descriptor_class,
 };
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for function calls in dataclass attribute defaults.

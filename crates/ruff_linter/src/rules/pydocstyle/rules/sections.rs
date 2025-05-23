@@ -3,8 +3,6 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 use std::sync::LazyLock;
 
-use crate::{AlwaysFixableViolation, Violation};
-use crate::{Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
@@ -20,6 +18,8 @@ use crate::docstrings::styles::SectionStyle;
 use crate::registry::Rule;
 use crate::rules::pydocstyle::helpers::find_underline;
 use crate::rules::pydocstyle::settings::Convention;
+use crate::{AlwaysFixableViolation, Violation};
+use crate::{Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for over-indented sections in docstrings.

@@ -1,10 +1,10 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCall;
+use ruff_text_size::Ranged;
+
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-
-use ruff_python_ast::ExprCall;
-use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for uses of the `exit()` and `quit()`.

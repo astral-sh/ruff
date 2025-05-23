@@ -8,7 +8,6 @@ use libcst_native::{
     SimpleWhitespace, SmallStatement, Statement, TrailingWhitespace,
 };
 
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -29,6 +28,7 @@ use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::fix::codemods::CodegenStylist;
 use crate::importer::ImportRequest;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 use super::unittest_assert::UnittestAssert;
 

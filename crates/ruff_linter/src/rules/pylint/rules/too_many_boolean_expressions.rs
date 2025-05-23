@@ -1,10 +1,10 @@
-use crate::{Diagnostic, Violation};
 use ast::{Expr, StmtIf};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for too many Boolean expressions in an `if` statement.

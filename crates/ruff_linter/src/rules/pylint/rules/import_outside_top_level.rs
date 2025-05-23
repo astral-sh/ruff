@@ -1,9 +1,9 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
 use crate::rules::flake8_tidy_imports::rules::BannedModuleImportPolicies;
+use crate::{Diagnostic, Violation};
 use crate::{
     checkers::ast::Checker, codes::Rule, rules::flake8_tidy_imports::matchers::NameMatchPolicy,
 };

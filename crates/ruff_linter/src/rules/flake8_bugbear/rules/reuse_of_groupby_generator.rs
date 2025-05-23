@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, Comprehension, Expr, Stmt};
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for multiple usage of the generator returned from

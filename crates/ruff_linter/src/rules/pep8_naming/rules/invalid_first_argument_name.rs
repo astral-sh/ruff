@@ -1,6 +1,5 @@
 use anyhow::Result;
 
-use crate::{Diagnostic, Fix, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
@@ -13,6 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::renamer::Renamer;
+use crate::{Diagnostic, Fix, Violation};
 
 /// ## What it does
 /// Checks for instance methods that use a name other than `self` for their

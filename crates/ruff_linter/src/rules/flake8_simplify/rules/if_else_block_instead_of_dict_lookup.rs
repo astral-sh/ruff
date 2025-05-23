@@ -1,6 +1,5 @@
 use rustc_hash::FxHashSet;
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableLiteral;
 use ruff_python_ast::helpers::contains_effect;
@@ -9,6 +8,7 @@ use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checki
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for three or more consecutive if-statements with direct returns

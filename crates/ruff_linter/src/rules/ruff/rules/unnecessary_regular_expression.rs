@@ -1,4 +1,3 @@
-use crate::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
@@ -10,6 +9,7 @@ use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 ///

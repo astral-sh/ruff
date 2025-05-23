@@ -1,6 +1,5 @@
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -12,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 use super::super::types;
 use super::helpers::{is_pytest_parametrize, split_names};

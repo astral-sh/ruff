@@ -1,6 +1,5 @@
 use std::fmt;
 
-use crate::{Diagnostic, Violation};
 use ast::Stmt;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
@@ -8,6 +7,7 @@ use ruff_python_semantic::{Scope, SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `asyncio.create_task` and `asyncio.ensure_future` calls

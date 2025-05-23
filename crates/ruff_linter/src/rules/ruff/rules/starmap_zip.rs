@@ -1,9 +1,10 @@
-use crate::checkers::ast::Checker;
-use crate::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprCall, parenthesize::parenthesized_range};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
+
+use crate::checkers::ast::Checker;
+use crate::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `itertools.starmap` calls where the second argument is a `zip` call.

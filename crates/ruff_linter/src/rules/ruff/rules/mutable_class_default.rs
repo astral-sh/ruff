@@ -1,6 +1,5 @@
 use ruff_python_ast::{self as ast, Stmt};
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::Ranged;
@@ -10,6 +9,7 @@ use crate::rules::ruff::rules::helpers::{
     dataclass_kind, has_default_copy_semantics, is_class_var_annotation, is_final_annotation,
     is_special_attribute,
 };
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for mutable default values in class attributes.

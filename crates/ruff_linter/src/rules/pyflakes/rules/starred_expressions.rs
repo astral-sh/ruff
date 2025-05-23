@@ -1,8 +1,9 @@
 use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for the use of too many expressions in starred assignment statements.

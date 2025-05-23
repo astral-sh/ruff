@@ -1,8 +1,8 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
+use ruff_text_size::Ranged;
 
 use crate::{Diagnostic, Violation};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for assignments to the variable `df`.

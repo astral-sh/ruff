@@ -1,11 +1,11 @@
 use ruff_python_ast::Alias;
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_stdlib::future::is_feature_name;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `__future__` imports that are not defined in the current Python

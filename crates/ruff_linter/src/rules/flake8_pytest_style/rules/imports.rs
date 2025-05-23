@@ -1,8 +1,9 @@
 use ruff_python_ast::Stmt;
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
+
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for incorrect import of pytest.

@@ -1,11 +1,11 @@
 use std::fmt;
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{Binding, BindingKind};
 use ruff_text_size::Ranged;
 
 use crate::Locator;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for the use of non-ASCII characters in variable names.

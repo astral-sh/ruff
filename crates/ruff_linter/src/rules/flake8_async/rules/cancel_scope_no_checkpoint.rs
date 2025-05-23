@@ -1,4 +1,3 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{AwaitVisitor, any_over_body};
 use ruff_python_ast::visitor::Visitor;
@@ -6,6 +5,7 @@ use ruff_python_ast::{Expr, StmtWith, WithItem};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::helpers::MethodName;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for timeout context managers which do not contain a checkpoint.

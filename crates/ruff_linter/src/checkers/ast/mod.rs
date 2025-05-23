@@ -31,7 +31,6 @@ use ruff_python_parser::semantic_errors::{
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::{Diagnostic, Edit, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
 use ruff_python_ast::identifier::Identifier;
@@ -73,6 +72,7 @@ use crate::rules::pyflakes::rules::{
 use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{LinterSettings, TargetVersion, flags};
+use crate::{Diagnostic, Edit, IsolationLevel};
 use crate::{Locator, docstrings, noqa};
 
 mod analyze;

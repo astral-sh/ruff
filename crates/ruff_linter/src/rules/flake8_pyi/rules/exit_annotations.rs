@@ -6,13 +6,13 @@ use ruff_python_ast::{
 };
 use smallvec::SmallVec;
 
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_semantic::{SemanticModel, analyze::visibility::is_overload};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for incorrect function signatures on `__exit__` and `__aexit__`

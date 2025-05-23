@@ -1,9 +1,9 @@
 use ruff_text_size::TextRange;
 
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for quoted type annotations in stub (`.pyi`) files, which should be avoided.

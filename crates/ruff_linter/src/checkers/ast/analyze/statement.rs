@@ -1,10 +1,10 @@
-use crate::Diagnostic;
 use ruff_python_ast::helpers;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
+use crate::Diagnostic;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::{

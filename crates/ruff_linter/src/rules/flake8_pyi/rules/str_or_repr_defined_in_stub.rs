@@ -1,13 +1,13 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::Stmt;
 
-use crate::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_abstract;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
+use crate::{AlwaysFixableViolation, Diagnostic, Fix};
 
 /// ## What it does
 /// Checks for redundant definitions of `__str__` or `__repr__` in stubs.

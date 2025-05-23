@@ -1,6 +1,5 @@
 use anyhow::Context;
 
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::{Scope, ScopeKind};
@@ -8,6 +7,7 @@ use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
 use super::helpers::{DataclassKind, dataclass_kind};

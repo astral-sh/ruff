@@ -1,10 +1,10 @@
-use crate::{Diagnostic, Violation};
 use ast::ExceptHandler;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for functions or methods with too many nested blocks.

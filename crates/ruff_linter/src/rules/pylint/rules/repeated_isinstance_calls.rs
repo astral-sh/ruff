@@ -1,6 +1,6 @@
-use crate::AlwaysFixableViolation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::AlwaysFixableViolation;
 use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## Removed

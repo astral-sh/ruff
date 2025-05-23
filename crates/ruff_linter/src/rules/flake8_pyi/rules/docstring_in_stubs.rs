@@ -1,12 +1,10 @@
-use ruff_python_ast::ExprStringLiteral;
-
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprStringLiteral;
+use ruff_python_semantic::Definition;
 use ruff_text_size::Ranged;
 
-use ruff_python_semantic::Definition;
-
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for the presence of docstrings in stub files.

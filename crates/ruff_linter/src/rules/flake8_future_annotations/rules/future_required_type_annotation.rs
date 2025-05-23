@@ -1,12 +1,12 @@
 use std::fmt;
 
-use crate::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::{MemberNameImport, NameImport};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Diagnostic, Fix};
 
 /// ## What it does
 /// Checks for uses of PEP 585- and PEP 604-style type annotations in Python

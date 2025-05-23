@@ -2,7 +2,6 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{self as ast, Expr, Operator};
@@ -10,6 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 static SQL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(

@@ -1,9 +1,9 @@
 use ruff_python_ast::{Expr, StmtAssign};
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for assignments with multiple or non-name targets in stub files.

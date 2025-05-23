@@ -1,9 +1,9 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
+use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::{Diagnostic, Violation};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for uses of the `assert` keyword.

@@ -2,11 +2,11 @@ use anyhow::bail;
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for comparisons to empty strings.

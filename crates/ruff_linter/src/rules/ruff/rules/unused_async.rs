@@ -1,4 +1,3 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::source_order;
@@ -8,6 +7,7 @@ use ruff_python_semantic::analyze::function_type::is_stub;
 
 use crate::checkers::ast::Checker;
 use crate::rules::fastapi::rules::is_fastapi_route;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for functions declared `async` that do not await or otherwise use features requiring the

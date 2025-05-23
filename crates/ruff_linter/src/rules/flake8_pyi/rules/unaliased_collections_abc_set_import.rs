@@ -1,12 +1,11 @@
-use crate::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Imported;
 use ruff_python_semantic::{Binding, BindingKind, Scope};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-
 use crate::renamer::Renamer;
+use crate::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `from collections.abc import Set` imports that do not alias

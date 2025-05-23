@@ -1,4 +1,3 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_dunder, is_sunder};
 use ruff_python_ast::name::UnqualifiedName;
@@ -10,6 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::is_dunder_operator_method;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for accesses on "private" class members.

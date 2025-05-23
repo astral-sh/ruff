@@ -3,7 +3,6 @@ use std::borrow::Cow;
 use anyhow::Result;
 use rustc_hash::FxHashMap;
 
-use crate::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{Binding, Imported, NodeId, Scope};
 use ruff_text_size::{Ranged, TextRange};
@@ -19,6 +18,7 @@ use crate::rules::flake8_type_checking::helpers::{
 use crate::rules::flake8_type_checking::imports::ImportBinding;
 use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::isort::{ImportSection, ImportType, categorize};
+use crate::{Diagnostic, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for first-party imports that are only used for type annotations, but

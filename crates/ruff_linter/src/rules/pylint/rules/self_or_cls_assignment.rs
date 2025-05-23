@@ -1,4 +1,3 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::ScopeKind;
@@ -6,6 +5,7 @@ use ruff_python_semantic::analyze::function_type::{self as function_type, Functi
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for assignment of `self` and `cls` in instance and class methods respectively.

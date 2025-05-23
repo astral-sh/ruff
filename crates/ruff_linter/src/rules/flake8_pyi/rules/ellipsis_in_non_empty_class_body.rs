@@ -1,10 +1,10 @@
-use crate::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Stmt, StmtExpr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{Diagnostic, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Removes ellipses (`...`) in otherwise non-empty class bodies.

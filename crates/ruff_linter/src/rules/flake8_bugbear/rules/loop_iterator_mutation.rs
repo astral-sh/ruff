@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use crate::Diagnostic;
-use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::name::UnqualifiedName;
@@ -15,6 +13,7 @@ use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for mutations to an iterable during a loop iteration.

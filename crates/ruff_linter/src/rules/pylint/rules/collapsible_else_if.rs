@@ -1,6 +1,5 @@
 use anyhow::Result;
 
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ast::whitespace::indentation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, ElifElseClause, Stmt};
@@ -12,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::adjust_indentation;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `else` blocks that consist of a single `if` statement.

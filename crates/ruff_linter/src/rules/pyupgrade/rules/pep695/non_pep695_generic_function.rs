@@ -1,10 +1,10 @@
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtFunctionDef;
 use ruff_python_ast::visitor::Visitor;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested_context};

@@ -2,7 +2,6 @@ use std::sync::LazyLock;
 
 use imperative::Mood;
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::visibility::{is_property, is_test};
 use ruff_source_file::UniversalNewlines;
@@ -12,6 +11,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::rules::pydocstyle::helpers::normalize_word;
 use crate::rules::pydocstyle::settings::Settings;
+use crate::{Diagnostic, Violation};
 
 static MOOD: LazyLock<Mood> = LazyLock::new(Mood::new);
 

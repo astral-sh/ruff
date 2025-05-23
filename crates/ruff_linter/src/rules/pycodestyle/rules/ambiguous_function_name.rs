@@ -1,10 +1,10 @@
 use ruff_python_ast::Identifier;
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for the use of the characters 'l', 'O', or 'I' as function names.

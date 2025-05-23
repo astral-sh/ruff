@@ -1,11 +1,11 @@
 use ast::{ExprAttribute, ExprName, Identifier};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_text_size::Ranged;
 
 use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};
-use ruff_python_semantic::analyze::typing::is_dict;
 
 /// ## What it does
 /// Checks for use of `zip()` to iterate over keys and values of a dictionary at once.

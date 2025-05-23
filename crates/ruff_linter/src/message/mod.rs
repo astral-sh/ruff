@@ -7,7 +7,6 @@ use ruff_db::diagnostic::{self as db, Annotation, DiagnosticId, LintName, Severi
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::FxHashMap;
 
-use crate::{Diagnostic, Fix};
 pub use azure::AzureEmitter;
 pub use github::GithubEmitter;
 pub use gitlab::GitlabEmitter;
@@ -28,6 +27,7 @@ use crate::Locator;
 use crate::codes::NoqaCode;
 use crate::logging::DisplayParseErrorType;
 use crate::registry::Rule;
+use crate::{Diagnostic, Fix};
 
 mod azure;
 mod diff;

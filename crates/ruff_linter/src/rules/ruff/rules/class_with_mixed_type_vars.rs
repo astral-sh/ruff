@@ -1,7 +1,6 @@
 use rustc_hash::FxHashSet;
 use std::iter;
 
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     Arguments, Expr, ExprStarred, ExprSubscript, ExprTuple, StmtClassDef, TypeParams,
@@ -13,6 +12,7 @@ use crate::fix::edits::{Parentheses, remove_argument};
 use crate::rules::pyupgrade::rules::pep695::{
     DisplayTypeVars, TypeParamKind, TypeVar, expr_name_to_type_var, find_generic,
 };
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does

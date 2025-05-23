@@ -1,8 +1,9 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast as ast;
+
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
 use crate::{Diagnostic, Violation};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
 
 /// ## What it does
 /// Checks for non-raw literal string arguments passed to the `match` parameter

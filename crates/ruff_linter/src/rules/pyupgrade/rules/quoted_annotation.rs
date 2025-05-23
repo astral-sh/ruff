@@ -1,12 +1,12 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Stmt;
 use ruff_python_parser::TokenKind;
+use ruff_python_semantic::SemanticModel;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Stmt;
-use ruff_python_semantic::SemanticModel;
-use ruff_source_file::LineRanges;
 
 /// ## What it does
 /// Checks for the presence of unnecessary quotes in type annotations.

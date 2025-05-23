@@ -1,4 +1,3 @@
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::{PythonWhitespace, indentation_at_offset};
 use ruff_source_file::{Line, LineRanges, UniversalNewlineIterator};
@@ -8,6 +7,7 @@ use ruff_text_size::TextRange;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::Rule;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for docstrings on class definitions that are not preceded by a

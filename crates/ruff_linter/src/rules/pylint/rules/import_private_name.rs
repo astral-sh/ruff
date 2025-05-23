@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scope};
@@ -10,6 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::package::PackageRoot;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for import statements that import a private name (a name starting

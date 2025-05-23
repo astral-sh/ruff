@@ -2,7 +2,6 @@
 
 use anyhow::{Context, Result};
 
-use crate::Edit;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Parameters, Stmt};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
@@ -16,6 +15,7 @@ use ruff_python_trivia::{
 use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Edit;
 use crate::Locator;
 use crate::cst::matchers::{match_function_def, match_indented_block, match_statement};
 use crate::fix::codemods;
@@ -595,19 +595,19 @@ mod tests {
     use ruff_source_file::SourceFileBuilder;
     use test_case::test_case;
 
-    use crate::codes::Rule;
-    use crate::{Diagnostic, Edit, Fix};
     use ruff_python_ast::Stmt;
     use ruff_python_codegen::Stylist;
     use ruff_python_parser::{parse_expression, parse_module};
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
     use crate::Locator;
+    use crate::codes::Rule;
     use crate::fix::apply_fixes;
     use crate::fix::edits::{
         add_to_dunder_all, make_redundant_alias, next_stmt_break, trailing_semicolon,
     };
     use crate::message::Message;
+    use crate::{Diagnostic, Edit, Fix};
 
     /// Parse the given source using [`Mode::Module`] and return the first statement.
     fn parse_first_stmt(source: &str) -> Result<Stmt> {

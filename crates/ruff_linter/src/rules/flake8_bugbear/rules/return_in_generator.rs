@@ -1,5 +1,3 @@
-use crate::Diagnostic;
-use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor;
 use ruff_python_ast::statement_visitor::StatementVisitor;
@@ -7,6 +5,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt, StmtFunctionDef};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `return {value}` statements in functions that also contain `yield`

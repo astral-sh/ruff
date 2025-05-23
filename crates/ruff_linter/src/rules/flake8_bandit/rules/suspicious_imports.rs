@@ -1,13 +1,13 @@
 //! Check for imports of or from suspicious modules.
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_imports.html>
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for imports of the `telnetlib` module.

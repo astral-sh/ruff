@@ -1,4 +1,3 @@
-use crate::{Diagnostic, Fix};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Binding, BindingKind, Imported, ResolvedReference, ScopeKind};
 use ruff_text_size::Ranged;
@@ -11,6 +10,7 @@ use crate::rules::{
     flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pep8_naming,
     pyflakes, pylint, ruff,
 };
+use crate::{Diagnostic, Fix};
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
 pub(crate) fn deferred_scopes(checker: &Checker) {

@@ -1,5 +1,6 @@
-use crate::{AlwaysFixableViolation, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::{AlwaysFixableViolation, Violation};
 
 /// ## What it does
 /// Checks for uses of `str.format` to format logging messages.

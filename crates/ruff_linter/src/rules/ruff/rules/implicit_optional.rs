@@ -2,7 +2,6 @@ use std::fmt;
 
 use anyhow::{Context, Result};
 
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast::name::Name;
@@ -10,6 +9,7 @@ use ruff_python_ast::{self as ast, Expr, Operator, Parameters};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 use ruff_python_ast::PythonVersion;
 

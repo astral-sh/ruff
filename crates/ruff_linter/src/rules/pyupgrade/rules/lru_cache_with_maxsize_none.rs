@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `functools.lru_cache` that set `maxsize=None`.

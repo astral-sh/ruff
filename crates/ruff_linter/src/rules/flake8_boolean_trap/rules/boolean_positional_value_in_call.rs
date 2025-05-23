@@ -1,10 +1,10 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_boolean_trap::helpers::allow_boolean_trap;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for boolean positional arguments in function calls.

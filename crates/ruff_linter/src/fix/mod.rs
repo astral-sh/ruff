@@ -3,7 +3,6 @@ use std::collections::BTreeSet;
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::{Edit, Fix, IsolationLevel, SourceMap};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -11,6 +10,7 @@ use crate::linter::FixTable;
 use crate::message::Message;
 use crate::registry::Rule;
 use crate::settings::types::UnsafeFixes;
+use crate::{Edit, Fix, IsolationLevel, SourceMap};
 
 pub(crate) mod codemods;
 pub(crate) mod edits;
@@ -157,17 +157,16 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
 
 #[cfg(test)]
 mod tests {
-    use crate::diagnostic::Diagnostic;
-    use crate::{Edit, Fix};
-
     use ruff_diagnostics::SourceMarker;
     use ruff_source_file::SourceFileBuilder;
     use ruff_text_size::{Ranged, TextSize};
 
     use crate::Locator;
+    use crate::diagnostic::Diagnostic;
     use crate::fix::{FixResult, apply_fixes};
     use crate::message::Message;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
+    use crate::{Edit, Fix};
 
     fn create_diagnostics(
         filename: &str,

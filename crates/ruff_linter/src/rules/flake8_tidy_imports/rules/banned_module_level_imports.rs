@@ -1,4 +1,3 @@
-use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::resolve_imported_module_path;
 use ruff_python_ast::{Alias, AnyNodeRef, Stmt, StmtImport, StmtImportFrom};
@@ -7,6 +6,7 @@ use std::borrow::Cow;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_tidy_imports::matchers::{MatchName, MatchNameOrParent, NameMatchPolicy};
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for module-level imports that should instead be imported lazily
