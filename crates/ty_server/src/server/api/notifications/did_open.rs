@@ -1,15 +1,14 @@
 use lsp_types::notification::DidOpenTextDocument;
 use lsp_types::{DidOpenTextDocumentParams, TextDocumentItem};
 
-use ruff_db::Db;
-use ty_project::watch::ChangeEvent;
-
 use crate::TextDocument;
 use crate::server::Result;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
-use crate::server::client::{Notifier, Requester};
 use crate::session::Session;
+use crate::session::client::Client;
 use crate::system::{AnySystemPath, url_to_any_system_path};
+use ruff_db::Db;
+use ty_project::watch::ChangeEvent;
 
 pub(crate) struct DidOpenTextDocumentHandler;
 
@@ -20,8 +19,7 @@ impl NotificationHandler for DidOpenTextDocumentHandler {
 impl SyncNotificationHandler for DidOpenTextDocumentHandler {
     fn run(
         session: &mut Session,
-        _notifier: Notifier,
-        _requester: &mut Requester,
+        _client: &Client,
         DidOpenTextDocumentParams {
             text_document:
                 TextDocumentItem {

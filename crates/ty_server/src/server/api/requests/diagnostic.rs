@@ -9,9 +9,10 @@ use lsp_types::{
 
 use crate::PositionEncoding;
 use crate::document::{FileRangeExt, ToRangeExt};
+use crate::server::Result;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
-use crate::server::{Result, client::Notifier};
 use crate::session::DocumentSnapshot;
+use crate::session::client::Client;
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::FileRange;
 use ruff_db::source::{line_index, source_text};
@@ -31,7 +32,7 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
     fn run_with_snapshot(
         db: &ProjectDatabase,
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         _params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
         let diagnostics = compute_diagnostics(&snapshot, db);
@@ -45,6 +46,17 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
                 },
             }),
         ))
+    }
+
+    fn salsa_cancellation_error() -> lsp_server::ResponseError {
+        lsp_server::ResponseError {
+            code: lsp_server::ErrorCode::ServerCancelled as i32,
+            message: "server cancelled the request".to_owned(),
+            data: serde_json::to_value(lsp_types::DiagnosticServerCancellationData {
+                retrigger_request: true,
+            })
+            .ok(),
+        }
     }
 }
 
