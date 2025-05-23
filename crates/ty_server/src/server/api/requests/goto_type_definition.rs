@@ -7,9 +7,9 @@ use ty_ide::goto_type_definition;
 use ty_project::ProjectDatabase;
 
 use crate::DocumentSnapshot;
+use crate::client::Client;
 use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
-use crate::server::client_old::Notifier;
 
 pub(crate) struct GotoTypeDefinitionRequestHandler;
 
@@ -25,7 +25,7 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
     fn run_with_snapshot(
         db: &ProjectDatabase,
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         params: GotoTypeDefinitionParams,
     ) -> crate::server::Result<Option<GotoDefinitionResponse>> {
         let Some(file) = snapshot.file(db) else {

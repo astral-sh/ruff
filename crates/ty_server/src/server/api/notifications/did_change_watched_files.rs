@@ -1,9 +1,8 @@
+use crate::client::Client;
 use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
-use crate::server::client_old::{Notifier, Requester};
-use crate::server::schedule::Task;
 use crate::session::Session;
 use crate::system::{AnySystemPath, url_to_any_system_path};
 use lsp_types as types;
@@ -21,8 +20,7 @@ impl NotificationHandler for DidChangeWatchedFiles {
 impl SyncNotificationHandler for DidChangeWatchedFiles {
     fn run(
         session: &mut Session,
-        notifier: Notifier,
-        requester: &mut Requester,
+        client: &Client,
         params: types::DidChangeWatchedFilesParams,
     ) -> Result<()> {
         let mut events_by_db: FxHashMap<_, Vec<ChangeEvent>> = FxHashMap::default();
@@ -105,12 +103,16 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
 
         if project_changed {
             if client_capabilities.diagnostics_refresh {
-                requester
-                    .request::<types::request::WorkspaceDiagnosticRefresh>((), |()| Task::nothing())
+                client
+                    .send_request::<types::request::WorkspaceDiagnosticRefresh>(
+                        session,
+                        (),
+                        |_, ()| {},
+                    )
                     .with_failure_code(lsp_server::ErrorCode::InternalError)?;
             } else {
                 for url in session.text_document_urls() {
-                    publish_diagnostics(session, url.clone(), &notifier)?;
+                    publish_diagnostics(session, url.clone(), client)?;
                 }
             }
 
@@ -118,8 +120,8 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         }
 
         if client_capabilities.inlay_refresh {
-            requester
-                .request::<types::request::InlayHintRefreshRequest>((), |()| Task::nothing())
+            client
+                .send_request::<types::request::InlayHintRefreshRequest>(session, (), |_, ()| {})
                 .with_failure_code(lsp_server::ErrorCode::InternalError)?;
         }
 
