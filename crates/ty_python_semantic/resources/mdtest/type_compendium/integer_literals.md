@@ -121,27 +121,28 @@ python-version = "3.12"
 ```
 
 Integer literals are _not_ subtypes of `float`, but the typing spec describes a special case for
-[`float` and `complex`] which accepts integer literals in places where a `float` or `complex` is
-expected. We use the types `JustFloat` and `JustComplex` below, because ty recognizes an annotation
-of `float` as `int | float` to support that typing system special case.
+[`float` and `complex`] which accepts integers (and therefore also integer literals) in places where
+a `float` or `complex` is expected. We use the types `JustFloat` and `JustComplex` below, because ty
+recognizes an annotation of `float` as `int | float` to support that typing system special case.
 
 ```py
-from ty_extensions import static_assert, is_subtype_of, TypeOf
+from ty_extensions import static_assert, is_subtype_of, JustFloat, JustComplex
 from typing import Literal
 
-type JustFloat = TypeOf[1.0]
-type JustComplex = TypeOf[1j]
-
-# Not subtypes of `float`
+# Not subtypes of `float` and `complex`
 static_assert(not is_subtype_of(Literal[0], JustFloat) and not is_subtype_of(Literal[0], JustComplex))
 static_assert(not is_subtype_of(Literal[1], JustFloat) and not is_subtype_of(Literal[1], JustComplex))
 static_assert(not is_subtype_of(Literal[54165], JustFloat) and not is_subtype_of(Literal[54165], JustComplex))
+```
 
-def f(
-    x: float = 0,
-    y: complex = 1,
-):
-    pass
+The typing system special case can be seen in the following example:
+
+```py
+a: JustFloat = 1  # error: [invalid-assignment]
+b: JustComplex = 1  # error: [invalid-assignment]
+
+x: float = 1
+y: complex = 1
 ```
 
 ### Subtypes of integer `Literal`s?
