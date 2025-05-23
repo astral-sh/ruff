@@ -1,23 +1,29 @@
 use lsp_server::ErrorCode;
 use lsp_types::notification::PublishDiagnostics;
 use lsp_types::{
-    Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag, NumberOrString,
-    PublishDiagnosticsParams, Range, Url,
+    CodeDescription, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
+    NumberOrString, PublishDiagnosticsParams, Range, Url,
 };
+use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::FileRange;
 use ruff_db::source::{line_index, source_text};
 use ty_project::{Db, ProjectDatabase};
 
-use crate::DocumentSnapshot;
-use crate::PositionEncoding;
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::server::Result;
 use crate::server::client::Notifier;
+use crate::{DocumentSnapshot, PositionEncoding};
 
 use super::LSPResult;
 
+/// A series of diagnostics across a single text document or an arbitrary number of notebook cells.
+pub(super) type DiagnosticsMap = FxHashMap<Url, Vec<Diagnostic>>;
+
+/// Clears the diagnostics for the document at `uri`.
+///
+/// This is done by notifying the client with an empty list of diagnostics for the document.
 pub(super) fn clear_diagnostics(uri: &Url, notifier: &Notifier) -> Result<()> {
     notifier
         .notify::<PublishDiagnostics>(PublishDiagnosticsParams {
@@ -29,25 +35,85 @@ pub(super) fn clear_diagnostics(uri: &Url, notifier: &Notifier) -> Result<()> {
     Ok(())
 }
 
+/// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
+/// notification].
+///
+/// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
+pub(super) fn publish_diagnostics_for_document(
+    db: &ProjectDatabase,
+    snapshot: &DocumentSnapshot,
+    notifier: &Notifier,
+) -> Result<()> {
+    for (uri, diagnostics) in compute_diagnostics(db, snapshot) {
+        notifier
+            .notify::<PublishDiagnostics>(PublishDiagnosticsParams {
+                uri,
+                diagnostics,
+                version: Some(snapshot.query().version()),
+            })
+            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+    }
+
+    Ok(())
+}
+
 pub(super) fn compute_diagnostics(
     db: &ProjectDatabase,
     snapshot: &DocumentSnapshot,
-) -> Vec<Diagnostic> {
+) -> DiagnosticsMap {
     let Some(file) = snapshot.file(db) else {
         tracing::info!(
             "No file found for snapshot for `{}`",
             snapshot.query().file_url()
         );
-        return vec![];
+        return DiagnosticsMap::default();
     };
 
     let diagnostics = db.check_file(file);
 
-    diagnostics
-        .as_slice()
-        .iter()
-        .map(|message| to_lsp_diagnostic(db, message, snapshot.encoding()))
-        .collect()
+    let mut diagnostics_map = DiagnosticsMap::default();
+    let query = snapshot.query();
+    // let source_kind = query.make_source_kind();
+
+    // Populates all relevant URLs with an empty diagnostic list.
+    // This ensures that documents without diagnostics still get updated.
+    if let Some(notebook) = query.as_notebook() {
+        for url in notebook.urls() {
+            diagnostics_map.entry(url.clone()).or_default();
+        }
+    } else {
+        diagnostics_map
+            .entry(query.make_key().into_url())
+            .or_default();
+    }
+
+    let lsp_diagnostics = diagnostics.as_slice().iter().map(|diagnostic| {
+        (
+            // TODO: Use the cell index instead using `source_kind`
+            usize::default(),
+            to_lsp_diagnostic(db, diagnostic, snapshot.encoding()),
+        )
+    });
+
+    if let Some(notebook) = query.as_notebook() {
+        for (index, diagnostic) in lsp_diagnostics {
+            let Some(uri) = notebook.cell_uri_by_index(index) else {
+                tracing::warn!("Unable to find notebook cell at index {index}");
+                continue;
+            };
+            diagnostics_map
+                .entry(uri.clone())
+                .or_default()
+                .push(diagnostic);
+        }
+    } else {
+        diagnostics_map
+            .entry(query.make_key().into_url())
+            .or_default()
+            .extend(lsp_diagnostics.map(|(_, diagnostic)| diagnostic));
+    }
+
+    diagnostics_map
 }
 
 /// Converts the tool specific [`Diagnostic`][ruff_db::diagnostic::Diagnostic] to an LSP
@@ -91,9 +157,8 @@ fn to_lsp_diagnostic(
         .id()
         .is_lint()
         .then(|| {
-            Some(lsp_types::CodeDescription {
-                href: lsp_types::Url::parse(&format!("https://ty.dev/rules#{}", diagnostic.id()))
-                    .ok()?,
+            Some(CodeDescription {
+                href: Url::parse(&format!("https://ty.dev/rules#{}", diagnostic.id())).ok()?,
             })
         })
         .flatten();

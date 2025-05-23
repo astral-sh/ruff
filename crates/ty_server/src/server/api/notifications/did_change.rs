@@ -1,11 +1,12 @@
 use lsp_server::ErrorCode;
-use lsp_types::DidChangeTextDocumentParams;
 use lsp_types::notification::DidChangeTextDocument;
+use lsp_types::{DidChangeTextDocumentParams, VersionedTextDocumentIdentifier};
 
 use ty_project::watch::ChangeEvent;
 
 use crate::server::Result;
 use crate::server::api::LSPResult;
+use crate::server::api::diagnostics::publish_diagnostics_for_document;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::server::client::{Notifier, Requester};
 use crate::session::Session;
@@ -20,21 +21,26 @@ impl NotificationHandler for DidChangeTextDocumentHandler {
 impl SyncNotificationHandler for DidChangeTextDocumentHandler {
     fn run(
         session: &mut Session,
-        _notifier: Notifier,
+        notifier: Notifier,
         _requester: &mut Requester,
         params: DidChangeTextDocumentParams,
     ) -> Result<()> {
-        let Ok(path) = url_to_any_system_path(&params.text_document.uri) else {
+        let DidChangeTextDocumentParams {
+            text_document: VersionedTextDocumentIdentifier { uri, version },
+            content_changes,
+        } = params;
+
+        let Ok(path) = url_to_any_system_path(&uri) else {
             return Ok(());
         };
 
-        let key = session.key_from_url(params.text_document.uri);
+        let key = session.key_from_url(uri.clone());
 
         session
-            .update_text_document(&key, params.content_changes, params.text_document.version)
+            .update_text_document(&key, content_changes, version)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        match path {
+        match path.clone() {
             AnySystemPath::System(path) => {
                 let db = match session.project_db_for_path_mut(path.as_std_path()) {
                     Some(db) => db,
@@ -48,7 +54,20 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             }
         }
 
-        // TODO(dhruvmanila): Publish diagnostics if the client doesn't support pull diagnostics
+        // Publish diagnostics if the client doesn't support pull diagnostics
+        if !session.resolved_client_capabilities().pull_diagnostics {
+            let db = path
+                .as_system()
+                .and_then(|path| session.project_db_for_path(path.as_std_path()))
+                .unwrap_or_else(|| session.default_project_db());
+            let snapshot = session
+                .take_snapshot(uri.clone())
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Unable to take snapshot for document with URL {uri}")
+                })
+                .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+            publish_diagnostics_for_document(db, &snapshot, &notifier)?;
+        }
 
         Ok(())
     }

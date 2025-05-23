@@ -29,14 +29,18 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
         _notifier: Notifier,
         _params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
-        let diagnostics = compute_diagnostics(db, &snapshot);
-
         Ok(DocumentDiagnosticReportResult::Report(
             DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
                 related_documents: None,
                 full_document_diagnostic_report: FullDocumentDiagnosticReport {
                     result_id: None,
-                    items: diagnostics,
+                    // Pull diagnostic requests are only called for text documents, not for
+                    // notebook documents.
+                    items: compute_diagnostics(db, &snapshot)
+                        .into_iter()
+                        .next()
+                        .map(|(_, diagnostics)| diagnostics)
+                        .unwrap_or_default(),
                 },
             }),
         ))
