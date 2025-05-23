@@ -20,6 +20,7 @@ beartype
 bidict
 black
 boostedblob
+bokeh
 check-jsonschema
 cki-lib
 cloud-init
