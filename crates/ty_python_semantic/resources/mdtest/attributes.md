@@ -64,7 +64,7 @@ C.inferred_from_value = "overwritten on class"
 # This assignment is fine:
 c_instance.declared_and_bound = False
 
-# Strictly speaking, infer this as `Literal[False]` rather than `bool` is unsound in general
+# Strictly speaking, inferring this as `Literal[False]` rather than `bool` is unsound in general
 # (we don't know what else happened to `c_instance` between the assignment and the use here),
 # but mypy and pyright support this.
 reveal_type(c_instance.declared_and_bound)  # revealed: Literal[False]
