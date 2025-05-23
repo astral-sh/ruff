@@ -3081,6 +3081,7 @@ dependencies = [
  "ruff_workspace",
  "serde",
  "serde-wasm-bindgen",
+ "uuid",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]
@@ -4071,6 +4072,7 @@ dependencies = [
  "ty_ide",
  "ty_project",
  "ty_python_semantic",
+ "uuid",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]
