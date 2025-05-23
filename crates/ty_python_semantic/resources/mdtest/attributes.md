@@ -1532,7 +1532,7 @@ def _(ns: argparse.Namespace):
 If a type provides a custom `__getattribute__`, we use its return type as the type for unknown
 attributes. Note that this behavior differs from runtime, where `__getattribute__` is called
 unconditionally, even for known attributes. This prevents `__getattribute__` from shadowing the
-inferred type for all attributes.
+inferred type for all attributes, and matches other type checkers such as mypy and pyright.
 
 ```py
 class Foo:
