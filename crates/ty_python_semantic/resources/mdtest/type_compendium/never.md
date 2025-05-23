@@ -155,13 +155,22 @@ x: list[Never] = []
 
 ## Tuples involving `Never`
 
-A type like `tuple[int, Never]` has no inhabitants, and so is equivalent to `Never`:
+A type like `tuple[int, Never]` has no inhabitants, and so it is equivalent to `Never`:
 
 ```py
 from ty_extensions import static_assert, is_equivalent_to
 from typing_extensions import Never
 
 static_assert(is_equivalent_to(tuple[int, Never], Never))
+```
+
+Note that this is not the case for the homogenous tuple type `tuple[Never, ...]` though, because
+that type is inhabited by the empty tuple:
+
+```py
+static_assert(not is_equivalent_to(tuple[Never, ...], Never))
+
+t: tuple[Never, ...] = ()
 ```
 
 ## `NoReturn` is the same as `Never`
