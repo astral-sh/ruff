@@ -23,6 +23,7 @@ use crate::system::{AnySystemPath, LSPSystem, url_to_any_system_path};
 use crate::{PositionEncoding, TextDocument};
 
 mod capabilities;
+pub(crate) mod client;
 pub(crate) mod index;
 mod request_queue;
 mod settings;

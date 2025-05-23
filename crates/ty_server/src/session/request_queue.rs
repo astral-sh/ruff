@@ -1,4 +1,4 @@
-use crate::client::ClientResponseHandler;
+use crate::session::client::ClientResponseHandler;
 use lsp_server::RequestId;
 use rustc_hash::FxHashMap;
 use std::cell::{Cell, OnceCell, RefCell};
@@ -66,7 +66,7 @@ impl Incoming {
     /// Cancels the pending request with the given id.
     ///
     /// Returns the method name if the request was still pending, `None` if it was already completed.
-    pub(crate) fn cancel(&mut self, request_id: &RequestId) -> Option<String> {
+    pub(super) fn cancel(&mut self, request_id: &RequestId) -> Option<String> {
         self.pending.remove(request_id).map(|mut pending| {
             if let Some(cancellation_token) = pending.cancellation_token.take() {
                 cancellation_token.cancel();

@@ -1,8 +1,8 @@
 use lsp_server::RequestId;
 use serde::Serialize;
 
-use crate::client::Client;
 use crate::session::Session;
+use crate::session::client::Client;
 
 type LocalFn = Box<dyn FnOnce(&mut Session, &Client)>;
 

@@ -15,7 +15,7 @@ mod traits;
 
 use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
-use crate::client::Client;
+use crate::session::client::Client;
 use crate::show_err_msg;
 use notifications as notification;
 use requests as request;

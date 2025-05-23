@@ -19,7 +19,7 @@ mod connection;
 mod main_loop;
 mod schedule;
 
-use crate::client::Client;
+use crate::session::client::Client;
 pub(crate) use api::Error;
 pub(crate) use connection::{ConnectionInitializer, ConnectionSender};
 pub(crate) use main_loop::{Action, Event, MainLoopReceiver, MainLoopSender};

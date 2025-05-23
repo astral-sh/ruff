@@ -4,7 +4,6 @@ pub use document::{DocumentKey, NotebookDocument, PositionEncoding, TextDocument
 pub use session::{ClientSettings, DocumentQuery, DocumentSnapshot, Session};
 use std::num::NonZeroUsize;
 
-mod client;
 mod document;
 mod logging;
 mod server;

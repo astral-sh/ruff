@@ -2,7 +2,7 @@ use crate::Session;
 use crate::server::{Action, ConnectionSender};
 use crate::server::{Event, MainLoopSender};
 use anyhow::{Context, anyhow};
-use lsp_server::{Message, Notification, RequestId};
+use lsp_server::{ErrorCode, Message, Notification, RequestId, ResponseError};
 use serde_json::Value;
 use std::any::TypeId;
 use std::fmt::Display;
@@ -190,6 +190,30 @@ impl Client {
         self.main_loop_sender
             .send(Event::Action(Action::RetryRequest(request)))
             .map_err(|error| anyhow!("Failed to send retry request: {error}"))
+    }
+
+    pub(crate) fn cancel(&self, session: &mut Session, id: RequestId) -> crate::Result<()> {
+        let method_name = session.request_queue_mut().incoming_mut().cancel(&id);
+
+        if let Some(method_name) = method_name {
+            tracing::debug!("Cancelled request id={id} method={method_name}");
+            let error = ResponseError {
+                code: ErrorCode::RequestCanceled as i32,
+                message: "request was cancelled by client".to_owned(),
+                data: None,
+            };
+
+            // Use `client_sender` here instead of `respond_err` because
+            // `respond_err` filters out responses for canceled requests (which we just did!).
+            self.client_sender
+                .send(Message::Response(lsp_server::Response {
+                    id,
+                    result: None,
+                    error: Some(error),
+                }))?;
+        }
+
+        Ok(())
     }
 }
 

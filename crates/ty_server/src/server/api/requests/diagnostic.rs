@@ -8,11 +8,11 @@ use lsp_types::{
 };
 
 use crate::PositionEncoding;
-use crate::client::Client;
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::server::Result;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::session::DocumentSnapshot;
+use crate::session::client::Client;
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::FileRange;
 use ruff_db::source::{line_index, source_text};

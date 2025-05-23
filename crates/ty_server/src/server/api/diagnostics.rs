@@ -2,8 +2,8 @@ use lsp_server::ErrorCode;
 use lsp_types::{PublishDiagnosticsParams, Url, notification::PublishDiagnostics};
 
 use super::LSPResult;
-use crate::client::Client;
 use crate::server::Result;
+use crate::session::client::Client;
 
 pub(super) fn clear_diagnostics(uri: &Url, client: &Client) -> Result<()> {
     client
