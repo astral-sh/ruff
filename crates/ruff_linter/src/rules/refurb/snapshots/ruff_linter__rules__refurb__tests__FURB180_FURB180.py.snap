@@ -50,7 +50,7 @@ FURB180.py:26:18: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract 
    |
    = help: Replace with `abc.ABC`
 
-ℹ Safe fix
+ℹ Unsafe fix
 23 23 |     pass
 24 24 | 
 25 25 | 
@@ -68,7 +68,7 @@ FURB180.py:31:34: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract 
    |
    = help: Replace with `abc.ABC`
 
-ℹ Safe fix
+ℹ Unsafe fix
 28 28 |     def foo(self): pass
 29 29 | 
 30 30 | 
