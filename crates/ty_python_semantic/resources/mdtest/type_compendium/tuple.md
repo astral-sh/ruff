@@ -45,8 +45,11 @@ static_assert(not is_subtype_of(tuple[S1], tuple[T1, T2]))
 
 ## The empty tuple
 
-The type of the empty tuple `()` is spelled `tuple[()]`. It is *not* a singleton type, as it can be
-subclassed:
+The type of the empty tuple `()` is spelled `tuple[()]`. It is [not a singleton type], because
+different instances of `()` are not guaranteed to be the same object (even if this is the case in
+CPython at the time of writing).
+
+The empty tuple can also be subclassed (further clarifying that it is not a singleton type):
 
 ```py
 from ty_extensions import static_assert, is_singleton, is_subtype_of, is_equivalent_to, is_assignable_to
@@ -64,14 +67,16 @@ static_assert(is_subtype_of(AnotherEmptyTuple, tuple[()]))
 static_assert(is_assignable_to(AnotherEmptyTuple, tuple[()]))
 ```
 
-## Singletons?
+## Non-empty tuples
 
-For the same reason, all other tuples are also not singletons, even if every element is a singleton:
+For the same reason as above (two instances of a tuple with the same elements might not be the same
+object), non-empty tuples are also not singleton types — even if all their elements are singletons:
 
 ```py
 from ty_extensions import static_assert, is_singleton
 
 static_assert(is_singleton(None))
+
 static_assert(not is_singleton(tuple[None]))
 ```
 
@@ -102,6 +107,30 @@ static_assert(is_disjoint_from(tuple[N1, F1], tuple[N2, F2]))
 static_assert(not is_disjoint_from(tuple[N1, N2], tuple[N2, N1]))
 ```
 
+We currently model tuple types to *not* be disjoint from arbitrary instance types, because we allow
+for the possibility of `tuple` to be subclassed
+
+```py
+class C: ...
+
+static_assert(not is_disjoint_from(tuple[int, str], C))
+
+class CommonSubtype(tuple[int, str], C): ...
+```
+
+Note: This is inconsistent with the fact that we model heterogeneous tuples to be disjoint from
+other heterogeneous tuples above:
+
+```py
+class I1(tuple[F1, F2]): ...
+class I2(tuple[F2, F1]): ...
+
+# TODO
+# This is a subtype of both `tuple[F1, F2]` and `tuple[F2, F1]`, so those two heterogeneous tuples
+# should not be disjoint from each other (see conflicting test above).
+class CommonSubtypeOfTuples(I1, I2): ...
+```
+
 ## Truthiness
 
 The truthiness of the empty tuple is `False`:
@@ -120,3 +149,18 @@ from typing_extensions import assert_type, Literal
 assert_type(bool((False,)), Literal[True])
 assert_type(bool((False, False)), Literal[True])
 ```
+
+Both of these results are conflicting with the fact that tuples can be subclassed, and that we
+currently allow subclasses of `tuple` to overwrite `__bool__` (or `__len__`):
+
+```py
+class NotAlwaysTruthyTuple(tuple[int]):
+    def __bool__(self) -> bool:
+        return False
+
+# TODO: This assignment should be allowed
+# error: [invalid-assignment]
+t: tuple[int] = NotAlwaysTruthyTuple((1,))
+```
+
+[not a singleton type]: https://discuss.python.org/t/should-we-specify-in-the-language-reference-that-the-empty-tuple-is-a-singleton/67957
