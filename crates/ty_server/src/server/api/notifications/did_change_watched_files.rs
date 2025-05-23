@@ -1,9 +1,9 @@
-use crate::client::Client;
 use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
+use crate::session::client::Client;
 use crate::system::{AnySystemPath, url_to_any_system_path};
 use lsp_types as types;
 use lsp_types::{FileChangeType, notification as notif};

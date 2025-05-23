@@ -12,9 +12,9 @@ use ruff_db::source::{line_index, source_text};
 use ty_project::{Db, ProjectDatabase};
 
 use super::LSPResult;
-use crate::client::Client;
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::server::Result;
+use crate::session::client::Client;
 use crate::system::url_to_any_system_path;
 use crate::{DocumentSnapshot, PositionEncoding, Session};
 

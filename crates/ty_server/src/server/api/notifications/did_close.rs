@@ -1,9 +1,9 @@
-use crate::client::Client;
 use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::clear_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
+use crate::session::client::Client;
 use crate::system::{AnySystemPath, url_to_any_system_path};
 use lsp_server::ErrorCode;
 use lsp_types::DidCloseTextDocumentParams;

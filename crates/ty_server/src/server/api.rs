@@ -15,8 +15,7 @@ mod traits;
 
 use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
-use crate::client::Client;
-use crate::{show_err_msg, show_warn_msg};
+use crate::session::client::Client;
 use ruff_db::panic::PanicError;
 
 /// Processes a request from the client to the server.
@@ -64,9 +63,8 @@ pub(super) fn request(req: server::Request) -> Task {
         tracing::error!("Encountered error when routing request with ID {id}: {err}");
 
         Task::local(move |_session, client| {
-            show_err_msg!(
-                client,
-                "ty failed to handle a request from the editor. Check the logs for more details."
+            client.show_error_message(
+                "ty failed to handle a request from the editor. Check the logs for more details.",
             );
             respond_silent_error(
                 id,
@@ -114,15 +112,14 @@ pub(super) fn notification(notif: server::Notification) -> Task {
             return Task::nothing();
         }
     }
-    .unwrap_or_else(|err| {
-        tracing::error!("Encountered error when routing notification: {err}");
-        Task::local(|_session, client| {
-            show_err_msg!(
-                client,
-                "ty failed to handle a notification from the editor. Check the logs for more details."
-            );
+        .unwrap_or_else(|err| {
+            tracing::error!("Encountered error when routing notification: {err}");
+            Task::local(|_session, client| {
+                client.show_error_message(
+                    "ty failed to handle a notification from the editor. Check the logs for more details."
+                );
+            })
         })
-    })
 }
 
 fn _local_request_task<R: traits::SyncRequestHandler>(req: server::Request) -> super::Result<Task>
@@ -256,10 +253,7 @@ fn local_notification_task<N: traits::SyncNotificationHandler>(
         let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
         if let Err(err) = N::run(session, client, params) {
             tracing::error!("An error occurred while running {id}: {err}");
-            show_err_msg!(
-                client,
-                "ty encountered a problem. Check the logs for more details."
-            );
+            client.show_error_message("ty encountered a problem. Check the logs for more details.");
         }
     }))
 }
@@ -292,9 +286,8 @@ where
                 Ok(result) => result,
                 Err(panic) => {
                     tracing::error!("An error occurred while running {id}: {panic}");
-                    show_err_msg!(
-                        client,
-                        "ty encountered a panic. Check the logs for more details."
+                    client.show_error_message(
+                        "ty encountered a panic. Check the logs for more details.",
                     );
                     return;
                 }
@@ -302,9 +295,8 @@ where
 
             if let Err(err) = result {
                 tracing::error!("An error occurred while running {id}: {err}");
-                show_err_msg!(
-                    client,
-                    "ty encountered a problem. Check the logs for more details."
+                client.show_error_message(
+                    "ty encountered a problem. Check the logs for more details.",
                 );
             }
         })
@@ -351,10 +343,7 @@ fn respond<Req>(
 {
     if let Err(err) = &result {
         tracing::error!("An error occurred with request ID {id}: {err}");
-        show_err_msg!(
-            client,
-            "ty encountered a problem. Check the logs for more details."
-        );
+        client.show_error_message("ty encountered a problem. Check the logs for more details.");
     }
     if let Err(err) = client.respond(id, result) {
         tracing::error!("Failed to send response: {err}");

@@ -9,7 +9,7 @@ use self::{
     task::{BackgroundTaskBuilder, SyncTask},
     thread::ThreadPriority,
 };
-use crate::client::Client;
+use crate::session::client::Client;
 pub(super) use task::{BackgroundSchedule, Task};
 
 /// The event loop thread is actually a secondary thread that we spawn from the

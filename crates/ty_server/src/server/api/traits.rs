@@ -1,6 +1,6 @@
 //! A stateful LSP implementation that calls into the ty API.
 
-use crate::client::Client;
+use crate::session::client::Client;
 use crate::session::{DocumentSnapshot, Session};
 
 use lsp_types::notification::Notification as LSPNotification;

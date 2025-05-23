@@ -6,11 +6,11 @@ use lsp_types::{
     FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport,
 };
 
-use crate::client::Client;
 use crate::server::Result;
 use crate::server::api::diagnostics::{Diagnostics, compute_diagnostics};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::session::DocumentSnapshot;
+use crate::session::client::Client;
 use ty_project::ProjectDatabase;
 
 pub(crate) struct DocumentDiagnosticRequestHandler;

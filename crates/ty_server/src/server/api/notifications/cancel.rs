@@ -1,11 +1,11 @@
-use lsp_server::{ErrorCode, RequestId, ResponseError};
+use lsp_server::RequestId;
 use lsp_types::CancelParams;
 use lsp_types::notification::Cancel;
 
-use crate::client::Client;
 use crate::server::Result;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
+use crate::session::client::Client;
 
 pub(crate) struct CancelNotificationHandler;
 
@@ -20,18 +20,7 @@ impl SyncNotificationHandler for CancelNotificationHandler {
             lsp_types::NumberOrString::String(id) => id.into(),
         };
 
-        let method_name = session.request_queue_mut().incoming_mut().cancel(&id);
-
-        if let Some(method_name) = method_name {
-            tracing::debug!("Cancelled request id={id} method={method_name}");
-            let error = ResponseError {
-                code: ErrorCode::RequestCanceled as i32,
-                message: "request was cancelled by client".to_owned(),
-                data: None,
-            };
-
-            let _ = client.respond_err(id, error);
-        }
+        let _ = client.cancel(session, id);
 
         Ok(())
     }

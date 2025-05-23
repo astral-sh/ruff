@@ -19,7 +19,7 @@ mod connection;
 mod main_loop;
 mod schedule;
 
-use crate::client::Client;
+use crate::session::client::Client;
 pub(crate) use api::Error;
 pub(crate) use connection::{ConnectionInitializer, ConnectionSender};
 pub(crate) use main_loop::{Action, Event, MainLoopReceiver, MainLoopSender};
@@ -63,6 +63,9 @@ impl Server {
             crate::version(),
         )?;
 
+        let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
+        let client = Client::new(main_loop_sender.clone(), connection.sender());
+
         crate::logging::init_logging(
             global_settings.tracing.log_level.unwrap_or_default(),
             global_settings.tracing.log_file.as_deref(),
@@ -100,16 +103,14 @@ impl Server {
                 "Multiple workspaces are not yet supported, using the first workspace: {}",
                 &first_workspace.0
             );
-            show_warn_msg!(
+            client.show_warning_message(format_args!(
                 "Multiple workspaces are not yet supported, using the first workspace: {}",
-                &first_workspace.0
-            );
+                &first_workspace.0,
+            ));
             vec![first_workspace]
         } else {
             workspaces
         };
-
-        let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
 
         Ok(Self {
             connection,

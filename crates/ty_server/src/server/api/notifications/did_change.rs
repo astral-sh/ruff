@@ -2,12 +2,12 @@ use lsp_server::ErrorCode;
 use lsp_types::notification::DidChangeTextDocument;
 use lsp_types::{DidChangeTextDocumentParams, VersionedTextDocumentIdentifier};
 
-use crate::client::Client;
 use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
+use crate::session::client::Client;
 use crate::system::{AnySystemPath, url_to_any_system_path};
 use ty_project::watch::ChangeEvent;
 

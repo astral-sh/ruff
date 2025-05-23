@@ -7,9 +7,9 @@ use ty_ide::completion;
 use ty_project::ProjectDatabase;
 
 use crate::DocumentSnapshot;
-use crate::client::Client;
 use crate::document::PositionExt;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
+use crate::session::client::Client;
 
 pub(crate) struct CompletionRequestHandler;
 

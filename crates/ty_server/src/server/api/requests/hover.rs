@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
 use crate::DocumentSnapshot;
-use crate::client::Client;
 use crate::document::{PositionExt, ToRangeExt};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
+use crate::session::client::Client;
 use lsp_types::request::HoverRequest;
 use lsp_types::{HoverContents, HoverParams, MarkupContent, Url};
 use ruff_db::source::{line_index, source_text};

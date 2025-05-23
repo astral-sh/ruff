@@ -1,7 +1,7 @@
 use crate::Session;
-use crate::client::Client;
 use crate::server::schedule::Scheduler;
 use crate::server::{Server, api};
+use crate::session::client::Client;
 use crossbeam::select;
 use lsp_server::Message;
 use lsp_types::{DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher};
@@ -65,14 +65,8 @@ impl Server {
                 }
                 Event::Action(action) => match action {
                     Action::SendResponse(response) => {
-                        // Always send cancellation responses to the client.
-                        if response.error.as_ref().is_some_and(|err| {
-                            err.code == lsp_server::ErrorCode::RequestCanceled as i32
-                        }) {
-                            self.connection.send(Message::Response(response))?;
-                        }
                         // Filter out responses for already canceled requests.
-                        else if let Some((start_time, method)) = self
+                        if let Some((start_time, method)) = self
                             .session
                             .request_queue_mut()
                             .incoming_mut()
