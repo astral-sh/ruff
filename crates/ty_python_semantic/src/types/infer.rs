@@ -6542,14 +6542,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         // intersection type, which is even more specific.
         for pos in intersection.positive(self.db()) {
             let result = match intersection_on {
-                IntersectionOn::Left => {
-                    self.infer_binary_type_comparison(*pos, op, other, range)?
-                }
-                IntersectionOn::Right => {
-                    self.infer_binary_type_comparison(other, op, *pos, range)?
-                }
+                IntersectionOn::Left => self.infer_binary_type_comparison(*pos, op, other, range),
+                IntersectionOn::Right => self.infer_binary_type_comparison(other, op, *pos, range),
             };
-            if let Type::BooleanLiteral(b) = result {
+
+            if let Ok(Type::BooleanLiteral(b)) = result {
                 return Ok(Type::BooleanLiteral(b));
             }
         }
@@ -6619,19 +6616,48 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         builder = builder.add_positive(KnownClass::Bool.to_instance(self.db()));
 
+        let mut has_success = None;
+        let mut first_error = None;
+
         for pos in intersection.positive(self.db()) {
             let result = match intersection_on {
-                IntersectionOn::Left => {
-                    self.infer_binary_type_comparison(*pos, op, other, range)?
-                }
-                IntersectionOn::Right => {
-                    self.infer_binary_type_comparison(other, op, *pos, range)?
-                }
+                IntersectionOn::Left => self.infer_binary_type_comparison(*pos, op, other, range),
+                IntersectionOn::Right => self.infer_binary_type_comparison(other, op, *pos, range),
             };
-            builder = builder.add_positive(result);
+
+            match result {
+                Ok(ty) => {
+                    has_success = Some(true);
+                    builder = builder.add_positive(ty);
+                }
+                Err(error) => {
+                    has_success = has_success.or(Some(false));
+                    first_error = first_error.or(Some(error));
+                }
+            }
         }
 
-        Ok(builder.build())
+        match has_success {
+            Some(true) | None => Ok(builder.build()),
+            Some(false) => match first_error {
+                Some(error) => Err(error),
+                None => {
+                    // This should be unreachable
+                    debug_assert!(false);
+
+                    let (left_ty, right_ty) = match intersection_on {
+                        IntersectionOn::Left => (Type::Intersection(intersection), other),
+                        IntersectionOn::Right => (other, Type::Intersection(intersection)),
+                    };
+
+                    Err(CompareUnsupportedError {
+                        op,
+                        left_ty,
+                        right_ty,
+                    })
+                }
+            },
+        }
     }
 
     /// Infers the type of a binary comparison (e.g. 'left == right'). See
