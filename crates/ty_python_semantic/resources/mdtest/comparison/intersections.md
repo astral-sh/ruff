@@ -125,8 +125,8 @@ def _(x: object):
             reveal_type(2 in x)  # revealed: bool
 ```
 
-Do not raise an error if any of the positive contributions to the intersection type are supported for
-the given operator:
+Do not raise an error if any of the positive contributions to the intersection type are supported
+for the given operator:
 
 ```py
 class Container:
