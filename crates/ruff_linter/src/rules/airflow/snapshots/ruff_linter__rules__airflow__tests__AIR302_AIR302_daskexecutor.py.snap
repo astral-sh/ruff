@@ -8,4 +8,4 @@ AIR302_daskexecutor.py:5:1: AIR302 `airflow.executors.dask_executor.DaskExecutor
 5 | DaskExecutor()
   | ^^^^^^^^^^^^ AIR302
   |
-  = help: Install `apache-airflow-providers-daskexecutor>=1.0.0` and use `airflow.providers.daskexecutor.executors.dask_executor.DaskExecutor` instead.
+  = help: Install `apache-airflow-providers-daskexecutor>=1.0.0` and use `DaskExecutor` from `airflow.providers.daskexecutor.executors.dask_executor` instead.

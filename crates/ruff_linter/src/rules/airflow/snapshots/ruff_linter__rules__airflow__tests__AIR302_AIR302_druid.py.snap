@@ -9,7 +9,7 @@ AIR302_druid.py:12:1: AIR302 `airflow.hooks.druid_hook.DruidDbApiHook` is moved 
    | ^^^^^^^^^^^^^^ AIR302
 13 | DruidHook()
    |
-   = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.hooks.druid.DruidDbApiHook` instead.
+   = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `DruidDbApiHook` from `airflow.providers.apache.druid.hooks.druid` instead.
 
 AIR302_druid.py:13:1: AIR302 `airflow.hooks.druid_hook.DruidHook` is moved into `apache-druid` provider in Airflow 3.0;
    |
@@ -19,7 +19,7 @@ AIR302_druid.py:13:1: AIR302 `airflow.hooks.druid_hook.DruidHook` is moved into 
 14 |
 15 | HiveToDruidOperator()
    |
-   = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.hooks.druid.DruidHook` instead.
+   = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `DruidHook` from `airflow.providers.apache.druid.hooks.druid` instead.
 
 AIR302_druid.py:15:1: AIR302 `airflow.operators.hive_to_druid.HiveToDruidOperator` is moved into `apache-druid` provider in Airflow 3.0;
    |
@@ -29,7 +29,7 @@ AIR302_druid.py:15:1: AIR302 `airflow.operators.hive_to_druid.HiveToDruidOperato
    | ^^^^^^^^^^^^^^^^^^^ AIR302
 16 | HiveToDruidTransfer()
    |
-   = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.transfers.hive_to_druid.HiveToDruidOperator` instead.
+   = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `HiveToDruidOperator` from `airflow.providers.apache.druid.transfers.hive_to_druid` instead.
 
 AIR302_druid.py:16:1: AIR302 `airflow.operators.hive_to_druid.HiveToDruidTransfer` is moved into `apache-druid` provider in Airflow 3.0;
    |
@@ -37,4 +37,4 @@ AIR302_druid.py:16:1: AIR302 `airflow.operators.hive_to_druid.HiveToDruidTransfe
 16 | HiveToDruidTransfer()
    | ^^^^^^^^^^^^^^^^^^^ AIR302
    |
-   = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.transfers.hive_to_druid.HiveToDruidOperator` instead.
+   = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `HiveToDruidOperator` from `airflow.providers.apache.druid.transfers.hive_to_druid` instead.

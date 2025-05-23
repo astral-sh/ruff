@@ -10,7 +10,7 @@ AIR301_names_fix.py:19:1: AIR301 [*] `airflow.api_connexion.security.requires_ac
 20 |
 21 | DatasetDetails()
    |
-   = help: Use `airflow.api_fastapi.core_api.security.requires_access_asset` instead
+   = help: Use `requires_access_asset` from `airflow.api_fastapi.core_api.security` instead.
 
 ℹ Safe fix
 15 15 | from airflow.secrets.local_filesystm import load_connections
@@ -31,7 +31,7 @@ AIR301_names_fix.py:21:1: AIR301 [*] `airflow.auth.managers.models.resource_deta
 21 | DatasetDetails()
    | ^^^^^^^^^^^^^^ AIR301
    |
-   = help: Use `airflow.api_fastapi.auth.managers.models.resource_details.AssetDetails` instead
+   = help: Use `AssetDetails` from `airflow.api_fastapi.auth.managers.models.resource_details` instead.
 
 ℹ Safe fix
 15 15 | from airflow.secrets.local_filesystm import load_connections
@@ -54,7 +54,7 @@ AIR301_names_fix.py:24:1: AIR301 [*] `airflow.datasets.manager.DatasetManager` i
 25 | dataset_manager()
 26 | resolve_dataset_manager()
    |
-   = help: Use `airflow.assets.manager.AssetManager` instead
+   = help: Use `AssetManager` from `airflow.assets.manager` instead.
 
 ℹ Safe fix
 15 15 | from airflow.secrets.local_filesystm import load_connections
@@ -80,7 +80,7 @@ AIR301_names_fix.py:25:1: AIR301 [*] `airflow.datasets.manager.dataset_manager` 
    | ^^^^^^^^^^^^^^^ AIR301
 26 | resolve_dataset_manager()
    |
-   = help: Use `airflow.assets.manager.asset_manager` instead
+   = help: Use `asset_manager` from `airflow.assets.manager` instead.
 
 ℹ Safe fix
 15 15 | from airflow.secrets.local_filesystm import load_connections
@@ -109,7 +109,7 @@ AIR301_names_fix.py:26:1: AIR301 [*] `airflow.datasets.manager.resolve_dataset_m
 27 |
 28 | DatasetLineageInfo()
    |
-   = help: Use `airflow.assets.manager.resolve_asset_manager` instead
+   = help: Use `resolve_asset_manager` from `airflow.assets.manager` instead.
 
 ℹ Safe fix
 15 15 | from airflow.secrets.local_filesystm import load_connections
@@ -138,7 +138,7 @@ AIR301_names_fix.py:28:1: AIR301 [*] `airflow.lineage.hook.DatasetLineageInfo` i
 29 |
 30 | AllowListValidator()
    |
-   = help: Use `airflow.lineage.hook.AssetLineageInfo` instead
+   = help: Use `AssetLineageInfo` from `airflow.lineage.hook` instead.
 
 ℹ Safe fix
 10 10 |     dataset_manager,
@@ -167,7 +167,7 @@ AIR301_names_fix.py:30:1: AIR301 [*] `airflow.metrics.validators.AllowListValida
    | ^^^^^^^^^^^^^^^^^^ AIR301
 31 | BlockListValidator()
    |
-   = help: Use `airflow.metrics.validators.PatternAllowListValidator` instead
+   = help: Use `PatternAllowListValidator` from `airflow.metrics.validators` instead.
 
 ℹ Safe fix
 11 11 |     resolve_dataset_manager,
@@ -196,7 +196,7 @@ AIR301_names_fix.py:31:1: AIR301 [*] `airflow.metrics.validators.BlockListValida
 32 |
 33 | load_connections()
    |
-   = help: Use `airflow.metrics.validators.PatternBlockListValidator` instead
+   = help: Use `PatternBlockListValidator` from `airflow.metrics.validators` instead.
 
 ℹ Safe fix
 11 11 |     resolve_dataset_manager,
@@ -226,7 +226,7 @@ AIR301_names_fix.py:35:1: AIR301 [*] `airflow.security.permissions.RESOURCE_DATA
 36 |
 37 | has_access_dataset()
    |
-   = help: Use `airflow.security.permissions.RESOURCE_ASSET` instead
+   = help: Use `RESOURCE_ASSET` from `airflow.security.permissions` instead.
 
 ℹ Safe fix
 13 13 | from airflow.lineage.hook import DatasetLineageInfo
@@ -265,7 +265,7 @@ AIR301_names_fix.py:44:1: AIR301 [*] `airflow.listeners.spec.dataset.on_dataset_
    | ^^^^^^^^^^^^^^^^^^ AIR301
 45 | on_dataset_changed()
    |
-   = help: Use `airflow.listeners.spec.asset.on_asset_created` instead
+   = help: Use `on_asset_created` from `airflow.listeners.spec.asset` instead.
 
 ℹ Safe fix
 40 40 |     on_dataset_changed,
@@ -283,7 +283,7 @@ AIR301_names_fix.py:45:1: AIR301 [*] `airflow.listeners.spec.dataset.on_dataset_
 45 | on_dataset_changed()
    | ^^^^^^^^^^^^^^^^^^ AIR301
    |
-   = help: Use `airflow.listeners.spec.asset.on_asset_changed` instead
+   = help: Use `on_asset_changed` from `airflow.listeners.spec.asset` instead.
 
 ℹ Safe fix
 40 40 |     on_dataset_changed,

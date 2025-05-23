@@ -8,4 +8,4 @@ AIR302_samba.py:5:1: AIR302 `airflow.hooks.samba_hook.SambaHook` is moved into `
 5 | SambaHook()
   | ^^^^^^^^^ AIR302
   |
-  = help: Install `apache-airflow-providers-samba>=1.0.0` and use `airflow.providers.samba.hooks.samba.SambaHook` instead.
+  = help: Install `apache-airflow-providers-samba>=1.0.0` and use `SambaHook` from `airflow.providers.samba.hooks.samba` instead.

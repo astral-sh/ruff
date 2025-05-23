@@ -8,4 +8,4 @@ AIR302_zendesk.py:5:1: AIR302 `airflow.hooks.zendesk_hook.ZendeskHook` is moved 
 5 | ZendeskHook()
   | ^^^^^^^^^^^ AIR302
   |
-  = help: Install `apache-airflow-providers-zendesk>=1.0.0` and use `airflow.providers.zendesk.hooks.zendesk.ZendeskHook` instead.
+  = help: Install `apache-airflow-providers-zendesk>=1.0.0` and use `ZendeskHook` from `airflow.providers.zendesk.hooks.zendesk` instead.

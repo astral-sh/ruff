@@ -8,4 +8,4 @@ AIR302_oracle.py:5:1: AIR302 `airflow.hooks.oracle_hook.OracleHook` is moved int
 5 | OracleHook()
   | ^^^^^^^^^^ AIR302
   |
-  = help: Install `apache-airflow-providers-oracle>=1.0.0` and use `airflow.providers.oracle.hooks.oracle.OracleHook` instead.
+  = help: Install `apache-airflow-providers-oracle>=1.0.0` and use `OracleHook` from `airflow.providers.oracle.hooks.oracle` instead.
