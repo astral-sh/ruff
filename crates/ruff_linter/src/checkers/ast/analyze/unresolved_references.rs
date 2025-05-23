@@ -1,4 +1,4 @@
-use ruff_diagnostics::Diagnostic;
+use crate::Diagnostic;
 use ruff_python_semantic::Exceptions;
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 

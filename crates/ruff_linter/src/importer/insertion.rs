@@ -1,7 +1,7 @@
 //! Insert statements into Python code.
 use std::ops::Add;
 
-use ruff_diagnostics::Edit;
+use crate::Edit;
 use ruff_python_ast::Stmt;
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_codegen::Stylist;

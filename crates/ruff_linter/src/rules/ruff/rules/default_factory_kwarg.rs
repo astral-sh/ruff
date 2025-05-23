@@ -1,7 +1,7 @@
 use anyhow::Result;
 
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ast::Keyword;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_constant;
 use ruff_python_ast::{self as ast, Expr};

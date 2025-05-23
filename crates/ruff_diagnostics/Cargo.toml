@@ -16,7 +16,5 @@ doctest = false
 [dependencies]
 ruff_text_size = { workspace = true }
 
-anyhow = { workspace = true }
-log = { workspace = true }
 is-macro = { workspace = true }
 serde = { workspace = true, optional = true, features = [] }

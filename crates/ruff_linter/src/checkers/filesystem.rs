@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use ruff_diagnostics::Diagnostic;
+use crate::Diagnostic;
 use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::CommentRanges;
 

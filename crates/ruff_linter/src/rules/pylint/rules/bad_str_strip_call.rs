@@ -3,7 +3,7 @@ use std::fmt;
 use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use crate::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing;

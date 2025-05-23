@@ -2642,7 +2642,6 @@ dependencies = [
  "rayon",
  "regex",
  "ruff",
- "ruff_diagnostics",
  "ruff_formatter",
  "ruff_linter",
  "ruff_notebook",
@@ -2672,9 +2671,7 @@ dependencies = [
 name = "ruff_diagnostics"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "is-macro",
- "log",
  "ruff_text_size",
  "serde",
 ]

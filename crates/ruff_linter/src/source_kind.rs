@@ -7,7 +7,7 @@ use anyhow::Result;
 use similar::{ChangeTag, TextDiff};
 use thiserror::Error;
 
-use ruff_diagnostics::SourceMap;
+use crate::SourceMap;
 use ruff_notebook::{Cell, Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
 

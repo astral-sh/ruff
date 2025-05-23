@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result};
 
-use ruff_diagnostics::Edit;
+use crate::Edit;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Parameters, Stmt};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
@@ -595,7 +595,8 @@ mod tests {
     use ruff_source_file::SourceFileBuilder;
     use test_case::test_case;
 
-    use ruff_diagnostics::{Diagnostic, Edit, Fix};
+    use crate::codes::Rule;
+    use crate::{Diagnostic, Edit, Fix};
     use ruff_python_ast::Stmt;
     use ruff_python_codegen::Stylist;
     use ruff_python_parser::{parse_expression, parse_module};
@@ -746,7 +747,6 @@ x = 1 \
                 iter,
             ));
             Message::diagnostic(
-                diag.name,
                 diag.body,
                 diag.suggestion,
                 diag.range,
@@ -754,6 +754,7 @@ x = 1 \
                 diag.parent,
                 SourceFileBuilder::new("<filename>", "<code>").finish(),
                 None,
+                Rule::MissingNewlineAtEndOfFile,
             )
         };
         assert_eq!(apply_fixes([diag].iter(), &locator).code, expect);

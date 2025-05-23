@@ -1,5 +1,5 @@
+use crate::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ast::ExprContext;
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::name::Name;

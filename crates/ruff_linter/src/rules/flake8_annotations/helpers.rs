@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::Edit;
+use crate::Edit;
 use ruff_python_ast::helpers::{
     ReturnStatementVisitor, pep_604_union, typing_optional, typing_union,
 };

@@ -1,7 +1,7 @@
 use anyhow::{Result, bail};
 use libcst_native::{CompoundStatement, Statement, Suite, With};
 
-use ruff_diagnostics::Edit;
+use crate::Edit;
 use ruff_python_ast as ast;
 use ruff_python_ast::whitespace;
 use ruff_python_codegen::Stylist;
