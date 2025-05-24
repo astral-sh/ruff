@@ -1,13 +1,14 @@
-use crate::importer::ImportRequest;
-use crate::rules::airflow::helpers::{ProviderReplacement, is_guarded_by_try_except};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::checkers::ast::Checker;
+use crate::rules::airflow::helpers::{
+    ProviderReplacement, generate_import_edit, generate_remove_and_runtime_import_edit,
+    is_guarded_by_try_except,
+};
+use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for uses of Airflow functions and values that have been moved to it providers.
@@ -1166,7 +1167,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         [
             "airflow",
             "sensors",
-            "external_task",
+            "external_task" | "external_task_sensor",
             "ExternalTaskSensorLink",
         ] => ProviderReplacement::AutoImport {
             module: "airflow.providers.standard.sensors.external_task",
@@ -1178,7 +1179,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             "airflow",
             "sensors",
             "external_task_sensor",
-            rest @ ("ExternalTaskMarker" | "ExternalTaskSensor" | "ExternalTaskSensorLink"),
+            rest @ ("ExternalTaskMarker" | "ExternalTaskSensor"),
         ] => ProviderReplacement::SourceModuleMovedToProvider {
             module: "airflow.providers.standard.sensors.external_task",
             name: (*rest).to_string(),
@@ -1214,15 +1215,15 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         if is_guarded_by_try_except(expr, module, name, semantic) {
             return;
         }
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(module, name),
-                expr.start(),
-                checker.semantic(),
-            )?;
-            let replacement_edit = Edit::range_replacement(binding, ranged.range());
-            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
-        });
+
+        if let Some(fix) = generate_import_edit(expr, checker, module, name, ranged) {
+            diagnostic.try_set_fix(|| Ok(fix));
+        } else if let Some(fix) =
+            generate_remove_and_runtime_import_edit(expr, checker, module, name)
+        {
+            diagnostic.try_set_fix(|| Ok(fix));
+        }
     }
+
     checker.report_diagnostic(diagnostic);
 }
