@@ -28,7 +28,7 @@ impl Diagnostic {
             range,
             fix: None,
             parent: None,
-            rule: T::RULE,
+            rule: T::rule(),
         }
     }
 

@@ -11,10 +11,8 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
         #[automatically_derived]
         #[expect(deprecated)]
         impl crate::ViolationMetadata for #name {
-            const RULE: crate::registry::Rule = crate::registry::Rule::#name;
-
-            fn rule_name() -> &'static str {
-                ::ruff_macros::kebab_case!(#name)
+            fn rule() -> crate::registry::Rule {
+                crate::registry::Rule::#name
             }
 
             fn explain() -> Option<&'static str> {
