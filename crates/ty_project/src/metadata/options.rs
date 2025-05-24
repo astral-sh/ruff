@@ -409,6 +409,9 @@ pub struct SrcOptions {
     /// * if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
     /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
     /// * otherwise, default to `.` (flat layout)
+    ///
+    /// Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
+    /// it will also be included in the first party search path.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
