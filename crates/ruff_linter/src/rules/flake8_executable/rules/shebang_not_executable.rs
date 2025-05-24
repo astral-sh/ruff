@@ -27,9 +27,16 @@ use crate::rules::flake8_executable::helpers::is_executable;
 ///
 /// Otherwise, remove the shebang.
 ///
+/// ## Filesystem considerations
+///
 /// A file is considered executable if it has the executable bit set (i.e., its
 /// permissions mode intersects with `0o111`). As such, _this rule is only
-/// available on Unix-like systems_, and is not enforced on Windows or WSL.
+/// available on Unix-like filesystems_.
+///
+/// It is not enforced on Windows, and will never trigger on Unix-like systems
+/// if the _project root_ is located on a _filesystem which does not support
+/// Unix-like permissions_ (e.g. mounting an removable drive using FAT or using
+/// /mnt/c/ on WSL).
 ///
 /// ## Example
 /// ```python
@@ -39,6 +46,7 @@ use crate::rules::flake8_executable::helpers::is_executable;
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 /// - [Git documentation: `git update-index --chmod`](https://git-scm.com/docs/git-update-index#Documentation/git-update-index.txt---chmod-x)
+/// - [WSL documentation: Working across filesystems](https://learn.microsoft.com/en-us/windows/wsl/filesystems)
 #[derive(ViolationMetadata)]
 pub(crate) struct ShebangNotExecutable;
 
@@ -52,16 +60,9 @@ impl Violation for ShebangNotExecutable {
 /// EXE001
 #[cfg(target_family = "unix")]
 pub(crate) fn shebang_not_executable(filepath: &Path, range: TextRange) -> Option<Diagnostic> {
-    // WSL supports Windows file systems, which do not have executable bits.
-    // Instead, everything is executable. Therefore, we skip this rule on WSL.
-    if is_wsl::is_wsl() {
-        return None;
-    }
-
     if let Ok(false) = is_executable(filepath) {
         return Some(Diagnostic::new(ShebangNotExecutable, range));
     }
-
     None
 }
 
