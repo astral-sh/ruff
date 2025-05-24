@@ -272,6 +272,8 @@ ASYNC116.py:110:11: ASYNC116 [*] `anyio.sleep()` with >24 hour interval should u
 109 |     # catch from import
 110 |     await sleep(86401)  # error: 116, "async"
     |           ^^^^^^^^^^^^ ASYNC116
+111 |
+112 | async def test_anyio_async116_helpers():
     |
     = help: Replace with `anyio.sleep_forever()`
 
@@ -289,3 +291,6 @@ ASYNC116.py:110:11: ASYNC116 [*] `anyio.sleep()` with >24 hour interval should u
 109 110 |     # catch from import
 110     |-    await sleep(86401)  # error: 116, "async"
     111 |+    await sleep_forever()  # error: 116, "async"
+111 112 | 
+112 113 | async def test_anyio_async116_helpers():
+113 114 |     import anyio
