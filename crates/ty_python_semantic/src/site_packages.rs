@@ -580,6 +580,7 @@ impl fmt::Display for SysPrefixPath {
 pub enum SysPrefixPathOrigin {
     PythonCliFlag,
     VirtualEnvVar,
+    CondaPrefixVar,
     Derived,
     LocalVenv,
 }
@@ -590,7 +591,7 @@ impl SysPrefixPathOrigin {
     pub(crate) fn must_be_virtual_env(self) -> bool {
         match self {
             Self::LocalVenv | Self::VirtualEnvVar => true,
-            Self::PythonCliFlag | Self::Derived => false,
+            Self::PythonCliFlag | Self::Derived | Self::CondaPrefixVar => false,
         }
     }
 }
@@ -600,6 +601,7 @@ impl Display for SysPrefixPathOrigin {
         match self {
             Self::PythonCliFlag => f.write_str("`--python` argument"),
             Self::VirtualEnvVar => f.write_str("`VIRTUAL_ENV` environment variable"),
+            Self::CondaPrefixVar => f.write_str("`CONDA_PREFIX` environment variable"),
             Self::Derived => f.write_str("derived `sys.prefix` path"),
             Self::LocalVenv => f.write_str("local virtual environment"),
         }

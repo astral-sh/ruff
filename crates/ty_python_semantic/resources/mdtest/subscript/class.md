@@ -63,7 +63,7 @@ def _(flag: bool):
 
     else:
         class Spam: ...
-    # error: [call-possibly-unbound-method] "Method `__class_getitem__` of type `<class 'Spam'> | <class 'Spam'>` is possibly unbound"
+    # error: [possibly-unbound-implicit-call] "Method `__class_getitem__` of type `<class 'Spam'> | <class 'Spam'>` is possibly unbound"
     # revealed: str
     reveal_type(Spam[42])
 ```

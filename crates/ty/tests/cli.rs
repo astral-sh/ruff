@@ -1454,10 +1454,10 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
 }
 
 #[test]
-fn cli_config_args_overrides_knot_toml() -> anyhow::Result<()> {
+fn cli_config_args_overrides_ty_toml() -> anyhow::Result<()> {
     let case = TestCase::with_files(vec![
         (
-            "knot.toml",
+            "ty.toml",
             r#"
             [terminal]
             error-on-warning = true
@@ -1465,6 +1465,27 @@ fn cli_config_args_overrides_knot_toml() -> anyhow::Result<()> {
         ),
         ("test.py", r"print(x)  # [unresolved-reference]"),
     ])?;
+
+    // Exit code of 1 due to the setting in `ty.toml`
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       ^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // Exit code of 0 because the `ty.toml` setting is overwritten by `--config`
     assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=false"), @r"
     success: true
     exit_code: 0
@@ -1531,6 +1552,83 @@ fn cli_config_args_invalid_option() -> anyhow::Result<()> {
     For more information, try '--help'.
     ");
 
+    Ok(())
+}
+
+/// The `site-packages` directory is used by ty for external import.
+/// Ty does the following checks to discover the `site-packages` directory in the order:
+/// 1) If `VIRTUAL_ENV` environment variable is set
+/// 2) If `CONDA_PREFIX` environment variable is set
+/// 3) If a `.venv` directory exists at the project root
+///
+/// This test is aiming at validating the logic around `CONDA_PREFIX`.
+///
+/// A conda-like environment file structure is used
+/// We test by first not setting the `CONDA_PREFIX` and expect a fail.
+/// Then we test by setting `CONDA_PREFIX` to `conda-env` and expect a pass.
+///
+/// ├── project
+/// │   └── test.py
+/// └── conda-env
+///     └── lib
+///         └── python3.13
+///             └── site-packages
+///                 └── package1
+///                     └── __init__.py
+///
+/// test.py imports package1
+/// And the command is run in the `project` directory.
+#[test]
+fn check_conda_prefix_var_to_resolve_path() -> anyhow::Result<()> {
+    let conda_package1_path = if cfg!(windows) {
+        "conda-env/Lib/site-packages/package1/__init__.py"
+    } else {
+        "conda-env/lib/python3.13/site-packages/package1/__init__.py"
+    };
+
+    let case = TestCase::with_files([
+        (
+            "project/test.py",
+            r#"
+            import package1
+            "#,
+        ),
+        (
+            conda_package1_path,
+            r#"
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("project")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `package1`
+     --> test.py:2:8
+      |
+    2 | import package1
+      |        ^^^^^^^^
+      |
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // do command : CONDA_PREFIX=<temp_dir>/conda_env
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("project")).env("CONDA_PREFIX", case.root().join("conda-env")), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
     Ok(())
 }
 

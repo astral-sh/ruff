@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.11.10"
+version = "0.11.11"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"

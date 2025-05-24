@@ -369,7 +369,65 @@ To do
 
 ### `frozen`
 
-To do
+If true (the default is False), assigning to fields will generate a diagnostic.
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int
+
+frozen_instance = MyFrozenClass(1)
+frozen_instance.x = 2  # error: [invalid-assignment]
+```
+
+If `__setattr__()` or `__delattr__()` is defined in the class, we should emit a diagnostic.
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int
+
+    # TODO: Emit a diagnostic here
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+    # TODO: Emit a diagnostic here
+    def __delattr__(self, name: str) -> None: ...
+```
+
+This also works for generic dataclasses:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenGeneric[T]:
+    x: T
+
+frozen_instance = MyFrozenGeneric[int](1)
+frozen_instance.x = 2  # error: [invalid-assignment]
+```
+
+When attempting to mutate an unresolved attribute on a frozen dataclass, only `unresolved-attribute`
+is emitted:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass: ...
+
+frozen = MyFrozenClass()
+frozen.x = 2  # error: [unresolved-attribute]
+```
 
 ### `match_args`
 

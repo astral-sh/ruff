@@ -152,13 +152,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (ClassBase::Class(_), _) => Ordering::Less,
                 (_, ClassBase::Class(_)) => Ordering::Greater,
 
-                (ClassBase::Protocol(left), ClassBase::Protocol(right)) => left.cmp(&right),
-                (ClassBase::Protocol(_), _) => Ordering::Less,
-                (_, ClassBase::Protocol(_)) => Ordering::Greater,
+                (ClassBase::Protocol, _) => Ordering::Less,
+                (_, ClassBase::Protocol) => Ordering::Greater,
 
-                (ClassBase::Generic(left), ClassBase::Generic(right)) => left.cmp(&right),
-                (ClassBase::Generic(_), _) => Ordering::Less,
-                (_, ClassBase::Generic(_)) => Ordering::Greater,
+                (ClassBase::Generic, _) => Ordering::Less,
+                (_, ClassBase::Generic) => Ordering::Greater,
 
                 (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
                     dynamic_elements_ordering(left, right)

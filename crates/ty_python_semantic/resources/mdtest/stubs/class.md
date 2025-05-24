@@ -16,7 +16,7 @@ class Foo[T]: ...
 class Bar(Foo[Bar]): ...
 
 reveal_type(Bar)  # revealed: <class 'Bar'>
-reveal_type(Bar.__mro__)  # revealed: tuple[<class 'Bar'>, <class 'Foo[Bar]'>, <class 'object'>]
+reveal_type(Bar.__mro__)  # revealed: tuple[<class 'Bar'>, <class 'Foo[Bar]'>, typing.Generic, <class 'object'>]
 ```
 
 ## Access to attributes declared in stubs

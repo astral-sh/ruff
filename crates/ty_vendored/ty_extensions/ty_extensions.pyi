@@ -14,6 +14,15 @@ Intersection: _SpecialForm
 TypeOf: _SpecialForm
 CallableTypeOf: _SpecialForm
 
+# ty treats annotations of `float` to mean `float | int`, and annotations of `complex`
+# to mean `complex | float | int`. This is to support a typing-system special case [1].
+# We therefore provide `JustFloat` and `JustComplex` to represent the "bare" `float` and
+# `complex` types, respectively.
+#
+# [1]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
+type JustFloat = TypeOf[1.0]
+type JustComplex = TypeOf[1.0j]
+
 # Predicates on types
 #
 # Ideally, these would be annotated using `TypeForm`, but that has not been

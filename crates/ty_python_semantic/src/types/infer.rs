@@ -67,12 +67,12 @@ use crate::symbol::{
 use crate::types::call::{Argument, Bindings, CallArgumentTypes, CallArguments, CallError};
 use crate::types::class::{MetaclassErrorKind, SliceLiteral};
 use crate::types::diagnostic::{
-    self, CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS,
-    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, INCONSISTENT_MRO,
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics,
+    self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
+    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
+    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
+    INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMETER_DEFAULT,
+    INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
     report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
@@ -102,8 +102,9 @@ use super::diagnostic::{
     SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE, report_attempted_protocol_instantiation,
     report_bad_argument_to_get_protocol_members, report_duplicate_bases,
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_type_checking_constant,
-    report_non_subscriptable, report_possibly_unresolved_reference,
+    report_invalid_exception_raised, report_invalid_or_unsupported_base,
+    report_invalid_type_checking_constant, report_non_subscriptable,
+    report_possibly_unresolved_reference,
     report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
     report_unresolved_reference,
 };
@@ -892,63 +893,51 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // (3) Check that the class's MRO is resolvable
             match class.try_mro(self.db(), None) {
-                Err(mro_error) => {
-                    match mro_error.reason() {
-                        MroErrorKind::DuplicateBases(duplicates) => {
-                            let base_nodes = class_node.bases();
-                            for duplicate in duplicates {
-                                report_duplicate_bases(&self.context, class, duplicate, base_nodes);
-                            }
-                        }
-                        MroErrorKind::InvalidBases(bases) => {
-                            let base_nodes = class_node.bases();
-                            for (index, base_ty) in bases {
-                                if base_ty.is_never() {
-                                    // A class base of type `Never` can appear in unreachable code. It
-                                    // does not indicate a problem, since the actual construction of the
-                                    // class will never happen.
-                                    continue;
-                                }
-                                let Some(builder) =
-                                    self.context.report_lint(&INVALID_BASE, &base_nodes[*index])
-                                else {
-                                    continue;
-                                };
-                                builder.into_diagnostic(format_args!(
-                                    "Invalid class base with type `{}` \
-                                     (all bases must be a class, `Any`, `Unknown` or `Todo`)",
-                                    base_ty.display(self.db())
-                                ));
-                            }
-                        }
-                        MroErrorKind::UnresolvableMro { bases_list } => {
-                            if let Some(builder) =
-                                self.context.report_lint(&INCONSISTENT_MRO, class_node)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Cannot create a consistent method resolution order (MRO) \
-                                     for class `{}` with bases list `[{}]`",
-                                    class.name(self.db()),
-                                    bases_list
-                                        .iter()
-                                        .map(|base| base.display(self.db()))
-                                        .join(", ")
-                                ));
-                            }
-                        }
-                        MroErrorKind::InheritanceCycle => {
-                            if let Some(builder) = self
-                                .context
-                                .report_lint(&CYCLIC_CLASS_DEFINITION, class_node)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Cyclic definition of `{}` (class cannot inherit from itself)",
-                                    class.name(self.db())
-                                ));
-                            }
+                Err(mro_error) => match mro_error.reason() {
+                    MroErrorKind::DuplicateBases(duplicates) => {
+                        let base_nodes = class_node.bases();
+                        for duplicate in duplicates {
+                            report_duplicate_bases(&self.context, class, duplicate, base_nodes);
                         }
                     }
-                }
+                    MroErrorKind::InvalidBases(bases) => {
+                        let base_nodes = class_node.bases();
+                        for (index, base_ty) in bases {
+                            report_invalid_or_unsupported_base(
+                                &self.context,
+                                &base_nodes[*index],
+                                *base_ty,
+                                class,
+                            );
+                        }
+                    }
+                    MroErrorKind::UnresolvableMro { bases_list } => {
+                        if let Some(builder) =
+                            self.context.report_lint(&INCONSISTENT_MRO, class_node)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Cannot create a consistent method resolution order (MRO) \
+                                     for class `{}` with bases list `[{}]`",
+                                class.name(self.db()),
+                                bases_list
+                                    .iter()
+                                    .map(|base| base.display(self.db()))
+                                    .join(", ")
+                            ));
+                        }
+                    }
+                    MroErrorKind::InheritanceCycle => {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&CYCLIC_CLASS_DEFINITION, class_node)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Cyclic definition of `{}` (class cannot inherit from itself)",
+                                class.name(self.db())
+                            ));
+                        }
+                    }
+                },
                 Ok(_) => check_class_slots(&self.context, class, class_node),
             }
 
@@ -3088,6 +3077,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => {
+                let is_read_only = || {
+                    let dataclass_params = match object_ty {
+                        Type::NominalInstance(instance) => match instance.class {
+                            ClassType::NonGeneric(cls) => cls.dataclass_params(self.db()),
+                            ClassType::Generic(cls) => {
+                                cls.origin(self.db()).dataclass_params(self.db())
+                            }
+                        },
+                        _ => None,
+                    };
+
+                    dataclass_params.is_some_and(|params| params.contains(DataclassParams::FROZEN))
+                };
+
                 match object_ty.class_member(db, attribute.into()) {
                     meta_attr @ SymbolAndQualifiers { .. } if meta_attr.is_class_var() => {
                         if emit_diagnostics {
@@ -3107,68 +3110,83 @@ impl<'db> TypeInferenceBuilder<'db> {
                         symbol: Symbol::Type(meta_attr_ty, meta_attr_boundness),
                         qualifiers: _,
                     } => {
-                        let assignable_to_meta_attr = if let Symbol::Type(meta_dunder_set, _) =
-                            meta_attr_ty.class_member(db, "__set__".into()).symbol
-                        {
-                            let successful_call = meta_dunder_set
-                                .try_call(
-                                    db,
-                                    &CallArgumentTypes::positional([
-                                        meta_attr_ty,
-                                        object_ty,
-                                        value_ty,
-                                    ]),
-                                )
-                                .is_ok();
-
-                            if !successful_call && emit_diagnostics {
+                        if is_read_only() {
+                            if emit_diagnostics {
                                 if let Some(builder) =
                                     self.context.report_lint(&INVALID_ASSIGNMENT, target)
                                 {
-                                    // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
                                     builder.into_diagnostic(format_args!(
-                                        "Invalid assignment to data descriptor attribute \
-                                         `{attribute}` on type `{}` with custom `__set__` method",
-                                        object_ty.display(db)
+                                        "Property `{attribute}` defined in `{ty}` is read-only",
+                                        ty = object_ty.display(self.db()),
                                     ));
                                 }
                             }
-
-                            successful_call
+                            false
                         } else {
-                            ensure_assignable_to(meta_attr_ty)
-                        };
-
-                        let assignable_to_instance_attribute = if meta_attr_boundness
-                            == Boundness::PossiblyUnbound
-                        {
-                            let (assignable, boundness) =
-                                if let Symbol::Type(instance_attr_ty, instance_attr_boundness) =
-                                    object_ty.instance_member(db, attribute).symbol
-                                {
-                                    (
-                                        ensure_assignable_to(instance_attr_ty),
-                                        instance_attr_boundness,
+                            let assignable_to_meta_attr = if let Symbol::Type(meta_dunder_set, _) =
+                                meta_attr_ty.class_member(db, "__set__".into()).symbol
+                            {
+                                let successful_call = meta_dunder_set
+                                    .try_call(
+                                        db,
+                                        &CallArgumentTypes::positional([
+                                            meta_attr_ty,
+                                            object_ty,
+                                            value_ty,
+                                        ]),
                                     )
+                                    .is_ok();
+
+                                if !successful_call && emit_diagnostics {
+                                    if let Some(builder) =
+                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                    {
+                                        // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
+                                        builder.into_diagnostic(format_args!(
+                                            "Invalid assignment to data descriptor attribute \
+                                         `{attribute}` on type `{}` with custom `__set__` method",
+                                            object_ty.display(db)
+                                        ));
+                                    }
+                                }
+
+                                successful_call
+                            } else {
+                                ensure_assignable_to(meta_attr_ty)
+                            };
+
+                            let assignable_to_instance_attribute =
+                                if meta_attr_boundness == Boundness::PossiblyUnbound {
+                                    let (assignable, boundness) = if let Symbol::Type(
+                                        instance_attr_ty,
+                                        instance_attr_boundness,
+                                    ) =
+                                        object_ty.instance_member(db, attribute).symbol
+                                    {
+                                        (
+                                            ensure_assignable_to(instance_attr_ty),
+                                            instance_attr_boundness,
+                                        )
+                                    } else {
+                                        (true, Boundness::PossiblyUnbound)
+                                    };
+
+                                    if boundness == Boundness::PossiblyUnbound {
+                                        report_possibly_unbound_attribute(
+                                            &self.context,
+                                            target,
+                                            attribute,
+                                            object_ty,
+                                        );
+                                    }
+
+                                    assignable
                                 } else {
-                                    (true, Boundness::PossiblyUnbound)
+                                    true
                                 };
 
-                            if boundness == Boundness::PossiblyUnbound {
-                                report_possibly_unbound_attribute(
-                                    &self.context,
-                                    target,
-                                    attribute,
-                                    object_ty,
-                                );
-                            }
-
-                            assignable
-                        } else {
-                            true
-                        };
-
-                        assignable_to_meta_attr && assignable_to_instance_attribute
+                            assignable_to_meta_attr && assignable_to_instance_attribute
+                        }
                     }
 
                     SymbolAndQualifiers {
@@ -3187,7 +3205,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 );
                             }
 
-                            ensure_assignable_to(instance_attr_ty)
+                            if is_read_only() {
+                                if emit_diagnostics {
+                                    if let Some(builder) =
+                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                    {
+                                        builder.into_diagnostic(format_args!(
+                                            "Property `{attribute}` defined in `{ty}` is read-only",
+                                            ty = object_ty.display(self.db()),
+                                        ));
+                                    }
+                                }
+                                false
+                            } else {
+                                ensure_assignable_to(instance_attr_ty)
+                            }
                         } else {
                             let result = object_ty.try_call_dunder_with_policy(
                                 db,
@@ -6076,17 +6108,29 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Some(KnownClass::Float.to_instance(self.db()))
             }
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => Some(
-                n.checked_div(m)
-                    .map(Type::IntLiteral)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-            ),
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => Some({
+                let mut q = n.checked_div(m);
+                let r = n.checked_rem(m);
+                // Division works differently in Python than in Rust. If the result is negative and
+                // there is a remainder, the division rounds down (instead of towards zero):
+                if n.is_negative() != m.is_negative() && r.unwrap_or(0) != 0 {
+                    q = q.map(|q| q - 1);
+                }
+                q.map(Type::IntLiteral)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
+            }),
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => Some(
-                n.checked_rem(m)
-                    .map(Type::IntLiteral)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-            ),
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => Some({
+                let mut r = n.checked_rem(m);
+                // Division works differently in Python than in Rust. If the result is negative and
+                // there is a remainder, the division rounds down (instead of towards zero). Adjust
+                // the remainder to compensate so that q * m + r == n:
+                if n.is_negative() != m.is_negative() && r.unwrap_or(0) != 0 {
+                    r = r.map(|x| x + m);
+                }
+                r.map(Type::IntLiteral)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
+            }),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Pow) => Some({
                 if m < 0 {
@@ -6493,20 +6537,27 @@ impl<'db> TypeInferenceBuilder<'db> {
         intersection_on: IntersectionOn,
         range: TextRange,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
+        enum State<'db> {
+            // We have not seen any positive elements (yet)
+            NoPositiveElements,
+            // The operator was unsupported on all elements that we have seen so far.
+            // Contains the first error we encountered.
+            UnsupportedOnAllElements(CompareUnsupportedError<'db>),
+            // The operator was supported on at least one positive element.
+            Supported,
+        }
+
         // If a comparison yields a definitive true/false answer on a (positive) part
         // of an intersection type, it will also yield a definitive answer on the full
         // intersection type, which is even more specific.
         for pos in intersection.positive(self.db()) {
             let result = match intersection_on {
-                IntersectionOn::Left => {
-                    self.infer_binary_type_comparison(*pos, op, other, range)?
-                }
-                IntersectionOn::Right => {
-                    self.infer_binary_type_comparison(other, op, *pos, range)?
-                }
+                IntersectionOn::Left => self.infer_binary_type_comparison(*pos, op, other, range),
+                IntersectionOn::Right => self.infer_binary_type_comparison(other, op, *pos, range),
             };
-            if let Type::BooleanLiteral(b) = result {
-                return Ok(Type::BooleanLiteral(b));
+
+            if let Ok(Type::BooleanLiteral(_)) = result {
+                return result;
             }
         }
 
@@ -6575,19 +6626,55 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         builder = builder.add_positive(KnownClass::Bool.to_instance(self.db()));
 
+        let mut state = State::NoPositiveElements;
+
         for pos in intersection.positive(self.db()) {
             let result = match intersection_on {
-                IntersectionOn::Left => {
-                    self.infer_binary_type_comparison(*pos, op, other, range)?
-                }
-                IntersectionOn::Right => {
-                    self.infer_binary_type_comparison(other, op, *pos, range)?
-                }
+                IntersectionOn::Left => self.infer_binary_type_comparison(*pos, op, other, range),
+                IntersectionOn::Right => self.infer_binary_type_comparison(other, op, *pos, range),
             };
-            builder = builder.add_positive(result);
+
+            match result {
+                Ok(ty) => {
+                    state = State::Supported;
+                    builder = builder.add_positive(ty);
+                }
+                Err(error) => {
+                    match state {
+                        State::NoPositiveElements => {
+                            // This is the first positive element, but the operation is not supported.
+                            // Store the error and continue.
+                            state = State::UnsupportedOnAllElements(error);
+                        }
+                        State::UnsupportedOnAllElements(_) => {
+                            // We already have an error stored, and continue to see elements on which
+                            // the operator is not supported. Continue with the same state (only keep
+                            // the first error).
+                        }
+                        State::Supported => {
+                            // We previously saw a positive element that supported the operator,
+                            // so the overall operation is still supported.
+                        }
+                    }
+                }
+            }
         }
 
-        Ok(builder.build())
+        match state {
+            State::Supported => Ok(builder.build()),
+            State::NoPositiveElements => {
+                // We didn't see any positive elements, check if the operation is supported on `object`:
+                match intersection_on {
+                    IntersectionOn::Left => {
+                        self.infer_binary_type_comparison(Type::object(self.db()), op, other, range)
+                    }
+                    IntersectionOn::Right => {
+                        self.infer_binary_type_comparison(other, op, Type::object(self.db()), range)
+                    }
+                }
+            }
+            State::UnsupportedOnAllElements(error) => Err(error),
+        }
     }
 
     /// Infers the type of a binary comparison (e.g. 'left == right'). See
@@ -7384,7 +7471,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
                         if let Some(builder) = self
                             .context
-                            .report_lint(&CALL_POSSIBLY_UNBOUND_METHOD, value_node)
+                            .report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, value_node)
                         {
                             builder.into_diagnostic(format_args!(
                                 "Method `__getitem__` of type `{}` is possibly unbound",
@@ -7432,7 +7519,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             if boundness == Boundness::PossiblyUnbound {
                                 if let Some(builder) = self
                                     .context
-                                    .report_lint(&CALL_POSSIBLY_UNBOUND_METHOD, value_node)
+                                    .report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, value_node)
                                 {
                                     builder.into_diagnostic(format_args!(
                                         "Method `__class_getitem__` of type `{}` \
@@ -7485,7 +7572,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if !value_ty.into_class_literal().is_some_and(|class| {
                         class
                             .iter_mro(self.db(), None)
-                            .any(|base| matches!(base, ClassBase::Generic(_)))
+                            .contains(&ClassBase::Generic)
                     }) {
                         report_non_subscriptable(
                             &self.context,

@@ -283,7 +283,7 @@ impl clap::Args for RulesArg {
 /// The diagnostic output format.
 #[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
 pub enum OutputFormat {
-    /// Print diagnostics verbosely, with context and helpful hints.
+    /// Print diagnostics verbosely, with context and helpful hints \[default\].
     ///
     /// Diagnostic messages may include additional context and
     /// annotations on the input to help understand the message.

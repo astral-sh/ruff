@@ -72,6 +72,34 @@ reveal_type(2 ** (-1))  # revealed: float
 reveal_type((-1) ** (-1))  # revealed: float
 ```
 
+## Division and Modulus
+
+Division works differently in Python than in Rust. If the result is negative and there is a
+remainder, the division rounds down (instead of towards zero). The remainder needs to be adjusted to
+compensate so that `(lhs // rhs) * rhs + (lhs % rhs) == lhs`:
+
+```py
+reveal_type(256 % 129)  # revealed: Literal[127]
+reveal_type(-256 % 129)  # revealed: Literal[2]
+reveal_type(256 % -129)  # revealed: Literal[-2]
+reveal_type(-256 % -129)  # revealed: Literal[-127]
+
+reveal_type(129 % 16)  # revealed: Literal[1]
+reveal_type(-129 % 16)  # revealed: Literal[15]
+reveal_type(129 % -16)  # revealed: Literal[-15]
+reveal_type(-129 % -16)  # revealed: Literal[-1]
+
+reveal_type(10 // 8)  # revealed: Literal[1]
+reveal_type(-10 // 8)  # revealed: Literal[-2]
+reveal_type(10 // -8)  # revealed: Literal[-2]
+reveal_type(-10 // -8)  # revealed: Literal[1]
+
+reveal_type(10 // 6)  # revealed: Literal[1]
+reveal_type(-10 // 6)  # revealed: Literal[-2]
+reveal_type(10 // -6)  # revealed: Literal[-2]
+reveal_type(-10 // -6)  # revealed: Literal[1]
+```
+
 ## Division by Zero
 
 This error is really outside the current Python type system, because e.g. `int.__truediv__` and
