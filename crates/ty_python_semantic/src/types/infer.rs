@@ -7269,25 +7269,32 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If `value` is a valid reference, we attempt type narrowing by assignment.
         if !value_ty.is_unknown() {
             if let Ok(expr) = PlaceExpr::try_from(subscript) {
-                // Type narrowing based on assignment to a subscript expression is generally unsound,
-                // because `__getitem__`/`__setitem__` of a user-defined class does not guarantee that the passed value is stored and can be retrieved as is.
-                // Currently, we only perform assignment-based narrowing on a few built-in classes and their subclasses
-                // where we are confident that this kind of narrowing can be performed soundly. This is the same approach as pyright.
+                // Type narrowing based on assignment to a subscript expression is generally unsound, because arbitrary
+                // `__getitem__`/`__setitem__` methods on a class do not necessarily guarantee that the passed-in value
+                // for `__setitem__` is stored and can be retrieved unmodified via `__getitem__`. Therefore, we
+                // currently only perform assignment-based narrowing on a few built-in classes (`list`, `dict`,
+                // `bytesarray`, `TypedDict` and `collections` types) where we are confident that
+                // this kind of narrowing can be performed soundly. This is the same approach as pyright.
+                // TODO: Other standard library classes may also be considered safe.
+                // Also, subclasses of these safe classes that do not override `__getitem__/__setitem__` may be considered safe.
                 let safe_mutable_classes = [
                     KnownClass::List.to_instance(db),
                     KnownClass::Dict.to_instance(db),
                     KnownClass::Bytearray.to_instance(db),
-                    Type::KnownInstance(KnownInstanceType::ChainMap),
-                    Type::KnownInstance(KnownInstanceType::Counter),
-                    Type::KnownInstance(KnownInstanceType::DefaultDict),
-                    Type::KnownInstance(KnownInstanceType::Deque),
-                    Type::KnownInstance(KnownInstanceType::OrderedDict),
-                    Type::KnownInstance(KnownInstanceType::TypedDict),
+                    KnownClass::DefaultDict.to_instance(db),
+                    KnownInstanceType::ChainMap.instance_fallback(db),
+                    KnownInstanceType::Counter.instance_fallback(db),
+                    KnownInstanceType::Deque.instance_fallback(db),
+                    KnownInstanceType::OrderedDict.instance_fallback(db),
+                    KnownInstanceType::TypedDict.instance_fallback(db),
                 ];
-                if safe_mutable_classes
-                    .iter()
-                    .any(|class| value_ty.is_assignable_to(db, *class))
-                {
+                if safe_mutable_classes.iter().any(|safe_mutable_class| {
+                    value_ty.is_equivalent_to(db, *safe_mutable_class)
+                        || value_ty
+                            .generic_origin(db)
+                            .zip(safe_mutable_class.generic_origin(db))
+                            .is_some_and(|(l, r)| l == r)
+                }) {
                     let (place, _) =
                         self.infer_place_load(&expr, ast::ExprRef::Subscript(subscript));
                     if let Place::Type(ty, Boundness::Bound) = place.place {

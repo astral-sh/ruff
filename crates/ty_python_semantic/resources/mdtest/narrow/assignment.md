@@ -78,8 +78,8 @@ Type narrowing based on assignment to a subscript expression is generally unsoun
 `__getitem__`/`__setitem__` methods on a class do not necessarily guarantee that the passed-in value
 for `__setitem__` is stored and can be retrieved unmodified via `__getitem__`. Therefore, we
 currently only perform assignment-based narrowing on a few built-in classes (`list`, `dict`,
-`bytesarray`, `TypedDict` and `collections` types) and their subclasses where we are confident that
-this kind of narrowing can be performed soundly. This is the same approach as pyright.
+`bytesarray`, `TypedDict` and `collections` types) where we are confident that this kind of
+narrowing can be performed soundly. This is the same approach as pyright.
 
 ```py
 from typing import TypedDict

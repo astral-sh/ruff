@@ -5583,6 +5583,20 @@ impl<'db> Type<'db> {
             _ => None,
         }
     }
+
+    pub(crate) fn generic_origin(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
+        match self {
+            Type::GenericAlias(generic) => Some(generic.origin(db)),
+            Type::NominalInstance(instance) => {
+                if let ClassType::Generic(generic) = instance.class {
+                    Some(generic.origin(db))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 impl<'db> From<&Type<'db>> for Type<'db> {
