@@ -81,34 +81,22 @@ fn format_number_with_underscores(value: &str) -> String {
         let prefix = &value[..2];
         let hex_part = &value[2..];
 
-        if hex_part.len() < HEX_THRESHOLD {
-            format!("{}{}", prefix, hex_part)
-        } else {
-            let formatted = format_digits(hex_part, HEX_GROUPSIZE);
-            format!("{}{}", prefix, formatted)
-        }
+        let formatted = format_digits(hex_part, HEX_GROUPSIZE, HEX_THRESHOLD);
+        format!("{}{}", prefix, formatted)
     } else if value.starts_with("0b") || value.starts_with("0B") {
         // Binary
         let prefix = &value[..2];
         let bin_part = &value[2..];
 
-        if bin_part.len() < BIN_THRESHOLD {
-            format!("{}{}", prefix, bin_part)
-        } else {
-            let formatted = format_digits(bin_part, BIN_GROUPSIZE);
-            format!("{}{}", prefix, formatted)
-        }
+        let formatted = format_digits(bin_part, BIN_GROUPSIZE, BIN_THRESHOLD);
+        format!("{}{}", prefix, formatted)
     } else if value.starts_with("0o") || value.starts_with("0O") {
         // Octal
         let prefix = &value[..2];
         let oct_part = &value[2..];
 
-        if oct_part.len() < OCT_THRESHOLD {
-            format!("{}{}", prefix, oct_part)
-        } else {
-            let formatted = format_digits(oct_part, OCT_GROUPSIZE);
-            format!("{}{}", prefix, formatted)
-        }
+        let formatted = format_digits(oct_part, OCT_GROUPSIZE, OCT_THRESHOLD);
+        format!("{}{}", prefix, formatted)
     } else {
         if value.contains(['e', 'E']) {
             // Handle scientific notation
@@ -124,29 +112,25 @@ fn format_number_with_underscores(value: &str) -> String {
 
         // Decimal (integer or float)
         let parts: Vec<&str> = value.split('.').collect();
-        let integer_part = if parts[0].len() < DEC_THRESHOLD {
-            parts[0]
-        } else {
-            &(format_digits(&parts[0], DEC_GROUPSIZE))
-        };
+        let integer_part = format_digits(&parts[0], DEC_GROUPSIZE, DEC_THRESHOLD);
 
         if parts.len() > 1 {
             // It's a float, handle the fractional part
-            let float_part = if parts[1].len() < FLT_THRESHOLD {
-                parts[1]
-            } else {
-                &(format_float(parts[1], FLT_GROUPSIZE))
-            };
-            return format!("{}.{}", integer_part, float_part);
+            let float_part = format_float(parts[1], FLT_GROUPSIZE, FLT_THRESHOLD);
+            format!("{}.{}", integer_part, float_part)
         } else {
             // It's an integer
-            return format!("{}", integer_part);
+            format!("{}", integer_part)
         }
     }
 }
 
 /// Helper function to format digits with underscores at specified intervals
-fn format_digits(digits: &str, group_size: usize) -> String {
+fn format_digits(digits: &str, group_size: usize, threshold: usize) -> String {
+    if digits.len() < threshold {
+        return digits.to_string();
+    }
+
     let mut result = String::new();
     let mut count = 0;
 
@@ -164,7 +148,11 @@ fn format_digits(digits: &str, group_size: usize) -> String {
 }
 
 // Helper function to format float parts with underscores at specified intervals
-fn format_float(digits: &str, group_size: usize) -> String {
+fn format_float(digits: &str, group_size: usize, threshold: usize) -> String {
+    if digits.len() < threshold {
+        return digits.to_string();
+    }
+
     let mut result = String::new();
     let mut count = 0;
 
@@ -177,6 +165,5 @@ fn format_float(digits: &str, group_size: usize) -> String {
         count += 1;
     }
 
-    // Reverse the result to get the correct order
     result
 }
