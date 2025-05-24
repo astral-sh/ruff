@@ -1492,7 +1492,7 @@ pub(crate) enum ParameterForm {
 mod tests {
     use super::*;
     use crate::db::tests::{TestDb, setup_db};
-    use crate::symbol::global_symbol;
+    use crate::place::global_symbol;
     use crate::types::{FunctionSignature, FunctionType, KnownClass};
     use ruff_db::system::DbWithWritableSystem as _;
 
@@ -1500,7 +1500,7 @@ mod tests {
     fn get_function_f<'db>(db: &'db TestDb, file: &'static str) -> FunctionType<'db> {
         let module = ruff_db::files::system_path_to_file(db, file).unwrap();
         global_symbol(db, module, "f")
-            .symbol
+            .place
             .expect_type()
             .expect_function_literal()
     }
