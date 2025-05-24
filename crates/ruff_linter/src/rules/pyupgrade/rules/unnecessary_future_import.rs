@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_python_ast::{Alias, Stmt};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{Applicability, AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
@@ -123,9 +123,19 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, stmt: &Stmt, names: &
             checker.stylist(),
             checker.indexer(),
         )?;
-        Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
-            checker.semantic().current_statement_parent_id(),
-        )))
+
+        let range = edit.range();
+        let applicability = if checker.comment_ranges().intersects(range) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        Ok(
+            Fix::applicable_edit(edit, applicability).isolate(Checker::isolation(
+                checker.semantic().current_statement_parent_id(),
+            )),
+        )
     });
     checker.report_diagnostic(diagnostic);
 }
