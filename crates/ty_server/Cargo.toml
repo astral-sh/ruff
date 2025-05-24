@@ -26,6 +26,7 @@ jod-thread = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
 rustc-hash = { workspace = true }
+salsa = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 shellexpand = { workspace = true }
