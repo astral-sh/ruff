@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
 expression: suite
-snapshot_kind: text
 ---
 [
     Expr(

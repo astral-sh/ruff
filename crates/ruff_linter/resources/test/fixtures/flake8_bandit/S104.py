@@ -22,3 +22,8 @@ def my_func():
 
 # Implicit string concatenation
 "0.0.0.0" f"0.0.0.0{expr}0.0.0.0"
+
+# t-strings - all ok
+t"0.0.0.0"
+"0.0.0.0" t"0.0.0.0{expr}0.0.0.0"
+"0.0.0.0" f"0.0.0.0{expr}0.0.0.0" t"0.0.0.0{expr}0.0.0.0"

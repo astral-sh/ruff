@@ -104,7 +104,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
             if f_string
                 .value
                 .f_strings()
-                .any(|fs| fs.elements.iter().any(ast::FStringElement::is_expression)) =>
+                .any(|fs| fs.elements.iter().any(ast::FTStringElement::is_expression)) =>
         {
             concatenated_f_string(f_string, checker.locator())
         }
@@ -175,6 +175,7 @@ fn is_explicit_concatenation(expr: &Expr) -> Option<bool> {
         Expr::DictComp(_) => Some(false),
         Expr::Compare(_) => Some(false),
         Expr::FString(_) => Some(true),
+        Expr::TString(_) => Some(false),
         Expr::StringLiteral(_) => Some(true),
         Expr::BytesLiteral(_) => Some(false),
         Expr::NoneLiteral(_) => Some(false),
