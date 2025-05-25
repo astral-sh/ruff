@@ -305,20 +305,6 @@ impl std::ops::DerefMut for LintDiagnosticGuard<'_, '_> {
     }
 }
 
-impl AsRef<Diagnostic> for LintDiagnosticGuard<'_, '_> {
-    fn as_ref(&self) -> &Diagnostic {
-        // OK because `self.diag` is only `None` within `Drop`.
-        self.diag.as_ref().unwrap()
-    }
-}
-
-impl AsMut<Diagnostic> for LintDiagnosticGuard<'_, '_> {
-    fn as_mut(&mut self) -> &mut Diagnostic {
-        // OK because `self.diag` is only `None` within `Drop`.
-        self.diag.as_mut().unwrap()
-    }
-}
-
 /// Finishes use of this guard.
 ///
 /// This will add the lint as a diagnostic to the typing context if

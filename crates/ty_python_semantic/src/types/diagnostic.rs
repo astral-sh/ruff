@@ -1766,21 +1766,17 @@ pub(super) fn report_possibly_unbound_attribute(
 ///
 /// ty can infer the Python version from various sources, such as command-line arguments,
 /// configuration files, or defaults.
-pub fn add_inferred_python_version_hint_to_diagnostic<D, A>(
+pub fn add_inferred_python_version_hint_to_diagnostic(
     db: &dyn Db,
-    mut diagnostic: D,
-    action: A,
-) -> D
-where
-    D: AsMut<Diagnostic>,
-    A: std::fmt::Display,
-{
+    diagnostic: &mut Diagnostic,
+    action: impl std::fmt::Display,
+) {
     let program = Program::get(db);
     let PythonVersionWithSource { version, source } = program.python_version_with_source(db);
 
     match source {
         crate::PythonVersionSource::Cli => {
-            diagnostic.as_mut().info(format_args!(
+            diagnostic.info(format_args!(
                 "Python {version} was assumed when {action} because it was specified on the command line",
             ));
         }
@@ -1795,23 +1791,21 @@ where
                         format_args!("Python {version} assumed due to this configuration setting"),
                     ),
                 );
-                diagnostic.as_mut().sub(sub_diagnostic);
+                diagnostic.sub(sub_diagnostic);
             } else {
-                diagnostic.as_mut().info(format_args!(
+                diagnostic.info(format_args!(
                     "Python {version} was assumed when {action} because of your configuration file(s)",
                 ));
             }
         }
         crate::PythonVersionSource::Default => {
-            diagnostic.as_mut().info(format_args!(
+            diagnostic.info(format_args!(
                 "Python {version} was assumed when {action} \
                 because it is the newest Python version supported by ty, \
                 and neither a command-line argument nor a configuration setting was provided",
             ));
         }
     }
-
-    diagnostic
 }
 
 pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
@@ -1825,7 +1819,11 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
         diagnostic.info(format_args!(
             "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
         ));
-        add_inferred_python_version_hint_to_diagnostic(context.db(), diagnostic, "resolving types");
+        add_inferred_python_version_hint_to_diagnostic(
+            context.db(),
+            &mut diagnostic,
+            "resolving types",
+        );
     }
 }
 
