@@ -36,7 +36,7 @@ impl PlaceExprSubSegment {
     }
 }
 
-/// An expression that can be the left side of a `Definition`.
+/// An expression that can be the target of a `Definition`.
 /// If you want to perform a comparison based on the equality of segments (without including flags), use [`PlaceSegments`].
 #[derive(Eq, PartialEq, Debug)]
 pub struct PlaceExpr {

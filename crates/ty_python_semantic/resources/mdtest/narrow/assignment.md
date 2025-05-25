@@ -140,6 +140,12 @@ reveal_type(td["x"])  # revealed: @Todo(TypedDict)
 does["not"]["exist"] = 0
 # error: [unresolved-reference]
 reveal_type(does["not"]["exist"])  # revealed: Unknown
+
+non_subscriptable = 1
+# error: [non-subscriptable]
+non_subscriptable[0] = 0
+# error: [non-subscriptable]
+reveal_type(non_subscriptable[0])  # revealed: Unknown
 ```
 
 ### No narrowing for custom classes with arbitrary `__getitem__` / `__setitem__`

@@ -3537,10 +3537,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
-        // assignments to non-Names are not Definitions
-        if matches!(*assignment.target, ast::Expr::Name(_)) {
+        if assignment.target.is_name_expr() {
             self.infer_definition(assignment);
         } else {
+            // Non-name assignment targets are inferred as ordinary expressions, not definitions.
             let ast::StmtAnnAssign {
                 range: _,
                 annotation,
@@ -3624,6 +3624,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
+        // If the target of an assignment is not one of the place expressions we support,
+        // then they are not definitions, so we can only be here if the target is in a form supported as a place expression.
+        // In this case, we can simply store types in `target` below, instead of calling `infer_expression` (which would return `Never`).
+        debug_assert!(PlaceExpr::try_from(target).is_ok());
+
         if let Some(value) = value {
             let inferred_ty = self.infer_expression(value);
             let inferred_ty = if target
@@ -3665,7 +3670,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         if assignment.target.is_name_expr() {
             self.infer_definition(assignment);
         } else {
-            // TODO currently we don't consider assignments to non-Names to be Definitions
+            // Non-name assignment targets are inferred as ordinary expressions, not definitions.
             self.infer_augment_assignment(assignment);
         }
     }
