@@ -1,5 +1,6 @@
 use super::call::CallErrorKind;
 use super::context::InferContext;
+use super::display::DisplayType;
 use super::mro::DuplicateBaseError;
 use super::{CallArgumentTypes, CallDunderError, ClassBase, ClassLiteral, KnownClass};
 use crate::db::Db;
@@ -1441,6 +1442,28 @@ declare_lint! {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(crate) enum AttributeAssignmentValidationType<'db> {
+    Value(Type<'db>),
+    Annotation(Type<'db>),
+}
+
+impl<'db> AttributeAssignmentValidationType<'db> {
+    pub(crate) fn inner(self) -> Type<'db> {
+        match self {
+            AttributeAssignmentValidationType::Value(ty) => ty,
+            AttributeAssignmentValidationType::Annotation(ty) => ty,
+        }
+    }
+
+    pub(crate) fn display(&self, db: &'db dyn Db) -> DisplayType {
+        match self {
+            AttributeAssignmentValidationType::Value(ty) => ty.display(db),
+            AttributeAssignmentValidationType::Annotation(ty) => ty.display(db),
+        }
+    }
+}
+
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq)]
 pub struct TypeCheckDiagnostics {
@@ -1601,19 +1624,35 @@ pub(super) fn report_invalid_attribute_assignment(
     context: &InferContext,
     node: AnyNodeRef,
     target_ty: Type,
-    source_ty: Type,
+    source_ty: AttributeAssignmentValidationType,
     attribute_name: &'_ str,
 ) {
-    report_invalid_assignment_with_message(
-        context,
-        node,
-        target_ty,
-        format_args!(
-            "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
-            source_ty.display(context.db()),
-            target_ty.display(context.db()),
-        ),
-    );
+    match source_ty {
+        AttributeAssignmentValidationType::Value(value_ty) => {
+            report_invalid_assignment_with_message(
+                context,
+                node,
+                target_ty,
+                format_args!(
+                    "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
+                    value_ty.display(context.db()),
+                    target_ty.display(context.db()),
+                ),
+            );
+        }
+        AttributeAssignmentValidationType::Annotation(annotated_ty) => {
+            report_invalid_assignment_with_message(
+                context,
+                node,
+                target_ty,
+                format_args!(
+                    "Attribute `{attribute_name}` was declared as type `{}` in the class body, but here it is declared as the incompatible type `{}`",
+                    target_ty.display(context.db()),
+                    annotated_ty.display(context.db()),
+                ),
+            );
+        }
+    }
 }
 
 pub(super) fn report_invalid_return_type(

@@ -99,13 +99,13 @@ use crate::{Db, FxOrderSet, Program};
 
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
-    INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
-    SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE, report_attempted_protocol_instantiation,
-    report_bad_argument_to_get_protocol_members, report_duplicate_bases,
-    report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_or_unsupported_base,
-    report_invalid_type_checking_constant, report_non_subscriptable,
-    report_possibly_unresolved_reference,
+    AttributeAssignmentValidationType, INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL,
+    REDUNDANT_CAST, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
+    report_attempted_protocol_instantiation, report_bad_argument_to_get_protocol_members,
+    report_duplicate_bases, report_index_out_of_bounds, report_invalid_exception_caught,
+    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_invalid_or_unsupported_base, report_invalid_type_checking_constant,
+    report_non_subscriptable, report_possibly_unresolved_reference,
     report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
     report_unresolved_reference,
 };
@@ -2974,19 +2974,19 @@ impl<'db> TypeInferenceBuilder<'db> {
         target: &ast::ExprAttribute,
         object_ty: Type<'db>,
         attribute: &str,
-        value_ty: Type<'db>,
+        source_ty: AttributeAssignmentValidationType<'db>,
         emit_diagnostics: bool,
     ) -> bool {
         let db = self.db();
 
         let ensure_assignable_to = |attr_ty| -> bool {
-            let assignable = value_ty.is_assignable_to(db, attr_ty);
+            let assignable = source_ty.inner().is_assignable_to(db, attr_ty);
             if !assignable && emit_diagnostics {
                 report_invalid_attribute_assignment(
                     &self.context,
                     target.into(),
                     attr_ty,
-                    value_ty,
+                    source_ty,
                     attribute,
                 );
             }
@@ -2996,7 +2996,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         match object_ty {
             Type::Union(union) => {
                 if union.elements(self.db()).iter().all(|elem| {
-                    self.validate_attribute_assignment(target, *elem, attribute, value_ty, false)
+                    self.validate_attribute_assignment(target, *elem, attribute, source_ty, false)
                 }) {
                     true
                 } else {
@@ -3008,7 +3008,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             builder.into_diagnostic(format_args!(
                                 "Object of type `{}` is not assignable \
                                  to attribute `{attribute}` on type `{}`",
-                                value_ty.display(self.db()),
+                                source_ty.display(self.db()),
                                 object_ty.display(self.db()),
                             ));
                         }
@@ -3021,7 +3021,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::Intersection(intersection) => {
                 // TODO: Handle negative intersection elements
                 if intersection.positive(db).iter().any(|elem| {
-                    self.validate_attribute_assignment(target, *elem, attribute, value_ty, false)
+                    self.validate_attribute_assignment(target, *elem, attribute, source_ty, false)
                 }) {
                     true
                 } else {
@@ -3032,7 +3032,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             builder.into_diagnostic(format_args!(
                                 "Object of type `{}` is not assignable \
                                  to attribute `{attribute}` on type `{}`",
-                                value_ty.display(self.db()),
+                                source_ty.display(self.db()),
                                 object_ty.display(self.db()),
                             ));
                         }
@@ -3142,7 +3142,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                         &CallArgumentTypes::positional([
                                             meta_attr_ty,
                                             object_ty,
-                                            value_ty,
+                                            source_ty.inner(),
                                         ]),
                                     )
                                     .is_ok();
@@ -3238,7 +3238,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                         db,
                                         Box::from(attribute),
                                     )),
-                                    value_ty,
+                                    source_ty.inner(),
                                 ]),
                                 MemberLookupPolicy::NO_INSTANCE_FALLBACK
                                     | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
@@ -3255,7 +3255,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                 "Can not assign object of `{}` to attribute \
                                                  `{attribute}` on type `{}` with \
                                                  custom `__setattr__` method.",
-                                                value_ty.display(db),
+                                                source_ty.display(db),
                                                 object_ty.display(db)
                                             ));
                                         }
@@ -3298,7 +3298,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     &CallArgumentTypes::positional([
                                         meta_attr_ty,
                                         object_ty,
-                                        value_ty,
+                                        source_ty.inner(),
                                     ]),
                                 )
                                 .is_ok();
@@ -3412,13 +3412,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             Type::ModuleLiteral(module) => {
                 if let Place::Type(attr_ty, _) = module.static_member(db, attribute) {
-                    let assignable = value_ty.is_assignable_to(db, attr_ty);
+                    let assignable = source_ty.inner().is_assignable_to(db, attr_ty);
                     if !assignable {
                         report_invalid_attribute_assignment(
                             &self.context,
                             target.into(),
                             attr_ty,
-                            value_ty,
+                            source_ty,
                             attribute,
                         );
                     }
@@ -3472,7 +3472,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         attr_expr,
                         object_ty,
                         attr.id(),
-                        assigned_ty,
+                        AttributeAssignmentValidationType::Value(assigned_ty),
                         true,
                     );
                 }
@@ -3536,6 +3536,34 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.add_binding(target.into(), definition, target_ty);
     }
 
+    fn infer_non_definition_target(&mut self, target: &ast::Expr, annotated_ty: Type<'db>) {
+        match target {
+            ast::Expr::Attribute(
+                attr_expr @ ast::ExprAttribute {
+                    value: object,
+                    ctx: ExprContext::Store,
+                    attr,
+                    ..
+                },
+            ) => {
+                self.store_expression_type(target, annotated_ty);
+
+                let object_ty = self.infer_expression(object);
+
+                self.validate_attribute_assignment(
+                    attr_expr,
+                    object_ty,
+                    attr.id(),
+                    AttributeAssignmentValidationType::Annotation(annotated_ty),
+                    true,
+                );
+            }
+            _ => {
+                self.infer_expression(target);
+            }
+        }
+    }
+
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
         // assignments to non-Names are not Definitions
         if matches!(*assignment.target, ast::Expr::Name(_)) {
@@ -3550,11 +3578,23 @@ impl<'db> TypeInferenceBuilder<'db> {
             } = assignment;
             let annotated =
                 self.infer_annotation_expression(annotation, DeferredExpressionState::None);
-            self.infer_optional_expression(value.as_deref());
+
+            if let Some(value) = value.as_deref() {
+                let value_ty = self.infer_expression(value);
+
+                if !value_ty.is_assignable_to(self.db(), annotated.inner_type()) {
+                    report_invalid_assignment(
+                        &self.context,
+                        value.into(),
+                        annotated.inner_type(),
+                        value_ty,
+                    );
+                }
+            }
 
             // If we have an annotated assignment like `self.attr: int = 1`, we still need to
             // do type inference on the `self.attr` target to get types for all sub-expressions.
-            self.infer_expression(target);
+            self.infer_non_definition_target(target, annotated.inner_type());
 
             // But here we explicitly overwrite the type for the overall `self.attr` node with
             // the annotated type. We do no use `store_expression_type` here, because it checks

@@ -14,6 +14,28 @@ reveal_type(y)  # revealed: Literal[1]
 
 ```py
 x: int = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
+
+class C:
+    declared: int
+
+c = C()
+# error: [unresolved-attribute] "Unresolved attribute `unresolved` on type `C`."
+# error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
+c.unresolved: int = "foo"
+# error: [invalid-assignment] "Attribute `declared` was declared as type `int` in the class body, but here it is declared as the incompatible type `str`"
+c.declared: str = "foo"
+
+def f() -> C:
+    return C()
+
+# This is not a definition we track.
+# error: [unresolved-attribute] "Unresolved attribute `unresolved` on type `C`."
+# error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
+f().unresolved: int = "foo"
+
+l = []
+# error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
+l[0]: int = "foo"
 ```
 
 ## Violates previous annotation
@@ -21,6 +43,32 @@ x: int = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` i
 ```py
 x: int
 x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
+
+class C:
+    declared: int
+
+c = C()
+# error: [unresolved-attribute] "Unresolved attribute `unresolved` on type `C`."
+c.unresolved: int
+# error: [unresolved-attribute] "Unresolved attribute `unresolved` on type `C`."
+c.unresolved = "foo"
+# error: [invalid-assignment] "Attribute `declared` was declared as type `int` in the class body, but here it is declared as the incompatible type `str`"
+c.declared: str
+# error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to attribute `declared` of type `int`"
+c.declared = "foo"
+
+def f() -> C:
+    return C()
+
+# error: [unresolved-attribute] "Unresolved attribute `unresolved` on type `C`."
+f().unresolved: int
+# error: [unresolved-attribute] "Unresolved attribute `unresolved` on type `C`."
+f().unresolved = "foo"
+
+# TODO: This doesn't cause a type error in mypy or pyright, but it might be better to treat it as an error.
+l = []
+l[0]: int
+l[0] = "foo"
 ```
 
 ## Tuple annotations are understood
@@ -77,6 +125,28 @@ b: tuple[int] = ("foo",)
 
 # error: [invalid-assignment] "Object of type `tuple[list[Unknown], Literal["foo"]]` is not assignable to `tuple[str | int, str]`"
 c: tuple[str | int, str] = ([], "foo")
+
+class D:
+    declared: tuple[int, int]
+
+d = D()
+# error: [unresolved-attribute] "Unresolved attribute `unresolved` on type `D`."
+# error: [invalid-assignment] "Object of type `tuple[Literal[1], Literal[2]]` is not assignable to `tuple[()]`"
+d.unresolved: tuple[()] = (1, 2)
+# error: [invalid-assignment] "Attribute `declared` was declared as type `tuple[int, int]` in the class body, but here it is declared as the incompatible type `tuple[()]`"
+# error: [invalid-assignment] "Object of type `tuple[Literal[1], Literal[2]]` is not assignable to `tuple[()]`"
+d.declared: tuple[()] = (1, 2)
+
+def f() -> D:
+    return D()
+
+# error: [unresolved-attribute] "Unresolved attribute `unresolved` on type `D`."
+# error: [invalid-assignment] "Object of type `tuple[Literal[1], Literal[2]]` is not assignable to `tuple[()]`"
+f().unresolved: tuple[()] = (1, 2)
+
+l = []
+# error: [invalid-assignment] "Object of type `tuple[Literal[1], Literal[2]]` is not assignable to `tuple[()]`"
+l[0]: tuple[()] = (1, 2)
 ```
 
 ## PEP-604 annotations are supported
