@@ -6051,12 +6051,28 @@ impl<'db> ContextManagerError<'db> {
             } => format_call_dunder_errors(enter_error, "__enter__", exit_error, "__exit__"),
         };
 
-        builder.into_diagnostic(
+        let mut diag = builder.into_diagnostic(
             format_args!(
                 "Object of type `{context_expression}` cannot be used with `with` because {formatted_errors}",
                 context_expression = context_expression_type.display(db)
             ),
         );
+
+        // If `__aenter__` and `__aexit__` are implemented, using `async with` was maybe the intention here
+        if let (Ok(_), Ok(_)) = (
+            context_expression_type.try_call_dunder(db, "__aenter__", CallArgumentTypes::none()),
+            context_expression_type.try_call_dunder(
+                db,
+                "__aexit__",
+                CallArgumentTypes::positional([Type::none(db), Type::none(db), Type::none(db)]),
+            ),
+        ) {
+            diag.info(format_args!(
+                "Objects of type `{context_expression}` *can* be used as async context managers",
+                context_expression = context_expression_type.display(db)
+            ));
+            diag.info("Consider using `async with` here");
+        }
     }
 }
 
