@@ -149,6 +149,7 @@ context_expr = Manager()
 with context_expr as f:
     reveal_type(f)  # revealed: str
 ```
+
 ## Context manager with `__aenter__` and `__aexit__`
 
 <!-- snapshot-diagnostics -->

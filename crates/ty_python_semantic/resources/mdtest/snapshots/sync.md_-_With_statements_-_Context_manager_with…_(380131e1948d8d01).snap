@@ -17,7 +17,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/with/sync.md
 3 |     async def __aexit__(self, *args): ...
 4 | 
 5 | # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
-6 | with Manager(): ...
+6 | with Manager():
+7 |     ...
 ```
 
 # Diagnostics
@@ -27,8 +28,9 @@ error[invalid-context-manager]: Object of type `Manager` cannot be used with `wi
  --> src/mdtest_snippet.py:6:6
   |
 5 | # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and...
-6 | with Manager(): ...
+6 | with Manager():
   |      ^^^^^^^^^
+7 |     ...
   |
 info: Objects of type `Manager` *can* be used as async context managers
 info: Consider using `async with` here
