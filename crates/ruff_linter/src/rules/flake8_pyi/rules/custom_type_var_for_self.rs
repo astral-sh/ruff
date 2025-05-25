@@ -139,7 +139,20 @@ pub(crate) fn custom_type_var_instead_of_self(
         .chain(&parameters.args)
         .next()?;
 
-    let self_or_cls_annotation = self_or_cls_parameter.annotation()?;
+    let self_or_cls_annotation_unchecked = self_or_cls_parameter.annotation()?;
+
+    let self_or_cls_annotation = match self_or_cls_annotation_unchecked {
+        ast::Expr::StringLiteral(_) => {
+            match checker.parse_type_annotation(self_or_cls_annotation_unchecked.as_string_literal_expr()?) {
+                Ok(parsed_annotation) => { parsed_annotation.expression() }
+                Err(_) => { return None }
+            }
+        }
+        ast::Expr::Subscript(_) | ast::Expr::Name(_) => {
+            self_or_cls_annotation_unchecked
+        }
+        _ => {return None}
+    }; 
     let parent_class = current_scope.kind.as_class()?;
 
     // Skip any abstract/static/overloaded methods,
@@ -193,7 +206,7 @@ pub(crate) fn custom_type_var_instead_of_self(
             function_def,
             custom_typevar,
             self_or_cls_parameter,
-            self_or_cls_annotation,
+            self_or_cls_annotation_unchecked,
         )
     });
 
