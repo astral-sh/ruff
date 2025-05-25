@@ -36,18 +36,14 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
             RuleGroup::Preview => {
                 format!("<span title='Rule is in preview'>{PREVIEW_SYMBOL}</span>")
             }
-            RuleGroup::Stable => {
-                String::new()
-            }
+            RuleGroup::Stable => String::new(),
         };
 
         let fix_token = match rule.fixable() {
             FixAvailability::Always | FixAvailability::Sometimes => {
                 format!("<span title='Automatic fix available'>{FIX_SYMBOL}</span>")
             }
-            FixAvailability::None => {
-                String::new()
-            }
+            FixAvailability::None => String::new(),
         };
 
         let tokens = format!("{status_token} {fix_token}");
