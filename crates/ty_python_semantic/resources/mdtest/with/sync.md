@@ -153,7 +153,8 @@ with context_expr as f:
 
 <!-- snapshot-diagnostics -->
 
-If `__aenter__` and `__aexit__` are implemented, then the `async with` is probably the intentional usage.
+If `__aenter__` and `__aexit__` are implemented, then the `async with` is probably the intentional
+usage.
 
 ```py
 class Manager:
@@ -161,5 +162,6 @@ class Manager:
     async def __aexit__(self, *args): ...
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
-with Manager(): ...
+with Manager():
+    ...
 ```
