@@ -5517,7 +5517,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             .report_lint(&INVALID_TYPE_GUARD_CALL, arguments)
                         {
                             builder.into_diagnostic("Type guard call does not have a target");
-                        };
+                        }
                         None
                     }
                     Some(ast::Expr::Name(ast::ExprName { id, .. })) => {
@@ -5532,7 +5532,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             self.context.report_lint(&INVALID_TYPE_GUARD_CALL, expr)
                         {
                             builder.into_diagnostic("Type guard call target is not a symbol");
-                        };
+                        }
                         None
                     }
                 };

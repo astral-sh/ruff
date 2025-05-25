@@ -126,7 +126,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::SubclassOf(_), _) => Ordering::Less,
         (_, Type::SubclassOf(_)) => Ordering::Greater,
 
-        (Type::TypeIs(left), Type::TypeIs(right)) => typeis_ordering(db, left, right),
+        (Type::TypeIs(left), Type::TypeIs(right)) => typeis_ordering(db, *left, *right),
         (Type::TypeIs(_), _) => Ordering::Less,
         (_, Type::TypeIs(_)) => Ordering::Greater,
 
@@ -259,7 +259,7 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 /// * Boundness: Unbound precedes bound
 /// * Symbol name: String comparison
 /// * Guarded type: [`union_or_intersection_elements_ordering`]
-fn typeis_ordering(db: &dyn Db, left: &TypeIsType, right: &TypeIsType) -> Ordering {
+fn typeis_ordering(db: &dyn Db, left: TypeIsType, right: TypeIsType) -> Ordering {
     let (left_ty, right_ty) = (left.ty(db), right.ty(db));
 
     match (left.symbol_info(db), right.symbol_info(db)) {
