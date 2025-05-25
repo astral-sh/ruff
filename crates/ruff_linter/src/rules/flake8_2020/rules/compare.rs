@@ -88,12 +88,23 @@ impl Violation for SysVersionCmpStr3 {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
-pub(crate) struct SysVersionInfo0Eq3;
+pub(crate) struct SysVersionInfo0Eq3 {
+    op: CmpOp,
+}
 
 impl Violation for SysVersionInfo0Eq3 {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`sys.version_info[0] == 3` referenced (python4), use `>=`".to_string()
+        let recommendation = if matches!(self.op, CmpOp::Eq) {
+            ">="
+        } else {
+            "<"
+        };
+        format!(
+            "`sys.version_info[0] {} 3` referenced (python4), use `{}`",
+            self.op.as_str(),
+            recommendation
+        )
     }
 }
 
@@ -246,7 +257,7 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                     {
                         if *n == 3 && checker.enabled(Rule::SysVersionInfo0Eq3) {
                             checker.report_diagnostic(Diagnostic::new(
-                                SysVersionInfo0Eq3,
+                                SysVersionInfo0Eq3 { op: ops[0] },
                                 left.range(),
                             ));
                         }
