@@ -5512,6 +5512,14 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 let find_narrowed_symbol = || match arguments.args.first() {
                     None => {
+                        // This branch looks extraneous, especially in the face of
+                        // `missing-arguments`. However, that lint won't be able to catch this:
+                        //
+                        // ```python
+                        // def f(v: object = object()) -> TypeIs[int]: ...
+                        //
+                        // if f(): ...
+                        // ```
                         if let Some(builder) = self
                             .context
                             .report_lint(&INVALID_TYPE_GUARD_CALL, arguments)
@@ -5528,11 +5536,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                     // TODO: Attribute and subscript narrowing
                     Some(expr) => {
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_TYPE_GUARD_CALL, expr)
-                        {
-                            builder.into_diagnostic("Type guard call target is not a symbol");
-                        }
                         None
                     }
                 };
