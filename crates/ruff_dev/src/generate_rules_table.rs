@@ -18,7 +18,6 @@ const FIX_SYMBOL: &str = "🛠️";
 const PREVIEW_SYMBOL: &str = "🧪";
 const REMOVED_SYMBOL: &str = "❌";
 const WARNING_SYMBOL: &str = "⚠️";
-const STABLE_SYMBOL: &str = "✔️";
 const SPACER: &str = "&nbsp;&nbsp;&nbsp;&nbsp;";
 
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
@@ -38,8 +37,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
                 format!("<span title='Rule is in preview'>{PREVIEW_SYMBOL}</span>")
             }
             RuleGroup::Stable => {
-                // A full opacity checkmark is a bit aggressive for indicating stable
-                format!("<span title='Rule is stable' style='opacity: 0.6'>{STABLE_SYMBOL}</span>")
+                String::new()
             }
         };
 
@@ -48,9 +46,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
                 format!("<span title='Automatic fix available'>{FIX_SYMBOL}</span>")
             }
             FixAvailability::None => {
-                format!(
-                    "<span title='Automatic fix not available' style='opacity: 0.1' aria-hidden='true'>{FIX_SYMBOL}</span>"
-                )
+                String::new()
             }
         };
 
@@ -106,12 +102,6 @@ pub(crate) fn generate() -> String {
 
     let _ = write!(
         &mut table_out,
-        "{SPACER}{STABLE_SYMBOL}{SPACER} The rule is stable."
-    );
-    table_out.push_str("<br />");
-
-    let _ = write!(
-        &mut table_out,
         "{SPACER}{PREVIEW_SYMBOL}{SPACER} The rule is unstable and is in [\"preview\"](faq.md#what-is-preview)."
     );
     table_out.push_str("<br />");
@@ -132,7 +122,8 @@ pub(crate) fn generate() -> String {
         &mut table_out,
         "{SPACER}{FIX_SYMBOL}{SPACER} The rule is automatically fixable by the `--fix` command-line option."
     );
-    table_out.push_str("<br />");
+    table_out.push_str("\n\n");
+    table_out.push_str("All rules not marked as preview, deprecated or removed are stable.");
     table_out.push('\n');
 
     for linter in Linter::iter() {
