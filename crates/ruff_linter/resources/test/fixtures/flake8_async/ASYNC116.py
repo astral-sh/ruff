@@ -113,13 +113,17 @@ async def test_anyio_async116_helpers():
     import anyio
 
     await anyio.sleep(delay=1)  # OK
+    await anyio.sleep(seconds=1)  # OK
 
-    await anyio.sleep(seconds=1)  # ASYNC116
+    await anyio.sleep(delay=86401)  # ASYNC116
+    await anyio.sleep(seconds=86401)  # ASYNC116
 
 
 async def test_trio_async116_helpers():
     import trio
 
     await trio.sleep(seconds=1)  # OK
+    await trio.sleep(delay=1)  # OK
 
-    await trio.sleep(delay=1)  # ASYNC116
+    await trio.sleep(seconds=86401)  # ASYNC116
+    await trio.sleep(delay=86401)  # ASYNC116
