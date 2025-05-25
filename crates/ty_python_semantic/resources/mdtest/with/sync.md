@@ -153,7 +153,7 @@ with context_expr as f:
 
 <!-- snapshot-diagnostics -->
 
-If `__aenter__` and `__aexit__` are implemented, then the `async with` is probably the intentional usage
+If `__aenter__` and `__aexit__` are implemented, then the `async with` is probably the intentional usage.
 
 ```py
 class Manager:
