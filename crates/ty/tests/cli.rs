@@ -242,7 +242,7 @@ fn config_override_python_platform() -> anyhow::Result<()> {
 }
 
 #[test]
-fn config_file_annotation_showing_where_python_version_set() -> anyhow::Result<()> {
+fn config_file_annotation_showing_where_python_version_set_typing_error() -> anyhow::Result<()> {
     let case = TestCase::with_files([
         (
             "pyproject.toml",
@@ -298,6 +298,77 @@ fn config_file_annotation_showing_where_python_version_set() -> anyhow::Result<(
     info: `aiter` was added as a builtin in Python 3.10
     info: Python 3.9 was assumed when resolving types because it was specified on the command line
     info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn config_file_annotation_showing_where_python_version_set_syntax_error() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            requires-python = ">=3.8"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            match object():
+                case int():
+                    pass
+                case _:
+                    pass
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-syntax]
+     --> test.py:2:1
+      |
+    2 | match object():
+      | ^^^^^ Cannot use `match` statement on Python 3.8 (syntax was added in Python 3.10)
+    3 |     case int():
+    4 |         pass
+      |
+    info: Python 3.8 was assumed when parsing syntax
+     --> pyproject.toml:3:19
+      |
+    2 | [project]
+    3 | requires-python = ">=3.8"
+      |                   ^^^^^^^ Python 3.8 assumed due to this configuration setting
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-syntax]
+     --> test.py:2:1
+      |
+    2 | match object():
+      | ^^^^^ Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    3 |     case int():
+    4 |         pass
+      |
+    info: Python 3.9 was assumed when parsing syntax because it was specified on the command line
 
     Found 1 diagnostic
 

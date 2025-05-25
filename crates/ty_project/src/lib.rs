@@ -23,8 +23,8 @@ use std::sync::Arc;
 use thiserror::Error;
 use tracing::error;
 use ty_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
-use ty_python_semantic::register_lints;
 use ty_python_semantic::types::check_types;
+use ty_python_semantic::{add_inferred_python_version_hint_to_diagnostic, register_lints};
 
 pub mod combine;
 
@@ -464,7 +464,10 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Diagnostic> {
         parsed
             .unsupported_syntax_errors()
             .iter()
-            .map(|error| create_unsupported_syntax_diagnostic(file, error)),
+            .map(|error| create_unsupported_syntax_diagnostic(file, error))
+            .map(|error| {
+                add_inferred_python_version_hint_to_diagnostic(db.upcast(), error, "parsing syntax")
+            }),
     );
 
     {

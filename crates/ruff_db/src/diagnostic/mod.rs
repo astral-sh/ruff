@@ -270,6 +270,18 @@ impl Diagnostic {
     }
 }
 
+impl AsRef<Diagnostic> for Diagnostic {
+    fn as_ref(&self) -> &Diagnostic {
+        self
+    }
+}
+
+impl AsMut<Diagnostic> for Diagnostic {
+    fn as_mut(&mut self) -> &mut Diagnostic {
+        self
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct DiagnosticInner {
     id: DiagnosticId,

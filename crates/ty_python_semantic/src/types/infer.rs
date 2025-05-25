@@ -6009,7 +6009,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         diag.info(
                             "Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later",
                         );
-                        diagnostic::add_inferred_python_version_hint(db, diag);
+                        diagnostic::add_inferred_python_version_hint_to_diagnostic(db, diag, "resolving types");
                     }
                 }
                 Type::unknown()
