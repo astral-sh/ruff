@@ -108,7 +108,7 @@ use super::diagnostic::{
     report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
     report_unresolved_reference,
 };
-use super::generics::{GenericContextOrigin, LegacyGenericBase};
+use super::generics::LegacyGenericBase;
 use super::slots::check_class_slots;
 use super::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION, parse_string_annotation,
@@ -856,6 +856,25 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                         continue;
                     }
+                    // Note that unlike several of the other errors caught in this function,
+                    // this does not lead to the class creation failing at runtime,
+                    // but it is semantically invalid.
+                    Type::KnownInstance(KnownInstanceType::Protocol(Some(_))) => {
+                        if class_node.type_params.is_none() {
+                            continue;
+                        }
+                        let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_GENERIC_CLASS, &class_node.bases()[i])
+                        else {
+                            continue;
+                        };
+                        builder.into_diagnostic(
+                            "Cannot both inherit from subscripted `Protocol` \
+                            and use PEP 695 type variables",
+                        );
+                        continue;
+                    }
                     Type::ClassLiteral(class) => class,
                     // dynamic/unknown bases are never `@final`
                     _ => continue,
@@ -917,13 +936,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                         {
                             builder.into_diagnostic(format_args!(
                                 "Cannot create a consistent method resolution order (MRO) \
-                                     for class `{}` with bases list `[{}]`",
+                                    for class `{}` with bases list `[{}]`",
                                 class.name(self.db()),
                                 bases_list
                                     .iter()
                                     .map(|base| base.display(self.db()))
                                     .join(", ")
                             ));
+                        }
+                    }
+                    MroErrorKind::Pep695ClassWithGenericInheritance => {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_GENERIC_CLASS, class_node)
+                        {
+                            builder.into_diagnostic(
+                                "Cannot both inherit from `typing.Generic` \
+                                and use PEP 695 type variables",
+                            );
                         }
                     }
                     MroErrorKind::InheritanceCycle => {
@@ -1018,21 +1047,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 ));
                             }
                         }
-                    }
-                }
-            }
-
-            // (5) Check that a generic class does not have invalid or conflicting generic
-            // contexts.
-            if class.pep695_generic_context(self.db()).is_some() {
-                if let Some(legacy_context) = class.legacy_generic_context(self.db()) {
-                    if let Some(builder) =
-                        self.context.report_lint(&INVALID_GENERIC_CLASS, class_node)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Cannot both inherit from {} and use PEP 695 type variables",
-                            legacy_context.origin(self.db())
-                        ));
                     }
                 }
             }
@@ -7628,7 +7642,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
                     {
                         builder.into_diagnostic(format_args!(
-                            "`{}` is not a valid argument to {origin}",
+                            "`{}` is not a valid argument to `{origin}`",
                             typevar.display(self.db()),
                         ));
                     }
@@ -7636,9 +7650,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             })
             .collect();
-        typevars.map(|typevars| {
-            GenericContext::new(self.db(), typevars, GenericContextOrigin::from(origin))
-        })
+        typevars.map(|typevars| GenericContext::new(self.db(), typevars))
     }
 
     fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {

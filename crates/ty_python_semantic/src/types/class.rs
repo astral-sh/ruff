@@ -223,8 +223,11 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) const fn is_generic(self) -> bool {
-        matches!(self, Self::Generic(_))
+    pub(super) fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::NonGeneric(class) => class.has_pep_695_type_params(db),
+            Self::Generic(generic) => generic.origin(db).has_pep_695_type_params(db),
+        }
     }
 
     /// Returns the class literal and specialization for this class. For a non-generic class, this
@@ -571,6 +574,10 @@ impl<'db> ClassLiteral<'db> {
         self.pep695_generic_context(db)
             .or_else(|| self.legacy_generic_context(db))
             .or_else(|| self.inherited_legacy_generic_context(db))
+    }
+
+    pub(crate) fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {
+        self.pep695_generic_context(db).is_some()
     }
 
     #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial)]
