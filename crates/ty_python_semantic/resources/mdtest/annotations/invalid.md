@@ -50,6 +50,22 @@ def _(
         reveal_type(j_)  # revealed: Unknown
 ```
 
+Even more types are rejected as invalid in the context of `type[]` type expressions:
+
+```py
+from typing_extensions import Callable, LiteralString, TypeAlias
+
+# fmt: off
+
+def f(
+    a: type[LiteralString],  # error: [invalid-type-form] "Variable of type `typing.LiteralString` is not allowed in a type expression when nested directly inside `type[]` or `Type[]`"
+    b: type[Callable],  # error: [invalid-type-form] "Variable of type `typing.Callable` is not allowed in a type expression when nested directly inside `type[]` or `Type[]`"
+    c: type[TypeAlias],  # error: [invalid-type-form] "Variable of type `typing.TypeAlias` is not allowed in a type expression when nested directly inside `type[]` or `Type[]`"
+): ...
+
+# fmt: on
+```
+
 ## Invalid AST nodes
 
 ```py

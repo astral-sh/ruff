@@ -81,9 +81,8 @@ class Shape:
 
     @classmethod
     def bar(cls: type[Self]) -> Self:
-        # TODO: type[Shape]
-        reveal_type(cls)  # revealed: @Todo(unsupported type[X] special form)
-        return cls()
+        reveal_type(cls)  # revealed: Self'meta
+        return cls()  # error: [call-non-callable]
 
 class Circle(Shape): ...
 
