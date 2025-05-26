@@ -828,9 +828,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "Inferring deferred types should not add more deferred definitions"
         );
 
-        // TODO: Only call this function when diagnostics are enabled.
-        self.check_class_definitions();
-        self.check_overloaded_functions(node);
+        if self.db().is_file_open(self.file()) {
+            self.check_class_definitions();
+            self.check_overloaded_functions(node);
+        }
     }
 
     /// Iterate over all class definitions to check that the definition will not cause an exception
