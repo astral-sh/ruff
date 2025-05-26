@@ -4,7 +4,9 @@ use crate::system::{AnySystemPath, url_to_any_system_path};
 use anyhow::anyhow;
 use lsp_server as server;
 use lsp_server::RequestId;
+use lsp_types::notification;
 use lsp_types::notification::Notification;
+use ruff_db::panic::PanicError;
 use std::panic::UnwindSafe;
 
 mod diagnostics;
@@ -13,34 +15,30 @@ mod requests;
 mod traits;
 
 use self::traits::{NotificationHandler, RequestHandler};
-use notifications as notification;
-use requests as request;
-use ruff_db::panic::PanicError;
-
 use super::{Result, client::Responder, schedule::BackgroundSchedule};
 
 pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
     let id = req.id.clone();
 
     match req.method.as_str() {
-        request::DocumentDiagnosticRequestHandler::METHOD => background_request_task::<
-            request::DocumentDiagnosticRequestHandler,
+        requests::DocumentDiagnosticRequestHandler::METHOD => background_request_task::<
+            requests::DocumentDiagnosticRequestHandler,
         >(
             req, BackgroundSchedule::Worker
         ),
-        request::GotoTypeDefinitionRequestHandler::METHOD => background_request_task::<
-            request::GotoTypeDefinitionRequestHandler,
+        requests::GotoTypeDefinitionRequestHandler::METHOD => background_request_task::<
+            requests::GotoTypeDefinitionRequestHandler,
         >(
             req, BackgroundSchedule::Worker
         ),
-        request::HoverRequestHandler::METHOD => {
-            background_request_task::<request::HoverRequestHandler>(req, BackgroundSchedule::Worker)
-        }
-        request::InlayHintRequestHandler::METHOD => background_request_task::<
-            request::InlayHintRequestHandler,
+        requests::HoverRequestHandler::METHOD => background_request_task::<
+            requests::HoverRequestHandler,
         >(req, BackgroundSchedule::Worker),
-        request::CompletionRequestHandler::METHOD => background_request_task::<
-            request::CompletionRequestHandler,
+        requests::InlayHintRequestHandler::METHOD => background_request_task::<
+            requests::InlayHintRequestHandler,
+        >(req, BackgroundSchedule::Worker),
+        requests::CompletionRequestHandler::METHOD => background_request_task::<
+            requests::CompletionRequestHandler,
         >(
             req, BackgroundSchedule::LatencySensitive
         ),
@@ -66,23 +64,23 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
 
 pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
     match notif.method.as_str() {
-        notification::DidCloseTextDocumentHandler::METHOD => {
-            local_notification_task::<notification::DidCloseTextDocumentHandler>(notif)
+        notifications::DidCloseTextDocumentHandler::METHOD => {
+            local_notification_task::<notifications::DidCloseTextDocumentHandler>(notif)
         }
-        notification::DidOpenTextDocumentHandler::METHOD => {
-            local_notification_task::<notification::DidOpenTextDocumentHandler>(notif)
+        notifications::DidOpenTextDocumentHandler::METHOD => {
+            local_notification_task::<notifications::DidOpenTextDocumentHandler>(notif)
         }
-        notification::DidChangeTextDocumentHandler::METHOD => {
-            local_notification_task::<notification::DidChangeTextDocumentHandler>(notif)
+        notifications::DidChangeTextDocumentHandler::METHOD => {
+            local_notification_task::<notifications::DidChangeTextDocumentHandler>(notif)
         }
-        notification::DidOpenNotebookHandler::METHOD => {
-            local_notification_task::<notification::DidOpenNotebookHandler>(notif)
+        notifications::DidOpenNotebookHandler::METHOD => {
+            local_notification_task::<notifications::DidOpenNotebookHandler>(notif)
         }
-        notification::DidCloseNotebookHandler::METHOD => {
-            local_notification_task::<notification::DidCloseNotebookHandler>(notif)
+        notifications::DidCloseNotebookHandler::METHOD => {
+            local_notification_task::<notifications::DidCloseNotebookHandler>(notif)
         }
-        notification::DidChangeWatchedFiles::METHOD => {
-            local_notification_task::<notification::DidChangeWatchedFiles>(notif)
+        notifications::DidChangeWatchedFiles::METHOD => {
+            local_notification_task::<notifications::DidChangeWatchedFiles>(notif)
         }
         lsp_types::notification::SetTrace::METHOD => {
             tracing::trace!("Ignoring `setTrace` notification");
@@ -231,7 +229,7 @@ where
                 Ok(result) => result,
                 Err(panic) => {
                     tracing::error!("An error occurred while running {id}: {panic}");
-                    show_err_msg!("ty encountered a problem. Check the logs for more details.");
+                    show_err_msg!("ty encountered a panic. Check the logs for more details.");
                     return;
                 }
             };
