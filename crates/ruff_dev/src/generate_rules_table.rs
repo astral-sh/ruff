@@ -20,10 +20,10 @@ const REMOVED_SYMBOL: &str = "❌";
 const WARNING_SYMBOL: &str = "⚠️";
 const SPACER: &str = "&nbsp;&nbsp;&nbsp;&nbsp;";
 
-/// Style for token indicators
-const TOKEN_STYLE: &str = "style='width: 1em; display: inline-block;'";
-/// Style for container for token
-const TOKEN_CONTAINER_STYLE: &str = "style='display: flex; gap: 1rem; justify-content: end;'";
+/// Style for the rule's fixability and status icons.
+const SYMBOL_STYLE: &str = "style='width: 1em; display: inline-block;'";
+/// Style for the container wrapping the fixability and status icons.
+const SYMBOLS_CONTAINER: &str = "style='display: flex; gap: 0.5rem; justify-content: end;'";
 
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
     table_out.push_str("| Code | Name | Message |    |");
@@ -33,25 +33,27 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
     for rule in rules {
         let status_token = match rule.group() {
             RuleGroup::Removed => {
-                format!("<span {TOKEN_STYLE} title='Rule has been removed'>{REMOVED_SYMBOL}</span>")
+                format!(
+                    "<span {SYMBOL_STYLE} title='Rule has been removed'>{REMOVED_SYMBOL}</span>"
+                )
             }
             RuleGroup::Deprecated => {
-                format!("<span {TOKEN_STYLE} title='Rule has been deprecated'>{WARNING_SYMBOL}</span>")
+                format!(
+                    "<span {SYMBOL_STYLE} title='Rule has been deprecated'>{WARNING_SYMBOL}</span>"
+                )
             }
             RuleGroup::Preview => {
-                format!("<span {TOKEN_STYLE} title='Rule is in preview'>{PREVIEW_SYMBOL}</span>")
+                format!("<span {SYMBOL_STYLE} title='Rule is in preview'>{PREVIEW_SYMBOL}</span>")
             }
-            RuleGroup::Stable => format!("<span {TOKEN_STYLE}></span>"),
+            RuleGroup::Stable => format!("<span {SYMBOL_STYLE}></span>"),
         };
 
         let fix_token = match rule.fixable() {
             FixAvailability::Always | FixAvailability::Sometimes => {
-                format!("<span {TOKEN_STYLE} title='Automatic fix available'>{FIX_SYMBOL}</span>")
+                format!("<span {SYMBOL_STYLE} title='Automatic fix available'>{FIX_SYMBOL}</span>")
             }
-            FixAvailability::None => format!("<span {TOKEN_STYLE}></span>"),
+            FixAvailability::None => format!("<span {SYMBOL_STYLE}></span>"),
         };
-
-        let tokens = format!("<span {TOKEN_CONTAINER_STYLE}>{status_token} {fix_token}</span>");
 
         let rule_name = rule.as_ref();
 
@@ -79,15 +81,14 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
         #[expect(clippy::or_fun_call)]
         let _ = write!(
             table_out,
-            "| {ss}{0}{1}{se} {{ #{0}{1} }} | {ss}{2}{se} | {ss}{3}{se} | {4} |",
-            linter.common_prefix(),
-            linter.code_for_rule(rule).unwrap(),
-            rule.explanation()
+            "| {ss}{prefix}{code}{se} {{ #{prefix}{code} }} | {ss}{explanation}{se} | {ss}{message}{se} | <div {SYMBOLS_CONTAINER}>{status_token}{fix_token}</div>|",
+            prefix = linter.common_prefix(),
+            code = linter.code_for_rule(rule).unwrap(),
+            explanation = rule
+                .explanation()
                 .is_some()
                 .then_some(format_args!("[{rule_name}](rules/{rule_name}.md)"))
                 .unwrap_or(format_args!("{rule_name}")),
-            message,
-            tokens,
         );
         table_out.push('\n');
     }
