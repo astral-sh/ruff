@@ -3214,8 +3214,7 @@ impl<'db> Type<'db> {
                         &mut CallArgumentTypes::positional([Type::StringLiteral(
                             StringLiteralType::new(db, Box::from(name.as_str())),
                         )]),
-                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                            | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                     )
                     .map(|outcome| Symbol::bound(outcome.return_type(db)))
                     // TODO: Handle call errors here.
@@ -4415,7 +4414,7 @@ impl<'db> Type<'db> {
             db,
             name,
             &mut argument_types,
-            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            MemberLookupPolicy::default(),
         )
     }
 
@@ -4423,6 +4422,9 @@ impl<'db> Type<'db> {
     /// particular, this allows to specify `MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK` to avoid
     /// looking up dunder methods on `object`, which is needed for functions like `__init__`,
     /// `__new__`, or `__setattr__`.
+    ///
+    /// Note that `NO_INSTANCE_FALLBACK` is always added to the policy, since implicit calls to
+    /// dunder methods never access instance members.
     fn try_call_dunder_with_policy(
         self,
         db: &'db dyn Db,
@@ -4430,8 +4432,14 @@ impl<'db> Type<'db> {
         argument_types: &mut CallArgumentTypes<'_, 'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        // Implicit calls to dunder methods never access instance members, so we pass
+        // `NO_INSTANCE_FALLBACK` here in addition to other policies:
         match self
-            .member_lookup_with_policy(db, name.into(), policy)
+            .member_lookup_with_policy(
+                db,
+                name.into(),
+                policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
             .symbol
         {
             Symbol::Type(dunder_callable, boundness) => {
