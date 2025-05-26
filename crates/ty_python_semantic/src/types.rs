@@ -6058,8 +6058,9 @@ impl<'db> ContextManagerError<'db> {
             ),
         );
 
-        // If `__aenter__` and `__aexit__` are implemented, using `async with` was maybe the intention here
-        if let (Ok(_), Ok(_)) = (
+        // If `__aenter__` and `__aexit__` are implemented, using `async with` was maybe the intention here.
+        if let (Ok(_) | Err(CallDunderError::CallError(..)), Ok(_))
+        | (Ok(_), Err(CallDunderError::CallError(..))) = (
             context_expression_type.try_call_dunder(db, "__aenter__", CallArgumentTypes::none()),
             context_expression_type.try_call_dunder(
                 db,

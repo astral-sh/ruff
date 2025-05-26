@@ -155,12 +155,37 @@ with context_expr as f:
 <!-- snapshot-diagnostics -->
 
 If `__aenter__` and `__aexit__` are implemented, then the `async with` is probably the intentional
-usage.
+usage. We then add a sub-diagnosis to hint the user to use `async with`.
 
 ```py
 class Manager:
     async def __aenter__(self): ...
     async def __aexit__(self, *args): ...
+
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
+with Manager():
+    ...
+```
+
+The sub-diagnosis is also provided if the user did not type annotated properly `__enter__` or/and
+`__exit__`.
+
+```py
+class Manager:
+    async def __aenter__(self): ...
+    async def __aexit__(self, exc_type: str, exc_value, traceback): ...
+
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
+with Manager():
+    ...
+```
+
+Or if the user did not use the proper arguments for `__enter__` or/and `__exit__`.
+
+```py
+class Manager:
+    async def __aenter__(self): ...
+    async def __aexit__(self, exc_type, exc_value, traceback, wrong_extra_arg): ...
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
 with Manager():
