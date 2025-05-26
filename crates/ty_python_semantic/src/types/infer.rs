@@ -8648,11 +8648,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                     element => Either::Right(std::iter::once(element)),
                 };
 
-                elements
+                let ty = elements
                     .fold(IntersectionBuilder::new(db), |builder, element| {
                         builder.add_positive(self.infer_type_expression(element))
                     })
-                    .build()
+                    .build();
+
+                if matches!(arguments_slice, ast::Expr::Tuple(_)) {
+                    self.store_expression_type(arguments_slice, ty);
+                }
+                ty
             }
             KnownInstanceType::TypeOf => match arguments_slice {
                 ast::Expr::Tuple(_) => {
