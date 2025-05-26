@@ -11,8 +11,8 @@ use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters};
 use crate::types::{
-    CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, Signature,
-    TypeMapping, TypeVarInstance,
+    CallableType, DataclassParams, DataclassTransformerParams, Signature, SpecialForm, TypeMapping,
+    TypeVarInstance,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -593,8 +593,7 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn legacy_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.explicit_bases(db).iter().find_map(|base| match base {
             Type::KnownInstance(
-                KnownInstanceType::Generic(generic_context)
-                | KnownInstanceType::Protocol(generic_context),
+                SpecialForm::Generic(generic_context) | SpecialForm::Protocol(generic_context),
             ) => *generic_context,
             _ => None,
         })
@@ -747,7 +746,7 @@ impl<'db> ClassLiteral<'db> {
                     .iter()
                     .rev()
                     .take(3)
-                    .any(|base| matches!(base, Type::KnownInstance(KnownInstanceType::Protocol(_))))
+                    .any(|base| matches!(base, Type::KnownInstance(SpecialForm::Protocol(_))))
             })
     }
 

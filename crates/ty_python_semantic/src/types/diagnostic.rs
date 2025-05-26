@@ -15,7 +15,7 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{KnownFunction, KnownInstanceType, Type, protocol_class::ProtocolClassLiteral};
+use crate::types::{KnownFunction, SpecialForm, Type, protocol_class::ProtocolClassLiteral};
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -1833,7 +1833,7 @@ pub(crate) fn report_invalid_arguments_to_annotated(
     builder.into_diagnostic(format_args!(
         "Special form `{}` expected at least 2 arguments \
          (one type and at least one metadata element)",
-        KnownInstanceType::Annotated.repr(db)
+        SpecialForm::Annotated.repr(db)
     ));
 }
 
@@ -1882,7 +1882,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
     };
     builder.into_diagnostic(format_args!(
         "Special form `{}` expected exactly two arguments (parameter types and return type)",
-        KnownInstanceType::Callable.repr(db)
+        SpecialForm::Callable.repr(db)
     ));
 }
 

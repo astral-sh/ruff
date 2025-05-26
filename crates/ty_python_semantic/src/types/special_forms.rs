@@ -1,4 +1,5 @@
-//! The `KnownInstance` type.
+//! An enumeration of special forms in the Python type system.
+//! Each of these is considered to inhabit a unique type in our model of the type system.
 //!
 //! Despite its name, this is quite a different type from [`super::NominalInstanceType`].
 //! For the vast majority of instance-types in Python, we cannot say how many possible
@@ -26,7 +27,7 @@ use ruff_db::files::File;
 /// is based on the known-instance's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the type var instance was garbage collected and recreated.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, PartialOrd, Ord)]
-pub enum KnownInstanceType<'db> {
+pub enum SpecialForm<'db> {
     /// The symbol `typing.Annotated` (which can also be found as `typing_extensions.Annotated`)
     Annotated,
     /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
@@ -107,7 +108,7 @@ pub enum KnownInstanceType<'db> {
     // TODO: fill this enum out with more special forms, etc.
 }
 
-impl<'db> KnownInstanceType<'db> {
+impl<'db> SpecialForm<'db> {
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         match self {
             Self::Annotated
@@ -338,70 +339,70 @@ impl<'db> KnownInstanceType<'db> {
 }
 
 struct KnownInstanceRepr<'db> {
-    known_instance: KnownInstanceType<'db>,
+    known_instance: SpecialForm<'db>,
     db: &'db dyn Db,
 }
 
 impl Display for KnownInstanceRepr<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.known_instance {
-            KnownInstanceType::Annotated => f.write_str("typing.Annotated"),
-            KnownInstanceType::Literal => f.write_str("typing.Literal"),
-            KnownInstanceType::LiteralString => f.write_str("typing.LiteralString"),
-            KnownInstanceType::Optional => f.write_str("typing.Optional"),
-            KnownInstanceType::Union => f.write_str("typing.Union"),
-            KnownInstanceType::NoReturn => f.write_str("typing.NoReturn"),
-            KnownInstanceType::Never => f.write_str("typing.Never"),
-            KnownInstanceType::Tuple => f.write_str("typing.Tuple"),
-            KnownInstanceType::Type => f.write_str("typing.Type"),
-            KnownInstanceType::TypingSelf => f.write_str("typing.Self"),
-            KnownInstanceType::Final => f.write_str("typing.Final"),
-            KnownInstanceType::ClassVar => f.write_str("typing.ClassVar"),
-            KnownInstanceType::Callable => f.write_str("typing.Callable"),
-            KnownInstanceType::Concatenate => f.write_str("typing.Concatenate"),
-            KnownInstanceType::Unpack => f.write_str("typing.Unpack"),
-            KnownInstanceType::Required => f.write_str("typing.Required"),
-            KnownInstanceType::NotRequired => f.write_str("typing.NotRequired"),
-            KnownInstanceType::TypeAlias => f.write_str("typing.TypeAlias"),
-            KnownInstanceType::TypeGuard => f.write_str("typing.TypeGuard"),
-            KnownInstanceType::TypedDict => f.write_str("typing.TypedDict"),
-            KnownInstanceType::TypeIs => f.write_str("typing.TypeIs"),
-            KnownInstanceType::List => f.write_str("typing.List"),
-            KnownInstanceType::Dict => f.write_str("typing.Dict"),
-            KnownInstanceType::DefaultDict => f.write_str("typing.DefaultDict"),
-            KnownInstanceType::Set => f.write_str("typing.Set"),
-            KnownInstanceType::FrozenSet => f.write_str("typing.FrozenSet"),
-            KnownInstanceType::Counter => f.write_str("typing.Counter"),
-            KnownInstanceType::Deque => f.write_str("typing.Deque"),
-            KnownInstanceType::ChainMap => f.write_str("typing.ChainMap"),
-            KnownInstanceType::OrderedDict => f.write_str("typing.OrderedDict"),
-            KnownInstanceType::Protocol(generic_context) => {
+            SpecialForm::Annotated => f.write_str("typing.Annotated"),
+            SpecialForm::Literal => f.write_str("typing.Literal"),
+            SpecialForm::LiteralString => f.write_str("typing.LiteralString"),
+            SpecialForm::Optional => f.write_str("typing.Optional"),
+            SpecialForm::Union => f.write_str("typing.Union"),
+            SpecialForm::NoReturn => f.write_str("typing.NoReturn"),
+            SpecialForm::Never => f.write_str("typing.Never"),
+            SpecialForm::Tuple => f.write_str("typing.Tuple"),
+            SpecialForm::Type => f.write_str("typing.Type"),
+            SpecialForm::TypingSelf => f.write_str("typing.Self"),
+            SpecialForm::Final => f.write_str("typing.Final"),
+            SpecialForm::ClassVar => f.write_str("typing.ClassVar"),
+            SpecialForm::Callable => f.write_str("typing.Callable"),
+            SpecialForm::Concatenate => f.write_str("typing.Concatenate"),
+            SpecialForm::Unpack => f.write_str("typing.Unpack"),
+            SpecialForm::Required => f.write_str("typing.Required"),
+            SpecialForm::NotRequired => f.write_str("typing.NotRequired"),
+            SpecialForm::TypeAlias => f.write_str("typing.TypeAlias"),
+            SpecialForm::TypeGuard => f.write_str("typing.TypeGuard"),
+            SpecialForm::TypedDict => f.write_str("typing.TypedDict"),
+            SpecialForm::TypeIs => f.write_str("typing.TypeIs"),
+            SpecialForm::List => f.write_str("typing.List"),
+            SpecialForm::Dict => f.write_str("typing.Dict"),
+            SpecialForm::DefaultDict => f.write_str("typing.DefaultDict"),
+            SpecialForm::Set => f.write_str("typing.Set"),
+            SpecialForm::FrozenSet => f.write_str("typing.FrozenSet"),
+            SpecialForm::Counter => f.write_str("typing.Counter"),
+            SpecialForm::Deque => f.write_str("typing.Deque"),
+            SpecialForm::ChainMap => f.write_str("typing.ChainMap"),
+            SpecialForm::OrderedDict => f.write_str("typing.OrderedDict"),
+            SpecialForm::Protocol(generic_context) => {
                 f.write_str("typing.Protocol")?;
                 if let Some(generic_context) = generic_context {
                     generic_context.display(self.db).fmt(f)?;
                 }
                 Ok(())
             }
-            KnownInstanceType::Generic(generic_context) => {
+            SpecialForm::Generic(generic_context) => {
                 f.write_str("typing.Generic")?;
                 if let Some(generic_context) = generic_context {
                     generic_context.display(self.db).fmt(f)?;
                 }
                 Ok(())
             }
-            KnownInstanceType::ReadOnly => f.write_str("typing.ReadOnly"),
+            SpecialForm::ReadOnly => f.write_str("typing.ReadOnly"),
             // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
             // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
             // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
-            KnownInstanceType::TypeVar(_) => f.write_str("typing.TypeVar"),
-            KnownInstanceType::TypeAliasType(_) => f.write_str("typing.TypeAliasType"),
-            KnownInstanceType::Unknown => f.write_str("ty_extensions.Unknown"),
-            KnownInstanceType::AlwaysTruthy => f.write_str("ty_extensions.AlwaysTruthy"),
-            KnownInstanceType::AlwaysFalsy => f.write_str("ty_extensions.AlwaysFalsy"),
-            KnownInstanceType::Not => f.write_str("ty_extensions.Not"),
-            KnownInstanceType::Intersection => f.write_str("ty_extensions.Intersection"),
-            KnownInstanceType::TypeOf => f.write_str("ty_extensions.TypeOf"),
-            KnownInstanceType::CallableTypeOf => f.write_str("ty_extensions.CallableTypeOf"),
+            SpecialForm::TypeVar(_) => f.write_str("typing.TypeVar"),
+            SpecialForm::TypeAliasType(_) => f.write_str("typing.TypeAliasType"),
+            SpecialForm::Unknown => f.write_str("ty_extensions.Unknown"),
+            SpecialForm::AlwaysTruthy => f.write_str("ty_extensions.AlwaysTruthy"),
+            SpecialForm::AlwaysFalsy => f.write_str("ty_extensions.AlwaysFalsy"),
+            SpecialForm::Not => f.write_str("ty_extensions.Not"),
+            SpecialForm::Intersection => f.write_str("ty_extensions.Intersection"),
+            SpecialForm::TypeOf => f.write_str("ty_extensions.TypeOf"),
+            SpecialForm::CallableTypeOf => f.write_str("ty_extensions.CallableTypeOf"),
         }
     }
 }

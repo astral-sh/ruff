@@ -55,7 +55,7 @@ use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
 use instance::Protocol;
 pub(crate) use instance::{NominalInstanceType, ProtocolInstanceType};
-pub(crate) use known_instance::KnownInstanceType;
+pub(crate) use special_forms::SpecialForm;
 
 mod builder;
 mod call;
@@ -67,12 +67,12 @@ mod display;
 mod generics;
 mod infer;
 mod instance;
-mod known_instance;
 mod mro;
 mod narrow;
 mod protocol_class;
 mod signatures;
 mod slots;
+mod special_forms;
 mod string_annotation;
 mod subclass_of;
 mod type_ordering;
@@ -512,7 +512,7 @@ pub enum Type<'db> {
     /// Construct this variant using the `Type::instance` constructor function.
     ProtocolInstance(ProtocolInstanceType<'db>),
     /// A single Python object that requires special treatment in the type system
-    KnownInstance(KnownInstanceType<'db>),
+    KnownInstance(SpecialForm<'db>),
     /// An instance of `builtins.property`
     PropertyInstance(PropertyInstanceType<'db>),
     /// The set of objects in any of the types in the union
@@ -936,7 +936,7 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::IntLiteral variant")
     }
 
-    pub const fn into_known_instance(self) -> Option<KnownInstanceType<'db>> {
+    pub const fn into_known_instance(self) -> Option<SpecialForm<'db>> {
         match self {
             Type::KnownInstance(known_instance) => Some(known_instance),
             _ => None,
@@ -944,7 +944,7 @@ impl<'db> Type<'db> {
     }
 
     #[track_caller]
-    pub fn expect_known_instance(self) -> KnownInstanceType<'db> {
+    pub fn expect_known_instance(self) -> SpecialForm<'db> {
         self.into_known_instance()
             .expect("Expected a Type::KnownInstance variant")
     }
@@ -4253,7 +4253,7 @@ impl<'db> Type<'db> {
                 }
             },
 
-            Type::KnownInstance(KnownInstanceType::TypedDict) => {
+            Type::KnownInstance(SpecialForm::TypedDict) => {
                 Signatures::single(CallableSignature::single(
                     self,
                     Signature::new(
@@ -4912,34 +4912,34 @@ impl<'db> Type<'db> {
             }),
 
             Type::KnownInstance(known_instance) => match known_instance {
-                KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
-                KnownInstanceType::Never | KnownInstanceType::NoReturn => Ok(Type::Never),
-                KnownInstanceType::LiteralString => Ok(Type::LiteralString),
-                KnownInstanceType::Unknown => Ok(Type::unknown()),
-                KnownInstanceType::AlwaysTruthy => Ok(Type::AlwaysTruthy),
-                KnownInstanceType::AlwaysFalsy => Ok(Type::AlwaysFalsy),
+                SpecialForm::TypeAliasType(alias) => Ok(alias.value_type(db)),
+                SpecialForm::Never | SpecialForm::NoReturn => Ok(Type::Never),
+                SpecialForm::LiteralString => Ok(Type::LiteralString),
+                SpecialForm::Unknown => Ok(Type::unknown()),
+                SpecialForm::AlwaysTruthy => Ok(Type::AlwaysTruthy),
+                SpecialForm::AlwaysFalsy => Ok(Type::AlwaysFalsy),
 
                 // We treat `typing.Type` exactly the same as `builtins.type`:
-                KnownInstanceType::Type => Ok(KnownClass::Type.to_instance(db)),
-                KnownInstanceType::Tuple => Ok(KnownClass::Tuple.to_instance(db)),
+                SpecialForm::Type => Ok(KnownClass::Type.to_instance(db)),
+                SpecialForm::Tuple => Ok(KnownClass::Tuple.to_instance(db)),
 
                 // Legacy `typing` aliases
-                KnownInstanceType::List => Ok(KnownClass::List.to_instance(db)),
-                KnownInstanceType::Dict => Ok(KnownClass::Dict.to_instance(db)),
-                KnownInstanceType::Set => Ok(KnownClass::Set.to_instance(db)),
-                KnownInstanceType::FrozenSet => Ok(KnownClass::FrozenSet.to_instance(db)),
-                KnownInstanceType::ChainMap => Ok(KnownClass::ChainMap.to_instance(db)),
-                KnownInstanceType::Counter => Ok(KnownClass::Counter.to_instance(db)),
-                KnownInstanceType::DefaultDict => Ok(KnownClass::DefaultDict.to_instance(db)),
-                KnownInstanceType::Deque => Ok(KnownClass::Deque.to_instance(db)),
-                KnownInstanceType::OrderedDict => Ok(KnownClass::OrderedDict.to_instance(db)),
+                SpecialForm::List => Ok(KnownClass::List.to_instance(db)),
+                SpecialForm::Dict => Ok(KnownClass::Dict.to_instance(db)),
+                SpecialForm::Set => Ok(KnownClass::Set.to_instance(db)),
+                SpecialForm::FrozenSet => Ok(KnownClass::FrozenSet.to_instance(db)),
+                SpecialForm::ChainMap => Ok(KnownClass::ChainMap.to_instance(db)),
+                SpecialForm::Counter => Ok(KnownClass::Counter.to_instance(db)),
+                SpecialForm::DefaultDict => Ok(KnownClass::DefaultDict.to_instance(db)),
+                SpecialForm::Deque => Ok(KnownClass::Deque.to_instance(db)),
+                SpecialForm::OrderedDict => Ok(KnownClass::OrderedDict.to_instance(db)),
 
-                KnownInstanceType::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
+                SpecialForm::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
 
                 // TODO: Use an opt-in rule for a bare `Callable`
-                KnownInstanceType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
+                SpecialForm::Callable => Ok(Type::Callable(CallableType::unknown(db))),
 
-                KnownInstanceType::TypingSelf => {
+                SpecialForm::TypingSelf => {
                     let index = semantic_index(db, scope_id.file(db));
                     let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                         return Err(InvalidTypeExpressionError {
@@ -4962,41 +4962,41 @@ impl<'db> Type<'db> {
                         TypeVarKind::Legacy,
                     )))
                 }
-                KnownInstanceType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
-                KnownInstanceType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
+                SpecialForm::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
+                SpecialForm::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
 
-                KnownInstanceType::Protocol(_) => Err(InvalidTypeExpressionError {
+                SpecialForm::Protocol(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
                     fallback_type: Type::unknown(),
                 }),
-                KnownInstanceType::Generic(_) => Err(InvalidTypeExpressionError {
+                SpecialForm::Generic(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
 
-                KnownInstanceType::Literal
-                | KnownInstanceType::Union
-                | KnownInstanceType::Intersection => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![
-                        InvalidTypeExpression::RequiresArguments(*self)
-                    ],
-                    fallback_type: Type::unknown(),
-                }),
+                SpecialForm::Literal | SpecialForm::Union | SpecialForm::Intersection => {
+                    Err(InvalidTypeExpressionError {
+                        invalid_expressions: smallvec::smallvec![
+                            InvalidTypeExpression::RequiresArguments(*self)
+                        ],
+                        fallback_type: Type::unknown(),
+                    })
+                }
 
-                KnownInstanceType::Optional
-                | KnownInstanceType::Not
-                | KnownInstanceType::TypeOf
-                | KnownInstanceType::TypeIs
-                | KnownInstanceType::TypeGuard
-                | KnownInstanceType::Unpack
-                | KnownInstanceType::CallableTypeOf => Err(InvalidTypeExpressionError {
+                SpecialForm::Optional
+                | SpecialForm::Not
+                | SpecialForm::TypeOf
+                | SpecialForm::TypeIs
+                | SpecialForm::TypeGuard
+                | SpecialForm::Unpack
+                | SpecialForm::CallableTypeOf => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![
                         InvalidTypeExpression::RequiresOneArgument(*self)
                     ],
                     fallback_type: Type::unknown(),
                 }),
 
-                KnownInstanceType::Annotated | KnownInstanceType::Concatenate => {
+                SpecialForm::Annotated | SpecialForm::Concatenate => {
                     Err(InvalidTypeExpressionError {
                         invalid_expressions: smallvec::smallvec![
                             InvalidTypeExpression::RequiresTwoArguments(*self)
@@ -5005,23 +5005,23 @@ impl<'db> Type<'db> {
                     })
                 }
 
-                KnownInstanceType::ClassVar | KnownInstanceType::Final => {
+                SpecialForm::ClassVar | SpecialForm::Final => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::TypeQualifier(
+                        *known_instance
+                    )],
+                    fallback_type: Type::unknown(),
+                }),
+
+                SpecialForm::ReadOnly | SpecialForm::NotRequired | SpecialForm::Required => {
                     Err(InvalidTypeExpressionError {
                         invalid_expressions: smallvec::smallvec![
-                            InvalidTypeExpression::TypeQualifier(*known_instance)
+                            InvalidTypeExpression::TypeQualifierRequiresOneArgument(
+                                *known_instance
+                            )
                         ],
                         fallback_type: Type::unknown(),
                     })
                 }
-
-                KnownInstanceType::ReadOnly
-                | KnownInstanceType::NotRequired
-                | KnownInstanceType::Required => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![
-                        InvalidTypeExpression::TypeQualifierRequiresOneArgument(*known_instance)
-                    ],
-                    fallback_type: Type::unknown(),
-                }),
             },
 
             Type::Union(union) => {
@@ -5495,10 +5495,8 @@ impl<'db> Type<'db> {
                 Some(TypeDefinition::Class(instance.class.definition(db)))
             }
             Self::KnownInstance(instance) => match instance {
-                KnownInstanceType::TypeVar(var) => {
-                    Some(TypeDefinition::TypeVar(var.definition(db)?))
-                }
-                KnownInstanceType::TypeAliasType(type_alias) => {
+                SpecialForm::TypeVar(var) => Some(TypeDefinition::TypeVar(var.definition(db)?)),
+                SpecialForm::TypeAliasType(type_alias) => {
                     type_alias.definition(db).map(TypeDefinition::TypeAlias)
                 }
                 _ => None,
@@ -5809,10 +5807,10 @@ enum InvalidTypeExpression<'db> {
     Generic,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
-    TypeQualifier(KnownInstanceType<'db>),
+    TypeQualifier(SpecialForm<'db>),
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
-    TypeQualifierRequiresOneArgument(KnownInstanceType<'db>),
+    TypeQualifierRequiresOneArgument(SpecialForm<'db>),
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
 }
