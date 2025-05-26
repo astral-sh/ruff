@@ -16,11 +16,10 @@ ISC.py:9:3: ISC003 [*] Explicitly concatenated string should be implicitly conca
 7  7  | 
 8  8  | _ = (
 9     |-  "abc" +
-10    |-  "def"
-   9  |+  "abc" "def"
-11 10 | )
-12 11 | 
-13 12 | _ = (
+   9  |+  "abc" 
+10 10 |   "def"
+11 11 | )
+12 12 | 
 
 ISC.py:14:3: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
@@ -37,11 +36,10 @@ ISC.py:14:3: ISC003 [*] Explicitly concatenated string should be implicitly conc
 12 12 | 
 13 13 | _ = (
 14    |-  f"abc" +
-15    |-  "def"
-   14 |+  f"abc" "def"
-16 15 | )
-17 16 | 
-18 17 | _ = (
+   14 |+  f"abc" 
+15 15 |   "def"
+16 16 | )
+17 17 | 
 
 ISC.py:19:3: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
@@ -58,11 +56,10 @@ ISC.py:19:3: ISC003 [*] Explicitly concatenated string should be implicitly conc
 17 17 | 
 18 18 | _ = (
 19    |-  b"abc" +
-20    |-  b"def"
-   19 |+  b"abc" b"def"
-21 20 | )
-22 21 | 
-23 22 | _ = (
+   19 |+  b"abc" 
+20 20 |   b"def"
+21 21 | )
+22 22 | 
 
 ISC.py:78:10: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
@@ -77,15 +74,14 @@ ISC.py:78:10: ISC003 [*] Explicitly concatenated string should be implicitly con
    = help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
-75 75 |     f"def"} g"
 76 76 | 
 77 77 | # Explicitly concatenated nested f-strings
-78    |-_ = f"a {f"first"
+78 78 | _ = f"a {f"first"
 79    |-    + f"second"} d"
-   78 |+_ = f"a {f"first" f"second"} d"
-80 79 | _ = f"a {f"first {f"middle"}"
-81 80 |     + f"second"} d"
-82 81 | 
+   79 |+     f"second"} d"
+80 80 | _ = f"a {f"first {f"middle"}"
+81 81 |     + f"second"} d"
+82 82 | 
 
 ISC.py:80:10: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
@@ -101,15 +97,14 @@ ISC.py:80:10: ISC003 [*] Explicitly concatenated string should be implicitly con
    = help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
-77 77 | # Explicitly concatenated nested f-strings
 78 78 | _ = f"a {f"first"
 79 79 |     + f"second"} d"
-80    |-_ = f"a {f"first {f"middle"}"
+80 80 | _ = f"a {f"first {f"middle"}"
 81    |-    + f"second"} d"
-   80 |+_ = f"a {f'first {f"middle"}' f"second"} d"
-82 81 | 
-83 82 | # See https://github.com/astral-sh/ruff/issues/12936
-84 83 | _ = "\12""0" # fix should be "\0120"
+   81 |+     f"second"} d"
+82 82 | 
+83 83 | # See https://github.com/astral-sh/ruff/issues/12936
+84 84 | _ = "\12""0" # fix should be "\0120"
 
 ISC.py:110:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
@@ -126,11 +121,10 @@ ISC.py:110:5: ISC003 [*] Explicitly concatenated string should be implicitly con
 108 108 | 
 109 109 | _ = (
 110     |-    rf"raw_f{x}" +
-111     |-    r"raw_normal"
-    110 |+    rf"raw_f{x}" r"raw_normal"
-112 111 | )
-113 112 | 
-114 113 | 
+    110 |+    rf"raw_f{x}" 
+111 111 |     r"raw_normal"
+112 112 | )
+113 113 | 
 
 ISC.py:117:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
@@ -148,11 +142,10 @@ ISC.py:117:5: ISC003 [*] Explicitly concatenated string should be implicitly con
 115 115 | # Different prefix combinations
 116 116 | _ = (
 117     |-    u"unicode" +
-118     |-    r"raw"
-    117 |+    u"unicode" r"raw"
-119 118 | )
-120 119 | 
-121 120 | _ = (
+    117 |+    u"unicode" 
+118 118 |     r"raw"
+119 119 | )
+120 120 | 
 
 ISC.py:122:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
@@ -169,11 +162,10 @@ ISC.py:122:5: ISC003 [*] Explicitly concatenated string should be implicitly con
 120 120 | 
 121 121 | _ = (
 122     |-    rb"raw_bytes" +
-123     |-    b"normal_bytes"
-    122 |+    rb"raw_bytes" b"normal_bytes"
-124 123 | )
-125 124 | 
-126 125 | _ = (
+    122 |+    rb"raw_bytes" 
+123 123 |     b"normal_bytes"
+124 124 | )
+125 125 | 
 
 ISC.py:127:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
@@ -190,6 +182,53 @@ ISC.py:127:5: ISC003 [*] Explicitly concatenated string should be implicitly con
 125 125 | 
 126 126 | _ = (
 127     |-    b"bytes" +
-128     |-    b"with_bytes"
-    127 |+    b"bytes" b"with_bytes"
-129 128 | )
+    127 |+    b"bytes" 
+128 128 |     b"with_bytes"
+129 129 | )
+130 130 | 
+
+ISC.py:133:6: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+131 |   # Repeated concatenation
+132 |
+133 |   _ = ("a" +
+    |  ______^
+134 | |     "b" +
+    | |_______^ ISC003
+135 |       "c" +
+136 |       "d" + "e"
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+130 130 | 
+131 131 | # Repeated concatenation
+132 132 | 
+133     |-_ = ("a" +
+    133 |+_ = ("a" 
+134 134 |     "b" +
+135 135 |     "c" +
+136 136 |     "d" + "e"
+
+ISC.py:138:6: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+136 |       "d" + "e"
+137 |   )
+138 |   _ = ("a"
+    |  ______^
+139 | |     + "b"
+    | |_________^ ISC003
+140 |       + "c"
+141 |       + "d"
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+136 136 |     "d" + "e"
+137 137 | )
+138 138 | _ = ("a"
+139     |-    + "b"
+    139 |+     "b"
+140 140 |     + "c"
+141 141 |     + "d"
+142 142 |     + "e"

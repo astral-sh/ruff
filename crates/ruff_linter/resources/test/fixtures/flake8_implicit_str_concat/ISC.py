@@ -127,3 +127,17 @@ _ = (
     b"bytes" +
     b"with_bytes"
 )
+
+# Repeated concatenation
+
+_ = ("a" +
+    "b" +
+    "c" +
+    "d" + "e"
+)
+_ = ("a"
+    + "b"
+    + "c"
+    + "d"
+    + "e"
+)
