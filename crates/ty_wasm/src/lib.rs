@@ -23,6 +23,14 @@ use ty_project::{Db, ProjectDatabase};
 use ty_python_semantic::Program;
 use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen]
+pub fn version() -> String {
+    option_env!("TY_WASM_COMMIT_SHORT_HASH")
+        .or_else(|| option_env!("CARGO_PKG_VERSION"))
+        .unwrap_or_else(|| "unknown")
+        .to_string()
+}
+
 #[wasm_bindgen(start)]
 pub fn run() {
     use log::Level;
