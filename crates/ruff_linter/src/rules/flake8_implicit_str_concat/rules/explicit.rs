@@ -82,15 +82,23 @@ pub(crate) fn explicit(expr: &Expr, checker: &Checker) -> Option<Diagnostic> {
 
 fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Fix {
     let ast::ExprBinOp { left, right, .. } = expr_bin_op;
-
     let operator_range = TextRange::new(left.end(), right.start());
     let operator_text = checker.locator().slice(operator_range);
 
     let plus_pos = operator_text.find('+').unwrap();
-    let before_plus = &operator_text[..plus_pos];
-    let after_plus = &operator_text[plus_pos + 1..];
 
-    let replacement = format!("{before_plus}{after_plus}");
+    let (before, after) = operator_text.split_at(plus_pos);
+    let after = &after[1..]; // Ignore `+` operator
 
-    Fix::safe_edit(Edit::range_replacement(replacement, operator_range))
+    // With `+` on first line '\n' isn't in before and we trim excess whitespace
+    let before = if before.contains('\n') {
+        before
+    } else {
+        before.trim_end()
+    };
+
+    Fix::safe_edit(Edit::range_replacement(
+        format!("{before}{after}"),
+        operator_range,
+    ))
 }
