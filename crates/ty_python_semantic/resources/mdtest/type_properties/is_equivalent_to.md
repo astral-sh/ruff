@@ -106,6 +106,17 @@ static_assert(
 )
 ```
 
+## Tuples containing unions, unions containing tuples
+
+```py
+from ty_extensions import is_equivalent_to, static_assert
+
+class A: ...
+class B: ...
+
+static_assert(is_equivalent_to(tuple[A | B], tuple[A] | tuple[B]))
+```
+
 ## Intersections containing tuples containing unions
 
 ```py
