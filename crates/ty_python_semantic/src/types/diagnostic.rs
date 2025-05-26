@@ -1769,7 +1769,7 @@ pub(super) fn report_possibly_unbound_attribute(
 pub fn add_inferred_python_version_hint_to_diagnostic(
     db: &dyn Db,
     diagnostic: &mut Diagnostic,
-    action: impl std::fmt::Display,
+    action: &str,
 ) {
     let program = Program::get(db);
     let PythonVersionWithSource { version, source } = program.python_version_with_source(db);
