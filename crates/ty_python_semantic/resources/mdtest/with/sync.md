@@ -150,12 +150,12 @@ with context_expr as f:
     reveal_type(f)  # revealed: str
 ```
 
-## Context manager with `__aenter__` and `__aexit__`
+## Accidental use of non-async `with`
 
 <!-- snapshot-diagnostics -->
 
-If `__aenter__` and `__aexit__` are implemented, then the `async with` is probably the intentional
-usage. We then add a sub-diagnosis to hint the user to use `async with`.
+If a synchronous `with` statement is used on a type with `__aenter__` and `__aexit__`, we show a
+diagnostic hint that the user might have intended to use `asnyc with` instead.
 
 ```py
 class Manager:
@@ -167,25 +167,25 @@ with Manager():
     ...
 ```
 
-The sub-diagnosis is also provided if the user did not type annotated properly `__enter__` or/and
-`__exit__`.
+The sub-diagnostic is also provided if the signatures of `__aenter__` and `__aexit__` do not match
+the expected signatures for a context manager:
 
 ```py
 class Manager:
     async def __aenter__(self): ...
-    async def __aexit__(self, exc_type: str, exc_value, traceback): ...
+    async def __aexit__(self, typ: str, exc, traceback): ...
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
 with Manager():
     ...
 ```
 
-Or if the user did not use the proper arguments for `__enter__` or/and `__exit__`.
+Similarly, we also show the hint if the functions have the wrong number of arguments:
 
 ```py
 class Manager:
-    async def __aenter__(self): ...
-    async def __aexit__(self, exc_type, exc_value, traceback, wrong_extra_arg): ...
+    async def __aenter__(self, wrong_extra_arg): ...
+    async def __aexit__(self, typ, exc, traceback, wrong_extra_arg): ...
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
 with Manager():
