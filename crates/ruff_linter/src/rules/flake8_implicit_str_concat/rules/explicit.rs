@@ -91,7 +91,7 @@ fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Fix {
     let after = &after[1..]; // Ignore `+` operator
 
     // With `+` on first line '\n' isn't in before and we trim excess whitespace
-    let before = if before.contains('\n') {
+    let before = if before.contains('\n') || before.contains('\r') {
         before
     } else {
         before.trim_end()
