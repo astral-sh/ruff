@@ -1,25 +1,6 @@
 <!-- WARNING: This file is auto-generated (cargo dev generate-all). Update the doc comments on the 'Options' struct in 'crates/ty_project/src/metadata/options.rs' if you want to change anything here. -->
 
 # Configuration
-#### `respect-ignore-files`
-
-Whether to automatically exclude files that are ignored by `.ignore`,
-`.gitignore`, `.git/info/exclude`, and global `gitignore` files.
-Enabled by default.
-
-**Default value**: `true`
-
-**Type**: `bool`
-
-**Example usage** (`pyproject.toml`):
-
-```toml
-[tool.ty]
-respect-ignore-files = false
-```
-
----
-
 #### `rules`
 
 Configures the enabled rules and their severity.
@@ -161,6 +142,25 @@ typeshed = "/path/to/custom/typeshed"
 ---
 
 ## `src`
+
+#### `respect-ignore-files`
+
+Whether to automatically exclude files that are ignored by `.ignore`,
+`.gitignore`, `.git/info/exclude`, and global `gitignore` files.
+Enabled by default.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage** (`pyproject.toml`):
+
+```toml
+[tool.ty.src]
+respect-ignore-files = false
+```
+
+---
 
 #### `root`
 

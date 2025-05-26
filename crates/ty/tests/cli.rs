@@ -85,7 +85,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     ");
 
     // Test that we can set to false via config file
-    case.write_file("ty.toml", "respect-ignore-files = false")?;
+    case.write_file("ty.toml", "src.respect-ignore-files = false")?;
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
@@ -104,7 +104,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     ");
 
     // Ensure CLI takes precedence
-    case.write_file("ty.toml", "respect-ignore-files = true")?;
+    case.write_file("ty.toml", "src.respect-ignore-files = true")?;
     assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @r"
     success: false
     exit_code: 1
@@ -1534,7 +1534,7 @@ fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
 #[test]
 fn cli_config_args_invalid_option() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", r"print(1)")?;
-    assert_cmd_snapshot!(case.command().arg("--config").arg("bad-option=true"), @r"
+    assert_cmd_snapshot!(case.command().arg("--config").arg("bad-option=true"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1544,13 +1544,13 @@ fn cli_config_args_invalid_option() -> anyhow::Result<()> {
       |
     1 | bad-option=true
       | ^^^^^^^^^^
-    unknown field `bad-option`, expected one of `environment`, `src`, `rules`, `terminal`, `respect-ignore-files`
+    unknown field `bad-option`, expected one of `environment`, `src`, `rules`, `terminal`
 
 
     Usage: ty <COMMAND>
 
     For more information, try '--help'.
-    ");
+    "###);
 
     Ok(())
 }
