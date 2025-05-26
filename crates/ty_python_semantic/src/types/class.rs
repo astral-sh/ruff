@@ -1771,15 +1771,10 @@ impl<'db> ClassLiteral<'db> {
                         // attribute is a non-data descriptor, it can not possibly be the
                         // correct type of the implicit instance attribute. If there are any
                         // attribute assignments in methods of this class, they would overwrite
-                        // the non-data descriptor. In this case, we just return the type
-                        // inferred from attribute assignments in methods. The descriptor
-                        // protocol implementation in `Type::invoke_descriptor_protocol` will
-                        // take care of unioning with the non-data descriptor type (because we
-                        // account for the fact that the methods containing these assignments
-                        // might never be called).
-                        if !implicit.is_unbound() {
-                            return implicit.into();
-                        }
+                        // the non-data descriptor. If they do so in a non-compatible way, we
+                        // should emit an error elsewhere. Here, we simply return `Unbound`,
+                        // to signal that there is no instance attribute of this name.
+                        return Symbol::Unbound.into();
                     }
 
                     let bindings = use_def.public_bindings(symbol_id);

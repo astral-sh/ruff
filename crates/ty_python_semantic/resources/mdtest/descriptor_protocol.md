@@ -193,7 +193,8 @@ reveal_type(C2().attr)  # revealed: Unknown | Literal["non-data", "normal"]
 C2().attr = 1
 ```
 
-This situation does not change if the attribute is declared on the class body:
+This situation changes if the class attribute is declared. Here, we should error if we see an
+incompatible attribute assignment, but otherwise just follow the declared type:
 
 ```py
 class C3:
@@ -201,11 +202,12 @@ class C3:
 
     def f(self):
         # TODO: we should ideally emit an error here. We are overwriting the
-        # non-data descriptor with a string, which is not compatible with the
-        # declared type.
-        self.attr = "normal"
+        # non-data descriptor with an integer, which is not compatible with
+        # the `__get__` return type of `NonDataDescriptor` when called on an
+        # instance.
+        self.attr = 1
 
-reveal_type(C3().attr)  # revealed: Literal["non-data", "normal"] | Unknown
+reveal_type(C3().attr)  # revealed: Literal["non-data"]
 ```
 
 The scenario above is similar to a use case where a method on a class is dynamically replaced.
@@ -221,20 +223,15 @@ class C4:
     def switch(self):
         # Similar to the `C3` example, we are overwriting a non-data descriptor (the
         # function `C4.f`) with something (a bound method) that is not compatible with
-        # the (implicitly) declared type of `C4.f`, which is a function literal type:
-        # `def f(self) -> None`. Strictly speaking, this we should also emit an error
-        # here.. or we should not consider the function definition to be a declaration.
+        # the return type of `__get__` of `C4.f` (a different bound method). Strictly
+        # speaking, we should also emit an error in this case.
         self.f = self.replacement
 
 reveal_type(C4.f)  # revealed: def f(self) -> None
 
 c4 = C4()
 
-# call c4.switch() or not
-
-# TODO: This should reveal the following type, as soon as we understand the type of self:
-# `(bound method C4.f() -> None) | (bound method C4.replacement() -> None) | Unknown`
-reveal_type(c4.f)  # revealed: (bound method C4.f() -> None) | Unknown
+reveal_type(c4.f)  # revealed: bound method C4.f() -> None
 
 # As a regression test for https://github.com/astral-sh/ty/issues/350, make sure that no
 # error is emitted when calling `c4.f()`:
