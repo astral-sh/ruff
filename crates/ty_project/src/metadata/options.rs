@@ -135,7 +135,7 @@ impl Options {
         } else {
             let src = project_root.join("src");
 
-            if system.is_directory(&src) {
+            let mut roots = if system.is_directory(&src) {
                 // Default to `src` and the project root if `src` exists and the root hasn't been specified.
                 // This corresponds to the `src-layout`
                 tracing::debug!(
@@ -154,7 +154,24 @@ impl Options {
                 // Default to a [flat project structure](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/).
                 tracing::debug!("Defaulting `src.root` to `.`");
                 vec![project_root.to_path_buf()]
+            };
+
+            // Considering pytest test discovery conventions,
+            // we also include the `tests` directory if it exists and is not a package.
+            let tests_dir = project_root.join("tests");
+            if system.is_directory(&tests_dir)
+                && !system.is_file(&tests_dir.join("__init__.py"))
+                && !roots.contains(&tests_dir)
+            {
+                // If the `tests` directory exists and is not a package, include it as a source root.
+                tracing::debug!(
+                    "Including `./tests` in `src.root` because a `./tests` directory exists"
+                );
+
+                roots.push(tests_dir);
             }
+
+            roots
         };
 
         let (extra_paths, python, typeshed) = self
@@ -392,6 +409,9 @@ pub struct SrcOptions {
     /// * if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
     /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
     /// * otherwise, default to `.` (flat layout)
+    ///
+    /// Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
+    /// it will also be included in the first party search path.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,

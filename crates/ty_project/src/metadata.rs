@@ -1029,6 +1029,52 @@ expected `.`, `]`
         Ok(())
     }
 
+    #[test]
+    fn src_root_with_tests() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        // pytest will find `tests/test_foo.py` and realize it is NOT part of a package
+        // given that there's no `__init__.py` file in the same folder.
+        // It will then add `tests` to `sys.path`
+        // in order to import `test_foo.py` as the module `test_foo`.
+        system
+            .memory_file_system()
+            .write_files_all([
+                (root.join("src/main.py"), ""),
+                (root.join("tests/conftest.py"), ""),
+                (root.join("tests/test_foo.py"), ""),
+            ])
+            .context("Failed to write files")?;
+
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "my_package", &system);
+
+        assert_eq!(
+            settings.search_paths.src_roots,
+            vec![root.clone(), root.join("src"), root.join("tests")]
+        );
+
+        // If `tests/__init__.py` is present, it is considered a package and `tests` is not added to `sys.path`.
+        system
+            .memory_file_system()
+            .write_file(root.join("tests/__init__.py"), "")
+            .context("Failed to write tests/__init__.py")?;
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "my_package", &system);
+
+        assert_eq!(
+            settings.search_paths.src_roots,
+            vec![root.clone(), root.join("src")]
+        );
+
+        Ok(())
+    }
+
     #[track_caller]
     fn assert_error_eq(error: &ProjectDiscoveryError, message: &str) {
         assert_eq!(error.to_string().replace('\\', "/"), message);
