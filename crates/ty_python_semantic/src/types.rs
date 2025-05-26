@@ -6065,7 +6065,7 @@ impl<'db> ContextManagerError<'db> {
             context_expression_type.try_call_dunder(
                 db,
                 "__aexit__",
-                CallArgumentTypes::positional([Type::none(db), Type::none(db), Type::none(db)]),
+                CallArgumentTypes::positional([Type::unknown(), Type::unknown(), Type::unknown()]),
             ),
         ) {
             diag.info(format_args!(
