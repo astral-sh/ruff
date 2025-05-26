@@ -210,25 +210,25 @@ ISC.py:133:6: ISC003 [*] Explicitly concatenated string should be implicitly con
 135 135 |     "c" +
 136 136 |     "d" + "e"
 
-ISC.py:138:6: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:139:6: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
-136 |       "d" + "e"
 137 |   )
-138 |   _ = ("a"
+138 |
+139 |   _ = ("a"
     |  ______^
-139 | |     + "b"
+140 | |     + "b"
     | |_________^ ISC003
-140 |       + "c"
-141 |       + "d"
+141 |       + "c"
+142 |       + "d"
     |
     = help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
-136 136 |     "d" + "e"
 137 137 | )
-138 138 | _ = ("a"
-139     |-    + "b"
-    139 |+     "b"
-140 140 |     + "c"
-141 141 |     + "d"
-142 142 |     + "e"
+138 138 | 
+139 139 | _ = ("a"
+140     |-    + "b"
+    140 |+     "b"
+141 141 |     + "c"
+142 142 |     + "d"
+143 143 |     + "e"
