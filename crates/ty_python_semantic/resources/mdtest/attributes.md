@@ -1531,18 +1531,23 @@ def _(ns: argparse.Namespace):
 
 If a type provides a custom `__getattribute__`, we use its return type as the type for unknown
 attributes. Note that this behavior differs from runtime, where `__getattribute__` is called
-unconditionally, even for known attributes. This prevents `__getattribute__` from shadowing the
-inferred type for all attributes, and matches other type checkers such as mypy and pyright.
+unconditionally, even for known attributes. The rationale for doing this is that it allows users to
+specify more precise types for specific attributes, such as `x: str` in the example below. This
+behavior matches other type checkers such as mypy and pyright.
 
 ```py
+from typing import Any
+
 class Foo:
     x: str
-    def __getattribute__(self, attr: str) -> int:
+    def __getattribute__(self, attr: str) -> Any:
         return 42
 
 reveal_type(Foo().x)  # revealed: str
-reveal_type(Foo().y)  # revealed: int
+reveal_type(Foo().y)  # revealed: Any
 ```
+
+A standard library example for a class with a custom `__getattribute__` method is `SimpleNamespace`:
 
 ```py
 from types import SimpleNamespace
