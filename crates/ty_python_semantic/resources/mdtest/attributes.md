@@ -1572,6 +1572,20 @@ c = C()
 reveal_type(c.x)  # revealed: int
 ```
 
+Like all dunder methods, `__getattribute__` is not looked up on instances:
+
+```py
+def external_getattribute(name) -> int:
+    return 1
+
+class ThisFails:
+    def __init__(self):
+        self.__getattribute__ = external_getattribute
+
+# error: [unresolved-attribute]
+ThisFails().x
+```
+
 ## Classes with custom `__setattr__` methods
 
 ### Basic

@@ -3214,7 +3214,8 @@ impl<'db> Type<'db> {
                         &mut CallArgumentTypes::positional([Type::StringLiteral(
                             StringLiteralType::new(db, Box::from(name.as_str())),
                         )]),
-                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                            | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     )
                     .map(|outcome| Symbol::bound(outcome.return_type(db)))
                     // TODO: Handle call errors here.
