@@ -143,14 +143,10 @@ pub(crate) fn custom_type_var_instead_of_self(
 
     let self_or_cls_annotation = match self_or_cls_annotation_unchecked {
         ast::Expr::StringLiteral(_) => {
-            match checker.parse_type_annotation(self_or_cls_annotation_unchecked.as_string_literal_expr()?) {
-                Ok(parsed_annotation) => { parsed_annotation.expression() }
-                Err(_) => { return None }
-            }
+            let literal_expr = self_or_cls_annotation_unchecked.as_string_literal_expr()?;
+            checker.parse_type_annotation(literal_expr).ok()?.expression()
         }
-        ast::Expr::Subscript(_) | ast::Expr::Name(_) => {
-            self_or_cls_annotation_unchecked
-        }
+        ast::Expr::Subscript(_) | ast::Expr::Name(_) => self_or_cls_annotation_unchecked,
         _ => {return None}
     }; 
     let parent_class = current_scope.kind.as_class()?;
