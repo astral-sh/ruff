@@ -44,13 +44,13 @@ use crate::symbol::{
 use crate::types::call::{Bindings, CallArgumentTypes, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
-pub use crate::types::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::generics::{GenericContext, PartialSpecialization, Specialization};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters};
+pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
 use instance::Protocol;
