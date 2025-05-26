@@ -2,7 +2,7 @@ use crate::db::tests::TestDb;
 use crate::symbol::{builtins_symbol, known_module_symbol};
 use crate::types::{
     BoundMethodType, CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters,
-    Signature, SpecialForm, SubclassOfType, TupleType, Type, UnionType,
+    Signature, SpecialFormType, SubclassOfType, TupleType, Type, UnionType,
 };
 use crate::{Db, KnownModule};
 use hashbrown::HashSet;
@@ -142,7 +142,7 @@ impl Ty {
             Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .symbol
                 .expect_type(),
-            Ty::TypingLiteral => Type::KnownInstance(SpecialForm::Literal),
+            Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
             Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).symbol.expect_type(),
             Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
             Ty::Union(tys) => {

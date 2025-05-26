@@ -1,8 +1,8 @@
 use crate::Db;
 use crate::types::generics::Specialization;
 use crate::types::{
-    ClassType, DynamicType, KnownClass, MroError, MroIterator, SpecialForm, Type, TypeMapping,
-    todo_type,
+    ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, SpecialFormType,
+    Type, TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -147,66 +147,78 @@ impl<'db> ClassBase<'db> {
             | Type::ProtocolInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy => None,
+
             Type::KnownInstance(known_instance) => match known_instance {
-                SpecialForm::TypeVar(_)
-                | SpecialForm::TypeAliasType(_)
-                | SpecialForm::Annotated
-                | SpecialForm::Literal
-                | SpecialForm::LiteralString
-                | SpecialForm::Union
-                | SpecialForm::NoReturn
-                | SpecialForm::Never
-                | SpecialForm::Final
-                | SpecialForm::NotRequired
-                | SpecialForm::TypeGuard
-                | SpecialForm::TypeIs
-                | SpecialForm::TypingSelf
-                | SpecialForm::Unpack
-                | SpecialForm::ClassVar
-                | SpecialForm::Concatenate
-                | SpecialForm::Required
-                | SpecialForm::TypeAlias
-                | SpecialForm::ReadOnly
-                | SpecialForm::Optional
-                | SpecialForm::Not
-                | SpecialForm::Intersection
-                | SpecialForm::TypeOf
-                | SpecialForm::CallableTypeOf
-                | SpecialForm::AlwaysTruthy
-                | SpecialForm::AlwaysFalsy => None,
-                SpecialForm::Unknown => Some(Self::unknown()),
+                KnownInstanceType::Generic(_) => Some(Self::Generic),
+                KnownInstanceType::Protocol(_) => Some(Self::Protocol),
+                KnownInstanceType::TypeAliasType(_) | KnownInstanceType::TypeVar(_) => None,
+            },
+
+            Type::SpecialForm(special_form) => match special_form {
+                SpecialFormType::Annotated
+                | SpecialFormType::Literal
+                | SpecialFormType::LiteralString
+                | SpecialFormType::Union
+                | SpecialFormType::NoReturn
+                | SpecialFormType::Never
+                | SpecialFormType::Final
+                | SpecialFormType::NotRequired
+                | SpecialFormType::TypeGuard
+                | SpecialFormType::TypeIs
+                | SpecialFormType::TypingSelf
+                | SpecialFormType::Unpack
+                | SpecialFormType::ClassVar
+                | SpecialFormType::Concatenate
+                | SpecialFormType::Required
+                | SpecialFormType::TypeAlias
+                | SpecialFormType::ReadOnly
+                | SpecialFormType::Optional
+                | SpecialFormType::Not
+                | SpecialFormType::Intersection
+                | SpecialFormType::TypeOf
+                | SpecialFormType::CallableTypeOf
+                | SpecialFormType::AlwaysTruthy
+                | SpecialFormType::AlwaysFalsy => None,
+
+                SpecialFormType::Unknown => Some(Self::unknown()),
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
-                SpecialForm::Dict => Self::try_from_type(db, KnownClass::Dict.to_class_literal(db)),
-                SpecialForm::List => Self::try_from_type(db, KnownClass::List.to_class_literal(db)),
-                SpecialForm::Type => Self::try_from_type(db, KnownClass::Type.to_class_literal(db)),
-                SpecialForm::Tuple => {
+                SpecialFormType::Dict => {
+                    Self::try_from_type(db, KnownClass::Dict.to_class_literal(db))
+                }
+                SpecialFormType::List => {
+                    Self::try_from_type(db, KnownClass::List.to_class_literal(db))
+                }
+                SpecialFormType::Type => {
+                    Self::try_from_type(db, KnownClass::Type.to_class_literal(db))
+                }
+                SpecialFormType::Tuple => {
                     Self::try_from_type(db, KnownClass::Tuple.to_class_literal(db))
                 }
-                SpecialForm::Set => Self::try_from_type(db, KnownClass::Set.to_class_literal(db)),
-                SpecialForm::FrozenSet => {
+                SpecialFormType::Set => {
+                    Self::try_from_type(db, KnownClass::Set.to_class_literal(db))
+                }
+                SpecialFormType::FrozenSet => {
                     Self::try_from_type(db, KnownClass::FrozenSet.to_class_literal(db))
                 }
-                SpecialForm::ChainMap => {
+                SpecialFormType::ChainMap => {
                     Self::try_from_type(db, KnownClass::ChainMap.to_class_literal(db))
                 }
-                SpecialForm::Counter => {
+                SpecialFormType::Counter => {
                     Self::try_from_type(db, KnownClass::Counter.to_class_literal(db))
                 }
-                SpecialForm::DefaultDict => {
+                SpecialFormType::DefaultDict => {
                     Self::try_from_type(db, KnownClass::DefaultDict.to_class_literal(db))
                 }
-                SpecialForm::Deque => {
+                SpecialFormType::Deque => {
                     Self::try_from_type(db, KnownClass::Deque.to_class_literal(db))
                 }
-                SpecialForm::OrderedDict => {
+                SpecialFormType::OrderedDict => {
                     Self::try_from_type(db, KnownClass::OrderedDict.to_class_literal(db))
                 }
-                SpecialForm::TypedDict => Self::try_from_type(db, todo_type!("TypedDict")),
-                SpecialForm::Callable => {
+                SpecialFormType::TypedDict => Self::try_from_type(db, todo_type!("TypedDict")),
+                SpecialFormType::Callable => {
                     Self::try_from_type(db, todo_type!("Support for Callable as a base class"))
                 }
-                SpecialForm::Protocol(_) => Some(ClassBase::Protocol),
-                SpecialForm::Generic(_) => Some(ClassBase::Generic),
             },
         }
     }
@@ -280,8 +292,8 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
         match value {
             ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
             ClassBase::Class(class) => class.into(),
-            ClassBase::Protocol => Type::KnownInstance(SpecialForm::Protocol(None)),
-            ClassBase::Generic => Type::KnownInstance(SpecialForm::Generic(None)),
+            ClassBase::Protocol => Type::KnownInstance(KnownInstanceType::Protocol(None)),
+            ClassBase::Generic => Type::KnownInstance(KnownInstanceType::Generic(None)),
         }
     }
 }

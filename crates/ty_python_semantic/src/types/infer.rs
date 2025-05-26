@@ -85,12 +85,12 @@ use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     BareTypeAliasType, CallDunderError, CallableSignature, CallableType, ClassLiteral, ClassType,
     DataclassParams, DynamicType, FunctionDecorators, FunctionType, GenericAlias,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, MemberLookupPolicy,
-    MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, Signature,
-    Signatures, SpecialForm, StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers,
-    Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    UnionBuilder, UnionType, binding_type, todo_type,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
+    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
+    Parameters, Signature, Signatures, SpecialFormType, StringLiteralType, SubclassOfType, Symbol,
+    SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
+    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -847,7 +847,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             //     - If the class is a protocol class: check for inheritance from a non-protocol class
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
                 let base_class = match base_class {
-                    Type::KnownInstance(SpecialForm::Generic(None)) => {
+                    Type::KnownInstance(KnownInstanceType::Generic(None)) => {
                         if let Some(builder) = self
                             .context
                             .report_lint(&INVALID_BASE, &class_node.bases()[i])
@@ -861,7 +861,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // Note that unlike several of the other errors caught in this function,
                     // this does not lead to the class creation failing at runtime,
                     // but it is semantically invalid.
-                    Type::KnownInstance(SpecialForm::Protocol(Some(_))) => {
+                    Type::KnownInstance(KnownInstanceType::Protocol(Some(_))) => {
                         if class_node.type_params.is_none() {
                             continue;
                         }
@@ -2395,13 +2395,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::TypeAlias(type_alias))
             .to_scope_id(self.db(), self.file());
 
-        let type_alias_ty = Type::KnownInstance(SpecialForm::TypeAliasType(TypeAliasType::PEP695(
-            PEP695TypeAliasType::new(
+        let type_alias_ty = Type::KnownInstance(KnownInstanceType::TypeAliasType(
+            TypeAliasType::PEP695(PEP695TypeAliasType::new(
                 self.db(),
                 &type_alias.name.as_name_expr().unwrap().id,
                 rhs_scope,
-            ),
-        )));
+            )),
+        ));
 
         self.add_declaration_with_binding(
             type_alias.into(),
@@ -2729,7 +2729,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             None => None,
         };
         let default_ty = self.infer_optional_type_expression(default.as_deref());
-        let ty = Type::KnownInstance(SpecialForm::TypeVar(TypeVarInstance::new(
+        let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
             name.id.clone(),
             Some(definition),
@@ -3081,6 +3081,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::BytesLiteral(..)
             | Type::LiteralString
             | Type::Tuple(..)
+            | Type::SpecialForm(..)
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..)
@@ -3541,11 +3542,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         };
 
-        if let Some(known_instance) = target
-            .as_name_expr()
-            .and_then(|name| SpecialForm::try_from_file_and_name(self.db(), self.file(), &name.id))
-        {
-            target_ty = Type::KnownInstance(known_instance);
+        if let Some(special_form) = target.as_name_expr().and_then(|name| {
+            SpecialFormType::try_from_file_and_name(self.db(), self.file(), &name.id)
+        }) {
+            target_ty = Type::SpecialForm(special_form);
         }
 
         self.store_expression_type(target, target_ty);
@@ -3629,9 +3629,17 @@ impl<'db> TypeInferenceBuilder<'db> {
         if let Type::NominalInstance(instance) = declared_ty.inner_type() {
             if instance.class.is_known(self.db(), KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
-                    if let Some(known_instance) =
-                        SpecialForm::try_from_file_and_name(self.db(), self.file(), &name_expr.id)
-                    {
+                    if let Some(special_form) = SpecialFormType::try_from_file_and_name(
+                        self.db(),
+                        self.file(),
+                        &name_expr.id,
+                    ) {
+                        declared_ty.inner = Type::SpecialForm(special_form);
+                    } else if let Some(known_instance) = KnownInstanceType::try_from_file_and_name(
+                        self.db(),
+                        self.file(),
+                        &name_expr.id,
+                    ) {
                         declared_ty.inner = Type::KnownInstance(known_instance);
                     }
                 }
@@ -5432,7 +5440,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                         let containing_assignment =
                                             self.index.expect_single_definition(target);
                                         overload.set_return_type(Type::KnownInstance(
-                                            SpecialForm::TypeVar(TypeVarInstance::new(
+                                            KnownInstanceType::TypeVar(TypeVarInstance::new(
                                                 self.db(),
                                                 target.id.clone(),
                                                 Some(containing_assignment),
@@ -5467,14 +5475,14 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                                         if let Some(name) = name.into_string_literal() {
                                             overload.set_return_type(Type::KnownInstance(
-                                                SpecialForm::TypeAliasType(TypeAliasType::Bare(
-                                                    BareTypeAliasType::new(
+                                                KnownInstanceType::TypeAliasType(
+                                                    TypeAliasType::Bare(BareTypeAliasType::new(
                                                         self.db(),
                                                         ast::name::Name::new(name.value(self.db())),
                                                         containing_assignment,
                                                         value,
-                                                    ),
-                                                )),
+                                                    )),
+                                                ),
                                             ));
                                         } else {
                                             if let Some(builder) = self.context.report_lint(
@@ -5956,6 +5964,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)
                 | Type::ProtocolInstance(_)
+                | Type::SpecialForm(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Union(_)
@@ -6285,6 +6294,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)
                 | Type::ProtocolInstance(_)
+                | Type::SpecialForm(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Intersection(_)
@@ -6310,6 +6320,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)
                 | Type::ProtocolInstance(_)
+                | Type::SpecialForm(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Intersection(_)
@@ -7432,45 +7443,50 @@ impl<'db> TypeInferenceBuilder<'db> {
                 value_ty,
                 Type::IntLiteral(i64::from(bool)),
             ),
-            (Type::KnownInstance(SpecialForm::Protocol(None)), Type::Tuple(typevars), _) => self
-                .legacy_generic_class_context(
+            (Type::KnownInstance(KnownInstanceType::Protocol(None)), Type::Tuple(typevars), _) => {
+                self.legacy_generic_class_context(
                     value_node,
                     typevars.elements(self.db()),
                     LegacyGenericBase::Protocol,
                 )
-                .map(|context| Type::KnownInstance(SpecialForm::Protocol(Some(context))))
-                .unwrap_or_else(Type::unknown),
-            (Type::KnownInstance(SpecialForm::Protocol(None)), typevar, _) => self
+                .map(|context| Type::KnownInstance(KnownInstanceType::Protocol(Some(context))))
+                .unwrap_or_else(Type::unknown)
+            }
+            (Type::KnownInstance(KnownInstanceType::Protocol(None)), typevar, _) => self
                 .legacy_generic_class_context(
                     value_node,
                     std::slice::from_ref(&typevar),
                     LegacyGenericBase::Protocol,
                 )
-                .map(|context| Type::KnownInstance(SpecialForm::Protocol(Some(context))))
+                .map(|context| Type::KnownInstance(KnownInstanceType::Protocol(Some(context))))
                 .unwrap_or_else(Type::unknown),
-            (Type::KnownInstance(SpecialForm::Protocol(Some(_))), _, _) => {
+            (Type::KnownInstance(KnownInstanceType::Protocol(Some(_))), _, _) => {
                 // TODO: emit a diagnostic
                 todo_type!("doubly-specialized typing.Protocol")
             }
-            (Type::KnownInstance(SpecialForm::Generic(None)), Type::Tuple(typevars), _) => self
-                .legacy_generic_class_context(
+            (Type::KnownInstance(KnownInstanceType::Generic(None)), Type::Tuple(typevars), _) => {
+                self.legacy_generic_class_context(
                     value_node,
                     typevars.elements(self.db()),
                     LegacyGenericBase::Generic,
                 )
-                .map(|context| Type::KnownInstance(SpecialForm::Generic(Some(context))))
-                .unwrap_or_else(Type::unknown),
-            (Type::KnownInstance(SpecialForm::Generic(None)), typevar, _) => self
+                .map(|context| Type::KnownInstance(KnownInstanceType::Generic(Some(context))))
+                .unwrap_or_else(Type::unknown)
+            }
+            (Type::KnownInstance(KnownInstanceType::Generic(None)), typevar, _) => self
                 .legacy_generic_class_context(
                     value_node,
                     std::slice::from_ref(&typevar),
                     LegacyGenericBase::Generic,
                 )
-                .map(|context| Type::KnownInstance(SpecialForm::Generic(Some(context))))
+                .map(|context| Type::KnownInstance(KnownInstanceType::Generic(Some(context))))
                 .unwrap_or_else(Type::unknown),
-            (Type::KnownInstance(SpecialForm::Generic(Some(_))), _, _) => {
+            (Type::KnownInstance(KnownInstanceType::Generic(Some(_))), _, _) => {
                 // TODO: emit a diagnostic
                 todo_type!("doubly-specialized typing.Generic")
+            }
+            (Type::SpecialForm(special_form), _, _) if special_form.class().is_special_form() => {
+                todo_type!("Inference of subscript on special form")
             }
             (Type::KnownInstance(known_instance), _, _)
                 if known_instance.class().is_special_form() =>
@@ -7635,7 +7651,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let typevars: Option<FxOrderSet<_>> = typevars
             .iter()
             .map(|typevar| match typevar {
-                Type::KnownInstance(SpecialForm::TypeVar(typevar)) => Some(*typevar),
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Some(*typevar),
                 _ => {
                     if let Some(builder) =
                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
@@ -7777,10 +7793,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ast::ExprContext::Load => {
                     let name_expr_ty = self.infer_name_expression(name);
                     match name_expr_ty {
-                        Type::KnownInstance(SpecialForm::ClassVar) => {
+                        Type::SpecialForm(SpecialFormType::ClassVar) => {
                             TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::CLASS_VAR)
                         }
-                        Type::KnownInstance(SpecialForm::Final) => {
+                        Type::SpecialForm(SpecialFormType::Final) => {
                             TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::FINAL)
                         }
                         _ => name_expr_ty
@@ -7807,7 +7823,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let slice = &**slice;
 
                 match value_ty {
-                    Type::KnownInstance(SpecialForm::Annotated) => {
+                    Type::SpecialForm(SpecialFormType::Annotated) => {
                         // This branch is similar to the corresponding branch in `infer_parameterized_known_instance_type_expression`, but
                         // `Annotated[…]` can appear both in annotation expressions and in type expressions, and needs to be handled slightly
                         // differently in each case (calling either `infer_type_expression_*` or `infer_annotation_expression_*`).
@@ -7816,11 +7832,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }) = slice
                         {
                             if arguments.len() < 2 {
-                                report_invalid_arguments_to_annotated(
-                                    self.db(),
-                                    &self.context,
-                                    subscript,
-                                );
+                                report_invalid_arguments_to_annotated(&self.context, subscript);
                             }
 
                             if let [inner_annotation, metadata @ ..] = &arguments[..] {
@@ -7838,16 +7850,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 TypeAndQualifiers::unknown()
                             }
                         } else {
-                            report_invalid_arguments_to_annotated(
-                                self.db(),
-                                &self.context,
-                                subscript,
-                            );
+                            report_invalid_arguments_to_annotated(&self.context, subscript);
                             self.infer_annotation_expression_impl(slice)
                         }
                     }
-                    Type::KnownInstance(
-                        known_instance @ (SpecialForm::ClassVar | SpecialForm::Final),
+                    Type::SpecialForm(
+                        type_qualifier @ (SpecialFormType::ClassVar | SpecialFormType::Final),
                     ) => match slice {
                         ast::Expr::Tuple(..) => {
                             if let Some(builder) =
@@ -7856,7 +7864,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 builder.into_diagnostic(format_args!(
                                     "Type qualifier `{type_qualifier}` \
                                      expects exactly one type parameter",
-                                    type_qualifier = known_instance.repr(self.db()),
                                 ));
                             }
                             Type::unknown().into()
@@ -7864,11 +7871,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                         _ => {
                             let mut type_and_qualifiers =
                                 self.infer_annotation_expression_impl(slice);
-                            match known_instance {
-                                SpecialForm::ClassVar => {
+                            match type_qualifier {
+                                SpecialFormType::ClassVar => {
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::CLASS_VAR);
                                 }
-                                SpecialForm::Final => {
+                                SpecialFormType::Final => {
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::FINAL);
                                 }
                                 _ => unreachable!(),
@@ -8320,7 +8327,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         builder.expression_type(value)
                     };
 
-                    value_ty == Type::KnownInstance(SpecialForm::Unpack)
+                    value_ty == Type::SpecialForm(SpecialFormType::Unpack)
                 }
                 _ => false,
             }
@@ -8391,7 +8398,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             )
                         }
                     }
-                    Type::KnownInstance(SpecialForm::Unknown) => {
+                    Type::SpecialForm(SpecialFormType::Unknown) => {
                         SubclassOfType::subclass_of_unknown()
                     }
                     _ => todo_type!("unsupported type[X] special form"),
@@ -8422,7 +8429,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ..
             }) => {
                 let parameters_ty = match self.infer_expression(value) {
-                    Type::KnownInstance(SpecialForm::Union) => match &**parameters {
+                    Type::SpecialForm(SpecialFormType::Union) => match &**parameters {
                         ast::Expr::Tuple(tuple) => {
                             let ty = UnionType::from_elements(
                                 self.db(),
@@ -8470,9 +8477,37 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 Type::unknown()
             }
-            Type::KnownInstance(known_instance) => {
-                self.infer_parameterized_known_instance_type_expression(subscript, known_instance)
+            Type::SpecialForm(special_form) => {
+                self.infer_parameterized_special_form_type_expression(subscript, special_form)
             }
+            Type::KnownInstance(known_instance) => match known_instance {
+                KnownInstanceType::Protocol(_) => {
+                    self.infer_type_expression(&subscript.slice);
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`typing.Protocol` is not allowed in type expressions",
+                        ));
+                    }
+                    Type::unknown()
+                }
+                KnownInstanceType::Generic(_) => {
+                    self.infer_type_expression(&subscript.slice);
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`typing.Generic` is not allowed in type expressions",
+                        ));
+                    }
+                    Type::unknown()
+                }
+                KnownInstanceType::TypeVar(_) => {
+                    self.infer_type_expression(&subscript.slice);
+                    todo_type!("TypeVar annotations")
+                }
+                KnownInstanceType::TypeAliasType(_) => {
+                    self.infer_type_expression(&subscript.slice);
+                    todo_type!("Generic PEP-695 type alias")
+                }
+            },
             Type::Dynamic(DynamicType::Todo(_)) => {
                 self.infer_type_expression(slice);
                 value_ty
@@ -8507,20 +8542,20 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn infer_parameterized_known_instance_type_expression(
+    fn infer_parameterized_special_form_type_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
-        known_instance: SpecialForm,
+        special_form: SpecialFormType,
     ) -> Type<'db> {
         let db = self.db();
         let arguments_slice = &*subscript.slice;
-        match known_instance {
-            SpecialForm::Annotated => {
+        match special_form {
+            SpecialFormType::Annotated => {
                 let ast::Expr::Tuple(ast::ExprTuple {
                     elts: arguments, ..
                 }) = arguments_slice
                 else {
-                    report_invalid_arguments_to_annotated(self.db(), &self.context, subscript);
+                    report_invalid_arguments_to_annotated(&self.context, subscript);
 
                     // `Annotated[]` with less than two arguments is an error at runtime.
                     // However, we still treat `Annotated[T]` as `T` here for the purpose of
@@ -8530,7 +8565,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 if arguments.len() < 2 {
-                    report_invalid_arguments_to_annotated(self.db(), &self.context, subscript);
+                    report_invalid_arguments_to_annotated(&self.context, subscript);
                 }
 
                 let [type_expr, metadata @ ..] = &arguments[..] else {
@@ -8546,25 +8581,27 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.store_expression_type(arguments_slice, ty);
                 ty
             }
-            SpecialForm::Literal => match self.infer_literal_parameter_type(arguments_slice) {
+            SpecialFormType::Literal => match self.infer_literal_parameter_type(arguments_slice) {
                 Ok(ty) => ty,
                 Err(nodes) => {
                     for node in nodes {
-                        if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, node) {
-                            builder.into_diagnostic(
-                                "Type arguments for `Literal` must be `None`, \
-                                     a literal value (int, bool, str, or bytes), or an enum value",
-                            );
-                        }
+                        let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, node)
+                        else {
+                            continue;
+                        };
+                        builder.into_diagnostic(
+                            "Type arguments for `Literal` must be `None`, \
+                            a literal value (int, bool, str, or bytes), or an enum value",
+                        );
                     }
                     Type::unknown()
                 }
             },
-            SpecialForm::Optional => {
+            SpecialFormType::Optional => {
                 let param_type = self.infer_type_expression(arguments_slice);
                 UnionType::from_elements(db, [param_type, Type::none(db)])
             }
-            SpecialForm::Union => match arguments_slice {
+            SpecialFormType::Union => match arguments_slice {
                 ast::Expr::Tuple(t) => {
                     let union_ty = UnionType::from_elements(
                         db,
@@ -8575,15 +8612,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 _ => self.infer_type_expression(arguments_slice),
             },
-            SpecialForm::TypeVar(_) => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("TypeVar annotations")
-            }
-            SpecialForm::TypeAliasType(_) => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("Generic PEP-695 type alias")
-            }
-            SpecialForm::Callable => {
+            SpecialFormType::Callable => {
                 let mut arguments = match arguments_slice {
                     ast::Expr::Tuple(tuple) => Either::Left(tuple.iter()),
                     _ => {
@@ -8610,7 +8639,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 if !correct_argument_number {
-                    report_invalid_arguments_to_callable(self.db(), &self.context, subscript);
+                    report_invalid_arguments_to_callable(&self.context, subscript);
                 }
 
                 let callable_type = if let (Some(parameters), Some(return_type), true) =
@@ -8634,12 +8663,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // Type API special forms
-            SpecialForm::Not => match arguments_slice {
+            SpecialFormType::Not => match arguments_slice {
                 ast::Expr::Tuple(_) => {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
-                            "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr(self.db())
+                            "Special form `{special_form}` expected exactly one type parameter",
                         ));
                     }
                     Type::unknown()
@@ -8649,7 +8677,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     argument_type.negate(db)
                 }
             },
-            SpecialForm::Intersection => {
+            SpecialFormType::Intersection => {
                 let elements = match arguments_slice {
                     ast::Expr::Tuple(tuple) => Either::Left(tuple.iter()),
                     element => Either::Right(std::iter::once(element)),
@@ -8666,12 +8694,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 ty
             }
-            SpecialForm::TypeOf => match arguments_slice {
+            SpecialFormType::TypeOf => match arguments_slice {
                 ast::Expr::Tuple(_) => {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
-                            "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr(self.db())
+                            "Special form `{special_form}` expected exactly one type parameter",
                         ));
                     }
                     Type::unknown()
@@ -8682,12 +8709,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_expression(arguments_slice)
                 }
             },
-            SpecialForm::CallableTypeOf => match arguments_slice {
+            SpecialFormType::CallableTypeOf => match arguments_slice {
                 ast::Expr::Tuple(_) => {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
-                            "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr(self.db())
+                            "Special form `{special_form}` expected exactly one type parameter",
                         ));
                     }
                     Type::unknown()
@@ -8717,11 +8743,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                             .report_lint(&INVALID_TYPE_FORM, arguments_slice)
                         {
                             builder.into_diagnostic(format_args!(
-                                "Expected the first argument to `{}` \
+                                "Expected the first argument to `{special_form}` \
                                  to be a callable object, \
-                                 but got an object of type `{}`",
-                                known_instance.repr(self.db()),
-                                argument_type.display(db)
+                                 but got an object of type `{actual_type}`",
+                                actual_type = argument_type.display(db)
                             ));
                         }
                         return Type::unknown();
@@ -8735,142 +8760,120 @@ impl<'db> TypeInferenceBuilder<'db> {
             },
 
             // TODO: Generics
-            SpecialForm::ChainMap => {
+            SpecialFormType::ChainMap => {
                 self.infer_type_expression(arguments_slice);
                 KnownClass::ChainMap.to_instance(db)
             }
-            SpecialForm::OrderedDict => {
+            SpecialFormType::OrderedDict => {
                 self.infer_type_expression(arguments_slice);
                 KnownClass::OrderedDict.to_instance(db)
             }
-            SpecialForm::Dict => {
+            SpecialFormType::Dict => {
                 self.infer_type_expression(arguments_slice);
                 KnownClass::Dict.to_instance(db)
             }
-            SpecialForm::List => {
+            SpecialFormType::List => {
                 self.infer_type_expression(arguments_slice);
                 KnownClass::List.to_instance(db)
             }
-            SpecialForm::DefaultDict => {
+            SpecialFormType::DefaultDict => {
                 self.infer_type_expression(arguments_slice);
                 KnownClass::DefaultDict.to_instance(db)
             }
-            SpecialForm::Counter => {
+            SpecialFormType::Counter => {
                 self.infer_type_expression(arguments_slice);
                 KnownClass::Counter.to_instance(db)
             }
-            SpecialForm::Set => {
+            SpecialFormType::Set => {
                 self.infer_type_expression(arguments_slice);
                 KnownClass::Set.to_instance(db)
             }
-            SpecialForm::FrozenSet => {
+            SpecialFormType::FrozenSet => {
                 self.infer_type_expression(arguments_slice);
                 KnownClass::FrozenSet.to_instance(db)
             }
-            SpecialForm::Deque => {
+            SpecialFormType::Deque => {
                 self.infer_type_expression(arguments_slice);
                 KnownClass::Deque.to_instance(db)
             }
 
-            SpecialForm::ReadOnly => {
+            SpecialFormType::ReadOnly => {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`ReadOnly[]` type qualifier")
             }
-            SpecialForm::NotRequired => {
+            SpecialFormType::NotRequired => {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`NotRequired[]` type qualifier")
             }
-            SpecialForm::ClassVar | SpecialForm::Final => {
+            SpecialFormType::ClassVar | SpecialFormType::Final => {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     let diag = builder.into_diagnostic(format_args!(
-                        "Type qualifier `{}` is not allowed in type expressions \
+                        "Type qualifier `{special_form}` is not allowed in type expressions \
                          (only in annotation expressions)",
-                        known_instance.repr(self.db())
                     ));
                     diagnostic::add_type_expression_reference_link(diag);
                 }
                 self.infer_type_expression(arguments_slice)
             }
-            SpecialForm::Required => {
+            SpecialFormType::Required => {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`Required[]` type qualifier")
             }
-            SpecialForm::TypeIs => {
+            SpecialFormType::TypeIs => {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`TypeIs[]` special form")
             }
-            SpecialForm::TypeGuard => {
+            SpecialFormType::TypeGuard => {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`TypeGuard[]` special form")
             }
-            SpecialForm::Concatenate => {
+            SpecialFormType::Concatenate => {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`Concatenate[]` special form")
             }
-            SpecialForm::Unpack => {
+            SpecialFormType::Unpack => {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`Unpack[]` special form")
             }
-            SpecialForm::Protocol(_) => {
-                self.infer_type_expression(arguments_slice);
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                    builder.into_diagnostic(format_args!(
-                        "`typing.Protocol` is not allowed in type expressions",
-                    ));
-                }
-                Type::unknown()
-            }
-            SpecialForm::Generic(_) => {
-                self.infer_type_expression(arguments_slice);
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                    builder.into_diagnostic(format_args!(
-                        "`typing.Generic` is not allowed in type expressions",
-                    ));
-                }
-                Type::unknown()
-            }
-            SpecialForm::NoReturn
-            | SpecialForm::Never
-            | SpecialForm::AlwaysTruthy
-            | SpecialForm::AlwaysFalsy => {
+            SpecialFormType::NoReturn
+            | SpecialFormType::Never
+            | SpecialFormType::AlwaysTruthy
+            | SpecialFormType::AlwaysFalsy => {
                 self.infer_type_expression(arguments_slice);
 
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
-                        "Type `{}` expected no type parameter",
-                        known_instance.repr(self.db())
+                        "Type `{special_form}` expected no type parameter",
                     ));
                 }
                 Type::unknown()
             }
-            SpecialForm::TypingSelf
-            | SpecialForm::TypeAlias
-            | SpecialForm::TypedDict
-            | SpecialForm::Unknown => {
+            SpecialFormType::TypingSelf
+            | SpecialFormType::TypeAlias
+            | SpecialFormType::TypedDict
+            | SpecialFormType::Unknown => {
                 self.infer_type_expression(arguments_slice);
 
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
-                        "Special form `{}` expected no type parameter",
-                        known_instance.repr(self.db())
+                        "Special form `{special_form}` expected no type parameter",
                     ));
                 }
                 Type::unknown()
             }
-            SpecialForm::LiteralString => {
+            SpecialFormType::LiteralString => {
                 self.infer_type_expression(arguments_slice);
 
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     let mut diag = builder.into_diagnostic(format_args!(
-                        "Type `{}` expected no type parameter",
-                        known_instance.repr(self.db())
+                        "Type `{special_form}` expected no type parameter",
                     ));
                     diag.info("Did you mean to use `Literal[...]` instead?");
                 }
                 Type::unknown()
             }
-            SpecialForm::Type => self.infer_subclass_of_type_expression(arguments_slice),
-            SpecialForm::Tuple => self.infer_tuple_type_expression(arguments_slice),
+            SpecialFormType::Type => self.infer_subclass_of_type_expression(arguments_slice),
+            SpecialFormType::Tuple => self.infer_tuple_type_expression(arguments_slice),
         }
     }
 
@@ -8882,7 +8885,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO handle type aliases
             ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 let value_ty = self.infer_expression(value);
-                if matches!(value_ty, Type::KnownInstance(SpecialForm::Literal)) {
+                if matches!(value_ty, Type::SpecialForm(SpecialFormType::Literal)) {
                     let ty = self.infer_literal_parameter_type(slice)?;
 
                     // This branch deals with annotations such as `Literal[Literal[1]]`.
@@ -9423,7 +9426,7 @@ mod tests {
             let name_ty = var_ty.member(&db, "__name__").symbol.expect_type();
             assert_eq!(name_ty.display(&db).to_string(), expected_name_ty);
 
-            let SpecialForm::TypeVar(typevar) = var_ty.expect_known_instance() else {
+            let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = var_ty else {
                 panic!("expected TypeVar");
             };
 

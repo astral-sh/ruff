@@ -9,8 +9,8 @@ use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    SpecialForm, Type, TypeMapping, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance,
-    UnionType, declaration_type, todo_type,
+    KnownInstanceType, Type, TypeMapping, TypeVarBoundOrConstraints, TypeVarInstance,
+    TypeVarVariance, UnionType, declaration_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -51,7 +51,7 @@ impl<'db> GenericContext<'db> {
         match type_param_node {
             ast::TypeParam::TypeVar(node) => {
                 let definition = index.expect_single_definition(node);
-                let Type::KnownInstance(SpecialForm::TypeVar(typevar)) =
+                let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
                     declaration_type(db, definition).inner_type()
                 else {
                     return None;

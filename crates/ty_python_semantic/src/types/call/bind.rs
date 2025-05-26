@@ -21,8 +21,8 @@ use crate::types::generics::{Specialization, SpecializationBuilder, Specializati
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators, FunctionType,
-    KnownClass, KnownFunction, MethodWrapperKind, PropertyInstanceType, SpecialForm, TupleType,
-    TypeMapping, UnionType, WrapperDescriptorKind, todo_type,
+    KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType,
+    SpecialFormType, TupleType, TypeMapping, UnionType, WrapperDescriptorKind, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -314,7 +314,9 @@ impl<'db> Bindings<'db> {
                             }
                             [
                                 Some(Type::PropertyInstance(property)),
-                                Some(Type::KnownInstance(SpecialForm::TypeAliasType(type_alias))),
+                                Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                                    type_alias,
+                                ))),
                                 ..,
                             ] if property.getter(db).is_some_and(|getter| {
                                 getter
@@ -327,7 +329,7 @@ impl<'db> Bindings<'db> {
                             }
                             [
                                 Some(Type::PropertyInstance(property)),
-                                Some(Type::KnownInstance(SpecialForm::TypeVar(typevar))),
+                                Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))),
                                 ..,
                             ] => {
                                 match property
@@ -913,7 +915,7 @@ impl<'db> Bindings<'db> {
                         _ => {}
                     },
 
-                    Type::KnownInstance(SpecialForm::TypedDict) => {
+                    Type::SpecialForm(SpecialFormType::TypedDict) => {
                         overload.set_return_type(todo_type!("TypedDict"));
                     }
 

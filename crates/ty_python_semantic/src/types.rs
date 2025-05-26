@@ -55,7 +55,7 @@ use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
 use instance::Protocol;
 pub(crate) use instance::{NominalInstanceType, ProtocolInstanceType};
-pub(crate) use special_forms::SpecialForm;
+pub(crate) use special_form::SpecialFormType;
 
 mod builder;
 mod call;
@@ -72,7 +72,7 @@ mod narrow;
 mod protocol_class;
 mod signatures;
 mod slots;
-mod special_forms;
+mod special_form;
 mod string_annotation;
 mod subclass_of;
 mod type_ordering;
@@ -512,7 +512,8 @@ pub enum Type<'db> {
     /// Construct this variant using the `Type::instance` constructor function.
     ProtocolInstance(ProtocolInstanceType<'db>),
     /// A single Python object that requires special treatment in the type system
-    KnownInstance(SpecialForm<'db>),
+    SpecialForm(SpecialFormType),
+    KnownInstance(KnownInstanceType<'db>),
     /// An instance of `builtins.property`
     PropertyInstance(PropertyInstanceType<'db>),
     /// The set of objects in any of the types in the union
@@ -664,6 +665,7 @@ impl<'db> Type<'db> {
             | Self::ModuleLiteral(_)
             | Self::ClassLiteral(_)
             | Self::NominalInstance(_)
+            | Self::SpecialForm(_)
             | Self::KnownInstance(_)
             | Self::PropertyInstance(_)
             | Self::BoundMethod(_)
@@ -691,6 +693,7 @@ impl<'db> Type<'db> {
             | Self::ModuleLiteral(_)
             | Self::FunctionLiteral(_)
             | Self::ClassLiteral(_)
+            | Self::SpecialForm(_)
             | Self::KnownInstance(_)
             | Self::StringLiteral(_)
             | Self::IntLiteral(_)
@@ -936,19 +939,6 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::IntLiteral variant")
     }
 
-    pub const fn into_known_instance(self) -> Option<SpecialForm<'db>> {
-        match self {
-            Type::KnownInstance(known_instance) => Some(known_instance),
-            _ => None,
-        }
-    }
-
-    #[track_caller]
-    pub fn expect_known_instance(self) -> SpecialForm<'db> {
-        self.into_known_instance()
-            .expect("Expected a Type::KnownInstance variant")
-    }
-
     pub const fn into_tuple(self) -> Option<TupleType<'db>> {
         match self {
             Type::Tuple(tuple_type) => Some(tuple_type),
@@ -1042,6 +1032,7 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
+            | Type::SpecialForm(_)
             | Type::IntLiteral(_) => self,
         }
     }
@@ -1377,6 +1368,8 @@ impl<'db> Type<'db> {
             // For example: `Type::KnownInstance(KnownInstanceType::Type)` is a subtype of `Type::NominalInstance(_SpecialForm)`,
             // because `Type::KnownInstance(KnownInstanceType::Type)` is a set with exactly one runtime value in it
             // (the symbol `typing.Type`), and that symbol is known to be an instance of `typing._SpecialForm` at runtime.
+            (Type::SpecialForm(left), right) => left.instance_fallback(db).is_subtype_of(db, right),
+
             (Type::KnownInstance(left), right) => {
                 left.instance_fallback(db).is_subtype_of(db, right)
             }
@@ -1870,6 +1863,7 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
                 | Type::GenericAlias(..)
+                | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
                 right @ (Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
@@ -1882,6 +1876,7 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
                 | Type::GenericAlias(..)
+                | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
             ) => left != right,
 
@@ -2014,6 +2009,11 @@ impl<'db> Type<'db> {
                 | Type::IntLiteral(..)),
             ) => !ty.satisfies_protocol(db, protocol),
 
+            (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
+            | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => !special_form
+                .instance_fallback(db)
+                .satisfies_protocol(db, protocol),
+
             (Type::ProtocolInstance(protocol), Type::KnownInstance(known_instance))
             | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => {
                 !known_instance
@@ -2049,15 +2049,24 @@ impl<'db> Type<'db> {
                     .is_disjoint_from(db, other),
             },
 
+            (Type::SpecialForm(special_form), Type::NominalInstance(instance))
+            | (Type::NominalInstance(instance), Type::SpecialForm(special_form)) => {
+                !special_form.is_instance_of(db, instance.class)
+            }
+
             (Type::KnownInstance(known_instance), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::KnownInstance(known_instance)) => {
                 !known_instance.is_instance_of(db, instance.class)
             }
 
-            (known_instance_ty @ Type::KnownInstance(_), Type::Tuple(tuple))
-            | (Type::Tuple(tuple), known_instance_ty @ Type::KnownInstance(_)) => {
-                known_instance_ty.is_disjoint_from(db, tuple.homogeneous_supertype(db))
-            }
+            (
+                known_instance_ty @ (Type::SpecialForm(_) | Type::KnownInstance(_)),
+                Type::Tuple(tuple),
+            )
+            | (
+                Type::Tuple(tuple),
+                known_instance_ty @ (Type::SpecialForm(_) | Type::KnownInstance(_)),
+            ) => known_instance_ty.is_disjoint_from(db, tuple.homogeneous_supertype(db)),
 
             (Type::BooleanLiteral(..), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::BooleanLiteral(..)) => {
@@ -2217,6 +2226,7 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::BytesLiteral(_)
+            | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -2331,15 +2341,16 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(..)
             | Type::GenericAlias(..)
             | Type::ModuleLiteral(..) => true,
-            Type::KnownInstance(known_instance) => {
+            Type::SpecialForm(special_form) => {
                 // Nearly all `KnownInstance` types are singletons, but if a symbol could validly
                 // originate from either `typing` or `typing_extensions` then this is not guaranteed.
                 // E.g. `typing.Protocol` is equivalent to `typing_extensions.Protocol`, so both are treated
                 // as inhabiting the type `KnownInstanceType::Protocol` in our model, but they are actually
                 // distinct symbols at different memory addresses at runtime.
-                !(known_instance.check_module(KnownModule::Typing)
-                    && known_instance.check_module(KnownModule::TypingExtensions))
+                !(special_form.check_module(KnownModule::Typing)
+                    && special_form.check_module(KnownModule::TypingExtensions))
             }
+            Type::KnownInstance(_) => false,
             Type::Callable(_) => {
                 // A callable type is never a singleton because for any given signature,
                 // there could be any number of distinct objects that are all callable with that
@@ -2407,6 +2418,7 @@ impl<'db> Type<'db> {
             | Type::BooleanLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
+            | Type::SpecialForm(..)
             | Type::KnownInstance(..) => true,
 
             Type::ProtocolInstance(..) => {
@@ -2561,6 +2573,7 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
+            | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
@@ -2685,7 +2698,7 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .instance_member(db, name),
 
-            Type::KnownInstance(_) => Symbol::Unbound.into(),
+            Type::SpecialForm(_) | Type::KnownInstance(_) => Symbol::Unbound.into(),
 
             Type::PropertyInstance(_) => KnownClass::Property
                 .to_instance(db)
@@ -3135,6 +3148,7 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::Tuple(..)
             | Type::TypeVar(..)
+            | Type::SpecialForm(..)
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..) => {
@@ -3416,6 +3430,7 @@ impl<'db> Type<'db> {
             | Type::PropertyInstance(_)
             | Type::BoundSuper(_)
             | Type::KnownInstance(_)
+            | Type::SpecialForm(_)
             | Type::AlwaysTruthy => Truthiness::AlwaysTrue,
 
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
@@ -4253,7 +4268,7 @@ impl<'db> Type<'db> {
                 }
             },
 
-            Type::KnownInstance(SpecialForm::TypedDict) => {
+            Type::SpecialForm(SpecialFormType::TypedDict) => {
                 Signatures::single(CallableSignature::single(
                     self,
                     Signature::new(
@@ -4342,10 +4357,11 @@ impl<'db> Type<'db> {
             // TODO: these are actually callable
             Type::MethodWrapper(_) | Type::DataclassDecorator(_) => Signatures::not_callable(self),
 
-            // TODO: some `KnownInstance`s are callable (e.g. TypedDicts)
-            Type::KnownInstance(_) => Signatures::not_callable(self),
+            // TODO: some `SpecialForm`s are callable (e.g. TypedDicts)
+            Type::SpecialForm(_) => Signatures::not_callable(self),
 
             Type::PropertyInstance(_)
+            | Type::KnownInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::IntLiteral(_)
@@ -4832,6 +4848,7 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
+            | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::PropertyInstance(_)
             | Type::ModuleLiteral(_)
@@ -4912,34 +4929,44 @@ impl<'db> Type<'db> {
             }),
 
             Type::KnownInstance(known_instance) => match known_instance {
-                SpecialForm::TypeAliasType(alias) => Ok(alias.value_type(db)),
-                SpecialForm::Never | SpecialForm::NoReturn => Ok(Type::Never),
-                SpecialForm::LiteralString => Ok(Type::LiteralString),
-                SpecialForm::Unknown => Ok(Type::unknown()),
-                SpecialForm::AlwaysTruthy => Ok(Type::AlwaysTruthy),
-                SpecialForm::AlwaysFalsy => Ok(Type::AlwaysFalsy),
+                KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
+                KnownInstanceType::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
+                KnownInstanceType::Protocol(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
+                    fallback_type: Type::unknown(),
+                }),
+                KnownInstanceType::Generic(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Generic],
+                    fallback_type: Type::unknown(),
+                }),
+            },
+
+            Type::SpecialForm(special_form) => match special_form {
+                SpecialFormType::Never | SpecialFormType::NoReturn => Ok(Type::Never),
+                SpecialFormType::LiteralString => Ok(Type::LiteralString),
+                SpecialFormType::Unknown => Ok(Type::unknown()),
+                SpecialFormType::AlwaysTruthy => Ok(Type::AlwaysTruthy),
+                SpecialFormType::AlwaysFalsy => Ok(Type::AlwaysFalsy),
 
                 // We treat `typing.Type` exactly the same as `builtins.type`:
-                SpecialForm::Type => Ok(KnownClass::Type.to_instance(db)),
-                SpecialForm::Tuple => Ok(KnownClass::Tuple.to_instance(db)),
+                SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db)),
+                SpecialFormType::Tuple => Ok(KnownClass::Tuple.to_instance(db)),
 
                 // Legacy `typing` aliases
-                SpecialForm::List => Ok(KnownClass::List.to_instance(db)),
-                SpecialForm::Dict => Ok(KnownClass::Dict.to_instance(db)),
-                SpecialForm::Set => Ok(KnownClass::Set.to_instance(db)),
-                SpecialForm::FrozenSet => Ok(KnownClass::FrozenSet.to_instance(db)),
-                SpecialForm::ChainMap => Ok(KnownClass::ChainMap.to_instance(db)),
-                SpecialForm::Counter => Ok(KnownClass::Counter.to_instance(db)),
-                SpecialForm::DefaultDict => Ok(KnownClass::DefaultDict.to_instance(db)),
-                SpecialForm::Deque => Ok(KnownClass::Deque.to_instance(db)),
-                SpecialForm::OrderedDict => Ok(KnownClass::OrderedDict.to_instance(db)),
-
-                SpecialForm::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
+                SpecialFormType::List => Ok(KnownClass::List.to_instance(db)),
+                SpecialFormType::Dict => Ok(KnownClass::Dict.to_instance(db)),
+                SpecialFormType::Set => Ok(KnownClass::Set.to_instance(db)),
+                SpecialFormType::FrozenSet => Ok(KnownClass::FrozenSet.to_instance(db)),
+                SpecialFormType::ChainMap => Ok(KnownClass::ChainMap.to_instance(db)),
+                SpecialFormType::Counter => Ok(KnownClass::Counter.to_instance(db)),
+                SpecialFormType::DefaultDict => Ok(KnownClass::DefaultDict.to_instance(db)),
+                SpecialFormType::Deque => Ok(KnownClass::Deque.to_instance(db)),
+                SpecialFormType::OrderedDict => Ok(KnownClass::OrderedDict.to_instance(db)),
 
                 // TODO: Use an opt-in rule for a bare `Callable`
-                SpecialForm::Callable => Ok(Type::Callable(CallableType::unknown(db))),
+                SpecialFormType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
 
-                SpecialForm::TypingSelf => {
+                SpecialFormType::TypingSelf => {
                     let index = semantic_index(db, scope_id.file(db));
                     let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                         return Err(InvalidTypeExpressionError {
@@ -4962,41 +4989,32 @@ impl<'db> Type<'db> {
                         TypeVarKind::Legacy,
                     )))
                 }
-                SpecialForm::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
-                SpecialForm::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
+                SpecialFormType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
+                SpecialFormType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
 
-                SpecialForm::Protocol(_) => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
+                SpecialFormType::Literal
+                | SpecialFormType::Union
+                | SpecialFormType::Intersection => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![
+                        InvalidTypeExpression::RequiresArguments(*self)
+                    ],
                     fallback_type: Type::unknown(),
                 }),
-                SpecialForm::Generic(_) => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Generic],
-                    fallback_type: Type::unknown(),
-                }),
 
-                SpecialForm::Literal | SpecialForm::Union | SpecialForm::Intersection => {
-                    Err(InvalidTypeExpressionError {
-                        invalid_expressions: smallvec::smallvec![
-                            InvalidTypeExpression::RequiresArguments(*self)
-                        ],
-                        fallback_type: Type::unknown(),
-                    })
-                }
-
-                SpecialForm::Optional
-                | SpecialForm::Not
-                | SpecialForm::TypeOf
-                | SpecialForm::TypeIs
-                | SpecialForm::TypeGuard
-                | SpecialForm::Unpack
-                | SpecialForm::CallableTypeOf => Err(InvalidTypeExpressionError {
+                SpecialFormType::Optional
+                | SpecialFormType::Not
+                | SpecialFormType::TypeOf
+                | SpecialFormType::TypeIs
+                | SpecialFormType::TypeGuard
+                | SpecialFormType::Unpack
+                | SpecialFormType::CallableTypeOf => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![
                         InvalidTypeExpression::RequiresOneArgument(*self)
                     ],
                     fallback_type: Type::unknown(),
                 }),
 
-                SpecialForm::Annotated | SpecialForm::Concatenate => {
+                SpecialFormType::Annotated | SpecialFormType::Concatenate => {
                     Err(InvalidTypeExpressionError {
                         invalid_expressions: smallvec::smallvec![
                             InvalidTypeExpression::RequiresTwoArguments(*self)
@@ -5005,23 +5023,23 @@ impl<'db> Type<'db> {
                     })
                 }
 
-                SpecialForm::ClassVar | SpecialForm::Final => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::TypeQualifier(
-                        *known_instance
-                    )],
-                    fallback_type: Type::unknown(),
-                }),
-
-                SpecialForm::ReadOnly | SpecialForm::NotRequired | SpecialForm::Required => {
+                SpecialFormType::ClassVar | SpecialFormType::Final => {
                     Err(InvalidTypeExpressionError {
                         invalid_expressions: smallvec::smallvec![
-                            InvalidTypeExpression::TypeQualifierRequiresOneArgument(
-                                *known_instance
-                            )
+                            InvalidTypeExpression::TypeQualifier(*special_form)
                         ],
                         fallback_type: Type::unknown(),
                     })
                 }
+
+                SpecialFormType::ReadOnly
+                | SpecialFormType::NotRequired
+                | SpecialFormType::Required => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![
+                        InvalidTypeExpression::TypeQualifierRequiresOneArgument(*special_form)
+                    ],
+                    fallback_type: Type::unknown(),
+                }),
             },
 
             Type::Union(union) => {
@@ -5129,6 +5147,7 @@ impl<'db> Type<'db> {
             Type::Never => Type::Never,
             Type::NominalInstance(instance) => instance.to_meta_type(db),
             Type::KnownInstance(known_instance) => known_instance.to_meta_type(db),
+            Type::SpecialForm(special_form) => special_form.to_meta_type(db),
             Type::PropertyInstance(_) => KnownClass::Property.to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class_literal(db),
@@ -5327,6 +5346,7 @@ impl<'db> Type<'db> {
             // some other generic context's specialization is applied to it.
             | Type::ClassLiteral(_)
             | Type::BoundSuper(_)
+            | Type::SpecialForm(_)
             | Type::KnownInstance(_) => self,
         }
     }
@@ -5426,6 +5446,7 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
             | Type::BoundSuper(_)
+            | Type::SpecialForm(_)
             | Type::KnownInstance(_) => {}
         }
     }
@@ -5440,6 +5461,7 @@ impl<'db> Type<'db> {
         match self {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
+            Type::SpecialForm(special_form) => Type::string_literal(db, special_form.repr()),
             Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
                 db,
                 known_instance.repr(db).to_string().into_boxed_str(),
@@ -5461,6 +5483,7 @@ impl<'db> Type<'db> {
                 Type::string_literal(db, &format!("'{}'", literal.value(db).escape_default()))
             }
             Type::LiteralString => Type::LiteralString,
+            Type::SpecialForm(special_form) => Type::string_literal(db, special_form.repr()),
             Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
                 db,
                 known_instance.repr(db).to_string().into_boxed_str(),
@@ -5495,8 +5518,10 @@ impl<'db> Type<'db> {
                 Some(TypeDefinition::Class(instance.class.definition(db)))
             }
             Self::KnownInstance(instance) => match instance {
-                SpecialForm::TypeVar(var) => Some(TypeDefinition::TypeVar(var.definition(db)?)),
-                SpecialForm::TypeAliasType(type_alias) => {
+                KnownInstanceType::TypeVar(var) => {
+                    Some(TypeDefinition::TypeVar(var.definition(db)?))
+                }
+                KnownInstanceType::TypeAliasType(type_alias) => {
                     type_alias.definition(db).map(TypeDefinition::TypeAlias)
                 }
                 _ => None,
@@ -5534,6 +5559,7 @@ impl<'db> Type<'db> {
             | Self::Never
             | Self::Callable(_)
             | Self::AlwaysTruthy
+            | Self::SpecialForm(_)
             | Self::AlwaysFalsy => None,
         }
     }
@@ -5646,6 +5672,127 @@ impl<'db> TypeMapping<'_, 'db> {
                 TypeMapping::PartialSpecialization(partial.normalized(db))
             }
             TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
+        }
+    }
+}
+
+/// Despite its name, this is quite a different type from `NominalInstanceType`.
+/// For the vast majority of instance-types in Python, we cannot say how many possible
+/// inhabitants there are or could be of that type at runtime. Each variant of the
+/// [`KnownInstanceType`] enum, however, represents a specific runtime symbol
+/// that requires heavy special-casing in the type system. Thus any one `KnownInstance`
+/// variant can only be inhabited by one specific object at runtime.
+///
+/// Conceptually this type is quite similar to `SpecialFormType` and has many similar
+/// methods. Unlike that enum, however, this enum's variants are able to wrap associated data.
+///
+/// # Ordering
+///
+/// Ordering between variants is stable and should be the same between runs.
+/// Ordering within variants is based on the wrapped data's salsa-assigned id and not on its values.
+/// The id may change between runs, or when e.g. a `TypeVarInstance` was garbage-collected and recreated.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, Ord, PartialOrd)]
+pub enum KnownInstanceType<'db> {
+    /// The symbol `typing.Protocol` (which can also be found as `typing_extensions.Protocol`)
+    Protocol(Option<GenericContext<'db>>),
+    /// The symbol `typing.Generic` (which can also be found as `typing_extensions.Generic`)
+    Generic(Option<GenericContext<'db>>),
+    /// A single instance of `typing.TypeVar`
+    TypeVar(TypeVarInstance<'db>),
+    /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
+    TypeAliasType(TypeAliasType<'db>),
+}
+
+impl<'db> KnownInstanceType<'db> {
+    fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::Protocol(generic_context) => {
+                Self::Protocol(generic_context.map(|ctx| ctx.normalized(db)))
+            }
+            Self::Generic(generic_context) => {
+                Self::Generic(generic_context.map(|ctx| ctx.normalized(db)))
+            }
+            Self::TypeVar(typevar) => Self::TypeVar(typevar.normalized(db)),
+            Self::TypeAliasType(type_alias) => Self::TypeAliasType(type_alias.normalized(db)),
+        }
+    }
+
+    const fn class(self) -> KnownClass {
+        match self {
+            Self::Protocol(_) => KnownClass::SpecialForm, // actually `_ProtocolMeta` at runtime but this is what typeshed says
+            Self::Generic(_) => KnownClass::SpecialForm, // actually `type` at runtime but this is what typeshed says
+            Self::TypeVar(_) => KnownClass::TypeVar,
+            Self::TypeAliasType(_) => KnownClass::TypeAliasType,
+        }
+    }
+
+    fn try_from_file_and_name(db: &'db dyn Db, file: File, symbol_name: &str) -> Option<Self> {
+        let candidate = match symbol_name {
+            "Protocol" => Self::Protocol(None),
+            "Generic" => Self::Generic(None),
+            _ => return None,
+        };
+        matches!(
+            file_to_module(db, file)?.known()?,
+            KnownModule::Typing | KnownModule::TypingExtensions
+        )
+        .then_some(candidate)
+    }
+
+    fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
+        self.class().to_class_literal(db)
+    }
+
+    /// Return the instance type which this type is a subtype of.
+    ///
+    /// For example, an alias created using the `type` statement is an instance of
+    /// `typing.TypeAliasType`, so `KnownInstanceType::TypeAliasType(_).instance_fallback(db)`
+    /// returns `Type::NominalInstance(NominalInstanceType { class: <typing.TypeAliasType> })`.
+    fn instance_fallback(self, db: &dyn Db) -> Type {
+        self.class().to_instance(db)
+    }
+
+    /// Return `true` if this symbol is an instance of `class`.
+    fn is_instance_of(self, db: &dyn Db, class: ClassType) -> bool {
+        self.class().is_subclass_of(db, class)
+    }
+
+    /// Return the repr of the symbol at runtime
+    fn repr(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
+        struct KnownInstanceRepr<'db> {
+            known_instance: KnownInstanceType<'db>,
+            db: &'db dyn Db,
+        }
+
+        impl std::fmt::Display for KnownInstanceRepr<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.known_instance {
+                    KnownInstanceType::Protocol(generic_context) => {
+                        f.write_str("typing.Protocol")?;
+                        if let Some(generic_context) = generic_context {
+                            generic_context.display(self.db).fmt(f)?;
+                        }
+                        Ok(())
+                    }
+                    KnownInstanceType::Generic(generic_context) => {
+                        f.write_str("typing.Generic")?;
+                        if let Some(generic_context) = generic_context {
+                            generic_context.display(self.db).fmt(f)?;
+                        }
+                        Ok(())
+                    }
+                    KnownInstanceType::TypeAliasType(_) => f.write_str("typing.TypeAliasType"),
+                    // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
+                    // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
+                    // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
+                    KnownInstanceType::TypeVar(_) => f.write_str("typing.TypeVar"),
+                }
+            }
+        }
+
+        KnownInstanceRepr {
+            known_instance: self,
+            db,
         }
     }
 }
@@ -5807,10 +5954,10 @@ enum InvalidTypeExpression<'db> {
     Generic,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
-    TypeQualifier(SpecialForm<'db>),
+    TypeQualifier(SpecialFormType),
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
-    TypeQualifierRequiresOneArgument(SpecialForm<'db>),
+    TypeQualifierRequiresOneArgument(SpecialFormType),
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
 }
@@ -5848,13 +5995,13 @@ impl<'db> InvalidTypeExpression<'db> {
                     }
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,
-                        "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions)",
-                        q = qualifier.repr(self.db)
+                        "Type qualifier `{qualifier}` is not allowed in type expressions \
+                        (only in annotation expressions)",
                     ),
                     InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier) => write!(
                         f,
-                        "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions, and only with exactly one argument)",
-                        q = qualifier.repr(self.db)
+                        "Type qualifier `{qualifier}` is not allowed in type expressions \
+                        (only in annotation expressions, and only with exactly one argument)",
                     ),
                     InvalidTypeExpression::InvalidType(ty, _) => write!(
                         f,
@@ -8856,8 +9003,8 @@ impl<'db> SuperOwnerKind<'db> {
             Type::BytesLiteral(_) => {
                 SuperOwnerKind::try_from_type(db, KnownClass::Bytes.to_instance(db))
             }
-            Type::KnownInstance(known_instance) => {
-                SuperOwnerKind::try_from_type(db, known_instance.instance_fallback(db))
+            Type::SpecialForm(special_form) => {
+                SuperOwnerKind::try_from_type(db, special_form.instance_fallback(db))
             }
             _ => None,
         }
