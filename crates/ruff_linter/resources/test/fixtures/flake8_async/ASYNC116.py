@@ -109,6 +109,7 @@ async def import_from_anyio():
     # catch from import
     await sleep(86401)  # error: 116, "async"
 
+
 async def test_anyio_async116_helpers():
     import anyio
 
@@ -116,7 +117,7 @@ async def test_anyio_async116_helpers():
     await anyio.sleep(seconds=1)  # OK
 
     await anyio.sleep(delay=86401)  # ASYNC116
-    await anyio.sleep(seconds=86401)  # ASYNC116
+    await anyio.sleep(seconds=86401)  # OK
 
 
 async def test_trio_async116_helpers():
@@ -126,4 +127,4 @@ async def test_trio_async116_helpers():
     await trio.sleep(delay=1)  # OK
 
     await trio.sleep(seconds=86401)  # ASYNC116
-    await trio.sleep(delay=86401)  # ASYNC116
+    await trio.sleep(delay=86401)  # OK
