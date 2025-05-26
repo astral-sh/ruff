@@ -280,7 +280,7 @@ use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
 };
-use crate::semantic_index::place::{FileScopeId, ScopeKind, ScopedPlaceId};
+use crate::semantic_index::place::{FileScopeId, PlaceExpr, ScopeKind, ScopedPlaceId};
 use crate::semantic_index::predicate::{
     Predicate, Predicates, PredicatesBuilder, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
@@ -288,8 +288,6 @@ use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
 };
 use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
-
-use super::place::PlaceExpr;
 
 mod place_state;
 
@@ -772,12 +770,22 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert_eq!(place, new_place);
     }
 
-    pub(super) fn record_binding(&mut self, place: ScopedPlaceId, binding: Definition<'db>) {
+    pub(super) fn record_binding(
+        &mut self,
+        place: ScopedPlaceId,
+        binding: Definition<'db>,
+        is_place_name: bool,
+    ) {
         let def_id = self.all_definitions.push(DefinitionState::Defined(binding));
         let place_state = &mut self.place_states[place];
         self.declarations_by_binding
             .insert(binding, place_state.declarations().clone());
-        place_state.record_binding(def_id, self.scope_start_visibility, self.is_class_scope);
+        place_state.record_binding(
+            def_id,
+            self.scope_start_visibility,
+            self.is_class_scope,
+            is_place_name,
+        );
     }
 
     pub(super) fn add_predicate(&mut self, predicate: Predicate<'db>) -> ScopedPredicateId {
@@ -942,6 +950,7 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         place: ScopedPlaceId,
         definition: Definition<'db>,
+        is_place_name: bool,
     ) {
         // We don't need to store anything in self.bindings_by_declaration or
         // self.declarations_by_binding.
@@ -950,13 +959,23 @@ impl<'db> UseDefMapBuilder<'db> {
             .push(DefinitionState::Defined(definition));
         let place_state = &mut self.place_states[place];
         place_state.record_declaration(def_id);
-        place_state.record_binding(def_id, self.scope_start_visibility, self.is_class_scope);
+        place_state.record_binding(
+            def_id,
+            self.scope_start_visibility,
+            self.is_class_scope,
+            is_place_name,
+        );
     }
 
-    pub(super) fn delete_binding(&mut self, place: ScopedPlaceId) {
+    pub(super) fn delete_binding(&mut self, place: ScopedPlaceId, is_place_name: bool) {
         let def_id = self.all_definitions.push(DefinitionState::Deleted);
         let place_state = &mut self.place_states[place];
-        place_state.record_binding(def_id, self.scope_start_visibility, self.is_class_scope);
+        place_state.record_binding(
+            def_id,
+            self.scope_start_visibility,
+            self.is_class_scope,
+            is_place_name,
+        );
     }
 
     pub(super) fn record_use(

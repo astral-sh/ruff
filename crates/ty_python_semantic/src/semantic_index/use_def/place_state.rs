@@ -197,7 +197,7 @@ pub(super) enum EagerSnapshot {
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update)]
 pub(super) struct Bindings {
     /// The narrowing constraint applicable to the "unbound" binding, if we need access to it even
-    /// when it's not visible. This happens in class scopes, where local bindings are not visible
+    /// when it's not visible. This happens in class scopes, where local name bindings are not visible
     /// to nested scopes, but we still need to know what narrowing constraints were applied to the
     /// "unbound" binding.
     unbound_narrowing_constraint: Option<ScopedNarrowingConstraint>,
@@ -241,10 +241,11 @@ impl Bindings {
         binding: ScopedDefinitionId,
         visibility_constraint: ScopedVisibilityConstraintId,
         is_class_scope: bool,
+        is_place_name: bool,
     ) {
-        // If we are in a class scope, and the unbound binding was previously visible, but we will
+        // If we are in a class scope, and the unbound name binding was previously visible, but we will
         // now replace it, record the narrowing constraints on it:
-        if is_class_scope && self.live_bindings[0].binding.is_unbound() {
+        if is_class_scope && is_place_name && self.live_bindings[0].binding.is_unbound() {
             self.unbound_narrowing_constraint = Some(self.live_bindings[0].narrowing_constraint);
         }
         // The new binding replaces all previous live bindings in this path, and has no
@@ -376,10 +377,15 @@ impl PlaceState {
         binding_id: ScopedDefinitionId,
         visibility_constraint: ScopedVisibilityConstraintId,
         is_class_scope: bool,
+        is_place_name: bool,
     ) {
         debug_assert_ne!(binding_id, ScopedDefinitionId::UNBOUND);
-        self.bindings
-            .record_binding(binding_id, visibility_constraint, is_class_scope);
+        self.bindings.record_binding(
+            binding_id,
+            visibility_constraint,
+            is_class_scope,
+            is_place_name,
+        );
     }
 
     /// Add given constraint to all live bindings.
@@ -511,6 +517,7 @@ mod tests {
             ScopedDefinitionId::from_u32(1),
             ScopedVisibilityConstraintId::ALWAYS_TRUE,
             false,
+            true,
         );
 
         assert_bindings(&narrowing_constraints, &sym, &["1<>"]);
@@ -524,6 +531,7 @@ mod tests {
             ScopedDefinitionId::from_u32(1),
             ScopedVisibilityConstraintId::ALWAYS_TRUE,
             false,
+            true,
         );
         let predicate = ScopedPredicateId::from_u32(0).into();
         sym.record_narrowing_constraint(&mut narrowing_constraints, predicate);
@@ -542,6 +550,7 @@ mod tests {
             ScopedDefinitionId::from_u32(1),
             ScopedVisibilityConstraintId::ALWAYS_TRUE,
             false,
+            true,
         );
         let predicate = ScopedPredicateId::from_u32(0).into();
         sym1a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
@@ -551,6 +560,7 @@ mod tests {
             ScopedDefinitionId::from_u32(1),
             ScopedVisibilityConstraintId::ALWAYS_TRUE,
             false,
+            true,
         );
         let predicate = ScopedPredicateId::from_u32(0).into();
         sym1b.record_narrowing_constraint(&mut narrowing_constraints, predicate);
@@ -569,6 +579,7 @@ mod tests {
             ScopedDefinitionId::from_u32(2),
             ScopedVisibilityConstraintId::ALWAYS_TRUE,
             false,
+            true,
         );
         let predicate = ScopedPredicateId::from_u32(1).into();
         sym2a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
@@ -578,6 +589,7 @@ mod tests {
             ScopedDefinitionId::from_u32(2),
             ScopedVisibilityConstraintId::ALWAYS_TRUE,
             false,
+            true,
         );
         let predicate = ScopedPredicateId::from_u32(2).into();
         sym1b.record_narrowing_constraint(&mut narrowing_constraints, predicate);
@@ -596,6 +608,7 @@ mod tests {
             ScopedDefinitionId::from_u32(3),
             ScopedVisibilityConstraintId::ALWAYS_TRUE,
             false,
+            true,
         );
         let predicate = ScopedPredicateId::from_u32(3).into();
         sym3a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
