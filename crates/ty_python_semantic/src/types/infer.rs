@@ -3406,24 +3406,31 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::ModuleLiteral(module) => {
                 if let Symbol::Type(attr_ty, _) = module.static_member(db, attribute) {
                     let assignable = value_ty.is_assignable_to(db, attr_ty);
-                    if !assignable {
-                        report_invalid_attribute_assignment(
-                            &self.context,
-                            target.into(),
-                            attr_ty,
-                            value_ty,
-                            attribute,
-                        );
+                    if assignable {
+                        true
+                    } else {
+                        if emit_diagnostics {
+                            report_invalid_attribute_assignment(
+                                &self.context,
+                                target.into(),
+                                attr_ty,
+                                value_ty,
+                                attribute,
+                            );
+                        }
+                        false
                     }
-
-                    false
                 } else {
-                    if let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target) {
-                        builder.into_diagnostic(format_args!(
-                            "Unresolved attribute `{}` on type `{}`.",
-                            attribute,
-                            object_ty.display(db)
-                        ));
+                    if emit_diagnostics {
+                        if let Some(builder) =
+                            self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Unresolved attribute `{}` on type `{}`.",
+                                attribute,
+                                object_ty.display(db)
+                            ));
+                        }
                     }
 
                     false

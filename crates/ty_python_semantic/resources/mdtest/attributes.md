@@ -1698,6 +1698,36 @@ reveal_type(outer.nested.inner.Outer.Nested.Inner.attr)  # revealed: int
 outer.nested.inner.Outer.Nested.Inner.attr = "a"
 ```
 
+### Unions of module attributes
+
+`mod1.py`:
+
+```py
+global_symbol: str = "a"
+```
+
+`mod2.py`:
+
+```py
+global_symbol: str = "a"
+```
+
+```py
+import mod1
+import mod2
+
+def _(flag: bool):
+    if flag:
+        mod = mod1
+    else:
+        mod = mod2
+
+    mod.global_symbol = "b"
+
+    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` on type `<module 'mod1'> | <module 'mod2'>`"
+    mod.global_symbol = 1
+```
+
 ## Literal types
 
 ### Function-literal attributes
