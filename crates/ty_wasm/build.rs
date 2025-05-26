@@ -22,7 +22,7 @@ fn commit_info(workspace_root: &Path) {
         return;
     }
 
-    if let Some(git_head_path) = dbg!(git_head(&git_dir)) {
+    if let Some(git_head_path) = git_head(&git_dir) {
         println!("cargo:rerun-if-changed={}", git_head_path.display());
 
         let git_head_contents = fs::read_to_string(git_head_path);

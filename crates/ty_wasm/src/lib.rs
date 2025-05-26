@@ -27,7 +27,7 @@ use wasm_bindgen::prelude::*;
 pub fn version() -> String {
     option_env!("TY_WASM_COMMIT_SHORT_HASH")
         .or_else(|| option_env!("CARGO_PKG_VERSION"))
-        .unwrap_or_else(|| "unknown")
+        .unwrap_or("unknown")
         .to_string()
 }
 
