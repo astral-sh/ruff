@@ -207,10 +207,6 @@ pub(super) struct Bindings {
 
 impl Bindings {
     pub(super) fn unbound_narrowing_constraint(&self) -> ScopedNarrowingConstraint {
-        debug_assert!(
-            self.unbound_narrowing_constraint.is_some()
-                || self.live_bindings[0].binding.is_unbound()
-        );
         self.unbound_narrowing_constraint
             .unwrap_or(self.live_bindings[0].narrowing_constraint)
     }

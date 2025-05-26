@@ -548,12 +548,12 @@ mod tests {
     impl UseDefMap<'_> {
         fn first_public_binding(&self, symbol: ScopedPlaceId) -> Option<Definition<'_>> {
             self.public_bindings(symbol)
-                .find_map(|constrained_binding| constrained_binding.binding)
+                .find_map(|constrained_binding| constrained_binding.binding.definition())
         }
 
         fn first_binding_at_use(&self, use_id: ScopedUseId) -> Option<Definition<'_>> {
             self.bindings_at_use(use_id)
-                .find_map(|constrained_binding| constrained_binding.binding)
+                .find_map(|constrained_binding| constrained_binding.binding.definition())
         }
     }
 

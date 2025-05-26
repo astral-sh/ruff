@@ -276,7 +276,7 @@ use self::place_state::{
 use crate::node_key::NodeKey;
 use crate::semantic_index::EagerSnapshotResult;
 use crate::semantic_index::ast_ids::ScopedUseId;
-use crate::semantic_index::definition::Definition;
+use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
 };
@@ -289,6 +289,8 @@ use crate::semantic_index::visibility_constraints::{
 };
 use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
 
+use super::place::PlaceExpr;
+
 mod place_state;
 
 /// Applicable definitions and constraints for every use of a name.
@@ -296,7 +298,7 @@ mod place_state;
 pub(crate) struct UseDefMap<'db> {
     /// Array of [`Definition`] in this scope. Only the first entry should be `None`;
     /// this represents the implicit "unbound"/"undeclared" definition of every place.
-    all_definitions: IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
+    all_definitions: IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
 
     /// Array of predicates in this scope.
     predicates: Predicates<'db>,
@@ -537,7 +539,7 @@ type EagerSnapshots = IndexVec<ScopedEagerSnapshotId, EagerSnapshot>;
 
 #[derive(Debug)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
-    all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
+    all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
     pub(crate) predicates: &'map Predicates<'db>,
     pub(crate) narrowing_constraints: &'map NarrowingConstraints,
     pub(crate) visibility_constraints: &'map VisibilityConstraints,
@@ -568,7 +570,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
 impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 
 pub(crate) struct BindingWithConstraints<'map, 'db> {
-    pub(crate) binding: Option<Definition<'db>>,
+    pub(crate) binding: DefinitionState<'db>,
     pub(crate) narrowing_constraint: ConstraintsIterator<'map, 'db>,
     pub(crate) visibility_constraint: ScopedVisibilityConstraintId,
 }
@@ -618,14 +620,14 @@ impl<'db> ConstraintsIterator<'_, 'db> {
 
 #[derive(Clone)]
 pub(crate) struct DeclarationsIterator<'map, 'db> {
-    all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
+    all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
     pub(crate) predicates: &'map Predicates<'db>,
     pub(crate) visibility_constraints: &'map VisibilityConstraints,
     inner: LiveDeclarationsIterator<'map>,
 }
 
 pub(crate) struct DeclarationWithConstraint<'db> {
-    pub(crate) declaration: Option<Definition<'db>>,
+    pub(crate) declaration: DefinitionState<'db>,
     pub(crate) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
@@ -660,7 +662,7 @@ pub(super) struct FlowSnapshot {
 #[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`Definition`].
-    all_definitions: IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
+    all_definitions: IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
 
     /// Builder of predicates.
     pub(super) predicates: PredicatesBuilder<'db>,
@@ -743,7 +745,7 @@ pub(super) struct UseDefMapBuilder<'db> {
 impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn new(is_class_scope: bool) -> Self {
         Self {
-            all_definitions: IndexVec::from_iter([None]),
+            all_definitions: IndexVec::from_iter([DefinitionState::Undefined]),
             predicates: PredicatesBuilder::default(),
             narrowing_constraints: NarrowingConstraintsBuilder::default(),
             visibility_constraints: VisibilityConstraintsBuilder::default(),
@@ -771,7 +773,7 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn record_binding(&mut self, place: ScopedPlaceId, binding: Definition<'db>) {
-        let def_id = self.all_definitions.push(Some(binding));
+        let def_id = self.all_definitions.push(DefinitionState::Defined(binding));
         let place_state = &mut self.place_states[place];
         self.declarations_by_binding
             .insert(binding, place_state.declarations().clone());
@@ -927,7 +929,9 @@ impl<'db> UseDefMapBuilder<'db> {
         place: ScopedPlaceId,
         declaration: Definition<'db>,
     ) {
-        let def_id = self.all_definitions.push(Some(declaration));
+        let def_id = self
+            .all_definitions
+            .push(DefinitionState::Defined(declaration));
         let place_state = &mut self.place_states[place];
         self.bindings_by_declaration
             .insert(declaration, place_state.bindings().clone());
@@ -941,9 +945,17 @@ impl<'db> UseDefMapBuilder<'db> {
     ) {
         // We don't need to store anything in self.bindings_by_declaration or
         // self.declarations_by_binding.
-        let def_id = self.all_definitions.push(Some(definition));
+        let def_id = self
+            .all_definitions
+            .push(DefinitionState::Defined(definition));
         let place_state = &mut self.place_states[place];
         place_state.record_declaration(def_id);
+        place_state.record_binding(def_id, self.scope_start_visibility, self.is_class_scope);
+    }
+
+    pub(super) fn delete_binding(&mut self, place: ScopedPlaceId) {
+        let def_id = self.all_definitions.push(DefinitionState::Deleted);
+        let place_state = &mut self.place_states[place];
         place_state.record_binding(def_id, self.scope_start_visibility, self.is_class_scope);
     }
 
@@ -973,11 +985,12 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         enclosing_place: ScopedPlaceId,
         scope: ScopeKind,
-        is_bound: bool,
+        enclosing_place_expr: &PlaceExpr,
     ) -> ScopedEagerSnapshotId {
-        // Names bound in class scopes are never visible to nested scopes, so we never need to
-        // save eager scope bindings in a class scope.
-        if scope.is_class() || !is_bound {
+        // Names bound in class scopes are never visible to nested scopes (but attributes/subscripts are visible),
+        // so we never need to save eager scope bindings in a class scope.
+        if (scope.is_class() && enclosing_place_expr.is_name()) || !enclosing_place_expr.is_bound()
+        {
             self.eager_snapshots.push(EagerSnapshot::Constraint(
                 self.place_states[enclosing_place]
                     .bindings()

@@ -7,7 +7,7 @@ use super::{
     infer_unpack_types,
 };
 use crate::semantic_index::DeclarationWithConstraint;
-use crate::semantic_index::definition::Definition;
+use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters};
 use crate::types::{
@@ -1378,7 +1378,7 @@ impl<'db> ClassLiteral<'db> {
             if !declarations
                 .clone()
                 .all(|DeclarationWithConstraint { declaration, .. }| {
-                    declaration.is_some_and(|declaration| {
+                    declaration.is_defined_and(|declaration| {
                         matches!(
                             declaration.kind(db),
                             DefinitionKind::AnnotatedAssignment(..)
@@ -1503,7 +1503,7 @@ impl<'db> ClassLiteral<'db> {
                 class_map
                     .public_bindings(method_place)
                     .find_map(|bind| {
-                        (bind.binding == Some(method))
+                        (bind.binding.is_defined_and(|def| def == method))
                             .then(|| class_map.is_binding_visible(db, &bind))
                     })
                     .unwrap_or(Truthiness::AlwaysFalse)
@@ -1518,7 +1518,7 @@ impl<'db> ClassLiteral<'db> {
             let unbound_visibility = attribute_assignments
                 .peek()
                 .map(|attribute_assignment| {
-                    if attribute_assignment.binding.is_none() {
+                    if attribute_assignment.binding.is_undefined() {
                         method_map.is_binding_visible(db, attribute_assignment)
                     } else {
                         Truthiness::AlwaysFalse
@@ -1527,7 +1527,7 @@ impl<'db> ClassLiteral<'db> {
                 .unwrap_or(Truthiness::AlwaysFalse);
 
             for attribute_assignment in attribute_assignments {
-                let Some(binding) = attribute_assignment.binding else {
+                let DefinitionState::Defined(binding) = attribute_assignment.binding else {
                     continue;
                 };
                 match method_map

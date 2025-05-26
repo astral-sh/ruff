@@ -53,6 +53,102 @@ constraints may no longer be valid due to a "time lag". However, it may be possi
 that some of them are valid by performing a more detailed analysis (e.g. checking that the narrowing
 target has not changed in all places where the function is called).
 
+### Narrowing by attribute/subscript assignments
+
+```py
+class A:
+    x: str | None = None
+
+    def update_x(self, value: str | None):
+        self.x = value
+
+a = A()
+a.x = "a"
+
+class B:
+    reveal_type(a.x)  # revealed: Literal["a"]
+
+def f():
+    reveal_type(a.x)  # revealed: Unknown | str | None
+
+[reveal_type(a.x) for _ in range(1)]  # revealed: Literal["a"]
+
+a = A()
+
+class C:
+    reveal_type(a.x)  # revealed: str | None
+
+def g():
+    reveal_type(a.x)  # revealed: Unknown | str | None
+
+[reveal_type(a.x) for _ in range(1)]  # revealed: str | None
+
+a = A()
+a.x = "a"
+a.update_x("b")
+
+class D:
+    # TODO: should be `str | None`
+    reveal_type(a.x)  # revealed: Literal["a"]
+
+def h():
+    reveal_type(a.x)  # revealed: Unknown | str | None
+
+# TODO: should be `str | None`
+[reveal_type(a.x) for _ in range(1)]  # revealed: Literal["a"]
+```
+
+### Narrowing by attribute/subscript assignments in nested scopes
+
+```py
+class D: ...
+
+class C:
+    d: D | None = None
+
+class B:
+    c1: C | None = None
+    c2: C | None = None
+
+class A:
+    b: B | None = None
+
+a = A()
+a.b = B()
+
+class _:
+    a.b.c1 = C()
+
+    class _:
+        a.b.c1.d = D()
+        a = 1
+
+        class _3:
+            reveal_type(a)  # revealed: A
+            reveal_type(a.b.c1.d)  # revealed: D
+
+    class _:
+        a = 1
+        # error: [unresolved-attribute]
+        a.b.c1.d = D()
+
+        class _3:
+            reveal_type(a)  # revealed: A
+            # TODO: should be `D | None`
+            reveal_type(a.b.c1.d)  # revealed: D
+
+a.b.c1 = C()
+a.b.c1.d = D()
+
+class _:
+    a.b = B()
+
+    class _:
+        # error: [possibly-unbound-attribute]
+        reveal_type(a.b.c1.d)  # revealed: D | None
+        reveal_type(a.b.c1)  # revealed: C | None
+```
+
 ### Narrowing constraints introduced in eager nested scopes
 
 ```py

@@ -6788,6 +6788,14 @@ impl Truthiness {
         }
     }
 
+    pub(crate) fn or(self, other: Self) -> Self {
+        match (self, other) {
+            (Truthiness::AlwaysFalse, Truthiness::AlwaysFalse) => Truthiness::AlwaysFalse,
+            (Truthiness::AlwaysTrue, _) | (_, Truthiness::AlwaysTrue) => Truthiness::AlwaysTrue,
+            _ => Truthiness::Ambiguous,
+        }
+    }
+
     fn into_type(self, db: &dyn Db) -> Type {
         match self {
             Self::AlwaysTrue => Type::BooleanLiteral(true),

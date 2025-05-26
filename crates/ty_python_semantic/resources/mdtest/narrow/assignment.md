@@ -16,7 +16,7 @@ reveal_type(a.x)  # revealed: Literal[0]
 # Make sure that we infer the narrowed type for eager
 # scopes (class, comprehension) and the non-narrowed
 # public type for lazy scopes (function)
-class C:
+class _:
     reveal_type(a.x)  # revealed: Literal[0]
 
 [reveal_type(a.x) for _ in range(1)]  # revealed: Literal[0]
@@ -24,10 +24,85 @@ class C:
 def _():
     reveal_type(a.x)  # revealed: Unknown | int | None
 
+if False:
+    a = A()
+reveal_type(a.x)  # revealed: Literal[0]
+
+if True:
+    a = A()
+reveal_type(a.x)  # revealed: int | None
+
+a.x = 0
+reveal_type(a.x)  # revealed: Literal[0]
+
+class _:
+    a = A()
+    reveal_type(a.x)  # revealed: int | None
+
+def cond() -> bool:
+    return True
+
+class _:
+    if False:
+        a = A()
+    reveal_type(a.x)  # revealed: Literal[0]
+
+    if cond():
+        a = A()
+    reveal_type(a.x)  # revealed: int | None
+
+class _:
+    a = A()
+
+    class Inner:
+        reveal_type(a.x)  # revealed: int | None
+
 # error: [unresolved-reference]
 does.nt.exist = 0
 # error: [unresolved-reference]
 reveal_type(does.nt.exist)  # revealed: Unknown
+```
+
+### Narrowing chain
+
+```py
+class D: ...
+
+class C:
+    d: D | None = None
+
+class B:
+    c1: C | None = None
+    c2: C | None = None
+
+class A:
+    b: B | None = None
+
+a = A()
+a.b = B()
+a.b.c1 = C()
+a.b.c2 = C()
+a.b.c1.d = D()
+a.b.c2.d = D()
+reveal_type(a.b)  # revealed: B
+reveal_type(a.b.c1)  # revealed: C
+reveal_type(a.b.c1.d)  # revealed: D
+
+a.b.c1 = C()
+reveal_type(a.b)  # revealed: B
+reveal_type(a.b.c1)  # revealed: C
+reveal_type(a.b.c1.d)  # revealed: D | None
+reveal_type(a.b.c2.d)  # revealed: D
+
+a.b.c1.d = D()
+a.b = B()
+reveal_type(a.b)  # revealed: B
+reveal_type(a.b.c1)  # revealed: C | None
+reveal_type(a.b.c2)  # revealed: C | None
+# error: [possibly-unbound-attribute]
+reveal_type(a.b.c1.d)  # revealed: D | None
+# error: [possibly-unbound-attribute]
+reveal_type(a.b.c2.d)  # revealed: D | None
 ```
 
 ### Do not narrow the type of a `property` by assignment

@@ -89,6 +89,36 @@ impl<'a, 'db> IntoIterator for &'a Definitions<'db> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update)]
+pub(crate) enum DefinitionState<'db> {
+    Defined(Definition<'db>),
+    Undefined,
+    Deleted,
+}
+
+impl<'db> DefinitionState<'db> {
+    pub(crate) fn is_defined_and(self, f: impl Fn(Definition<'db>) -> bool) -> bool {
+        matches!(self, DefinitionState::Defined(def) if f(def))
+    }
+
+    pub(crate) fn is_undefined_or(self, f: impl Fn(Definition<'db>) -> bool) -> bool {
+        matches!(self, DefinitionState::Undefined)
+            || matches!(self, DefinitionState::Defined(def) if f(def))
+    }
+
+    pub(crate) fn is_undefined(self) -> bool {
+        matches!(self, DefinitionState::Undefined)
+    }
+
+    #[allow(unused)]
+    pub(crate) fn definition(self) -> Option<Definition<'db>> {
+        match self {
+            DefinitionState::Defined(def) => Some(def),
+            DefinitionState::Deleted | DefinitionState::Undefined => None,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum DefinitionNodeRef<'a> {
     Import(ImportDefinitionNodeRef<'a>),

@@ -2,7 +2,7 @@ use ruff_db::files::File;
 
 use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::file_to_module;
-use crate::semantic_index::definition::Definition;
+use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::{PlaceExpr, PlaceExprSubSegment, ScopeId, ScopedPlaceId};
 use crate::semantic_index::{
     BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, place_table,
@@ -814,9 +814,10 @@ fn place_from_bindings_impl<'db>(
             binding,
             visibility_constraint,
             narrowing_constraint: _,
-        }) if binding.is_none_or(is_non_exported) => Some(*visibility_constraint),
+        }) if binding.is_undefined_or(is_non_exported) => Some(*visibility_constraint),
         _ => None,
     };
+    let mut deleted_visibility = Truthiness::AlwaysFalse;
 
     // Evaluate this lazily because we don't always need it (for example, if there are no visible
     // bindings at all, we don't need it), and it can cause us to evaluate visibility constraint
@@ -835,7 +836,19 @@ fn place_from_bindings_impl<'db>(
              narrowing_constraint,
              visibility_constraint,
          }| {
-            let binding = binding?;
+            let binding =
+                match binding {
+                    DefinitionState::Defined(binding) => binding,
+                    DefinitionState::Undefined => {
+                        return None;
+                    }
+                    DefinitionState::Deleted => {
+                        deleted_visibility = deleted_visibility.or(
+                            visibility_constraints.evaluate(db, predicates, visibility_constraint)
+                        );
+                        return None;
+                    }
+                };
 
             if is_non_exported(binding) {
                 return None;
@@ -911,13 +924,15 @@ fn place_from_bindings_impl<'db>(
             Truthiness::Ambiguous => Boundness::PossiblyUnbound,
         };
 
-        if let Some(second) = types.next() {
-            Place::Type(
-                UnionType::from_elements(db, [first, second].into_iter().chain(types)),
-                boundness,
-            )
+        let ty = if let Some(second) = types.next() {
+            UnionType::from_elements(db, [first, second].into_iter().chain(types))
         } else {
-            Place::Type(first, boundness)
+            first
+        };
+        match deleted_visibility {
+            Truthiness::AlwaysFalse => Place::Type(ty, boundness),
+            Truthiness::AlwaysTrue => Place::Unbound,
+            Truthiness::Ambiguous => Place::Type(ty, Boundness::PossiblyUnbound),
         }
     } else {
         Place::Unbound
@@ -946,7 +961,7 @@ fn place_from_declarations_impl<'db>(
         Some(DeclarationWithConstraint {
             declaration,
             visibility_constraint,
-        }) if declaration.is_none_or(is_non_exported) => {
+        }) if declaration.is_undefined_or(is_non_exported) => {
             visibility_constraints.evaluate(db, predicates, *visibility_constraint)
         }
         _ => Truthiness::AlwaysFalse,
@@ -957,7 +972,9 @@ fn place_from_declarations_impl<'db>(
              declaration,
              visibility_constraint,
          }| {
-            let declaration = declaration?;
+            let DefinitionState::Defined(declaration) = declaration else {
+                return None;
+            };
 
             if is_non_exported(declaration) {
                 return None;

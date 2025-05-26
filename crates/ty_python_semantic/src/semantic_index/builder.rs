@@ -323,7 +323,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                 let eager_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_eager_state(
                     enclosing_place_id,
                     enclosing_scope_kind,
-                    enclosing_place.is_bound(),
+                    enclosing_place,
                 );
                 self.eager_snapshots.insert(key, eager_snapshot);
             }
@@ -433,6 +433,19 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition
     }
 
+    fn delete_associated_bindings(&mut self, place: ScopedPlaceId) {
+        let scope = self.current_scope();
+        // Don't delete associated bindings if the scope is a class scope & place is a name (it's never visible to nested scopes)
+        if self.scopes[scope].kind() == ScopeKind::Class
+            && self.place_tables[scope].place_expr(place).is_name()
+        {
+            return;
+        }
+        for associated_place in self.place_tables[scope].associated_place_ids(place) {
+            self.use_def_maps[scope].delete_binding(associated_place);
+        }
+    }
+
     /// Push a new [`Definition`] onto the list of definitions
     /// associated with the `definition_node` AST node.
     ///
@@ -487,9 +500,13 @@ impl<'db> SemanticIndexBuilder<'db> {
         match category {
             DefinitionCategory::DeclarationAndBinding => {
                 use_def.record_declaration_and_binding(place, definition);
+                self.delete_associated_bindings(place);
             }
             DefinitionCategory::Declaration => use_def.record_declaration(place, definition),
-            DefinitionCategory::Binding => use_def.record_binding(place, definition),
+            DefinitionCategory::Binding => {
+                use_def.record_binding(place, definition);
+                self.delete_associated_bindings(place);
+            }
         }
 
         let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
