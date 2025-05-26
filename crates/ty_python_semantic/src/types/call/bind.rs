@@ -20,9 +20,9 @@ use crate::types::diagnostic::{
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators, FunctionType,
-    KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType,
-    TupleType, TypeMapping, UnionType, WrapperDescriptorKind, todo_type,
+    BoundMethodType, DataclassParams, DataclassTransformerParams, DynamicType, FunctionDecorators,
+    FunctionType, KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind,
+    PropertyInstanceType, TupleType, TypeMapping, UnionType, WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -916,7 +916,7 @@ impl<'db> Bindings<'db> {
                     },
 
                     Type::KnownInstance(KnownInstanceType::TypedDict) => {
-                        overload.set_return_type(todo_type!("TypedDict"));
+                        overload.set_return_type(Type::Dynamic(DynamicType::TodoTypedDict));
                     }
 
                     // Not a special case

@@ -1070,6 +1070,10 @@ impl<'db> ClassLiteral<'db> {
                 ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
                 }
+
+                ClassBase::Dynamic(DynamicType::TodoTypedDict) if name == "__get__" => {
+                    return Symbol::Unbound.into();
+                }
                 ClassBase::Dynamic(_) => {
                     // Note: calling `Type::from(superclass).member()` would be incorrect here.
                     // What we'd really want is a `Type::Any.own_class_member()` method,
