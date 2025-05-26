@@ -198,7 +198,7 @@ export const DEFAULT_SETTINGS = JSON.stringify(
       "python-version": "3.13",
     },
     rules: {
-      "division-by-zero": "error",
+      "undefined-reveal": "ignore",
     },
   },
   null,
