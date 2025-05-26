@@ -6,7 +6,7 @@ use lsp_types::{
     FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport,
 };
 
-use crate::server::api::diagnostics::compute_diagnostics;
+use crate::server::api::diagnostics::{Diagnostics, compute_diagnostics};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::{Result, client::Notifier};
 use crate::session::DocumentSnapshot;
@@ -34,13 +34,10 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
                 related_documents: None,
                 full_document_diagnostic_report: FullDocumentDiagnosticReport {
                     result_id: None,
-                    // Pull diagnostic requests are only called for text documents, not for
+                    // SAFETY: Pull diagnostic requests are only called for text documents, not for
                     // notebook documents.
                     items: compute_diagnostics(db, &snapshot)
-                        .into_iter()
-                        .next()
-                        .map(|(_, diagnostics)| diagnostics)
-                        .unwrap_or_default(),
+                        .map_or_else(Vec::new, Diagnostics::expect_text_document),
                 },
             }),
         ))

@@ -55,15 +55,6 @@ impl DocumentKey {
             | DocumentKey::Text(url) => url,
         }
     }
-
-    /// Converts the key back into its original URL.
-    pub(crate) fn into_url(self) -> Url {
-        match self {
-            DocumentKey::NotebookCell(url)
-            | DocumentKey::Notebook(url)
-            | DocumentKey::Text(url) => url,
-        }
-    }
 }
 
 impl std::fmt::Display for DocumentKey {

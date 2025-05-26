@@ -135,7 +135,7 @@ impl Index {
     }
 
     pub(super) fn open_notebook_document(&mut self, notebook_url: Url, document: NotebookDocument) {
-        for cell_url in document.urls() {
+        for cell_url in document.cell_urls() {
             self.notebook_cells
                 .insert(cell_url.clone(), notebook_url.clone());
         }
@@ -265,6 +265,7 @@ pub enum DocumentQuery {
 
 impl DocumentQuery {
     /// Retrieve the original key that describes this document query.
+    #[expect(dead_code)]
     pub(crate) fn make_key(&self) -> DocumentKey {
         match self {
             Self::Text { file_url, .. } => DocumentKey::Text(file_url.clone()),
