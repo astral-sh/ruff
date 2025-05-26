@@ -2109,6 +2109,52 @@ reveal_type(Foo.BAR.value)  # revealed: @Todo(Attribute access on enum classes)
 reveal_type(Foo.__members__)  # revealed: @Todo(Attribute access on enum classes)
 ```
 
+## Errors for unresolved and invalid attribute assignments
+
+```py
+class C:
+    class_attr: int = 1
+
+    def __init__(self) -> None:
+        self.instance_attr: int = 1
+
+c = C()
+
+C.class_attr = 2
+c.class_attr = 2
+c.instance_attr = 2
+
+C.class_attr = "invalid"  # error: [invalid-assignment]
+c.class_attr = "invalid"  # error: [invalid-assignment]
+c.instance_attr = "invalid"  # error: [invalid-assignment]
+
+# TODO: The following attribute assignments are flagged by mypy/pyright (Type can
+# not be declared in assignment to non-self attribute). We currently do not emit
+# any errors and also don't validate the type of the annotation in any form. This
+# should probably be changed.
+C.class_attr: None = 2
+c.class_attr: None = 2
+c.instance_attr: None = 2
+
+# TODO: Similar here. We do report `invalid-assignment` errors, but only because
+# the value type does not match.
+C.class_attr: str = "invalid"  # error: [invalid-assignment]
+c.class_attr: str = "invalid"  # error: [invalid-assignment]
+c.instance_attr: str = "invalid"  # error: [invalid-assignment]
+
+# For non-existent attributes, we emit `unresolved-attribute` errors:
+C.non_existent = 2  # error: [unresolved-attribute]
+c.non_existent = 2  # error: [unresolved-attribute]
+
+# TODO: Similar to above, these should either be forbidden or validated.
+#
+# Make sure that we emit `unresolved-attribute` errors, at least:
+C.non_existent: int = 2  # error: [unresolved-attribute]
+c.non_existent: int = 2  # error: [unresolved-attribute]
+C.non_existent: None = 2  # error: [unresolved-attribute]
+c.non_existent: None = 2  # error: [unresolved-attribute]
+```
+
 ## References
 
 Some of the tests in the *Class and instance variables* section draw inspiration from

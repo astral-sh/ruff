@@ -3549,11 +3549,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             } = assignment;
             let annotated =
                 self.infer_annotation_expression(annotation, DeferredExpressionState::None);
-            self.infer_optional_expression(value.as_deref());
 
             // If we have an annotated assignment like `self.attr: int = 1`, we still need to
             // do type inference on the `self.attr` target to get types for all sub-expressions.
-            self.infer_expression(target);
+            if let Some(value) = value {
+                let value_ty = self.infer_expression(value);
+                self.infer_target(target, value, |_builder, _value_expr| value_ty);
+            } else {
+                self.infer_expression(target);
+            }
 
             // But here we explicitly overwrite the type for the overall `self.attr` node with
             // the annotated type. We do no use `store_expression_type` here, because it checks
