@@ -1,10 +1,5 @@
 //! Scheduling, I/O, and API endpoints.
 
-use std::num::NonZeroUsize;
-// The new PanicInfoHook name requires MSRV >= 1.82
-#[expect(deprecated)]
-use std::panic::PanicInfo;
-
 use lsp_server::Message;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities,
@@ -13,6 +8,8 @@ use lsp_types::{
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
     TypeDefinitionProviderCapability, Url,
 };
+use std::num::NonZeroUsize;
+use std::panic::PanicHookInfo;
 
 use self::connection::{Connection, ConnectionInitializer};
 use self::schedule::event_loop_thread;
@@ -125,9 +122,7 @@ impl Server {
     }
 
     pub(crate) fn run(self) -> crate::Result<()> {
-        // The new PanicInfoHook name requires MSRV >= 1.82
-        #[expect(deprecated)]
-        type PanicHook = Box<dyn Fn(&PanicInfo<'_>) + 'static + Sync + Send>;
+        type PanicHook = Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>;
         struct RestorePanicHook {
             hook: Option<PanicHook>,
         }

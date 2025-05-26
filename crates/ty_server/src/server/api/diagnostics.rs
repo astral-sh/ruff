@@ -41,13 +41,7 @@ pub(super) fn compute_diagnostics(
         return vec![];
     };
 
-    let diagnostics = match db.check_file(file) {
-        Ok(diagnostics) => diagnostics,
-        Err(cancelled) => {
-            tracing::info!("Diagnostics computation {cancelled}");
-            return vec![];
-        }
-    };
+    let diagnostics = db.check_file(file);
 
     diagnostics
         .as_slice()

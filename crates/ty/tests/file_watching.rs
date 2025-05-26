@@ -1135,7 +1135,7 @@ print(sys.last_exc, os.getegid())
         Ok(())
     })?;
 
-    let diagnostics = case.db.check().context("Failed to check project.")?;
+    let diagnostics = case.db.check();
 
     assert_eq!(diagnostics.len(), 2);
     assert_eq!(
@@ -1160,7 +1160,7 @@ print(sys.last_exc, os.getegid())
     })
     .expect("Search path settings to be valid");
 
-    let diagnostics = case.db.check().context("Failed to check project.")?;
+    let diagnostics = case.db.check();
     assert!(diagnostics.is_empty());
 
     Ok(())
@@ -1763,10 +1763,7 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
     let foo = case
         .system_file(case.project_path("foo.py"))
         .expect("foo.py to exist");
-    let diagnostics = case
-        .db()
-        .check_file(foo)
-        .context("Failed to check project.")?;
+    let diagnostics = case.db().check_file(foo);
 
     assert!(
         diagnostics.is_empty(),
@@ -1786,10 +1783,7 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
 
     case.apply_changes(changes);
 
-    let diagnostics = case
-        .db()
-        .check_file(foo)
-        .context("Failed to check project.")?;
+    let diagnostics = case.db().check_file(foo);
 
     assert!(
         diagnostics.len() == 1,
