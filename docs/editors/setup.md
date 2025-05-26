@@ -131,6 +131,56 @@ To view the trace logs between Neovim and Ruff, set the log level for Neovim's L
 vim.lsp.set_log_level('debug')
 ```
 
+Ruff is also available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright)
+extension for [coc.nvim](https://github.com/neoclide/coc.nvim).
+
+<details>
+<summary>With the <a href="https://github.com/dense-analysis/ale">ALE</a> plugin for Neovim.</summary>
+
+```vim
+" Linters
+let g:ale_linters = { "python": ["ruff"] }
+" Fixers
+let g:ale_fixers = { "python": ["ruff", "ruff_format"] }
+```
+
+For the fixers, `ruff` will run `ruff check --fix` (to fix all auto-fixable problems) whereas
+`ruff_format` will run `ruff format`.
+
+</details>
+
+<details>
+<summary>With the <a href="https://github.com/stevearc/conform.nvim"><code>conform.nvim</code></a> plugin for Neovim, especially about organizing imports order.</summary>
+<br>
+
+```lua
+require("conform").setup({
+    formatters_by_ft = {
+        python = {
+          -- To fix auto-fixable lint errors.
+          "ruff_fix",
+          -- To run the Ruff formatter.
+          "ruff_format",
+          -- To organize the imports.
+          "ruff_organize_imports",
+        },
+    },
+})
+```
+
+</details>
+
+<details>
+<summary>With the <a href="https://github.com/mfussenegger/nvim-lint"><code>nvim-lint</code></a> plugin for Neovim.</summary>
+
+```lua
+require("lint").linters_by_ft = {
+  python = { "ruff" },
+}
+```
+
+</details>
+
 ## Vim
 
 The [`vim-lsp`](https://github.com/prabirshrestha/vim-lsp) plugin can be used to configure the Ruff Language Server in Vim.
@@ -170,7 +220,7 @@ Ruff is also available as part of the [coc-pyright](https://github.com/fannheywa
 extension for [coc.nvim](https://github.com/neoclide/coc.nvim).
 
 <details>
-<summary>With the <a href="https://github.com/dense-analysis/ale">ALE</a> plugin for Vim or Neovim.</summary>
+<summary>With the <a href="https://github.com/dense-analysis/ale">ALE</a> plugin for Vim.</summary>
 
 ```vim
 " Linters
@@ -199,38 +249,6 @@ tools:
       - "%f:%l:%c: %m"
     format-command: "ruff format --stdin-filename ${INPUT} --quiet -"
     format-stdin: true
-```
-
-</details>
-
-<details>
-<summary>With the <a href="https://github.com/stevearc/conform.nvim"><code>conform.nvim</code></a> plugin for Neovim.</summary>
-<br>
-
-```lua
-require("conform").setup({
-    formatters_by_ft = {
-        python = {
-          -- To fix auto-fixable lint errors.
-          "ruff_fix",
-          -- To run the Ruff formatter.
-          "ruff_format",
-          -- To organize the imports.
-          "ruff_organize_imports",
-        },
-    },
-})
-```
-
-</details>
-
-<details>
-<summary>With the <a href="https://github.com/mfussenegger/nvim-lint"><code>nvim-lint</code></a> plugin for Neovim.</summary>
-
-```lua
-require("lint").linters_by_ft = {
-  python = { "ruff" },
-}
 ```
 
 </details>
