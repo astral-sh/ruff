@@ -1557,6 +1557,21 @@ sn = SimpleNamespace(a="a")
 reveal_type(sn.a)  # revealed: Any
 ```
 
+`__getattribute__` takes precedence over `__getattr__`:
+
+```py
+class C:
+    def __getattribute__(self, name: str) -> int:
+        return 1
+
+    def __getattr__(self, name: str) -> str:
+        return "a"
+
+c = C()
+
+reveal_type(c.x)  # revealed: int
+```
+
 ## Classes with custom `__setattr__` methods
 
 ### Basic

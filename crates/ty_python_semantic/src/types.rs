@@ -3231,12 +3231,12 @@ impl<'db> Type<'db> {
                         symbol: Symbol::Type(_, Boundness::PossiblyUnbound),
                         qualifiers: _,
                     } => member
-                        .or_fall_back_to(db, custom_getattr_result)
-                        .or_fall_back_to(db, custom_getattribute_result),
+                        .or_fall_back_to(db, custom_getattribute_result)
+                        .or_fall_back_to(db, custom_getattr_result),
                     SymbolAndQualifiers {
                         symbol: Symbol::Unbound,
                         qualifiers: _,
-                    } => custom_getattr_result().or_fall_back_to(db, custom_getattribute_result),
+                    } => custom_getattribute_result().or_fall_back_to(db, custom_getattr_result),
                 }
             }
 
