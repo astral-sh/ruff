@@ -322,9 +322,11 @@ pub(crate) enum TerminalColor {
     /// Never display colors.
     Never,
 }
+
 /// A TOML `<KEY> = <VALUE>` pair
 /// (such as you might find in a `ty.toml` configuration file)
 /// overriding a specific configuration option.
+///
 /// Overrides of individual settings using this option always take precedence
 /// over all configuration files.
 #[derive(Debug, Clone)]
@@ -359,7 +361,15 @@ impl clap::Args for ConfigsArg {
                 .short('c')
                 .long("config")
                 .value_name("CONFIG_OPTION")
-                .help("A TOML `<KEY> = <VALUE>` pair")
+                .help("A TOML `<KEY> = <VALUE>` pair overriding a specific configuration option.")
+                .long_help(
+                    "
+A TOML `<KEY> = <VALUE>` pair (such as you might find in a `ty.toml` configuration file)
+overriding a specific configuration option.
+
+Overrides of individual settings using this option always take precedence
+over all configuration files.",
+                )
                 .action(ArgAction::Append),
         )
     }

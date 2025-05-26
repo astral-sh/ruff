@@ -3242,8 +3242,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     )),
                                     value_ty,
                                 ]),
-                                MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                                    | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                             );
 
                             match result {
@@ -3415,24 +3414,31 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::ModuleLiteral(module) => {
                 if let Place::Type(attr_ty, _) = module.static_member(db, attribute) {
                     let assignable = value_ty.is_assignable_to(db, attr_ty);
-                    if !assignable {
-                        report_invalid_attribute_assignment(
-                            &self.context,
-                            target.into(),
-                            attr_ty,
-                            value_ty,
-                            attribute,
-                        );
+                    if assignable {
+                        true
+                    } else {
+                        if emit_diagnostics {
+                            report_invalid_attribute_assignment(
+                                &self.context,
+                                target.into(),
+                                attr_ty,
+                                value_ty,
+                                attribute,
+                            );
+                        }
+                        false
                     }
-
-                    false
                 } else {
-                    if let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target) {
-                        builder.into_diagnostic(format_args!(
-                            "Unresolved attribute `{}` on type `{}`.",
-                            attribute,
-                            object_ty.display(db)
-                        ));
+                    if emit_diagnostics {
+                        if let Some(builder) =
+                            self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Unresolved attribute `{}` on type `{}`.",
+                                attribute,
+                                object_ty.display(db)
+                            ));
+                        }
                     }
 
                     false
@@ -6661,20 +6667,27 @@ impl<'db> TypeInferenceBuilder<'db> {
         intersection_on: IntersectionOn,
         range: TextRange,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
+        enum State<'db> {
+            // We have not seen any positive elements (yet)
+            NoPositiveElements,
+            // The operator was unsupported on all elements that we have seen so far.
+            // Contains the first error we encountered.
+            UnsupportedOnAllElements(CompareUnsupportedError<'db>),
+            // The operator was supported on at least one positive element.
+            Supported,
+        }
+
         // If a comparison yields a definitive true/false answer on a (positive) part
         // of an intersection type, it will also yield a definitive answer on the full
         // intersection type, which is even more specific.
         for pos in intersection.positive(self.db()) {
             let result = match intersection_on {
-                IntersectionOn::Left => {
-                    self.infer_binary_type_comparison(*pos, op, other, range)?
-                }
-                IntersectionOn::Right => {
-                    self.infer_binary_type_comparison(other, op, *pos, range)?
-                }
+                IntersectionOn::Left => self.infer_binary_type_comparison(*pos, op, other, range),
+                IntersectionOn::Right => self.infer_binary_type_comparison(other, op, *pos, range),
             };
-            if let Type::BooleanLiteral(b) = result {
-                return Ok(Type::BooleanLiteral(b));
+
+            if let Ok(Type::BooleanLiteral(_)) = result {
+                return result;
             }
         }
 
@@ -6743,19 +6756,55 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         builder = builder.add_positive(KnownClass::Bool.to_instance(self.db()));
 
+        let mut state = State::NoPositiveElements;
+
         for pos in intersection.positive(self.db()) {
             let result = match intersection_on {
-                IntersectionOn::Left => {
-                    self.infer_binary_type_comparison(*pos, op, other, range)?
-                }
-                IntersectionOn::Right => {
-                    self.infer_binary_type_comparison(other, op, *pos, range)?
-                }
+                IntersectionOn::Left => self.infer_binary_type_comparison(*pos, op, other, range),
+                IntersectionOn::Right => self.infer_binary_type_comparison(other, op, *pos, range),
             };
-            builder = builder.add_positive(result);
+
+            match result {
+                Ok(ty) => {
+                    state = State::Supported;
+                    builder = builder.add_positive(ty);
+                }
+                Err(error) => {
+                    match state {
+                        State::NoPositiveElements => {
+                            // This is the first positive element, but the operation is not supported.
+                            // Store the error and continue.
+                            state = State::UnsupportedOnAllElements(error);
+                        }
+                        State::UnsupportedOnAllElements(_) => {
+                            // We already have an error stored, and continue to see elements on which
+                            // the operator is not supported. Continue with the same state (only keep
+                            // the first error).
+                        }
+                        State::Supported => {
+                            // We previously saw a positive element that supported the operator,
+                            // so the overall operation is still supported.
+                        }
+                    }
+                }
+            }
         }
 
-        Ok(builder.build())
+        match state {
+            State::Supported => Ok(builder.build()),
+            State::NoPositiveElements => {
+                // We didn't see any positive elements, check if the operation is supported on `object`:
+                match intersection_on {
+                    IntersectionOn::Left => {
+                        self.infer_binary_type_comparison(Type::object(self.db()), op, other, range)
+                    }
+                    IntersectionOn::Right => {
+                        self.infer_binary_type_comparison(other, op, Type::object(self.db()), range)
+                    }
+                }
+            }
+            State::UnsupportedOnAllElements(error) => Err(error),
+        }
     }
 
     /// Infers the type of a binary comparison (e.g. 'left == right'). See
@@ -8788,11 +8837,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                     element => Either::Right(std::iter::once(element)),
                 };
 
-                elements
+                let ty = elements
                     .fold(IntersectionBuilder::new(db), |builder, element| {
                         builder.add_positive(self.infer_type_expression(element))
                     })
-                    .build()
+                    .build();
+
+                if matches!(arguments_slice, ast::Expr::Tuple(_)) {
+                    self.store_expression_type(arguments_slice, ty);
+                }
+                ty
             }
             KnownInstanceType::TypeOf => match arguments_slice {
                 ast::Expr::Tuple(_) => {

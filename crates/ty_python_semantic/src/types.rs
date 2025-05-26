@@ -2563,9 +2563,13 @@ impl<'db> Type<'db> {
             // `Type::NominalInstance(type)` is equivalent to looking up the name in the
             // MRO of the class `object`.
             Type::NominalInstance(instance) if instance.class.is_known(db, KnownClass::Type) => {
-                KnownClass::Object
-                    .to_class_literal(db)
-                    .find_name_in_mro_with_policy(db, name, policy)
+                if policy.mro_no_object_fallback() {
+                    Some(Place::Unbound.into())
+                } else {
+                    KnownClass::Object
+                        .to_class_literal(db)
+                        .find_name_in_mro_with_policy(db, name, policy)
+                }
             }
 
             Type::FunctionLiteral(_)
@@ -3190,6 +3194,28 @@ impl<'db> Type<'db> {
                     .into()
                 };
 
+                let custom_getattribute_result = || {
+                    // Avoid cycles when looking up `__getattribute__`
+                    if "__getattribute__" == name.as_str() {
+                        return Place::Unbound.into();
+                    }
+
+                    // Typeshed has a `__getattribute__` method defined on `builtins.object` so we
+                    // explicitly hide it here using `MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK`.
+                    self.try_call_dunder_with_policy(
+                        db,
+                        "__getattribute__",
+                        &mut CallArgumentTypes::positional([Type::StringLiteral(
+                            StringLiteralType::new(db, Box::from(name.as_str())),
+                        )]),
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                    )
+                    .map(|outcome| Place::bound(outcome.return_type(db)))
+                    // TODO: Handle call errors here.
+                    .unwrap_or(Place::Unbound)
+                    .into()
+                };
+
                 match result {
                     member @ PlaceAndQualifiers {
                         place: Place::Type(_, Boundness::Bound),
@@ -3198,11 +3224,13 @@ impl<'db> Type<'db> {
                     member @ PlaceAndQualifiers {
                         place: Place::Type(_, Boundness::PossiblyUnbound),
                         qualifiers: _,
-                    } => member.or_fall_back_to(db, custom_getattr_result),
+                    } => member
+                        .or_fall_back_to(db, custom_getattribute_result)
+                        .or_fall_back_to(db, custom_getattr_result),
                     PlaceAndQualifiers {
                         place: Place::Unbound,
                         qualifiers: _,
-                    } => custom_getattr_result(),
+                    } => custom_getattribute_result().or_fall_back_to(db, custom_getattr_result),
                 }
             }
 
@@ -4380,7 +4408,7 @@ impl<'db> Type<'db> {
             db,
             name,
             &mut argument_types,
-            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            MemberLookupPolicy::default(),
         )
     }
 
@@ -4388,6 +4416,9 @@ impl<'db> Type<'db> {
     /// particular, this allows to specify `MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK` to avoid
     /// looking up dunder methods on `object`, which is needed for functions like `__init__`,
     /// `__new__`, or `__setattr__`.
+    ///
+    /// Note that `NO_INSTANCE_FALLBACK` is always added to the policy, since implicit calls to
+    /// dunder methods never access instance members.
     fn try_call_dunder_with_policy(
         self,
         db: &'db dyn Db,
@@ -4395,8 +4426,14 @@ impl<'db> Type<'db> {
         argument_types: &mut CallArgumentTypes<'_, 'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        // Implicit calls to dunder methods never access instance members, so we pass
+        // `NO_INSTANCE_FALLBACK` here in addition to other policies:
         match self
-            .member_lookup_with_policy(db, name.into(), policy)
+            .member_lookup_with_policy(
+                db,
+                name.into(),
+                policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
             .place
         {
             Place::Type(dunder_callable, boundness) => {
