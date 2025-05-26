@@ -79,7 +79,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
         #[expect(clippy::or_fun_call)]
         let _ = write!(
             table_out,
-            "| {ss}{0}{1}{se} {{ #{0}{1} }} | {ss}{2}{se} | {ss}{3}{se} | {ss}{4}{se} |",
+            "| {ss}{0}{1}{se} {{ #{0}{1} }} | {ss}{2}{se} | {ss}{3}{se} | {4} |",
             linter.common_prefix(),
             linter.code_for_rule(rule).unwrap(),
             rule.explanation()
