@@ -20,33 +20,38 @@ const REMOVED_SYMBOL: &str = "❌";
 const WARNING_SYMBOL: &str = "⚠️";
 const SPACER: &str = "&nbsp;&nbsp;&nbsp;&nbsp;";
 
+/// Style for token indicators
+const TOKEN_STYLE: &str = "style='width: 1em; display: inline-block;'";
+/// Style for container for token
+const TOKEN_CONTAINER_STYLE: &str = "style='display: flex; gap: 1rem; justify-content: end;'";
+
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
-    table_out.push_str("| Code | Name | Message | |");
+    table_out.push_str("| Code | Name | Message |    |");
     table_out.push('\n');
-    table_out.push_str("| ---- | ---- | ------- | ------: |");
+    table_out.push_str("| ---- | ---- | ------- | -: |");
     table_out.push('\n');
     for rule in rules {
         let status_token = match rule.group() {
             RuleGroup::Removed => {
-                format!("<span title='Rule has been removed'>{REMOVED_SYMBOL}</span>")
+                format!("<span {TOKEN_STYLE} title='Rule has been removed'>{REMOVED_SYMBOL}</span>")
             }
             RuleGroup::Deprecated => {
-                format!("<span title='Rule has been deprecated'>{WARNING_SYMBOL}</span>")
+                format!("<span {TOKEN_STYLE} title='Rule has been deprecated'>{WARNING_SYMBOL}</span>")
             }
             RuleGroup::Preview => {
-                format!("<span title='Rule is in preview'>{PREVIEW_SYMBOL}</span>")
+                format!("<span {TOKEN_STYLE} title='Rule is in preview'>{PREVIEW_SYMBOL}</span>")
             }
-            RuleGroup::Stable => String::new(),
+            RuleGroup::Stable => format!("<span {TOKEN_STYLE}></span>"),
         };
 
         let fix_token = match rule.fixable() {
             FixAvailability::Always | FixAvailability::Sometimes => {
-                format!("<span title='Automatic fix available'>{FIX_SYMBOL}</span>")
+                format!("<span {TOKEN_STYLE} title='Automatic fix available'>{FIX_SYMBOL}</span>")
             }
-            FixAvailability::None => String::new(),
+            FixAvailability::None => format!("<span {TOKEN_STYLE}></span>"),
         };
 
-        let tokens = format!("{status_token} {fix_token}");
+        let tokens = format!("<span {TOKEN_CONTAINER_STYLE}>{status_token} {fix_token}</span>");
 
         let rule_name = rule.as_ref();
 
