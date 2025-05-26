@@ -34,7 +34,7 @@ pub(crate) fn event_loop_thread(
 
 pub(crate) struct Scheduler<'s> {
     session: &'s mut Session,
-    client: Client<'s>,
+    client: Client,
     fmt_pool: thread::Pool,
     background_pool: thread::Pool,
 }
@@ -60,7 +60,7 @@ impl<'s> Scheduler<'s> {
     pub(super) fn request<R>(
         &mut self,
         params: R::Params,
-        response_handler: impl Fn(R::Result) -> Task<'s> + 'static,
+        response_handler: impl Fn(R::Result) -> Task + 'static,
     ) -> crate::Result<()>
     where
         R: lsp_types::request::Request,
@@ -69,13 +69,13 @@ impl<'s> Scheduler<'s> {
     }
 
     /// Creates a task to handle a response from the client.
-    pub(super) fn response(&mut self, response: lsp_server::Response) -> Task<'s> {
+    pub(super) fn response(&mut self, response: lsp_server::Response) -> Task {
         self.client.requester.pop_response_task(response)
     }
 
     /// Dispatches a `task` by either running it as a blocking function or
     /// executing it on a background thread pool.
-    pub(super) fn dispatch(&mut self, task: task::Task<'s>) {
+    pub(super) fn dispatch(&mut self, task: task::Task) {
         match task {
             Task::Sync(SyncTask { func }) => {
                 let notifier = self.client.notifier();
