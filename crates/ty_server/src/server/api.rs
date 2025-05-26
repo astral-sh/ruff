@@ -4,7 +4,6 @@ use crate::system::{AnySystemPath, url_to_any_system_path};
 use anyhow::anyhow;
 use lsp_server as server;
 use lsp_server::RequestId;
-use lsp_types::notification;
 use lsp_types::notification::Notification;
 use ruff_db::panic::PanicError;
 use std::panic::UnwindSafe;
