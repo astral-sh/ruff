@@ -6068,7 +6068,7 @@ impl<'db> ContextManagerError<'db> {
             ),
         ) {
             diag.info(format_args!(
-                "Objects of type `{context_expression}` *can* be used as async context managers",
+                "Objects of type `{context_expression}` can be used as async context managers",
                 context_expression = context_expression_type.display(db)
             ));
             diag.info("Consider using `async with` here");

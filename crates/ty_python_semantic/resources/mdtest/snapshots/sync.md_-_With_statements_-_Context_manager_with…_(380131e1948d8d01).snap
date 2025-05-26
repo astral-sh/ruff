@@ -32,7 +32,7 @@ error[invalid-context-manager]: Object of type `Manager` cannot be used with `wi
   |      ^^^^^^^^^
 7 |     ...
   |
-info: Objects of type `Manager` *can* be used as async context managers
+info: Objects of type `Manager` can be used as async context managers
 info: Consider using `async with` here
 info: rule `invalid-context-manager` is enabled by default
 
