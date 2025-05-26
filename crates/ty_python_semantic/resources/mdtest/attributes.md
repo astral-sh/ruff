@@ -1527,6 +1527,65 @@ def _(ns: argparse.Namespace):
     reveal_type(ns.whatever)  # revealed: Any
 ```
 
+## Classes with custom `__getattribute__` methods
+
+If a type provides a custom `__getattribute__`, we use its return type as the type for unknown
+attributes. Note that this behavior differs from runtime, where `__getattribute__` is called
+unconditionally, even for known attributes. The rationale for doing this is that it allows users to
+specify more precise types for specific attributes, such as `x: str` in the example below. This
+behavior matches other type checkers such as mypy and pyright.
+
+```py
+from typing import Any
+
+class Foo:
+    x: str
+    def __getattribute__(self, attr: str) -> Any:
+        return 42
+
+reveal_type(Foo().x)  # revealed: str
+reveal_type(Foo().y)  # revealed: Any
+```
+
+A standard library example for a class with a custom `__getattribute__` method is `SimpleNamespace`:
+
+```py
+from types import SimpleNamespace
+
+sn = SimpleNamespace(a="a")
+
+reveal_type(sn.a)  # revealed: Any
+```
+
+`__getattribute__` takes precedence over `__getattr__`:
+
+```py
+class C:
+    def __getattribute__(self, name: str) -> int:
+        return 1
+
+    def __getattr__(self, name: str) -> str:
+        return "a"
+
+c = C()
+
+reveal_type(c.x)  # revealed: int
+```
+
+Like all dunder methods, `__getattribute__` is not looked up on instances:
+
+```py
+def external_getattribute(name) -> int:
+    return 1
+
+class ThisFails:
+    def __init__(self):
+        self.__getattribute__ = external_getattribute
+
+# error: [unresolved-attribute]
+ThisFails().x
+```
+
 ## Classes with custom `__setattr__` methods
 
 ### Basic
