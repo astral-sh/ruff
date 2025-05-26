@@ -580,10 +580,6 @@ impl<'db> ClassLiteral<'db> {
         self.pep695_generic_context(db).is_some()
     }
 
-    pub(crate) fn has_legacy_generic_context(self, db: &'db dyn Db) -> bool {
-        self.legacy_generic_context(db).is_some()
-    }
-
     #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial)]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);

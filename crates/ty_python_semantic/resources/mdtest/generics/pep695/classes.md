@@ -67,6 +67,14 @@ T = TypeVar("T")
 
 # error: [invalid-generic-class] "Cannot both inherit from `typing.Generic` and use PEP 695 type variables"
 class BothGenericSyntaxes[U](Generic[T]): ...
+
+reveal_type(BothGenericSyntaxes.__mro__)  # revealed: tuple[<class 'BothGenericSyntaxes[Unknown]'>, Unknown, <class 'object'>]
+
+# error: [invalid-generic-class] "Cannot both inherit from `typing.Generic` and use PEP 695 type variables"
+# error: [invalid-base] "Cannot inherit from plain `Generic`"
+class DoublyInvalid[T](Generic): ...
+
+reveal_type(DoublyInvalid.__mro__)  # revealed: tuple[<class 'DoublyInvalid[Unknown]'>, Unknown, <class 'object'>]
 ```
 
 Generic classes implicitly inherit from `Generic`:

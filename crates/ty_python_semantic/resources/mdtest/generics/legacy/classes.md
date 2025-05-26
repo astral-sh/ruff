@@ -37,7 +37,7 @@ class RepeatedTypevar(Generic[T, T]): ...
 You can only specialize `typing.Generic` with typevars (TODO: or param specs or typevar tuples).
 
 ```py
-# error: [invalid-argument-type] "`<class 'int'>` is not a valid argument to `typing.Generic`"
+# error: [invalid-argument-type] "`<class 'int'>` is not a valid argument to `Generic`"
 class GenericOfType(Generic[int]): ...
 ```
 
