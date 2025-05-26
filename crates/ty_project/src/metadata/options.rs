@@ -57,19 +57,6 @@ pub struct Options {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
     pub terminal: Option<TerminalOptions>,
-
-    /// Whether to automatically exclude files that are ignored by `.ignore`,
-    /// `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
-    /// Enabled by default.
-    #[option(
-        default = r#"true"#,
-        value_type = r#"bool"#,
-        example = r#"
-            respect-ignore-files = false
-        "#
-    )]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub respect_ignore_files: Option<bool>,
 }
 
 impl Options {
@@ -216,7 +203,7 @@ impl Options {
     pub(crate) fn to_settings(&self, db: &dyn Db) -> (Settings, Vec<OptionDiagnostic>) {
         let (rules, diagnostics) = self.to_rule_selection(db);
 
-        let mut settings = Settings::new(rules, self.respect_ignore_files);
+        let mut settings = Settings::new(rules, self.src.as_ref());
 
         if let Some(terminal) = self.terminal.as_ref() {
             settings.set_terminal(TerminalSettings {
@@ -421,6 +408,19 @@ pub struct SrcOptions {
         "#
     )]
     pub root: Option<RelativePathBuf>,
+
+    /// Whether to automatically exclude files that are ignored by `.ignore`,
+    /// `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
+    /// Enabled by default.
+    #[option(
+        default = r#"true"#,
+        value_type = r#"bool"#,
+        example = r#"
+            respect-ignore-files = false
+        "#
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub respect_ignore_files: Option<bool>,
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]

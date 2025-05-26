@@ -4,7 +4,7 @@ use clap::error::ErrorKind;
 use clap::{ArgAction, ArgMatches, Error, Parser};
 use ruff_db::system::SystemPathBuf;
 use ty_project::combine::Combine;
-use ty_project::metadata::options::{EnvironmentOptions, Options, TerminalOptions};
+use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions, TerminalOptions};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
 use ty_python_semantic::lint;
 
@@ -184,9 +184,11 @@ impl CheckCommand {
                     .map(|output_format| RangedValue::cli(output_format.into())),
                 error_on_warning: self.error_on_warning,
             }),
+            src: Some(SrcOptions {
+                respect_ignore_files,
+                ..SrcOptions::default()
+            }),
             rules,
-            respect_ignore_files,
-            ..Default::default()
         };
         // Merge with options passed in via --config
         options.combine(self.config.into_options().unwrap_or_default())
