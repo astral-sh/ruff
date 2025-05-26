@@ -14,6 +14,7 @@ pub use program::{
 pub use python_platform::PythonPlatform;
 pub use semantic_model::{HasType, SemanticModel};
 pub use site_packages::SysPrefixPathOrigin;
+pub use util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 
 pub mod ast_node_ref;
 mod db;

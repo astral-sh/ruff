@@ -114,7 +114,9 @@ use super::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION, parse_string_annotation,
 };
 use super::subclass_of::SubclassOfInner;
-use super::{BoundSuperError, BoundSuperType, ClassBase};
+use super::{
+    BoundSuperError, BoundSuperType, ClassBase, add_inferred_python_version_hint_to_diagnostic,
+};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -6029,7 +6031,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         diag.info(
                             "Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later",
                         );
-                        diagnostic::add_inferred_python_version_hint(db, diag);
+                        add_inferred_python_version_hint_to_diagnostic(db, &mut diag, "resolving types");
                     }
                 }
                 Type::unknown()
