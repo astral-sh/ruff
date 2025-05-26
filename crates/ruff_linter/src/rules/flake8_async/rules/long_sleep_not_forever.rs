@@ -86,7 +86,7 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
     let arg_name = match module {
         AsyncModule::Trio => "seconds",
         AsyncModule::AnyIo => "delay",
-        _ => return,
+        AsyncModule::AsyncIo => return,
     };
 
     let Some(arg) = call.arguments.find_argument_value(arg_name, 0) else {
