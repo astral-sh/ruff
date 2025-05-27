@@ -3413,6 +3413,9 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
+            | Type::PropertyInstance(_)
+            | Type::BoundSuper(_)
+            | Type::KnownInstance(_)
             | Type::AlwaysTruthy => Truthiness::AlwaysTrue,
 
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
@@ -3448,10 +3451,6 @@ impl<'db> Type<'db> {
 
             Type::ProtocolInstance(_) => try_dunder_bool()?,
 
-            Type::KnownInstance(known_instance) => known_instance.bool(),
-
-            Type::PropertyInstance(_) => Truthiness::AlwaysTrue,
-
             Type::Union(union) => try_union(*union)?,
 
             Type::Intersection(_) => {
@@ -3464,7 +3463,6 @@ impl<'db> Type<'db> {
             Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
             Type::Tuple(items) => Truthiness::from(!items.elements(db).is_empty()),
-            Type::BoundSuper(_) => Truthiness::AlwaysTrue,
         };
 
         Ok(truthiness)
