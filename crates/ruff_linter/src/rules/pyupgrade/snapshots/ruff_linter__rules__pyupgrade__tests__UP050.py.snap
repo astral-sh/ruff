@@ -216,4 +216,22 @@ UP050.py:69:5: UP050 [*] Class `A` uses `metaclass=type`, which is redundant
    68 |+class A:
 72 69 |     ...
 73 70 | 
-74 71 |
+74 71 | 
+
+UP050.py:83:9: UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+   |
+81 | import builtins
+82 |
+83 | class A(metaclass=builtins.type):
+   |         ^^^^^^^^^^^^^^^^^^^^^^^ UP050
+84 |     ...
+   |
+   = help: Remove `metaclass=type`
+
+ℹ Safe fix
+80 80 | 
+81 81 | import builtins
+82 82 | 
+83    |-class A(metaclass=builtins.type):
+   83 |+class A:
+84 84 |     ...

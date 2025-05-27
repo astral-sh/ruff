@@ -76,3 +76,9 @@ type = str
 
 class Foo(metaclass=type):
     ...
+
+
+import builtins
+
+class A(metaclass=builtins.type):
+    ...
