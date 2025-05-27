@@ -148,22 +148,15 @@ pub(crate) fn non_pep604_annotation(
 
     match operator {
         Pep604Operator::Optional => {
-            let (rule, mut diagnostic) = if is_defer_optional_to_up045_enabled(checker.settings) {
-                (
-                    Rule::NonPEP604AnnotationOptional,
-                    checker.report_diagnostic(NonPEP604AnnotationOptional, expr.range()),
-                )
+            let guard = if is_defer_optional_to_up045_enabled(checker.settings) {
+                checker.report_diagnostic_if_enabled(NonPEP604AnnotationOptional, expr.range())
             } else {
-                (
-                    Rule::NonPEP604AnnotationUnion,
-                    checker.report_diagnostic(NonPEP604AnnotationUnion, expr.range()),
-                )
+                checker.report_diagnostic_if_enabled(NonPEP604AnnotationUnion, expr.range())
             };
 
-            if !checker.enabled(rule) {
-                diagnostic.defuse();
+            let Some(mut diagnostic) = guard else {
                 return;
-            }
+            };
 
             if fixable {
                 match slice {
