@@ -141,3 +141,48 @@ class MyInt(int): ...
 # No error for a subclass of int
 reveal_type(MyInt(3) / 0)  # revealed: int | float
 ```
+
+## Bit-shifting
+
+Literal artithmetic is supported for bit-shifting operations on `int`s:
+
+```py
+reveal_type(42 << 3)  # revealed: Literal[336]
+reveal_type(0 << 3)  # revealed: Literal[0]
+reveal_type(-42 << 3)  # revealed: Literal[-336]
+
+reveal_type(42 >> 3)  # revealed: Literal[5]
+reveal_type(0 >> 3)  # revealed: Literal[0]
+reveal_type(-42 >> 3)  # revealed: Literal[-6]
+```
+
+If the result of a left shift overflows the `int` literal type, it becomes `int`. Right shifts do
+not overflow:
+
+```py
+reveal_type(42 << 100) # revealed: int
+reveal_type(0 << 100) # revealed: int
+reveal_type(-42 << 100) # revealed: int
+
+reveal_type(42 >> 100) # revealed: Literal[0]
+reveal_type(0 >> 100) # revealed: Literal[0]
+reveal_type(-42 >> 100) # revealed: Literal[-1]
+```
+
+It is an error to shift by a negative value. This is handled similarly to `division-by-zero`, above:
+
+```py
+# error: [negative-shift] "Cannot left shift object of type `Literal[42]` by a negative value"
+reveal_type(42 << -3)  # revealed: int
+# error: [negative-shift] "Cannot left shift object of type `Literal[0]` by a negative value"
+reveal_type(0 << -3) # revealed: int
+# error: [negative-shift] "Cannot left shift object of type `Literal[-42]` by a negative value"
+reveal_type(-42 << -3)  # revealed: int
+
+# error: [negative-shift] "Cannot right shift object of type `Literal[42]` by a negative value"
+reveal_type(42 >> -3)  # revealed: int
+# error: [negative-shift] "Cannot right shift object of type `Literal[0]` by a negative value"
+reveal_type(0 >> -3) # revealed: int
+# error: [negative-shift] "Cannot right shift object of type `Literal[-42]` by a negative value"
+reveal_type(-42 >> -3)  # revealed: int
+```
