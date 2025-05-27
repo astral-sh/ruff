@@ -18,7 +18,14 @@ use ruff_db::files::File;
 
 /// Enumeration of specific runtime symbols that are special enough
 /// that they can each be considered to inhabit a unique type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
+///
+/// # Ordering
+///
+/// Ordering between variants is stable and should be the same between runs.
+/// Ordering within variants (for variants that wrap associate data)
+/// is based on the known-instance's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the type var instance was garbage collected and recreated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, PartialOrd, Ord)]
 pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Annotated` (which can also be found as `typing_extensions.Annotated`)
     Annotated,
