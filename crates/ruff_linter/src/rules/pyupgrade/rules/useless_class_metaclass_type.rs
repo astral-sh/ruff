@@ -43,7 +43,6 @@ impl AlwaysFixableViolation for UselessClassMetaclassType {
     }
 }
 
-/// https://github.com/astral-sh/ruff/issues/18320
 /// UP050
 pub(crate) fn useless_class_metaclass_type(checker: &Checker, class_def: &StmtClassDef) {
     let Some(arguments) = class_def.arguments.as_deref() else {
