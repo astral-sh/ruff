@@ -4184,10 +4184,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [
-                                            Type::Callable(CallableType::single(
-                                                db,
-                                                getter_signature,
-                                            )),
+                                            CallableType::single(db, getter_signature),
                                             Type::none(db),
                                         ],
                                     ))
@@ -4196,10 +4193,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [
-                                            Type::Callable(CallableType::single(
-                                                db,
-                                                setter_signature,
-                                            )),
+                                            CallableType::single(db, setter_signature),
                                             Type::none(db),
                                         ],
                                     ))
@@ -4208,10 +4202,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [
-                                            Type::Callable(CallableType::single(
-                                                db,
-                                                deleter_signature,
-                                            )),
+                                            CallableType::single(db, deleter_signature),
                                             Type::none(db),
                                         ],
                                     ))
@@ -4935,7 +4926,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
 
                 // TODO: Use an opt-in rule for a bare `Callable`
-                KnownInstanceType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
+                KnownInstanceType::Callable => Ok(CallableType::unknown(db)),
 
                 KnownInstanceType::TypingSelf => {
                     let index = semantic_index(db, scope_id.file(db));
@@ -6931,10 +6922,7 @@ impl<'db> FunctionType<'db> {
 
     /// Convert the `FunctionType` into a [`Type::Callable`].
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::from_overloads(
-            db,
-            self.signature(db).overloads.iter().cloned(),
-        ))
+        Type::Callable(CallableType::new(db, self.signature(db).overloads.clone()))
     }
 
     /// Convert the `FunctionType` into a [`Type::BoundMethod`].
@@ -7549,13 +7537,15 @@ pub struct BoundMethodType<'db> {
 
 impl<'db> BoundMethodType<'db> {
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::from_overloads(
+        Type::Callable(CallableType::new(
             db,
-            self.function(db)
-                .signature(db)
-                .overloads
-                .iter()
-                .map(signatures::Signature::bind_self),
+            CallableSignature::from_overloads(
+                self.function(db)
+                    .signature(db)
+                    .overloads
+                    .iter()
+                    .map(signatures::Signature::bind_self),
+            ),
         ))
     }
 
@@ -7618,39 +7608,19 @@ impl<'db> BoundMethodType<'db> {
 #[salsa::interned(debug)]
 #[derive(PartialOrd, Ord)]
 pub struct CallableType<'db> {
-    #[returns(deref)]
-    signatures: Box<[Signature<'db>]>,
+    #[returns(ref)]
+    signatures: CallableSignature<'db>,
 }
 
 impl<'db> CallableType<'db> {
-    /// Create a non-overloaded callable type with a single signature.
-    pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> Self {
-        CallableType::new(db, vec![signature].into_boxed_slice())
-    }
-
-    /// Create an overloaded callable type with multiple signatures.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `overloads` is empty.
-    pub(crate) fn from_overloads<I>(db: &'db dyn Db, overloads: I) -> Self
-    where
-        I: IntoIterator<Item = Signature<'db>>,
-    {
-        let overloads = overloads.into_iter().collect::<Vec<_>>().into_boxed_slice();
-        assert!(
-            !overloads.is_empty(),
-            "CallableType must have at least one signature"
-        );
-        CallableType::new(db, overloads)
+    /// Create a callable type with a single non-overloaded signature.
+    pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
+        Type::Callable(CallableType::new(db, CallableSignature::single(signature)))
     }
 
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
-    pub(crate) fn unknown(db: &'db dyn Db) -> Self {
-        CallableType::single(
-            db,
-            Signature::new(Parameters::unknown(), Some(Type::unknown())),
-        )
+    pub(crate) fn unknown(db: &'db dyn Db) -> Type<'db> {
+        Self::single(db, Signature::unknown())
     }
 
     /// Create a callable type which represents a fully-static "bottom" callable.
@@ -7659,28 +7629,18 @@ impl<'db> CallableType<'db> {
     /// `(*args: object, **kwargs: object) -> Never`.
     #[cfg(test)]
     pub(crate) fn bottom(db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::single(db, Signature::bottom(db)))
+        Self::single(db, Signature::bottom(db))
     }
 
     /// Return a "normalized" version of this `Callable` type.
     ///
     /// See [`Type::normalized`] for more details.
     fn normalized(self, db: &'db dyn Db) -> Self {
-        CallableType::from_overloads(
-            db,
-            self.signatures(db)
-                .iter()
-                .map(|signature| signature.normalized(db)),
-        )
+        CallableType::new(db, self.signatures(db).normalized(db))
     }
 
     fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
-        CallableType::from_overloads(
-            db,
-            self.signatures(db)
-                .iter()
-                .map(|signature| signature.apply_type_mapping(db, type_mapping)),
-        )
+        CallableType::new(db, self.signatures(db).apply_type_mapping(db, type_mapping))
     }
 
     fn find_legacy_typevars(
@@ -7688,134 +7648,50 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
-        for signature in self.signatures(db) {
-            signature.find_legacy_typevars(db, typevars);
-        }
+        self.signatures(db).find_legacy_typevars(db, typevars);
     }
 
     /// Check whether this callable type is fully static.
     ///
     /// See [`Type::is_fully_static`] for more details.
     fn is_fully_static(self, db: &'db dyn Db) -> bool {
-        self.signatures(db)
-            .iter()
-            .all(|signature| signature.is_fully_static(db))
+        self.signatures(db).is_fully_static(db)
     }
 
     /// Check whether this callable type is a subtype of another callable type.
     ///
     /// See [`Type::is_subtype_of`] for more details.
     fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_assignable_to_impl(db, other, &|self_signature, other_signature| {
-            self_signature.is_subtype_of(db, other_signature)
-        })
+        self.signatures(db).is_subtype_of(db, other.signatures(db))
     }
 
     /// Check whether this callable type is assignable to another callable type.
     ///
     /// See [`Type::is_assignable_to`] for more details.
     fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_assignable_to_impl(db, other, &|self_signature, other_signature| {
-            self_signature.is_assignable_to(db, other_signature)
-        })
-    }
-
-    /// Implementation for the various relation checks between two, possible overloaded, callable
-    /// types.
-    ///
-    /// The `check_signature` closure is used to check the relation between two [`Signature`]s.
-    fn is_assignable_to_impl<F>(self, db: &'db dyn Db, other: Self, check_signature: &F) -> bool
-    where
-        F: Fn(&Signature<'db>, &Signature<'db>) -> bool,
-    {
-        match (self.signatures(db), other.signatures(db)) {
-            ([self_signature], [other_signature]) => {
-                // Base case: both callable types contain a single signature.
-                check_signature(self_signature, other_signature)
-            }
-
-            // `self` is possibly overloaded while `other` is definitely not overloaded.
-            (self_signatures, [other_signature]) => {
-                let other_callable = CallableType::single(db, other_signature.clone());
-                self_signatures
-                    .iter()
-                    .map(|self_signature| CallableType::single(db, self_signature.clone()))
-                    .any(|self_callable| {
-                        self_callable.is_assignable_to_impl(db, other_callable, check_signature)
-                    })
-            }
-
-            // `self` is definitely not overloaded while `other` is possibly overloaded.
-            ([self_signature], other_signatures) => {
-                let self_callable = CallableType::single(db, self_signature.clone());
-                other_signatures
-                    .iter()
-                    .map(|other_signature| CallableType::single(db, other_signature.clone()))
-                    .all(|other_callable| {
-                        self_callable.is_assignable_to_impl(db, other_callable, check_signature)
-                    })
-            }
-
-            // `self` is definitely overloaded while `other` is possibly overloaded.
-            (_, other_signatures) => other_signatures
-                .iter()
-                .map(|other_signature| CallableType::single(db, other_signature.clone()))
-                .all(|other_callable| {
-                    self.is_assignable_to_impl(db, other_callable, check_signature)
-                }),
-        }
+        self.signatures(db)
+            .is_assignable_to(db, other.signatures(db))
     }
 
     /// Check whether this callable type is equivalent to another callable type.
     ///
     /// See [`Type::is_equivalent_to`] for more details.
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        match (self.signatures(db), other.signatures(db)) {
-            ([self_signature], [other_signature]) => {
-                // Common case: both callable types contain a single signature, use the custom
-                // equivalence check instead of delegating it to the subtype check.
-                self_signature.is_equivalent_to(db, other_signature)
-            }
-            (self_signatures, other_signatures) => {
-                if !self_signatures
-                    .iter()
-                    .chain(other_signatures.iter())
-                    .all(|signature| signature.is_fully_static(db))
-                {
-                    return false;
-                }
-                if self == other {
-                    return true;
-                }
-                self.is_subtype_of(db, other) && other.is_subtype_of(db, self)
-            }
-        }
+        self.signatures(db)
+            .is_equivalent_to(db, other.signatures(db))
     }
 
     /// Check whether this callable type is gradual equivalent to another callable type.
     ///
     /// See [`Type::is_gradual_equivalent_to`] for more details.
     fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        match (self.signatures(db), other.signatures(db)) {
-            ([self_signature], [other_signature]) => {
-                self_signature.is_gradual_equivalent_to(db, other_signature)
-            }
-            _ => {
-                // TODO: overloads
-                false
-            }
-        }
+        self.signatures(db)
+            .is_gradual_equivalent_to(db, other.signatures(db))
     }
 
     /// See [`Type::replace_self_reference`].
     fn replace_self_reference(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
-        CallableType::from_overloads(
-            db,
-            self.signatures(db)
-                .iter()
-                .cloned()
-                .map(|signature| signature.replace_self_reference(db, class)),
-        )
+        CallableType::new(db, self.signatures(db).replace_self_reference(db, class))
     }
 }
 

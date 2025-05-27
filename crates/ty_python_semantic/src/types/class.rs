@@ -9,10 +9,10 @@ use super::{
 use crate::semantic_index::DeclarationWithConstraint;
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, Specialization};
-use crate::types::signatures::{Parameter, Parameters};
+use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, Signature,
-    TypeMapping, TypeVarInstance,
+    CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, TypeMapping,
+    TypeVarInstance,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -1269,7 +1269,7 @@ impl<'db> ClassLiteral<'db> {
             }
 
             let signature = Signature::new(Parameters::new(parameters), Some(Type::none(db)));
-            Some(Type::Callable(CallableType::single(db, signature)))
+            Some(CallableType::single(db, signature))
         };
 
         match (field_policy, name) {
@@ -1305,7 +1305,7 @@ impl<'db> ClassLiteral<'db> {
                     Some(KnownClass::Bool.to_instance(db)),
                 );
 
-                Some(Type::Callable(CallableType::single(db, signature)))
+                Some(CallableType::single(db, signature))
             }
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback

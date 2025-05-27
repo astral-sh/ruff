@@ -83,12 +83,13 @@ use crate::types::diagnostic::{
 };
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
+use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     BareTypeAliasType, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
     DynamicType, FunctionDecorators, FunctionType, GenericAlias, IntersectionBuilder,
     IntersectionType, KnownClass, KnownFunction, KnownInstanceType, MemberLookupPolicy,
-    MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, Signature,
+    MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters,
     StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type,
     TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
     TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
@@ -4849,10 +4850,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // TODO: Useful inference of a lambda's return type will require a different approach,
         // which does the inference of the body expression based on arguments at each call site,
         // rather than eagerly computing a return type without knowing the argument types.
-        Type::Callable(CallableType::single(
-            self.db(),
-            Signature::new(parameters, Some(Type::unknown())),
-        ))
+        CallableType::single(self.db(), Signature::new(parameters, Some(Type::unknown())))
     }
 
     /// Returns the type of the first parameter if the given scope is function-like (i.e. function or lambda).
@@ -8629,8 +8627,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     CallableType::unknown(db)
                 };
 
-                let callable_type = Type::Callable(callable_type);
-
                 // `Signature` / `Parameters` are not a `Type` variant, so we're storing
                 // the outer callable type on these expressions instead.
                 self.store_expression_type(arguments_slice, callable_type);
@@ -8735,10 +8731,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return Type::unknown();
                     };
 
-                    Type::Callable(CallableType::from_overloads(
-                        db,
+                    let signature = CallableSignature::from_overloads(
                         std::iter::once(signature).chain(signature_iter),
-                    ))
+                    );
+                    Type::Callable(CallableType::new(db, signature))
                 }
             },
 
