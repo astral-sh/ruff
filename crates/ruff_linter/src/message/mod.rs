@@ -60,7 +60,7 @@ pub struct Message {
     pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
     pub(crate) noqa_offset: Option<TextSize>,
-    rule: Option<Rule>,
+    noqa_code: Option<NoqaCode>,
 }
 
 impl Message {
@@ -77,7 +77,7 @@ impl Message {
             fix: None,
             parent: None,
             noqa_offset: None,
-            rule: None,
+            noqa_code: None,
         }
     }
 
@@ -109,7 +109,7 @@ impl Message {
             fix,
             parent,
             noqa_offset,
-            rule: Some(rule),
+            noqa_code: Some(rule.noqa_code()),
         }
     }
 
@@ -229,12 +229,16 @@ impl Message {
 
     /// Returns the [`Rule`] corresponding to the diagnostic message.
     pub fn to_rule(&self) -> Option<Rule> {
-        self.rule
+        if self.is_syntax_error() {
+            None
+        } else {
+            Some(self.name().parse().expect("Expected a valid rule name"))
+        }
     }
 
     /// Returns the [`NoqaCode`] corresponding to the diagnostic message.
     pub fn to_noqa_code(&self) -> Option<NoqaCode> {
-        self.to_rule().map(|rule| rule.noqa_code())
+        self.noqa_code
     }
 
     /// Returns the URL for the rule documentation, if it exists.
