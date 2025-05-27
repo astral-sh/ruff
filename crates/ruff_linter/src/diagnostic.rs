@@ -21,6 +21,10 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
+    // TODO(brent) We temporarily allow this to avoid updating all of the call sites to add
+    // references. I expect this method to go away or change significantly with the rest of the
+    // diagnostic refactor, but if it still exists in this form at the end of the refactor, we
+    // should just update the call sites.
     #[expect(clippy::needless_pass_by_value)]
     pub fn new<T: Violation>(kind: T, range: TextRange) -> Self {
         Self {
