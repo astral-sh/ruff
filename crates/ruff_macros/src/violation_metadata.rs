@@ -7,10 +7,12 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
 
     let name = input.ident;
 
+    let (impl_generics, ty_generics, where_clause) = &input.generics.split_for_impl();
+
     Ok(quote! {
         #[automatically_derived]
         #[expect(deprecated)]
-        impl ruff_diagnostics::ViolationMetadata for #name {
+        impl #impl_generics ruff_diagnostics::ViolationMetadata for #name #ty_generics #where_clause {
             fn rule_name() -> &'static str {
                 ::ruff_macros::kebab_case!(#name)
             }
