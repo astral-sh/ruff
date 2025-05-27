@@ -107,9 +107,7 @@ pub(super) fn compute_diagnostics(
 
     let diagnostics = db.check_file(file);
 
-    let query = snapshot.query();
-
-    if let Some(notebook) = query.as_notebook() {
+    if let Some(notebook) = snapshot.query().as_notebook() {
         let mut cell_diagnostics: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
 
         // Populates all relevant URLs with an empty diagnostic list. This ensures that documents
