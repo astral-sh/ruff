@@ -978,12 +978,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::ImportSelf) {
-                if let Some(diagnostic) = pylint::rules::import_from_self(
-                    level,
-                    module,
-                    names,
-                    checker.module.qualified_name(),
-                ) {
+                if let Some(diagnostic) =
+                    pylint::rules::import_from_self(level, module, names, &checker.module)
+                {
                     checker.report_diagnostic(diagnostic);
                 }
             }

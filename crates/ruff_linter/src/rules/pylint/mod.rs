@@ -80,6 +80,7 @@ mod tests {
         Path::new("import_private_name/submodule/__main__.py")
     )]
     #[test_case(Rule::ImportSelf, Path::new("import_self/module.py"))]
+    #[test_case(Rule::ImportSelf, Path::new("import_self/subpackage/__init__.py"))]
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"))]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"))]
     #[test_case(Rule::InvalidBoolReturnType, Path::new("invalid_return_type_bool.py"))]

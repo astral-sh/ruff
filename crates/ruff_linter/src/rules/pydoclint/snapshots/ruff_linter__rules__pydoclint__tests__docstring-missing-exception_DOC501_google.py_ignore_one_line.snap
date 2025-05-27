@@ -1,159 +1,159 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC501_google.py:34:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
+DOC501_google.py:54:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
    |
-32 |   # DOC501
-33 |   def calculate_speed(distance: float, time: float) -> float:
-34 | /     """Calculate speed as distance divided by time.
-35 | |
-36 | |     Args:
-37 | |         distance: Distance traveled.
-38 | |         time: Time spent traveling.
-39 | |
-40 | |     Returns:
-41 | |         Speed as distance divided by time.
-42 | |     """
+52 |   # DOC501
+53 |   def calculate_speed(distance: float, time: float) -> float:
+54 | /     """Calculate speed as distance divided by time.
+55 | |
+56 | |     Args:
+57 | |         distance: Distance traveled.
+58 | |         time: Time spent traveling.
+59 | |
+60 | |     Returns:
+61 | |         Speed as distance divided by time.
+62 | |     """
    | |_______^ DOC501
-43 |       try:
-44 |           return distance / time
+63 |       try:
+64 |           return distance / time
    |
    = help: Add `FasterThanLightError` to the docstring
 
-DOC501_google.py:51:5: DOC501 Raised exception `ValueError` missing from docstring
+DOC501_google.py:71:5: DOC501 Raised exception `ValueError` missing from docstring
    |
-49 |   # DOC501
-50 |   def calculate_speed(distance: float, time: float) -> float:
-51 | /     """Calculate speed as distance divided by time.
-52 | |
-53 | |     Args:
-54 | |         distance: Distance traveled.
-55 | |         time: Time spent traveling.
-56 | |
-57 | |     Returns:
-58 | |         Speed as distance divided by time.
-59 | |     """
+69 |   # DOC501
+70 |   def calculate_speed(distance: float, time: float) -> float:
+71 | /     """Calculate speed as distance divided by time.
+72 | |
+73 | |     Args:
+74 | |         distance: Distance traveled.
+75 | |         time: Time spent traveling.
+76 | |
+77 | |     Returns:
+78 | |         Speed as distance divided by time.
+79 | |     """
    | |_______^ DOC501
-60 |       try:
-61 |           return distance / time
+80 |       try:
+81 |           return distance / time
    |
    = help: Add `ValueError` to the docstring
 
-DOC501_google.py:51:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
+DOC501_google.py:71:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
    |
-49 |   # DOC501
-50 |   def calculate_speed(distance: float, time: float) -> float:
-51 | /     """Calculate speed as distance divided by time.
-52 | |
-53 | |     Args:
-54 | |         distance: Distance traveled.
-55 | |         time: Time spent traveling.
-56 | |
-57 | |     Returns:
-58 | |         Speed as distance divided by time.
-59 | |     """
+69 |   # DOC501
+70 |   def calculate_speed(distance: float, time: float) -> float:
+71 | /     """Calculate speed as distance divided by time.
+72 | |
+73 | |     Args:
+74 | |         distance: Distance traveled.
+75 | |         time: Time spent traveling.
+76 | |
+77 | |     Returns:
+78 | |         Speed as distance divided by time.
+79 | |     """
    | |_______^ DOC501
-60 |       try:
-61 |           return distance / time
+80 |       try:
+81 |           return distance / time
    |
    = help: Add `FasterThanLightError` to the docstring
 
-DOC501_google.py:106:5: DOC501 Raised exception `AnotherError` missing from docstring
+DOC501_google.py:126:5: DOC501 Raised exception `AnotherError` missing from docstring
     |
-104 |   # DOC501
-105 |   def calculate_speed(distance: float, time: float) -> float:
-106 | /     """Calculate speed as distance divided by time.
-107 | |
-108 | |     Args:
-109 | |         distance: Distance traveled.
-110 | |         time: Time spent traveling.
-111 | |
-112 | |     Returns:
-113 | |         Speed as distance divided by time.
-114 | |     """
+124 |   # DOC501
+125 |   def calculate_speed(distance: float, time: float) -> float:
+126 | /     """Calculate speed as distance divided by time.
+127 | |
+128 | |     Args:
+129 | |         distance: Distance traveled.
+130 | |         time: Time spent traveling.
+131 | |
+132 | |     Returns:
+133 | |         Speed as distance divided by time.
+134 | |     """
     | |_______^ DOC501
-115 |       raise AnotherError
+135 |       raise AnotherError
     |
     = help: Add `AnotherError` to the docstring
 
-DOC501_google.py:120:5: DOC501 Raised exception `AnotherError` missing from docstring
+DOC501_google.py:140:5: DOC501 Raised exception `AnotherError` missing from docstring
     |
-118 |   # DOC501
-119 |   def calculate_speed(distance: float, time: float) -> float:
-120 | /     """Calculate speed as distance divided by time.
-121 | |
-122 | |     Args:
-123 | |         distance: Distance traveled.
-124 | |         time: Time spent traveling.
-125 | |
-126 | |     Returns:
-127 | |         Speed as distance divided by time.
-128 | |     """
+138 |   # DOC501
+139 |   def calculate_speed(distance: float, time: float) -> float:
+140 | /     """Calculate speed as distance divided by time.
+141 | |
+142 | |     Args:
+143 | |         distance: Distance traveled.
+144 | |         time: Time spent traveling.
+145 | |
+146 | |     Returns:
+147 | |         Speed as distance divided by time.
+148 | |     """
     | |_______^ DOC501
-129 |       raise AnotherError()
+149 |       raise AnotherError()
     |
     = help: Add `AnotherError` to the docstring
 
-DOC501_google.py:134:5: DOC501 Raised exception `SomeError` missing from docstring
+DOC501_google.py:154:5: DOC501 Raised exception `SomeError` missing from docstring
     |
-132 |   # DOC501
-133 |   def foo(bar: int):
-134 | /     """Foo.
-135 | |
-136 | |     Args:
-137 | |         bar: Bar.
-138 | |     """
+152 |   # DOC501
+153 |   def foo(bar: int):
+154 | /     """Foo.
+155 | |
+156 | |     Args:
+157 | |         bar: Bar.
+158 | |     """
     | |_______^ DOC501
-139 |       raise something.SomeError
+159 |       raise something.SomeError
     |
     = help: Add `SomeError` to the docstring
 
-DOC501_google.py:197:5: DOC501 Raised exception `ZeroDivisionError` missing from docstring
+DOC501_google.py:217:5: DOC501 Raised exception `ZeroDivisionError` missing from docstring
     |
-195 |   # DOC501
-196 |   def calculate_speed(distance: float, time: float) -> float:
-197 | /     """Calculate speed as distance divided by time.
-198 | |
-199 | |     Args:
-200 | |         distance: Distance traveled.
-201 | |         time: Time spent traveling.
-202 | |
-203 | |     Returns:
-204 | |         Speed as distance divided by time.
-205 | |
-206 | |     Raises:
-207 | |         TypeError: if you didn't pass a number for both parameters
-208 | |     """
+215 |   # DOC501
+216 |   def calculate_speed(distance: float, time: float) -> float:
+217 | /     """Calculate speed as distance divided by time.
+218 | |
+219 | |     Args:
+220 | |         distance: Distance traveled.
+221 | |         time: Time spent traveling.
+222 | |
+223 | |     Returns:
+224 | |         Speed as distance divided by time.
+225 | |
+226 | |     Raises:
+227 | |         TypeError: if you didn't pass a number for both parameters
+228 | |     """
     | |_______^ DOC501
-209 |       try:
-210 |           return distance / time
+229 |       try:
+230 |           return distance / time
     |
     = help: Add `ZeroDivisionError` to the docstring
 
-DOC501_google.py:238:5: DOC501 Raised exception `TypeError` missing from docstring
+DOC501_google.py:258:5: DOC501 Raised exception `TypeError` missing from docstring
     |
-237 |   def foo():
-238 | /     """Foo.
-239 | |
-240 | |     Returns:
-241 | |         42: int.
-242 | |     """
+257 |   def foo():
+258 | /     """Foo.
+259 | |
+260 | |     Returns:
+261 | |         42: int.
+262 | |     """
     | |_______^ DOC501
-243 |       if True:
-244 |           raise TypeError  # DOC501
+263 |       if True:
+264 |           raise TypeError  # DOC501
     |
     = help: Add `TypeError` to the docstring
 
-DOC501_google.py:238:5: DOC501 Raised exception `ValueError` missing from docstring
+DOC501_google.py:258:5: DOC501 Raised exception `ValueError` missing from docstring
     |
-237 |   def foo():
-238 | /     """Foo.
-239 | |
-240 | |     Returns:
-241 | |         42: int.
-242 | |     """
+257 |   def foo():
+258 | /     """Foo.
+259 | |
+260 | |     Returns:
+261 | |         42: int.
+262 | |     """
     | |_______^ DOC501
-243 |       if True:
-244 |           raise TypeError  # DOC501
+263 |       if True:
+264 |           raise TypeError  # DOC501
     |
     = help: Add `ValueError` to the docstring
