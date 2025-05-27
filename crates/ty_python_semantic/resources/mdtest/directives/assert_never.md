@@ -2,27 +2,53 @@
 
 ## Basic functionality
 
-<!-- snapshot-diagnostics -->
+`assert_never` makes sure that the type of the argument is `Never`.
 
-`assert_never` makes sure that the type of the argument is `Never`. If it is not, a
-`type-assertion-failure` diagnostic is emitted.
+### Correct usage
 
 ```py
 from typing_extensions import assert_never, Never, Any
 from ty_extensions import Unknown
 
-def _(never: Never, any_: Any, unknown: Unknown, flag: bool):
+def _(never: Never):
     assert_never(never)  # fine
+```
 
+### Diagnostics
+
+<!-- snapshot-diagnostics -->
+
+If it is not, a `type-assertion-failure` diagnostic is emitted.
+
+```py
+from typing_extensions import assert_never, Never, Any
+from ty_extensions import Unknown
+
+def _():
     assert_never(0)  # error: [type-assertion-failure]
+
+def _():
     assert_never("")  # error: [type-assertion-failure]
+
+def _():
     assert_never(None)  # error: [type-assertion-failure]
+
+def _():
     assert_never([])  # error: [type-assertion-failure]
+
+def _():
     assert_never({})  # error: [type-assertion-failure]
+
+def _():
     assert_never(())  # error: [type-assertion-failure]
+
+def _(flag: bool, never: Never):
     assert_never(1 if flag else never)  # error: [type-assertion-failure]
 
+def _(any_: Any):
     assert_never(any_)  # error: [type-assertion-failure]
+
+def _(unknown: Unknown):
     assert_never(unknown)  # error: [type-assertion-failure]
 ```
 

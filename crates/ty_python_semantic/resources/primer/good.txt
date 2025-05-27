@@ -63,7 +63,6 @@ more-itertools
 mypy-protobuf
 mypy_primer
 nionutils
-nox
 openlibrary
 operator
 optuna
@@ -107,7 +106,6 @@ starlette
 static-frame
 stone
 strawberry
-streamlit
 svcs
 sympy
 tornado

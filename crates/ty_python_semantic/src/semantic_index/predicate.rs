@@ -105,6 +105,7 @@ impl PredicateOrLiteral<'_> {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum PredicateNode<'db> {
     Expression(Expression<'db>),
+    ReturnsNever(Expression<'db>),
     Pattern(PatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
