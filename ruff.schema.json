@@ -2459,6 +2459,13 @@
             "type": "string"
           }
         },
+        "typing-extensions": {
+          "description": "Whether to allow imports from the third-party `typing_extensions` module for Python versions before a symbol was added to the first-party `typing` module.\n\nMany rules try to import symbols from the `typing` module but fall back to `typing_extensions` for earlier versions of Python. This option can be used to disable this fallback behavior in cases where `typing_extensions` is not installed.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "typing-modules": {
           "description": "A list of modules whose exports should be treated equivalently to members of the `typing` module.\n\nThis is useful for ensuring proper type annotation inference for projects that re-export `typing` and `typing_extensions` members from a compatibility module. If omitted, any members imported from modules apart from `typing` and `typing_extensions` will be treated as ordinary Python objects.",
           "type": [
@@ -2841,7 +2848,8 @@
         "py310",
         "py311",
         "py312",
-        "py313"
+        "py313",
+        "py314"
       ]
     },
     "Quote": {
@@ -2949,6 +2957,7 @@
         "AIR301",
         "AIR302",
         "AIR31",
+        "AIR311",
         "AIR312",
         "ALL",
         "ANN",
@@ -4026,6 +4035,8 @@
         "RUF057",
         "RUF058",
         "RUF059",
+        "RUF06",
+        "RUF060",
         "RUF1",
         "RUF10",
         "RUF100",

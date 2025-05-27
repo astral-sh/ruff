@@ -3,20 +3,22 @@ use std::borrow::Cow;
 use anyhow::Result;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{Binding, Imported, NodeId, Scope};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
+use crate::preview::is_full_path_match_source_strategy_enabled;
 use crate::rules::flake8_type_checking::helpers::{
     filter_contained, is_typing_reference, quote_annotation,
 };
 use crate::rules::flake8_type_checking::imports::ImportBinding;
-use crate::rules::isort::{categorize, ImportSection, ImportType};
+use crate::rules::isort::categorize::MatchSourceStrategy;
+use crate::rules::isort::{ImportSection, ImportType, categorize};
 
 /// ## What it does
 /// Checks for first-party imports that are only used for type annotations, but
@@ -62,6 +64,12 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// def func(sized: local_module.Container) -> int:
 ///     return len(sized)
 /// ```
+///
+///
+/// ## Preview
+/// When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
+/// the criterion for determining whether an import is first-party
+/// is stricter, which could affect whether this lint is triggered vs [`TC001`](https://docs.astral.sh/ruff/rules/typing-only-third-party-import/). See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
 ///
 /// ## Options
 /// - `lint.flake8-type-checking.quote-annotations`
@@ -137,6 +145,11 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// def func(df: pd.DataFrame) -> int:
 ///     return len(df)
 /// ```
+///
+/// ## Preview
+/// When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
+/// the criterion for determining whether an import is first-party
+/// is stricter, which could affect whether this lint is triggered vs [`TC001`](https://docs.astral.sh/ruff/rules/typing-only-first-party-import/). See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
 ///
 /// ## Options
 /// - `lint.flake8-type-checking.quote-annotations`
@@ -299,9 +312,18 @@ pub(crate) fn typing_only_runtime_import(
                 continue;
             }
 
+            let source_name = import.source_name().join(".");
+
             // Categorize the import, using coarse-grained categorization.
+            let match_source_strategy =
+                if is_full_path_match_source_strategy_enabled(checker.settings) {
+                    MatchSourceStrategy::FullPath
+                } else {
+                    MatchSourceStrategy::Root
+                };
+
             let import_type = match categorize(
-                &qualified_name.to_string(),
+                &source_name,
                 qualified_name.is_unresolved_import(),
                 &checker.settings.src,
                 checker.package(),
@@ -311,6 +333,7 @@ pub(crate) fn typing_only_runtime_import(
                 checker.settings.isort.no_sections,
                 &checker.settings.isort.section_order,
                 &checker.settings.isort.default_section,
+                match_source_strategy,
             ) {
                 ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
                     ImportType::FirstParty
@@ -370,10 +393,8 @@ pub(crate) fn typing_only_runtime_import(
             ..
         } in imports
         {
-            let mut diagnostic = Diagnostic::new(
-                diagnostic_for(import_type, import.qualified_name().to_string()),
-                range,
-            );
+            let mut diagnostic =
+                diagnostic_for(import_type, import.qualified_name().to_string(), range);
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
@@ -394,10 +415,8 @@ pub(crate) fn typing_only_runtime_import(
             ..
         } in imports
         {
-            let mut diagnostic = Diagnostic::new(
-                diagnostic_for(import_type, import.qualified_name().to_string()),
-                range,
-            );
+            let mut diagnostic =
+                diagnostic_for(import_type, import.qualified_name().to_string(), range);
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
@@ -417,11 +436,17 @@ fn rule_for(import_type: ImportType) -> Rule {
 }
 
 /// Return the [`Diagnostic`] for the given import type.
-fn diagnostic_for(import_type: ImportType, qualified_name: String) -> DiagnosticKind {
+fn diagnostic_for(import_type: ImportType, qualified_name: String, range: TextRange) -> Diagnostic {
     match import_type {
-        ImportType::StandardLibrary => TypingOnlyStandardLibraryImport { qualified_name }.into(),
-        ImportType::ThirdParty => TypingOnlyThirdPartyImport { qualified_name }.into(),
-        ImportType::FirstParty => TypingOnlyFirstPartyImport { qualified_name }.into(),
+        ImportType::StandardLibrary => {
+            Diagnostic::new(TypingOnlyStandardLibraryImport { qualified_name }, range)
+        }
+        ImportType::ThirdParty => {
+            Diagnostic::new(TypingOnlyThirdPartyImport { qualified_name }, range)
+        }
+        ImportType::FirstParty => {
+            Diagnostic::new(TypingOnlyFirstPartyImport { qualified_name }, range)
+        }
         _ => unreachable!("Unexpected import type"),
     }
 }

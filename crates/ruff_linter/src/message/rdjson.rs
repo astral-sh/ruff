@@ -2,13 +2,13 @@ use std::io::Write;
 
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use ruff_diagnostics::Edit;
 use ruff_source_file::SourceCode;
 use ruff_text_size::Ranged;
 
-use crate::message::{Emitter, EmitterContext, Message, SourceLocation};
+use crate::message::{Emitter, EmitterContext, LineColumn, Message};
 
 #[derive(Default)]
 pub struct RdjsonEmitter;
@@ -57,21 +57,22 @@ impl Serialize for ExpandedMessages<'_> {
 }
 
 fn message_to_rdjson_value(message: &Message) -> Value {
-    let source_code = message.source_file().to_source_code();
+    let source_file = message.source_file();
+    let source_code = source_file.to_source_code();
 
-    let start_location = source_code.source_location(message.start());
-    let end_location = source_code.source_location(message.end());
+    let start_location = source_code.line_column(message.start());
+    let end_location = source_code.line_column(message.end());
 
     if let Some(fix) = message.fix() {
         json!({
             "message": message.body(),
             "location": {
                 "path": message.filename(),
-                "range": rdjson_range(&start_location, &end_location),
+                "range": rdjson_range(start_location, end_location),
             },
             "code": {
-                "value": message.rule().map(|rule| rule.noqa_code().to_string()),
-                "url": message.rule().and_then(|rule| rule.url()),
+                "value": message.to_noqa_code().map(|code| code.to_string()),
+                "url": message.to_url(),
             },
             "suggestions": rdjson_suggestions(fix.edits(), &source_code),
         })
@@ -80,11 +81,11 @@ fn message_to_rdjson_value(message: &Message) -> Value {
             "message": message.body(),
             "location": {
                 "path": message.filename(),
-                "range": rdjson_range(&start_location, &end_location),
+                "range": rdjson_range(start_location, end_location),
             },
             "code": {
-                "value": message.rule().map(|rule| rule.noqa_code().to_string()),
-                "url": message.rule().and_then(|rule| rule.url()),
+                "value": message.to_noqa_code().map(|code| code.to_string()),
+                "url": message.to_url(),
             },
         })
     }
@@ -95,11 +96,11 @@ fn rdjson_suggestions(edits: &[Edit], source_code: &SourceCode) -> Value {
         edits
             .iter()
             .map(|edit| {
-                let location = source_code.source_location(edit.start());
-                let end_location = source_code.source_location(edit.end());
+                let location = source_code.line_column(edit.start());
+                let end_location = source_code.line_column(edit.end());
 
                 json!({
-                    "range": rdjson_range(&location, &end_location),
+                    "range": rdjson_range(location, end_location),
                     "text": edit.content().unwrap_or_default(),
                 })
             })
@@ -107,16 +108,10 @@ fn rdjson_suggestions(edits: &[Edit], source_code: &SourceCode) -> Value {
     )
 }
 
-fn rdjson_range(start: &SourceLocation, end: &SourceLocation) -> Value {
+fn rdjson_range(start: LineColumn, end: LineColumn) -> Value {
     json!({
-        "start": {
-            "line": start.row,
-            "column": start.column,
-        },
-        "end": {
-            "line": end.row,
-            "column": end.column,
-        },
+        "start": start,
+        "end": end,
     })
 }
 
@@ -124,10 +119,10 @@ fn rdjson_range(start: &SourceLocation, end: &SourceLocation) -> Value {
 mod tests {
     use insta::assert_snapshot;
 
+    use crate::message::RdjsonEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
-    use crate::message::RdjsonEmitter;
 
     #[test]
     fn output() {

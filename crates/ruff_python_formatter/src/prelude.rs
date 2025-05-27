@@ -1,7 +1,5 @@
-#[allow(unused_imports)]
 pub(crate) use crate::{
-    builders::PyFormatterExtensions, AsFormat, FormatNodeRule, FormattedIterExt as _, IntoFormat,
-    PyFormatContext, PyFormatter,
+    AsFormat, FormatNodeRule, FormattedIterExt as _, IntoFormat, PyFormatContext, PyFormatter,
+    builders::PyFormatterExtensions,
 };
-#[allow(unused_imports)]
 pub(crate) use ruff_formatter::prelude::*;

@@ -4,9 +4,9 @@ use regex::Regex;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt, WithItem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -379,15 +379,13 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
         _ => panic!("redefined_loop_name called on Statement that is not a `With` or `For`"),
     };
 
-    let mut diagnostics = Vec::new();
-
     for outer_assignment_target in &outer_assignment_targets {
         for inner_assignment_target in &inner_assignment_targets {
             // Compare the targets structurally.
             if ComparableExpr::from(outer_assignment_target.expr)
                 .eq(&(ComparableExpr::from(inner_assignment_target.expr)))
             {
-                diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     RedefinedLoopName {
                         name: checker.generator().expr(outer_assignment_target.expr),
                         outer_kind: outer_assignment_target.binding_kind,
@@ -398,6 +396,4 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
             }
         }
     }
-
-    checker.report_diagnostics(diagnostics);
 }

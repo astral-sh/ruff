@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 constant_literals.py:4:4: F632 [*] Use `==` to compare constant literals
   |
@@ -123,7 +122,7 @@ constant_literals.py:14:4: E712 [*] Avoid equality comparisons to `False`; use `
 12 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 13 13 |     pass
 14    |-if False == None:  # E711, E712 (fix)
-   14 |+if False is None:  # E711, E712 (fix)
+   14 |+if not None:  # E711, E712 (fix)
 15 15 |     pass
 16 16 | if None == False:  # E711, E712 (fix)
 17 17 |     pass
@@ -144,7 +143,7 @@ constant_literals.py:14:13: E711 [*] Comparison to `None` should be `cond is Non
 12 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 13 13 |     pass
 14    |-if False == None:  # E711, E712 (fix)
-   14 |+if False is None:  # E711, E712 (fix)
+   14 |+if not None:  # E711, E712 (fix)
 15 15 |     pass
 16 16 | if None == False:  # E711, E712 (fix)
 17 17 |     pass
@@ -164,7 +163,7 @@ constant_literals.py:16:4: E711 [*] Comparison to `None` should be `cond is None
 14 14 | if False == None:  # E711, E712 (fix)
 15 15 |     pass
 16    |-if None == False:  # E711, E712 (fix)
-   16 |+if None is False:  # E711, E712 (fix)
+   16 |+if not None:  # E711, E712 (fix)
 17 17 |     pass
 18 18 | 
 19 19 | named_var = []
@@ -184,7 +183,7 @@ constant_literals.py:16:4: E712 [*] Avoid equality comparisons to `False`; use `
 14 14 | if False == None:  # E711, E712 (fix)
 15 15 |     pass
 16    |-if None == False:  # E711, E712 (fix)
-   16 |+if None is False:  # E711, E712 (fix)
+   16 |+if not None:  # E711, E712 (fix)
 17 17 |     pass
 18 18 | 
 19 19 | named_var = []

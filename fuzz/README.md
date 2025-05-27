@@ -12,8 +12,11 @@ To use the fuzzers provided in this directory, start by invoking:
 
 This will install [`cargo-fuzz`](https://github.com/rust-fuzz/cargo-fuzz) and optionally download a
 [dataset](https://zenodo.org/record/3628784) which improves the efficacy of the testing.
-**This step is necessary for initialising the corpus directory, as all fuzzers share a common
-corpus.**
+
+> [!NOTE]
+>
+> This step is necessary for initialising the corpus directory, as all fuzzers share a common corpus.
+
 The dataset may take several hours to download and clean, so if you're just looking to try out the
 fuzzers, skip the dataset download, though be warned that some features simply cannot be tested
 without it (very unlikely for the fuzzer to generate valid python code from "thin air").
@@ -24,13 +27,23 @@ Once you have initialised the fuzzers, you can then execute any fuzzer with:
 cargo fuzz run -s none name_of_fuzzer -- -timeout=1
 ```
 
-**Users using Apple M1 devices must use a nightly compiler and omit the `-s none` portion of this
-command, as this architecture does not support fuzzing without a sanitizer.**
+> [!NOTE]
+>
+> Users using Apple M1 devices must use a nightly compiler and omit the `-s none` portion of this
+> command, as this architecture does not support fuzzing without a sanitizer.
+>
+> ```shell
+> cargo +nightly fuzz run name_of_fuzzer -- -timeout=1
+> ```
+
 You can view the names of the available fuzzers with `cargo fuzz list`.
 For specific details about how each fuzzer works, please read this document in its entirety.
 
-**IMPORTANT: You should run `./reinit-fuzzer.sh` after adding more file-based testcases.** This will
-allow the testing of new features that you've added unit tests for.
+> [!NOTE]
+>
+> Re-run `./init-fuzzer.sh` (say no to the dataset download) after adding more file-based test cases
+> to the repository. This will make sure that the corpus is up to date with any new Python code
+> added to the repository.
 
 ### Debugging a crash
 
@@ -74,9 +87,9 @@ Each fuzzer harness in [`fuzz_targets`](fuzz_targets) targets a different aspect
 them in different ways. While there is implementation-specific documentation in the source code
 itself, each harness is briefly described below.
 
-### `red_knot_check_invalid_syntax`
+### `ty_check_invalid_syntax`
 
-This fuzz harness checks that the type checker (Red Knot) does not panic when checking a source
+This fuzz harness checks that the type checker (ty) does not panic when checking a source
 file with invalid syntax. This rejects any corpus entries that is already valid Python code.
 Currently, this is limited to syntax errors that's produced by Ruff's Python parser which means
 that it does not cover all possible syntax errors (<https://github.com/astral-sh/ruff/issues/11934>).

@@ -1,6 +1,6 @@
 use ast::{ExprContext, Operator};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Stmt};
 use ruff_python_semantic::{Binding, SemanticModel, TypingOnlyBindingsStatus};
@@ -142,26 +142,26 @@ impl AlwaysFixableViolation for QuotedTypeAlias {
 }
 
 /// TC007
-pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Option<Vec<Diagnostic>> {
+pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) {
     if binding.context.is_typing() {
-        return None;
+        return;
     }
 
     if !binding.is_annotated_type_alias() {
-        return None;
+        return;
     }
 
     let Some(Stmt::AnnAssign(ast::StmtAnnAssign {
         value: Some(expr), ..
     })) = binding.statement(checker.semantic())
     else {
-        return None;
+        return;
     };
 
     let mut names = Vec::new();
     collect_typing_references(checker, expr, &mut names);
     if names.is_empty() {
-        return None;
+        return;
     }
 
     // We generate a diagnostic for every name that needs to be quoted
@@ -178,14 +178,13 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Optio
         checker.locator(),
         checker.default_string_flags(),
     );
-    let mut diagnostics = Vec::with_capacity(names.len());
     for name in names {
-        let mut diagnostic = Diagnostic::new(UnquotedTypeAlias, name.range());
-        diagnostic.set_parent(parent);
-        diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
-        diagnostics.push(diagnostic);
+        checker.report_diagnostic(
+            Diagnostic::new(UnquotedTypeAlias, name.range())
+                .with_parent(parent)
+                .with_fix(Fix::unsafe_edit(edit.clone())),
+        );
     }
-    Some(diagnostics)
 }
 
 /// Traverses the type expression and collects `[Expr::Name]` nodes that are

@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
 
@@ -69,7 +69,9 @@ impl Violation for TSuffixedTypeAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { name } = self;
-        format!("Private type alias `{name}` should not be suffixed with `T` (the `T` suffix implies that an object is a `TypeVar`)")
+        format!(
+            "Private type alias `{name}` should not be suffixed with `T` (the `T` suffix implies that an object is a `TypeVar`)"
+        )
     }
 }
 

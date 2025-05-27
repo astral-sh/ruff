@@ -4,7 +4,7 @@ use crate::comments::format::{
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::prelude::*;
-use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
+use crate::statement::clause::{ClauseHeader, clause_body, clause_header};
 use crate::statement::stmt_class_def::FormatDecorators;
 use crate::statement::suite::SuiteKind;
 use ruff_formatter::write;

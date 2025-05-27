@@ -1,35 +1,29 @@
 use anyhow::Result;
 use log::debug;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::Fix;
+use crate::{Fix, Violation};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct DiagnosticKind {
+pub struct Diagnostic {
     /// The identifier of the diagnostic, used to align the diagnostic with a rule.
-    pub name: String,
+    pub name: &'static str,
     /// The message body to display to the user, to explain the diagnostic.
     pub body: String,
     /// The message to display to the user, to explain the suggested fix.
     pub suggestion: Option<String>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Diagnostic {
-    pub kind: DiagnosticKind,
     pub range: TextRange,
     pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
 }
 
 impl Diagnostic {
-    pub fn new<T: Into<DiagnosticKind>>(kind: T, range: TextRange) -> Self {
+    pub fn new<T: Violation>(kind: T, range: TextRange) -> Self {
         Self {
-            kind: kind.into(),
+            name: T::rule_name(),
+            body: Violation::message(&kind),
+            suggestion: Violation::fix_title(&kind),
             range,
             fix: None,
             parent: None,
@@ -56,7 +50,7 @@ impl Diagnostic {
     pub fn try_set_fix(&mut self, func: impl FnOnce() -> Result<Fix>) {
         match func() {
             Ok(fix) => self.fix = Some(fix),
-            Err(err) => debug!("Failed to create fix for {}: {}", self.kind.name, err),
+            Err(err) => debug!("Failed to create fix for {}: {}", self.name, err),
         }
     }
 
@@ -67,7 +61,7 @@ impl Diagnostic {
         match func() {
             Ok(None) => {}
             Ok(Some(fix)) => self.fix = Some(fix),
-            Err(err) => debug!("Failed to create fix for {}: {}", self.kind.name, err),
+            Err(err) => debug!("Failed to create fix for {}: {}", self.name, err),
         }
     }
 

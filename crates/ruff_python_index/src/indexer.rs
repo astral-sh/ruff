@@ -4,7 +4,7 @@
 use ruff_python_ast::Stmt;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::{
-    has_leading_content, has_trailing_content, is_python_whitespace, CommentRanges,
+    CommentRanges, has_leading_content, has_trailing_content, is_python_whitespace,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -53,7 +53,7 @@ impl Indexer {
                 continuation_lines.push(line_start);
 
                 // SAFETY: Safe because of the len assertion at the top of the function.
-                #[allow(clippy::cast_possible_truncation)]
+                #[expect(clippy::cast_possible_truncation)]
                 {
                     line_start = prev_end + TextSize::new((index + 1) as u32);
                 }

@@ -1,11 +1,11 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::Definition;
+use ruff_python_semantic::analyze::visibility;
 use ruff_python_stdlib::typing::simple_magic_return_type;
 use ruff_text_size::Ranged;
 
@@ -150,7 +150,7 @@ impl Violation for MissingTypeKwargs {
 #[deprecated(note = "ANN101 has been removed")]
 pub(crate) struct MissingTypeSelf;
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl Violation for MissingTypeSelf {
     fn message(&self) -> String {
         unreachable!("ANN101 has been removed");
@@ -194,7 +194,7 @@ impl Violation for MissingTypeSelf {
 #[deprecated(note = "ANN102 has been removed")]
 pub(crate) struct MissingTypeCls;
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl Violation for MissingTypeCls {
     fn message(&self) -> String {
         unreachable!("ANN102 has been removed")
@@ -224,6 +224,16 @@ impl Violation for MissingTypeCls {
 /// def add(a: int, b: int) -> int:
 ///     return a + b
 /// ```
+///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for some Python versions,
+/// its diagnostic will not be emitted, and no fix will be offered, if `typing_extensions` imports
+/// have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingReturnTypeUndocumentedPublicFunction {
     name: String,
@@ -267,6 +277,16 @@ impl Violation for MissingReturnTypeUndocumentedPublicFunction {
 /// def _add(a: int, b: int) -> int:
 ///     return a + b
 /// ```
+///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for some Python versions,
+/// its diagnostic will not be emitted, and no fix will be offered, if `typing_extensions` imports
+/// have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingReturnTypePrivateFunction {
     name: String,
@@ -584,9 +604,9 @@ pub(crate) fn definition(
     checker: &Checker,
     definition: &Definition,
     visibility: visibility::Visibility,
-) -> Vec<Diagnostic> {
+) {
     let Some(function) = definition.as_function_def() else {
-        return vec![];
+        return;
     };
 
     let ast::StmtFunctionDef {
@@ -879,13 +899,10 @@ pub(crate) fn definition(
         }
     }
 
-    if !checker.settings.flake8_annotations.ignore_fully_untyped {
-        return diagnostics;
-    }
-
     // If settings say so, don't report any of the
     // diagnostics gathered here if there were no type annotations at all.
-    if has_any_typed_arg
+    if !checker.settings.flake8_annotations.ignore_fully_untyped
+        || has_any_typed_arg
         || has_typed_return
         || (is_method
             && !visibility::is_staticmethod(decorator_list, checker.semantic())
@@ -895,8 +912,8 @@ pub(crate) fn definition(
                 .or_else(|| parameters.args.first())
                 .is_some_and(|first_param| first_param.annotation().is_some()))
     {
-        diagnostics
-    } else {
-        vec![]
+        for diagnostic in diagnostics {
+            checker.report_diagnostic(diagnostic);
+        }
     }
 }

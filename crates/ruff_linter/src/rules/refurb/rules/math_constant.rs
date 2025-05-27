@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Number};
 use ruff_text_size::Ranged;
 
@@ -105,7 +105,7 @@ enum Constant {
 }
 
 impl Constant {
-    #[allow(clippy::approx_constant)]
+    #[expect(clippy::approx_constant)]
     fn from_value(value: f64) -> Option<Self> {
         if (3.14..3.15).contains(&value) {
             matches_constant(std::f64::consts::PI, value).then_some(Self::Pi)

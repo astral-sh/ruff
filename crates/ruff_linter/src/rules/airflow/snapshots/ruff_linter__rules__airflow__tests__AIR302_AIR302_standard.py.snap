@@ -1,0 +1,232 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302_standard.py:25:1: AIR302 `airflow.operators.bash_operator.BashOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+23 | )
+24 |
+25 | BashOperator()
+   | ^^^^^^^^^^^^ AIR302
+26 |
+27 | TriggerDagRunLink()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.1` and use `BashOperator` from `airflow.providers.standard.operators.bash` instead.
+
+AIR302_standard.py:27:1: AIR302 `airflow.operators.dagrun_operator.TriggerDagRunLink` is moved into `standard` provider in Airflow 3.0;
+   |
+25 | BashOperator()
+26 |
+27 | TriggerDagRunLink()
+   | ^^^^^^^^^^^^^^^^^ AIR302
+28 | TriggerDagRunOperator()
+29 | DummyOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.2` and use `TriggerDagRunLink` from `airflow.providers.standard.operators.trigger_dagrun` instead.
+
+AIR302_standard.py:28:1: AIR302 `airflow.operators.dagrun_operator.TriggerDagRunOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+27 | TriggerDagRunLink()
+28 | TriggerDagRunOperator()
+   | ^^^^^^^^^^^^^^^^^^^^^ AIR302
+29 | DummyOperator()
+30 | EmptyOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.2` and use `TriggerDagRunOperator` from `airflow.providers.standard.operators.trigger_dagrun` instead.
+
+AIR302_standard.py:29:1: AIR302 `airflow.operators.dummy.DummyOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+27 | TriggerDagRunLink()
+28 | TriggerDagRunOperator()
+29 | DummyOperator()
+   | ^^^^^^^^^^^^^ AIR302
+30 | EmptyOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.2` and use `EmptyOperator` from `airflow.providers.standard.operators.empty` instead.
+
+AIR302_standard.py:30:1: AIR302 `airflow.operators.dummy.EmptyOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+28 | TriggerDagRunOperator()
+29 | DummyOperator()
+30 | EmptyOperator()
+   | ^^^^^^^^^^^^^ AIR302
+31 |
+32 | LatestOnlyOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.2` and use `EmptyOperator` from `airflow.providers.standard.operators.empty` instead.
+
+AIR302_standard.py:32:1: AIR302 `airflow.operators.latest_only_operator.LatestOnlyOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+30 | EmptyOperator()
+31 |
+32 | LatestOnlyOperator()
+   | ^^^^^^^^^^^^^^^^^^ AIR302
+33 |
+34 | BranchPythonOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `LatestOnlyOperator` from `airflow.providers.standard.operators.latest_only` instead.
+
+AIR302_standard.py:34:1: AIR302 `airflow.operators.python_operator.BranchPythonOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+32 | LatestOnlyOperator()
+33 |
+34 | BranchPythonOperator()
+   | ^^^^^^^^^^^^^^^^^^^^ AIR302
+35 | PythonOperator()
+36 | PythonVirtualenvOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.1` and use `BranchPythonOperator` from `airflow.providers.standard.operators.python` instead.
+
+AIR302_standard.py:35:1: AIR302 `airflow.operators.python_operator.PythonOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+34 | BranchPythonOperator()
+35 | PythonOperator()
+   | ^^^^^^^^^^^^^^ AIR302
+36 | PythonVirtualenvOperator()
+37 | ShortCircuitOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonOperator` from `airflow.providers.standard.operators.python` instead.
+
+AIR302_standard.py:36:1: AIR302 `airflow.operators.python_operator.PythonVirtualenvOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+34 | BranchPythonOperator()
+35 | PythonOperator()
+36 | PythonVirtualenvOperator()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+37 | ShortCircuitOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonVirtualenvOperator` from `airflow.providers.standard.operators.python` instead.
+
+AIR302_standard.py:37:1: AIR302 `airflow.operators.python_operator.ShortCircuitOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+35 | PythonOperator()
+36 | PythonVirtualenvOperator()
+37 | ShortCircuitOperator()
+   | ^^^^^^^^^^^^^^^^^^^^ AIR302
+38 |
+39 | ExternalTaskMarker()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.1` and use `ShortCircuitOperator` from `airflow.providers.standard.operators.python` instead.
+
+AIR302_standard.py:39:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskMarker` is moved into `standard` provider in Airflow 3.0;
+   |
+37 | ShortCircuitOperator()
+38 |
+39 | ExternalTaskMarker()
+   | ^^^^^^^^^^^^^^^^^^ AIR302
+40 | ExternalTaskSensor()
+41 | ExternalTaskSensorLink()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalTaskMarker` from `airflow.providers.standard.sensors.external_task` instead.
+
+AIR302_standard.py:40:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensor` is moved into `standard` provider in Airflow 3.0;
+   |
+39 | ExternalTaskMarker()
+40 | ExternalTaskSensor()
+   | ^^^^^^^^^^^^^^^^^^ AIR302
+41 | ExternalTaskSensorLink()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalTaskSensor` from `airflow.providers.standard.sensors.external_task` instead.
+
+AIR302_standard.py:41:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensorLink` is moved into `standard` provider in Airflow 3.0;
+   |
+39 | ExternalTaskMarker()
+40 | ExternalTaskSensor()
+41 | ExternalTaskSensorLink()
+   | ^^^^^^^^^^^^^^^^^^^^^^ AIR302
+42 |
+43 | from airflow.operators.dummy_operator import (
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalTaskSensorLink` from `airflow.providers.standard.sensors.external_task` instead.
+
+AIR302_standard.py:48:1: AIR302 `airflow.operators.dummy_operator.DummyOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+46 | )
+47 |
+48 | DummyOperator()
+   | ^^^^^^^^^^^^^ AIR302
+49 | EmptyOperator()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.2` and use `EmptyOperator` from `airflow.providers.standard.operators.empty` instead.
+
+AIR302_standard.py:49:1: AIR302 `airflow.operators.dummy_operator.EmptyOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+48 | DummyOperator()
+49 | EmptyOperator()
+   | ^^^^^^^^^^^^^ AIR302
+50 |
+51 | from airflow.hooks.subprocess import SubprocessResult
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.2` and use `EmptyOperator` from `airflow.providers.standard.operators.empty` instead.
+
+AIR302_standard.py:52:1: AIR302 `airflow.hooks.subprocess.SubprocessResult` is moved into `standard` provider in Airflow 3.0;
+   |
+51 | from airflow.hooks.subprocess import SubprocessResult
+52 | SubprocessResult()
+   | ^^^^^^^^^^^^^^^^ AIR302
+53 | from airflow.hooks.subprocess import working_directory
+54 | working_directory()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `SubprocessResult` from `airflow.providers.standard.hooks.subprocess` instead.
+
+AIR302_standard.py:54:1: AIR302 `airflow.hooks.subprocess.working_directory` is moved into `standard` provider in Airflow 3.0;
+   |
+52 | SubprocessResult()
+53 | from airflow.hooks.subprocess import working_directory
+54 | working_directory()
+   | ^^^^^^^^^^^^^^^^^ AIR302
+55 | from airflow.operators.datetime import target_times_as_dates
+56 | target_times_as_dates()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `working_directory` from `airflow.providers.standard.hooks.subprocess` instead.
+
+AIR302_standard.py:56:1: AIR302 `airflow.operators.datetime.target_times_as_dates` is moved into `standard` provider in Airflow 3.0;
+   |
+54 | working_directory()
+55 | from airflow.operators.datetime import target_times_as_dates
+56 | target_times_as_dates()
+   | ^^^^^^^^^^^^^^^^^^^^^ AIR302
+57 | from airflow.operators.trigger_dagrun import TriggerDagRunLink
+58 | TriggerDagRunLink()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.1` and use `target_times_as_dates` from `airflow.providers.standard.operators.datetime` instead.
+
+AIR302_standard.py:58:1: AIR302 `airflow.operators.trigger_dagrun.TriggerDagRunLink` is moved into `standard` provider in Airflow 3.0;
+   |
+56 | target_times_as_dates()
+57 | from airflow.operators.trigger_dagrun import TriggerDagRunLink
+58 | TriggerDagRunLink()
+   | ^^^^^^^^^^^^^^^^^ AIR302
+59 | from airflow.sensors.external_task import ExternalTaskSensorLink
+60 | ExternalTaskSensorLink()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.2` and use `TriggerDagRunLink` from `airflow.providers.standard.operators.trigger_dagrun` instead.
+
+AIR302_standard.py:60:1: AIR302 [*] `airflow.sensors.external_task.ExternalTaskSensorLink` is moved into `standard` provider in Airflow 3.0;
+   |
+58 | TriggerDagRunLink()
+59 | from airflow.sensors.external_task import ExternalTaskSensorLink
+60 | ExternalTaskSensorLink()
+   | ^^^^^^^^^^^^^^^^^^^^^^ AIR302
+61 | from airflow.sensors.time_delta import WaitSensor
+62 | WaitSensor()
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalDagLink` from `airflow.providers.standard.sensors.external_task` instead.
+
+ℹ Safe fix
+57 57 | from airflow.operators.trigger_dagrun import TriggerDagRunLink
+58 58 | TriggerDagRunLink()
+59 59 | from airflow.sensors.external_task import ExternalTaskSensorLink
+60    |-ExternalTaskSensorLink()
+   60 |+from airflow.providers.standard.sensors.external_task import ExternalDagLink
+   61 |+ExternalDagLink()
+61 62 | from airflow.sensors.time_delta import WaitSensor
+62 63 | WaitSensor()
+
+AIR302_standard.py:62:1: AIR302 `airflow.sensors.time_delta.WaitSensor` is moved into `standard` provider in Airflow 3.0;
+   |
+60 | ExternalTaskSensorLink()
+61 | from airflow.sensors.time_delta import WaitSensor
+62 | WaitSensor()
+   | ^^^^^^^^^^ AIR302
+   |
+   = help: Install `apache-airflow-providers-standard>=0.0.1` and use `WaitSensor` from `airflow.providers.standard.sensors.time_delta` instead.

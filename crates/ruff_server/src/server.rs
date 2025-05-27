@@ -5,7 +5,7 @@ use lsp_types as types;
 use lsp_types::InitializeParams;
 use std::num::NonZeroUsize;
 // The new PanicInfoHook name requires MSRV >= 1.82
-#[allow(deprecated)]
+#[expect(deprecated)]
 use std::panic::PanicInfo;
 use std::str::FromStr;
 use types::ClientCapabilities;
@@ -26,13 +26,13 @@ use types::WorkspaceFoldersServerCapabilities;
 
 use self::connection::Connection;
 use self::connection::ConnectionInitializer;
-use self::schedule::event_loop_thread;
 use self::schedule::Scheduler;
 use self::schedule::Task;
+use self::schedule::event_loop_thread;
+use crate::PositionEncoding;
 use crate::session::AllSettings;
 use crate::session::Session;
 use crate::workspace::Workspaces;
-use crate::PositionEncoding;
 
 mod api;
 mod client;
@@ -59,6 +59,7 @@ impl Server {
 
         let client_capabilities = init_params.capabilities;
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
+
         let server_capabilities = Self::server_capabilities(position_encoding);
 
         let connection = connection.initialize_finish(
@@ -98,6 +99,8 @@ impl Server {
             workspace_settings.unwrap_or_default(),
         )?;
 
+        tracing::debug!("Negotiated position encoding: {position_encoding:?}");
+
         Ok(Self {
             connection,
             worker_threads,
@@ -113,7 +116,7 @@ impl Server {
 
     pub fn run(self) -> crate::Result<()> {
         // The new PanicInfoHook name requires MSRV >= 1.82
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         type PanicHook = Box<dyn Fn(&PanicInfo<'_>) + 'static + Sync + Send>;
         struct RestorePanicHook {
             hook: Option<PanicHook>,
@@ -167,7 +170,6 @@ impl Server {
         .join()
     }
 
-    #[allow(clippy::needless_pass_by_value)] // this is because we aren't using `next_request_id` yet.
     fn event_loop(
         connection: &Connection,
         client_capabilities: &ClientCapabilities,
@@ -246,10 +248,14 @@ impl Server {
             if let Err(err) = scheduler
                 .request::<lsp_types::request::RegisterCapability>(params, response_handler)
             {
-                tracing::error!("An error occurred when trying to register the configuration file watcher: {err}");
+                tracing::error!(
+                    "An error occurred when trying to register the configuration file watcher: {err}"
+                );
             }
         } else {
-            tracing::warn!("LSP client does not support dynamic capability registration - automatic configuration reloading will not be available.");
+            tracing::warn!(
+                "LSP client does not support dynamic capability registration - automatic configuration reloading will not be available."
+            );
         }
     }
 

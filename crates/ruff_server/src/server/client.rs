@@ -4,7 +4,7 @@ use lsp_server::{Notification, RequestId};
 use rustc_hash::FxHashMap;
 use serde_json::Value;
 
-use super::{schedule::Task, ClientSender};
+use super::{ClientSender, schedule::Task};
 
 type ResponseBuilder<'s> = Box<dyn FnOnce(lsp_server::Response) -> Task<'s>>;
 
@@ -48,7 +48,7 @@ impl Client<'_> {
     }
 }
 
-#[allow(dead_code)] // we'll need to use `Notifier` in the future
+#[expect(dead_code)] // we'll need to use `Notifier` in the future
 impl Notifier {
     pub(crate) fn notify<N>(&self, params: N::Params) -> crate::Result<()>
     where

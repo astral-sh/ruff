@@ -10,7 +10,7 @@ use crate::registry::{AsRule, Linter};
 use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NoqaCode(&'static str, &'static str);
 
 impl NoqaCode {
@@ -46,6 +46,15 @@ impl PartialEq<&str> for NoqaCode {
     }
 }
 
+impl serde::Serialize for NoqaCode {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum RuleGroup {
     /// The rule is stable.
@@ -61,7 +70,7 @@ pub enum RuleGroup {
 
 #[ruff_macros::map_codes]
 pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
-    #[allow(clippy::enum_glob_use)]
+    #[expect(clippy::enum_glob_use)]
     use Linter::*;
 
     #[rustfmt::skip]
@@ -1014,6 +1023,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "057") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryRound),
         (Ruff, "058") => (RuleGroup::Preview, rules::ruff::rules::StarmapZip),
         (Ruff, "059") => (RuleGroup::Preview, rules::ruff::rules::UnusedUnpackedVariable),
+        (Ruff, "060") => (RuleGroup::Preview, rules::ruff::rules::InEmptyCollection),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
         (Ruff, "102") => (RuleGroup::Preview, rules::ruff::rules::InvalidRuleCode),
@@ -1072,6 +1082,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Airflow, "002") => (RuleGroup::Preview, rules::airflow::rules::AirflowDagNoScheduleArgument),
         (Airflow, "301") => (RuleGroup::Preview, rules::airflow::rules::Airflow3Removal),
         (Airflow, "302") => (RuleGroup::Preview, rules::airflow::rules::Airflow3MovedToProvider),
+        (Airflow, "311") => (RuleGroup::Preview, rules::airflow::rules::Airflow3SuggestedUpdate),
         (Airflow, "312") => (RuleGroup::Preview, rules::airflow::rules::Airflow3SuggestedToMoveToProvider),
 
         // perflint

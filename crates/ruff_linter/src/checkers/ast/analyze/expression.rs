@@ -4,8 +4,8 @@ use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 use ruff_diagnostics::Diagnostic;
 
 use ruff_python_ast::types::Node;
-use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::ScopeKind;
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -229,6 +229,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.enabled(Rule::Airflow3Removal) {
                         airflow::rules::airflow_3_removal_expr(checker, expr);
                     }
+                    if checker.enabled(Rule::Airflow3SuggestedUpdate) {
+                        airflow::rules::airflow_3_0_suggested_update_expr(checker, expr);
+                    }
                     if checker.enabled(Rule::Airflow3MovedToProvider) {
                         airflow::rules::moved_to_provider_in_3(checker, expr);
                     }
@@ -450,6 +453,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);
+            }
+            if checker.enabled(Rule::Airflow3SuggestedUpdate) {
+                airflow::rules::airflow_3_0_suggested_update_expr(checker, expr);
             }
             if checker.enabled(Rule::Airflow3MovedToProvider) {
                 airflow::rules::moved_to_provider_in_3(checker, expr);
@@ -1152,6 +1158,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);
             }
+            if checker.enabled(Rule::Airflow3SuggestedUpdate) {
+                airflow::rules::airflow_3_0_suggested_update_expr(checker, expr);
+            }
             if checker.enabled(Rule::UnnecessaryCastToInt) {
                 ruff::rules::unnecessary_cast_to_int(checker, call);
             }
@@ -1494,6 +1503,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.enabled(Rule::NanComparison) {
                 pylint::rules::nan_comparison(checker, left, comparators);
+            }
+            if checker.enabled(Rule::InEmptyCollection) {
+                ruff::rules::in_empty_collection(checker, compare);
             }
             if checker.enabled(Rule::InDictKeys) {
                 flake8_simplify::rules::key_in_dict_compare(checker, compare);

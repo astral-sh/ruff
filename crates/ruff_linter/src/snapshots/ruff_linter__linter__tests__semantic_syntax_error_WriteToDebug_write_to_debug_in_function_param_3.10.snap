@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+<filename>:2:13: SyntaxError: cannot assign to `__debug__`
+  |
+2 | def process(__debug__):
+  |             ^^^^^^^^^
+3 |     pass
+  |

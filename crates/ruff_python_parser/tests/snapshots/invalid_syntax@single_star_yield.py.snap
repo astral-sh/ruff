@@ -65,5 +65,5 @@ Module(
 
   |
 1 | def f(): yield *x
-  |                ^^ Syntax Error: can't use starred expression here
+  |                ^^ Syntax Error: Starred expression cannot be used here
   |

@@ -18,20 +18,16 @@ impl Emitter for PylintEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {
-            let row = if context.is_notebook(message.filename()) {
+            let row = if context.is_notebook(&message.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 OneIndexed::from_zero_indexed(0)
             } else {
-                message.compute_start_location().row
+                message.compute_start_location().line
             };
 
-            let body = if let Some(rule) = message.rule() {
-                format!(
-                    "[{code}] {body}",
-                    code = rule.noqa_code(),
-                    body = message.body()
-                )
+            let body = if let Some(code) = message.to_noqa_code() {
+                format!("[{code}] {body}", body = message.body())
             } else {
                 message.body().to_string()
             };
@@ -39,7 +35,7 @@ impl Emitter for PylintEmitter {
             writeln!(
                 writer,
                 "{path}:{row}: {body}",
-                path = relativize_path(message.filename()),
+                path = relativize_path(&*message.filename()),
             )?;
         }
 
@@ -51,10 +47,10 @@ impl Emitter for PylintEmitter {
 mod tests {
     use insta::assert_snapshot;
 
+    use crate::message::PylintEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
-    use crate::message::PylintEmitter;
 
     #[test]
     fn output() {

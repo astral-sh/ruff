@@ -1,14 +1,12 @@
-#![allow(clippy::print_stdout, clippy::print_stderr)]
-
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use pretty_assertions::StrComparison;
 use schemars::schema_for;
 
-use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
 use crate::ROOT_DIR;
+use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
 use ruff_workspace::options::Options;
 
 #[derive(clap::Args)]
@@ -58,7 +56,7 @@ mod tests {
 
     use crate::generate_all::Mode;
 
-    use super::{main, Args};
+    use super::{Args, main};
 
     #[test]
     fn test_generate_json_schema() -> Result<()> {

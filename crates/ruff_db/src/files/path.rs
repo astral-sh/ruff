@@ -1,7 +1,7 @@
-use crate::files::{system_path_to_file, vendored_path_to_file, File};
+use crate::Db;
+use crate::files::{File, system_path_to_file, vendored_path_to_file};
 use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
-use crate::Db;
 use std::fmt::{Display, Formatter};
 
 /// Path to a file.

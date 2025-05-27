@@ -1,7 +1,7 @@
 use ruff_python_ast::Alias;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -11,6 +11,11 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// The import alias is redundant and should be removed to avoid confusion.
+///
+/// ## Fix safety
+/// This fix is marked as always unsafe because the user may be intentionally
+/// re-exporting the import. While statements like `import numpy as numpy`
+/// appear redundant, they can have semantic meaning in certain contexts.
 ///
 /// ## Example
 /// ```python
@@ -37,7 +42,7 @@ impl Violation for UselessImportAlias {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        #[allow(clippy::if_not_else)]
+        #[expect(clippy::if_not_else)]
         if !self.required_import_conflict {
             "Import alias does not rename original package".to_string()
         } else {

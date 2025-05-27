@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall, Int, Number};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -62,7 +62,25 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let Some(arg) = call.arguments.find_argument_value("seconds", 0) else {
+    let Some(qualified_name) = checker
+        .semantic()
+        .resolve_qualified_name(call.func.as_ref())
+    else {
+        return;
+    };
+
+    let Some(module) = AsyncModule::try_from(&qualified_name) else {
+        return;
+    };
+
+    // Determine the correct argument name
+    let arg_name = match module {
+        AsyncModule::Trio => "seconds",
+        AsyncModule::AnyIo => "delay",
+        AsyncModule::AsyncIo => return,
+    };
+
+    let Some(arg) = call.arguments.find_argument_value(arg_name, 0) else {
         return;
     };
 

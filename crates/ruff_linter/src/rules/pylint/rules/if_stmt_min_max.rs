@@ -1,5 +1,5 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, CmpOp, Stmt};
@@ -27,6 +27,19 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// Use instead:
 /// ```python
 /// highest_score = max(highest_score, score)
+/// ```
+///
+/// ## Fix safety
+/// This fix is marked unsafe if it would delete any comments within the replacement range.
+///
+/// An example to illustrate where comments are preserved and where they are not:
+///
+/// ```py
+/// a, b = 0, 10
+///
+/// if a >= b: # deleted comment
+///     # deleted comment
+///     a = b # preserved comment
 /// ```
 ///
 /// ## References
@@ -80,11 +93,13 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
         return;
     }
 
-    let [body @ Stmt::Assign(ast::StmtAssign {
-        targets: body_targets,
-        value: body_value,
-        ..
-    })] = body.as_slice()
+    let [
+        body @ Stmt::Assign(ast::StmtAssign {
+            targets: body_targets,
+            value: body_value,
+            ..
+        }),
+    ] = body.as_slice()
     else {
         return;
     };
@@ -169,11 +184,18 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
         stmt_if.range(),
     );
 
+    let range_replacement = stmt_if.range();
+    let applicability = if checker.comment_ranges().intersects(range_replacement) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
     if checker.semantic().has_builtin_binding(min_max.as_str()) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            replacement,
-            stmt_if.range(),
-        )));
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(replacement, range_replacement),
+            applicability,
+        ));
     }
 
     checker.report_diagnostic(diagnostic);

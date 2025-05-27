@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -89,7 +89,7 @@ fn is_magic_value(literal_expr: LiteralExpressionRef, allowed_types: &[ConstantT
             !matches!(value.to_str(), "" | "__main__")
         }
         LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
-            #[allow(clippy::float_cmp)]
+            #[expect(clippy::float_cmp)]
             ast::Number::Float(value) => !(*value == 0.0 || *value == 1.0),
             ast::Number::Int(value) => !matches!(*value, Int::ZERO | Int::ONE),
             ast::Number::Complex { .. } => true,

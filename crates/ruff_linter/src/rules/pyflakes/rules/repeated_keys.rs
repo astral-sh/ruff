@@ -2,7 +2,7 @@ use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use std::collections::hash_map::Entry;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::{ComparableExpr, HashableExpr};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
@@ -39,6 +39,12 @@ use crate::registry::Rule;
 /// }
 /// foo["baz"]  # 2
 /// ```
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing a repeated dictionary key
+/// may delete comments that are attached to the removed key-value pair. This can also change
+/// the program's behavior if the value expressions have side effects.
 ///
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
@@ -105,6 +111,12 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 /// }
 /// foo[baz]  # 2
 /// ```
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing a repeated dictionary key
+/// may delete comments that are attached to the removed key-value pair. This can also change
+/// the program's behavior if the value expressions have side effects.
 ///
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)

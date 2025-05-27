@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::Ranged;
 
@@ -26,6 +26,11 @@ use crate::docstrings::Docstring;
 /// def average(values: list[float]) -> float:
 ///     """Return the mean of the given values."""
 /// ```
+///
+/// ## Fix safety
+/// The fix is marked as unsafe because it could affect tools that parse docstrings,
+/// documentation generators, or custom introspection utilities that rely on
+/// specific docstring formatting.
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)

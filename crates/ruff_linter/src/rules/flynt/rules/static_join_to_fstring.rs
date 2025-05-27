@@ -3,7 +3,7 @@ use itertools::Itertools;
 
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -27,6 +27,14 @@ use crate::rules::flynt::helpers;
 /// ```python
 /// f"{foo} {bar}"
 /// ```
+///
+/// # Fix safety
+/// The fix is always marked unsafe because the evaluation of the f-string
+/// expressions will default to calling the `__format__` method of each
+/// object, whereas `str.join` expects each object to be an instance of
+/// `str` and uses the corresponding string. Therefore it is possible for
+/// the values of the resulting strings to differ, or for one expression
+/// to raise an exception while the other does not.
 ///
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)

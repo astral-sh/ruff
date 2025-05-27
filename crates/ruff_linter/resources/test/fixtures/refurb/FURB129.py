@@ -57,7 +57,7 @@ with o("FURB129.py") as f:
         pass
 
 
-# False positives
+# Ok
 def func(f):
     for _line in f.readlines():
         pass

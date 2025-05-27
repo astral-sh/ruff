@@ -234,9 +234,6 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
             visitor.visit_expr(test);
             visitor.visit_body(body);
             for clause in elif_else_clauses {
-                if let Some(test) = &mut clause.test {
-                    visitor.visit_expr(test);
-                }
                 walk_elif_else_clause(visitor, clause);
             }
         }
@@ -576,7 +573,7 @@ pub fn walk_except_handler<V: Transformer + ?Sized>(
 }
 
 pub fn walk_arguments<V: Transformer + ?Sized>(visitor: &V, arguments: &mut Arguments) {
-    // Note that the there might be keywords before the last arg, e.g. in
+    // Note that there might be keywords before the last arg, e.g. in
     // f(*args, a=2, *args2, **kwargs)`, but we follow Python in evaluating first `args` and then
     // `keywords`. See also [Arguments::arguments_source_order`].
     for arg in &mut *arguments.args {

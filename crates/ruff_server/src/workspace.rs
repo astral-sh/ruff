@@ -3,8 +3,8 @@ use std::ops::Deref;
 use lsp_types::{Url, WorkspaceFolder};
 use thiserror::Error;
 
-use crate::session::WorkspaceSettingsMap;
 use crate::ClientSettings;
+use crate::session::WorkspaceSettingsMap;
 
 #[derive(Debug)]
 pub struct Workspaces(Vec<Workspace>);

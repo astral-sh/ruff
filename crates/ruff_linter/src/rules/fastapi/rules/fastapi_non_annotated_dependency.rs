@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::Modules;
@@ -58,6 +58,16 @@ use ruff_python_ast::PythonVersion;
 /// async def read_items(commons: Annotated[dict, Depends(common_parameters)]):
 ///     return commons
 /// ```
+///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for Python versions
+/// before 3.9, its diagnostic will not be emitted, and no fix will be offered, if
+/// `typing_extensions` imports have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
 ///
 /// [FastAPI documentation]: https://fastapi.tiangolo.com/tutorial/query-params-str-validations/?h=annotated#advantages-of-annotated
 /// [typing-annotated]: https://docs.python.org/3/library/typing.html#typing.Annotated
@@ -223,6 +233,10 @@ fn create_diagnostic(
     dependency_call: Option<DependencyCall>,
     mut seen_default: bool,
 ) -> bool {
+    let Some(importer) = checker.typing_importer("Annotated", PythonVersion::PY39) else {
+        return seen_default;
+    };
+
     let mut diagnostic = Diagnostic::new(
         FastApiNonAnnotatedDependency {
             py_version: checker.target_version(),
@@ -231,11 +245,7 @@ fn create_diagnostic(
     );
 
     let try_generate_fix = || {
-        let (import_edit, binding) = checker.import_from_typing(
-            "Annotated",
-            parameter.range.start(),
-            PythonVersion::PY39,
-        )?;
+        let (import_edit, binding) = importer.import(parameter.range.start())?;
 
         // Each of these classes takes a single, optional default
         // argument, followed by kw-only arguments

@@ -1319,6 +1319,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::UnnecessaryEnumerate,
                 Rule::UnusedLoopControlVariable,
                 Rule::YieldInForLoop,
+                Rule::ManualDictComprehension,
                 Rule::ManualListComprehension,
             ]) {
                 checker.analyze.for_loops.push(checker.semantic.snapshot());
@@ -1347,9 +1348,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ManualListCopy) {
                 perflint::rules::manual_list_copy(checker, for_stmt);
             }
-            if checker.enabled(Rule::ManualDictComprehension) {
-                perflint::rules::manual_dict_comprehension(checker, target, body);
-            }
+
             if checker.enabled(Rule::ModifiedIteratingSet) {
                 pylint::rules::modified_iterating_set(checker, for_stmt);
             }

@@ -3,17 +3,17 @@ use std::borrow::Cow;
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableStmt;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
+use ruff_python_ast::stmt_if::{IfElifBranch, if_elif_branches};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::{CommentRanges, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::Checker;
 use crate::Locator;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for `if` branches with identical arm bodies.
