@@ -964,27 +964,36 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         _ => return,
     };
 
-    let mut diagnostic = checker.report_diagnostic(
-        Airflow3Removal {
-            deprecated: qualified_name.to_string(),
-            replacement: replacement.clone(),
-        },
-        range,
-    );
-    let semantic = checker.semantic();
-    if let Some((module, name)) = match &replacement {
-        Replacement::AutoImport { module, name } => Some((module, *name)),
-        Replacement::SourceModuleMoved { module, name } => Some((module, name.as_str())),
-        _ => None,
-    } {
-        if is_guarded_by_try_except(expr, module, name, semantic) {
-            diagnostic.defuse();
+    let (module, name) = match &replacement {
+        Replacement::AutoImport { module, name } => (module, *name),
+        Replacement::SourceModuleMoved { module, name } => (module, name.as_str()),
+        _ => {
+            checker.report_diagnostic(
+                Airflow3Removal {
+                    deprecated: qualified_name.to_string(),
+                    replacement: replacement.clone(),
+                },
+                range,
+            );
             return;
         }
+    };
 
-        let import_target = name.split('.').next().unwrap_or(name);
+    if is_guarded_by_try_except(expr, module, name, checker.semantic()) {
+        return;
+    }
 
-        diagnostic.try_set_fix(|| {
+    let import_target = name.split('.').next().unwrap_or(name);
+
+    checker
+        .report_diagnostic(
+            Airflow3Removal {
+                deprecated: qualified_name.to_string(),
+                replacement: replacement.clone(),
+            },
+            range,
+        )
+        .try_set_fix(|| {
             let (import_edit, _) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from(module, import_target),
                 expr.start(),
@@ -993,7 +1002,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             let replacement_edit = Edit::range_replacement(name.to_string(), range);
             Ok(Fix::safe_edits(import_edit, [replacement_edit]))
         });
-    }
 }
 
 /// Check whether a customized Airflow plugin contains removed extensions.
