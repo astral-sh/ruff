@@ -175,3 +175,15 @@ _ = (
     "contains + plus" +
     "another string"
 )
+
+_ = (
+    "start"
+		# leading comment
+    + "end"
+)
+
+_ = (
+    "start" +
+		# leading comment
+    "end"
+)

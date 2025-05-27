@@ -311,3 +311,46 @@ ISC.py:175:5: ISC003 [*] Explicitly concatenated string should be implicitly con
     175 |+    "contains + plus"
 176 176 |     "another string"
 177 177 | )
+178 178 | 
+
+ISC.py:180:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+179 |   _ = (
+180 | /     "start"
+181 | |         # leading comment
+182 | |     + "end"
+    | |___________^ ISC003
+183 |   )
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+179 179 | _ = (
+180 180 |     "start"
+181 181 | 		# leading comment
+182     |-    + "end"
+    182 |+     "end"
+183 183 | )
+184 184 | 
+185 185 | _ = (
+
+ISC.py:186:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+185 |   _ = (
+186 | /     "start" +
+187 | |         # leading comment
+188 | |     "end"
+    | |_________^ ISC003
+189 |   )
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+183 183 | )
+184 184 | 
+185 185 | _ = (
+186     |-    "start" +
+    186 |+    "start"
+187 187 | 		# leading comment
+188 188 |     "end"
+189 189 | )
