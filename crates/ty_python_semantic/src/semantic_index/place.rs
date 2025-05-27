@@ -236,19 +236,32 @@ impl PlaceExpr {
         }
     }
 
-    pub(crate) fn contains(&self, sub: &PlaceExpr) -> bool {
-        if self.root_name != sub.root_name {
-            return false;
+    fn root_exprs(&self) -> RootExprs<'_> {
+        RootExprs {
+            expr: self,
+            len: self.sub_segments.len(),
         }
-        if self.sub_segments.len() <= sub.sub_segments.len() {
-            return false;
+    }
+}
+
+struct RootExprs<'e> {
+    expr: &'e PlaceExpr,
+    len: usize,
+}
+
+impl Iterator for RootExprs<'_> {
+    type Item = PlaceExpr;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.len == 0 {
+            return None;
         }
-        for (self_segment, other_segment) in self.sub_segments.iter().zip(sub.sub_segments.iter()) {
-            if self_segment != other_segment {
-                return false;
-            }
-        }
-        true
+        self.len -= 1;
+        Some(PlaceExpr {
+            root_name: self.expr.root_name.clone(),
+            sub_segments: self.expr.sub_segments[..self.len].to_vec(),
+            flags: self.expr.flags,
+        })
     }
 }
 
@@ -523,17 +536,14 @@ impl PlaceTable {
         &self.places[place_id.into()]
     }
 
-    pub(crate) fn associated_place_ids(
+    /// Iterate over the "root" expressions of the place (e.g. `x.y.z`, `x.y`, `x` for `x.y.z[0]`).
+    pub(crate) fn root_place_exprs(
         &self,
-        expr: &PlaceExpr,
-    ) -> impl Iterator<Item = ScopedPlaceId> {
-        self.places
-            .iter_enumerated()
-            .filter_map(|(id, place)| place.contains(expr).then_some(id))
-    }
-
-    pub(crate) fn root_place_exprs(&self, expr: &PlaceExpr) -> impl Iterator<Item = &PlaceExpr> {
-        self.places.iter().filter(|place| expr.contains(place))
+        place_expr: &PlaceExpr,
+    ) -> impl Iterator<Item = &PlaceExpr> {
+        place_expr
+            .root_exprs()
+            .filter_map(|place_expr| self.place_by_expr(&place_expr))
     }
 
     #[expect(unused)]
@@ -634,6 +644,8 @@ impl std::fmt::Debug for PlaceTable {
 #[derive(Debug, Default)]
 pub(super) struct PlaceTableBuilder {
     table: PlaceTable,
+
+    associated_place_ids: IndexVec<ScopedPlaceId, Vec<ScopedPlaceId>>,
 }
 
 impl PlaceTableBuilder {
@@ -654,6 +666,8 @@ impl PlaceTableBuilder {
                 entry.insert_with_hasher(hash, id, (), |id| {
                     PlaceTable::hash_place_expr(&self.table.places[*id])
                 });
+                let new_id = self.associated_place_ids.push(vec![]);
+                debug_assert_eq!(new_id, id);
                 (id, true)
             }
         }
@@ -672,6 +686,13 @@ impl PlaceTableBuilder {
                 entry.insert_with_hasher(hash, id, (), |id| {
                     PlaceTable::hash_place_expr(&self.table.places[*id])
                 });
+                let new_id = self.associated_place_ids.push(vec![]);
+                debug_assert_eq!(new_id, id);
+                for root in self.table.places[id].root_exprs() {
+                    if let Some(root_id) = self.table.place_id_by_expr(&root) {
+                        self.associated_place_ids[root_id].push(id);
+                    }
+                }
                 (id, true)
             }
         }
@@ -701,12 +722,12 @@ impl PlaceTableBuilder {
         self.table.place_expr(place_id)
     }
 
+    /// Returns the place IDs associated with the place (e.g. `x.y`, `x.y.z`, `x.y.z[0]` for `x`).
     pub(super) fn associated_place_ids(
         &self,
         place: ScopedPlaceId,
     ) -> impl Iterator<Item = ScopedPlaceId> {
-        let place_expr = self.place_expr(place);
-        self.table.associated_place_ids(place_expr)
+        self.associated_place_ids[place].iter().copied()
     }
 
     pub(super) fn finish(mut self) -> PlaceTable {
