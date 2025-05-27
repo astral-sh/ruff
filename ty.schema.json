@@ -671,6 +671,16 @@
             }
           ]
         },
+        "negative-shift": {
+          "title": "detects shifting an int by a negative value",
+          "description": "## What it does\nDetects shifting an int by a negative value.\n\n## Why is this bad?\nShifting an int by a negative value raises a `ValueError` at runtime.\n\n## Examples\n```python\n42 >> -1\n42 << -1\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "no-matching-overload": {
           "title": "detects calls that do not match any overload",
           "description": "## What it does\nChecks for calls to an overloaded function that do not match any of the overloads.\n\n## Why is this bad?\nFailing to provide the correct arguments to one of the overloads will raise a `TypeError`\nat runtime.\n\n## Examples\n```python\n@overload\ndef func(x: int): ...\n@overload\ndef func(x: bool): ...\nfunc(\"string\")  # error: [no-matching-overload]\n```",
