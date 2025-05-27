@@ -232,3 +232,82 @@ ISC.py:139:6: ISC003 [*] Explicitly concatenated string should be implicitly con
 141 141 |     + "c"
 142 142 |     + "d"
 143 143 |     + "e"
+
+ISC.py:160:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+159 |   _ = (
+160 | /     "first"
+161 | |     +    "second"  # extra spaces around +
+    | |_________________^ ISC003
+162 |   )
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+158 158 | 
+159 159 | _ = (
+160 160 |     "first"
+161     |-    +    "second"  # extra spaces around +
+    161 |+        "second"  # extra spaces around +
+162 162 | )
+163 163 | 
+164 164 | _ = (
+
+ISC.py:165:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+164 |   _ = (
+165 | /     "first"    +  # trailing spaces before +
+166 | |     "second"
+    | |____________^ ISC003
+167 |   )
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+162 162 | )
+163 163 | 
+164 164 | _ = (
+165     |-    "first"    +  # trailing spaces before +
+    165 |+    "first"  # trailing spaces before +
+166 166 |     "second"
+167 167 | )
+168 168 | 
+
+ISC.py:170:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+169 |   _ = ((
+170 | /     "deep" +
+171 | |     "nesting"
+    | |_____________^ ISC003
+172 |   ))
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+167 167 | )
+168 168 | 
+169 169 | _ = ((
+170     |-    "deep" +
+    170 |+    "deep"
+171 171 |     "nesting"
+172 172 | ))
+173 173 | 
+
+ISC.py:175:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+174 |   _ = (
+175 | /     "contains + plus" +
+176 | |     "another string"
+    | |____________________^ ISC003
+177 |   )
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+172 172 | ))
+173 173 | 
+174 174 | _ = (
+175     |-    "contains + plus" +
+    175 |+    "contains + plus"
+176 176 |     "another string"
+177 177 | )

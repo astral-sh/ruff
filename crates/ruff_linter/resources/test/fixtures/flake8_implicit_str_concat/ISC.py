@@ -142,3 +142,36 @@ _ = ("a"
     + "d"
     + "e"
 )
+
+_ = (
+    "start" +
+    variable + # comment
+    "end"
+)
+
+_ = (
+    "start" +
+    variable
+		# leading comment
+    + "end"
+)
+
+_ = (
+    "first"
+    +    "second"  # extra spaces around +
+)
+
+_ = (
+    "first"    +  # trailing spaces before +
+    "second"
+)
+
+_ = ((
+    "deep" +
+    "nesting"
+))
+
+_ = (
+    "contains + plus" +
+    "another string"
+)
