@@ -94,6 +94,14 @@ impl Session {
     // and `default_workspace_db_mut` but the borrow checker doesn't allow that.
     // https://github.com/astral-sh/ruff/pull/13041#discussion_r1726725437
 
+    /// Returns a reference to the project's [`ProjectDatabase`] corresponding to the given path,
+    /// or the default project if no project is found for the path.
+    pub(crate) fn project_db_or_default(&self, path: &AnySystemPath) -> &ProjectDatabase {
+        path.as_system()
+            .and_then(|path| self.project_db_for_path(path.as_std_path()))
+            .unwrap_or_else(|| self.default_project_db())
+    }
+
     /// Returns a reference to the project's [`ProjectDatabase`] corresponding to the given path, if
     /// any.
     pub(crate) fn project_db_for_path(&self, path: impl AsRef<Path>) -> Option<&ProjectDatabase> {

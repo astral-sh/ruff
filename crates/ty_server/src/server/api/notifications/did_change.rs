@@ -56,17 +56,17 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
 
         // Publish diagnostics if the client doesn't support pull diagnostics
         if !session.resolved_client_capabilities().pull_diagnostics {
-            let db = path
-                .as_system()
-                .and_then(|path| session.project_db_for_path(path.as_std_path()))
-                .unwrap_or_else(|| session.default_project_db());
             let snapshot = session
                 .take_snapshot(uri.clone())
                 .ok_or_else(|| {
                     anyhow::anyhow!("Unable to take snapshot for document with URL {uri}")
                 })
                 .with_failure_code(lsp_server::ErrorCode::InternalError)?;
-            publish_diagnostics_for_document(db, &snapshot, &notifier)?;
+            publish_diagnostics_for_document(
+                session.project_db_or_default(&path),
+                &snapshot,
+                &notifier,
+            )?;
         }
 
         Ok(())

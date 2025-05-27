@@ -83,8 +83,8 @@ pub(super) fn publish_diagnostics_for_document(
         Diagnostics::TextDocument(diagnostics) => {
             publish_diagnostics(snapshot.query().file_url().clone(), diagnostics)?;
         }
-        Diagnostics::NotebookDocument(map) => {
-            for (cell_url, diagnostics) in map {
+        Diagnostics::NotebookDocument(cell_diagnostics) => {
+            for (cell_url, diagnostics) in cell_diagnostics {
                 publish_diagnostics(cell_url, diagnostics)?;
             }
         }
