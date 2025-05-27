@@ -1,0 +1,72 @@
+class A:
+    ...
+
+
+class A(metaclass=type):
+    ...
+
+
+class A(
+    metaclass=type
+):
+    ...
+
+
+class A(
+    metaclass=type
+    #
+):
+    ...
+
+
+class A(
+    #
+    metaclass=type
+):
+    ...
+
+
+class A(
+    metaclass=type,
+    #
+):
+    ...
+
+
+class A(
+    #
+    metaclass=type,
+    #
+):
+    ...
+
+
+class B(A, metaclass=type):
+    ...
+
+
+class B(
+    A,
+    metaclass=type,
+):
+    ...
+
+
+class B(
+    A,
+    # comment
+    metaclass=type,
+):
+    ...
+
+
+def foo():
+    class A(metaclass=type):
+        ...
+
+
+class A(
+    metaclass=type  # comment
+    ,
+):
+    ...
