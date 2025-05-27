@@ -187,7 +187,10 @@ impl HasNavigationTargets for Type<'_> {
 
 impl HasNavigationTargets for TypeDefinition<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let full_range = self.full_range(db.upcast());
+        let Some(full_range) = self.full_range(db.upcast()) else {
+            return NavigationTargets::empty();
+        };
+
         NavigationTargets::single(NavigationTarget {
             file: full_range.file(),
             focus_range: self.focus_range(db.upcast()).unwrap_or(full_range).range(),
@@ -204,10 +207,10 @@ mod tests {
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
-    use ruff_python_ast::PythonVersion;
     use ruff_text_size::TextSize;
     use ty_python_semantic::{
-        Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
+        Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionWithSource,
+        SearchPathSettings,
     };
 
     pub(super) fn cursor_test(source: &str) -> CursorTest {
@@ -227,7 +230,7 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersion::latest_ty(),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],

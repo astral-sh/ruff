@@ -611,8 +611,12 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(match ty {
                                     Type::ModuleLiteral(module_literal) => {
-                                        match dunder_all_names(db, module_literal.module(db).file())
-                                        {
+                                        let all_names = module_literal
+                                            .module(db)
+                                            .file()
+                                            .map(|file| dunder_all_names(db, file))
+                                            .unwrap_or_default();
+                                        match all_names {
                                             Some(names) => {
                                                 let mut names = names.iter().collect::<Vec<_>>();
                                                 names.sort();
@@ -663,15 +667,15 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::GetProtocolMembers) => {
                             if let [Some(Type::ClassLiteral(class))] = overload.parameter_types() {
                                 if let Some(protocol_class) = class.into_protocol_class(db) {
-                                    // TODO: actually a frozenset at runtime (requires support for legacy generic classes)
-                                    overload.set_return_type(Type::Tuple(TupleType::new(
-                                        db,
-                                        protocol_class
-                                            .interface(db)
-                                            .members(db)
-                                            .map(|member| Type::string_literal(db, member.name()))
-                                            .collect::<Box<[Type<'db>]>>(),
-                                    )));
+                                    let member_names = protocol_class
+                                        .interface(db)
+                                        .members(db)
+                                        .map(|member| Type::string_literal(db, member.name()));
+                                    let specialization = UnionType::from_elements(db, member_names);
+                                    overload.set_return_type(
+                                        KnownClass::FrozenSet
+                                            .to_specialized_instance(db, [specialization]),
+                                    );
                                 }
                             }
                         }

@@ -1,10 +1,5 @@
 //! Scheduling, I/O, and API endpoints.
 
-use std::num::NonZeroUsize;
-// The new PanicInfoHook name requires MSRV >= 1.82
-#[expect(deprecated)]
-use std::panic::PanicInfo;
-
 use lsp_server::Message;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities,
@@ -13,6 +8,8 @@ use lsp_types::{
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
     TypeDefinitionProviderCapability, Url,
 };
+use std::num::NonZeroUsize;
+use std::panic::PanicHookInfo;
 
 use self::connection::{Connection, ConnectionInitializer};
 use self::schedule::event_loop_thread;
@@ -96,10 +93,20 @@ impl Server {
                 anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
             })?;
 
-        if workspaces.len() > 1 {
-            // TODO(dhruvmanila): Support multi-root workspaces
-            anyhow::bail!("Multi-root workspaces are not supported yet");
-        }
+        let workspaces = if workspaces.len() > 1 {
+            let first_workspace = workspaces.into_iter().next().unwrap();
+            tracing::warn!(
+                "Multiple workspaces are not yet supported, using the first workspace: {}",
+                &first_workspace.0
+            );
+            show_warn_msg!(
+                "Multiple workspaces are not yet supported, using the first workspace: {}",
+                &first_workspace.0
+            );
+            vec![first_workspace]
+        } else {
+            workspaces
+        };
 
         Ok(Self {
             connection,
@@ -115,9 +122,7 @@ impl Server {
     }
 
     pub(crate) fn run(self) -> crate::Result<()> {
-        // The new PanicInfoHook name requires MSRV >= 1.82
-        #[expect(deprecated)]
-        type PanicHook = Box<dyn Fn(&PanicInfo<'_>) + 'static + Sync + Send>;
+        type PanicHook = Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>;
         struct RestorePanicHook {
             hook: Option<PanicHook>,
         }

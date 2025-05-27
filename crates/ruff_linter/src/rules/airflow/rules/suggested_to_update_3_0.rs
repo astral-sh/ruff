@@ -72,10 +72,10 @@ impl Violation for Airflow3SuggestedUpdate {
             Replacement::AttrName(name) => Some(format!("Use `{name}` instead")),
             Replacement::Message(message) => Some((*message).to_string()),
             Replacement::AutoImport { module, name } => {
-                Some(format!("Use `{module}.{name}` instead"))
+                Some(format!("Use `{name}` from `{module}` instead."))
             }
             Replacement::SourceModuleMoved { module, name } => {
-                Some(format!("Use `{module}.{name}` instead"))
+                Some(format!("Use `{name}` from `{module}` instead."))
             }
         }
     }

@@ -27,7 +27,6 @@ use crate::{Db, FxOrderSet};
 pub struct GenericContext<'db> {
     #[returns(ref)]
     pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
-    pub(crate) origin: GenericContextOrigin,
 }
 
 impl<'db> GenericContext<'db> {
@@ -41,7 +40,7 @@ impl<'db> GenericContext<'db> {
             .iter()
             .filter_map(|type_param| Self::variable_from_type_param(db, index, type_param))
             .collect();
-        Self::new(db, variables, GenericContextOrigin::TypeParameterList)
+        Self::new(db, variables)
     }
 
     fn variable_from_type_param(
@@ -87,11 +86,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::new(
-            db,
-            variables,
-            GenericContextOrigin::LegacyGenericFunction,
-        ))
+        Some(Self::new(db, variables))
     }
 
     /// Creates a generic context from the legacy `TypeVar`s that appear in class's base class
@@ -107,7 +102,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::new(db, variables, GenericContextOrigin::Inherited))
+        Some(Self::new(db, variables))
     }
 
     pub(crate) fn len(self, db: &'db dyn Db) -> usize {
@@ -237,44 +232,28 @@ impl<'db> GenericContext<'db> {
 
         Specialization::new(db, self, expanded.into_boxed_slice())
     }
-}
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum GenericContextOrigin {
-    LegacyBase(LegacyGenericBase),
-    Inherited,
-    LegacyGenericFunction,
-    TypeParameterList,
-}
-
-impl GenericContextOrigin {
-    pub(crate) const fn as_str(self) -> &'static str {
-        match self {
-            Self::LegacyBase(base) => base.as_str(),
-            Self::Inherited => "inherited",
-            Self::LegacyGenericFunction => "legacy generic function",
-            Self::TypeParameterList => "type parameter list",
-        }
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        let variables: FxOrderSet<_> = self
+            .variables(db)
+            .iter()
+            .map(|ty| ty.normalized(db))
+            .collect();
+        Self::new(db, variables)
     }
 }
 
-impl std::fmt::Display for GenericContextOrigin {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum LegacyGenericBase {
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum LegacyGenericBase {
     Generic,
     Protocol,
 }
 
 impl LegacyGenericBase {
-    pub(crate) const fn as_str(self) -> &'static str {
+    const fn as_str(self) -> &'static str {
         match self {
-            Self::Generic => "`typing.Generic`",
-            Self::Protocol => "subscripted `typing.Protocol`",
+            Self::Generic => "Generic",
+            Self::Protocol => "Protocol",
         }
     }
 }
@@ -282,12 +261,6 @@ impl LegacyGenericBase {
 impl std::fmt::Display for LegacyGenericBase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
-    }
-}
-
-impl From<LegacyGenericBase> for GenericContextOrigin {
-    fn from(base: LegacyGenericBase) -> Self {
-        Self::LegacyBase(base)
     }
 }
 
@@ -559,6 +532,16 @@ impl<'db> PartialSpecialization<'_, 'db> {
         PartialSpecialization {
             generic_context: self.generic_context,
             types: Cow::from(self.types.clone().into_owned()),
+        }
+    }
+
+    pub(crate) fn normalized(&self, db: &'db dyn Db) -> PartialSpecialization<'db, 'db> {
+        let generic_context = self.generic_context.normalized(db);
+        let types: Cow<_> = self.types.iter().map(|ty| ty.normalized(db)).collect();
+
+        PartialSpecialization {
+            generic_context,
+            types,
         }
     }
 }

@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.11.11
+
+### Preview features
+
+- \[`airflow`\] Add autofixes for `AIR302` and `AIR312` ([#17942](https://github.com/astral-sh/ruff/pull/17942))
+- \[`airflow`\] Move rules from `AIR312` to `AIR302` ([#17940](https://github.com/astral-sh/ruff/pull/17940))
+- \[`airflow`\] Update `AIR301` and `AIR311` with the latest Airflow implementations ([#17985](https://github.com/astral-sh/ruff/pull/17985))
+- \[`flake8-simplify`\] Enable fix in preview mode (`SIM117`) ([#18208](https://github.com/astral-sh/ruff/pull/18208))
+
+### Bug fixes
+
+- Fix inconsistent formatting of match-case on `[]` and `_` ([#18147](https://github.com/astral-sh/ruff/pull/18147))
+- \[`pylint`\] Fix `PLW1514` not recognizing the `encoding` positional argument of `codecs.open` ([#18109](https://github.com/astral-sh/ruff/pull/18109))
+
+### CLI
+
+- Add full option name in formatter warning ([#18217](https://github.com/astral-sh/ruff/pull/18217))
+
+### Documentation
+
+- Fix rendering of admonition in docs ([#18163](https://github.com/astral-sh/ruff/pull/18163))
+- \[`flake8-print`\] Improve print/pprint docs for `T201` and `T203` ([#18130](https://github.com/astral-sh/ruff/pull/18130))
+- \[`flake8-simplify`\] Add fix safety section (`SIM110`,`SIM210`) ([#18114](https://github.com/astral-sh/ruff/pull/18114),[#18100](https://github.com/astral-sh/ruff/pull/18100))
+- \[`pylint`\] Fix docs example that produced different output (`PLW0603`) ([#18216](https://github.com/astral-sh/ruff/pull/18216))
+
 ## 0.11.10
 
 ### Preview features

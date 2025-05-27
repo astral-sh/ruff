@@ -493,16 +493,17 @@ mod tests {
     use super::*;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem as _;
-    use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
-    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, SearchPathSettings};
+    use ty_python_semantic::{
+        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
+    };
 
     fn get_assertions(source: &str) -> InlineFileAssertions {
         let mut db = Db::setup();
 
         let settings = ProgramSettings {
-            python_version: PythonVersion::default(),
+            python_version: PythonVersionWithSource::default(),
             python_platform: PythonPlatform::default(),
             search_paths: SearchPathSettings::new(Vec::new()),
         };

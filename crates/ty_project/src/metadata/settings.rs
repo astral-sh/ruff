@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::metadata::options::SrcOptions;
 use ruff_db::diagnostic::DiagnosticFormat;
 use ty_python_semantic::lint::RuleSelection;
 
@@ -26,11 +27,15 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn new(rules: RuleSelection, respect_ignore_files: Option<bool>) -> Self {
+    pub fn new(rules: RuleSelection, src_options: Option<&SrcOptions>) -> Self {
+        let respect_ignore_files = src_options
+            .and_then(|src| src.respect_ignore_files)
+            .unwrap_or(true);
+
         Self {
             rules: Arc::new(rules),
             terminal: TerminalSettings::default(),
-            respect_ignore_files: respect_ignore_files.unwrap_or(true),
+            respect_ignore_files,
         }
     }
 

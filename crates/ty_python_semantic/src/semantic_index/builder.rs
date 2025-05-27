@@ -1336,7 +1336,9 @@ where
                             continue;
                         };
 
-                        let referenced_module = module.file();
+                        let Some(referenced_module) = module.file() else {
+                            continue;
+                        };
 
                         // In order to understand the visibility of definitions created by a `*` import,
                         // we need to know the visibility of the global-scope definitions in the
@@ -2474,6 +2476,18 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
                 | ScopeKind::Module
                 | ScopeKind::TypeAlias
                 | ScopeKind::Annotation => {}
+            }
+        }
+        false
+    }
+
+    fn in_yield_allowed_context(&self) -> bool {
+        for scope_info in self.scope_stack.iter().rev() {
+            let scope = &self.scopes[scope_info.file_scope_id];
+            match scope.kind() {
+                ScopeKind::Class | ScopeKind::Comprehension => return false,
+                ScopeKind::Function | ScopeKind::Lambda => return true,
+                ScopeKind::Module | ScopeKind::TypeAlias | ScopeKind::Annotation => {}
             }
         }
         false
