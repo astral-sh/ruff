@@ -664,13 +664,13 @@ fn superfluous_else_node(
         .unwrap_or_else(|| elif_else.range());
     for child in if_elif_body {
         let diagnostic = if child.is_return_stmt() {
-            checker.checked_report_diagnostic(SuperfluousElseReturn { branch }, range)
+            checker.report_diagnostic_if_enabled(SuperfluousElseReturn { branch }, range)
         } else if child.is_break_stmt() {
-            checker.checked_report_diagnostic(SuperfluousElseBreak { branch }, range)
+            checker.report_diagnostic_if_enabled(SuperfluousElseBreak { branch }, range)
         } else if child.is_raise_stmt() {
-            checker.checked_report_diagnostic(SuperfluousElseRaise { branch }, range)
+            checker.report_diagnostic_if_enabled(SuperfluousElseRaise { branch }, range)
         } else if child.is_continue_stmt() {
-            checker.checked_report_diagnostic(SuperfluousElseContinue { branch }, range)
+            checker.report_diagnostic_if_enabled(SuperfluousElseContinue { branch }, range)
         } else {
             continue;
         };

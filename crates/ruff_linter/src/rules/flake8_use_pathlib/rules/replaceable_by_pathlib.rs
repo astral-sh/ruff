@@ -23,7 +23,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
     let range = call.func.range();
     match qualified_name.segments() {
         // PTH100
-        ["os", "path", "abspath"] => checker.checked_report_diagnostic(OsPathAbspath, range),
+        ["os", "path", "abspath"] => checker.report_diagnostic_if_enabled(OsPathAbspath, range),
         // PTH101
         ["os", "chmod"] => {
             // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
@@ -40,10 +40,10 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             {
                 return;
             }
-            checker.checked_report_diagnostic(OsChmod, range)
+            checker.report_diagnostic_if_enabled(OsChmod, range)
         }
         // PTH102
-        ["os", "makedirs"] => checker.checked_report_diagnostic(OsMakedirs, range),
+        ["os", "makedirs"] => checker.report_diagnostic_if_enabled(OsMakedirs, range),
         // PTH103
         ["os", "mkdir"] => {
             // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
@@ -55,7 +55,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             if is_argument_non_default(&call.arguments, "dir_fd", 2) {
                 return;
             }
-            checker.checked_report_diagnostic(OsMkdir, range)
+            checker.report_diagnostic_if_enabled(OsMkdir, range)
         }
         // PTH104
         ["os", "rename"] => {
@@ -71,7 +71,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             {
                 return;
             }
-            checker.checked_report_diagnostic(OsRename, range)
+            checker.report_diagnostic_if_enabled(OsRename, range)
         }
         // PTH105
         ["os", "replace"] => {
@@ -87,7 +87,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             {
                 return;
             }
-            checker.checked_report_diagnostic(OsReplace, range)
+            checker.report_diagnostic_if_enabled(OsReplace, range)
         }
         // PTH106
         ["os", "rmdir"] => {
@@ -100,7 +100,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             if is_argument_non_default(&call.arguments, "dir_fd", 1) {
                 return;
             }
-            checker.checked_report_diagnostic(OsRmdir, range)
+            checker.report_diagnostic_if_enabled(OsRmdir, range)
         }
         // PTH107
         ["os", "remove"] => {
@@ -113,7 +113,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             if is_argument_non_default(&call.arguments, "dir_fd", 1) {
                 return;
             }
-            checker.checked_report_diagnostic(OsRemove, range)
+            checker.report_diagnostic_if_enabled(OsRemove, range)
         }
         // PTH108
         ["os", "unlink"] => {
@@ -126,21 +126,23 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             if is_argument_non_default(&call.arguments, "dir_fd", 1) {
                 return;
             }
-            checker.checked_report_diagnostic(OsUnlink, range)
+            checker.report_diagnostic_if_enabled(OsUnlink, range)
         }
         // PTH109
-        ["os", "getcwd"] => checker.checked_report_diagnostic(OsGetcwd, range),
-        ["os", "getcwdb"] => checker.checked_report_diagnostic(OsGetcwd, range),
+        ["os", "getcwd"] => checker.report_diagnostic_if_enabled(OsGetcwd, range),
+        ["os", "getcwdb"] => checker.report_diagnostic_if_enabled(OsGetcwd, range),
         // PTH110
-        ["os", "path", "exists"] => checker.checked_report_diagnostic(OsPathExists, range),
+        ["os", "path", "exists"] => checker.report_diagnostic_if_enabled(OsPathExists, range),
         // PTH111
-        ["os", "path", "expanduser"] => checker.checked_report_diagnostic(OsPathExpanduser, range),
+        ["os", "path", "expanduser"] => {
+            checker.report_diagnostic_if_enabled(OsPathExpanduser, range)
+        }
         // PTH112
-        ["os", "path", "isdir"] => checker.checked_report_diagnostic(OsPathIsdir, range),
+        ["os", "path", "isdir"] => checker.report_diagnostic_if_enabled(OsPathIsdir, range),
         // PTH113
-        ["os", "path", "isfile"] => checker.checked_report_diagnostic(OsPathIsfile, range),
+        ["os", "path", "isfile"] => checker.report_diagnostic_if_enabled(OsPathIsfile, range),
         // PTH114
-        ["os", "path", "islink"] => checker.checked_report_diagnostic(OsPathIslink, range),
+        ["os", "path", "islink"] => checker.report_diagnostic_if_enabled(OsPathIslink, range),
         // PTH116
         ["os", "stat"] => {
             // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
@@ -157,12 +159,12 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             {
                 return;
             }
-            checker.checked_report_diagnostic(OsStat, range)
+            checker.report_diagnostic_if_enabled(OsStat, range)
         }
         // PTH117
-        ["os", "path", "isabs"] => checker.checked_report_diagnostic(OsPathIsabs, range),
+        ["os", "path", "isabs"] => checker.report_diagnostic_if_enabled(OsPathIsabs, range),
         // PTH118
-        ["os", "path", "join"] => checker.checked_report_diagnostic(
+        ["os", "path", "join"] => checker.report_diagnostic_if_enabled(
             OsPathJoin {
                 module: "path".to_string(),
                 joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
@@ -173,7 +175,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             },
             range,
         ),
-        ["os", "sep", "join"] => checker.checked_report_diagnostic(
+        ["os", "sep", "join"] => checker.report_diagnostic_if_enabled(
             OsPathJoin {
                 module: "sep".to_string(),
                 joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
@@ -185,21 +187,21 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             range,
         ),
         // PTH119
-        ["os", "path", "basename"] => checker.checked_report_diagnostic(OsPathBasename, range),
+        ["os", "path", "basename"] => checker.report_diagnostic_if_enabled(OsPathBasename, range),
         // PTH120
-        ["os", "path", "dirname"] => checker.checked_report_diagnostic(OsPathDirname, range),
+        ["os", "path", "dirname"] => checker.report_diagnostic_if_enabled(OsPathDirname, range),
         // PTH121
-        ["os", "path", "samefile"] => checker.checked_report_diagnostic(OsPathSamefile, range),
+        ["os", "path", "samefile"] => checker.report_diagnostic_if_enabled(OsPathSamefile, range),
         // PTH122
-        ["os", "path", "splitext"] => checker.checked_report_diagnostic(OsPathSplitext, range),
+        ["os", "path", "splitext"] => checker.report_diagnostic_if_enabled(OsPathSplitext, range),
         // PTH202
-        ["os", "path", "getsize"] => checker.checked_report_diagnostic(OsPathGetsize, range),
+        ["os", "path", "getsize"] => checker.report_diagnostic_if_enabled(OsPathGetsize, range),
         // PTH203
-        ["os", "path", "getatime"] => checker.checked_report_diagnostic(OsPathGetatime, range),
+        ["os", "path", "getatime"] => checker.report_diagnostic_if_enabled(OsPathGetatime, range),
         // PTH204
-        ["os", "path", "getmtime"] => checker.checked_report_diagnostic(OsPathGetmtime, range),
+        ["os", "path", "getmtime"] => checker.report_diagnostic_if_enabled(OsPathGetmtime, range),
         // PTH205
-        ["os", "path", "getctime"] => checker.checked_report_diagnostic(OsPathGetctime, range),
+        ["os", "path", "getctime"] => checker.report_diagnostic_if_enabled(OsPathGetctime, range),
         // PTH123
         ["" | "builtins", "open"] => {
             // `closefd` and `opener` are not supported by pathlib, so check if they are
@@ -234,10 +236,10 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             {
                 return;
             }
-            checker.checked_report_diagnostic(BuiltinOpen, range)
+            checker.report_diagnostic_if_enabled(BuiltinOpen, range)
         }
         // PTH124
-        ["py", "path", "local"] => checker.checked_report_diagnostic(PyPath, range),
+        ["py", "path", "local"] => checker.report_diagnostic_if_enabled(PyPath, range),
         // PTH207
         ["glob", "glob"] => {
             // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
@@ -250,7 +252,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
                 return;
             }
 
-            checker.checked_report_diagnostic(
+            checker.report_diagnostic_if_enabled(
                 Glob {
                     function: "glob".to_string(),
                 },
@@ -269,7 +271,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
                 return;
             }
 
-            checker.checked_report_diagnostic(
+            checker.report_diagnostic_if_enabled(
                 Glob {
                     function: "iglob".to_string(),
                 },
@@ -288,7 +290,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             if is_argument_non_default(&call.arguments, "dir_fd", 1) {
                 return;
             }
-            checker.checked_report_diagnostic(OsReadlink, range)
+            checker.report_diagnostic_if_enabled(OsReadlink, range)
         }
         // PTH208
         ["os", "listdir"] => {
@@ -299,7 +301,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             {
                 return;
             }
-            checker.checked_report_diagnostic(OsListdir, range)
+            checker.report_diagnostic_if_enabled(OsListdir, range)
         }
         _ => return,
     };

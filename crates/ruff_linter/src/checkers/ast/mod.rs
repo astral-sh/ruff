@@ -399,7 +399,7 @@ impl<'a> Checker<'a> {
     ///
     /// Prefer [`Checker::report_diagnostic`] in general because the conversion from a `Diagnostic`
     /// to a `Rule` is somewhat expensive.
-    pub(crate) fn checked_report_diagnostic<'chk, T: Violation>(
+    pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
         &'chk self,
         kind: T,
         range: TextRange,

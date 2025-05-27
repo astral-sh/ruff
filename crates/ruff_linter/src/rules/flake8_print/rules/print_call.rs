@@ -135,9 +135,9 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
                     }
                 }
             }
-            checker.checked_report_diagnostic(Print, call.func.range())
+            checker.report_diagnostic_if_enabled(Print, call.func.range())
         }
-        ["pprint", "pprint"] => checker.checked_report_diagnostic(PPrint, call.func.range()),
+        ["pprint", "pprint"] => checker.report_diagnostic_if_enabled(PPrint, call.func.range()),
         _ => return,
     };
 

@@ -383,21 +383,21 @@ impl Candidate {
         {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());
             match context {
-                Context::String => checker.checked_report_diagnostic(
+                Context::String => checker.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterString {
                         confusable: self.confusable,
                         representant: self.representant,
                     },
                     char_range,
                 ),
-                Context::Docstring => checker.checked_report_diagnostic(
+                Context::Docstring => checker.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterDocstring {
                         confusable: self.confusable,
                         representant: self.representant,
                     },
                     char_range,
                 ),
-                Context::Comment => checker.checked_report_diagnostic(
+                Context::Comment => checker.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterComment {
                         confusable: self.confusable,
                         representant: self.representant,

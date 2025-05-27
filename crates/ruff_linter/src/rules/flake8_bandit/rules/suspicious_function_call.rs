@@ -1041,12 +1041,12 @@ fn suspicious_function(
         | ["jsonpickle", "decode"]
         | ["jsonpickle", "unpickler", "decode"]
         | ["pandas", "read_pickle"] => {
-            checker.checked_report_diagnostic(SuspiciousPickleUsage, range)
+            checker.report_diagnostic_if_enabled(SuspiciousPickleUsage, range)
         }
 
         // Marshal
         ["marshal", "load" | "loads"] => {
-            checker.checked_report_diagnostic(SuspiciousMarshalUsage, range)
+            checker.report_diagnostic_if_enabled(SuspiciousMarshalUsage, range)
         }
 
         // InsecureHash
@@ -1062,7 +1062,7 @@ fn suspicious_function(
             "primitives",
             "hashes",
             "SHA1" | "MD5",
-        ] => checker.checked_report_diagnostic(SuspiciousInsecureHashUsage, range),
+        ] => checker.report_diagnostic_if_enabled(SuspiciousInsecureHashUsage, range),
 
         // InsecureCipher
         [
@@ -1078,7 +1078,7 @@ fn suspicious_function(
             "ciphers",
             "algorithms",
             "ARC4" | "Blowfish" | "IDEA",
-        ] => checker.checked_report_diagnostic(SuspiciousInsecureCipherUsage, range),
+        ] => checker.report_diagnostic_if_enabled(SuspiciousInsecureCipherUsage, range),
 
         // InsecureCipherMode
         [
@@ -1088,13 +1088,17 @@ fn suspicious_function(
             "ciphers",
             "modes",
             "ECB",
-        ] => checker.checked_report_diagnostic(SuspiciousInsecureCipherModeUsage, range),
+        ] => checker.report_diagnostic_if_enabled(SuspiciousInsecureCipherModeUsage, range),
 
         // Mktemp
-        ["tempfile", "mktemp"] => checker.checked_report_diagnostic(SuspiciousMktempUsage, range),
+        ["tempfile", "mktemp"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousMktempUsage, range)
+        }
 
         // Eval
-        ["" | "builtins", "eval"] => checker.checked_report_diagnostic(SuspiciousEvalUsage, range),
+        ["" | "builtins", "eval"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousEvalUsage, range)
+        }
 
         // MarkSafe
         ["django", "utils", "safestring" | "html", "mark_safe"] => {
@@ -1105,7 +1109,7 @@ fn suspicious_function(
                     }
                 }
             }
-            checker.checked_report_diagnostic(SuspiciousMarkSafeUsage, range)
+            checker.report_diagnostic_if_enabled(SuspiciousMarkSafeUsage, range)
         }
 
         // URLOpen (`Request`)
@@ -1127,7 +1131,7 @@ fn suspicious_function(
                     }
                 }
             }
-            checker.checked_report_diagnostic(SuspiciousURLOpenUsage, range)
+            checker.report_diagnostic_if_enabled(SuspiciousURLOpenUsage, range)
         }
 
         // URLOpen (`urlopen`, `urlretrieve`)
@@ -1179,7 +1183,7 @@ fn suspicious_function(
                     }
                 }
             }
-            checker.checked_report_diagnostic(SuspiciousURLOpenUsage, range)
+            checker.report_diagnostic_if_enabled(SuspiciousURLOpenUsage, range)
         }
 
         // URLOpen (`URLopener`, `FancyURLopener`)
@@ -1190,18 +1194,18 @@ fn suspicious_function(
             "urllib",
             "request",
             "URLopener" | "FancyURLopener",
-        ] => checker.checked_report_diagnostic(SuspiciousURLOpenUsage, range),
+        ] => checker.report_diagnostic_if_enabled(SuspiciousURLOpenUsage, range),
 
         // NonCryptographicRandom
         [
             "random",
             "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform"
             | "triangular" | "randbytes",
-        ] => checker.checked_report_diagnostic(SuspiciousNonCryptographicRandomUsage, range),
+        ] => checker.report_diagnostic_if_enabled(SuspiciousNonCryptographicRandomUsage, range),
 
         // UnverifiedContext
         ["ssl", "_create_unverified_context"] => {
-            checker.checked_report_diagnostic(SuspiciousUnverifiedContextUsage, range)
+            checker.report_diagnostic_if_enabled(SuspiciousUnverifiedContextUsage, range)
         }
 
         // XMLCElementTree
@@ -1210,7 +1214,7 @@ fn suspicious_function(
             "etree",
             "cElementTree",
             "parse" | "iterparse" | "fromstring" | "XMLParser",
-        ] => checker.checked_report_diagnostic(SuspiciousXMLCElementTreeUsage, range),
+        ] => checker.report_diagnostic_if_enabled(SuspiciousXMLCElementTreeUsage, range),
 
         // XMLElementTree
         [
@@ -1218,31 +1222,31 @@ fn suspicious_function(
             "etree",
             "ElementTree",
             "parse" | "iterparse" | "fromstring" | "XMLParser",
-        ] => checker.checked_report_diagnostic(SuspiciousXMLElementTreeUsage, range),
+        ] => checker.report_diagnostic_if_enabled(SuspiciousXMLElementTreeUsage, range),
 
         // XMLExpatReader
         ["xml", "sax", "expatreader", "create_parser"] => {
-            checker.checked_report_diagnostic(SuspiciousXMLExpatReaderUsage, range)
+            checker.report_diagnostic_if_enabled(SuspiciousXMLExpatReaderUsage, range)
         }
 
         // XMLExpatBuilder
         ["xml", "dom", "expatbuilder", "parse" | "parseString"] => {
-            checker.checked_report_diagnostic(SuspiciousXMLExpatBuilderUsage, range)
+            checker.report_diagnostic_if_enabled(SuspiciousXMLExpatBuilderUsage, range)
         }
 
         // XMLSax
         ["xml", "sax", "parse" | "parseString" | "make_parser"] => {
-            checker.checked_report_diagnostic(SuspiciousXMLSaxUsage, range)
+            checker.report_diagnostic_if_enabled(SuspiciousXMLSaxUsage, range)
         }
 
         // XMLMiniDOM
         ["xml", "dom", "minidom", "parse" | "parseString"] => {
-            checker.checked_report_diagnostic(SuspiciousXMLMiniDOMUsage, range)
+            checker.report_diagnostic_if_enabled(SuspiciousXMLMiniDOMUsage, range)
         }
 
         // XMLPullDOM
         ["xml", "dom", "pulldom", "parse" | "parseString"] => {
-            checker.checked_report_diagnostic(SuspiciousXMLPullDOMUsage, range)
+            checker.report_diagnostic_if_enabled(SuspiciousXMLPullDOMUsage, range)
         }
 
         // XMLETree
@@ -1251,13 +1255,13 @@ fn suspicious_function(
             "etree",
             "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser"
             | "check_docinfo",
-        ] => checker.checked_report_diagnostic(SuspiciousXMLETreeUsage, range),
+        ] => checker.report_diagnostic_if_enabled(SuspiciousXMLETreeUsage, range),
 
         // Telnet
-        ["telnetlib", ..] => checker.checked_report_diagnostic(SuspiciousTelnetUsage, range),
+        ["telnetlib", ..] => checker.report_diagnostic_if_enabled(SuspiciousTelnetUsage, range),
 
         // FTPLib
-        ["ftplib", ..] => checker.checked_report_diagnostic(SuspiciousFTPLibUsage, range),
+        ["ftplib", ..] => checker.report_diagnostic_if_enabled(SuspiciousFTPLibUsage, range),
 
         _ => return,
     };
