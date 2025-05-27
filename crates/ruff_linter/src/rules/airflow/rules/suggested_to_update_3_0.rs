@@ -283,25 +283,34 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         _ => return,
     };
 
-    let mut diagnostic = checker.report_diagnostic(
-        Airflow3SuggestedUpdate {
-            deprecated: qualified_name.to_string(),
-            replacement: replacement.clone(),
-        },
-        range,
-    );
-
-    let semantic = checker.semantic();
-    if let Some((module, name)) = match &replacement {
-        Replacement::AutoImport { module, name } => Some((module, *name)),
-        Replacement::SourceModuleMoved { module, name } => Some((module, name.as_str())),
-        _ => None,
-    } {
-        if is_guarded_by_try_except(expr, module, name, semantic) {
-            diagnostic.defuse();
+    let (module, name) = match &replacement {
+        Replacement::AutoImport { module, name } => (module, *name),
+        Replacement::SourceModuleMoved { module, name } => (module, name.as_str()),
+        _ => {
+            checker.report_diagnostic(
+                Airflow3SuggestedUpdate {
+                    deprecated: qualified_name.to_string(),
+                    replacement: replacement.clone(),
+                },
+                range,
+            );
             return;
         }
-        diagnostic.try_set_fix(|| {
+    };
+
+    if is_guarded_by_try_except(expr, module, name, checker.semantic()) {
+        return;
+    }
+
+    checker
+        .report_diagnostic(
+            Airflow3SuggestedUpdate {
+                deprecated: qualified_name.to_string(),
+                replacement: replacement.clone(),
+            },
+            range,
+        )
+        .try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from(module, name),
                 expr.start(),
@@ -310,5 +319,4 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             let replacement_edit = Edit::range_replacement(binding, range);
             Ok(Fix::safe_edits(import_edit, [replacement_edit]))
         });
-    }
 }
