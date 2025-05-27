@@ -62,6 +62,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_GUARD_CALL);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&MISSING_ARGUMENT);
+    registry.register_lint(&NEGATIVE_SHIFT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NON_SUBSCRIPTABLE);
     registry.register_lint(&NOT_ITERABLE);
@@ -1054,6 +1055,25 @@ declare_lint! {
     /// ```
     pub(crate) static MISSING_ARGUMENT = {
         summary: "detects missing required arguments in a call",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects shifting an int by a negative value.
+    ///
+    /// ## Why is this bad?
+    /// Shifting an int by a negative value raises a `ValueError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// 42 >> -1
+    /// 42 << -1
+    /// ```
+    pub(crate) static NEGATIVE_SHIFT = {
+        summary: "detects shifting an int by a negative value",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
