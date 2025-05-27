@@ -3515,7 +3515,7 @@ impl<'db> Type<'db> {
 
     /// Returns an empty [`Bindings`] that can be used to analyze a call to this type.
     ///
-    /// Note that all types have valid [`Signatures`] and [`Bindings`], even if the type is not callable.
+    /// Note that all types have valid [`Bindings`], even if the type is not callable.
     /// Moreover, "callable" can be subtle for a union type, since some union elements might be
     /// callable and some not. A union is callable if every element type is callable — and even
     /// then, the elements might be inconsistent, such that there's no argument list that's valid

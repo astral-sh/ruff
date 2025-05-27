@@ -22,27 +22,6 @@ use crate::types::{ClassLiteral, TypeMapping, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
-/// The signature of a possible union of callables.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
-pub(crate) struct Signatures<'db> {
-    elements: SmallVec<[CallableSignature<'db>; 1]>,
-}
-
-impl<'db> Signatures<'db> {
-    pub(crate) fn iter(&self) -> std::slice::Iter<'_, CallableSignature<'db>> {
-        self.elements.iter()
-    }
-}
-
-impl<'a, 'db> IntoIterator for &'a Signatures<'db> {
-    type Item = &'a CallableSignature<'db>;
-    type IntoIter = std::slice::Iter<'a, CallableSignature<'db>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
 /// The signature of a single callable. If the callable is overloaded, there is a separate
 /// [`Signature`] for each overload.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]

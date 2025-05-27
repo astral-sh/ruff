@@ -8700,7 +8700,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let argument_type = self.infer_expression(arguments_slice);
                     let bindings = argument_type.bindings(db);
 
-                    // SAFETY: This is enforced by the constructor methods on `Signatures` even in
+                    // SAFETY: This is enforced by the constructor methods on `Bindings` even in
                     // the case of a non-callable union.
                     let callable_binding = bindings
                         .into_iter()
