@@ -136,21 +136,21 @@ impl AlwaysFixableViolation for TrueFalseComparison {
         let cond = cond.truncated_display();
         match (value, op) {
             (true, EqCmpOp::Eq) => {
-                format!("Avoid equality comparisons to `True`; use `assert {cond}:` for truth checks")
+                format!("Avoid equality comparisons to `True`; use `{cond}:` for truth checks")
             }
             (true, EqCmpOp::NotEq) => {
                 format!(
-                    "Avoid inequality comparisons to `True`; use `assert not {cond}:` for false checks"
+                    "Avoid inequality comparisons to `True`; use `not {cond}:` for false checks"
                 )
             }
             (false, EqCmpOp::Eq) => {
                 format!(
-                    "Avoid equality comparisons to `False`; use `assert not {cond}:` for false checks"
+                    "Avoid equality comparisons to `False`; use `not {cond}:` for false checks"
                 )
             }
             (false, EqCmpOp::NotEq) => {
                 format!(
-                    "Avoid inequality comparisons to `False`; use `assert {cond}:` for truth checks"
+                    "Avoid inequality comparisons to `False`; use `{cond}:` for truth checks"
                 )
             }
         }
