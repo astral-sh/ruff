@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::IsolationLevel;
+use ruff_diagnostics::{IsolationLevel, SourceMap};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -11,7 +11,7 @@ use crate::linter::FixTable;
 use crate::message::Message;
 use crate::registry::Rule;
 use crate::settings::types::UnsafeFixes;
-use crate::{Edit, Fix, SourceMap};
+use crate::{Edit, Fix};
 
 pub(crate) mod codemods;
 pub(crate) mod edits;
