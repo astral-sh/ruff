@@ -82,12 +82,12 @@ pub(crate) fn explicit(expr: &Expr, checker: &Checker) -> Option<Diagnostic> {
 
 fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Fix {
     let ast::ExprBinOp { left, right, .. } = expr_bin_op;
-    let operator_range = TextRange::new(left.end(), right.start());
-    let operator_text = checker.locator().slice(operator_range);
+    let between_operands_range = TextRange::new(left.end(), right.start());
+    let between_operands = checker.locator().slice(between_operands_range);
 
-    let plus_pos = operator_text.find('+').unwrap();
+    let plus_pos = between_operands.find('+').unwrap();
 
-    let (before, after) = operator_text.split_at(plus_pos);
+    let (before, after) = between_operands.split_at(plus_pos);
     let after = &after[1..]; // Ignore `+` operator
 
     // With `+` on first line a newline isn't in before; trim excess whitespace
@@ -99,6 +99,6 @@ fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Fix {
 
     Fix::safe_edit(Edit::range_replacement(
         format!("{before}{after}"),
-        operator_range,
+        between_operands_range,
     ))
 }
