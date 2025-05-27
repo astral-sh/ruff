@@ -27,8 +27,8 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
     ) -> Result<()> {
         let mut events_by_db: FxHashMap<_, Vec<ChangeEvent>> = FxHashMap::default();
 
-        // Keep track of whether there are any changes for configuration files
-        let mut config_file_changed = false;
+        // Keep track of whether the ignore files or config files have changed
+        let mut project_changed = false;
 
         for change in params.changes {
             let path = match url_to_any_system_path(&change.uri) {
@@ -57,11 +57,11 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                 continue;
             };
 
-            if !system_path
-                .extension()
-                .is_some_and(|ext| matches!(ext, "py" | "pyi" | "ipynb"))
-            {
-                config_file_changed = true;
+            if matches!(
+                system_path.file_name(),
+                Some(".gitignore" | ".ignore" | "ty.toml" | "pyproject.toml")
+            ) {
+                project_changed = true;
             }
 
             let change_event = match change.typ {
@@ -105,7 +105,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
 
         let client_capabilities = session.client_capabilities();
 
-        if config_file_changed {
+        if project_changed {
             if client_capabilities.diagnostics_refresh {
                 requester
                     .request::<types::request::WorkspaceDiagnosticRefresh>((), |()| Task::nothing())
