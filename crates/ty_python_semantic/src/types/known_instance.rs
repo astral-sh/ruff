@@ -11,7 +11,7 @@
 use std::fmt::Display;
 
 use super::generics::GenericContext;
-use super::{ClassType, Truthiness, Type, TypeAliasType, TypeVarInstance, class::KnownClass};
+use super::{ClassType, Type, TypeAliasType, TypeVarInstance, class::KnownClass};
 use crate::db::Db;
 use crate::module_resolver::{KnownModule, file_to_module};
 use ruff_db::files::File;
@@ -101,58 +101,6 @@ pub enum KnownInstanceType<'db> {
 }
 
 impl<'db> KnownInstanceType<'db> {
-    /// Evaluate the known instance in boolean context
-    pub(crate) const fn bool(self) -> Truthiness {
-        match self {
-            Self::Annotated
-            | Self::Literal
-            | Self::LiteralString
-            | Self::Optional
-            // This is a legacy `TypeVar` _outside_ of any generic class or function, so it's
-            // AlwaysTrue. The truthiness of a typevar inside of a generic class or function
-            // depends on its bounds and constraints; but that's represented by `Type::TypeVar` and
-            // handled in elsewhere.
-            | Self::TypeVar(_)
-            | Self::Union
-            | Self::NoReturn
-            | Self::Never
-            | Self::Tuple
-            | Self::Type
-            | Self::TypingSelf
-            | Self::Final
-            | Self::ClassVar
-            | Self::Callable
-            | Self::Concatenate
-            | Self::Unpack
-            | Self::Required
-            | Self::NotRequired
-            | Self::TypeAlias
-            | Self::TypeGuard
-            | Self::TypedDict
-            | Self::TypeIs
-            | Self::List
-            | Self::Dict
-            | Self::DefaultDict
-            | Self::Set
-            | Self::FrozenSet
-            | Self::Counter
-            | Self::Deque
-            | Self::ChainMap
-            | Self::OrderedDict
-            | Self::Protocol(_)
-            | Self::Generic(_)
-            | Self::ReadOnly
-            | Self::TypeAliasType(_)
-            | Self::Unknown
-            | Self::AlwaysTruthy
-            | Self::AlwaysFalsy
-            | Self::Not
-            | Self::Intersection
-            | Self::TypeOf
-            | Self::CallableTypeOf => Truthiness::AlwaysTrue,
-        }
-    }
-
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         match self {
             Self::Annotated
