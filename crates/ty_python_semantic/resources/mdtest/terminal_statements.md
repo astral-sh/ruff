@@ -570,6 +570,37 @@ def f():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
+## Calls to functions returning `Never`
+
+Calls to functions which have an annotated return type of `Never` are terminal.
+
+```py
+from typing import NoReturn
+import sys
+
+def f() -> NoReturn:
+    sys.exit(1)
+
+def g(x: int | None):
+    if x is None:
+        sys.exit(1)
+
+    # TODO: should be just int, not int | None
+    reveal_type(x)  # revealed: int | None
+```
+
+Bindings after terminal statement is unreachable:
+
+```py
+def _():
+    x = 3
+
+    sys.exit(1)
+
+    x = 4
+    reveal_type(x)  # revealed: Never
+```
+
 ## Nested functions
 
 Free references inside of a function body refer to variables defined in the containing scope.

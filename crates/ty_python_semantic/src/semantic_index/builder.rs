@@ -1949,11 +1949,29 @@ where
                 }
                 walk_stmt(self, stmt);
             }
-            ast::Stmt::Expr(ast::StmtExpr { value, range: _ }) if self.in_module_scope() => {
-                if let Some(expr) = dunder_all_extend_argument(value) {
-                    self.add_standalone_expression(expr);
+            ast::Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
+                if self.in_module_scope() {
+                    if let Some(expr) = dunder_all_extend_argument(value) {
+                        self.add_standalone_expression(expr);
+                    }
                 }
+
                 self.visit_expr(value);
+
+                // HACK: for now, only consider function calls which are top level expressions.
+                // This should also be done for calls in sub-expressions, example:
+                // `3 + f()`
+                if let Some(ast::ExprCall { func, .. }) = value.as_call_expr() {
+                    let expression = self.add_standalone_expression(func);
+
+                    let predicate = Predicate {
+                        node: PredicateNode::ReturnsNever(expression),
+                        is_positive: false,
+                    };
+
+                    self.record_reachability_constraint(predicate);
+                    self.record_visibility_constraint(predicate);
+                }
             }
             _ => {
                 walk_stmt(self, stmt);

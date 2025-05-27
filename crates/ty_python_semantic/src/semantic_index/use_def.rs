@@ -184,6 +184,17 @@
 //! end of the scope, it records the state for each symbol as the public definitions of that
 //! symbol.
 //!
+//! ```python
+//! x = 1
+//! x = 2
+//! y = x
+//! if flag:
+//!     x = 3
+//! else:
+//!     x = 4
+//! z = x
+//! ```
+//!
 //! Let's walk through the above example. Initially we do not have any record of `x`. When we add
 //! the new symbol (before we process the first binding), we create a new undefined `SymbolState`
 //! which has a single live binding (the "unbound" definition) and a single live declaration (the
