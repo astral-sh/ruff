@@ -134,20 +134,29 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
         }
     }
 
-    if !lambda_has_expected_arity(lambda) {
+    if checker.settings.preview.is_disabled() && iterables.len() != 1 {
+        return;
+    }
+
+    if !lambda_has_expected_arity(lambda, iterables) {
         return;
     }
 
     let mut diagnostic = Diagnostic::new(UnnecessaryMap { object_type }, call.range);
     diagnostic.try_set_fix(|| {
-        fixes::fix_unnecessary_map(
-            call,
-            parent,
-            object_type,
-            checker.locator(),
-            checker.stylist(),
-        )
-        .map(Fix::unsafe_edit)
+        let edit = if checker.settings.preview.is_enabled() {
+            fixes::fix_unnecessary_map_preview(call, object_type, lambda, iterables, checker)
+        } else {
+            fixes::fix_unnecessary_map(
+                call,
+                parent,
+                object_type,
+                checker.locator(),
+                checker.stylist(),
+            )
+        };
+
+        edit.map(Fix::unsafe_edit)
     });
     checker.report_diagnostic(diagnostic);
 }
@@ -189,20 +198,27 @@ fn map_lambda_and_iterables<'a>(
 /// * It has exactly one parameter
 /// * That parameter is not variadic
 /// * That parameter does not have a default value
-fn lambda_has_expected_arity(lambda: &ExprLambda) -> bool {
+fn lambda_has_expected_arity(lambda: &ExprLambda, iterables: &[Expr]) -> bool {
     let Some(parameters) = lambda.parameters.as_deref() else {
         return false;
     };
-
-    let [parameter] = &*parameters.args else {
-        return false;
-    };
-
-    if parameter.default.is_some() {
+    if parameters.vararg.is_some()
+        || parameters.kwarg.is_some()
+        || !parameters.kwonlyargs.is_empty()
+    {
         return false;
     }
 
-    if parameters.vararg.is_some() || parameters.kwarg.is_some() {
+    if parameters
+        .posonlyargs
+        .iter()
+        .chain(&parameters.args)
+        .any(|parameter| parameter.default.is_some())
+    {
+        return false;
+    }
+
+    if parameters.posonlyargs.len() + parameters.args.len() != iterables.len() {
         return false;
     }
 
