@@ -15,7 +15,7 @@ pub use rule_selector::clap_completion::RuleSelectorParser;
 pub use rules::pycodestyle::rules::IOError;
 
 pub use diagnostic::Diagnostic;
-pub(crate) use ruff_diagnostics::{Applicability, Edit, Fix, IsolationLevel, SourceMap};
+pub(crate) use ruff_diagnostics::{Applicability, Edit, Fix, SourceMap};
 pub use violation::{AlwaysFixableViolation, FixAvailability, Violation, ViolationMetadata};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
