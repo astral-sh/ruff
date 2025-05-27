@@ -70,7 +70,9 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Fix safety
 ///
-/// This fix is marked as unsafe as it changes program behavior.
+/// This fix is marked as unsafe because it replaces the mutable default with `None`
+/// and initializes it in the function body, which may not be what the user intended,
+/// as described above.
 ///
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
