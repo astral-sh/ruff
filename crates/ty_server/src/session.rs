@@ -86,10 +86,6 @@ impl Session {
         })
     }
 
-    pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
-        &self.resolved_client_capabilities
-    }
-
     // TODO(dhruvmanila): Ideally, we should have a single method for `workspace_db_for_path_mut`
     // and `default_workspace_db_mut` but the borrow checker doesn't allow that.
     // https://github.com/astral-sh/ruff/pull/13041#discussion_r1726725437
