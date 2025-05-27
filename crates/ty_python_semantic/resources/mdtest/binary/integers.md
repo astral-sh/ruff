@@ -160,13 +160,13 @@ If the result of a left shift overflows the `int` literal type, it becomes `int`
 not overflow:
 
 ```py
-reveal_type(42 << 100) # revealed: int
-reveal_type(0 << 100) # revealed: int
-reveal_type(-42 << 100) # revealed: int
+reveal_type(42 << 100)  # revealed: int
+reveal_type(0 << 100)  # revealed: int
+reveal_type(-42 << 100)  # revealed: int
 
-reveal_type(42 >> 100) # revealed: Literal[0]
-reveal_type(0 >> 100) # revealed: Literal[0]
-reveal_type(-42 >> 100) # revealed: Literal[-1]
+reveal_type(42 >> 100)  # revealed: Literal[0]
+reveal_type(0 >> 100)  # revealed: Literal[0]
+reveal_type(-42 >> 100)  # revealed: Literal[-1]
 ```
 
 It is an error to shift by a negative value. This is handled similarly to `division-by-zero`, above:
@@ -175,14 +175,14 @@ It is an error to shift by a negative value. This is handled similarly to `divis
 # error: [negative-shift] "Cannot left shift object of type `Literal[42]` by a negative value"
 reveal_type(42 << -3)  # revealed: int
 # error: [negative-shift] "Cannot left shift object of type `Literal[0]` by a negative value"
-reveal_type(0 << -3) # revealed: int
+reveal_type(0 << -3)  # revealed: int
 # error: [negative-shift] "Cannot left shift object of type `Literal[-42]` by a negative value"
 reveal_type(-42 << -3)  # revealed: int
 
 # error: [negative-shift] "Cannot right shift object of type `Literal[42]` by a negative value"
 reveal_type(42 >> -3)  # revealed: int
 # error: [negative-shift] "Cannot right shift object of type `Literal[0]` by a negative value"
-reveal_type(0 >> -3) # revealed: int
+reveal_type(0 >> -3)  # revealed: int
 # error: [negative-shift] "Cannot right shift object of type `Literal[-42]` by a negative value"
 reveal_type(-42 >> -3)  # revealed: int
 ```
