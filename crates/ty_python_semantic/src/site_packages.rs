@@ -213,6 +213,8 @@ impl VirtualEnvironment {
                 )
             })?;
 
+        // Since the `extends-environment` key is nonstandard,
+        // for now we only trust it if the virtual environment was created with `uv`.
         let parent_environment = if created_with_uv {
             parent_environment
                 .and_then(|sys_prefix| {
@@ -750,11 +752,13 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
     struct VirtualEnvironmentTestCase {
         system_site_packages: bool,
         pyvenv_cfg_version_field: Option<&'static str>,
         command_field: Option<&'static str>,
         implementation_field: Option<&'static str>,
+        parent_environment: Option<&'static str>,
     }
 
     struct PythonEnvironmentTestCase {
@@ -808,6 +812,7 @@ mod tests {
                 system_site_packages,
                 command_field,
                 implementation_field,
+                parent_environment,
             }) = virtual_env
             else {
                 return system_install_sys_prefix;
@@ -842,6 +847,24 @@ mod tests {
                 pyvenv_cfg_contents.push_str(implementation_field);
                 pyvenv_cfg_contents.push('\n');
             }
+            if let Some(parent_environment) = parent_environment {
+                pyvenv_cfg_contents.push_str("uv = 1.2.3\n");
+                pyvenv_cfg_contents.push_str("extends-environment = ");
+                pyvenv_cfg_contents.push_str(parent_environment);
+                pyvenv_cfg_contents.push('\n');
+
+                let parent_site_packages =
+                    SystemPath::new(parent_environment).join(if cfg!(windows) {
+                        "Lib/site-packages"
+                    } else {
+                        &unix_site_packages
+                    });
+
+                memory_fs
+                    .create_directory_all(parent_site_packages)
+                    .unwrap();
+            }
+
             // Deliberately using weird casing here to test that our pyvenv.cfg parsing is case-insensitive:
             if *system_site_packages {
                 pyvenv_cfg_contents.push_str("include-system-site-packages = TRuE\n");
@@ -885,6 +908,7 @@ mod tests {
             env
         }
 
+        #[track_caller]
         fn assert_virtual_environment(
             &self,
             venv: &VirtualEnvironment,
@@ -962,14 +986,17 @@ mod tests {
                     site_packages_directories.as_slice(),
                     &[expected_venv_site_packages, expected_system_site_packages]
                 );
-            } else {
+            } else if self_venv.parent_environment.is_none() {
                 assert_eq!(
                     site_packages_directories.as_slice(),
                     &[expected_venv_site_packages]
                 );
+            } else {
+                assert_eq!(&site_packages_directories[0], &expected_venv_site_packages);
             }
         }
 
+        #[track_caller]
         fn assert_system_environment(
             &self,
             env: &SystemEnvironment,
@@ -1082,6 +1109,7 @@ mod tests {
                 pyvenv_cfg_version_field: None,
                 command_field: None,
                 implementation_field: None,
+                parent_environment: None,
             }),
         };
         test.run();
@@ -1095,10 +1123,8 @@ mod tests {
             free_threaded: false,
             origin: SysPrefixPathOrigin::VirtualEnvVar,
             virtual_env: Some(VirtualEnvironmentTestCase {
-                system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version = 3.12"),
-                command_field: None,
-                implementation_field: None,
+                ..VirtualEnvironmentTestCase::default()
             }),
         };
         test.run();
@@ -1112,10 +1138,8 @@ mod tests {
             free_threaded: false,
             origin: SysPrefixPathOrigin::VirtualEnvVar,
             virtual_env: Some(VirtualEnvironmentTestCase {
-                system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version_info = 3.12"),
-                command_field: None,
-                implementation_field: None,
+                ..VirtualEnvironmentTestCase::default()
             }),
         };
         test.run();
@@ -1129,10 +1153,8 @@ mod tests {
             free_threaded: false,
             origin: SysPrefixPathOrigin::VirtualEnvVar,
             virtual_env: Some(VirtualEnvironmentTestCase {
-                system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version_info = 3.12.0rc2"),
-                command_field: None,
-                implementation_field: None,
+                ..VirtualEnvironmentTestCase::default()
             }),
         };
         test.run();
@@ -1146,10 +1168,8 @@ mod tests {
             free_threaded: true,
             origin: SysPrefixPathOrigin::VirtualEnvVar,
             virtual_env: Some(VirtualEnvironmentTestCase {
-                system_site_packages: false,
                 pyvenv_cfg_version_field: Some("version_info = 3.13"),
-                command_field: None,
-                implementation_field: None,
+                ..VirtualEnvironmentTestCase::default()
             }),
         };
         test.run();
@@ -1165,8 +1185,7 @@ mod tests {
             virtual_env: Some(VirtualEnvironmentTestCase {
                 system_site_packages: true,
                 pyvenv_cfg_version_field: Some("version_info = 3.13"),
-                command_field: None,
-                implementation_field: None,
+                ..VirtualEnvironmentTestCase::default()
             }),
         };
         test.run();
@@ -1180,10 +1199,8 @@ mod tests {
             free_threaded: true,
             origin: SysPrefixPathOrigin::VirtualEnvVar,
             virtual_env: Some(VirtualEnvironmentTestCase {
-                system_site_packages: true,
-                pyvenv_cfg_version_field: None,
-                command_field: None,
                 implementation_field: Some("implementation = PyPy"),
+                ..VirtualEnvironmentTestCase::default()
             }),
         };
         let venv = test.run().expect_venv();
@@ -1198,10 +1215,8 @@ mod tests {
             free_threaded: true,
             origin: SysPrefixPathOrigin::VirtualEnvVar,
             virtual_env: Some(VirtualEnvironmentTestCase {
-                system_site_packages: true,
-                pyvenv_cfg_version_field: None,
-                command_field: None,
                 implementation_field: Some("implementation = CPython"),
+                ..VirtualEnvironmentTestCase::default()
             }),
         };
         let venv = test.run().expect_venv();
@@ -1216,10 +1231,8 @@ mod tests {
             free_threaded: true,
             origin: SysPrefixPathOrigin::VirtualEnvVar,
             virtual_env: Some(VirtualEnvironmentTestCase {
-                system_site_packages: true,
-                pyvenv_cfg_version_field: None,
-                command_field: None,
                 implementation_field: Some("implementation = GraalVM"),
+                ..VirtualEnvironmentTestCase::default()
             }),
         };
         let venv = test.run().expect_venv();
@@ -1233,12 +1246,7 @@ mod tests {
             minor_version: 13,
             free_threaded: true,
             origin: SysPrefixPathOrigin::VirtualEnvVar,
-            virtual_env: Some(VirtualEnvironmentTestCase {
-                system_site_packages: true,
-                pyvenv_cfg_version_field: None,
-                command_field: None,
-                implementation_field: None,
-            }),
+            virtual_env: Some(VirtualEnvironmentTestCase::default()),
         };
         let venv = test.run().expect_venv();
         assert_eq!(venv.implementation, PythonImplementation::Unknown);
@@ -1335,12 +1343,11 @@ mod tests {
             free_threaded: true,
             origin: SysPrefixPathOrigin::VirtualEnvVar,
             virtual_env: Some(VirtualEnvironmentTestCase {
-                system_site_packages: true,
                 pyvenv_cfg_version_field: Some("version_info = 3.13"),
                 command_field: Some(
                     r#"command = /.pyenv/versions/3.13.3/bin/python3.13 -m venv --without-pip --prompt="python-default/3.13.3" /somewhere-else/python/virtualenvs/python-default/3.13.3"#,
                 ),
-                implementation_field: None,
+                ..VirtualEnvironmentTestCase::default()
             }),
         };
         test.run();
@@ -1422,5 +1429,37 @@ mod tests {
             ))
             if path == pyvenv_cfg_path
         ));
+    }
+
+    #[test]
+    fn resolves_site_packages_of_parent_environment() {
+        let system = TestSystem::default();
+        let test_case = PythonEnvironmentTestCase {
+            system: system.clone(),
+            minor_version: 13,
+            free_threaded: false,
+            origin: SysPrefixPathOrigin::VirtualEnvVar,
+            virtual_env: Some(VirtualEnvironmentTestCase {
+                pyvenv_cfg_version_field: Some("version_info = 3.13"),
+                parent_environment: Some("/parent/env"),
+                ..VirtualEnvironmentTestCase::default()
+            }),
+        };
+        let virtual_environment = test_case.run().expect_venv();
+        let site_packages_directories = virtual_environment
+            .site_packages_directories(&system)
+            .unwrap();
+        assert_eq!(site_packages_directories.len(), 2);
+        if cfg!(windows) {
+            assert_eq!(
+                site_packages_directories[1],
+                SystemPathBuf::from("/parent/env/Lib/site-packages")
+            );
+        } else {
+            assert_eq!(
+                site_packages_directories[1],
+                SystemPathBuf::from("/parent/env/lib/python3.13/site-packages")
+            );
+        }
     }
 }
