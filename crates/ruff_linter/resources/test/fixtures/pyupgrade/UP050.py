@@ -70,3 +70,9 @@ class A(
     ,
 ):
     ...
+
+
+type = str
+
+class Foo(metaclass=type):
+    ...
