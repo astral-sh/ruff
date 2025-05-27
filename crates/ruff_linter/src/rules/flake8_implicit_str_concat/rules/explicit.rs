@@ -2,8 +2,9 @@ use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 
@@ -59,8 +60,8 @@ pub(crate) fn explicit(expr: &Expr, checker: &Checker) -> Option<Diagnostic> {
         if let ast::ExprBinOp {
             left,
             right,
-            range,
             op: Operator::Add,
+            ..
         } = bin_op
         {
             let concatable = matches!(
@@ -70,7 +71,11 @@ pub(crate) fn explicit(expr: &Expr, checker: &Checker) -> Option<Diagnostic> {
                     Expr::StringLiteral(_) | Expr::FString(_)
                 ) | (Expr::BytesLiteral(_), Expr::BytesLiteral(_))
             );
-            if concatable && checker.locator().contains_line_break(*range) {
+            if concatable
+                && checker
+                    .locator()
+                    .contains_line_break(TextRange::new(left.end(), right.start()))
+            {
                 let mut diagnostic = Diagnostic::new(ExplicitStringConcatenation, expr.range());
                 diagnostic.set_fix(generate_fix(checker, bin_op));
                 return Some(diagnostic);
@@ -84,17 +89,21 @@ fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Fix {
     let ast::ExprBinOp { left, right, .. } = expr_bin_op;
     let between_operands_range = TextRange::new(left.end(), right.start());
     let between_operands = checker.locator().slice(between_operands_range);
-
     let plus_pos = between_operands.find('+').unwrap();
-
     let (before, after) = between_operands.split_at(plus_pos);
     let after = &after[1..]; // Ignore `+` operator
 
-    // With `+` on first line a newline isn't in before; trim excess whitespace
-    let before = if before.contains('\n') || before.contains('\r') {
+    let linebreak_before_operator = checker.locator().contains_line_break(TextRange::new(
+        left.end(),
+        left.end() + TextSize::try_from(plus_pos).unwrap(),
+    ));
+
+    // If removing `+` from first line trim trailing spaces
+    // Preserve indentation when removing `+` from second line
+    let before = if linebreak_before_operator {
         before
     } else {
-        before.trim_end()
+        before.trim_end_matches(is_python_whitespace)
     };
 
     Fix::safe_edit(Edit::range_replacement(
