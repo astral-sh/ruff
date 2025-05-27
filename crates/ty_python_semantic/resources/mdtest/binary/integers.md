@@ -39,6 +39,13 @@ def both(x: int):
     reveal_type(x // x)  # revealed: int
     reveal_type(x / x)  # revealed: int | float
     reveal_type(x % x)  # revealed: int
+
+# Edge case where negation leads to overflow:
+i64_max = 9223372036854775807
+i64_min = -i64_max - 1
+reveal_type(i64_max)  # revealed: Literal[9223372036854775807]
+reveal_type(i64_min)  # revealed: Literal[-9223372036854775808]
+reveal_type(-i64_min)  # revealed: int
 ```
 
 ## Power
