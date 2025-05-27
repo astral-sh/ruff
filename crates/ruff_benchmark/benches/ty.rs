@@ -78,7 +78,7 @@ fn setup_tomllib_case() -> Case {
 
     let src_root = SystemPath::new("/src");
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_cli_options(Options {
+    metadata.apply_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(PythonVersion::PY312)),
             ..EnvironmentOptions::default()
@@ -224,7 +224,7 @@ fn setup_micro_case(code: &str) -> Case {
 
     let src_root = SystemPath::new("/src");
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_cli_options(Options {
+    metadata.apply_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(PythonVersion::PY312)),
             ..EnvironmentOptions::default()
