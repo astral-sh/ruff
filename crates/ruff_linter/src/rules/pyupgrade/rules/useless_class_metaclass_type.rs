@@ -12,6 +12,8 @@ use crate::fix::edits::{Parentheses, remove_argument};
 /// ## Why is this bad?
 /// Since Python 3, the default metaclass is `type`, so specifying it explicitly is redundant.
 ///
+/// Even though `__prepare__` is not required, the default metaclass (`type`) implements it,
+/// for the convenience of subclasses calling it via `super()`.
 /// ## Example
 ///
 /// ```python
