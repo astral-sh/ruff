@@ -67,6 +67,7 @@ mod tests {
     #[test_case(Rule::UselessExpression, Path::new("B018.ipynb"))]
     #[test_case(Rule::UselessExpression, Path::new("B018.py"))]
     #[test_case(Rule::ReturnInGenerator, Path::new("B901.py"))]
+    #[test_case(Rule::QuotedFStringValue, Path::new("B907.py"))]
     #[test_case(Rule::LoopIteratorMutation, Path::new("B909.py"))]
     #[test_case(Rule::MutableContextvarDefault, Path::new("B039.py"))]
     #[test_case(Rule::BatchedWithoutExplicitStrict, Path::new("B911.py"))]
