@@ -1700,6 +1700,63 @@ fn check_conda_prefix_var_to_resolve_path() -> anyhow::Result<()> {
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
+
+    Ok(())
+}
+
+#[test]
+fn config_file_override() -> anyhow::Result<()> {
+    // Set `error-on-warning` to true in the configuration file
+    // Explicitly set `--warn unresolved-reference` to ensure the rule warns instead of errors
+    let case = TestCase::with_files(vec![
+        ("test.py", r"print(x)  # [unresolved-reference]"),
+        (
+            "ty-override.toml",
+            r#"
+            [terminal]
+            error-on-warning = true
+            "#,
+        ),
+    ])?;
+
+    // Ensure flag works via CLI arg
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config-file").arg("ty-override.toml"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       ^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // Ensure the flag works via an environment variable
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").env("TY_CONFIG_FILE", "ty-override.toml"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       ^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
     Ok(())
 }
 
