@@ -3,6 +3,7 @@ use log::debug;
 
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::registry::AsRule;
 use crate::violation::Violation;
 use crate::{Fix, codes::Rule};
 
@@ -79,6 +80,12 @@ impl Diagnostic {
     #[inline]
     pub fn set_parent(&mut self, parent: TextSize) {
         self.parent = Some(parent);
+    }
+}
+
+impl AsRule for Diagnostic {
+    fn rule(&self) -> Rule {
+        self.rule
     }
 }
 

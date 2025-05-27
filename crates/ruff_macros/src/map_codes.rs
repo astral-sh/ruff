@@ -463,18 +463,6 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
                 match self { #rule_fixable_match_arms }
             }
         }
-
-        impl AsRule for crate::Diagnostic {
-            fn rule(&self) -> Rule {
-                self.rule
-            }
-        }
-
-        impl ::std::fmt::Display for Rule {
-            fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-                f.write_str(self.into())
-            }
-        }
     }
 }
 
