@@ -144,14 +144,10 @@ impl AlwaysFixableViolation for TrueFalseComparison {
                 )
             }
             (false, EqCmpOp::Eq) => {
-                format!(
-                    "Avoid equality comparisons to `False`; use `not {cond}:` for false checks"
-                )
+                format!("Avoid equality comparisons to `False`; use `not {cond}:` for false checks")
             }
             (false, EqCmpOp::NotEq) => {
-                format!(
-                    "Avoid inequality comparisons to `False`; use `{cond}:` for truth checks"
-                )
+                format!("Avoid inequality comparisons to `False`; use `{cond}:` for truth checks")
             }
         }
     }
