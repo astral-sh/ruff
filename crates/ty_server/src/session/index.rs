@@ -34,7 +34,6 @@ impl Index {
         }
     }
 
-    #[expect(dead_code)]
     pub(super) fn text_document_urls(&self) -> impl Iterator<Item = &Url> + '_ {
         self.documents
             .iter()

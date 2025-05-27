@@ -46,6 +46,7 @@ pub struct Session {
 
     /// The global position encoding, negotiated during LSP initialization.
     position_encoding: PositionEncoding,
+
     /// Tracks what LSP features the client supports and doesn't support.
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
 }
@@ -147,6 +148,11 @@ impl Session {
             document_ref: self.index().make_document_ref(key)?,
             position_encoding: self.position_encoding,
         })
+    }
+
+    /// Iterates over the LSP URLs for all open text documents. These URLs are valid file paths.
+    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = &Url> + '_ {
+        self.index().text_document_urls()
     }
 
     /// Registers a notebook document at the provided `url`.

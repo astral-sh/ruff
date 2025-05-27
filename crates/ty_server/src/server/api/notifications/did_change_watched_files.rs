@@ -1,5 +1,6 @@
 use crate::server::Result;
 use crate::server::api::LSPResult;
+use crate::server::api::diagnostics::publish_diagnostics_for_document;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::server::client::{Notifier, Requester};
 use crate::server::schedule::Task;
@@ -20,11 +21,14 @@ impl NotificationHandler for DidChangeWatchedFiles {
 impl SyncNotificationHandler for DidChangeWatchedFiles {
     fn run(
         session: &mut Session,
-        _notifier: Notifier,
+        notifier: Notifier,
         requester: &mut Requester,
         params: types::DidChangeWatchedFilesParams,
     ) -> Result<()> {
         let mut events_by_db: FxHashMap<_, Vec<ChangeEvent>> = FxHashMap::default();
+
+        // Keep track of whether there are any changes for configuration files
+        let mut config_file_changed = false;
 
         for change in params.changes {
             let path = match url_to_any_system_path(&change.uri) {
@@ -52,6 +56,13 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                 );
                 continue;
             };
+
+            if !system_path
+                .extension()
+                .is_some_and(|ext| matches!(ext, "py" | "pyi" | "ipynb"))
+            {
+                config_file_changed = true;
+            }
 
             let change_event = match change.typ {
                 FileChangeType::CREATED => ChangeEvent::Created {
@@ -94,10 +105,28 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
 
         let client_capabilities = session.client_capabilities();
 
-        if client_capabilities.diagnostics_refresh {
-            requester
-                .request::<types::request::WorkspaceDiagnosticRefresh>((), |()| Task::nothing())
-                .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+        if config_file_changed {
+            if client_capabilities.diagnostics_refresh {
+                requester
+                    .request::<types::request::WorkspaceDiagnosticRefresh>((), |()| Task::nothing())
+                    .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+            } else {
+                for url in session.text_document_urls() {
+                    let Ok(path) = url_to_any_system_path(url) else {
+                        continue;
+                    };
+                    let snapshot = session.take_snapshot(url.clone()).unwrap_or_else(|| {
+                        panic!("Snapshot should be available for an open text document at `{url}`");
+                    });
+                    publish_diagnostics_for_document(
+                        session.project_db_or_default(&path),
+                        &snapshot,
+                        &notifier,
+                    )?;
+                }
+            }
+
+            // TODO: always publish diagnostics for notebook files (since they don't use pull diagnostics)
         }
 
         if client_capabilities.inlay_refresh {
