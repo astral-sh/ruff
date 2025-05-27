@@ -4,6 +4,7 @@ use std::iter::FusedIterator;
 use std::str::Split;
 
 use compact_str::format_compact;
+use indexmap::IndexSet;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath, FileRootKind};
@@ -289,7 +290,7 @@ impl SearchPaths {
                             virtual_env_path,
                             error
                         );
-                        vec![]
+                        IndexSet::default()
                     };
 
                     match PythonEnvironment::new(
@@ -304,7 +305,7 @@ impl SearchPaths {
                     }
                 } else {
                     tracing::debug!("No virtual environment found");
-                    vec![]
+                    IndexSet::default()
                 }
             }
 
