@@ -29,7 +29,7 @@ pub(crate) use self::infer::{
     infer_scope_types,
 };
 pub(crate) use self::narrow::ClassInfoConstraintFunction;
-pub(crate) use self::signatures::{CallableSignature, Signature, Signatures};
+pub(crate) use self::signatures::{CallableSignature, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, file_to_module, resolve_module};
@@ -41,7 +41,7 @@ use crate::suppression::check_suppressions;
 use crate::symbol::{
     Boundness, Symbol, SymbolAndQualifiers, imported_symbol, symbol_from_bindings,
 };
-use crate::types::call::{Bindings, CallArgumentTypes, CallableBinding};
+use crate::types::call::{Binding, Bindings, CallArgumentTypes, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
@@ -3513,28 +3513,27 @@ impl<'db> Type<'db> {
         non_negative_int_literal(db, return_ty)
     }
 
-    /// Returns the call signatures of a type.
+    /// Returns an empty [`Bindings`] that can be used to analyze a call to this type.
     ///
-    /// Note that all types have a valid [`Signatures`], even if the type is not callable.
+    /// Note that all types have valid [`Signatures`] and [`Bindings`], even if the type is not callable.
     /// Moreover, "callable" can be subtle for a union type, since some union elements might be
     /// callable and some not. A union is callable if every element type is callable — and even
     /// then, the elements might be inconsistent, such that there's no argument list that's valid
     /// for all elements. It's usually best to only worry about "callability" relative to a
     /// particular argument list, via [`try_call`][Self::try_call] and
     /// [`CallErrorKind::NotCallable`].
-    fn signatures(self, db: &'db dyn Db) -> Signatures<'db> {
+    fn bindings(self, db: &'db dyn Db) -> Bindings<'db> {
         match self {
-            Type::Callable(callable) => Signatures::single(match callable.signatures(db) {
-                [signature] => CallableSignature::single(self, signature.clone()),
-                signatures => CallableSignature::from_overloads(self, signatures.iter().cloned()),
-            }),
+            Type::Callable(callable) => {
+                CallableBinding::from_overloads(self, callable.signatures(db).iter().cloned())
+                    .into()
+            }
 
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
-                Signatures::single(
-                    CallableSignature::from_overloads(self, signature.overloads.iter().cloned())
-                        .with_bound_type(bound_method.self_instance(db)),
-                )
+                CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
+                    .with_bound_type(bound_method.self_instance(db))
+                    .into()
             }
 
             Type::MethodWrapper(
@@ -3558,7 +3557,7 @@ impl<'db> Type<'db> {
                 // specified yet, they will be dynamically added in `Bindings::evaluate_known_cases`.
 
                 let not_none = Type::none(db).negate(db);
-                let signature = CallableSignature::from_overloads(
+                CallableBinding::from_overloads(
                     self,
                     [
                         Signature::new(
@@ -3584,8 +3583,8 @@ impl<'db> Type<'db> {
                             None,
                         ),
                     ],
-                );
-                Signatures::single(signature)
+                )
+                .into()
             }
 
             Type::WrapperDescriptor(
@@ -3611,7 +3610,7 @@ impl<'db> Type<'db> {
                         unreachable!("Not part of outer match pattern")
                     }
                 };
-                let signature = CallableSignature::from_overloads(
+                CallableBinding::from_overloads(
                     self,
                     [
                         Signature::new(
@@ -3641,86 +3640,85 @@ impl<'db> Type<'db> {
                             None,
                         ),
                     ],
-                );
-                Signatures::single(signature)
+                )
+                .into()
             }
 
-            Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(_)) => {
-                Signatures::single(CallableSignature::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("instance")))
-                                .with_annotated_type(Type::object(db)),
-                            Parameter::positional_only(Some(Name::new_static("value")))
-                                .with_annotated_type(Type::object(db)),
-                        ]),
-                        None,
-                    ),
-                ))
-            }
-            Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderSet) => {
-                Signatures::single(CallableSignature::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("self")))
-                                .with_annotated_type(KnownClass::Property.to_instance(db)),
-                            Parameter::positional_only(Some(Name::new_static("instance")))
-                                .with_annotated_type(Type::object(db)),
-                            Parameter::positional_only(Some(Name::new_static("value")))
-                                .with_annotated_type(Type::object(db)),
-                        ]),
-                        None,
-                    ),
-                ))
-            }
+            Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(_)) => Binding::single(
+                self,
+                Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("instance")))
+                            .with_annotated_type(Type::object(db)),
+                        Parameter::positional_only(Some(Name::new_static("value")))
+                            .with_annotated_type(Type::object(db)),
+                    ]),
+                    None,
+                ),
+            )
+            .into(),
 
-            Type::MethodWrapper(MethodWrapperKind::StrStartswith(_)) => {
-                Signatures::single(CallableSignature::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("prefix")))
-                                .with_annotated_type(UnionType::from_elements(
-                                    db,
-                                    [
-                                        KnownClass::Str.to_instance(db),
-                                        KnownClass::Tuple.to_specialized_instance(
-                                            db,
-                                            [KnownClass::Str.to_instance(db)],
-                                        ),
-                                    ],
-                                )),
-                            Parameter::positional_only(Some(Name::new_static("start")))
-                                .with_annotated_type(UnionType::from_elements(
-                                    db,
-                                    [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
-                                ))
-                                .with_default_type(Type::none(db)),
-                            Parameter::positional_only(Some(Name::new_static("end")))
-                                .with_annotated_type(UnionType::from_elements(
-                                    db,
-                                    [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
-                                ))
-                                .with_default_type(Type::none(db)),
-                        ]),
-                        Some(KnownClass::Bool.to_instance(db)),
-                    ),
-                ))
-            }
+            Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderSet) => Binding::single(
+                self,
+                Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(KnownClass::Property.to_instance(db)),
+                        Parameter::positional_only(Some(Name::new_static("instance")))
+                            .with_annotated_type(Type::object(db)),
+                        Parameter::positional_only(Some(Name::new_static("value")))
+                            .with_annotated_type(Type::object(db)),
+                    ]),
+                    None,
+                ),
+            )
+            .into(),
+
+            Type::MethodWrapper(MethodWrapperKind::StrStartswith(_)) => Binding::single(
+                self,
+                Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("prefix")))
+                            .with_annotated_type(UnionType::from_elements(
+                                db,
+                                [
+                                    KnownClass::Str.to_instance(db),
+                                    KnownClass::Tuple.to_specialized_instance(
+                                        db,
+                                        [KnownClass::Str.to_instance(db)],
+                                    ),
+                                ],
+                            )),
+                        Parameter::positional_only(Some(Name::new_static("start")))
+                            .with_annotated_type(UnionType::from_elements(
+                                db,
+                                [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                            ))
+                            .with_default_type(Type::none(db)),
+                        Parameter::positional_only(Some(Name::new_static("end")))
+                            .with_annotated_type(UnionType::from_elements(
+                                db,
+                                [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                            ))
+                            .with_default_type(Type::none(db)),
+                    ]),
+                    Some(KnownClass::Bool.to_instance(db)),
+                ),
+            )
+            .into(),
 
             // TODO: We should probably also check the original return type of the function
             // that was decorated with `@dataclass_transform`, to see if it is consistent with
             // with what we configure here.
-            Type::DataclassTransformer(_) => Signatures::single(CallableSignature::single(
+            Type::DataclassTransformer(_) => Binding::single(
                 self,
                 Signature::new(
                     Parameters::new([Parameter::positional_only(Some(Name::new_static("func")))
                         .with_annotated_type(Type::object(db))]),
                     None,
                 ),
-            )),
+            )
+            .into(),
 
             Type::FunctionLiteral(function_type) => match function_type.known(db) {
                 Some(
@@ -3729,62 +3727,54 @@ impl<'db> Type<'db> {
                     | KnownFunction::IsAssignableTo
                     | KnownFunction::IsDisjointFrom
                     | KnownFunction::IsGradualEquivalentTo,
-                ) => {
-                    let signature = CallableSignature::single(
-                        self,
-                        Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("a")))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                                Parameter::positional_only(Some(Name::new_static("b")))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                            ]),
-                            Some(KnownClass::Bool.to_instance(db)),
-                        ),
-                    );
-                    Signatures::single(signature)
-                }
+                ) => Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("a")))
+                                .type_form()
+                                .with_annotated_type(Type::any()),
+                            Parameter::positional_only(Some(Name::new_static("b")))
+                                .type_form()
+                                .with_annotated_type(Type::any()),
+                        ]),
+                        Some(KnownClass::Bool.to_instance(db)),
+                    ),
+                )
+                .into(),
 
                 Some(
                     KnownFunction::IsFullyStatic
                     | KnownFunction::IsSingleton
                     | KnownFunction::IsSingleValued,
-                ) => {
-                    let signature = CallableSignature::single(
-                        self,
-                        Signature::new(
-                            Parameters::new([Parameter::positional_only(Some(Name::new_static(
-                                "a",
-                            )))
+                ) => Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new([Parameter::positional_only(Some(Name::new_static("a")))
                             .type_form()
                             .with_annotated_type(Type::any())]),
-                            Some(KnownClass::Bool.to_instance(db)),
-                        ),
-                    );
-                    Signatures::single(signature)
-                }
+                        Some(KnownClass::Bool.to_instance(db)),
+                    ),
+                )
+                .into(),
 
-                Some(KnownFunction::AssertType) => {
-                    let signature = CallableSignature::single(
-                        self,
-                        Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("value")))
-                                    .with_annotated_type(Type::any()),
-                                Parameter::positional_only(Some(Name::new_static("type")))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                            ]),
-                            Some(Type::none(db)),
-                        ),
-                    );
-                    Signatures::single(signature)
-                }
+                Some(KnownFunction::AssertType) => Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("value")))
+                                .with_annotated_type(Type::any()),
+                            Parameter::positional_only(Some(Name::new_static("type")))
+                                .type_form()
+                                .with_annotated_type(Type::any()),
+                        ]),
+                        Some(Type::none(db)),
+                    ),
+                )
+                .into(),
 
                 Some(KnownFunction::AssertNever) => {
-                    let signature = CallableSignature::single(
+                    Binding::single(
                         self,
                         Signature::new(
                             Parameters::new([Parameter::positional_only(Some(Name::new_static(
@@ -3797,29 +3787,27 @@ impl<'db> Type<'db> {
                             .with_annotated_type(Type::any())]),
                             Some(Type::none(db)),
                         ),
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
-                Some(KnownFunction::Cast) => {
-                    let signature = CallableSignature::single(
-                        self,
-                        Signature::new(
-                            Parameters::new([
-                                Parameter::positional_or_keyword(Name::new_static("typ"))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                                Parameter::positional_or_keyword(Name::new_static("val"))
-                                    .with_annotated_type(Type::any()),
-                            ]),
-                            Some(Type::any()),
-                        ),
-                    );
-                    Signatures::single(signature)
-                }
+                Some(KnownFunction::Cast) => Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_or_keyword(Name::new_static("typ"))
+                                .type_form()
+                                .with_annotated_type(Type::any()),
+                            Parameter::positional_or_keyword(Name::new_static("val"))
+                                .with_annotated_type(Type::any()),
+                        ]),
+                        Some(Type::any()),
+                    ),
+                )
+                .into(),
 
                 Some(KnownFunction::Dataclass) => {
-                    let signature = CallableSignature::from_overloads(
+                    CallableBinding::from_overloads(
                         self,
                         [
                             // def dataclass(cls: None, /) -> Callable[[type[_T]], type[_T]]: ...
@@ -3889,12 +3877,15 @@ impl<'db> Type<'db> {
                                 None,
                             ),
                         ],
-                    );
-
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
-                _ => Signatures::single(function_type.signature(db).overloads.clone()),
+                _ => CallableBinding::from_overloads(
+                    self,
+                    function_type.signature(db).overloads.iter().cloned(),
+                )
+                .into(),
             },
 
             Type::ClassLiteral(class) => match class.known(db) {
@@ -3909,7 +3900,7 @@ impl<'db> Type<'db> {
                     // class bool(int):
                     //     def __new__(cls, o: object = ..., /) -> Self: ...
                     // ```
-                    let signature = CallableSignature::single(
+                    Binding::single(
                         self,
                         Signature::new(
                             Parameters::new([Parameter::positional_only(Some(Name::new_static(
@@ -3919,8 +3910,8 @@ impl<'db> Type<'db> {
                             .with_default_type(Type::BooleanLiteral(false))]),
                             Some(KnownClass::Bool.to_instance(db)),
                         ),
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
                 Some(KnownClass::Str) => {
@@ -3931,7 +3922,7 @@ impl<'db> Type<'db> {
                     //     @overload
                     //     def __new__(cls, object: ReadableBuffer, encoding: str = ..., errors: str = ...) -> Self: ...
                     // ```
-                    let signature = CallableSignature::from_overloads(
+                    CallableBinding::from_overloads(
                         self,
                         [
                             Signature::new(
@@ -3964,8 +3955,8 @@ impl<'db> Type<'db> {
                                 Some(KnownClass::Str.to_instance(db)),
                             ),
                         ],
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
                 Some(KnownClass::Type) => {
@@ -3979,7 +3970,7 @@ impl<'db> Type<'db> {
                     //     @overload
                     //     def __init__(self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None: ...
                     // ```
-                    let signature = CallableSignature::from_overloads(
+                    CallableBinding::from_overloads(
                         self,
                         [
                             Signature::new(
@@ -4009,29 +4000,32 @@ impl<'db> Type<'db> {
                                 Some(type_instance),
                             ),
                         ],
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
+
                 Some(KnownClass::NamedTuple) => {
-                    Signatures::single(CallableSignature::todo("functional `NamedTuple` syntax"))
+                    Binding::single(self, Signature::todo("functional `NamedTuple` syntax")).into()
                 }
+
                 Some(KnownClass::Object) => {
                     // ```py
                     // class object:
                     //    def __init__(self) -> None: ...
                     //    def __new__(cls) -> Self: ...
                     // ```
-                    let signature = CallableSignature::from_overloads(
+                    Binding::single(
                         self,
-                        [Signature::new(
+                        Signature::new(
                             Parameters::empty(),
                             Some(KnownClass::Object.to_instance(db)),
-                        )],
-                    );
-                    Signatures::single(signature)
+                        ),
+                    )
+                    .into()
                 }
+
                 Some(KnownClass::Enum) => {
-                    Signatures::single(CallableSignature::todo("functional `Enum` syntax"))
+                    Binding::single(self, Signature::todo("functional `Enum` syntax")).into()
                 }
 
                 Some(KnownClass::Super) => {
@@ -4044,7 +4038,7 @@ impl<'db> Type<'db> {
                     //     @overload
                     //     def __init__(self) -> None: ...
                     // ```
-                    let signature = CallableSignature::from_overloads(
+                    CallableBinding::from_overloads(
                         self,
                         [
                             Signature::new(
@@ -4068,8 +4062,8 @@ impl<'db> Type<'db> {
                                 Some(KnownClass::Super.to_instance(db)),
                             ),
                         ],
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
                 Some(KnownClass::TypeVar) => {
@@ -4086,7 +4080,7 @@ impl<'db> Type<'db> {
                     //         default: Any = ...,
                     //     ) -> Self: ...
                     // ```
-                    let signature = CallableSignature::single(
+                    Binding::single(
                         self,
                         Signature::new(
                             Parameters::new([
@@ -4118,8 +4112,8 @@ impl<'db> Type<'db> {
                             ]),
                             Some(KnownClass::TypeVar.to_instance(db)),
                         ),
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
                 Some(KnownClass::TypeAliasType) => {
@@ -4132,7 +4126,7 @@ impl<'db> Type<'db> {
                     //     type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()
                     // ) -> Self: ...
                     // ```
-                    let signature = CallableSignature::single(
+                    Binding::single(
                         self,
                         Signature::new(
                             Parameters::new([
@@ -4157,8 +4151,8 @@ impl<'db> Type<'db> {
                             ]),
                             None,
                         ),
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
                 Some(KnownClass::Property) => {
@@ -4182,7 +4176,7 @@ impl<'db> Type<'db> {
                         Some(Type::any()),
                     );
 
-                    let signature = CallableSignature::single(
+                    Binding::single(
                         self,
                         Signature::new(
                             Parameters::new([
@@ -4231,8 +4225,8 @@ impl<'db> Type<'db> {
                             ]),
                             None,
                         ),
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
                 // Most class literal constructor calls are handled by `try_call_constructor` and
@@ -4240,21 +4234,19 @@ impl<'db> Type<'db> {
                 // cases (e.g. evaluating callable subtyping). TODO improve this definition
                 // (intersection of `__new__` and `__init__` signatures? and respect metaclass
                 // `__call__`).
-                _ => {
-                    let signature = CallableSignature::single(
-                        self,
-                        Signature::new_generic(
-                            class.generic_context(db),
-                            Parameters::gradual_form(),
-                            self.to_instance(db),
-                        ),
-                    );
-                    Signatures::single(signature)
-                }
+                _ => Binding::single(
+                    self,
+                    Signature::new_generic(
+                        class.generic_context(db),
+                        Parameters::gradual_form(),
+                        self.to_instance(db),
+                    ),
+                )
+                .into(),
             },
 
             Type::KnownInstance(KnownInstanceType::TypedDict) => {
-                Signatures::single(CallableSignature::single(
+                Binding::single(
                     self,
                     Signature::new(
                         Parameters::new([
@@ -4272,28 +4264,28 @@ impl<'db> Type<'db> {
                         ]),
                         None,
                     ),
-                ))
+                )
+                .into()
             }
 
             Type::GenericAlias(_) => {
                 // TODO annotated return type on `__new__` or metaclass `__call__`
                 // TODO check call vs signatures of `__new__` and/or `__init__`
-                let signature = CallableSignature::single(
+                Binding::single(
                     self,
                     Signature::new(Parameters::gradual_form(), self.to_instance(db)),
-                );
-                Signatures::single(signature)
+                )
+                .into()
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                SubclassOfInner::Dynamic(dynamic_type) => {
-                    Type::Dynamic(dynamic_type).signatures(db)
-                }
+                SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type).bindings(db),
+
                 // Most type[] constructor calls are handled by `try_call_constructor` and not via
                 // getting the signature here. This signature can still be used in some cases (e.g.
                 // evaluating callable subtyping). TODO improve this definition (intersection of
                 // `__new__` and `__init__` signatures? and respect metaclass `__call__`).
-                SubclassOfInner::Class(class) => Type::from(class).signatures(db),
+                SubclassOfInner::Class(class) => Type::from(class).bindings(db),
             },
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
@@ -4311,39 +4303,43 @@ impl<'db> Type<'db> {
                     .symbol
                 {
                     Symbol::Type(dunder_callable, boundness) => {
-                        let mut signatures = dunder_callable.signatures(db).clone();
-                        signatures.replace_callable_type(dunder_callable, self);
+                        let mut bindings = dunder_callable.bindings(db);
+                        bindings.replace_callable_type(dunder_callable, self);
                         if boundness == Boundness::PossiblyUnbound {
-                            signatures.set_dunder_call_is_possibly_unbound();
+                            bindings.set_dunder_call_is_possibly_unbound();
                         }
-                        signatures
+                        bindings
                     }
-                    Symbol::Unbound => Signatures::not_callable(self),
+                    Symbol::Unbound => CallableBinding::not_callable(self).into(),
                 }
             }
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
-            Type::Dynamic(_) | Type::Never => Signatures::single(CallableSignature::dynamic(self)),
+            Type::Dynamic(_) | Type::Never => {
+                Binding::single(self, Signature::dynamic(self)).into()
+            }
 
             // Note that this correctly returns `None` if none of the union elements are callable.
-            Type::Union(union) => Signatures::from_union(
+            Type::Union(union) => Bindings::from_union(
                 self,
                 union
                     .elements(db)
                     .iter()
-                    .map(|element| element.signatures(db)),
+                    .map(|element| element.bindings(db)),
             ),
 
             Type::Intersection(_) => {
-                Signatures::single(CallableSignature::todo("Type::Intersection.call()"))
+                Binding::single(self, Signature::todo("Type::Intersection.call()")).into()
             }
 
             // TODO: these are actually callable
-            Type::MethodWrapper(_) | Type::DataclassDecorator(_) => Signatures::not_callable(self),
+            Type::MethodWrapper(_) | Type::DataclassDecorator(_) => {
+                CallableBinding::not_callable(self).into()
+            }
 
             // TODO: some `KnownInstance`s are callable (e.g. TypedDicts)
-            Type::KnownInstance(_) => Signatures::not_callable(self),
+            Type::KnownInstance(_) => CallableBinding::not_callable(self).into(),
 
             Type::PropertyInstance(_)
             | Type::AlwaysFalsy
@@ -4356,7 +4352,7 @@ impl<'db> Type<'db> {
             | Type::Tuple(_)
             | Type::BoundSuper(_)
             | Type::TypeVar(_)
-            | Type::ModuleLiteral(_) => Signatures::not_callable(self),
+            | Type::ModuleLiteral(_) => CallableBinding::not_callable(self).into(),
         }
     }
 
@@ -4371,8 +4367,9 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         argument_types: &CallArgumentTypes<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
-        let signatures = self.signatures(db);
-        Bindings::match_parameters(signatures, argument_types).check_types(db, argument_types)
+        self.bindings(db)
+            .match_parameters(argument_types)
+            .check_types(db, argument_types)
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -4418,8 +4415,9 @@ impl<'db> Type<'db> {
             .symbol
         {
             Symbol::Type(dunder_callable, boundness) => {
-                let signatures = dunder_callable.signatures(db);
-                let bindings = Bindings::match_parameters(signatures, argument_types)
+                let bindings = dunder_callable
+                    .bindings(db)
+                    .match_parameters(argument_types)
                     .check_types(db, argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
@@ -6860,7 +6858,7 @@ impl<'db> FunctionSignature<'db> {
     /// Returns the "bottom" signature (subtype of all fully-static signatures.)
     pub(crate) fn bottom(db: &'db dyn Db) -> Self {
         FunctionSignature {
-            overloads: CallableSignature::single(Type::any(), Signature::bottom(db)),
+            overloads: CallableSignature::single(Signature::bottom(db)),
             implementation: None,
         }
     }
@@ -7008,7 +7006,6 @@ impl<'db> FunctionType<'db> {
         if let Some(overloaded) = self.to_overloaded(db) {
             FunctionSignature {
                 overloads: CallableSignature::from_overloads(
-                    Type::FunctionLiteral(self),
                     overloaded.overloads.iter().copied().map(|overload| {
                         type_mappings.iter().fold(
                             overload.internal_signature(db, inherited_generic_context),
@@ -7025,13 +7022,10 @@ impl<'db> FunctionType<'db> {
             }
         } else {
             FunctionSignature {
-                overloads: CallableSignature::single(
-                    Type::FunctionLiteral(self),
-                    type_mappings.iter().fold(
-                        self.internal_signature(db, inherited_generic_context),
-                        |ty, mapping| ty.apply_type_mapping(db, mapping),
-                    ),
-                ),
+                overloads: CallableSignature::single(type_mappings.iter().fold(
+                    self.internal_signature(db, inherited_generic_context),
+                    |ty, mapping| ty.apply_type_mapping(db, mapping),
+                )),
                 implementation: None,
             }
         }

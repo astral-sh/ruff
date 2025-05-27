@@ -25,68 +25,12 @@ use ruff_python_ast::{self as ast, name::Name};
 /// The signature of a possible union of callables.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) struct Signatures<'db> {
-    /// The type that is (hopefully) callable.
-    pub(crate) callable_type: Type<'db>,
-    /// The type we'll use for error messages referring to details of the called signature. For calls to functions this
-    /// will be the same as `callable_type`; for other callable instances it may be a `__call__` method.
-    pub(crate) signature_type: Type<'db>,
-    /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a non-union
-    /// type.
     elements: SmallVec<[CallableSignature<'db>; 1]>,
 }
 
 impl<'db> Signatures<'db> {
-    pub(crate) fn not_callable(signature_type: Type<'db>) -> Self {
-        Self {
-            callable_type: signature_type,
-            signature_type,
-            elements: smallvec![CallableSignature::not_callable(signature_type)],
-        }
-    }
-
-    pub(crate) fn single(signature: CallableSignature<'db>) -> Self {
-        Self {
-            callable_type: signature.callable_type,
-            signature_type: signature.signature_type,
-            elements: smallvec![signature],
-        }
-    }
-
-    /// Creates a new `Signatures` from an iterator of [`Signature`]s. Panics if the iterator is
-    /// empty.
-    pub(crate) fn from_union<I>(signature_type: Type<'db>, elements: I) -> Self
-    where
-        I: IntoIterator<Item = Signatures<'db>>,
-    {
-        let elements: SmallVec<_> = elements
-            .into_iter()
-            .flat_map(|s| s.elements.into_iter())
-            .collect();
-        assert!(!elements.is_empty());
-        Self {
-            callable_type: signature_type,
-            signature_type,
-            elements,
-        }
-    }
-
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, CallableSignature<'db>> {
         self.elements.iter()
-    }
-
-    pub(crate) fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
-        if self.callable_type == before {
-            self.callable_type = after;
-        }
-        for signature in &mut self.elements {
-            signature.replace_callable_type(before, after);
-        }
-    }
-
-    pub(crate) fn set_dunder_call_is_possibly_unbound(&mut self) {
-        for signature in &mut self.elements {
-            signature.dunder_call_is_possibly_unbound = true;
-        }
     }
 }
 
@@ -103,92 +47,27 @@ impl<'a, 'db> IntoIterator for &'a Signatures<'db> {
 /// [`Signature`] for each overload.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) struct CallableSignature<'db> {
-    /// The type that is (hopefully) callable.
-    pub(crate) callable_type: Type<'db>,
-
-    /// The type we'll use for error messages referring to details of the called signature. For
-    /// calls to functions this will be the same as `callable_type`; for other callable instances
-    /// it may be a `__call__` method.
-    pub(crate) signature_type: Type<'db>,
-
-    /// If this is a callable object (i.e. called via a `__call__` method), the boundness of
-    /// that call method.
-    pub(crate) dunder_call_is_possibly_unbound: bool,
-
-    /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
-    pub(crate) bound_type: Option<Type<'db>>,
-
     /// The signatures of each overload of this callable. Will be empty if the type is not
     /// callable.
-    ///
-    /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a
-    /// non-overloaded callable.
     pub(crate) overloads: SmallVec<[Signature<'db>; 1]>,
 }
 
 impl<'db> CallableSignature<'db> {
-    pub(crate) fn not_callable(signature_type: Type<'db>) -> Self {
+    pub(crate) fn single(signature: Signature<'db>) -> Self {
         Self {
-            callable_type: signature_type,
-            signature_type,
-            dunder_call_is_possibly_unbound: false,
-            bound_type: None,
-            overloads: smallvec![],
-        }
-    }
-
-    pub(crate) fn single(signature_type: Type<'db>, signature: Signature<'db>) -> Self {
-        Self {
-            callable_type: signature_type,
-            signature_type,
-            dunder_call_is_possibly_unbound: false,
-            bound_type: None,
             overloads: smallvec![signature],
         }
     }
 
     /// Creates a new `CallableSignature` from an iterator of [`Signature`]s. Returns a
     /// non-callable signature if the iterator is empty.
-    pub(crate) fn from_overloads<I>(signature_type: Type<'db>, overloads: I) -> Self
+    pub(crate) fn from_overloads<I>(overloads: I) -> Self
     where
         I: IntoIterator<Item = Signature<'db>>,
     {
         Self {
-            callable_type: signature_type,
-            signature_type,
-            dunder_call_is_possibly_unbound: false,
-            bound_type: None,
             overloads: overloads.into_iter().collect(),
         }
-    }
-
-    /// Return a signature for a dynamic callable
-    pub(crate) fn dynamic(signature_type: Type<'db>) -> Self {
-        let signature = Signature {
-            generic_context: None,
-            inherited_generic_context: None,
-            parameters: Parameters::gradual_form(),
-            return_ty: Some(signature_type),
-        };
-        Self::single(signature_type, signature)
-    }
-
-    /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
-    #[allow(unused_variables)] // 'reason' only unused in debug builds
-    pub(crate) fn todo(reason: &'static str) -> Self {
-        let signature_type = todo_type!(reason);
-        let signature = Signature {
-            generic_context: None,
-            inherited_generic_context: None,
-            parameters: Parameters::todo(),
-            return_ty: Some(signature_type),
-        };
-        Self::single(signature_type, signature)
-    }
-
-    pub(crate) fn with_bound_type(mut self, bound_type: Type<'db>) -> Self {
-        self.bound_type = Some(bound_type);
-        self
     }
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Signature<'db>> {
@@ -197,12 +76,6 @@ impl<'db> CallableSignature<'db> {
 
     pub(crate) fn as_slice(&self) -> &[Signature<'db>] {
         self.overloads.as_slice()
-    }
-
-    fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
-        if self.callable_type == before {
-            self.callable_type = after;
-        }
     }
 }
 
@@ -260,6 +133,28 @@ impl<'db> Signature<'db> {
             inherited_generic_context: None,
             parameters,
             return_ty,
+        }
+    }
+
+    /// Return a signature for a dynamic callable
+    pub(crate) fn dynamic(signature_type: Type<'db>) -> Self {
+        Signature {
+            generic_context: None,
+            inherited_generic_context: None,
+            parameters: Parameters::gradual_form(),
+            return_ty: Some(signature_type),
+        }
+    }
+
+    /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
+    #[allow(unused_variables)] // 'reason' only unused in debug builds
+    pub(crate) fn todo(reason: &'static str) -> Self {
+        let signature_type = todo_type!(reason);
+        Signature {
+            generic_context: None,
+            inherited_generic_context: None,
+            parameters: Parameters::todo(),
+            return_ty: Some(signature_type),
         }
     }
 
@@ -1750,7 +1645,7 @@ mod tests {
         assert_eq!(
             func.signature(&db),
             &FunctionSignature {
-                overloads: CallableSignature::single(Type::FunctionLiteral(func), expected_sig),
+                overloads: CallableSignature::single(expected_sig),
                 implementation: None
             },
         );
