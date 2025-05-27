@@ -3093,6 +3093,11 @@ impl std::ops::DerefMut for DiagnosticGuard<'_, '_> {
 
 impl Drop for DiagnosticGuard<'_, '_> {
     fn drop(&mut self) {
+        if std::thread::panicking() {
+            // Don't submit diagnostics when panicking because they might be incomplete.
+            return;
+        }
+
         if let Some(diagnostic) = self.diagnostic.take() {
             self.checker.diagnostics.borrow_mut().push(diagnostic);
         }
