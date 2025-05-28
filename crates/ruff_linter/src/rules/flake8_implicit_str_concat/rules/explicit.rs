@@ -4,7 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 
@@ -87,27 +87,24 @@ pub(crate) fn explicit(expr: &Expr, checker: &Checker) -> Option<Diagnostic> {
 
 fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Fix {
     let ast::ExprBinOp { left, right, .. } = expr_bin_op;
+
     let between_operands_range = TextRange::new(left.end(), right.start());
     let between_operands = checker.locator().slice(between_operands_range);
-    let plus_pos = between_operands.find('+').unwrap();
-    let (before, after) = between_operands.split_at(plus_pos);
-    let after = &after[1..]; // Ignore `+` operator
+    let (before_plus, after_plus) = between_operands.split_once('+').unwrap();
 
-    let linebreak_before_operator = checker.locator().contains_line_break(TextRange::new(
-        left.end(),
-        left.end() + TextSize::try_from(plus_pos).unwrap(),
-    ));
+    let linebreak_before_operator =
+        before_plus.contains_line_break(TextRange::at(TextSize::new(0), before_plus.text_len()));
 
     // If removing `+` from first line trim trailing spaces
     // Preserve indentation when removing `+` from second line
-    let before = if linebreak_before_operator {
-        before
+    let before_plus = if linebreak_before_operator {
+        before_plus
     } else {
-        before.trim_end_matches(is_python_whitespace)
+        before_plus.trim_end_matches(is_python_whitespace)
     };
 
     Fix::safe_edit(Edit::range_replacement(
-        format!("{before}{after}"),
+        format!("{before_plus}{after_plus}"),
         between_operands_range,
     ))
 }
