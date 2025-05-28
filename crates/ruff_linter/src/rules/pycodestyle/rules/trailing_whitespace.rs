@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_index::Indexer;
 use ruff_source_file::Line;
@@ -7,6 +6,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use crate::Locator;
 use crate::registry::Rule;
 use crate::settings::LinterSettings;
+use crate::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for superfluous trailing whitespace.

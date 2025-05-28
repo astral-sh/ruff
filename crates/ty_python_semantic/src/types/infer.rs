@@ -108,13 +108,15 @@ use super::diagnostic::{
     report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
     report_unresolved_reference,
 };
-use super::generics::{GenericContextOrigin, LegacyGenericBase};
+use super::generics::LegacyGenericBase;
 use super::slots::check_class_slots;
 use super::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION, parse_string_annotation,
 };
 use super::subclass_of::SubclassOfInner;
-use super::{BoundSuperError, BoundSuperType, ClassBase};
+use super::{
+    BoundSuperError, BoundSuperType, ClassBase, add_inferred_python_version_hint_to_diagnostic,
+};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -856,6 +858,25 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                         continue;
                     }
+                    // Note that unlike several of the other errors caught in this function,
+                    // this does not lead to the class creation failing at runtime,
+                    // but it is semantically invalid.
+                    Type::KnownInstance(KnownInstanceType::Protocol(Some(_))) => {
+                        if class_node.type_params.is_none() {
+                            continue;
+                        }
+                        let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_GENERIC_CLASS, &class_node.bases()[i])
+                        else {
+                            continue;
+                        };
+                        builder.into_diagnostic(
+                            "Cannot both inherit from subscripted `Protocol` \
+                            and use PEP 695 type variables",
+                        );
+                        continue;
+                    }
                     Type::ClassLiteral(class) => class,
                     // dynamic/unknown bases are never `@final`
                     _ => continue,
@@ -917,13 +938,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                         {
                             builder.into_diagnostic(format_args!(
                                 "Cannot create a consistent method resolution order (MRO) \
-                                     for class `{}` with bases list `[{}]`",
+                                    for class `{}` with bases list `[{}]`",
                                 class.name(self.db()),
                                 bases_list
                                     .iter()
                                     .map(|base| base.display(self.db()))
                                     .join(", ")
                             ));
+                        }
+                    }
+                    MroErrorKind::Pep695ClassWithGenericInheritance => {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_GENERIC_CLASS, class_node)
+                        {
+                            builder.into_diagnostic(
+                                "Cannot both inherit from `typing.Generic` \
+                                and use PEP 695 type variables",
+                            );
                         }
                     }
                     MroErrorKind::InheritanceCycle => {
@@ -1018,21 +1049,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 ));
                             }
                         }
-                    }
-                }
-            }
-
-            // (5) Check that a generic class does not have invalid or conflicting generic
-            // contexts.
-            if class.pep695_generic_context(self.db()).is_some() {
-                if let Some(legacy_context) = class.legacy_generic_context(self.db()) {
-                    if let Some(builder) =
-                        self.context.report_lint(&INVALID_GENERIC_CLASS, class_node)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Cannot both inherit from {} and use PEP 695 type variables",
-                            legacy_context.origin(self.db())
-                        ));
                     }
                 }
             }
@@ -3231,8 +3247,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     )),
                                     value_ty,
                                 ]),
-                                MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                                    | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                             );
 
                             match result {
@@ -3406,24 +3421,31 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::ModuleLiteral(module) => {
                 if let Symbol::Type(attr_ty, _) = module.static_member(db, attribute) {
                     let assignable = value_ty.is_assignable_to(db, attr_ty);
-                    if !assignable {
-                        report_invalid_attribute_assignment(
-                            &self.context,
-                            target.into(),
-                            attr_ty,
-                            value_ty,
-                            attribute,
-                        );
+                    if assignable {
+                        true
+                    } else {
+                        if emit_diagnostics {
+                            report_invalid_attribute_assignment(
+                                &self.context,
+                                target.into(),
+                                attr_ty,
+                                value_ty,
+                                attribute,
+                            );
+                        }
+                        false
                     }
-
-                    false
                 } else {
-                    if let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target) {
-                        builder.into_diagnostic(format_args!(
-                            "Unresolved attribute `{}` on type `{}`.",
-                            attribute,
-                            object_ty.display(db)
-                        ));
+                    if emit_diagnostics {
+                        if let Some(builder) =
+                            self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Unresolved attribute `{}` on type `{}`.",
+                                attribute,
+                                object_ty.display(db)
+                            ));
+                        }
                     }
 
                     false
@@ -6009,7 +6031,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         diag.info(
                             "Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later",
                         );
-                        diagnostic::add_inferred_python_version_hint(db, diag);
+                        add_inferred_python_version_hint_to_diagnostic(db, &mut diag, "resolving types");
                     }
                 }
                 Type::unknown()
@@ -7622,7 +7644,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
                     {
                         builder.into_diagnostic(format_args!(
-                            "`{}` is not a valid argument to {origin}",
+                            "`{}` is not a valid argument to `{origin}`",
                             typevar.display(self.db()),
                         ));
                     }
@@ -7630,9 +7652,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             })
             .collect();
-        typevars.map(|typevars| {
-            GenericContext::new(self.db(), typevars, GenericContextOrigin::from(origin))
-        })
+        typevars.map(|typevars| GenericContext::new(self.db(), typevars))
     }
 
     fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {
@@ -8642,11 +8662,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                     element => Either::Right(std::iter::once(element)),
                 };
 
-                elements
+                let ty = elements
                     .fold(IntersectionBuilder::new(db), |builder, element| {
                         builder.add_positive(self.infer_type_expression(element))
                     })
-                    .build()
+                    .build();
+
+                if matches!(arguments_slice, ast::Expr::Tuple(_)) {
+                    self.store_expression_type(arguments_slice, ty);
+                }
+                ty
             }
             KnownInstanceType::TypeOf => match arguments_slice {
                 ast::Expr::Tuple(_) => {
@@ -8712,6 +8737,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::Callable(CallableType::from_overloads(
                         db,
                         std::iter::once(signature).chain(signature_iter),
+                        false,
                     ))
                 }
             },

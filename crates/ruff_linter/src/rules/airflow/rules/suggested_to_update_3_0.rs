@@ -3,7 +3,7 @@ use crate::importer::ImportRequest;
 use crate::rules::airflow::helpers::{
     Replacement, is_airflow_builtin_or_provider, is_guarded_by_try_except,
 };
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall, ExprName, name::QualifiedName};
 use ruff_python_semantic::Modules;
@@ -72,10 +72,10 @@ impl Violation for Airflow3SuggestedUpdate {
             Replacement::AttrName(name) => Some(format!("Use `{name}` instead")),
             Replacement::Message(message) => Some((*message).to_string()),
             Replacement::AutoImport { module, name } => {
-                Some(format!("Use `{module}.{name}` instead"))
+                Some(format!("Use `{name}` from `{module}` instead."))
             }
             Replacement::SourceModuleMoved { module, name } => {
-                Some(format!("Use `{module}.{name}` instead"))
+                Some(format!("Use `{name}` from `{module}` instead."))
             }
         }
     }
@@ -120,7 +120,11 @@ fn diagnostic_for_argument(
     let Some(keyword) = arguments.find_keyword(deprecated) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(
+    let range = keyword
+        .arg
+        .as_ref()
+        .map_or_else(|| keyword.range(), Ranged::range);
+    let mut diagnostic = checker.report_diagnostic(
         Airflow3SuggestedUpdate {
             deprecated: deprecated.to_string(),
             replacement: match replacement {
@@ -128,20 +132,15 @@ fn diagnostic_for_argument(
                 None => Replacement::None,
             },
         },
-        keyword
-            .arg
-            .as_ref()
-            .map_or_else(|| keyword.range(), Ranged::range),
+        range,
     );
 
     if let Some(replacement) = replacement {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             replacement.to_string(),
-            diagnostic.range,
+            range,
         )));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 /// Check whether a removed Airflow argument is passed.
 ///
@@ -284,24 +283,34 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         _ => return,
     };
 
-    let mut diagnostic = Diagnostic::new(
-        Airflow3SuggestedUpdate {
-            deprecated: qualified_name.to_string(),
-            replacement: replacement.clone(),
-        },
-        range,
-    );
-
-    let semantic = checker.semantic();
-    if let Some((module, name)) = match &replacement {
-        Replacement::AutoImport { module, name } => Some((module, *name)),
-        Replacement::SourceModuleMoved { module, name } => Some((module, name.as_str())),
-        _ => None,
-    } {
-        if is_guarded_by_try_except(expr, module, name, semantic) {
+    let (module, name) = match &replacement {
+        Replacement::AutoImport { module, name } => (module, *name),
+        Replacement::SourceModuleMoved { module, name } => (module, name.as_str()),
+        _ => {
+            checker.report_diagnostic(
+                Airflow3SuggestedUpdate {
+                    deprecated: qualified_name.to_string(),
+                    replacement: replacement.clone(),
+                },
+                range,
+            );
             return;
         }
-        diagnostic.try_set_fix(|| {
+    };
+
+    if is_guarded_by_try_except(expr, module, name, checker.semantic()) {
+        return;
+    }
+
+    checker
+        .report_diagnostic(
+            Airflow3SuggestedUpdate {
+                deprecated: qualified_name.to_string(),
+                replacement: replacement.clone(),
+            },
+            range,
+        )
+        .try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from(module, name),
                 expr.start(),
@@ -310,7 +319,4 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             let replacement_edit = Edit::range_replacement(binding, range);
             Ok(Fix::safe_edits(import_edit, [replacement_edit]))
         });
-    }
-
-    checker.report_diagnostic(diagnostic);
 }

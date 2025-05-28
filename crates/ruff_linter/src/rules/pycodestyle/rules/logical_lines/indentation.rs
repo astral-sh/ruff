@@ -1,8 +1,9 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::TextRange;
+
+use crate::Diagnostic;
+use crate::Violation;
 
 use super::LogicalLine;
 

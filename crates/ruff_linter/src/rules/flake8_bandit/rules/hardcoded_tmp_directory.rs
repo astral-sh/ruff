@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Expr, StringLike};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -102,10 +102,10 @@ fn check(checker: &Checker, value: &str, range: TextRange) {
         }
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         HardcodedTempFile {
             string: value.to_string(),
         },
         range,
-    ));
+    );
 }

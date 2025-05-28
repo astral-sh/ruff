@@ -1,5 +1,6 @@
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::Violation;
 
 /// ## What it does
 /// Checks for variables defined in `for`, `try`, `with` statements

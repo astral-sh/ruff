@@ -8,4 +8,4 @@ AIR302_papermill.py:5:1: AIR302 `airflow.operators.papermill_operator.PapermillO
 5 | PapermillOperator()
   | ^^^^^^^^^^^^^^^^^ AIR302
   |
-  = help: Install `apache-airflow-providers-papermill>=1.0.0` and use `airflow.providers.papermill.operators.papermill.PapermillOperator` instead.
+  = help: Install `apache-airflow-providers-papermill>=1.0.0` and use `PapermillOperator` from `airflow.providers.papermill.operators.papermill` instead.

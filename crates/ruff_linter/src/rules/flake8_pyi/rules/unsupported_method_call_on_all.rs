@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -69,12 +69,12 @@ pub(crate) fn unsupported_method_call_on_all(checker: &Checker, func: &Expr) {
     if !is_unsupported_method(attr.as_str()) {
         return;
     }
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         UnsupportedMethodCallOnAll {
             name: attr.to_string(),
         },
         func.range(),
-    ));
+    );
 }
 
 fn is_unsupported_method(name: &str) -> bool {

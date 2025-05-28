@@ -1,5 +1,6 @@
-use ruff_diagnostics::Violation;
 use ruff_macros::ViolationMetadata;
+
+use crate::Violation;
 
 /// ## Removal
 /// This rule was removed from Ruff because it was common for it to introduce behavioral changes.

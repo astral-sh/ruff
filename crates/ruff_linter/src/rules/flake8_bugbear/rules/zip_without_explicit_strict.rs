@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast::{self as ast, Arguments, Expr};
@@ -7,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_argument;
+use crate::{AlwaysFixableViolation, Applicability, Fix};
 
 /// ## What it does
 /// Checks for `zip` calls without an explicit `strict` parameter.
@@ -63,8 +63,9 @@ pub(crate) fn zip_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
             .iter()
             .any(|arg| is_infinite_iterable(arg, semantic))
     {
-        checker.report_diagnostic(
-            Diagnostic::new(ZipWithoutExplicitStrict, call.range()).with_fix(Fix::applicable_edit(
+        checker
+            .report_diagnostic(ZipWithoutExplicitStrict, call.range())
+            .set_fix(Fix::applicable_edit(
                 add_argument(
                     "strict=False",
                     &call.arguments,
@@ -82,8 +83,7 @@ pub(crate) fn zip_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
                 } else {
                     Applicability::Safe
                 },
-            )),
-        );
+            ));
     }
 }
 

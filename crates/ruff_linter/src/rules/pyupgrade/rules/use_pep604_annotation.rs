@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
@@ -10,6 +9,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix::edits::pad;
 use crate::preview::is_defer_optional_to_up045_enabled;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Check for type annotations that can be rewritten based on [PEP 604] syntax.
@@ -148,21 +148,15 @@ pub(crate) fn non_pep604_annotation(
 
     match operator {
         Pep604Operator::Optional => {
-            let (rule, mut diagnostic) = if is_defer_optional_to_up045_enabled(checker.settings) {
-                (
-                    Rule::NonPEP604AnnotationOptional,
-                    Diagnostic::new(NonPEP604AnnotationOptional, expr.range()),
-                )
+            let guard = if is_defer_optional_to_up045_enabled(checker.settings) {
+                checker.report_diagnostic_if_enabled(NonPEP604AnnotationOptional, expr.range())
             } else {
-                (
-                    Rule::NonPEP604AnnotationUnion,
-                    Diagnostic::new(NonPEP604AnnotationUnion, expr.range()),
-                )
+                checker.report_diagnostic_if_enabled(NonPEP604AnnotationUnion, expr.range())
             };
 
-            if !checker.enabled(rule) {
+            let Some(mut diagnostic) = guard else {
                 return;
-            }
+            };
 
             if fixable {
                 match slice {
@@ -184,14 +178,13 @@ pub(crate) fn non_pep604_annotation(
                     }
                 }
             }
-            checker.report_diagnostic(diagnostic);
         }
         Pep604Operator::Union => {
             if !checker.enabled(Rule::NonPEP604AnnotationUnion) {
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(NonPEP604AnnotationUnion, expr.range());
+            let mut diagnostic = checker.report_diagnostic(NonPEP604AnnotationUnion, expr.range());
             if fixable {
                 match slice {
                     Expr::Slice(_) => {
@@ -226,7 +219,6 @@ pub(crate) fn non_pep604_annotation(
                     }
                 }
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `for` loops that can be replaced with `yield from` expressions.
@@ -126,7 +126,7 @@ pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: &ast::StmtFor) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(YieldInForLoop, stmt_for.range());
+    let mut diagnostic = checker.report_diagnostic(YieldInForLoop, stmt_for.range());
 
     let contents = checker.locator().slice(
         parenthesized_range(
@@ -158,8 +158,6 @@ pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: &ast::StmtFor) {
             stmt_for.range(),
         )));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Return `true` if the two expressions are equivalent, and both consistent solely

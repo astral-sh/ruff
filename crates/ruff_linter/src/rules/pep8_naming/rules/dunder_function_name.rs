@@ -1,11 +1,12 @@
 use ruff_python_ast::Stmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Scope, ScopeKind};
 
+use crate::Violation;
+use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
@@ -48,24 +49,25 @@ impl Violation for DunderFunctionName {
 
 /// N807
 pub(crate) fn dunder_function_name(
+    checker: &Checker,
     scope: &Scope,
     stmt: &Stmt,
     name: &str,
     ignore_names: &IgnoreNames,
-) -> Option<Diagnostic> {
+) {
     if matches!(scope.kind, ScopeKind::Class(_)) {
-        return None;
+        return;
     }
     if !visibility::is_magic(name) {
-        return None;
+        return;
     }
     // Allowed under PEP 562 (https://peps.python.org/pep-0562/).
     if matches!(scope.kind, ScopeKind::Module) && (name == "__getattr__" || name == "__dir__") {
-        return None;
+        return;
     }
     // Ignore any explicitly-allowed names.
     if ignore_names.matches(name) {
-        return None;
+        return;
     }
-    Some(Diagnostic::new(DunderFunctionName, stmt.identifier()))
+    checker.report_diagnostic(DunderFunctionName, stmt.identifier());
 }

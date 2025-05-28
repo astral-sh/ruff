@@ -26,12 +26,9 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
-use ruff_python_parser::semantic_errors::{
-    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
-};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{Diagnostic, Edit, IsolationLevel};
+use ruff_diagnostics::IsolationLevel;
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
 use ruff_python_ast::identifier::Identifier;
@@ -46,6 +43,9 @@ use ruff_python_ast::{
 use ruff_python_ast::{PySourceType, helpers, str, visitor};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
+use ruff_python_parser::semantic_errors::{
+    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
+};
 use ruff_python_parser::typing::{AnnotationKind, ParsedAnnotation, parse_type_annotation};
 use ruff_python_parser::{ParseError, Parsed, Tokens};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
@@ -66,13 +66,14 @@ use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::preview::{is_semantic_errors_enabled, is_undefined_export_in_dunder_init_enabled};
-use crate::registry::Rule;
+use crate::registry::{AsRule, Rule};
 use crate::rules::pyflakes::rules::{
     LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
 };
 use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{LinterSettings, TargetVersion, flags};
+use crate::{Diagnostic, Edit, Violation};
 use crate::{Locator, docstrings, noqa};
 
 mod analyze;
@@ -379,10 +380,40 @@ impl<'a> Checker<'a> {
         self.indexer.comment_ranges()
     }
 
-    /// Push a new [`Diagnostic`] to the collection in the [`Checker`]
-    pub(crate) fn report_diagnostic(&self, diagnostic: Diagnostic) {
-        let mut diagnostics = self.diagnostics.borrow_mut();
-        diagnostics.push(diagnostic);
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic.
+    ///
+    /// The guard derefs to a [`Diagnostic`], so it can be used to further modify the diagnostic
+    /// before it is added to the collection in the checker on `Drop`.
+    pub(crate) fn report_diagnostic<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> DiagnosticGuard<'chk, 'a> {
+        DiagnosticGuard {
+            checker: self,
+            diagnostic: Some(Diagnostic::new(kind, range)),
+        }
+    }
+
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
+    /// enabled.
+    ///
+    /// Prefer [`Checker::report_diagnostic`] in general because the conversion from a `Diagnostic`
+    /// to a `Rule` is somewhat expensive.
+    pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> Option<DiagnosticGuard<'chk, 'a>> {
+        let diagnostic = Diagnostic::new(kind, range);
+        if self.enabled(diagnostic.rule()) {
+            Some(DiagnosticGuard {
+                checker: self,
+                diagnostic: Some(diagnostic),
+            })
+        } else {
+            None
+        }
     }
 
     /// Adds a [`TextRange`] to the set of ranges of variable names
@@ -508,9 +539,9 @@ impl<'a> Checker<'a> {
     }
 
     /// Push `diagnostic` if the checker is not in a `@no_type_check` context.
-    pub(crate) fn report_type_diagnostic(&self, diagnostic: Diagnostic) {
+    pub(crate) fn report_type_diagnostic<T: Violation>(&self, kind: T, range: TextRange) {
         if !self.semantic.in_no_type_check() {
-            self.report_diagnostic(diagnostic);
+            self.report_diagnostic(kind, range);
         }
     }
 
@@ -595,7 +626,7 @@ impl SemanticSyntaxContext for Checker<'_> {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
                 if self.settings.rules.enabled(Rule::LateFutureImport) {
-                    self.report_diagnostic(Diagnostic::new(LateFutureImport, error.range));
+                    self.report_diagnostic(LateFutureImport, error.range);
                 }
             }
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start } => {
@@ -604,31 +635,28 @@ impl SemanticSyntaxContext for Checker<'_> {
                     .rules
                     .enabled(Rule::LoadBeforeGlobalDeclaration)
                 {
-                    self.report_diagnostic(Diagnostic::new(
+                    self.report_diagnostic(
                         LoadBeforeGlobalDeclaration {
                             name,
                             row: self.compute_source_row(start),
                         },
                         error.range,
-                    ));
+                    );
                 }
             }
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
                 if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
-                    self.report_diagnostic(Diagnostic::new(
-                        YieldOutsideFunction::new(kind),
-                        error.range,
-                    ));
+                    self.report_diagnostic(YieldOutsideFunction::new(kind), error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {
                 if self.settings.rules.enabled(Rule::ReturnOutsideFunction) {
-                    self.report_diagnostic(Diagnostic::new(ReturnOutsideFunction, error.range));
+                    self.report_diagnostic(ReturnOutsideFunction, error.range);
                 }
             }
             SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(_) => {
                 if self.settings.rules.enabled(Rule::AwaitOutsideAsync) {
-                    self.report_diagnostic(Diagnostic::new(AwaitOutsideAsync, error.range));
+                    self.report_diagnostic(AwaitOutsideAsync, error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
@@ -2717,12 +2745,12 @@ impl<'a> Checker<'a> {
                         self.semantic.restore(snapshot);
 
                         if self.enabled(Rule::ForwardAnnotationSyntaxError) {
-                            self.report_type_diagnostic(Diagnostic::new(
+                            self.report_type_diagnostic(
                                 pyflakes::rules::ForwardAnnotationSyntaxError {
                                     parse_error: parse_error.error.to_string(),
                                 },
                                 string_expr.range(),
-                            ));
+                            );
                         }
                     }
                 }
@@ -3019,4 +3047,60 @@ pub(crate) fn check_ast(
     } = checker;
 
     (diagnostics.into_inner(), semantic_errors.into_inner())
+}
+
+/// An abstraction for mutating a diagnostic.
+///
+/// Callers can build this guard by starting with `Checker::report_diagnostic`.
+///
+/// The primary function of this guard is to add the underlying diagnostic to the `Checker`'s list
+/// of diagnostics on `Drop`, while dereferencing to the underlying diagnostic for mutations like
+/// adding fixes or parent ranges.
+pub(crate) struct DiagnosticGuard<'a, 'b> {
+    /// The parent checker that will receive the diagnostic on `Drop`.
+    checker: &'a Checker<'b>,
+    /// The diagnostic that we want to report.
+    ///
+    /// This is always `Some` until the `Drop` (or `defuse`) call.
+    diagnostic: Option<Diagnostic>,
+}
+
+impl DiagnosticGuard<'_, '_> {
+    /// Consume the underlying `Diagnostic` without emitting it.
+    ///
+    /// In general you should avoid constructing diagnostics that may not be emitted, but this
+    /// method can be used where this is unavoidable.
+    pub(crate) fn defuse(mut self) {
+        self.diagnostic = None;
+    }
+}
+
+impl std::ops::Deref for DiagnosticGuard<'_, '_> {
+    type Target = Diagnostic;
+
+    fn deref(&self) -> &Diagnostic {
+        // OK because `self.diagnostic` is only `None` within `Drop`.
+        self.diagnostic.as_ref().unwrap()
+    }
+}
+
+/// Return a mutable borrow of the diagnostic in this guard.
+impl std::ops::DerefMut for DiagnosticGuard<'_, '_> {
+    fn deref_mut(&mut self) -> &mut Diagnostic {
+        // OK because `self.diagnostic` is only `None` within `Drop`.
+        self.diagnostic.as_mut().unwrap()
+    }
+}
+
+impl Drop for DiagnosticGuard<'_, '_> {
+    fn drop(&mut self) {
+        if std::thread::panicking() {
+            // Don't submit diagnostics when panicking because they might be incomplete.
+            return;
+        }
+
+        if let Some(diagnostic) = self.diagnostic.take() {
+            self.checker.diagnostics.borrow_mut().push(diagnostic);
+        }
+    }
 }

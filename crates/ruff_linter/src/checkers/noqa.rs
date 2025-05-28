@@ -5,7 +5,6 @@ use std::path::Path;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
@@ -21,6 +20,7 @@ use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
+use crate::{Diagnostic, Edit, Fix};
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(

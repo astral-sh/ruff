@@ -2,11 +2,11 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
 
 use crate::Locator;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for the use of type comments (e.g., `x = 1  # type: int`) in stub

@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Comprehension, Expr};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Fix};
 
 use crate::rules::flake8_comprehensions::fixes;
 
@@ -85,7 +85,7 @@ fn add_diagnostic(checker: &Checker, expr: &Expr) {
     {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryComprehension {
             kind: comprehension_kind,
         },
@@ -95,7 +95,6 @@ fn add_diagnostic(checker: &Checker, expr: &Expr) {
         fixes::fix_unnecessary_comprehension(expr, checker.locator(), checker.stylist())
             .map(Fix::unsafe_edit)
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 /// C416

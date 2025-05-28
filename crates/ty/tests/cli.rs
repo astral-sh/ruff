@@ -85,7 +85,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     ");
 
     // Test that we can set to false via config file
-    case.write_file("ty.toml", "respect-ignore-files = false")?;
+    case.write_file("ty.toml", "src.respect-ignore-files = false")?;
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
@@ -104,7 +104,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     ");
 
     // Ensure CLI takes precedence
-    case.write_file("ty.toml", "respect-ignore-files = true")?;
+    case.write_file("ty.toml", "src.respect-ignore-files = true")?;
     assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @r"
     success: false
     exit_code: 1
@@ -242,7 +242,7 @@ fn config_override_python_platform() -> anyhow::Result<()> {
 }
 
 #[test]
-fn config_file_annotation_showing_where_python_version_set() -> anyhow::Result<()> {
+fn config_file_annotation_showing_where_python_version_set_typing_error() -> anyhow::Result<()> {
     let case = TestCase::with_files([
         (
             "pyproject.toml",
@@ -298,6 +298,77 @@ fn config_file_annotation_showing_where_python_version_set() -> anyhow::Result<(
     info: `aiter` was added as a builtin in Python 3.10
     info: Python 3.9 was assumed when resolving types because it was specified on the command line
     info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn config_file_annotation_showing_where_python_version_set_syntax_error() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            requires-python = ">=3.8"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            match object():
+                case int():
+                    pass
+                case _:
+                    pass
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-syntax]
+     --> test.py:2:1
+      |
+    2 | match object():
+      | ^^^^^ Cannot use `match` statement on Python 3.8 (syntax was added in Python 3.10)
+    3 |     case int():
+    4 |         pass
+      |
+    info: Python 3.8 was assumed when parsing syntax
+     --> pyproject.toml:3:19
+      |
+    2 | [project]
+    3 | requires-python = ">=3.8"
+      |                   ^^^^^^^ Python 3.8 assumed due to this configuration setting
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-syntax]
+     --> test.py:2:1
+      |
+    2 | match object():
+      | ^^^^^ Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    3 |     case int():
+    4 |         pass
+      |
+    info: Python 3.9 was assumed when parsing syntax because it was specified on the command line
 
     Found 1 diagnostic
 
@@ -1534,7 +1605,7 @@ fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
 #[test]
 fn cli_config_args_invalid_option() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", r"print(1)")?;
-    assert_cmd_snapshot!(case.command().arg("--config").arg("bad-option=true"), @r"
+    assert_cmd_snapshot!(case.command().arg("--config").arg("bad-option=true"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1544,13 +1615,13 @@ fn cli_config_args_invalid_option() -> anyhow::Result<()> {
       |
     1 | bad-option=true
       | ^^^^^^^^^^
-    unknown field `bad-option`, expected one of `environment`, `src`, `rules`, `terminal`, `respect-ignore-files`
+    unknown field `bad-option`, expected one of `environment`, `src`, `rules`, `terminal`
 
 
     Usage: ty <COMMAND>
 
     For more information, try '--help'.
-    ");
+    "###);
 
     Ok(())
 }
@@ -1629,6 +1700,63 @@ fn check_conda_prefix_var_to_resolve_path() -> anyhow::Result<()> {
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
+
+    Ok(())
+}
+
+#[test]
+fn config_file_override() -> anyhow::Result<()> {
+    // Set `error-on-warning` to true in the configuration file
+    // Explicitly set `--warn unresolved-reference` to ensure the rule warns instead of errors
+    let case = TestCase::with_files(vec![
+        ("test.py", r"print(x)  # [unresolved-reference]"),
+        (
+            "ty-override.toml",
+            r#"
+            [terminal]
+            error-on-warning = true
+            "#,
+        ),
+    ])?;
+
+    // Ensure flag works via CLI arg
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config-file").arg("ty-override.toml"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       ^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // Ensure the flag works via an environment variable
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").env("TY_CONFIG_FILE", "ty-override.toml"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       ^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
     Ok(())
 }
 

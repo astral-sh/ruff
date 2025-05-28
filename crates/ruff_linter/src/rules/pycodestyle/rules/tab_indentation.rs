@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_index::Indexer;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for indentation that uses tabs.

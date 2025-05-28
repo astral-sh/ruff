@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::{Token, TokenKind};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for strings that contain the control character `BS`.

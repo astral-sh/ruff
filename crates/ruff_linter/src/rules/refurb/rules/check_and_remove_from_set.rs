@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
@@ -9,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `set.remove` that can be replaced with `set.discard`.
@@ -104,7 +104,7 @@ pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         CheckAndRemoveFromSet {
             element: SourceCodeSnippet::from_str(checker.locator().slice(check_element)),
             set: check_set.id.to_string(),
@@ -116,7 +116,6 @@ pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf
         if_stmt.start(),
         if_stmt.end(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 fn compare(lhs: &ComparableExpr, rhs: &ComparableExpr) -> bool {
