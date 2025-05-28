@@ -2,8 +2,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of Django's `extra` function where one or more arguments
@@ -54,7 +54,7 @@ pub(crate) fn django_extra(checker: &Checker, call: &ast::ExprCall) {
     }
 
     if is_call_insecure(call) {
-        checker.report_diagnostic(Diagnostic::new(DjangoExtra, call.arguments.range()));
+        checker.report_diagnostic(DjangoExtra, call.arguments.range());
     }
 }
 

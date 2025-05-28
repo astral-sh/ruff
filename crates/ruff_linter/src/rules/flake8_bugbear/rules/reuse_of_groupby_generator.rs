@@ -4,8 +4,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for multiple usage of the generator returned from
@@ -339,6 +339,6 @@ pub(crate) fn reuse_of_groupby_generator(
         finder.visit_stmt(stmt);
     }
     for expr in finder.exprs {
-        checker.report_diagnostic(Diagnostic::new(ReuseOfGroupbyGenerator, expr.range()));
+        checker.report_diagnostic(ReuseOfGroupbyGenerator, expr.range());
     }
 }

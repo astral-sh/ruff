@@ -7,7 +7,7 @@ use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unused variables in loops (e.g., `for` and `while` statements).
@@ -121,7 +121,7 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
             .is_match(rename.as_str())
             .then_some(rename);
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             UnusedLoopControlVariable {
                 name: name.to_string(),
                 rename: rename.clone(),
@@ -147,7 +147,6 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
                 }
             }
         }
-        checker.report_diagnostic(diagnostic);
     }
 }
 

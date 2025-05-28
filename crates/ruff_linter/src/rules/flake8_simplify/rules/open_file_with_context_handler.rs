@@ -4,8 +4,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for cases where files are opened (e.g., using the builtin `open()` function)
@@ -265,8 +265,5 @@ pub(crate) fn open_file_with_context_handler(checker: &Checker, call: &ast::Expr
         }
     }
 
-    checker.report_diagnostic(Diagnostic::new(
-        OpenFileWithContextHandler,
-        call.func.range(),
-    ));
+    checker.report_diagnostic(OpenFileWithContextHandler, call.func.range());
 }

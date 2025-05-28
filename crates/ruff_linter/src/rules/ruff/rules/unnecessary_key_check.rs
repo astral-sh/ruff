@@ -7,7 +7,7 @@ use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary key checks prior to accessing a dictionary.
@@ -102,7 +102,7 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryKeyCheck, expr.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryKeyCheck, expr.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         format!(
             "{}.get({})",
@@ -127,5 +127,4 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
         ),
         expr.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

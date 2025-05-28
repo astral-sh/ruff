@@ -8,8 +8,8 @@ use rustc_hash::FxHashMap;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for mismatched argument types in "old-style" format strings.
@@ -240,6 +240,6 @@ pub(crate) fn bad_string_format_type(
         _ => is_valid_constant(&format_strings, &bin_op.right),
     };
     if !is_valid {
-        checker.report_diagnostic(Diagnostic::new(BadStringFormatType, bin_op.range()));
+        checker.report_diagnostic(BadStringFormatType, bin_op.range());
     }
 }

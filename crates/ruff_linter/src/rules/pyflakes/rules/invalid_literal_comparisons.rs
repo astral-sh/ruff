@@ -7,7 +7,7 @@ use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for `is` and `is not` comparisons against literals, like integers,
@@ -90,7 +90,8 @@ pub(crate) fn invalid_literal_comparison(
                 || helpers::is_mutable_iterable_initializer(left)
                 || helpers::is_mutable_iterable_initializer(right))
         {
-            let mut diagnostic = Diagnostic::new(IsLiteral { cmp_op: op.into() }, expr.range());
+            let mut diagnostic =
+                checker.report_diagnostic(IsLiteral { cmp_op: op.into() }, expr.range());
             if lazy_located.is_none() {
                 lazy_located = Some(locate_cmp_ops(expr, checker.tokens()));
             }
@@ -117,7 +118,6 @@ pub(crate) fn invalid_literal_comparison(
                     bail!("Failed to fix invalid comparison due to missing op")
                 }
             });
-            checker.report_diagnostic(diagnostic);
         }
         left = right;
     }

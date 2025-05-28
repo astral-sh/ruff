@@ -4,8 +4,8 @@ use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for a `DAG()` class or `@dag()` decorator without an explicit
@@ -86,6 +86,5 @@ pub(crate) fn dag_no_schedule_argument(checker: &Checker, expr: &Expr) {
     }
 
     // Produce a diagnostic when the `schedule` keyword argument is not found.
-    let diagnostic = Diagnostic::new(AirflowDagNoScheduleArgument, expr.range());
-    checker.report_diagnostic(diagnostic);
+    checker.report_diagnostic(AirflowDagNoScheduleArgument, expr.range());
 }

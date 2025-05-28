@@ -8,7 +8,7 @@ use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of exceptions that alias `TimeoutError`.
@@ -83,7 +83,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
 fn atom_diagnostic(checker: &Checker, target: &Expr) {
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         TimeoutErrorAlias {
             name: UnqualifiedName::from_expr(target).map(|name| name.to_string()),
         },
@@ -100,12 +100,11 @@ fn atom_diagnostic(checker: &Checker, target: &Expr) {
             import_edit,
         ))
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
 fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
-    let mut diagnostic = Diagnostic::new(TimeoutErrorAlias { name: None }, tuple.range());
+    let mut diagnostic = checker.report_diagnostic(TimeoutErrorAlias { name: None }, tuple.range());
     let semantic = checker.semantic();
     if semantic.has_builtin_binding("TimeoutError") {
         // Filter out any `TimeoutErrors` aliases.
@@ -150,7 +149,6 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
             tuple.range(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// UP041

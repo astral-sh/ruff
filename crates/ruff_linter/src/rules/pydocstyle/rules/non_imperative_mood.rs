@@ -7,11 +7,11 @@ use ruff_python_semantic::analyze::visibility::{is_property, is_test};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::rules::pydocstyle::helpers::normalize_word;
 use crate::rules::pydocstyle::settings::Settings;
-use crate::{Diagnostic, Violation};
 
 static MOOD: LazyLock<Mood> = LazyLock::new(Mood::new);
 
@@ -99,11 +99,11 @@ pub(crate) fn non_imperative_mood(checker: &Checker, docstring: &Docstring, sett
     }
 
     if matches!(MOOD.is_imperative(&first_word_norm), Some(false)) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             NonImperativeMood {
                 first_line: first_line.to_string(),
             },
             docstring.range(),
-        ));
+        );
     }
 }

@@ -4,9 +4,9 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::{Diagnostic, Violation};
 
 use super::super::helpers::{FileOpen, find_file_opens};
 
@@ -92,7 +92,7 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
                 .position(|open| open.is_ref(read_from))
             {
                 let open = self.candidates.remove(open);
-                self.checker.report_diagnostic(Diagnostic::new(
+                self.checker.report_diagnostic(
                     ReadWholeFile {
                         filename: SourceCodeSnippet::from_str(
                             &self.checker.generator().expr(open.filename),
@@ -100,7 +100,7 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
                         suggestion: make_suggestion(&open, self.checker.generator()),
                     },
                     open.item.range(),
-                ));
+                );
             }
             return;
         }

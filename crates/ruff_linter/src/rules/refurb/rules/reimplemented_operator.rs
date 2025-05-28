@@ -14,7 +14,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::importer::{ImportRequest, Importer};
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for lambda expressions and function definitions that can be replaced with a function from
@@ -112,7 +112,7 @@ pub(crate) fn reimplemented_operator(checker: &Checker, target: &FunctionLike) {
         return;
     };
     let fix = target.try_fix(&operator, checker.importer(), checker.semantic());
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ReimplementedOperator {
             operator,
             target: target.kind(),
@@ -120,7 +120,6 @@ pub(crate) fn reimplemented_operator(checker: &Checker, target: &FunctionLike) {
         target.range(),
     );
     diagnostic.try_set_optional_fix(|| fix);
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Candidate for lambda expression or function definition consisting of a return statement.

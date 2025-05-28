@@ -1,6 +1,6 @@
 use ruff_python_ast::{self as ast, Arguments, Expr};
 
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{
     checkers::ast::Checker, preview::is_fix_manual_list_comprehension_enabled,
     rules::perflint::helpers::statement_deletion_range,
@@ -331,7 +331,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         ComprehensionType::Extend
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ManualListComprehension {
             is_async: for_stmt.is_async,
             comprehension_type: Some(comprehension_type),
@@ -352,8 +352,6 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             )
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 fn convert_to_list_extend(

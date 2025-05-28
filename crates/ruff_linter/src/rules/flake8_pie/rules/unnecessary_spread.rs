@@ -4,7 +4,7 @@ use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextLen, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unnecessary dictionary unpacking operators (`**`).
@@ -52,11 +52,10 @@ pub(crate) fn unnecessary_spread(checker: &Checker, dict: &ast::ExprDict) {
             // We only care about when the key is None which indicates a spread `**`
             // inside a dict.
             if let Expr::Dict(inner) = value {
-                let mut diagnostic = Diagnostic::new(UnnecessarySpread, value.range());
+                let mut diagnostic = checker.report_diagnostic(UnnecessarySpread, value.range());
                 if let Some(fix) = unnecessary_spread_fix(inner, prev_end, checker.tokens()) {
                     diagnostic.set_fix(fix);
                 }
-                checker.report_diagnostic(diagnostic);
             }
         }
         prev_end = value.end();

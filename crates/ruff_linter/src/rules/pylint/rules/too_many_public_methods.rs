@@ -3,8 +3,8 @@ use ruff_python_ast as ast;
 use ruff_python_semantic::analyze::visibility::{self, Visibility::Public};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for classes with too many public methods
@@ -121,12 +121,12 @@ pub(crate) fn too_many_public_methods(
         .count();
 
     if methods > max_methods {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             TooManyPublicMethods {
                 methods,
                 max_methods,
             },
             class_def.range(),
-        ));
+        );
     }
 }

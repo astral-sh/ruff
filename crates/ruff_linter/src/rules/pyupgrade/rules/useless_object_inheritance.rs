@@ -4,7 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
-use crate::{AlwaysFixableViolation, Diagnostic, Fix};
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for classes that inherit from `object`.
@@ -55,7 +55,7 @@ pub(crate) fn useless_object_inheritance(checker: &Checker, class_def: &ast::Stm
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             UselessObjectInheritance {
                 name: class_def.name.to_string(),
             },
@@ -70,6 +70,5 @@ pub(crate) fn useless_object_inheritance(checker: &Checker, class_def: &ast::Stm
             )
             .map(Fix::safe_edit)
         });
-        checker.report_diagnostic(diagnostic);
     }
 }

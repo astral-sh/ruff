@@ -5,7 +5,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::preview::is_support_slices_in_literal_concatenation_enabled;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of the `+` operator to concatenate collections.
@@ -210,7 +210,7 @@ pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
         Type::Tuple => format!("({})", checker.generator().expr(&new_expr)),
         Type::List => checker.generator().expr(&new_expr),
     };
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         CollectionLiteralConcatenation {
             expression: SourceCodeSnippet::new(contents.clone()),
         },
@@ -227,5 +227,4 @@ pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
             expr.range(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }

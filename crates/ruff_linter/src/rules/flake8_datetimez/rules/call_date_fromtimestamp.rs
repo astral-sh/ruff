@@ -4,8 +4,8 @@ use ruff_text_size::TextRange;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for usage of `datetime.date.fromtimestamp()`.
@@ -73,6 +73,6 @@ pub(crate) fn call_date_fromtimestamp(checker: &Checker, func: &Expr, location: 
             )
         })
     {
-        checker.report_diagnostic(Diagnostic::new(CallDateFromtimestamp, location));
+        checker.report_diagnostic(CallDateFromtimestamp, location);
     }
 }

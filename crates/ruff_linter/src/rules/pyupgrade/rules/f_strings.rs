@@ -18,7 +18,7 @@ use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::{curly_escape, curly_unescape};
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `str.format` calls that can be replaced with f-strings.
@@ -504,7 +504,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(FString, call.range());
+    let mut diagnostic = checker.report_diagnostic(FString, call.range());
 
     // Avoid fix if there are comments within the call:
     // ```
@@ -528,5 +528,4 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
             )));
         }
     }
-    checker.report_diagnostic(diagnostic);
 }

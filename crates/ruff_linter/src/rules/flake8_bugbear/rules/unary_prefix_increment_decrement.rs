@@ -3,8 +3,8 @@ use ruff_python_ast::{self as ast, Expr, UnaryOp};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for the attempted use of the unary prefix increment (`++`) or
@@ -61,20 +61,20 @@ pub(crate) fn unary_prefix_increment_decrement(
     };
     match (op, nested_op) {
         (UnaryOp::UAdd, UnaryOp::UAdd) => {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 UnaryPrefixIncrementDecrement {
                     operator: UnaryPrefixOperatorType::Increment,
                 },
                 expr.range(),
-            ));
+            );
         }
         (UnaryOp::USub, UnaryOp::USub) => {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 UnaryPrefixIncrementDecrement {
                     operator: UnaryPrefixOperatorType::Decrement,
                 },
                 expr.range(),
-            ));
+            );
         }
         _ => {}
     }

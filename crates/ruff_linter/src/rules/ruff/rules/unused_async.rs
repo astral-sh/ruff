@@ -5,9 +5,9 @@ use ruff_python_ast::{self as ast, AnyNodeRef, Expr, Stmt};
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::function_type::is_stub;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::fastapi::rules::is_fastapi_route;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for functions declared `async` that do not await or otherwise use features requiring the
@@ -188,11 +188,11 @@ pub(crate) fn unused_async(
     };
 
     if !found_await_or_async {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             UnusedAsync {
                 name: name.to_string(),
             },
             function_def.identifier(),
-        ));
+        );
     }
 }

@@ -3,8 +3,8 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `if` statements with complex conditionals in stubs.
@@ -48,12 +48,12 @@ pub(crate) fn complex_if_statement_in_stub(checker: &Checker, test: &Expr) {
         left, comparators, ..
     }) = test
     else {
-        checker.report_diagnostic(Diagnostic::new(ComplexIfStatementInStub, test.range()));
+        checker.report_diagnostic(ComplexIfStatementInStub, test.range());
         return;
     };
 
     if comparators.len() != 1 {
-        checker.report_diagnostic(Diagnostic::new(ComplexIfStatementInStub, test.range()));
+        checker.report_diagnostic(ComplexIfStatementInStub, test.range());
         return;
     }
 
@@ -74,5 +74,5 @@ pub(crate) fn complex_if_statement_in_stub(checker: &Checker, test: &Expr) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(ComplexIfStatementInStub, test.range()));
+    checker.report_diagnostic(ComplexIfStatementInStub, test.range());
 }

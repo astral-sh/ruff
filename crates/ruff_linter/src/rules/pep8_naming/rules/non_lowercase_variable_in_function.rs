@@ -4,9 +4,9 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for the use of non-lowercase variable names in functions.
@@ -81,10 +81,10 @@ pub(crate) fn non_lowercase_variable_in_function(checker: &Checker, expr: &Expr,
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         NonLowercaseVariableInFunction {
             name: name.to_string(),
         },
         expr.range(),
-    ));
+    );
 }

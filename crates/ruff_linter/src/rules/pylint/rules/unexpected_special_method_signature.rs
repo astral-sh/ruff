@@ -6,8 +6,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum ExpectedParams {
@@ -186,13 +186,13 @@ pub(crate) fn unexpected_special_method_signature(
     };
 
     if !valid_signature {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             UnexpectedSpecialMethodSignature {
                 method_name: name.to_owned(),
                 expected_params,
                 actual_params,
             },
             stmt.identifier(),
-        ));
+        );
     }
 }

@@ -3,8 +3,8 @@ use ruff_python_ast::{self as ast};
 use ruff_python_semantic::analyze::visibility::{self, Visibility::Public};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -105,7 +105,7 @@ pub(crate) fn class_as_data_structure(checker: &Checker, class_def: &ast::StmtCl
     }
 
     if has_dunder_init && public_methods == 1 {
-        checker.report_diagnostic(Diagnostic::new(ClassAsDataStructure, class_def.range()));
+        checker.report_diagnostic(ClassAsDataStructure, class_def.range());
     }
 }
 

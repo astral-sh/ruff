@@ -3,8 +3,8 @@ use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of `six.PY3`.
@@ -56,6 +56,6 @@ pub(crate) fn name_or_attribute(checker: &Checker, expr: &Expr) {
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["six", "PY3"]))
     {
-        checker.report_diagnostic(Diagnostic::new(SixPY3, expr.range()));
+        checker.report_diagnostic(SixPY3, expr.range());
     }
 }

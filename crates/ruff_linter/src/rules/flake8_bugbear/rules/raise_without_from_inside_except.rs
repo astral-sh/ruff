@@ -5,8 +5,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::RaiseStatementVisitor;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `raise` statements in exception handlers that lack a `from`
@@ -106,10 +106,7 @@ pub(crate) fn raise_without_from_inside_except(
                     .as_try_stmt()
                     .is_some_and(|try_stmt| try_stmt.is_star);
 
-                checker.report_diagnostic(Diagnostic::new(
-                    RaiseWithoutFromInsideExcept { is_star },
-                    range,
-                ));
+                checker.report_diagnostic(RaiseWithoutFromInsideExcept { is_star }, range);
             }
         }
     }

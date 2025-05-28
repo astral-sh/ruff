@@ -2,8 +2,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, StmtAssert};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for invalid use of literals in assert message arguments.
@@ -52,8 +52,5 @@ pub(crate) fn invalid_assert_message_literal_argument(checker: &Checker, stmt: &
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
-        InvalidAssertMessageLiteralArgument,
-        message.range(),
-    ));
+    checker.report_diagnostic(InvalidAssertMessageLiteralArgument, message.range());
 }

@@ -5,7 +5,7 @@ use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
-use crate::{Diagnostic, Violation};
+use crate::Violation;
 use crate::{checkers::ast::Checker, settings::LinterSettings};
 
 /// ## What it does
@@ -112,12 +112,12 @@ pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         UnsafeMarkupUse {
             name: qualified_name.to_string(),
         },
         call.range(),
-    ));
+    );
 }
 
 fn is_markup_call(qualified_name: &QualifiedName, settings: &LinterSettings) -> bool {

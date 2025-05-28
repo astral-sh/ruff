@@ -6,9 +6,9 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for dictionary comprehensions that use a static key, like a string
@@ -58,12 +58,12 @@ pub(crate) fn static_key_dict_comprehension(checker: &Checker, dict_comp: &ast::
     };
 
     if is_constant(&dict_comp.key, &names) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             StaticKeyDictComprehension {
                 key: SourceCodeSnippet::from_str(checker.locator().slice(dict_comp.key.as_ref())),
             },
             dict_comp.key.range(),
-        ));
+        );
     }
 }
 

@@ -4,8 +4,8 @@ use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtFunctionDef};
 use ruff_text_size::TextRange;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `return {value}` statements in functions that also contain `yield`
@@ -100,7 +100,7 @@ pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunction
 
     if visitor.has_yield {
         if let Some(return_) = visitor.return_ {
-            checker.report_diagnostic(Diagnostic::new(ReturnInGenerator, return_));
+            checker.report_diagnostic(ReturnInGenerator, return_);
         }
     }
 }

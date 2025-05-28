@@ -3,8 +3,9 @@ use ruff_python_ast::Identifier;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
+use crate::checkers::ast::Checker;
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for the use of the characters 'l', 'O', or 'I' as class names.
@@ -36,13 +37,8 @@ impl Violation for AmbiguousClassName {
 }
 
 /// E742
-pub(crate) fn ambiguous_class_name(name: &Identifier) -> Option<Diagnostic> {
+pub(crate) fn ambiguous_class_name(checker: &Checker, name: &Identifier) {
     if is_ambiguous_name(name) {
-        Some(Diagnostic::new(
-            AmbiguousClassName(name.to_string()),
-            name.range(),
-        ))
-    } else {
-        None
+        checker.report_diagnostic(AmbiguousClassName(name.to_string()), name.range());
     }
 }

@@ -4,8 +4,8 @@ use ruff_text_size::TextRange;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 use super::helpers;
 
@@ -82,5 +82,5 @@ pub(crate) fn call_datetime_utcnow(checker: &Checker, func: &Expr, location: Tex
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(CallDatetimeUtcnow, location));
+    checker.report_diagnostic(CallDatetimeUtcnow, location);
 }

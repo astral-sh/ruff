@@ -4,7 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for docstring summary lines that are not separated from the docstring
@@ -84,7 +84,7 @@ pub(crate) fn blank_after_summary(checker: &Checker, docstring: &Docstring) {
         }
     }
     if lines_count > 1 && blanks_count != 1 {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             MissingBlankLineAfterSummary {
                 num_lines: blanks_count,
             },
@@ -118,6 +118,5 @@ pub(crate) fn blank_after_summary(checker: &Checker, docstring: &Docstring) {
                 blank_end,
             )));
         }
-        checker.report_diagnostic(diagnostic);
     }
 }

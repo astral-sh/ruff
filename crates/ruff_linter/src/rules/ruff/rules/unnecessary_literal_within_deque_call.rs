@@ -3,7 +3,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for usages of `collections.deque` that have an empty iterable as the first argument.
@@ -92,7 +92,7 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryEmptyIterableWithinDequeCall {
             has_maxlen: maxlen.is_some(),
         },
@@ -100,8 +100,6 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
     );
 
     diagnostic.set_fix(fix_unnecessary_literal_in_deque(checker, deque, maxlen));
-
-    checker.report_diagnostic(diagnostic);
 }
 
 fn fix_unnecessary_literal_in_deque(

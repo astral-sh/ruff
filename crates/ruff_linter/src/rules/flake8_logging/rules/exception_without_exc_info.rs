@@ -5,8 +5,8 @@ use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of `logging.exception()` with `exc_info` set to `False`.
@@ -74,7 +74,7 @@ pub(crate) fn exception_without_exc_info(checker: &Checker, call: &ExprCall) {
     }
 
     if exc_info_arg_is_falsey(call, checker) {
-        checker.report_diagnostic(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
+        checker.report_diagnostic(ExceptionWithoutExcInfo, call.range());
     }
 }
 

@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use crate::rules::flynt::helpers;
 
@@ -152,7 +152,7 @@ pub(crate) fn static_join_to_fstring(checker: &Checker, expr: &Expr, joiner: &st
 
     let contents = checker.generator().expr(&new_expr);
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         StaticJoinToFString {
             expression: SourceCodeSnippet::new(contents.clone()),
         },
@@ -162,5 +162,4 @@ pub(crate) fn static_join_to_fstring(checker: &Checker, expr: &Expr, joiner: &st
         pad(contents, expr.range(), checker.locator()),
         expr.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

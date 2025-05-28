@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of deprecated NumPy functions.
@@ -73,7 +73,7 @@ pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr) {
                 _ => None,
             })
     {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             NumpyDeprecatedFunction {
                 existing: existing.to_string(),
                 replacement: replacement.to_string(),
@@ -89,6 +89,5 @@ pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr) {
             let replacement_edit = Edit::range_replacement(binding, expr.range());
             Ok(Fix::safe_edits(import_edit, [replacement_edit]))
         });
-        checker.report_diagnostic(diagnostic);
     }
 }

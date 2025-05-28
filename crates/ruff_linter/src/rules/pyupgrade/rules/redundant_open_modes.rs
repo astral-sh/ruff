@@ -6,7 +6,7 @@ use ruff_python_stdlib::open_mode::OpenMode;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for redundant `open` mode arguments.
@@ -81,17 +81,12 @@ pub(crate) fn redundant_open_modes(checker: &Checker, call: &ast::ExprCall) {
     };
     let reduced = mode.reduce();
     if reduced != mode {
-        checker.report_diagnostic(create_diagnostic(call, mode_arg, reduced, checker));
+        create_diagnostic(call, mode_arg, reduced, checker);
     }
 }
 
-fn create_diagnostic(
-    call: &ast::ExprCall,
-    mode_arg: &Expr,
-    mode: OpenMode,
-    checker: &Checker,
-) -> Diagnostic {
-    let mut diagnostic = Diagnostic::new(
+fn create_diagnostic(call: &ast::ExprCall, mode_arg: &Expr, mode: OpenMode, checker: &Checker) {
+    let mut diagnostic = checker.report_diagnostic(
         RedundantOpenModes {
             replacement: mode.to_string(),
         },
@@ -109,8 +104,6 @@ fn create_diagnostic(
             mode_arg.range(),
         )));
     }
-
-    diagnostic
 }
 
 fn create_remove_argument_fix(

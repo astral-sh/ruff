@@ -6,8 +6,8 @@ use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::analyze::function_type::FunctionType;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for static methods that use `self` or `cls` as their first argument.
@@ -101,10 +101,10 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
         _ => return,
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         BadStaticmethodArgument {
             argument_name: self_or_cls.name.to_string(),
         },
         self_or_cls.range(),
-    ));
+    );
 }

@@ -3,8 +3,8 @@ use ruff_python_ast as ast;
 
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of the Python `requests` or `httpx` module that omit the
@@ -70,22 +70,22 @@ pub(crate) fn request_without_timeout(checker: &Checker, call: &ast::ExprCall) {
     {
         if let Some(keyword) = call.arguments.find_keyword("timeout") {
             if keyword.value.is_none_literal_expr() {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     RequestWithoutTimeout {
                         implicit: false,
                         module: module.to_string(),
                     },
                     keyword.range(),
-                ));
+                );
             }
         } else if module == "requests" {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 RequestWithoutTimeout {
                     implicit: true,
                     module: module.to_string(),
                 },
                 call.func.range(),
-            ));
+            );
         }
     }
 }

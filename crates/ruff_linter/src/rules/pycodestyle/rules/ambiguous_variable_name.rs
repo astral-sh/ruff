@@ -2,9 +2,9 @@ use ruff_text_size::TextRange;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for the use of the characters 'l', 'O', or 'I' as variable names.
@@ -50,9 +50,6 @@ pub(crate) fn ambiguous_variable_name(checker: &Checker, name: &str, range: Text
         return;
     }
     if is_ambiguous_name(name) {
-        checker.report_diagnostic(Diagnostic::new(
-            AmbiguousVariableName(name.to_string()),
-            range,
-        ));
+        checker.report_diagnostic(AmbiguousVariableName(name.to_string()), range);
     }
 }

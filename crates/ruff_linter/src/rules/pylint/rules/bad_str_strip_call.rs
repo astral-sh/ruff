@@ -8,8 +8,8 @@ use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -211,7 +211,5 @@ pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
         None
     };
 
-    let diagnostic = Diagnostic::new(BadStrStripCall { strip, removal }, arg.range());
-
-    checker.report_diagnostic(diagnostic);
+    checker.report_diagnostic(BadStrStripCall { strip, removal }, arg.range());
 }

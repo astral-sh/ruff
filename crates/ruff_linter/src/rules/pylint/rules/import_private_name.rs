@@ -7,9 +7,9 @@ use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scope};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::package::PackageRoot;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for import statements that import a private name (a name starting
@@ -136,10 +136,7 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
         } else {
             None
         };
-        checker.report_diagnostic(Diagnostic::new(
-            ImportPrivateName { name, module },
-            binding.range(),
-        ));
+        checker.report_diagnostic(ImportPrivateName { name, module }, binding.range());
     }
 }
 

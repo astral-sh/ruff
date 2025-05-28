@@ -2,7 +2,6 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
-use crate::Diagnostic;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{AlwaysFixableViolation, Fix};
@@ -70,7 +69,7 @@ pub(crate) fn unnecessary_range_start(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryRangeStart, start.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryRangeStart, start.range());
     diagnostic.try_set_fix(|| {
         remove_argument(
             &start,
@@ -80,5 +79,4 @@ pub(crate) fn unnecessary_range_start(checker: &Checker, call: &ast::ExprCall) {
         )
         .map(Fix::safe_edit)
     });
-    checker.report_diagnostic(diagnostic);
 }

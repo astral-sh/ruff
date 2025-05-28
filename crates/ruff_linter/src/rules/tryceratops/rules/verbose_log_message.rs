@@ -6,9 +6,9 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for excessive logging of exception objects.
@@ -78,7 +78,7 @@ pub(crate) fn verbose_log_message(checker: &Checker, handlers: &[ExceptHandler])
                     };
                     let binding = checker.semantic().binding(id);
                     if binding.kind.is_bound_exception() {
-                        checker.report_diagnostic(Diagnostic::new(VerboseLogMessage, expr.range()));
+                        checker.report_diagnostic(VerboseLogMessage, expr.range());
                     }
                 }
             }

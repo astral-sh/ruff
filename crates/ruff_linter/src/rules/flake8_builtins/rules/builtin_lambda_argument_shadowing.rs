@@ -2,9 +2,9 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprLambda;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for lambda arguments that use the same names as Python builtins.
@@ -46,12 +46,12 @@ pub(crate) fn builtin_lambda_argument_shadowing(checker: &Checker, lambda: &Expr
             &checker.settings.flake8_builtins.ignorelist,
             checker.target_version(),
         ) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 BuiltinLambdaArgumentShadowing {
                     name: name.to_string(),
                 },
                 name.range(),
-            ));
+            );
         }
     }
 }

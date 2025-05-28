@@ -13,7 +13,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `if` branches with identical arm bodies.
@@ -87,7 +87,7 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             IfWithSameArms,
             TextRange::new(current_branch.start(), following_branch.end()),
         );
@@ -101,8 +101,6 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
                 checker.comment_ranges(),
             )
         });
-
-        checker.report_diagnostic(diagnostic);
     }
 }
 

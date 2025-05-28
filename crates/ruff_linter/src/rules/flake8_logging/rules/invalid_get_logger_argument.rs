@@ -4,7 +4,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for any usage of `__cached__` and `__file__` as an argument to
@@ -84,12 +84,11 @@ pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCal
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(InvalidGetLoggerArgument, expr.range());
+    let mut diagnostic = checker.report_diagnostic(InvalidGetLoggerArgument, expr.range());
     if checker.semantic().has_builtin_binding("__name__") {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             "__name__".to_string(),
             expr.range(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }

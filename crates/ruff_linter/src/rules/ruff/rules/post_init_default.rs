@@ -7,7 +7,7 @@ use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
 use super::helpers::{DataclassKind, dataclass_kind};
@@ -113,7 +113,7 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
         let Some(default) = parameter.default() else {
             continue;
         };
-        let mut diagnostic = Diagnostic::new(PostInitDefault, default.range());
+        let mut diagnostic = checker.report_diagnostic(PostInitDefault, default.range());
 
         if !stopped_fixes {
             diagnostic.try_set_fix(|| {
@@ -130,8 +130,6 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
             // following parameter with a default).
             stopped_fixes |= diagnostic.fix.is_none();
         }
-
-        checker.report_diagnostic(diagnostic);
     }
 }
 

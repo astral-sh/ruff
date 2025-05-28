@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for mutable objects passed as a value argument to `dict.fromkeys`.
@@ -87,12 +87,11 @@ pub(crate) fn mutable_fromkeys_value(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(MutableFromkeysValue, call.range());
+    let mut diagnostic = checker.report_diagnostic(MutableFromkeysValue, call.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         generate_dict_comprehension(keys, value, checker.generator()),
         call.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Format a code snippet to expression `{key: value for key in keys}`, where

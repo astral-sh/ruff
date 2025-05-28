@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks the following constructs, all of which can be replaced by
@@ -115,7 +115,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(checker: &Checke
         Cow::Owned(format!("iter({iterable})"))
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryIterableAllocationForFirstElement {
             iterable: SourceCodeSnippet::new(iterable.to_string()),
         },
@@ -126,8 +126,6 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(checker: &Checke
         format!("next({iterable})"),
         expr.range(),
     )));
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Check that the slice [`Expr`] is a slice of the first element (e.g., `x[0]`).

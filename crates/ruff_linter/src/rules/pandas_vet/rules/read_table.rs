@@ -4,8 +4,8 @@ use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of `pd.read_table` to read CSV files.
@@ -62,8 +62,7 @@ pub(crate) fn use_of_read_table(checker: &Checker, call: &ast::ExprCall) {
             .map(|keyword| &keyword.value)
         {
             if value == "," {
-                checker
-                    .report_diagnostic(Diagnostic::new(PandasUseOfDotReadTable, call.func.range()));
+                checker.report_diagnostic(PandasUseOfDotReadTable, call.func.range());
             }
         }
     }

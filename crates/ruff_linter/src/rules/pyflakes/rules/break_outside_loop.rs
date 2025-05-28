@@ -3,7 +3,7 @@ use ruff_python_ast::{self as ast, Stmt};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
-use crate::{Diagnostic, Violation};
+use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does
 /// Checks for `break` statements outside of loops.
@@ -32,15 +32,16 @@ impl Violation for BreakOutsideLoop {
 
 /// F701
 pub(crate) fn break_outside_loop<'a>(
+    checker: &Checker,
     stmt: &'a Stmt,
     parents: &mut impl Iterator<Item = &'a Stmt>,
-) -> Option<Diagnostic> {
+) {
     let mut child = stmt;
     for parent in parents {
         match parent {
             Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
                 if !orelse.contains(child) {
-                    return None;
+                    return;
                 }
             }
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
@@ -51,5 +52,5 @@ pub(crate) fn break_outside_loop<'a>(
         child = parent;
     }
 
-    Some(Diagnostic::new(BreakOutsideLoop, stmt.range()))
+    checker.report_diagnostic(BreakOutsideLoop, stmt.range());
 }

@@ -6,7 +6,7 @@ use ruff_python_semantic::analyze::typing::is_set;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for loops in which a `set` is modified during iteration.
@@ -97,7 +97,7 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
     });
 
     if is_modified {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             ModifiedIteratingSet {
                 name: name.id.clone(),
             },
@@ -107,7 +107,6 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
             format!("{}.copy()", checker.locator().slice(name)),
             name.range(),
         )));
-        checker.report_diagnostic(diagnostic);
     }
 }
 

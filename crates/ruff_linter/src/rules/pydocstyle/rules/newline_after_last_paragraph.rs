@@ -7,7 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for multi-line docstrings whose closing quotes are not on their
@@ -79,7 +79,7 @@ pub(crate) fn newline_after_last_paragraph(checker: &Checker, docstring: &Docstr
             {
                 if last_line != "\"\"\"" && last_line != "'''" {
                     let mut diagnostic =
-                        Diagnostic::new(NewLineAfterLastParagraph, docstring.range());
+                        checker.report_diagnostic(NewLineAfterLastParagraph, docstring.range());
                     // Insert a newline just before the end-quote(s).
                     let num_trailing_quotes = "'''".text_len();
                     let num_trailing_spaces: TextSize = last_line
@@ -99,7 +99,6 @@ pub(crate) fn newline_after_last_paragraph(checker: &Checker, docstring: &Docstr
                         docstring.end() - num_trailing_quotes - num_trailing_spaces,
                         docstring.end() - num_trailing_quotes,
                     )));
-                    checker.report_diagnostic(diagnostic);
                 }
             }
             return;

@@ -3,8 +3,9 @@ use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
+use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::settings::IgnoreNames;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for lowercase imports that are aliased to non-lowercase names.
@@ -49,19 +50,20 @@ impl Violation for LowercaseImportedAsNonLowercase {
 
 /// N812
 pub(crate) fn lowercase_imported_as_non_lowercase(
+    checker: &Checker,
     name: &str,
     asname: &str,
     alias: &Alias,
     stmt: &Stmt,
     ignore_names: &IgnoreNames,
-) -> Option<Diagnostic> {
+) {
     if !str::is_cased_uppercase(name) && str::is_cased_lowercase(name) && !str::is_lowercase(asname)
     {
         // Ignore any explicitly-allowed names.
         if ignore_names.matches(name) || ignore_names.matches(asname) {
-            return None;
+            return;
         }
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             LowercaseImportedAsNonLowercase {
                 name: name.to_string(),
                 asname: asname.to_string(),
@@ -69,7 +71,5 @@ pub(crate) fn lowercase_imported_as_non_lowercase(
             alias.range(),
         );
         diagnostic.set_parent(stmt.start());
-        return Some(diagnostic);
     }
-    None
 }

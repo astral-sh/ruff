@@ -6,9 +6,9 @@ use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for abstract classes without abstract methods or properties.
@@ -196,22 +196,22 @@ pub(crate) fn abstract_base_class(
             && is_empty_body(body)
             && !is_overload(decorator_list, checker.semantic())
         {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 EmptyMethodWithoutAbstractDecorator {
                     name: format!("{name}.{method_name}"),
                 },
                 stmt.range(),
-            ));
+            );
         }
     }
     if checker.enabled(Rule::AbstractBaseClassWithoutAbstractMethod) {
         if !has_abstract_method {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 AbstractBaseClassWithoutAbstractMethod {
                     name: name.to_string(),
                 },
                 stmt.identifier(),
-            ));
+            );
         }
     }
 }

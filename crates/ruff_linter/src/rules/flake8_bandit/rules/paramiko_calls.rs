@@ -3,8 +3,8 @@ use ruff_python_ast::Expr;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `paramiko` calls.
@@ -45,6 +45,6 @@ pub(crate) fn paramiko_call(checker: &Checker, func: &Expr) {
             matches!(qualified_name.segments(), ["paramiko", "exec_command"])
         })
     {
-        checker.report_diagnostic(Diagnostic::new(ParamikoCall, func.range()));
+        checker.report_diagnostic(ParamikoCall, func.range());
     }
 }

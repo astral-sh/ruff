@@ -4,9 +4,9 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::in_dunder_method;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `__init__` methods that return values.
@@ -59,6 +59,6 @@ pub(crate) fn return_in_init(checker: &Checker, stmt: &Stmt) {
     }
 
     if in_dunder_method("__init__", checker.semantic(), checker.settings) {
-        checker.report_diagnostic(Diagnostic::new(ReturnInInit, stmt.range()));
+        checker.report_diagnostic(ReturnInInit, stmt.range());
     }
 }

@@ -5,8 +5,8 @@ use ruff_python_ast::{self as ast, ExceptHandler, Expr, Operator};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for exception handlers that catch non-exception classes.
@@ -69,10 +69,7 @@ pub(crate) fn except_with_non_exception_classes(checker: &Checker, except_handle
                 .current_statement()
                 .as_try_stmt()
                 .is_some_and(|try_stmt| try_stmt.is_star);
-            checker.report_diagnostic(Diagnostic::new(
-                ExceptWithNonExceptionClasses { is_star },
-                expr.range(),
-            ));
+            checker.report_diagnostic(ExceptWithNonExceptionClasses { is_star }, expr.range());
         }
     }
 }

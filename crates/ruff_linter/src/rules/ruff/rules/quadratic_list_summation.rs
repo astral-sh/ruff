@@ -9,7 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for the use of `sum()` to flatten lists of lists, which has
@@ -95,9 +95,8 @@ pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(QuadraticListSummation, *range);
+    let mut diagnostic = checker.report_diagnostic(QuadraticListSummation, *range);
     diagnostic.try_set_fix(|| convert_to_reduce(iterable, call, checker));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Generate a [`Fix`] to convert a `sum()` call to a `functools.reduce()` call.

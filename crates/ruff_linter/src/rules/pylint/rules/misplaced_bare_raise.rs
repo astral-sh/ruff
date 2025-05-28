@@ -2,9 +2,9 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::in_dunder_method;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for bare `raise` statements outside of exception handlers.
@@ -64,5 +64,5 @@ pub(crate) fn misplaced_bare_raise(checker: &Checker, raise: &ast::StmtRaise) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(MisplacedBareRaise, raise.range()));
+    checker.report_diagnostic(MisplacedBareRaise, raise.range());
 }

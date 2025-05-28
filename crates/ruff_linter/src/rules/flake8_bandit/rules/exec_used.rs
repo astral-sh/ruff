@@ -3,8 +3,8 @@ use ruff_python_ast::Expr;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of the builtin `exec` function.
@@ -34,6 +34,6 @@ impl Violation for ExecBuiltin {
 /// S102
 pub(crate) fn exec_used(checker: &Checker, func: &Expr) {
     if checker.semantic().match_builtin_expr(func, "exec") {
-        checker.report_diagnostic(Diagnostic::new(ExecBuiltin, func.range()));
+        checker.report_diagnostic(ExecBuiltin, func.range());
     }
 }

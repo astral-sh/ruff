@@ -15,7 +15,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of mutable objects as function argument defaults.
@@ -111,7 +111,7 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
                 is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
             })
         {
-            let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
+            let mut diagnostic = checker.report_diagnostic(MutableArgumentDefault, default.range());
 
             // If the function body is on the same line as the function def, do not fix
             if let Some(fix) = move_initialization(
@@ -126,7 +126,6 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
             ) {
                 diagnostic.set_fix(fix);
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

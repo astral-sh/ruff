@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for the use of `global` statements to update identifiers.
@@ -55,13 +55,13 @@ impl Violation for GlobalStatement {
 /// PLW0603
 pub(crate) fn global_statement(checker: &Checker, name: &str) {
     if let Some(range) = checker.semantic().global(name) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             GlobalStatement {
                 name: name.to_string(),
             },
             // Match Pylint's behavior by reporting on the `global` statement`, rather
             // than the variable usage.
             range,
-        ));
+        );
     }
 }

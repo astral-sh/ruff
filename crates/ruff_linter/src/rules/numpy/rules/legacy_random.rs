@@ -4,8 +4,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for the use of legacy `np.random` function calls.
@@ -137,11 +137,11 @@ pub(crate) fn legacy_random(checker: &Checker, expr: &Expr) {
                 }
             })
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             NumpyLegacyRandom {
                 method_name: method_name.to_string(),
             },
             expr.range(),
-        ));
+        );
     }
 }

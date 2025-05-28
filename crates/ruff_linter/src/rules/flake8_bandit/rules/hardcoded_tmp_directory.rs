@@ -3,8 +3,8 @@ use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for the use of hardcoded temporary file or directory paths.
@@ -102,10 +102,10 @@ fn check(checker: &Checker, value: &str, range: TextRange) {
         }
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         HardcodedTempFile {
             string: value.to_string(),
         },
         range,
-    ));
+    );
 }

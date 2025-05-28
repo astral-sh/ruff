@@ -4,7 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for single-line docstrings that are broken across multiple lines.
@@ -67,7 +67,8 @@ pub(crate) fn one_liner(checker: &Checker, docstring: &Docstring) {
     }
 
     if non_empty_line_count == 1 && line_count > 1 {
-        let mut diagnostic = Diagnostic::new(UnnecessaryMultilineDocstring, docstring.range());
+        let mut diagnostic =
+            checker.report_diagnostic(UnnecessaryMultilineDocstring, docstring.range());
 
         // If removing whitespace would lead to an invalid string of quote
         // characters, avoid applying the fix.
@@ -87,7 +88,5 @@ pub(crate) fn one_liner(checker: &Checker, docstring: &Docstring) {
                 docstring.range(),
             )));
         }
-
-        checker.report_diagnostic(diagnostic);
     }
 }

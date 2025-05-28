@@ -5,8 +5,8 @@ use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for object type comparisons using `==` and other comparison
@@ -76,7 +76,7 @@ pub(crate) fn type_comparison(checker: &Checker, compare: &ast::ExprCompare) {
             }
 
             // Disallow the comparison.
-            checker.report_diagnostic(Diagnostic::new(TypeComparison, compare.range()));
+            checker.report_diagnostic(TypeComparison, compare.range());
         }
     }
 }

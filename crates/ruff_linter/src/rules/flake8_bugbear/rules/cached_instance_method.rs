@@ -5,8 +5,8 @@ use ruff_python_semantic::analyze::{class, function_type};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of the `functools.lru_cache` and `functools.cache`
@@ -102,7 +102,7 @@ pub(crate) fn cached_instance_method(checker: &Checker, function_def: &ast::Stmt
                 return;
             }
 
-            checker.report_diagnostic(Diagnostic::new(CachedInstanceMethod, decorator.range()));
+            checker.report_diagnostic(CachedInstanceMethod, decorator.range());
         }
     }
 }

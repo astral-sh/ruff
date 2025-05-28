@@ -9,8 +9,8 @@ use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonTy
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for dictionary iterations that extract the dictionary value
@@ -86,8 +86,7 @@ pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &ast::StmtFo
     };
 
     if has_violation {
-        let diagnostic = Diagnostic::new(DictIndexMissingItems, stmt_for.range());
-        checker.report_diagnostic(diagnostic);
+        checker.report_diagnostic(DictIndexMissingItems, stmt_for.range());
     }
 }
 

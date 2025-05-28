@@ -8,8 +8,8 @@ use ruff_python_semantic::analyze::typing::{
 };
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for function calls in default function arguments.
@@ -111,12 +111,12 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
                         )
                     })
                 {
-                    self.checker.report_diagnostic(Diagnostic::new(
+                    self.checker.report_diagnostic(
                         FunctionCallInDefaultArgument {
                             name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
                         },
                         expr.range(),
-                    ));
+                    );
                 }
                 visitor::walk_expr(self, expr);
             }

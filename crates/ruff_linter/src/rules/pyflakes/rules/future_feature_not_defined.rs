@@ -4,8 +4,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_stdlib::future::is_feature_name;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `__future__` imports that are not defined in the current Python
@@ -35,10 +35,10 @@ pub(crate) fn future_feature_not_defined(checker: &Checker, alias: &Alias) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         FutureFeatureNotDefined {
             name: alias.name.to_string(),
         },
         alias.range(),
-    ));
+    );
 }

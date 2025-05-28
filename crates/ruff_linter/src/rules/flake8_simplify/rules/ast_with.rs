@@ -7,10 +7,10 @@ use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
 use super::fix_with;
+use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
 use crate::preview::multiple_with_statements_fix_safe_enabled;
-use crate::{Diagnostic, Fix};
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -171,7 +171,7 @@ pub(crate) fn multiple_with_statements(
             return;
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             MultipleWithStatements,
             TextRange::new(with_stmt.start(), colon.end()),
         );
@@ -208,6 +208,5 @@ pub(crate) fn multiple_with_statements(
                 }
             });
         }
-        checker.report_diagnostic(diagnostic);
     }
 }

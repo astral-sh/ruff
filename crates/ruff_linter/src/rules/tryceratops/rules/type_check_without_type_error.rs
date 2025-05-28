@@ -5,8 +5,8 @@ use ruff_python_ast::{self as ast, Expr, Stmt, StmtIf};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for type checks that do not raise `TypeError`.
@@ -94,7 +94,7 @@ fn check_type_check_test(semantic: &SemanticModel, test: &Expr) -> bool {
 
 fn check_raise(checker: &Checker, exc: &Expr, item: &Stmt) {
     if is_builtin_exception(exc, checker.semantic()) {
-        checker.report_diagnostic(Diagnostic::new(TypeCheckWithoutTypeError, item.range()));
+        checker.report_diagnostic(TypeCheckWithoutTypeError, item.range());
     }
 }
 

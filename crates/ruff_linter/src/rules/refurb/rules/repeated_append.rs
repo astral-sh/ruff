@@ -11,7 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for consecutive calls to `append`.
@@ -94,7 +94,7 @@ pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
 
         let replacement = make_suggestion(&group, checker.generator());
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             RepeatedAppend {
                 name: group.name().to_string(),
                 replacement: SourceCodeSnippet::new(replacement.clone()),
@@ -119,8 +119,6 @@ pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
                 group.end(),
             )));
         }
-
-        checker.report_diagnostic(diagnostic);
     }
 }
 

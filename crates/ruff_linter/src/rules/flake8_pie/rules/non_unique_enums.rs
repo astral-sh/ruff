@@ -6,7 +6,6 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Expr, ExprCall, Stmt};
 use ruff_text_size::Ranged;
 
-use crate::Diagnostic;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
@@ -91,13 +90,12 @@ pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) 
         let comparable = ComparableExpr::from(value);
 
         if !seen_targets.insert(comparable) {
-            let diagnostic = Diagnostic::new(
+            checker.report_diagnostic(
                 NonUniqueEnums {
                     value: checker.generator().expr(value),
                 },
                 stmt.range(),
             );
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

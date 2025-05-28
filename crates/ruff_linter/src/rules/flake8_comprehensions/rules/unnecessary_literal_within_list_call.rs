@@ -3,7 +3,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use super::helpers;
 
@@ -82,7 +82,7 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: &ast
         return;
     }
 
-    let diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryLiteralWithinListCall {
             kind: argument_kind,
         },
@@ -119,7 +119,7 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: &ast
         }
     };
 
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    diagnostic.set_fix(fix);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

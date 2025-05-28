@@ -4,9 +4,9 @@ use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-use crate::{Diagnostic, Violation};
 
 use super::helpers::is_empty_or_null_string;
 
@@ -178,10 +178,7 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
                 .find_argument("expected_exception", 0)
                 .is_none()
             {
-                checker.report_diagnostic(Diagnostic::new(
-                    PytestRaisesWithoutException,
-                    call.func.range(),
-                ));
+                checker.report_diagnostic(PytestRaisesWithoutException, call.func.range());
             }
         }
 
@@ -234,10 +231,7 @@ pub(crate) fn complex_raises(checker: &Checker, stmt: &Stmt, items: &[WithItem],
         };
 
         if is_too_complex {
-            checker.report_diagnostic(Diagnostic::new(
-                PytestRaisesWithMultipleStatements,
-                stmt.range(),
-            ));
+            checker.report_diagnostic(PytestRaisesWithMultipleStatements, stmt.range());
         }
     }
 }
@@ -264,11 +258,11 @@ fn exception_needs_match(checker: &Checker, exception: &Expr) {
                 .then_some(qualified_name)
         })
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             PytestRaisesTooBroad {
                 exception: qualified_name,
             },
             exception.range(),
-        ));
+        );
     }
 }

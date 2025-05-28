@@ -3,8 +3,8 @@ use ruff_python_ast::{self as ast, Stmt};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `break`, `continue`, and `return` statements in `finally`
@@ -56,7 +56,7 @@ impl Violation for JumpStatementInFinally {
 fn walk_stmt(checker: &Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
     for stmt in body {
         if f(stmt) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 JumpStatementInFinally {
                     name: match stmt {
                         Stmt::Break(_) => "break",
@@ -67,7 +67,7 @@ fn walk_stmt(checker: &Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
                     .to_owned(),
                 },
                 stmt.range(),
-            ));
+            );
         }
         match stmt {
             Stmt::While(ast::StmtWhile { body, .. }) | Stmt::For(ast::StmtFor { body, .. }) => {

@@ -4,7 +4,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the use of `.digest().hex()` on a hashlib hash, like `sha512`.
@@ -109,13 +109,12 @@ pub(crate) fn hashlib_digest_hex(checker: &Checker, call: &ExprCall) {
             )
         })
     {
-        let mut diagnostic = Diagnostic::new(HashlibDigestHex, call.range());
+        let mut diagnostic = checker.report_diagnostic(HashlibDigestHex, call.range());
         if arguments.is_empty() {
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 ".hexdigest".to_string(),
                 TextRange::new(value.end(), call.func.end()),
             )));
         }
-        checker.report_diagnostic(diagnostic);
     }
 }

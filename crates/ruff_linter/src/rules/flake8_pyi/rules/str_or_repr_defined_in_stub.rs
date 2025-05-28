@@ -7,7 +7,7 @@ use ruff_python_semantic::analyze::visibility::is_abstract;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
-use crate::{AlwaysFixableViolation, Diagnostic, Fix};
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for redundant definitions of `__str__` or `__repr__` in stubs.
@@ -82,7 +82,7 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         StrOrReprDefinedInStub {
             name: name.to_string(),
         },
@@ -94,5 +94,4 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
     diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().current_statement_parent_id(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

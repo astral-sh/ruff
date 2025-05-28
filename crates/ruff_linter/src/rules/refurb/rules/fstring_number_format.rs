@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `bin(...)[2:]` (or `hex`, or `oct`) to convert
@@ -145,7 +145,7 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
 
     let replacement = try_create_replacement(checker, arg, base);
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         FStringNumberFormat {
             replacement: replacement.as_deref().map(SourceCodeSnippet::from_str),
             base,
@@ -157,8 +157,6 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
         let edit = Edit::range_replacement(replacement, subscript.range());
         diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Generate a replacement, if possible.

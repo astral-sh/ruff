@@ -8,9 +8,9 @@ use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for redundant unions between a `Literal` and a builtin supertype of
@@ -90,7 +90,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
         };
 
         if builtin_types_in_union.contains(&literal_type) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 RedundantLiteralUnion {
                     literal: SourceCodeSnippet::from_str(
                         checker.locator().slice(typing_literal_expr),
@@ -98,7 +98,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
                     builtin_type: literal_type,
                 },
                 typing_literal_expr.range(),
-            ));
+            );
         }
     }
 }

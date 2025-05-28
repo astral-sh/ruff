@@ -7,9 +7,9 @@ use ruff_python_semantic::analyze::typing::TypeChecker;
 use ruff_python_semantic::{BindingKind, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::is_dunder_operator_method;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for accesses on "private" class members.
@@ -144,12 +144,12 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         }
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         PrivateMemberAccess {
             access: attr.to_string(),
         },
         expr.range(),
-    ));
+    );
 }
 
 /// Check for the following cases:

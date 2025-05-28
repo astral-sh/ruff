@@ -3,8 +3,8 @@ use ruff_python_ast::Expr;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `raise` statements that raise a literal value.
@@ -39,6 +39,6 @@ impl Violation for RaiseLiteral {
 /// B016
 pub(crate) fn raise_literal(checker: &Checker, expr: &Expr) {
     if expr.is_literal_expr() {
-        checker.report_diagnostic(Diagnostic::new(RaiseLiteral, expr.range()));
+        checker.report_diagnostic(RaiseLiteral, expr.range());
     }
 }

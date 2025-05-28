@@ -2,8 +2,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of the `global` keyword at the module level.
@@ -27,6 +27,6 @@ impl Violation for GlobalAtModuleLevel {
 /// PLW0604
 pub(crate) fn global_at_module_level(checker: &Checker, stmt: &Stmt) {
     if checker.semantic().current_scope().kind.is_module() {
-        checker.report_diagnostic(Diagnostic::new(GlobalAtModuleLevel, stmt.range()));
+        checker.report_diagnostic(GlobalAtModuleLevel, stmt.range());
     }
 }

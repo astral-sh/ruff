@@ -8,8 +8,8 @@ use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `__str__` implementations that return a type other than `str`.
@@ -68,10 +68,7 @@ pub(crate) fn invalid_str_return(checker: &Checker, function_def: &ast::StmtFunc
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.report_diagnostic(Diagnostic::new(
-            InvalidStrReturnType,
-            function_def.identifier(),
-        ));
+        checker.report_diagnostic(InvalidStrReturnType, function_def.identifier());
         return;
     }
 
@@ -87,11 +84,11 @@ pub(crate) fn invalid_str_return(checker: &Checker, function_def: &ast::StmtFunc
                 ResolvedPythonType::from(value),
                 ResolvedPythonType::Unknown | ResolvedPythonType::Atom(PythonType::String)
             ) {
-                checker.report_diagnostic(Diagnostic::new(InvalidStrReturnType, value.range()));
+                checker.report_diagnostic(InvalidStrReturnType, value.range());
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidStrReturnType, stmt.range()));
+            checker.report_diagnostic(InvalidStrReturnType, stmt.range());
         }
     }
 }

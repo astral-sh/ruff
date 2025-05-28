@@ -1,9 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::TextRange;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for variable (and function) assignments that use the same names
@@ -73,11 +73,11 @@ pub(crate) fn builtin_variable_shadowing(checker: &Checker, name: &str, range: T
         &checker.settings.flake8_builtins.ignorelist,
         checker.target_version(),
     ) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             BuiltinVariableShadowing {
                 name: name.to_string(),
             },
             range,
-        ));
+        );
     }
 }

@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use super::helpers::{Parentheses, get_mark_decorators};
 
@@ -126,7 +126,7 @@ fn pytest_mark_parentheses(
     preferred: Parentheses,
     actual: Parentheses,
 ) {
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         PytestIncorrectMarkParenthesesStyle {
             mark_name: marker.to_string(),
             expected_parens: preferred,
@@ -135,7 +135,6 @@ fn pytest_mark_parentheses(
         decorator.range(),
     );
     diagnostic.set_fix(fix);
-    checker.report_diagnostic(diagnostic);
 }
 
 fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str) {
@@ -204,9 +203,9 @@ fn check_useless_usefixtures(checker: &Checker, decorator: &Decorator, marker: &
         _ => return,
     }
 
-    let mut diagnostic = Diagnostic::new(PytestUseFixturesWithoutParameters, decorator.range());
+    let mut diagnostic =
+        checker.report_diagnostic(PytestUseFixturesWithoutParameters, decorator.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(decorator.range())));
-    checker.report_diagnostic(diagnostic);
 }
 
 pub(crate) fn marks(checker: &Checker, decorators: &[Decorator]) {

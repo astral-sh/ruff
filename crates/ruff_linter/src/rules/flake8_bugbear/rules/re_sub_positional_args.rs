@@ -6,8 +6,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for calls to `re.sub`, `re.subn`, and `re.split` that pass `count`,
@@ -75,10 +75,7 @@ pub(crate) fn re_sub_positional_args(checker: &Checker, call: &ast::ExprCall) {
     };
 
     if call.arguments.args.len() > method.num_args() {
-        checker.report_diagnostic(Diagnostic::new(
-            ReSubPositionalArgs { method },
-            call.range(),
-        ));
+        checker.report_diagnostic(ReSubPositionalArgs { method }, call.range());
     }
 }
 

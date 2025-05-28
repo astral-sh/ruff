@@ -4,8 +4,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks that async functions do not call `time.sleep`.
@@ -51,10 +51,7 @@ pub(crate) fn blocking_sleep(checker: &Checker, call: &ExprCall) {
             .as_ref()
             .is_some_and(is_blocking_sleep)
         {
-            checker.report_diagnostic(Diagnostic::new(
-                BlockingSleepInAsyncFunction,
-                call.func.range(),
-            ));
+            checker.report_diagnostic(BlockingSleepInAsyncFunction, call.func.range());
         }
     }
 }

@@ -7,9 +7,9 @@ use ruff_python_ast::{self as ast, Expr, ExprContext, Parameters, Stmt};
 use ruff_python_ast::{ExprLambda, visitor};
 use ruff_python_semantic::SemanticModel;
 
+use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes;
-use crate::{Diagnostic, Fix};
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -138,7 +138,7 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryMap { object_type }, call.range);
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryMap { object_type }, call.range);
     diagnostic.try_set_fix(|| {
         fixes::fix_unnecessary_map(
             call,
@@ -149,7 +149,6 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
         )
         .map(Fix::unsafe_edit)
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 fn is_list_set_or_dict(func: &Expr, semantic: &SemanticModel) -> bool {

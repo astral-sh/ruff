@@ -3,7 +3,6 @@ use ruff_python_ast::Number;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
-use crate::Diagnostic;
 use crate::Edit;
 use crate::Fix;
 use crate::FixAvailability;
@@ -178,7 +177,7 @@ pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) 
         (Index::Last, true) => MinMax::Min,
     };
 
-    let mut diagnostic = Diagnostic::new(SortedMinMax { min_max }, subscript.range());
+    let mut diagnostic = checker.report_diagnostic(SortedMinMax { min_max }, subscript.range());
 
     if checker.semantic().has_builtin_binding(min_max.as_str()) {
         diagnostic.set_fix({
@@ -200,8 +199,6 @@ pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) 
             }
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

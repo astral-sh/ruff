@@ -3,8 +3,8 @@ use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Operator};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for the presence of string literals in `X | Y`-style union types.
@@ -66,7 +66,7 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
     traverse_op(expr, &mut strings);
 
     for string in strings {
-        checker.report_diagnostic(Diagnostic::new(RuntimeStringUnion, string.range()));
+        checker.report_diagnostic(RuntimeStringUnion, string.range());
     }
 }
 

@@ -21,7 +21,7 @@ use crate::preview::{
 use crate::registry::Rule;
 use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::{isort, isort::ImportSection, isort::ImportType};
-use crate::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
+use crate::{Applicability, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unused imports.
@@ -425,7 +425,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
             iter::zip(to_remove, iter::repeat(fix_remove)),
             iter::zip(to_reexport, iter::repeat(fix_reexport)),
         ) {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 UnusedImport {
                     name: binding.import.qualified_name().to_string(),
                     module: binding.import.member_name().to_string(),
@@ -444,14 +444,13 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                     diagnostic.set_fix(fix.clone());
                 }
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 
     // Separately, generate a diagnostic for every _ignored_ import, to ensure that the
     // suppression comments aren't marked as unused.
     for binding in ignored.into_values().flatten() {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             UnusedImport {
                 name: binding.import.qualified_name().to_string(),
                 module: binding.import.member_name().to_string(),
@@ -465,7 +464,6 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
         if let Some(range) = binding.parent_range {
             diagnostic.set_parent(range.start());
         }
-        checker.report_diagnostic(diagnostic);
     }
 }
 

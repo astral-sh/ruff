@@ -3,9 +3,9 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_django::rules::helpers::is_model_form;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for the use of `fields = "__all__"` in Django `ModelForm`
@@ -78,19 +78,13 @@ pub(crate) fn all_with_model_form(checker: &Checker, class_def: &ast::StmtClassD
                 match value.as_ref() {
                     Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                         if value == "__all__" {
-                            checker.report_diagnostic(Diagnostic::new(
-                                DjangoAllWithModelForm,
-                                element.range(),
-                            ));
+                            checker.report_diagnostic(DjangoAllWithModelForm, element.range());
                             return;
                         }
                     }
                     Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
                         if value == "__all__".as_bytes() {
-                            checker.report_diagnostic(Diagnostic::new(
-                                DjangoAllWithModelForm,
-                                element.range(),
-                            ));
+                            checker.report_diagnostic(DjangoAllWithModelForm, element.range());
                             return;
                         }
                     }

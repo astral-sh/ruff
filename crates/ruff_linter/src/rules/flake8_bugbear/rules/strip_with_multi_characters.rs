@@ -4,8 +4,8 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of multi-character strings in `.strip()`, `.lstrip()`, and
@@ -73,6 +73,6 @@ pub(crate) fn strip_with_multi_characters(
     };
 
     if value.chars().count() > 1 && !value.chars().all_unique() {
-        checker.report_diagnostic(Diagnostic::new(StripWithMultiCharacters, expr.range()));
+        checker.report_diagnostic(StripWithMultiCharacters, expr.range());
     }
 }

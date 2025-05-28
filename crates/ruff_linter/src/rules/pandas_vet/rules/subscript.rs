@@ -4,7 +4,6 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
-use crate::Diagnostic;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -152,21 +151,6 @@ pub(crate) fn subscript(checker: &Checker, value: &Expr, expr: &Expr) {
         return;
     };
 
-    let range = expr.range();
-
-    let diagnostic = match attr.as_str() {
-        "ix" if checker.settings.rules.enabled(Rule::PandasUseOfDotIx) => {
-            Diagnostic::new(PandasUseOfDotIx, range)
-        }
-        "at" if checker.settings.rules.enabled(Rule::PandasUseOfDotAt) => {
-            Diagnostic::new(PandasUseOfDotAt, range)
-        }
-        "iat" if checker.settings.rules.enabled(Rule::PandasUseOfDotIat) => {
-            Diagnostic::new(PandasUseOfDotIat, range)
-        }
-        _ => return,
-    };
-
     // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.at[0]`), and on irrelevant bindings
     // (like imports).
     if !matches!(
@@ -176,5 +160,18 @@ pub(crate) fn subscript(checker: &Checker, value: &Expr, expr: &Expr) {
         return;
     }
 
-    checker.report_diagnostic(diagnostic);
+    let range = expr.range();
+
+    match attr.as_str() {
+        "ix" if checker.settings.rules.enabled(Rule::PandasUseOfDotIx) => {
+            checker.report_diagnostic(PandasUseOfDotIx, range)
+        }
+        "at" if checker.settings.rules.enabled(Rule::PandasUseOfDotAt) => {
+            checker.report_diagnostic(PandasUseOfDotAt, range)
+        }
+        "iat" if checker.settings.rules.enabled(Rule::PandasUseOfDotIat) => {
+            checker.report_diagnostic(PandasUseOfDotIat, range)
+        }
+        _ => return,
+    };
 }

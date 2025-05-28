@@ -3,8 +3,8 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks that async functions do not open files with blocking methods like `open`.
@@ -52,10 +52,7 @@ pub(crate) fn blocking_open_call(checker: &Checker, call: &ast::ExprCall) {
     if is_open_call(&call.func, checker.semantic())
         || is_open_call_from_pathlib(call.func.as_ref(), checker.semantic())
     {
-        checker.report_diagnostic(Diagnostic::new(
-            BlockingOpenCallInAsyncFunction,
-            call.func.range(),
-        ));
+        checker.report_diagnostic(BlockingOpenCallInAsyncFunction, call.func.range());
     }
 }
 

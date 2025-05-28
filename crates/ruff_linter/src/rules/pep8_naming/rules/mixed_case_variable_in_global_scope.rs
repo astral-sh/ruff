@@ -3,9 +3,9 @@ use ruff_python_ast::Expr;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for global variable names that follow the `mixedCase` convention.
@@ -79,10 +79,10 @@ pub(crate) fn mixed_case_variable_in_global_scope(checker: &Checker, expr: &Expr
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         MixedCaseVariableInGlobalScope {
             name: name.to_string(),
         },
         expr.range(),
-    ));
+    );
 }

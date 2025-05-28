@@ -3,8 +3,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for too many Boolean expressions in an `if` statement.
@@ -47,13 +47,13 @@ pub(crate) fn too_many_boolean_expressions(checker: &Checker, stmt: &StmtIf) {
     if let Some(bool_op) = stmt.test.as_bool_op_expr() {
         let expressions = count_bools(bool_op);
         if expressions > checker.settings.pylint.max_bool_expr {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 TooManyBooleanExpressions {
                     expressions,
                     max_expressions: checker.settings.pylint.max_bool_expr,
                 },
                 bool_op.range(),
-            ));
+            );
         }
     }
 
@@ -61,13 +61,13 @@ pub(crate) fn too_many_boolean_expressions(checker: &Checker, stmt: &StmtIf) {
         if let Some(bool_op) = elif.test.as_ref().and_then(Expr::as_bool_op_expr) {
             let expressions = count_bools(bool_op);
             if expressions > checker.settings.pylint.max_bool_expr {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     TooManyBooleanExpressions {
                         expressions,
                         max_expressions: checker.settings.pylint.max_bool_expr,
                     },
                     bool_op.range(),
-                ));
+                );
             }
         }
     }

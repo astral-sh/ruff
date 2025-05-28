@@ -5,7 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Detects attempts to use `super` without parentheses.
@@ -108,12 +108,10 @@ pub(crate) fn super_without_brackets(checker: &Checker, func: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(SuperWithoutBrackets, value.range());
+    let mut diagnostic = checker.report_diagnostic(SuperWithoutBrackets, value.range());
 
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "super()".to_string(),
         value.range(),
     )));
-
-    checker.report_diagnostic(diagnostic);
 }

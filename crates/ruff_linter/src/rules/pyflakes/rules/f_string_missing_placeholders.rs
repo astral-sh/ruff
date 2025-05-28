@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for f-strings that do not contain any placeholder expressions.
@@ -91,13 +91,13 @@ pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &ast::ExprF
             TextSize::new(1),
         );
 
-        let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, f_string.range());
+        let mut diagnostic =
+            checker.report_diagnostic(FStringMissingPlaceholders, f_string.range());
         diagnostic.set_fix(convert_f_string_to_regular_string(
             prefix_range,
             f_string.range(),
             checker.locator(),
         ));
-        checker.report_diagnostic(diagnostic);
     }
 }
 

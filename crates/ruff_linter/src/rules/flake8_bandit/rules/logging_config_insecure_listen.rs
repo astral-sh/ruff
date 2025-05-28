@@ -3,8 +3,8 @@ use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for insecure `logging.config.listen` calls.
@@ -51,9 +51,6 @@ pub(crate) fn logging_config_insecure_listen(checker: &Checker, call: &ast::Expr
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
-            LoggingConfigInsecureListen,
-            call.func.range(),
-        ));
+        checker.report_diagnostic(LoggingConfigInsecureListen, call.func.range());
     }
 }

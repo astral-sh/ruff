@@ -2,8 +2,8 @@ use ruff_python_ast::{Expr, StmtAssign};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for assignments with multiple or non-name targets in stub files.
@@ -56,5 +56,5 @@ pub(crate) fn complex_assignment_in_stub(checker: &Checker, stmt: &StmtAssign) {
     if matches!(stmt.targets.as_slice(), [Expr::Name(_)]) {
         return;
     }
-    checker.report_diagnostic(Diagnostic::new(ComplexAssignmentInStub, stmt.range));
+    checker.report_diagnostic(ComplexAssignmentInStub, stmt.range);
 }

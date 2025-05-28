@@ -3,8 +3,8 @@ use ruff_python_ast::{self as ast, Stmt};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `continue` statements inside `finally`
@@ -49,7 +49,7 @@ impl Violation for ContinueInFinally {
 fn traverse_body(checker: &Checker, body: &[Stmt]) {
     for stmt in body {
         if stmt.is_continue_stmt() {
-            checker.report_diagnostic(Diagnostic::new(ContinueInFinally, stmt.range()));
+            checker.report_diagnostic(ContinueInFinally, stmt.range());
         }
 
         match stmt {

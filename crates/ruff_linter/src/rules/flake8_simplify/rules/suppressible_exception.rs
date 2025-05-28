@@ -8,7 +8,7 @@ use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `try`-`except`-`pass` blocks that can be replaced with the
@@ -120,7 +120,7 @@ pub(crate) fn suppressible_exception(
         handler_names.join(", ")
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         SuppressibleException {
             exception: exception.clone(),
         },
@@ -147,5 +147,4 @@ pub(crate) fn suppressible_exception(
             ))
         });
     }
-    checker.report_diagnostic(diagnostic);
 }

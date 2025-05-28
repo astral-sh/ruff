@@ -8,7 +8,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `TypedDict` declarations that use functional syntax.
@@ -97,7 +97,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ConvertTypedDictFunctionalToClass {
             name: class_name.to_string(),
         },
@@ -115,7 +115,6 @@ pub(crate) fn convert_typed_dict_functional_to_class(
             checker.comment_ranges(),
         ));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Return the class name, arguments, keywords and base class for a `TypedDict`

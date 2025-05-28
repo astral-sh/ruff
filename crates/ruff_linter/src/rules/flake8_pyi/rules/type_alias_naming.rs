@@ -2,8 +2,8 @@ use ruff_python_ast::{self as ast, Expr};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for type aliases that do not use the CamelCase naming convention.
@@ -109,12 +109,12 @@ pub(crate) fn snake_case_type_alias(checker: &Checker, target: &Expr) {
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             SnakeCaseTypeAlias {
                 name: id.to_string(),
             },
             *range,
-        ));
+        );
     }
 }
 
@@ -125,11 +125,11 @@ pub(crate) fn t_suffixed_type_alias(checker: &Checker, target: &Expr) {
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             TSuffixedTypeAlias {
                 name: id.to_string(),
             },
             *range,
-        ));
+        );
     }
 }

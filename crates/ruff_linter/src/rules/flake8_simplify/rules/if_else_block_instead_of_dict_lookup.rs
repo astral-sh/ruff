@@ -7,8 +7,8 @@ use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for three or more consecutive if-statements with direct returns
@@ -156,8 +156,5 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
-        IfElseBlockInsteadOfDictLookup,
-        stmt_if.range(),
-    ));
+    checker.report_diagnostic(IfElseBlockInsteadOfDictLookup, stmt_if.range());
 }

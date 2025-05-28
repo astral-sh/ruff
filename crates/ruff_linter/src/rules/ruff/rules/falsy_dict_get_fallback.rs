@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
-use crate::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
+use crate::{AlwaysFixableViolation, Applicability, Fix};
 
 /// ## What it does
 /// Checks for `dict.get(key, falsy_value)` calls in boolean test positions.
@@ -87,7 +87,7 @@ pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(FalsyDictGetFallback, fallback_arg.range());
+    let mut diagnostic = checker.report_diagnostic(FalsyDictGetFallback, fallback_arg.range());
 
     let comment_ranges = checker.comment_ranges();
 
@@ -107,6 +107,4 @@ pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
         )
         .map(|edit| Fix::applicable_edit(edit, applicability))
     });
-
-    checker.report_diagnostic(diagnostic);
 }

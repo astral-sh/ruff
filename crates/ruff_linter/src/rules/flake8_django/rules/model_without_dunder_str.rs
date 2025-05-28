@@ -4,8 +4,8 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::{Modules, SemanticModel, analyze};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 use super::helpers;
 
@@ -64,10 +64,7 @@ pub(crate) fn model_without_dunder_str(checker: &Checker, class_def: &ast::StmtC
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
-        DjangoModelWithoutDunderStr,
-        class_def.identifier(),
-    ));
+    checker.report_diagnostic(DjangoModelWithoutDunderStr, class_def.identifier());
 }
 
 /// Returns `true` if the class has `__str__` method.

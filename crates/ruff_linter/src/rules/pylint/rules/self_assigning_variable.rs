@@ -4,8 +4,8 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for self-assignment of variables.
@@ -79,12 +79,12 @@ fn visit_assignments(checker: &Checker, left: &Expr, right: &Expr) {
             Expr::Name(ast::ExprName { id: lhs_name, .. }),
             Expr::Name(ast::ExprName { id: rhs_name, .. }),
         ) if lhs_name == rhs_name => {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 SelfAssigningVariable {
                     name: lhs_name.to_string(),
                 },
                 left.range(),
-            ));
+            );
         }
         _ => {}
     }

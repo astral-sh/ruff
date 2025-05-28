@@ -5,8 +5,8 @@ use ruff_python_semantic::analyze::visibility::is_override;
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for argument names that do not follow the `snake_case` convention.
@@ -94,13 +94,11 @@ fn invalid_argument_name(checker: &Checker, parameters: &Parameters) {
             continue;
         }
 
-        let diagnostic = Diagnostic::new(
+        checker.report_diagnostic(
             InvalidArgumentName {
                 name: name.to_string(),
             },
             parameter.range(),
         );
-
-        checker.report_diagnostic(diagnostic);
     }
 }

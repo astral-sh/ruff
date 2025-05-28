@@ -4,8 +4,8 @@ use ruff_python_ast::{self as ast, Expr, Int, Number, Operator, Stmt};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `for` loops with explicit loop-index variables that can be replaced
@@ -139,13 +139,12 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
                 continue;
             }
 
-            let diagnostic = Diagnostic::new(
+            checker.report_diagnostic(
                 EnumerateForLoop {
                     index: index.id.to_string(),
                 },
                 stmt.range(),
             );
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

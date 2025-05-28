@@ -4,9 +4,9 @@ use ruff_python_ast::{Alias, AnyNodeRef, Stmt, StmtImport, StmtImportFrom};
 use ruff_text_size::Ranged;
 use std::borrow::Cow;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_tidy_imports::matchers::{MatchName, MatchNameOrParent, NameMatchPolicy};
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for module-level imports that should instead be imported lazily
@@ -68,12 +68,12 @@ pub(crate) fn banned_module_level_imports(checker: &Checker, stmt: &Stmt) {
                 .flake8_tidy_imports
                 .banned_module_level_imports(),
         ) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 BannedModuleLevelImports {
                     name: banned_module,
                 },
                 node.range(),
-            ));
+            );
         }
     }
 }

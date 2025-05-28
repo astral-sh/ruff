@@ -6,7 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
 use crate::rules::flake8_comprehensions::settings::Settings;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary `dict()`, `list()` or `tuple()` calls that can be
@@ -89,7 +89,7 @@ pub(crate) fn unnecessary_collection_call(
     };
 
     let mut diagnostic =
-        Diagnostic::new(UnnecessaryCollectionCall { kind: collection }, call.range());
+        checker.report_diagnostic(UnnecessaryCollectionCall { kind: collection }, call.range());
 
     // Convert `dict()` to `{}`.
     if call.arguments.keywords.is_empty() {
@@ -128,8 +128,6 @@ pub(crate) fn unnecessary_collection_call(
             fixes::fix_unnecessary_collection_call(call, checker).map(Fix::unsafe_edit)
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

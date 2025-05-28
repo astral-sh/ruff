@@ -9,7 +9,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::numpy::helpers::{AttributeSearcher, ImportSearcher};
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of NumPy functions and constants that were removed from
@@ -667,7 +667,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         Numpy2Deprecation {
             existing: replacement.existing.to_string(),
             migration_guide: replacement.details.guideline(),
@@ -701,7 +701,6 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         )),
         Details::Manual { guideline: _ } => {}
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Ignore attempts to access a `numpy` member via its deprecated name

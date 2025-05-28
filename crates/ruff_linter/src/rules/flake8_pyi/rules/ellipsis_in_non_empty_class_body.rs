@@ -4,7 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
-use crate::{Diagnostic, Fix, FixAvailability, Violation};
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Removes ellipses (`...`) in otherwise non-empty class bodies.
@@ -55,13 +55,13 @@ pub(crate) fn ellipsis_in_non_empty_class_body(checker: &Checker, body: &[Stmt])
         };
 
         if value.is_ellipsis_literal_expr() {
-            let mut diagnostic = Diagnostic::new(EllipsisInNonEmptyClassBody, stmt.range());
+            let mut diagnostic =
+                checker.report_diagnostic(EllipsisInNonEmptyClassBody, stmt.range());
             let edit =
                 fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());
             diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
                 checker.semantic().current_statement_id(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

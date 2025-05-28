@@ -3,8 +3,8 @@ use ruff_python_ast::{Expr, Keyword};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for function calls that use star-argument unpacking after providing a
@@ -71,9 +71,6 @@ pub(crate) fn star_arg_unpacking_after_keyword_arg(
         if arg.start() <= keyword.start() {
             continue;
         }
-        checker.report_diagnostic(Diagnostic::new(
-            StarArgUnpackingAfterKeywordArg,
-            arg.range(),
-        ));
+        checker.report_diagnostic(StarArgUnpackingAfterKeywordArg, arg.range());
     }
 }

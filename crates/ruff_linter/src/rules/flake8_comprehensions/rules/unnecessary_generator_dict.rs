@@ -3,7 +3,7 @@ use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Diagnostic, Fix};
+use crate::{AlwaysFixableViolation, Fix};
 
 use crate::rules::flake8_comprehensions::fixes;
 
@@ -70,8 +70,7 @@ pub(crate) fn unnecessary_generator_dict(
     if tuple.iter().any(Expr::is_starred_expr) {
         return;
     }
-    let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryGeneratorDict, expr.range());
     diagnostic
         .try_set_fix(|| fixes::fix_unnecessary_generator_dict(expr, checker).map(Fix::unsafe_edit));
-    checker.report_diagnostic(diagnostic);
 }

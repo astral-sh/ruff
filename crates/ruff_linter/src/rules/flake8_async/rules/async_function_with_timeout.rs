@@ -3,9 +3,9 @@ use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::helpers::AsyncModule;
-use crate::{Diagnostic, Violation};
 use ruff_python_ast::PythonVersion;
 
 #[expect(clippy::doc_link_with_quotes)]
@@ -112,8 +112,5 @@ pub(crate) fn async_function_with_timeout(checker: &Checker, function_def: &ast:
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
-        AsyncFunctionWithTimeout { module },
-        timeout.range(),
-    ));
+    checker.report_diagnostic(AsyncFunctionWithTimeout { module }, timeout.range());
 }

@@ -5,9 +5,9 @@ use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::type_param_name;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `TypeVar` and `ParamSpec` definitions in which the type is
@@ -124,13 +124,13 @@ pub(crate) fn type_bivariance(checker: &Checker, value: &Expr) {
             return;
         };
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             TypeBivariance {
                 kind,
                 param_name: type_param_name(arguments).map(ToString::to_string),
             },
             func.range(),
-        ));
+        );
     }
 }
 

@@ -8,8 +8,8 @@ use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_text_size::Ranged;
 
 use crate::Locator;
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 static SQL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
@@ -113,7 +113,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
     };
 
     if SQL_REGEX.is_match(&content) {
-        checker.report_diagnostic(Diagnostic::new(HardcodedSQLExpression, expr.range()));
+        checker.report_diagnostic(HardcodedSQLExpression, expr.range());
     }
 }
 

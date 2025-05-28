@@ -4,7 +4,7 @@ use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `itertools.starmap` calls where the second argument is a `zip` call.
@@ -90,13 +90,11 @@ pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(StarmapZip, call.range);
+    let mut diagnostic = checker.report_diagnostic(StarmapZip, call.range);
 
     if let Some(fix) = replace_with_map(call, iterable_call, checker) {
         diagnostic.set_fix(fix);
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Replace the `starmap` call with a call to the `map` builtin, if `map` has not been shadowed.

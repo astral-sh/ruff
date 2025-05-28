@@ -8,8 +8,8 @@ use ruff_python_ast::{
 };
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `raise` statements within `try` blocks. The only `raise`s
@@ -115,7 +115,7 @@ pub(crate) fn raise_within_try(checker: &Checker, body: &[Stmt], handlers: &[Exc
                     .is_some_and(|builtin| matches!(builtin, "Exception" | "BaseException"))
             })
         {
-            checker.report_diagnostic(Diagnostic::new(RaiseWithinTry, stmt.range()));
+            checker.report_diagnostic(RaiseWithinTry, stmt.range());
         }
     }
 }

@@ -11,7 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::adjust_indentation;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `else` blocks that consist of a single `if` statement.
@@ -82,7 +82,7 @@ pub(crate) fn collapsible_else_if(checker: &Checker, stmt: &Stmt) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         CollapsibleElseIf,
         TextRange::new(else_clause.start(), first.start()),
     );
@@ -95,7 +95,6 @@ pub(crate) fn collapsible_else_if(checker: &Checker, stmt: &Stmt) {
             checker.stylist(),
         )
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Generate [`Fix`] to convert an `else` block to an `elif` block.

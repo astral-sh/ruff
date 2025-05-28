@@ -3,8 +3,8 @@ use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::is_list;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `for` loops that can be replaced by a making a copy of a list.
@@ -119,5 +119,5 @@ pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &ast::StmtFor) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(ManualListCopy, *range));
+    checker.report_diagnostic(ManualListCopy, *range);
 }

@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for the use of a classmethod being made without the decorator.
@@ -172,8 +172,10 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
 
             let range = TextRange::new(stmt.range().start(), stmt.range().start());
             let mut diagnostic = match method_type {
-                MethodType::Classmethod => Diagnostic::new(NoClassmethodDecorator, range),
-                MethodType::Staticmethod => Diagnostic::new(NoStaticmethodDecorator, range),
+                MethodType::Classmethod => checker.report_diagnostic(NoClassmethodDecorator, range),
+                MethodType::Staticmethod => {
+                    checker.report_diagnostic(NoStaticmethodDecorator, range)
+                }
             };
 
             let indentation = indentation_at_offset(stmt.range().start(), checker.source());
@@ -192,7 +194,6 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
                             checker.indexer(),
                         )],
                     ));
-                    checker.report_diagnostic(diagnostic);
                 }
                 None => {
                     continue;

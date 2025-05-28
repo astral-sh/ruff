@@ -4,7 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for docstrings that use `'''triple single quotes'''` instead of
@@ -79,8 +79,8 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
     match expected_quote {
         Quote::Single => {
             if !opener.ends_with("'''") {
-                let mut diagnostic =
-                    Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
+                let mut diagnostic = checker
+                    .report_diagnostic(TripleSingleQuotes { expected_quote }, docstring.range());
 
                 let body = docstring.body().as_str();
                 if !body.ends_with('\'') {
@@ -89,14 +89,12 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
                         docstring.range(),
                     )));
                 }
-
-                checker.report_diagnostic(diagnostic);
             }
         }
         Quote::Double => {
             if !opener.ends_with("\"\"\"") {
-                let mut diagnostic =
-                    Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
+                let mut diagnostic = checker
+                    .report_diagnostic(TripleSingleQuotes { expected_quote }, docstring.range());
 
                 let body = docstring.body().as_str();
                 if !body.ends_with('"') {
@@ -105,8 +103,6 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
                         docstring.range(),
                     )));
                 }
-
-                checker.report_diagnostic(diagnostic);
             }
         }
     }

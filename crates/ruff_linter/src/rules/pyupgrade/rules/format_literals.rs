@@ -16,7 +16,7 @@ use crate::cst::matchers::{
 };
 use crate::fix::codemods::CodegenStylist;
 use crate::rules::pyflakes::format::FormatSummary;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unnecessary positional indices in format strings.
@@ -112,12 +112,11 @@ pub(crate) fn format_literals(checker: &Checker, call: &ast::ExprCall, summary: 
         Arguments::Reorder(&summary.indices)
     };
 
-    let mut diagnostic = Diagnostic::new(FormatLiterals, call.range());
+    let mut diagnostic = checker.report_diagnostic(FormatLiterals, call.range());
     diagnostic.try_set_fix(|| {
         generate_call(call, arguments, checker.locator(), checker.stylist())
             .map(|suggestion| Fix::unsafe_edit(Edit::range_replacement(suggestion, call.range())))
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns true if the indices are sequential.

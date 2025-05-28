@@ -16,7 +16,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::pyupgrade::helpers::curly_escape;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `printf`-style string formatting, and offers to replace it with
@@ -385,7 +385,7 @@ pub(crate) fn printf_string_formatting(
             return;
         };
         if !convertible(&format_string, right) {
-            checker.report_diagnostic(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
+            checker.report_diagnostic(PrintfStringFormatting, string_expr.range());
             return;
         }
 
@@ -446,10 +446,7 @@ pub(crate) fn printf_string_formatting(
             let Some(params_string) =
                 clean_params_dictionary(right, checker.locator(), checker.stylist())
             else {
-                checker.report_diagnostic(Diagnostic::new(
-                    PrintfStringFormatting,
-                    string_expr.range(),
-                ));
+                checker.report_diagnostic(PrintfStringFormatting, string_expr.range());
                 return;
             };
             Cow::Owned(params_string)
@@ -504,12 +501,11 @@ pub(crate) fn printf_string_formatting(
     // Add the `.format` call.
     let _ = write!(&mut contents, ".format{params_string}");
 
-    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, bin_op.range());
+    let mut diagnostic = checker.report_diagnostic(PrintfStringFormatting, bin_op.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         contents,
         bin_op.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 #[cfg(test)]

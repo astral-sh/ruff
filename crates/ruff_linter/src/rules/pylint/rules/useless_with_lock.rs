@@ -2,8 +2,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for lock objects that are created and immediately discarded in
@@ -80,6 +80,6 @@ pub(crate) fn useless_with_lock(checker: &Checker, with: &ast::StmtWith) {
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(UselessWithLock, call.range()));
+        checker.report_diagnostic(UselessWithLock, call.range());
     }
 }

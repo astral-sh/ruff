@@ -6,8 +6,8 @@ use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for files with overly permissive permissions.
@@ -78,22 +78,22 @@ pub(crate) fn bad_file_permissions(checker: &Checker, call: &ast::ExprCall) {
                 // The mask is a valid integer value -- check for overly permissive permissions.
                 Ok(Some(mask)) => {
                     if (mask & WRITE_WORLD > 0) || (mask & EXECUTE_GROUP > 0) {
-                        checker.report_diagnostic(Diagnostic::new(
+                        checker.report_diagnostic(
                             BadFilePermissions {
                                 reason: Reason::Permissive(mask),
                             },
                             mode_arg.range(),
-                        ));
+                        );
                     }
                 }
                 // The mask is an invalid integer value (i.e., it's out of range).
                 Err(_) => {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(
                         BadFilePermissions {
                             reason: Reason::Invalid,
                         },
                         mode_arg.range(),
-                    ));
+                    );
                 }
             }
         }

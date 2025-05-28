@@ -5,7 +5,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for the use of string and bytes literals longer than 50 characters
@@ -72,12 +72,11 @@ pub(crate) fn string_or_bytes_too_long(checker: &Checker, string: StringLike) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(StringOrBytesTooLong, string.range());
+    let mut diagnostic = checker.report_diagnostic(StringOrBytesTooLong, string.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         string.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Count the number of visible characters in an f-string. This accounts for

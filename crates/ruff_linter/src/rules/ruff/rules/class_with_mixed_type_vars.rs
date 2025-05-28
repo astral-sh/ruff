@@ -12,7 +12,7 @@ use crate::fix::edits::{Parentheses, remove_argument};
 use crate::rules::pyupgrade::rules::pep695::{
     DisplayTypeVars, TypeParamKind, TypeVar, expr_name_to_type_var, find_generic,
 };
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -103,7 +103,7 @@ pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: &StmtClas
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(ClassWithMixedTypeVars, generic_base.range);
+    let mut diagnostic = checker.report_diagnostic(ClassWithMixedTypeVars, generic_base.range);
 
     diagnostic.try_set_optional_fix(|| {
         convert_type_vars(
@@ -114,8 +114,6 @@ pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: &StmtClas
             checker,
         )
     });
-
-    checker.report_diagnostic(diagnostic);
 }
 
 fn typing_generic_base_and_arguments<'a>(

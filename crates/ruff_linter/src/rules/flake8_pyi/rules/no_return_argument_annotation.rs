@@ -4,8 +4,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -65,7 +65,7 @@ pub(crate) fn no_return_argument_annotation(checker: &Checker, parameters: &ast:
         .filter_map(ast::AnyParameterRef::annotation)
     {
         if is_no_return(annotation, checker) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 NoReturnArgumentAnnotationInStub {
                     module: if checker.target_version() >= PythonVersion::PY311 {
                         TypingModule::Typing
@@ -74,7 +74,7 @@ pub(crate) fn no_return_argument_annotation(checker: &Checker, parameters: &ast:
                     },
                 },
                 annotation.range(),
-            ));
+            );
         }
     }
 }

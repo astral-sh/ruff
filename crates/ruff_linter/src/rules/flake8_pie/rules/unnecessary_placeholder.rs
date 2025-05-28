@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::fix;
 use crate::{AlwaysFixableViolation, Applicability};
-use crate::{Diagnostic, Edit, Fix};
+use crate::{Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary `pass` statements and ellipsis (`...`) literals in
@@ -138,14 +138,14 @@ fn add_diagnostic(
     let isolation_level = Checker::isolation(checker.semantic().current_statement_id());
     let fix = Fix::applicable_edit(edit, applicability).isolate(isolation_level);
 
-    let diagnostic = Diagnostic::new(
-        UnnecessaryPlaceholder {
-            kind: placeholder_kind,
-        },
-        stmt.range(),
-    );
-
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(
+            UnnecessaryPlaceholder {
+                kind: placeholder_kind,
+            },
+            stmt.range(),
+        )
+        .set_fix(fix);
 }
 
 #[derive(Debug, PartialEq, Eq)]

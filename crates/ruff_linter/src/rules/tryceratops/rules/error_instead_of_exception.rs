@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
-use crate::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `logging.error` instead of `logging.exception` when
@@ -80,7 +80,8 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
         for (expr, logging_level) in calls {
             if matches!(logging_level, LoggingLevel::Error) {
                 if exc_info(&expr.arguments, checker.semantic()).is_none() {
-                    let mut diagnostic = Diagnostic::new(ErrorInsteadOfException, expr.range());
+                    let mut diagnostic =
+                        checker.report_diagnostic(ErrorInsteadOfException, expr.range());
 
                     match expr.func.as_ref() {
                         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
@@ -134,8 +135,6 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
                         }
                         _ => {}
                     }
-
-                    checker.report_diagnostic(diagnostic);
                 }
             }
         }

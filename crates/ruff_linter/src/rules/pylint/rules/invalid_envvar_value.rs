@@ -4,8 +4,8 @@ use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `os.getenv` calls with an invalid `key` argument.
@@ -58,6 +58,6 @@ pub(crate) fn invalid_envvar_value(checker: &Checker, call: &ast::ExprCall) {
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(InvalidEnvvarValue, expr.range()));
+        checker.report_diagnostic(InvalidEnvvarValue, expr.range());
     }
 }

@@ -1,10 +1,10 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::rules::pydocstyle::helpers::normalize_word;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for docstrings that start with `This`.
@@ -64,5 +64,5 @@ pub(crate) fn starts_with_this(checker: &Checker, docstring: &Docstring) {
     if normalize_word(first_word) != "this" {
         return;
     }
-    checker.report_diagnostic(Diagnostic::new(DocstringStartsWithThis, docstring.range()));
+    checker.report_diagnostic(DocstringStartsWithThis, docstring.range());
 }

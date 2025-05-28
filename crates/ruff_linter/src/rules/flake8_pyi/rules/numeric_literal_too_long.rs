@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextSize};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for numeric literals with a string representation longer than ten
@@ -50,10 +50,9 @@ pub(crate) fn numeric_literal_too_long(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(NumericLiteralTooLong, expr.range());
+    let mut diagnostic = checker.report_diagnostic(NumericLiteralTooLong, expr.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         expr.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

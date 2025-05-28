@@ -6,8 +6,8 @@ use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::typing::{is_immutable_func, is_mutable_expr, is_mutable_func};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of mutable objects as `ContextVar` defaults.
@@ -102,6 +102,6 @@ pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall
                 matches!(qualified_name.segments(), ["contextvars", "ContextVar"])
             })
     {
-        checker.report_diagnostic(Diagnostic::new(MutableContextvarDefault, default.range()));
+        checker.report_diagnostic(MutableContextvarDefault, default.range());
     }
 }

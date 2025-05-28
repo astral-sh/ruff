@@ -3,8 +3,8 @@ use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum BoolOp {
@@ -76,8 +76,5 @@ pub(crate) fn binary_op_exception(checker: &Checker, except_handler: &ExceptHand
         return;
     };
 
-    checker.report_diagnostic(Diagnostic::new(
-        BinaryOpException { op: op.into() },
-        type_.range(),
-    ));
+    checker.report_diagnostic(BinaryOpException { op: op.into() }, type_.range());
 }

@@ -2,8 +2,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, UnaryOp};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for unnecessary subscript reversal of iterable.
@@ -86,10 +86,10 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: &ast::Expr
     if !matches!(function_name, "reversed" | "set" | "sorted") {
         return;
     }
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         UnnecessarySubscriptReversal {
             func: function_name.to_string(),
         },
         call.range(),
-    ));
+    );
 }

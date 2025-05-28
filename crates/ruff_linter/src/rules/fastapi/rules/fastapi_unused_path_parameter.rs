@@ -13,7 +13,7 @@ use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_parameter;
 use crate::rules::fastapi::rules::is_fastapi_route_decorator;
-use crate::{Diagnostic, FixAvailability, Violation};
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Identifies FastAPI routes that declare path parameters in the route path
@@ -186,7 +186,7 @@ pub(crate) fn fastapi_unused_path_parameter(
             .iter()
             .any(|param| param.name() == path_param);
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             FastApiUnusedPathParameter {
                 arg_name: path_param.to_string(),
                 function_name: function_def.name.to_string(),
@@ -204,7 +204,6 @@ pub(crate) fn fastapi_unused_path_parameter(
                 checker.locator().contents(),
             )));
         }
-        checker.report_diagnostic(diagnostic);
     }
 }
 

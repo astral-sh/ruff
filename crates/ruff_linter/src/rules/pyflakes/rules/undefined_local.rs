@@ -4,8 +4,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{Scope, ScopeId};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for undefined local variables.
@@ -62,12 +62,12 @@ pub(crate) fn undefined_local(checker: &Checker, scope_id: ScopeId, scope: &Scop
                     }
                 }) {
                     // Then it's probably an error.
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(
                         UndefinedLocal {
                             name: name.to_string(),
                         },
                         range,
-                    ));
+                    );
                 }
             }
         }

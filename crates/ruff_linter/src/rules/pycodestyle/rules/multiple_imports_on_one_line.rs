@@ -10,7 +10,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Check for multiple imports on one line.
@@ -49,7 +49,7 @@ impl Violation for MultipleImportsOnOneLine {
 /// E401
 pub(crate) fn multiple_imports_on_one_line(checker: &Checker, stmt: &Stmt, names: &[Alias]) {
     if names.len() > 1 {
-        let mut diagnostic = Diagnostic::new(MultipleImportsOnOneLine, stmt.range());
+        let mut diagnostic = checker.report_diagnostic(MultipleImportsOnOneLine, stmt.range());
         diagnostic.set_fix(split_imports(
             stmt,
             names,
@@ -57,7 +57,6 @@ pub(crate) fn multiple_imports_on_one_line(checker: &Checker, stmt: &Stmt, names
             checker.indexer(),
             checker.stylist(),
         ));
-        checker.report_diagnostic(diagnostic);
     }
 }
 

@@ -4,8 +4,8 @@ use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of policies disabling SSH verification in Paramiko.
@@ -78,9 +78,6 @@ pub(crate) fn ssh_no_host_key_verification(checker: &Checker, call: &ExprCall) {
             ["paramiko", "client", "SSHClient"] | ["paramiko", "SSHClient"]
         )
     }) {
-        checker.report_diagnostic(Diagnostic::new(
-            SSHNoHostKeyVerification,
-            policy_argument.range(),
-        ));
+        checker.report_diagnostic(SSHNoHostKeyVerification, policy_argument.range());
     }
 }

@@ -4,8 +4,8 @@ use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for uses of `subprocess.Popen` with a `preexec_fn` argument.
@@ -65,7 +65,7 @@ pub(crate) fn subprocess_popen_preexec_fn(checker: &Checker, call: &ast::ExprCal
             .find_keyword("preexec_fn")
             .filter(|keyword| !keyword.value.is_none_literal_expr())
         {
-            checker.report_diagnostic(Diagnostic::new(SubprocessPopenPreexecFn, keyword.range()));
+            checker.report_diagnostic(SubprocessPopenPreexecFn, keyword.range());
         }
     }
 }

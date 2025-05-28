@@ -18,7 +18,7 @@ use crate::cst::helpers::space;
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};
 use crate::fix::codemods::CodegenStylist;
 use crate::fix::edits::fits;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for nested `if` statements that can be collapsed into a single `if`
@@ -107,7 +107,7 @@ pub(crate) fn nested_if_statements(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         CollapsibleIf,
         TextRange::new(nested_if.start(), colon.end()),
     );
@@ -138,7 +138,6 @@ pub(crate) fn nested_if_statements(
             }
         });
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy)]

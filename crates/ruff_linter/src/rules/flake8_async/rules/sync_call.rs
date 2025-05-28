@@ -6,7 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
 use crate::rules::flake8_async::helpers::MethodName;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for calls to trio functions that are not immediately awaited.
@@ -80,7 +80,7 @@ pub(crate) fn sync_call(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(TrioSyncCall { method_name }, call.range);
+    let mut diagnostic = checker.report_diagnostic(TrioSyncCall { method_name }, call.range);
     if checker.semantic().in_async_context() {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
             pad(
@@ -91,5 +91,4 @@ pub(crate) fn sync_call(checker: &Checker, call: &ExprCall) {
             call.func.start(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }

@@ -4,8 +4,8 @@ use ruff_text_size::Ranged;
 
 use ruff_python_semantic::{Definition, Member, MemberKind};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for `__iter__` methods in stubs that return `Iterable[T]` instead
@@ -125,9 +125,6 @@ pub(crate) fn iter_method_return_iterable(checker: &Checker, definition: &Defini
             }
         })
     {
-        checker.report_diagnostic(Diagnostic::new(
-            IterMethodReturnIterable { is_async },
-            returns.range(),
-        ));
+        checker.report_diagnostic(IterMethodReturnIterable { is_async }, returns.range());
     }
 }
