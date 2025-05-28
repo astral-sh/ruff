@@ -27,7 +27,7 @@ type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 /// will also have the system installation's `site-packages` packages
 /// available, however. Ephemeral environments created with `uv` in
 /// `uv run --with` invocations, meanwhile, "extend" a parent environment
-/// (which could be another virtual enviroment or a system installation,
+/// (which could be another virtual environment or a system installation,
 /// and which could itself have multiple `site-packages` directories).
 ///
 /// We use an `IndexSet` here to guard against the (very remote)
@@ -814,7 +814,6 @@ mod tests {
         pyvenv_cfg_version_field: Option<&'static str>,
         command_field: Option<&'static str>,
         implementation_field: Option<&'static str>,
-        parent_environment: Option<&'static str>,
     }
 
     struct PythonEnvironmentTestCase {
@@ -868,7 +867,6 @@ mod tests {
                 system_site_packages,
                 command_field,
                 implementation_field,
-                parent_environment,
             }) = virtual_env
             else {
                 return system_install_sys_prefix;
@@ -902,23 +900,6 @@ mod tests {
             if let Some(implementation_field) = implementation_field {
                 pyvenv_cfg_contents.push_str(implementation_field);
                 pyvenv_cfg_contents.push('\n');
-            }
-            if let Some(parent_environment) = parent_environment {
-                pyvenv_cfg_contents.push_str("uv = 1.2.3\n");
-                pyvenv_cfg_contents.push_str("extends-environment = ");
-                pyvenv_cfg_contents.push_str(parent_environment);
-                pyvenv_cfg_contents.push('\n');
-
-                let parent_site_packages =
-                    SystemPath::new(parent_environment).join(if cfg!(windows) {
-                        "Lib/site-packages"
-                    } else {
-                        &unix_site_packages
-                    });
-
-                memory_fs
-                    .create_directory_all(parent_site_packages)
-                    .unwrap();
             }
 
             // Deliberately using weird casing here to test that our pyvenv.cfg parsing is case-insensitive:
@@ -1042,11 +1023,6 @@ mod tests {
                     site_packages_directories,
                     [expected_venv_site_packages, expected_system_site_packages].as_slice()
                 );
-            } else if self_venv.parent_environment.is_none() {
-                assert_eq!(
-                    site_packages_directories,
-                    [expected_venv_site_packages].as_slice()
-                );
             } else {
                 assert_eq!(
                     &site_packages_directories.into_iter().next().unwrap(),
@@ -1164,11 +1140,8 @@ mod tests {
             free_threaded: false,
             origin: SysPrefixPathOrigin::VirtualEnvVar,
             virtual_env: Some(VirtualEnvironmentTestCase {
-                system_site_packages: false,
                 pyvenv_cfg_version_field: None,
-                command_field: None,
-                implementation_field: None,
-                parent_environment: None,
+                ..VirtualEnvironmentTestCase::default()
             }),
         };
         test.run();
@@ -1488,37 +1461,5 @@ mod tests {
             ))
             if path == pyvenv_cfg_path
         ));
-    }
-
-    #[test]
-    fn resolves_site_packages_of_parent_environment() {
-        let system = TestSystem::default();
-        let test_case = PythonEnvironmentTestCase {
-            system: system.clone(),
-            minor_version: 13,
-            free_threaded: false,
-            origin: SysPrefixPathOrigin::VirtualEnvVar,
-            virtual_env: Some(VirtualEnvironmentTestCase {
-                pyvenv_cfg_version_field: Some("version_info = 3.13"),
-                parent_environment: Some("/parent/env"),
-                ..VirtualEnvironmentTestCase::default()
-            }),
-        };
-        let virtual_environment = test_case.run().expect_venv();
-        let site_packages_directories = virtual_environment
-            .site_packages_directories(&system)
-            .unwrap();
-        assert_eq!(site_packages_directories.len(), 2);
-        if cfg!(windows) {
-            assert_eq!(
-                site_packages_directories.into_iter().nth(1).unwrap(),
-                SystemPathBuf::from("/parent/env/Lib/site-packages")
-            );
-        } else {
-            assert_eq!(
-                site_packages_directories.into_iter().nth(1).unwrap(),
-                SystemPathBuf::from("/parent/env/lib/python3.13/site-packages")
-            );
-        }
     }
 }
