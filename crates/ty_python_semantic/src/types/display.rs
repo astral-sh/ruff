@@ -8,7 +8,7 @@ use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::generics::{GenericContext, Specialization};
-use crate::types::signatures::{Parameter, Parameters, Signature};
+use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::{
     CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol, StringLiteralType,
     SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
@@ -413,13 +413,13 @@ impl<'db> CallableType<'db> {
 }
 
 pub(crate) struct DisplayCallableType<'db> {
-    signatures: &'db [Signature<'db>],
+    signatures: &'db CallableSignature<'db>,
     db: &'db dyn Db,
 }
 
 impl Display for DisplayCallableType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.signatures {
+        match self.signatures.overloads.as_slice() {
             [signature] => signature.display(self.db).fmt(f),
             signatures => {
                 // TODO: How to display overloads?
