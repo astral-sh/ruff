@@ -742,23 +742,28 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 let return_ty =
                     inference.expression_type(expr_call.scoped_expression_id(self.db, scope));
 
+                if let Some(name) = expr_call.func.as_name_expr() {
+                    dbg!(&name.id);
+                    dbg!(return_ty);
+                }
+
                 // TODO: Handle unions and intersections
                 let (guarded_ty, symbol) = match return_ty {
                     // TODO: TypeGuard
                     Type::TypeIs(type_is) => {
                         let (_, symbol, _) = type_is.symbol_info(self.db)?;
+                        if let Some(name) = expr_call.func.as_name_expr() {
+                            dbg!(symbol, name);
+                        }
                         (type_is.ty(self.db), symbol)
                     }
                     _ => return None,
                 };
 
-                let mut constraints = NarrowingConstraints::default();
-
-                if is_positive {
-                    constraints.insert(symbol, guarded_ty.negate_if(self.db, !is_positive));
-                }
-
-                Some(constraints)
+                Some(NarrowingConstraints::from_iter([(
+                    symbol,
+                    guarded_ty.negate_if(self.db, !is_positive),
+                )]))
             }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
                 let [first_arg, second_arg] = &*expr_call.arguments.args else {

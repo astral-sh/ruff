@@ -14,6 +14,8 @@ def _(
     b: TypeIs[str | int],
     c: TypeGuard[Intersection[complex, Not[int], Not[float]]],
     d: TypeIs[tuple[TypeOf[bytes]]],
+    e: TypeGuard,  # error: [invalid-type-form]
+    f: TypeIs,  # error: [invalid-type-form]
 ):
     # TODO: Should be `TypeGuard[str]`
     reveal_type(a)  # revealed: @Todo(`TypeGuard[]` special form)
@@ -21,6 +23,8 @@ def _(
     # TODO: Should be `TypeGuard[complex & ~int & ~float]`
     reveal_type(c)  # revealed: @Todo(`TypeGuard[]` special form)
     reveal_type(d)  # revealed: TypeIs[tuple[<class 'bytes'>]]
+    reveal_type(e)  # revealed: Unknown
+    reveal_type(f)  # revealed: Unknown
 
 # TODO: error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `TypeGuard[str]`"
 def _(a) -> TypeGuard[str]: ...
@@ -137,12 +141,12 @@ def g(a: Literal["foo", "bar"]) -> TypeIs[Literal["foo"]]:
 
 ## Invalid calls
 
-```pyi
+```py
 from typing import Any
 from typing_extensions import TypeGuard, TypeIs
 
-def f(a: object) -> TypeGuard[str]: ...
-def g(a: object) -> TypeIs[int]: ...
+def f(a: object) -> TypeGuard[str]: return True
+def g(a: object) -> TypeIs[int]: return True
 def _(d: Any):
     if f():  # error: [missing-argument]
         ...
@@ -158,7 +162,7 @@ def _(d: Any):
         ...
 
 def _(a: tuple[str, int] | tuple[int, str]):
-    if g(a[0]):  # error: [invalid-type-guard-call]
+    if g(a[0]):
         # TODO: Should be `tuple[str, int]`
         reveal_type(a)  # revealed: tuple[str, int] | tuple[int, str]
 ```
@@ -219,10 +223,10 @@ def _(x: str | int, flag: bool) -> None:
 
 ```py
 from typing import Any
-from typing_extensions import TypeGuard
+from typing_extensions import TypeGuard, TypeIs
 
 def guard_int(a: object) -> TypeGuard[int]: return True
-def is_int(a: object) -> TypeGuard[int]: return True
+def is_int(a: object) -> TypeIs[int]: return True
 def does_not_narrow_in_negative_case(a: str | int):
     if not guard_int(a):
         # TODO: Should be `str`

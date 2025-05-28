@@ -118,7 +118,8 @@ use super::string_annotation::{
 };
 use super::subclass_of::SubclassOfInner;
 use super::{
-    BoundSuperError, BoundSuperType, ClassBase, TypeIsType, add_inferred_python_version_hint_to_diagnostic,
+    BoundSuperError, BoundSuperType, ClassBase, TypeIsType,
+    add_inferred_python_version_hint_to_diagnostic,
 };
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -5535,9 +5536,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Some((symbol, name.to_string()))
                     }
                     // TODO: Attribute and subscript narrowing
-                    Some(expr) => {
-                        None
-                    }
+                    Some(_) => None,
                 };
 
                 // TODO: Handle unions/intersections
