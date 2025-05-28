@@ -14,7 +14,8 @@ use ty_project::{Db, ProjectDatabase};
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::server::Result;
 use crate::server::client::Notifier;
-use crate::{DocumentSnapshot, PositionEncoding};
+use crate::system::url_to_any_system_path;
+use crate::{DocumentSnapshot, PositionEncoding, Session};
 
 use super::LSPResult;
 
@@ -59,17 +60,31 @@ pub(super) fn clear_diagnostics(uri: &Url, notifier: &Notifier) -> Result<()> {
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
 /// notification].
 ///
+/// This function is a no-op if the client supports pull diagnostics.
+///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
-pub(super) fn publish_diagnostics_for_document(
-    db: &ProjectDatabase,
-    snapshot: &DocumentSnapshot,
-    notifier: &Notifier,
-) -> Result<()> {
-    let Some(diagnostics) = compute_diagnostics(db, snapshot) else {
+pub(super) fn publish_diagnostics(session: &Session, url: Url, notifier: &Notifier) -> Result<()> {
+    if session.client_capabilities().pull_diagnostics {
+        return Ok(());
+    }
+
+    let Ok(path) = url_to_any_system_path(&url) else {
         return Ok(());
     };
 
-    let publish_diagnostics = |uri: Url, diagnostics: Vec<Diagnostic>| {
+    let snapshot = session
+        .take_snapshot(url.clone())
+        .ok_or_else(|| anyhow::anyhow!("Unable to take snapshot for document with URL {url}"))
+        .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+
+    let db = session.project_db_or_default(&path);
+
+    let Some(diagnostics) = compute_diagnostics(db, &snapshot) else {
+        return Ok(());
+    };
+
+    // Sends a notification to the client with the diagnostics for the document.
+    let publish_diagnostics_notification = |uri: Url, diagnostics: Vec<Diagnostic>| {
         notifier
             .notify::<PublishDiagnostics>(PublishDiagnosticsParams {
                 uri,
@@ -81,11 +96,11 @@ pub(super) fn publish_diagnostics_for_document(
 
     match diagnostics {
         Diagnostics::TextDocument(diagnostics) => {
-            publish_diagnostics(snapshot.query().file_url().clone(), diagnostics)?;
+            publish_diagnostics_notification(url, diagnostics)?;
         }
         Diagnostics::NotebookDocument(cell_diagnostics) => {
             for (cell_url, diagnostics) in cell_diagnostics {
-                publish_diagnostics(cell_url, diagnostics)?;
+                publish_diagnostics_notification(cell_url, diagnostics)?;
             }
         }
     }

@@ -6,7 +6,7 @@ use ty_project::watch::ChangeEvent;
 
 use crate::server::Result;
 use crate::server::api::LSPResult;
-use crate::server::api::diagnostics::publish_diagnostics_for_document;
+use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::server::client::{Notifier, Requester};
 use crate::session::Session;
@@ -40,7 +40,7 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             .update_text_document(&key, content_changes, version)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        match path.clone() {
+        match path {
             AnySystemPath::System(path) => {
                 let db = match session.project_db_for_path_mut(path.as_std_path()) {
                     Some(db) => db,
@@ -54,21 +54,6 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             }
         }
 
-        // Publish diagnostics if the client doesn't support pull diagnostics
-        if !session.client_capabilities().pull_diagnostics {
-            let snapshot = session
-                .take_snapshot(uri.clone())
-                .ok_or_else(|| {
-                    anyhow::anyhow!("Unable to take snapshot for document with URL {uri}")
-                })
-                .with_failure_code(lsp_server::ErrorCode::InternalError)?;
-            publish_diagnostics_for_document(
-                session.project_db_or_default(&path),
-                &snapshot,
-                &notifier,
-            )?;
-        }
-
-        Ok(())
+        publish_diagnostics(session, uri, &notifier)
     }
 }

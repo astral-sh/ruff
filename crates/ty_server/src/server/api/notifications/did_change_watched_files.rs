@@ -1,6 +1,6 @@
 use crate::server::Result;
 use crate::server::api::LSPResult;
-use crate::server::api::diagnostics::publish_diagnostics_for_document;
+use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::server::client::{Notifier, Requester};
 use crate::server::schedule::Task;
@@ -110,17 +110,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                     .with_failure_code(lsp_server::ErrorCode::InternalError)?;
             } else {
                 for url in session.text_document_urls() {
-                    let Ok(path) = url_to_any_system_path(url) else {
-                        continue;
-                    };
-                    let snapshot = session.take_snapshot(url.clone()).unwrap_or_else(|| {
-                        panic!("Snapshot should be available for an open text document at `{url}`");
-                    });
-                    publish_diagnostics_for_document(
-                        session.project_db_or_default(&path),
-                        &snapshot,
-                        &notifier,
-                    )?;
+                    publish_diagnostics(session, url.clone(), &notifier)?;
                 }
             }
 
