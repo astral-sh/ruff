@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast::{self as ast, CmpOp, Expr};
@@ -76,7 +76,7 @@ pub(crate) fn type_comparison(checker: &Checker, compare: &ast::ExprCompare) {
             }
 
             // Disallow the comparison.
-            checker.report_diagnostic(Diagnostic::new(TypeComparison, compare.range()));
+            checker.report_diagnostic(TypeComparison, compare.range());
         }
     }
 }

@@ -5,7 +5,7 @@ use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, 
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 
@@ -240,6 +240,6 @@ pub(crate) fn bad_string_format_type(
         _ => is_valid_constant(&format_strings, &bin_op.right),
     };
     if !is_valid {
-        checker.report_diagnostic(Diagnostic::new(BadStringFormatType, bin_op.range()));
+        checker.report_diagnostic(BadStringFormatType, bin_op.range());
     }
 }

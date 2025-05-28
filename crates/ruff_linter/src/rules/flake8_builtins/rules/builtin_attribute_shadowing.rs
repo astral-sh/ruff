@@ -1,4 +1,3 @@
-use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
@@ -135,14 +134,14 @@ pub(crate) fn builtin_attribute_shadowing(
                         == Some(scope_id)
                 })
             {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     BuiltinAttributeShadowing {
                         kind,
                         name: name.to_string(),
                         row: checker.compute_source_row(binding.start()),
                     },
                     reference.range(),
-                ));
+                );
             }
         }
     }

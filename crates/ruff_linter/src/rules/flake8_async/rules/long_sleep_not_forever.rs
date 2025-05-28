@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprCall, ExprNumberLiteral, Number};
 use ruff_python_semantic::Modules;
@@ -137,7 +137,7 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(LongSleepNotForever { module }, call.range());
+    let mut diagnostic = checker.report_diagnostic(LongSleepNotForever { module }, call.range());
     let replacement_function = "sleep_forever";
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -149,5 +149,4 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
         let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
         Ok(Fix::unsafe_edits(import_edit, [reference_edit, arg_edit]))
     });
-    checker.report_diagnostic(diagnostic);
 }

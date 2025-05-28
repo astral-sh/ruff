@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_parser::{TokenKind, Tokens};
@@ -52,11 +52,10 @@ pub(crate) fn unnecessary_spread(checker: &Checker, dict: &ast::ExprDict) {
             // We only care about when the key is None which indicates a spread `**`
             // inside a dict.
             if let Expr::Dict(inner) = value {
-                let mut diagnostic = Diagnostic::new(UnnecessarySpread, value.range());
+                let mut diagnostic = checker.report_diagnostic(UnnecessarySpread, value.range());
                 if let Some(fix) = unnecessary_spread_fix(inner, prev_end, checker.tokens()) {
                     diagnostic.set_fix(fix);
                 }
-                checker.report_diagnostic(diagnostic);
             }
         }
         prev_end = value.end();

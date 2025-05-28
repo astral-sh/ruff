@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall, Int, Number};
 use ruff_python_semantic::Modules;
@@ -109,7 +109,7 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
             return;
         }
 
-        let mut diagnostic = Diagnostic::new(AsyncZeroSleep { module }, call.range());
+        let mut diagnostic = checker.report_diagnostic(AsyncZeroSleep { module }, call.range());
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from(&module.to_string(), "lowlevel"),
@@ -121,6 +121,5 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
             let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
             Ok(Fix::safe_edits(import_edit, [reference_edit, arg_edit]))
         });
-        checker.report_diagnostic(diagnostic);
     }
 }

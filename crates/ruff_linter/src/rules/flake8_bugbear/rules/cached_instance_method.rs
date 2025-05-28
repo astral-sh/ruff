@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{self as ast, Expr};
@@ -102,7 +102,7 @@ pub(crate) fn cached_instance_method(checker: &Checker, function_def: &ast::Stmt
                 return;
             }
 
-            checker.report_diagnostic(Diagnostic::new(CachedInstanceMethod, decorator.range()));
+            checker.report_diagnostic(CachedInstanceMethod, decorator.range());
         }
     }
 }

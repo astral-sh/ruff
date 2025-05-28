@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtClassDef;
 use ruff_text_size::Ranged;
@@ -55,7 +55,7 @@ pub(crate) fn useless_class_metaclass_type(checker: &Checker, class_def: &StmtCl
     for keyword in &arguments.keywords {
         if let (Some("metaclass"), expr) = (keyword.arg.as_deref(), &keyword.value) {
             if checker.semantic().match_builtin_expr(expr, "type") {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     UselessClassMetaclassType {
                         name: class_def.name.to_string(),
                     },
@@ -71,8 +71,6 @@ pub(crate) fn useless_class_metaclass_type(checker: &Checker, class_def: &StmtCl
                     )
                     .map(Fix::safe_edit)
                 });
-
-                checker.report_diagnostic(diagnostic);
             }
         }
     }

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{self as ast, Expr};
@@ -124,13 +124,13 @@ pub(crate) fn type_bivariance(checker: &Checker, value: &Expr) {
             return;
         };
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             TypeBivariance {
                 kind,
                 param_name: type_param_name(arguments).map(ToString::to_string),
             },
             func.range(),
-        ));
+        );
     }
 }
 

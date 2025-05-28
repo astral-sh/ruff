@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{
@@ -86,8 +86,7 @@ pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &ast::StmtFo
     };
 
     if has_violation {
-        let diagnostic = Diagnostic::new(DictIndexMissingItems, stmt_for.range());
-        checker.report_diagnostic(diagnostic);
+        checker.report_diagnostic(DictIndexMissingItems, stmt_for.range());
     }
 }
 

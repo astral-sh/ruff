@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -224,21 +224,20 @@ pub(crate) fn unused_private_type_var(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        let diagnostic = Diagnostic::new(
-            UnusedPrivateTypeVar {
-                type_var_like_name: id.to_string(),
-                type_var_like_kind: type_var_like_kind.to_string(),
-            },
-            binding.range(),
-        )
-        .with_fix(Fix::unsafe_edit(fix::edits::delete_stmt(
-            stmt,
-            None,
-            checker.locator(),
-            checker.indexer(),
-        )));
-
-        checker.report_diagnostic(diagnostic);
+        checker
+            .report_diagnostic(
+                UnusedPrivateTypeVar {
+                    type_var_like_name: id.to_string(),
+                    type_var_like_kind: type_var_like_kind.to_string(),
+                },
+                binding.range(),
+            )
+            .set_fix(Fix::unsafe_edit(fix::edits::delete_stmt(
+                stmt,
+                None,
+                checker.locator(),
+                checker.indexer(),
+            )));
     }
 }
 
@@ -271,12 +270,12 @@ pub(crate) fn unused_private_protocol(checker: &Checker, scope: &Scope) {
             continue;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             UnusedPrivateProtocol {
                 name: class_def.name.to_string(),
             },
             binding.range(),
-        ));
+        );
     }
 }
 
@@ -303,12 +302,12 @@ pub(crate) fn unused_private_type_alias(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             UnusedPrivateTypeAlias {
                 name: alias_name.to_string(),
             },
             binding.range(),
-        ));
+        );
     }
 }
 
@@ -358,12 +357,12 @@ pub(crate) fn unused_private_typed_dict(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             UnusedPrivateTypedDict {
                 name: class_name.to_string(),
             },
             binding.range(),
-        ));
+        );
     }
 }
 

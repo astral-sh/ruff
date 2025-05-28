@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{Arguments, Expr, ExprCall};
@@ -88,9 +88,9 @@ pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: &ExprCall) {
         checker.comment_ranges(),
         checker.source(),
     );
-    let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range());
-
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(UnnecessaryCastToInt, call.range())
+        .set_fix(fix);
 }
 
 /// Creates a fix that replaces `int(expression)` with `expression`.

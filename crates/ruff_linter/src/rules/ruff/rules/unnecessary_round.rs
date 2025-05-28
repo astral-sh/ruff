@@ -1,6 +1,6 @@
 use crate::Locator;
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
 use ruff_python_semantic::SemanticModel;
@@ -100,9 +100,9 @@ pub(crate) fn unnecessary_round(checker: &Checker, call: &ExprCall) {
     let edit = unwrap_round_call(call, rounded, checker.semantic(), checker.locator());
     let fix = Fix::applicable_edit(edit, applicability);
 
-    let diagnostic = Diagnostic::new(UnnecessaryRound, call.range());
-
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(UnnecessaryRound, call.range())
+        .set_fix(fix);
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

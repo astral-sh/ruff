@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     BytesLiteral, Expr, ExprBytesLiteral, ExprCall, ExprStringLiteral, StringLiteral,
@@ -161,7 +161,7 @@ fn check_string(checker: &Checker, literal: &StringLiteral, module: RegexModule,
     let kind = PatternKind::String;
     let func = func.to_string();
     let range = literal.range;
-    let mut diagnostic = Diagnostic::new(UnrawRePattern { module, func, kind }, range);
+    let mut diagnostic = checker.report_diagnostic(UnrawRePattern { module, func, kind }, range);
 
     if
     // The (no-op) `u` prefix is a syntax error when combined with `r`
@@ -177,7 +177,6 @@ fn check_string(checker: &Checker, literal: &StringLiteral, module: RegexModule,
             literal.range().start(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 fn check_bytes(checker: &Checker, literal: &BytesLiteral, module: RegexModule, func: &str) {
@@ -188,7 +187,5 @@ fn check_bytes(checker: &Checker, literal: &BytesLiteral, module: RegexModule, f
     let kind = PatternKind::Bytes;
     let func = func.to_string();
     let range = literal.range;
-    let diagnostic = Diagnostic::new(UnrawRePattern { module, func, kind }, range);
-
-    checker.report_diagnostic(diagnostic);
+    checker.report_diagnostic(UnrawRePattern { module, func, kind }, range);
 }

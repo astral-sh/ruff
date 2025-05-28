@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 use ruff_python_semantic::Modules;
@@ -63,9 +63,7 @@ pub(crate) fn root_logger_call(checker: &Checker, call: &ExprCall) {
     let kind = RootLoggerCall {
         attr: (*attr).to_string(),
     };
-    let diagnostic = Diagnostic::new(kind, call.range);
-
-    checker.report_diagnostic(diagnostic);
+    checker.report_diagnostic(kind, call.range);
 }
 
 #[inline]

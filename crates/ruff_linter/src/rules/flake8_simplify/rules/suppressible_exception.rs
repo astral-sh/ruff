@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers;
 use ruff_python_ast::name::UnqualifiedName;
@@ -120,7 +120,7 @@ pub(crate) fn suppressible_exception(
         handler_names.join(", ")
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         SuppressibleException {
             exception: exception.clone(),
         },
@@ -147,5 +147,4 @@ pub(crate) fn suppressible_exception(
             ))
         });
     }
-    checker.report_diagnostic(diagnostic);
 }

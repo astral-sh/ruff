@@ -1,5 +1,5 @@
 use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_trivia::is_python_whitespace;
@@ -47,13 +47,13 @@ impl AlwaysFixableViolation for ExplicitStringConcatenation {
 }
 
 /// ISC003
-pub(crate) fn explicit(expr: &Expr, checker: &Checker) -> Option<Diagnostic> {
+pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
     // If the user sets `allow-multiline` to `false`, then we should allow explicitly concatenated
     // strings that span multiple lines even if this rule is enabled. Otherwise, there's no way
     // for the user to write multiline strings, and that setting is "more explicit" than this rule
     // being enabled.
     if !checker.settings.flake8_implicit_str_concat.allow_multiline {
-        return None;
+        return;
     }
 
     if let Expr::BinOp(bin_op) = expr {
@@ -76,13 +76,12 @@ pub(crate) fn explicit(expr: &Expr, checker: &Checker) -> Option<Diagnostic> {
                     .locator()
                     .contains_line_break(TextRange::new(left.end(), right.start()))
             {
-                let mut diagnostic = Diagnostic::new(ExplicitStringConcatenation, expr.range());
-                diagnostic.set_fix(generate_fix(checker, bin_op));
-                return Some(diagnostic);
+                checker
+                    .report_diagnostic(ExplicitStringConcatenation, expr.range())
+                    .set_fix(generate_fix(checker, bin_op));
             }
         }
     }
-    None
 }
 
 fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Fix {

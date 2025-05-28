@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{Modules, SemanticModel};
@@ -61,10 +61,7 @@ pub(crate) fn locals_in_render_function(checker: &Checker, call: &ast::ExprCall)
 
     if let Some(argument) = call.arguments.find_argument_value("context", 2) {
         if is_locals_call(argument, checker.semantic()) {
-            checker.report_diagnostic(Diagnostic::new(
-                DjangoLocalsInRenderFunction,
-                argument.range(),
-            ));
+            checker.report_diagnostic(DjangoLocalsInRenderFunction, argument.range());
         }
     }
 }

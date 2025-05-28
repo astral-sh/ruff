@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -85,7 +85,7 @@ pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
     {
         return;
     }
-    let mut diagnostic = Diagnostic::new(NoExplicitStacklevel, call.func.range());
+    let mut diagnostic = checker.report_diagnostic(NoExplicitStacklevel, call.func.range());
 
     let edit = add_argument(
         "stacklevel=2",
@@ -95,8 +95,6 @@ pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
     );
 
     diagnostic.set_fix(Fix::unsafe_edit(edit));
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if `skip_file_prefixes` is set to its non-default value.

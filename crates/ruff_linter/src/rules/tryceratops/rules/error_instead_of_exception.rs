@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
@@ -80,7 +80,8 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
         for (expr, logging_level) in calls {
             if matches!(logging_level, LoggingLevel::Error) {
                 if exc_info(&expr.arguments, checker.semantic()).is_none() {
-                    let mut diagnostic = Diagnostic::new(ErrorInsteadOfException, expr.range());
+                    let mut diagnostic =
+                        checker.report_diagnostic(ErrorInsteadOfException, expr.range());
 
                     match expr.func.as_ref() {
                         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
@@ -134,8 +135,6 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
                         }
                         _ => {}
                     }
-
-                    checker.report_diagnostic(diagnostic);
                 }
             }
         }

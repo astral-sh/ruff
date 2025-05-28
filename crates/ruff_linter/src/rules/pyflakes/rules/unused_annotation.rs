@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Scope;
 use ruff_text_size::Ranged;
@@ -46,6 +46,6 @@ pub(crate) fn unused_annotation(checker: &Checker, scope: &Scope) {
             None
         }
     }) {
-        checker.report_diagnostic(Diagnostic::new(UnusedAnnotation { name }, range));
+        checker.report_diagnostic(UnusedAnnotation { name }, range);
     }
 }

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
@@ -87,12 +87,11 @@ pub(crate) fn mutable_fromkeys_value(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(MutableFromkeysValue, call.range());
+    let mut diagnostic = checker.report_diagnostic(MutableFromkeysValue, call.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         generate_dict_comprehension(keys, value, checker.generator()),
         call.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Format a code snippet to expression `{key: value for key in keys}`, where

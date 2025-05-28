@@ -4,7 +4,7 @@ use anyhow::{Result, anyhow};
 use libcst_native::{Arg, Expression};
 use regex::Regex;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Stylist;
@@ -112,12 +112,11 @@ pub(crate) fn format_literals(checker: &Checker, call: &ast::ExprCall, summary: 
         Arguments::Reorder(&summary.indices)
     };
 
-    let mut diagnostic = Diagnostic::new(FormatLiterals, call.range());
+    let mut diagnostic = checker.report_diagnostic(FormatLiterals, call.range());
     diagnostic.try_set_fix(|| {
         generate_call(call, arguments, checker.locator(), checker.stylist())
             .map(|suggestion| Fix::unsafe_edit(Edit::range_replacement(suggestion, call.range())))
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns true if the indices are sequential.

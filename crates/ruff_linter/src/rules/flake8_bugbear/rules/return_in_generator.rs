@@ -1,4 +1,3 @@
-use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor;
@@ -101,7 +100,7 @@ pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunction
 
     if visitor.has_yield {
         if let Some(return_) = visitor.return_ {
-            checker.report_diagnostic(Diagnostic::new(ReturnInGenerator, return_));
+            checker.report_diagnostic(ReturnInGenerator, return_);
         }
     }
 }

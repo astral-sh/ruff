@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -106,5 +106,5 @@ pub(crate) fn prefix_type_params(checker: &Checker, value: &Expr, targets: &[Exp
         return;
     };
 
-    checker.report_diagnostic(Diagnostic::new(UnprefixedTypeParam { kind }, value.range()));
+    checker.report_diagnostic(UnprefixedTypeParam { kind }, value.range());
 }

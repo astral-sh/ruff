@@ -1,6 +1,5 @@
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AlwaysFixableViolation, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
@@ -94,7 +93,7 @@ pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: &[Stmt])
         }
 
         if !seen_targets.insert(target.id.as_str()) {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 DuplicateClassFieldDefinition {
                     name: target.id.to_string(),
                 },
@@ -105,7 +104,6 @@ pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: &[Stmt])
             diagnostic.set_fix(Fix::unsafe_edit(edit).isolate(Checker::isolation(
                 checker.semantic().current_statement_id(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

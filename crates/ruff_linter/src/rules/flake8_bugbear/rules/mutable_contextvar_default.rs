@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
@@ -102,6 +102,6 @@ pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall
                 matches!(qualified_name.segments(), ["contextvars", "ContextVar"])
             })
     {
-        checker.report_diagnostic(Diagnostic::new(MutableContextvarDefault, default.range()));
+        checker.report_diagnostic(MutableContextvarDefault, default.range());
     }
 }
