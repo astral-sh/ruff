@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use crate::DocumentSnapshot;
 use crate::document::{PositionExt, ToRangeExt};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
-use crate::server::client::Notifier;
+use crate::session::client::Client;
 use lsp_types::request::HoverRequest;
 use lsp_types::{HoverContents, HoverParams, MarkupContent, Url};
 use ruff_db::source::{line_index, source_text};
@@ -25,7 +25,7 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
     fn run_with_snapshot(
         db: &ProjectDatabase,
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         params: HoverParams,
     ) -> crate::server::Result<Option<lsp_types::Hover>> {
         let Some(file) = snapshot.file(db) else {

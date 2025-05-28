@@ -7,28 +7,26 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
-
 use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::SystemPath;
 use ty_project::{ProjectDatabase, ProjectMetadata};
-
-use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
-use crate::system::{AnySystemPath, LSPSystem, url_to_any_system_path};
-use crate::{PositionEncoding, TextDocument};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub use self::index::DocumentQuery;
 pub(crate) use self::settings::AllSettings;
 pub use self::settings::ClientSettings;
 pub(crate) use self::settings::Experimental;
+use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
+use crate::session::request_queue::RequestQueue;
+use crate::system::{AnySystemPath, LSPSystem, url_to_any_system_path};
+use crate::{PositionEncoding, TextDocument};
 
 mod capabilities;
+pub(crate) mod client;
 pub(crate) mod index;
+mod request_queue;
 mod settings;
-
-// TODO(dhruvmanila): In general, the server shouldn't use any salsa queries directly and instead
-// should use methods on `ProjectDatabase`.
 
 /// The global state for the LSP
 pub struct Session {
@@ -49,10 +47,13 @@ pub struct Session {
 
     /// Tracks what LSP features the client supports and doesn't support.
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
+
+    /// Tracks the pending requests between client and server.
+    request_queue: RequestQueue,
 }
 
 impl Session {
-    pub fn new(
+    pub(crate) fn new(
         client_capabilities: &ClientCapabilities,
         position_encoding: PositionEncoding,
         global_settings: ClientSettings,
@@ -84,7 +85,16 @@ impl Session {
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
             )),
+            request_queue: RequestQueue::new(),
         })
+    }
+
+    pub(crate) fn request_queue(&self) -> &RequestQueue {
+        &self.request_queue
+    }
+
+    pub(crate) fn request_queue_mut(&mut self) -> &mut RequestQueue {
+        &mut self.request_queue
     }
 
     // TODO(dhruvmanila): Ideally, we should have a single method for `workspace_db_for_path_mut`

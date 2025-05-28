@@ -6,10 +6,11 @@ use lsp_types::{
     FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport,
 };
 
+use crate::server::Result;
 use crate::server::api::diagnostics::{Diagnostics, compute_diagnostics};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
-use crate::server::{Result, client::Notifier};
 use crate::session::DocumentSnapshot;
+use crate::session::client::Client;
 use ty_project::ProjectDatabase;
 
 pub(crate) struct DocumentDiagnosticRequestHandler;
@@ -26,7 +27,7 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
     fn run_with_snapshot(
         db: &ProjectDatabase,
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         _params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
         Ok(DocumentDiagnosticReportResult::Report(
@@ -41,5 +42,16 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
                 },
             }),
         ))
+    }
+
+    fn salsa_cancellation_error() -> lsp_server::ResponseError {
+        lsp_server::ResponseError {
+            code: lsp_server::ErrorCode::ServerCancelled as i32,
+            message: "server cancelled the request".to_owned(),
+            data: serde_json::to_value(lsp_types::DiagnosticServerCancellationData {
+                retrigger_request: true,
+            })
+            .ok(),
+        }
     }
 }

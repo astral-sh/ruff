@@ -2,15 +2,14 @@ use lsp_server::ErrorCode;
 use lsp_types::notification::DidChangeTextDocument;
 use lsp_types::{DidChangeTextDocumentParams, VersionedTextDocumentIdentifier};
 
-use ty_project::watch::ChangeEvent;
-
 use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
-use crate::server::client::{Notifier, Requester};
 use crate::session::Session;
+use crate::session::client::Client;
 use crate::system::{AnySystemPath, url_to_any_system_path};
+use ty_project::watch::ChangeEvent;
 
 pub(crate) struct DidChangeTextDocumentHandler;
 
@@ -21,8 +20,7 @@ impl NotificationHandler for DidChangeTextDocumentHandler {
 impl SyncNotificationHandler for DidChangeTextDocumentHandler {
     fn run(
         session: &mut Session,
-        notifier: Notifier,
-        _requester: &mut Requester,
+        client: &Client,
         params: DidChangeTextDocumentParams,
     ) -> Result<()> {
         let DidChangeTextDocumentParams {
@@ -54,6 +52,6 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             }
         }
 
-        publish_diagnostics(session, uri, &notifier)
+        publish_diagnostics(session, uri, client)
     }
 }

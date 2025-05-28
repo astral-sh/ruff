@@ -11,13 +11,12 @@ use ruff_db::files::FileRange;
 use ruff_db::source::{line_index, source_text};
 use ty_project::{Db, ProjectDatabase};
 
+use super::LSPResult;
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::server::Result;
-use crate::server::client::Notifier;
+use crate::session::client::Client;
 use crate::system::url_to_any_system_path;
 use crate::{DocumentSnapshot, PositionEncoding, Session};
-
-use super::LSPResult;
 
 /// Represents the diagnostics for a text document or a notebook document.
 pub(super) enum Diagnostics {
@@ -46,9 +45,9 @@ impl Diagnostics {
 /// Clears the diagnostics for the document at `uri`.
 ///
 /// This is done by notifying the client with an empty list of diagnostics for the document.
-pub(super) fn clear_diagnostics(uri: &Url, notifier: &Notifier) -> Result<()> {
-    notifier
-        .notify::<PublishDiagnostics>(PublishDiagnosticsParams {
+pub(super) fn clear_diagnostics(uri: &Url, client: &Client) -> Result<()> {
+    client
+        .send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
             uri: uri.clone(),
             diagnostics: vec![],
             version: None,
@@ -63,7 +62,7 @@ pub(super) fn clear_diagnostics(uri: &Url, notifier: &Notifier) -> Result<()> {
 /// This function is a no-op if the client supports pull diagnostics.
 ///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
-pub(super) fn publish_diagnostics(session: &Session, url: Url, notifier: &Notifier) -> Result<()> {
+pub(super) fn publish_diagnostics(session: &Session, url: Url, client: &Client) -> Result<()> {
     if session.client_capabilities().pull_diagnostics {
         return Ok(());
     }
@@ -85,8 +84,8 @@ pub(super) fn publish_diagnostics(session: &Session, url: Url, notifier: &Notifi
 
     // Sends a notification to the client with the diagnostics for the document.
     let publish_diagnostics_notification = |uri: Url, diagnostics: Vec<Diagnostic>| {
-        notifier
-            .notify::<PublishDiagnostics>(PublishDiagnosticsParams {
+        client
+            .send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
                 uri,
                 diagnostics,
                 version: Some(snapshot.query().version()),
