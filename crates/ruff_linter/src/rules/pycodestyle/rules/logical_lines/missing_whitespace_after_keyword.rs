@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
-use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
@@ -45,7 +44,6 @@ impl AlwaysFixableViolation for MissingWhitespaceAfterKeyword {
 pub(crate) fn missing_whitespace_after_keyword(
     line: &LogicalLine,
     context: &mut LogicalLinesContext,
-    source_file: &SourceFile,
 ) {
     for window in line.tokens().windows(2) {
         let tok0 = &window[0];
@@ -73,8 +71,11 @@ pub(crate) fn missing_whitespace_after_keyword(
                 ))
             && tok0.end() == tok1.start()
         {
-            let mut diagnostic =
-                OldDiagnostic::new(MissingWhitespaceAfterKeyword, tok0.range(), source_file);
+            let mut diagnostic = OldDiagnostic::new(
+                MissingWhitespaceAfterKeyword,
+                tok0.range(),
+                context.source_file(),
+            );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(" ".to_string(), tok0.end())));
             context.push_diagnostic(diagnostic);
         }

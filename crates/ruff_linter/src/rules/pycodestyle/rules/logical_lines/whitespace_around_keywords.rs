@@ -1,5 +1,4 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
@@ -124,11 +123,7 @@ impl AlwaysFixableViolation for TabBeforeKeyword {
 }
 
 /// E271, E272, E273, E274
-pub(crate) fn whitespace_around_keywords(
-    line: &LogicalLine,
-    context: &mut LogicalLinesContext,
-    source_file: &SourceFile,
-) {
+pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut LogicalLinesContext) {
     let mut after_keyword = false;
 
     for token in line.tokens() {
@@ -141,7 +136,7 @@ pub(crate) fn whitespace_around_keywords(
                         let mut diagnostic = OldDiagnostic::new(
                             TabBeforeKeyword,
                             TextRange::at(start - offset, offset),
-                            source_file,
+                            context.source_file(),
                         );
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                             " ".to_string(),
@@ -154,7 +149,7 @@ pub(crate) fn whitespace_around_keywords(
                         let mut diagnostic = OldDiagnostic::new(
                             MultipleSpacesBeforeKeyword,
                             TextRange::at(start - offset, offset),
-                            source_file,
+                            context.source_file(),
                         );
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                             " ".to_string(),
@@ -171,7 +166,7 @@ pub(crate) fn whitespace_around_keywords(
                     let mut diagnostic = OldDiagnostic::new(
                         TabAfterKeyword,
                         TextRange::at(token.end(), len),
-                        source_file,
+                        context.source_file(),
                     );
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         " ".to_string(),
@@ -183,7 +178,7 @@ pub(crate) fn whitespace_around_keywords(
                     let mut diagnostic = OldDiagnostic::new(
                         MultipleSpacesAfterKeyword,
                         TextRange::at(token.end(), len),
-                        source_file,
+                        context.source_file(),
                     );
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         " ".to_string(),

@@ -146,7 +146,6 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundModuloOperator {
 pub(crate) fn missing_whitespace_around_operator(
     line: &LogicalLine,
     context: &mut LogicalLinesContext,
-    source_file: &SourceFile,
 ) {
     let mut definition_state = DefinitionState::from_tokens(line.tokens());
     let mut tokens = line.tokens().iter().peekable();
@@ -255,28 +254,36 @@ pub(crate) fn missing_whitespace_around_operator(
                 // Operator with trailing but no leading space, enforce consistent spacing.
                 (false, true) => {
                     context.push_diagnostic(
-                        diagnostic_kind_for_operator(kind, token.range(), source_file).with_fix(
-                            Fix::safe_edit(Edit::insertion(" ".to_string(), token.start())),
-                        ),
+                        diagnostic_kind_for_operator(kind, token.range(), context.source_file())
+                            .with_fix(Fix::safe_edit(Edit::insertion(
+                                " ".to_string(),
+                                token.start(),
+                            ))),
                     );
                 }
                 // Operator with leading but no trailing space, enforce consistent spacing.
                 (true, false) => {
                     context.push_diagnostic(
-                        diagnostic_kind_for_operator(kind, token.range(), source_file).with_fix(
-                            Fix::safe_edit(Edit::insertion(" ".to_string(), token.end())),
-                        ),
+                        diagnostic_kind_for_operator(kind, token.range(), context.source_file())
+                            .with_fix(Fix::safe_edit(Edit::insertion(
+                                " ".to_string(),
+                                token.end(),
+                            ))),
                     );
                 }
                 // Operator with no space, require spaces if it is required by the operator.
                 (false, false) => {
                     if needs_space == NeedsSpace::Yes {
                         context.push_diagnostic(
-                            diagnostic_kind_for_operator(kind, token.range(), source_file)
-                                .with_fix(Fix::safe_edits(
-                                    Edit::insertion(" ".to_string(), token.start()),
-                                    [Edit::insertion(" ".to_string(), token.end())],
-                                )),
+                            diagnostic_kind_for_operator(
+                                kind,
+                                token.range(),
+                                context.source_file(),
+                            )
+                            .with_fix(Fix::safe_edits(
+                                Edit::insertion(" ".to_string(), token.start()),
+                                [Edit::insertion(" ".to_string(), token.end())],
+                            )),
                         );
                     }
                 }

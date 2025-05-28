@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
-use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
 use crate::Edit;
@@ -41,11 +40,7 @@ impl AlwaysFixableViolation for MissingWhitespace {
 }
 
 /// E231
-pub(crate) fn missing_whitespace(
-    line: &LogicalLine,
-    context: &mut LogicalLinesContext,
-    source_file: &SourceFile,
-) {
+pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesContext) {
     let mut fstrings = 0u32;
     let mut definition_state = DefinitionState::from_tokens(line.tokens());
     let mut brackets = Vec::new();
@@ -111,7 +106,7 @@ pub(crate) fn missing_whitespace(
                     let diagnostic = OldDiagnostic::new(
                         MissingWhitespace { token: kind },
                         token.range(),
-                        source_file,
+                        context.source_file(),
                     );
                     let fix = Fix::safe_edit(Edit::insertion(" ".to_string(), token.end()));
                     context.push_diagnostic(diagnostic.with_fix(fix));

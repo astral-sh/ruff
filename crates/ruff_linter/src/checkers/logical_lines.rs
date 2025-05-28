@@ -42,7 +42,7 @@ pub(crate) fn check_logical_lines(
     settings: &LinterSettings,
     source_file: &SourceFile,
 ) -> Vec<OldDiagnostic> {
-    let mut context = LogicalLinesContext::new(settings);
+    let mut context = LogicalLinesContext::new(settings, source_file);
 
     let mut prev_line = None;
     let mut prev_indent_level = None;
@@ -103,24 +103,24 @@ pub(crate) fn check_logical_lines(
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
             if enforce_space_around_operator {
-                space_around_operator(&line, &mut context, source_file);
+                space_around_operator(&line, &mut context);
             }
 
             if enforce_whitespace_around_named_parameter_equals {
-                whitespace_around_named_parameter_equals(&line, &mut context, source_file);
+                whitespace_around_named_parameter_equals(&line, &mut context);
             }
 
             if enforce_missing_whitespace_around_operator {
-                missing_whitespace_around_operator(&line, &mut context, source_file);
+                missing_whitespace_around_operator(&line, &mut context);
             }
 
             if enforce_missing_whitespace {
-                missing_whitespace(&line, &mut context, source_file);
+                missing_whitespace(&line, &mut context);
             }
         }
 
         if line.flags().contains(TokenFlags::PUNCTUATION) && enforce_space_after_comma {
-            space_after_comma(&line, &mut context, source_file);
+            space_after_comma(&line, &mut context);
         }
 
         if line
@@ -128,30 +128,30 @@ pub(crate) fn check_logical_lines(
             .intersects(TokenFlags::OPERATOR | TokenFlags::BRACKET | TokenFlags::PUNCTUATION)
             && enforce_extraneous_whitespace
         {
-            extraneous_whitespace(&line, &mut context, source_file);
+            extraneous_whitespace(&line, &mut context);
         }
 
         if line.flags().contains(TokenFlags::KEYWORD) {
             if enforce_whitespace_around_keywords {
-                whitespace_around_keywords(&line, &mut context, source_file);
+                whitespace_around_keywords(&line, &mut context);
             }
 
             if enforce_missing_whitespace_after_keyword {
-                missing_whitespace_after_keyword(&line, &mut context, source_file);
+                missing_whitespace_after_keyword(&line, &mut context);
             }
         }
 
         if line.flags().contains(TokenFlags::COMMENT) && enforce_whitespace_before_comment {
-            whitespace_before_comment(&line, locator, &mut context, source_file);
+            whitespace_before_comment(&line, locator, &mut context);
         }
 
         if line.flags().contains(TokenFlags::BRACKET) {
             if enforce_whitespace_before_parameters {
-                whitespace_before_parameters(&line, &mut context, source_file);
+                whitespace_before_parameters(&line, &mut context);
             }
 
             if enforce_redundant_backslash {
-                redundant_backslash(&line, locator, indexer, &mut context, source_file);
+                redundant_backslash(&line, locator, indexer, &mut context);
             }
         }
 
@@ -198,13 +198,15 @@ pub(crate) fn check_logical_lines(
 #[derive(Debug, Clone)]
 pub(crate) struct LogicalLinesContext<'a> {
     settings: &'a LinterSettings,
+    source_file: &'a SourceFile,
     diagnostics: Vec<OldDiagnostic>,
 }
 
 impl<'a> LogicalLinesContext<'a> {
-    fn new(settings: &'a LinterSettings) -> Self {
+    fn new(settings: &'a LinterSettings, source_file: &'a SourceFile) -> Self {
         Self {
             settings,
+            source_file,
             diagnostics: Vec::new(),
         }
     }
@@ -213,5 +215,9 @@ impl<'a> LogicalLinesContext<'a> {
         if self.settings.rules.enabled(diagnostic.rule()) {
             self.diagnostics.push(diagnostic);
         }
+    }
+
+    pub(crate) fn source_file(&self) -> &SourceFile {
+        self.source_file
     }
 }
