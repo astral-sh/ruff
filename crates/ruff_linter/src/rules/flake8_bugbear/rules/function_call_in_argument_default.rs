@@ -1,15 +1,14 @@
-use ruff_python_ast::{self as ast, Expr, Parameters};
-use ruff_text_size::Ranged;
-
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Expr, Parameters};
 use ruff_python_semantic::analyze::typing::{
     is_immutable_annotation, is_immutable_func, is_immutable_newtype_call, is_mutable_func,
 };
+use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does

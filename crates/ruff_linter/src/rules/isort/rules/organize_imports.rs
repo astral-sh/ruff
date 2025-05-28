@@ -1,6 +1,5 @@
 use itertools::{EitherOrBoth, Itertools};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::whitespace::trailing_lines_end;
 use ruff_python_ast::{PySourceType, PythonVersion, Stmt};
@@ -19,6 +18,7 @@ use crate::package::PackageRoot;
 use crate::preview::is_full_path_match_source_strategy_enabled;
 use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::settings::LinterSettings;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// De-duplicates, groups, and sorts imports based on the provided `isort` settings.

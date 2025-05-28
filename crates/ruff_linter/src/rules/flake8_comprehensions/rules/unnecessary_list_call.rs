@@ -1,12 +1,11 @@
 use ruff_python_ast::{Arguments, Expr, ExprCall};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-
 use crate::rules::flake8_comprehensions::fixes;
+use crate::{AlwaysFixableViolation, Fix};
 
 use super::helpers;
 

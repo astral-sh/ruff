@@ -2,8 +2,6 @@ use std::ops::Add;
 
 use anyhow::Result;
 
-use ruff_diagnostics::{AlwaysFixableViolation, FixAvailability, Violation};
-use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;
@@ -22,6 +20,8 @@ use crate::fix::edits::adjust_indentation;
 use crate::preview::is_only_add_return_none_at_end_enabled;
 use crate::registry::Rule;
 use crate::rules::flake8_return::helpers::end_of_last_statement;
+use crate::{AlwaysFixableViolation, FixAvailability, Violation};
+use crate::{Edit, Fix};
 
 use super::super::branch::Branch;
 use super::super::helpers::result_exists;

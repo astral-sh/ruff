@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
@@ -6,6 +5,7 @@ use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for explicit casts to `list` on for-loop iterables.

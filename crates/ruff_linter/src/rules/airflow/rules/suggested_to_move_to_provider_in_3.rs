@@ -1,7 +1,7 @@
 use crate::importer::ImportRequest;
 
 use crate::rules::airflow::helpers::{ProviderReplacement, is_guarded_by_try_except};
-use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{Expr, ExprAttribute};

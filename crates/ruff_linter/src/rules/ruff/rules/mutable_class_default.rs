@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast, Stmt};
 
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{
     dataclass_kind, has_default_copy_semantics, is_class_var_annotation, is_final_annotation,

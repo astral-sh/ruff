@@ -1,6 +1,5 @@
 use anyhow::Result;
 
-use ruff_diagnostics::{Fix, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
@@ -13,6 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::{Checker, DiagnosticGuard};
 use crate::registry::Rule;
 use crate::renamer::Renamer;
+use crate::{Fix, Violation};
 
 /// ## What it does
 /// Checks for instance methods that use a name other than `self` for their
@@ -64,8 +64,7 @@ pub(crate) struct InvalidFirstArgumentNameForMethod {
 }
 
 impl Violation for InvalidFirstArgumentNameForMethod {
-    const FIX_AVAILABILITY: ruff_diagnostics::FixAvailability =
-        ruff_diagnostics::FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: crate::FixAvailability = crate::FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -137,8 +136,7 @@ pub(crate) struct InvalidFirstArgumentNameForClassMethod {
 }
 
 impl Violation for InvalidFirstArgumentNameForClassMethod {
-    const FIX_AVAILABILITY: ruff_diagnostics::FixAvailability =
-        ruff_diagnostics::FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: crate::FixAvailability = crate::FixAvailability::Sometimes;
 
     #[derive_message_formats]
     // The first string below is what shows up in the documentation

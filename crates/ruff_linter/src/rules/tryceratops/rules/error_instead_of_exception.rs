@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
@@ -9,6 +8,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `logging.error` instead of `logging.exception` when

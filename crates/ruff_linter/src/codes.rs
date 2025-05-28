@@ -6,7 +6,7 @@ use std::fmt::Formatter;
 
 use strum_macros::{AsRefStr, EnumIter};
 
-use crate::registry::{AsRule, Linter};
+use crate::registry::Linter;
 use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
@@ -1155,4 +1155,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         _ => return None,
     })
+}
+
+impl std::fmt::Display for Rule {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        f.write_str(self.into())
+    }
 }

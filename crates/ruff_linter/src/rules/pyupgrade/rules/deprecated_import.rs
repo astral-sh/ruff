@@ -1,6 +1,5 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{Alias, StmtImportFrom};
@@ -11,6 +10,7 @@ use ruff_text_size::Ranged;
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::pyupgrade::fixes;
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 /// An import was moved and renamed as part of a deprecation.

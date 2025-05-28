@@ -4,7 +4,6 @@ use std::fmt::{Debug, Display, Formatter};
 use anyhow::Result;
 use itertools::Itertools;
 
-use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::identifier::Identifier;
@@ -15,6 +14,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::importer::{ImportRequest, Importer};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for lambda expressions and function definitions that can be replaced with a function from

@@ -1,8 +1,8 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 use super::{LogicalLine, Whitespace};
 

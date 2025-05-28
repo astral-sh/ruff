@@ -1,9 +1,9 @@
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::except;
 use ruff_python_ast::{self as ast, ExceptHandler};
 
 use crate::Locator;
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does

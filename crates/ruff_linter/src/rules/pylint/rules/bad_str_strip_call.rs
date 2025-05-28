@@ -3,12 +3,12 @@ use std::fmt;
 use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use ruff_python_ast::PythonVersion;
 

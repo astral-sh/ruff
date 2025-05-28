@@ -1,8 +1,8 @@
-use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 
+use crate::AlwaysFixableViolation;
 use crate::checkers::ast::Checker;
 use crate::rules::refurb::helpers::replace_with_identity_check;
 

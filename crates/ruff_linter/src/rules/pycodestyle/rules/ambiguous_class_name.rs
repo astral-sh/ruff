@@ -1,10 +1,11 @@
 use ruff_python_ast::Identifier;
 
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
-use crate::{checkers::ast::Checker, rules::pycodestyle::helpers::is_ambiguous_name};
+use crate::Violation;
+use crate::checkers::ast::Checker;
+use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 
 /// ## What it does
 /// Checks for the use of the characters 'l', 'O', or 'I' as class names.

@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PySourceType;
 use ruff_python_ast::script::ScriptTag;
@@ -11,6 +10,7 @@ use crate::Locator;
 use crate::comments::shebang::ShebangDirective;
 use crate::fs;
 use crate::package::PackageRoot;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for packages that are missing an `__init__.py` file.

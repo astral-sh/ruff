@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, AnyStringFlags, StringFlags, StringLike};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use super::super::helpers::{contains_escaped_quote, raw_contents, unescape_string};
 

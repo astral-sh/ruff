@@ -1,7 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
-use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     BytesLiteral, Expr, ExprBytesLiteral, ExprCall, ExprStringLiteral, StringLiteral,
@@ -11,6 +10,7 @@ use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Reports the following `re` and `regex` calls when

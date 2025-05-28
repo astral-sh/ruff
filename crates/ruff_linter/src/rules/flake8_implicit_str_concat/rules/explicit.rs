@@ -1,12 +1,12 @@
-use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::AlwaysFixableViolation;
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix};
 
 /// ## What it does
 /// Checks for string literals that are explicitly concatenated (using the

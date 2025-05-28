@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast};
 use ruff_python_ast::{ExceptHandler, Expr};
 
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does

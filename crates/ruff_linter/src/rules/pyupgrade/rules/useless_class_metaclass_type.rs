@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
-use ruff_diagnostics::{Fix, FixAvailability, Violation};
+use crate::{Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtClassDef;
 use ruff_text_size::Ranged;

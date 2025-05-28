@@ -1,7 +1,6 @@
 use ruff_python_ast::parenthesize::parenthesized_range;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{self, generate_comparison};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
@@ -10,6 +9,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum EqCmpOp {

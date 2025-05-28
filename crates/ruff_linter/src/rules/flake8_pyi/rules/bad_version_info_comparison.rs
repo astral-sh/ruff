@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::preview::is_bad_version_info_in_non_stub_enabled;
 use crate::registry::Rule;

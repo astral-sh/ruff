@@ -1,10 +1,11 @@
-use crate::checkers::ast::Checker;
-use crate::fix::edits::{Parentheses, remove_argument};
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprAttribute, helpers::Truthiness};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
+
+use crate::checkers::ast::Checker;
+use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{AlwaysFixableViolation, Applicability, Fix};
 
 /// ## What it does
 /// Checks for `dict.get(key, falsy_value)` calls in boolean test positions.

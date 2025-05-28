@@ -1,4 +1,3 @@
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
@@ -7,6 +6,7 @@ use ruff_python_semantic::{
     analyze::{function_type, visibility},
 };
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_unused_arguments::rules::is_not_implemented_stub_with_variable;
 

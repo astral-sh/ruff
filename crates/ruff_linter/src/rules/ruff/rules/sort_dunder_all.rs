@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_source_file::LineRanges;
@@ -9,6 +8,7 @@ use crate::rules::ruff::rules::sequence_sorting::{
     MultilineStringSequenceValue, SequenceKind, SortClassification, SortingStyle,
     sort_single_line_elements_sequence,
 };
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `__all__` definitions that are not ordered

@@ -1,12 +1,12 @@
 use ruff_python_ast as ast;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for an empty type-checking block.

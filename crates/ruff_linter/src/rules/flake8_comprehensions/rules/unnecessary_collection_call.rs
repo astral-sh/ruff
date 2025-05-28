@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
@@ -7,6 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
 use crate::rules::flake8_comprehensions::settings::Settings;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary `dict()`, `list()` or `tuple()` calls that can be

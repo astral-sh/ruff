@@ -1,6 +1,3 @@
-use crate::Locator;
-use crate::checkers::ast::Checker;
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
 use ruff_python_semantic::SemanticModel;
@@ -8,6 +5,10 @@ use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, Reso
 use ruff_python_semantic::analyze::typing;
 use ruff_source_file::find_newline;
 use ruff_text_size::Ranged;
+
+use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for `round()` calls that have no effect on the input.

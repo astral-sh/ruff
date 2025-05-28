@@ -1,11 +1,10 @@
-use ruff_python_ast::Stmt;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
+use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does
 /// Checks for member imports that should instead be accessed by importing the

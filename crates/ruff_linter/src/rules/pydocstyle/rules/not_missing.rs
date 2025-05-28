@@ -1,4 +1,3 @@
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::{
@@ -7,6 +6,7 @@ use ruff_python_semantic::analyze::visibility::{
 use ruff_python_semantic::{Definition, Member, MemberKind, Module, ModuleKind};
 use ruff_text_size::TextRange;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 

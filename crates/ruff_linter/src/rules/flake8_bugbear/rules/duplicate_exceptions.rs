@@ -1,8 +1,6 @@
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Violation};
-use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
@@ -11,6 +9,8 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
 use crate::registry::Rule;
+use crate::{AlwaysFixableViolation, Violation};
+use crate::{Edit, Fix};
 
 /// ## What it does
 /// Checks for `try-except` blocks with duplicate exception handlers.

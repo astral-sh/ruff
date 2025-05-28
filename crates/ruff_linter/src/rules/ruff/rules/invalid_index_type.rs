@@ -1,10 +1,10 @@
 use ruff_python_ast::{Expr, ExprNumberLiteral, ExprSlice, ExprSubscript, Number};
 
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 use std::fmt;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does

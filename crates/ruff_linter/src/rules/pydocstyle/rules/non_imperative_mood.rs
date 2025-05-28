@@ -2,12 +2,12 @@ use std::sync::LazyLock;
 
 use imperative::Mood;
 
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::visibility::{is_property, is_test};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::rules::pydocstyle::helpers::normalize_word;

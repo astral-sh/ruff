@@ -12,9 +12,9 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
     Ok(quote! {
         #[automatically_derived]
         #[expect(deprecated)]
-        impl #impl_generics ruff_diagnostics::ViolationMetadata for #name #ty_generics #where_clause {
-            fn rule_name() -> &'static str {
-                ::ruff_macros::kebab_case!(#name)
+        impl #impl_generics crate::ViolationMetadata for #name #ty_generics #where_clause {
+            fn rule() -> crate::registry::Rule {
+                crate::registry::Rule::#name
             }
 
             fn explain() -> Option<&'static str> {

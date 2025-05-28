@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::str::is_triple_quote;
 use ruff_python_semantic::Definition;
@@ -10,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::Rule;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for docstring summary lines that are not positioned on the first

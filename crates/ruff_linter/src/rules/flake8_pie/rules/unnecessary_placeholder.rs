@@ -1,5 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability};
-use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::whitespace::trailing_comment_start_offset;
@@ -9,6 +7,8 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Applicability};
+use crate::{Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary `pass` statements and ellipsis (`...`) literals in

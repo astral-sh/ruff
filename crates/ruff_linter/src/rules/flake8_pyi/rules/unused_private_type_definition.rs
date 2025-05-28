@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -7,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the presence of unused private `TypeVar`, `ParamSpec` or

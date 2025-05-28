@@ -1,5 +1,5 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Operator, Parameters, Stmt, UnaryOp};
 use ruff_python_semantic::{ScopeKind, SemanticModel, analyze::class::is_enumeration};
@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pyi::rules::TypingModule;
-use ruff_python_ast::PythonVersion;
+use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 
 /// ## What it does
 /// Checks for typed function arguments in stubs with complex default values.

@@ -2,11 +2,11 @@ use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashMap;
 use std::sync::LazyLock;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of deprecated methods from the `unittest` module.

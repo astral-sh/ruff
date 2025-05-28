@@ -2,13 +2,13 @@ use std::sync::LazyLock;
 
 use regex::RegexSet;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::directives::{TodoComment, TodoDirective, TodoDirectiveKind};
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 
 /// ## What it does
 /// Checks that a TODO comment is labelled with "TODO".

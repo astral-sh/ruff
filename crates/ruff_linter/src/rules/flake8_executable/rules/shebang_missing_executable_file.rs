@@ -4,12 +4,12 @@ use std::path::Path;
 
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::registry::AsRule;
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::is_executable;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for executable `.py` files that do not have a shebang.

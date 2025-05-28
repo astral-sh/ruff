@@ -1,8 +1,8 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::{AlwaysFixableViolation, Fix};
 use crate::{checkers::ast::Checker, fix::edits::add_argument};
 
 /// ## What it does

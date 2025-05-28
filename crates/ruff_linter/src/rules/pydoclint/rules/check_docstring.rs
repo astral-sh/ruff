@@ -1,5 +1,4 @@
 use itertools::Itertools;
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::helpers::map_subscript;
@@ -11,6 +10,7 @@ use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};

@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Operator};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
@@ -10,6 +9,7 @@ use crate::rules::flake8_logging_format::violations::{
     LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
     LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
 };
+use crate::{Edit, Fix};
 
 /// Returns `true` if the attribute is a reserved attribute on the `logging` module's `LogRecord`
 /// class.

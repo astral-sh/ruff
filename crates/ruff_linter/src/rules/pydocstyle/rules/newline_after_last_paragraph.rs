@@ -1,6 +1,5 @@
 use ruff_text_size::{TextLen, TextSize};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::docstrings::clean_space;
 use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlines};
@@ -8,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for multi-line docstrings whose closing quotes are not on their

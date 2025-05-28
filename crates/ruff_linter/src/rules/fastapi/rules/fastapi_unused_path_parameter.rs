@@ -2,8 +2,6 @@ use std::iter::Peekable;
 use std::ops::Range;
 use std::str::CharIndices;
 
-use ruff_diagnostics::Fix;
-use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};
@@ -11,9 +9,11 @@ use ruff_python_semantic::{BindingKind, Modules, ScopeKind, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_parameter;
 use crate::rules::fastapi::rules::is_fastapi_route_decorator;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Identifies FastAPI routes that declare path parameters in the route path

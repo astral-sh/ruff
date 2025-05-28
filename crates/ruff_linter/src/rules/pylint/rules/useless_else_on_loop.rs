@@ -1,7 +1,6 @@
 use anyhow::Result;
 
 use ast::whitespace::indentation;
-use ruff_diagnostics::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier;
 use ruff_python_ast::{self as ast, ExceptHandler, MatchCase, Stmt};
@@ -13,6 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::adjust_indentation;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `else` clauses on loops without a `break` statement.

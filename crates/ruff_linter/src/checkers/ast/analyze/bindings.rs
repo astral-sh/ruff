@@ -1,6 +1,6 @@
-use ruff_diagnostics::Fix;
 use ruff_text_size::Ranged;
 
+use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::rules::{

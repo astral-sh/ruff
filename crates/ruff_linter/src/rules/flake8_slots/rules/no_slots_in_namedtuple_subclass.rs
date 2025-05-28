@@ -1,10 +1,10 @@
 use std::fmt;
 
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt, StmtClassDef, identifier::Identifier};
 use ruff_python_semantic::SemanticModel;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_slots::rules::helpers::has_slots;
 

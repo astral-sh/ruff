@@ -1,10 +1,11 @@
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 
-use crate::{checkers::ast::Checker, rules::pep8_naming::settings::IgnoreNames};
+use crate::Violation;
+use crate::checkers::ast::Checker;
+use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
 /// Checks for lowercase imports that are aliased to non-lowercase names.

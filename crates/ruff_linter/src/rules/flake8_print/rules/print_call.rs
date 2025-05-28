@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `print` statements.

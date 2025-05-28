@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::noqa::{self, Directive, FileNoqaDirectives, NoqaDirectives};
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Check for `noqa` annotations that suppress all diagnostics, as opposed to

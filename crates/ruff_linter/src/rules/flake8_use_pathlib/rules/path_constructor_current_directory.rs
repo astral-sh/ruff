@@ -1,6 +1,5 @@
 use std::ops::Range;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{Expr, ExprBinOp, ExprCall, Operator};
@@ -10,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for `pathlib.Path` objects that are initialized with the current

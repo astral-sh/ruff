@@ -9,7 +9,6 @@ use itertools::Itertools;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::Diagnostic;
 use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
@@ -18,6 +17,7 @@ use ruff_python_parser::{ParseError, ParseOptions, Parsed, UnsupportedSyntaxErro
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::Ranged;
 
+use crate::Diagnostic;
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;

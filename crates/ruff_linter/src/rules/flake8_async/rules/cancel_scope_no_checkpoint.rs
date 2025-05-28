@@ -1,9 +1,9 @@
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{AwaitVisitor, any_over_body};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Expr, StmtWith, WithItem};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::helpers::MethodName;
 

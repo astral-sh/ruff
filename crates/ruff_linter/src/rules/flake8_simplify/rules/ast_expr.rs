@@ -1,13 +1,13 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, str_prefix::StringLiteralPrefix};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::fix::snippet::SourceCodeSnippet;
-use ruff_diagnostics::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::typing::is_dict;
 
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Check for environment variables that are not capitalized.

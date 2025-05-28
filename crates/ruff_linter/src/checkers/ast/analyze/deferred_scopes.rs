@@ -1,9 +1,9 @@
-use ruff_diagnostics::Fix;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Binding, BindingKind, Imported, ResolvedReference, ScopeKind};
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
+use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;

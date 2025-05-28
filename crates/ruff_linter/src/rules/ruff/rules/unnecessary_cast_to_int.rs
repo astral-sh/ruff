@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{Arguments, Expr, ExprCall};
@@ -13,6 +12,7 @@ use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::unnecessary_round::{
     InferredType, NdigitsValue, RoundedValue, rounded_and_ndigits,
 };
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for `int` conversions of values that are already integers.

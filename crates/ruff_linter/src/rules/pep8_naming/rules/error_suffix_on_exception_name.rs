@@ -1,10 +1,11 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 
-use crate::{checkers::ast::Checker, rules::pep8_naming::settings::IgnoreNames};
+use crate::Violation;
+use crate::checkers::ast::Checker;
+use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
 /// Checks for custom exception definitions that omit the `Error` suffix.
