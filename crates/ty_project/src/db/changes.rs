@@ -18,8 +18,7 @@ pub struct ChangeResult {
 }
 
 impl ChangeResult {
-    /// Returns `true` if the project structure has changed, e.g. files were added or removed,
-    /// or the project configuration has changed.
+    /// Returns `true` if the project structure has changed.
     pub fn project_changed(&self) -> bool {
         self.project_changed
     }
@@ -278,6 +277,6 @@ impl ProjectDatabase {
         // re-scanned (or that were removed etc).
         project.replace_index_diagnostics(self, diagnostics);
 
-        return result;
+        result
     }
 }
