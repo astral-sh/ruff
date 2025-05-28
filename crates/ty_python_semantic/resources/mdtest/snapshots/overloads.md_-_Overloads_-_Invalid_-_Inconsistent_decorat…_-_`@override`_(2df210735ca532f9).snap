@@ -1,0 +1,132 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: overloads.md - Overloads - Invalid - Inconsistent decorators - `@override`
+mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import overload, override
+ 2 | 
+ 3 | class Base:
+ 4 |     @overload
+ 5 |     def method(self, x: int) -> int: ...
+ 6 |     @overload
+ 7 |     def method(self, x: str) -> str: ...
+ 8 |     def method(self, x: int | str) -> int | str:
+ 9 |         return x
+10 | 
+11 | class Sub1(Base):
+12 |     @overload
+13 |     def method(self, x: int) -> int: ...
+14 |     @overload
+15 |     def method(self, x: str) -> str: ...
+16 |     @override
+17 |     def method(self, x: int | str) -> int | str:
+18 |         return x
+19 | 
+20 | class Sub2(Base):
+21 |     @overload
+22 |     def method(self, x: int) -> int: ...
+23 |     @overload
+24 |     @override
+25 |     def method(self, x: str) -> str: ...
+26 |     # error: [invalid-overload]
+27 |     def method(self, x: int | str) -> int | str:
+28 |         return x
+29 | 
+30 | class Sub3(Base):
+31 |     @overload
+32 |     @override
+33 |     def method(self, x: int) -> int: ...
+34 |     @overload
+35 |     def method(self, x: str) -> str: ...
+36 |     # error: [invalid-overload]
+37 |     def method(self, x: int | str) -> int | str:
+38 |         return x
+```
+
+## mdtest_snippet.pyi
+
+```
+ 1 | from typing_extensions import overload, override
+ 2 | 
+ 3 | class Base:
+ 4 |     @overload
+ 5 |     def method(self, x: int) -> int: ...
+ 6 |     @overload
+ 7 |     def method(self, x: str) -> str: ...
+ 8 | 
+ 9 | class Sub1(Base):
+10 |     @overload
+11 |     @override
+12 |     def method(self, x: int) -> int: ...
+13 |     @overload
+14 |     def method(self, x: str) -> str: ...
+15 | 
+16 | class Sub2(Base):
+17 |     @overload
+18 |     def method(self, x: int) -> int: ...
+19 |     @overload
+20 |     @override
+21 |     # error: [invalid-overload]
+22 |     def method(self, x: str) -> str: ...
+```
+
+# Diagnostics
+
+```
+error[invalid-overload]: `@override` decorator should be applied only to the overload implementation
+  --> src/mdtest_snippet.py:27:9
+   |
+25 |     def method(self, x: str) -> str: ...
+26 |     # error: [invalid-overload]
+27 |     def method(self, x: int | str) -> int | str:
+   |         ------
+   |         |
+   |         Implementation defined here
+28 |         return x
+   |
+info: rule `invalid-overload` is enabled by default
+
+```
+
+```
+error[invalid-overload]: `@override` decorator should be applied only to the overload implementation
+  --> src/mdtest_snippet.py:37:9
+   |
+35 |     def method(self, x: str) -> str: ...
+36 |     # error: [invalid-overload]
+37 |     def method(self, x: int | str) -> int | str:
+   |         ------
+   |         |
+   |         Implementation defined here
+38 |         return x
+   |
+info: rule `invalid-overload` is enabled by default
+
+```
+
+```
+error[invalid-overload]: `@override` decorator should be applied only to the first overload
+  --> src/mdtest_snippet.pyi:18:9
+   |
+16 | class Sub2(Base):
+17 |     @overload
+18 |     def method(self, x: int) -> int: ...
+   |         ------ First overload defined here
+19 |     @overload
+20 |     @override
+21 |     # error: [invalid-overload]
+22 |     def method(self, x: str) -> str: ...
+   |         ^^^^^^
+   |
+info: rule `invalid-overload` is enabled by default
+
+```

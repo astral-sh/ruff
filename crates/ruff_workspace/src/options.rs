@@ -6,7 +6,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
 
-use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 use ruff_formatter::IndentStyle;
 use ruff_graph::Direction;
@@ -30,8 +29,9 @@ use ruff_linter::rules::{
 use ruff_linter::settings::types::{
     IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
 };
-use ruff_linter::{warn_user_once, RuleSelector};
+use ruff_linter::{RuleSelector, warn_user_once};
 use ruff_macros::{CombineOptions, OptionsMetadata};
+use ruff_options_metadata::{OptionsMetadata, Visit};
 use ruff_python_ast::name::Name;
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 use ruff_python_semantic::NameImports;
@@ -513,6 +513,22 @@ pub struct LintOptions {
         "#
     )]
     pub preview: Option<bool>,
+
+    /// Whether to allow imports from the third-party `typing_extensions` module for Python versions
+    /// before a symbol was added to the first-party `typing` module.
+    ///
+    /// Many rules try to import symbols from the `typing` module but fall back to
+    /// `typing_extensions` for earlier versions of Python. This option can be used to disable this
+    /// fallback behavior in cases where `typing_extensions` is not installed.
+    #[option(
+        default = "true",
+        value_type = "bool",
+        example = r#"
+            # Disable `typing_extensions` imports
+            typing-extensions = false
+        "#
+    )]
+    pub typing_extensions: Option<bool>,
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
@@ -540,10 +556,10 @@ impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
             "DeprecatedTopLevelLintOptions"
         ))
     }
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::Schema;
 
-        let common_schema = LintCommonOptions::json_schema(gen);
+        let common_schema = LintCommonOptions::json_schema(generator);
         let mut schema_obj = common_schema.into_object();
 
         if let Some(object) = schema_obj.object.as_mut() {
@@ -1134,14 +1150,14 @@ impl Flake8BanditOptions {
             extend_markup_names: self
                 .extend_markup_names
                 .or_else(|| {
-                    #[allow(deprecated)]
+                    #[expect(deprecated)]
                     ruff_options.and_then(|options| options.extend_markup_names.clone())
                 })
                 .unwrap_or_default(),
             allowed_markup_calls: self
                 .allowed_markup_calls
                 .or_else(|| {
-                    #[allow(deprecated)]
+                    #[expect(deprecated)]
                     ruff_options.and_then(|options| options.allowed_markup_calls.clone())
                 })
                 .unwrap_or_default(),
@@ -1292,7 +1308,7 @@ pub struct Flake8BuiltinsOptions {
 
 impl Flake8BuiltinsOptions {
     pub fn into_settings(self) -> ruff_linter::rules::flake8_builtins::settings::Settings {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         ruff_linter::rules::flake8_builtins::settings::Settings {
             ignorelist: self
                 .ignorelist
@@ -2654,7 +2670,9 @@ impl IsortOptions {
         let force_sort_within_sections = self.force_sort_within_sections.unwrap_or_default();
         let lines_between_types = self.lines_between_types.unwrap_or_default();
         if force_sort_within_sections && lines_between_types != 0 {
-            warn_user_once!("`lines-between-types` is ignored when `force-sort-within-sections` is set to `true`");
+            warn_user_once!(
+                "`lines-between-types` is ignored when `force-sort-within-sections` is set to `true`"
+            );
         }
 
         // Extract any configuration options that deal with user-defined sections.
@@ -3102,7 +3120,7 @@ pub struct PydocstyleOptions {
         default = r#"false"#,
         value_type = "bool",
         example = r#"
-            ignore_var_parameters = true
+            ignore-var-parameters = true
         "#
     )]
     pub ignore_var_parameters: Option<bool>,
@@ -3876,6 +3894,7 @@ pub struct LintOptionsWire {
     pydoclint: Option<PydoclintOptions>,
     ruff: Option<RuffOptions>,
     preview: Option<bool>,
+    typing_extensions: Option<bool>,
 }
 
 impl From<LintOptionsWire> for LintOptions {
@@ -3930,10 +3949,11 @@ impl From<LintOptionsWire> for LintOptions {
             pydoclint,
             ruff,
             preview,
+            typing_extensions,
         } = value;
 
         LintOptions {
-            #[allow(deprecated)]
+            #[expect(deprecated)]
             common: LintCommonOptions {
                 allowed_confusables,
                 dummy_variable_rgx,
@@ -3985,6 +4005,7 @@ impl From<LintOptionsWire> for LintOptions {
             pydoclint,
             ruff,
             preview,
+            typing_extensions,
         }
     }
 }

@@ -994,6 +994,7 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     - `lint.extend-per-file-ignores`
     - `lint.exclude`
     - `lint.preview`
+    - `lint.typing-extensions`
 
     For more information, try '--help'.
     ");
@@ -1156,18 +1157,20 @@ include = ["*.ipy"]
 
 #[test]
 fn warn_invalid_noqa_with_no_diagnostics() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(["--isolated"])
-        .arg("--select")
-        .arg("F401")
-        .arg("-")
-        .pass_stdin(
-            r#"
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--isolated"])
+            .arg("--select")
+            .arg("F401")
+            .arg("-")
+            .pass_stdin(
+                r#"
 # ruff: noqa: AAA101
 print("Hello world!")
 "#
-        ));
+            )
+    );
 }
 
 #[test]
@@ -1899,6 +1902,40 @@ def first_square():
     Ok(())
 }
 
+/// Regression test for <https://github.com/astral-sh/ruff/issues/2253>
+#[test]
+fn add_noqa_parent() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let test_path = tempdir.path().join("noqa.py");
+    fs::write(
+        &test_path,
+        r#"
+from foo import (  # noqa: F401
+		bar
+)
+		"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+                .args(STDIN_BASE_OPTIONS)
+                .arg("--add-noqa")
+                .arg("--select=F401")
+                .arg("noqa.py")
+                .current_dir(&tempdir), @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        ");
+    });
+
+    Ok(())
+}
+
 /// Infer `3.11` from `requires-python` in `pyproject.toml`.
 #[test]
 fn requires_python() -> Result<()> {
@@ -2117,7 +2154,7 @@ requires-python = ">= 3.11"
             .arg("test.py")
             .arg("-")
             .current_dir(project_dir)
-            , @r###"
+            , @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -2207,6 +2244,7 @@ requires-python = ">= 3.11"
         	XXX,
         ]
         linter.typing_modules = []
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -2390,7 +2428,7 @@ requires-python = ">= 3.11"
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
     Ok(())
 }
@@ -2428,7 +2466,7 @@ requires-python = ">= 3.11"
             .arg("test.py")
             .arg("-")
             .current_dir(project_dir)
-            , @r###"
+            , @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -2518,6 +2556,7 @@ requires-python = ">= 3.11"
         	XXX,
         ]
         linter.typing_modules = []
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -2701,7 +2740,7 @@ requires-python = ">= 3.11"
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
     Ok(())
 }
@@ -2790,7 +2829,7 @@ from typing import Union;foo: Union[int, str] = 1
             .args(STDIN_BASE_OPTIONS)
             .arg("test.py")
             .arg("--show-settings")
-            .current_dir(project_dir), @r###"
+            .current_dir(project_dir), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -2881,6 +2920,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -3064,7 +3104,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
     Ok(())
 }
@@ -3170,7 +3210,7 @@ from typing import Union;foo: Union[int, str] = 1
             .arg("--show-settings")
             .args(["--select","UP007"])
             .arg("foo/test.py")
-            .current_dir(&project_dir), @r###"
+            .current_dir(&project_dir), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -3260,6 +3300,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -3443,7 +3484,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
     Ok(())
 }
@@ -3475,7 +3516,7 @@ requires-python = ">= 3.11"
         &inner_pyproject,
         r#"
 [tool.ruff]
-target-version = "py310"        
+target-version = "py310"
 "#,
     )?;
 
@@ -3497,7 +3538,7 @@ from typing import Union;foo: Union[int, str] = 1
             .arg("--show-settings")
             .args(["--select","UP007"])
             .arg("foo/test.py")
-            .current_dir(&project_dir), @r###"
+            .current_dir(&project_dir), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -3587,6 +3628,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -3770,7 +3812,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
     Ok(())
 }
@@ -3823,7 +3865,7 @@ from typing import Union;foo: Union[int, str] = 1
             .args(STDIN_BASE_OPTIONS)
             .arg("--show-settings")
             .arg("foo/test.py")
-            .current_dir(&project_dir), @r###"
+            .current_dir(&project_dir), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -3890,7 +3932,7 @@ from typing import Union;foo: Union[int, str] = 1
         linter.per_file_ignores = {}
         linter.safety_table.forced_safe = []
         linter.safety_table.forced_unsafe = []
-        linter.unresolved_target_version = 3.9
+        linter.unresolved_target_version = none
         linter.per_file_target_version = {}
         linter.preview = disabled
         linter.explicit_preview_rules = false
@@ -3914,6 +3956,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -4097,7 +4140,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
 
     insta::with_settings!({
@@ -4107,7 +4150,7 @@ from typing import Union;foo: Union[int, str] = 1
             .args(STDIN_BASE_OPTIONS)
             .arg("--show-settings")
             .arg("test.py")
-            .current_dir(project_dir.join("foo")), @r###"
+            .current_dir(project_dir.join("foo")), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -4174,7 +4217,7 @@ from typing import Union;foo: Union[int, str] = 1
         linter.per_file_ignores = {}
         linter.safety_table.forced_safe = []
         linter.safety_table.forced_unsafe = []
-        linter.unresolved_target_version = 3.9
+        linter.unresolved_target_version = none
         linter.per_file_target_version = {}
         linter.preview = disabled
         linter.explicit_preview_rules = false
@@ -4198,6 +4241,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -4381,7 +4425,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
     Ok(())
 }
@@ -4444,7 +4488,7 @@ from typing import Union;foo: Union[int, str] = 1
             .args(STDIN_BASE_OPTIONS)
             .arg("--show-settings")
             .arg("test.py")
-            .current_dir(&project_dir), @r###"
+            .current_dir(&project_dir), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -4535,6 +4579,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -4718,7 +4763,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
 
     Ok(())
@@ -4954,30 +4999,81 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
 
 #[test]
 fn flake8_import_convention_unused_aliased_import() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .arg("--config")
-        .arg(r#"lint.isort.required-imports = ["import pandas"]"#)
-        .args(["--select", "I002,ICN001,F401"])
-        .args(["--stdin-filename", "test.py"])
-        .arg("--unsafe-fixes")
-        .arg("--fix")
-        .arg("-")
-        .pass_stdin("1"));
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(r#"lint.isort.required-imports = ["import pandas"]"#)
+            .args(["--select", "I002,ICN001,F401"])
+            .args(["--stdin-filename", "test.py"])
+            .arg("--unsafe-fixes")
+            .arg("--fix")
+            .arg("-")
+            .pass_stdin("1")
+    );
 }
 
 #[test]
 fn flake8_import_convention_unused_aliased_import_no_conflict() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(r#"lint.isort.required-imports = ["import pandas as pd"]"#)
+            .args(["--select", "I002,ICN001,F401"])
+            .args(["--stdin-filename", "test.py"])
+            .arg("--unsafe-fixes")
+            .arg("--fix")
+            .arg("-")
+            .pass_stdin("1")
+    );
+}
+
+// See: https://github.com/astral-sh/ruff/issues/16177
+#[test]
+fn flake8_pyi_redundant_none_literal() {
+    let snippet = r#"
+from typing import Literal
+
+# For each of these expressions, Ruff provides a fix for one of the `Literal[None]` elements
+# but not both, as if both were autofixed it would result in `None | None`,
+# which leads to a `TypeError` at runtime.
+a: Literal[None,] | Literal[None,]
+b: Literal[None] | Literal[None]
+c: Literal[None] | Literal[None,]
+d: Literal[None,] | Literal[None]
+"#;
+
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .arg("--config")
-        .arg(r#"lint.isort.required-imports = ["import pandas as pd"]"#)
-        .args(["--select", "I002,ICN001,F401"])
+        .args(["--select", "PYI061"])
         .args(["--stdin-filename", "test.py"])
-        .arg("--unsafe-fixes")
-        .arg("--fix")
+        .arg("--preview")
+        .arg("--diff")
         .arg("-")
-        .pass_stdin("1"));
+        .pass_stdin(snippet), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    --- test.py
+    +++ test.py
+    @@ -4,7 +4,7 @@
+     # For each of these expressions, Ruff provides a fix for one of the `Literal[None]` elements
+     # but not both, as if both were autofixed it would result in `None | None`,
+     # which leads to a `TypeError` at runtime.
+    -a: Literal[None,] | Literal[None,]
+    -b: Literal[None] | Literal[None]
+    -c: Literal[None] | Literal[None,]
+    -d: Literal[None,] | Literal[None]
+    +a: None | Literal[None,]
+    +b: None | Literal[None]
+    +c: None | Literal[None,]
+    +d: None | Literal[None]
+
+
+    ----- stderr -----
+    Would fix 4 errors.
+    ");
 }
 
 /// Test that private, old-style `TypeVar` generics
@@ -5175,8 +5271,8 @@ fn a005_module_shadowing_non_strict() -> Result<()> {
 }
 
 /// Test A005 with `strict-checking` unset
-/// TODO(brent) This should currently match the strict version, but after the next minor
-/// release it will match the non-strict version directly above
+///
+/// This should match the non-strict version directly above
 #[test]
 fn a005_module_shadowing_strict_default() -> Result<()> {
     let tempdir = TempDir::new()?;
@@ -5563,4 +5659,35 @@ fn semantic_syntax_errors() -> Result<()> {
     );
 
     Ok(())
+}
+
+/// Regression test for <https://github.com/astral-sh/ruff/issues/17821>.
+///
+/// `lint.typing-extensions = false` with Python 3.9 should disable the PYI019 lint because it would
+/// try to import `Self` from `typing_extensions`
+#[test]
+fn combine_typing_extensions_config() {
+    let contents = "
+from typing import TypeVar
+T = TypeVar('T')
+class Foo:
+    def f(self: T) -> T: ...
+";
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--config", "lint.typing-extensions = false"])
+            .arg("--select=PYI019")
+            .arg("--target-version=py39")
+            .arg("-")
+            .pass_stdin(contents),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
 }

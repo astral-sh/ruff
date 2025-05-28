@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
 use ruff_python_ast::{self as ast, Arguments, ElifElseClause, Expr, ExprContext, Stmt};
@@ -8,6 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `if` statements that can be replaced with `bool`.
@@ -19,28 +19,39 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ## Example
 /// Given:
 /// ```python
-/// if x > 0:
-///     return True
-/// else:
+/// def foo(x: int) -> bool:
+///     if x > 0:
+///         return True
+///     else:
+///         return False
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(x: int) -> bool:
+///     return x > 0
+/// ```
+///
+/// Or, given:
+/// ```python
+/// def foo(x: int) -> bool:
+///     if x > 0:
+///         return True
 ///     return False
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// return x > 0
+/// def foo(x: int) -> bool:
+///     return x > 0
 /// ```
 ///
-/// Or, given:
-/// ```python
-/// if x > 0:
-///     return True
-/// return False
-/// ```
+/// ## Fix safety
 ///
-/// Use instead:
-/// ```python
-/// return x > 0
-/// ```
+/// This fix is marked as unsafe because it may change the program’s behavior if the condition does not
+/// return a proper Boolean. While the fix will try to wrap non-boolean values in a call to bool,
+/// custom implementations of comparison functions like `__eq__` can avoid the bool call and still
+/// lead to altered behavior.
 ///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
@@ -96,11 +107,13 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         // else:
         //     return False
         // ```
-        [ElifElseClause {
-            body: else_body,
-            test: None,
-            ..
-        }] => (
+        [
+            ElifElseClause {
+                body: else_body,
+                test: None,
+                ..
+            },
+        ] => (
             if_test.as_ref(),
             if_body,
             else_body.as_slice(),
@@ -113,15 +126,19 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         // elif x < 0:
         //     return False
         // ```
-        [.., ElifElseClause {
-            body: elif_body,
-            test: Some(elif_test),
-            range: elif_range,
-        }, ElifElseClause {
-            body: else_body,
-            test: None,
-            range: else_range,
-        }] => (
+        [
+            ..,
+            ElifElseClause {
+                body: elif_body,
+                test: Some(elif_test),
+                range: elif_range,
+            },
+            ElifElseClause {
+                body: else_body,
+                test: None,
+                range: else_range,
+            },
+        ] => (
             elif_test,
             elif_body,
             else_body.as_slice(),
@@ -288,7 +305,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         .as_ref()
         .map(|expr| checker.generator().expr(expr));
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         NeedlessBool {
             condition: condition.map(SourceCodeSnippet::new),
             negate: inverted,
@@ -301,7 +318,6 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
             range,
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -312,11 +328,7 @@ enum Bool {
 
 impl From<bool> for Bool {
     fn from(value: bool) -> Self {
-        if value {
-            Bool::True
-        } else {
-            Bool::False
-        }
+        if value { Bool::True } else { Bool::False }
     }
 }
 

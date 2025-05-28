@@ -1,4 +1,4 @@
-use ruff_formatter::{write, Argument, Arguments};
+use ruff_formatter::{Argument, Arguments, write};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::context::{NodeLevel, WithNodeLevel};
@@ -178,7 +178,6 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
         self
     }
 
-    #[allow(unused)]
     pub(crate) fn entries<T, I, F>(&mut self, entries: I) -> &mut Self
     where
         T: Ranged,

@@ -42,7 +42,7 @@ S704.py:11:1: S704 Unsafe use of `flask.Markup` detected
 
 S704.py:17:1: S704 Unsafe use of `markupsafe.Markup` detected
    |
-15 | # NOTE: We may be able to get rid of these false positives with red-knot
+15 | # NOTE: We may be able to get rid of these false positives with ty
 16 | #       if it includes comprehensive constant expression detection/evaluation.
 17 | Markup("*" * 8)  # S704 (false positive)
    | ^^^^^^^^^^^^^^^ S704

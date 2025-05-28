@@ -6,7 +6,7 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::FixAvailability;
+use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 
 use crate::args::HelpFormat;
@@ -19,7 +19,7 @@ struct Explanation<'a> {
     summary: &'a str,
     message_formats: &'a [&'a str],
     fix: String,
-    #[allow(clippy::struct_field_names)]
+    #[expect(clippy::struct_field_names)]
     explanation: Option<&'a str>,
     preview: bool,
 }

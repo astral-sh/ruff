@@ -3,8 +3,9 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-edition = "2021"
-rust-version = "1.84"
+# Please update rustfmt.toml when bumping the Rust edition
+edition = "2024"
+rust-version = "1.85"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -23,6 +24,7 @@ ruff_index = { path = "crates/ruff_index" }
 ruff_linter = { path = "crates/ruff_linter" }
 ruff_macros = { path = "crates/ruff_macros" }
 ruff_notebook = { path = "crates/ruff_notebook" }
+ruff_options_metadata = { path = "crates/ruff_options_metadata" }
 ruff_python_ast = { path = "crates/ruff_python_ast" }
 ruff_python_codegen = { path = "crates/ruff_python_codegen" }
 ruff_python_formatter = { path = "crates/ruff_python_formatter" }
@@ -35,14 +37,15 @@ ruff_python_trivia = { path = "crates/ruff_python_trivia" }
 ruff_server = { path = "crates/ruff_server" }
 ruff_source_file = { path = "crates/ruff_source_file" }
 ruff_text_size = { path = "crates/ruff_text_size" }
-red_knot_vendored = { path = "crates/red_knot_vendored" }
 ruff_workspace = { path = "crates/ruff_workspace" }
 
-red_knot_ide = { path = "crates/red_knot_ide" }
-red_knot_project = { path = "crates/red_knot_project", default-features = false }
-red_knot_python_semantic = { path = "crates/red_knot_python_semantic" }
-red_knot_server = { path = "crates/red_knot_server" }
-red_knot_test = { path = "crates/red_knot_test" }
+ty = { path = "crates/ty" }
+ty_ide = { path = "crates/ty_ide" }
+ty_project = { path = "crates/ty_project", default-features = false }
+ty_python_semantic = { path = "crates/ty_python_semantic" }
+ty_server = { path = "crates/ty_server" }
+ty_test = { path = "crates/ty_test" }
+ty_vendored = { path = "crates/ty_vendored" }
 
 aho-corasick = { version = "1.1.3" }
 anstream = { version = "0.6.18" }
@@ -50,7 +53,7 @@ anstyle = { version = "1.0.10" }
 anyhow = { version = "1.0.80" }
 assert_fs = { version = "1.1.0" }
 argfile = { version = "0.2.0" }
-bincode = { version = "1.3.3" }
+bincode = { version = "2.0.0" }
 bitflags = { version = "2.5.0" }
 bstr = { version = "1.9.1" }
 cachedir = { version = "0.3.1" }
@@ -64,7 +67,7 @@ console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
 countme = { version = "3.0.1" }
 compact_str = "0.9.0"
-criterion = { version = "0.5.1", default-features = false }
+criterion = { version = "0.6.0", default-features = false }
 crossbeam = { version = "0.8.4" }
 dashmap = { version = "6.0.1" }
 dir-test = { version = "0.4.0" }
@@ -83,6 +86,7 @@ hashbrown = { version = "0.15.0", default-features = false, features = [
     "equivalent",
     "inline-more",
 ] }
+heck = "0.5.0"
 ignore = { version = "0.4.22" }
 imara-diff = { version = "0.1.5" }
 imperative = { version = "1.0.4" }
@@ -96,7 +100,7 @@ is-wsl = { version = "0.4.0" }
 itertools = { version = "0.14.0" }
 jiff = { version = "0.2.0" }
 js-sys = { version = "0.3.69" }
-jod-thread = { version = "0.1.2" }
+jod-thread = { version = "1.0.0" }
 libc = { version = "0.2.153" }
 libcst = { version = "1.1.0", default-features = false }
 log = { version = "0.4.17" }
@@ -123,8 +127,9 @@ rand = { version = "0.9.0" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
+rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "87bf6b6c2d5f6479741271da73bd9d30c2580c26" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "4818b15f3b7516555d39f5a41cb75970448bee4c" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
@@ -159,8 +164,9 @@ tracing-log = { version = "0.2.0" }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = [
     "env-filter",
     "fmt",
+    "ansi",
+    "smallvec"
 ] }
-tracing-tree = { version = "0.4.0" }
 tryfn = { version = "0.2.1" }
 typed-arena = { version = "2.0.2" }
 unic-ucd-category = { version = "0.9" }
@@ -173,7 +179,6 @@ uuid = { version = "1.6.1", features = [
     "v4",
     "fast-rng",
     "macro-diagnostics",
-    "js",
 ] }
 walkdir = { version = "2.3.2" }
 wasm-bindgen = { version = "0.2.92" }
@@ -182,7 +187,7 @@ wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false }
 
 [workspace.metadata.cargo-shear]
-ignored = ["getrandom"]
+ignored = ["getrandom", "ruff_options_metadata", "uuid"]
 
 
 [workspace.lints.rust]
@@ -210,6 +215,7 @@ similar_names = "allow"
 single_match_else = "allow"
 too_many_lines = "allow"
 needless_continue = "allow"       # An explicit continue can be more readable, especially if the alternative is an empty block.
+unnecessary_debug_formatting = "allow"  # too many instances, the display also doesn't quote the path which is often desired in logs where we use them the most often.
 # Without the hashes we run into a `rustfmt` bug in some snapshot tests, see #13250
 needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
@@ -254,6 +260,9 @@ opt-level = 3
 [profile.dev.package.similar]
 opt-level = 3
 
+[profile.dev.package.salsa]
+opt-level = 3
+
 # Reduce complexity of a parser function that would trigger a locals limit in a wasm tool.
 # https://github.com/bytecodealliance/wasm-tools/blob/b5c3d98e40590512a3b12470ef358d5c7b983b15/crates/wasmparser/src/limits.rs#L29
 [profile.dev.package.ruff_python_parser]
@@ -268,73 +277,3 @@ debug = 1
 # The profile that 'cargo dist' will build with.
 [profile.dist]
 inherits = "release"
-
-# Config for 'dist'
-[workspace.metadata.dist]
-# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.28.4-prerelease.1"
-# CI backends to support
-ci = "github"
-# The installers to generate for each app
-installers = ["shell", "powershell"]
-# The archive format to use for windows builds (defaults .zip)
-windows-archive = ".zip"
-# The archive format to use for non-windows builds (defaults .tar.xz)
-unix-archive = ".tar.gz"
-# Target platforms to build apps for (Rust target-triple syntax)
-targets = [
-    "aarch64-apple-darwin",
-    "aarch64-pc-windows-msvc",
-    "aarch64-unknown-linux-gnu",
-    "aarch64-unknown-linux-musl",
-    "arm-unknown-linux-musleabihf",
-    "armv7-unknown-linux-gnueabihf",
-    "armv7-unknown-linux-musleabihf",
-    "i686-pc-windows-msvc",
-    "i686-unknown-linux-gnu",
-    "i686-unknown-linux-musl",
-    "powerpc64-unknown-linux-gnu",
-    "powerpc64le-unknown-linux-gnu",
-    "s390x-unknown-linux-gnu",
-    "x86_64-apple-darwin",
-    "x86_64-pc-windows-msvc",
-    "x86_64-unknown-linux-gnu",
-    "x86_64-unknown-linux-musl",
-]
-# Whether to auto-include files like READMEs, LICENSEs, and CHANGELOGs (default true)
-auto-includes = false
-# Whether dist should create a Github Release or use an existing draft
-create-release = true
-# Which actions to run on pull requests
-pr-run-mode = "skip"
-# Whether CI should trigger releases with dispatches instead of tag pushes
-dispatch-releases = true
-# Which phase dist should use to create the GitHub release
-github-release = "announce"
-# Whether CI should include auto-generated code to build local artifacts
-build-local-artifacts = false
-# Local artifacts jobs to run in CI
-local-artifacts-jobs = ["./build-binaries", "./build-docker"]
-# Publish jobs to run in CI
-publish-jobs = ["./publish-pypi", "./publish-wasm"]
-# Post-announce jobs to run in CI
-post-announce-jobs = [
-    "./notify-dependents",
-    "./publish-docs",
-    "./publish-playground",
-]
-# Custom permissions for GitHub Jobs
-github-custom-job-permissions = { "build-docker" = { packages = "write", contents = "read" }, "publish-wasm" = { contents = "read", id-token = "write", packages = "write" } }
-# Whether to install an updater program
-install-updater = false
-# Path that installers should place binaries in
-install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
-
-[workspace.metadata.dist.github-custom-runners]
-global = "depot-ubuntu-latest-4"
-
-[workspace.metadata.dist.github-action-commits]
-"actions/checkout" = "11bd71901bbe5b1630ceea73d27597364c9af683" # v4
-"actions/upload-artifact" = "ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
-"actions/download-artifact" = "95815c38cf2ff2164869cbab79da8d1f422bc89e" # v4.2.1
-"actions/attest-build-provenance" = "c074443f1aee8d4aeeae555aebba3282517141b2" #v2.2.3

@@ -43,7 +43,7 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
@@ -72,7 +72,7 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -114,7 +114,7 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: arm64
@@ -170,7 +170,7 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.platform.arch }}
@@ -223,7 +223,7 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -298,7 +298,7 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
@@ -310,7 +310,7 @@ jobs:
           manylinux: auto
           docker-options: ${{ matrix.platform.maturin_docker_options }}
           args: --release --locked --out dist
-      - uses: uraimo/run-on-arch-action@ac33288c3728ca72563c97b8b88dda5a65a84448 # v2
+      - uses: uraimo/run-on-arch-action@d94c13912ea685de38fccc1109385b83fd79427d # v3.0.1
         if: ${{ matrix.platform.arch != 'ppc64' && matrix.platform.arch != 'ppc64le'}}
         name: Test wheel
         with:
@@ -363,7 +363,7 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -377,7 +377,7 @@ jobs:
           args: --release --locked --out dist
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        uses: addnab/docker-run-action@v3
+        uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
         with:
           image: alpine:latest
           options: -v ${{ github.workspace }}:/io -w /io
@@ -429,7 +429,7 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
@@ -441,7 +441,7 @@ jobs:
           manylinux: musllinux_1_2
           args: --release --locked --out dist
           docker-options: ${{ matrix.platform.maturin_docker_options }}
-      - uses: uraimo/run-on-arch-action@ac33288c3728ca72563c97b8b88dda5a65a84448 # v2
+      - uses: uraimo/run-on-arch-action@d94c13912ea685de38fccc1109385b83fd79427d # v3.0.1
         name: Test wheel
         with:
           arch: ${{ matrix.platform.arch }}

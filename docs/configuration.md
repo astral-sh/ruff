@@ -51,7 +51,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
     target-version = "py39"
 
     [tool.ruff.lint]
-    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
     # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
     # McCabe complexity (`C901`) by default.
     select = ["E4", "E7", "E9", "F"]
@@ -133,7 +133,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
     target-version = "py39"
 
     [lint]
-    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
     # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
     # McCabe complexity (`C901`) by default.
     select = ["E4", "E7", "E9", "F"]
@@ -608,7 +608,7 @@ Options:
           RUFF_OUTPUT_FILE=]
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312, py313]
+          py37, py38, py39, py310, py311, py312, py313, py314]
       --preview
           Enable preview mode; checks will include unstable rules and fixes.
           Use `--no-preview` to disable
@@ -723,7 +723,7 @@ Options:
           notebooks, use `--extension ipy:ipynb`
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312, py313]
+          py37, py38, py39, py310, py311, py312, py313, py314]
       --preview
           Enable preview mode; enables unstable formatting. Use `--no-preview`
           to disable

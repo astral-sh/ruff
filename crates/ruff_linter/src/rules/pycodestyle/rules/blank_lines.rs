@@ -5,11 +5,7 @@ use std::slice::Iter;
 
 use itertools::Itertools;
 
-use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Edit;
-use ruff_diagnostics::Fix;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
@@ -21,10 +17,14 @@ use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
 
+use crate::AlwaysFixableViolation;
+use crate::Diagnostic;
+use crate::Edit;
+use crate::Fix;
+use crate::Locator;
 use crate::checkers::logical_lines::expand_indent;
 use crate::line_width::IndentWidth;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
-use crate::Locator;
 
 /// Number of blank lines around top level classes and functions.
 const BLANK_LINES_TOP_LEVEL: u32 = 2;
@@ -818,7 +818,7 @@ impl<'a> BlankLinesChecker<'a> {
         }
     }
 
-    #[allow(clippy::nonminimal_bool)]
+    #[expect(clippy::nonminimal_bool)]
     fn check_line(
         &self,
         line: &LogicalLineInfo,

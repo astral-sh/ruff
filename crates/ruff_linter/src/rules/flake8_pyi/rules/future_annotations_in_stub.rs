@@ -1,9 +1,9 @@
 use ruff_python_ast::StmtImportFrom;
 
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use crate::{checkers::ast::Checker, fix};
+use crate::{Fix, FixAvailability, Violation};
+use crate::{checkers::ast::Checker, fix, preview::is_fix_future_annotations_in_stub_enabled};
 
 /// ## What it does
 /// Checks for the presence of the `from __future__ import annotations` import
@@ -53,9 +53,9 @@ pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(FutureAnnotationsInStub, *range);
+    let mut diagnostic = checker.report_diagnostic(FutureAnnotationsInStub, *range);
 
-    if checker.settings.preview.is_enabled() {
+    if is_fix_future_annotations_in_stub_enabled(checker.settings) {
         let stmt = checker.semantic().current_statement();
 
         diagnostic.try_set_fix(|| {
@@ -71,6 +71,4 @@ pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
             Ok(Fix::safe_edit(edit))
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }

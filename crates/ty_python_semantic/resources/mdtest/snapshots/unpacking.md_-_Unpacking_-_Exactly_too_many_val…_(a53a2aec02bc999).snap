@@ -1,0 +1,31 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: unpacking.md - Unpacking - Exactly too many values to unpack
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unpacking.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | a, b = (1, 2, 3)  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Too many values to unpack
+ --> src/mdtest_snippet.py:1:1
+  |
+1 | a, b = (1, 2, 3)  # error: [invalid-assignment]
+  | ^^^^   --------- Got 3
+  | |
+  | Expected 2
+  |
+info: rule `invalid-assignment` is enabled by default
+
+```

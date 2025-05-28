@@ -18,8 +18,8 @@ mod tests {
 
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
-    use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::settings::LinterSettings;
+    use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
@@ -84,6 +84,8 @@ mod tests {
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.pyi"))]
     #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046.py"))]
+    #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046_CR.py"))]
+    #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046_LF.py"))]
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_if.py"))]
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_for.py"))]
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_while.py"))]
@@ -97,6 +99,7 @@ mod tests {
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_1.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_2.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_3.py"))]
+    #[test_case(Rule::InEmptyCollection, Path::new("RUF060.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
@@ -133,7 +136,7 @@ mod tests {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: false,
                 },
-                unresolved_target_version: PythonVersion::PY310,
+                unresolved_target_version: PythonVersion::PY310.into(),
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
         )?;

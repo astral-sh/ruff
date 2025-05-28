@@ -2,17 +2,17 @@ use itertools::Itertools;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ast::ExprContext;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::Locator;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for repeated equality comparisons that can be rewritten as a membership
@@ -57,7 +57,9 @@ impl AlwaysFixableViolation for RepeatedEqualityComparison {
     fn message(&self) -> String {
         match (self.expression.full_display(), self.all_hashable) {
             (Some(expression), false) => {
-                format!("Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable.")
+                format!(
+                    "Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable."
+                )
             }
             (Some(expression), true) => {
                 format!("Consider merging multiple comparisons: `{expression}`.")
@@ -137,7 +139,7 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                 .iter()
                 .all(|comparator| comparator.is_literal_expr());
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 RepeatedEqualityComparison {
                     expression: SourceCodeSnippet::new(merged_membership_test(
                         expr,
@@ -191,8 +193,6 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                 })),
                 bool_op.range(),
             )));
-
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

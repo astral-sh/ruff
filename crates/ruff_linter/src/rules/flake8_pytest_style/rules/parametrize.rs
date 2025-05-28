@@ -1,7 +1,6 @@
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, ExprCall, ExprContext, StringLiteralFlags};
@@ -12,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 use super::super::types;
 use super::helpers::{is_pytest_parametrize, split_names};
@@ -92,7 +92,9 @@ impl Violation for PytestParametrizeNamesWrongType {
                 }
             }
         };
-        format!("Wrong type passed to first argument of `pytest.mark.parametrize`; expected {expected_string}")
+        format!(
+            "Wrong type passed to first argument of `pytest.mark.parametrize`; expected {expected_string}"
+        )
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -347,7 +349,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             checker.locator().contents(),
                         )
                         .unwrap_or(expr.range());
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = checker.report_diagnostic(
                             PytestParametrizeNamesWrongType {
                                 single_argument: false,
                                 expected: names_type,
@@ -373,7 +375,6 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             format!("({})", checker.generator().expr(&node)),
                             name_range,
                         )));
-                        checker.report_diagnostic(diagnostic);
                     }
                     types::ParametrizeNameType::List => {
                         let name_range = get_parametrize_name_range(
@@ -383,7 +384,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             checker.locator().contents(),
                         )
                         .unwrap_or(expr.range());
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = checker.report_diagnostic(
                             PytestParametrizeNamesWrongType {
                                 single_argument: false,
                                 expected: names_type,
@@ -408,7 +409,6 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             checker.generator().expr(&node),
                             name_range,
                         )));
-                        checker.report_diagnostic(diagnostic);
                     }
                     types::ParametrizeNameType::Csv => {}
                 }
@@ -421,7 +421,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                 match names_type {
                     types::ParametrizeNameType::Tuple => {}
                     types::ParametrizeNameType::List => {
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = checker.report_diagnostic(
                             PytestParametrizeNamesWrongType {
                                 single_argument: false,
                                 expected: names_type,
@@ -437,10 +437,9 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             checker.generator().expr(&node),
                             expr.range(),
                         )));
-                        checker.report_diagnostic(diagnostic);
                     }
                     types::ParametrizeNameType::Csv => {
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = checker.report_diagnostic(
                             PytestParametrizeNamesWrongType {
                                 single_argument: false,
                                 expected: names_type,
@@ -455,7 +454,6 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                                 expr.range(),
                             )));
                         }
-                        checker.report_diagnostic(diagnostic);
                     }
                 }
             }
@@ -467,7 +465,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                 match names_type {
                     types::ParametrizeNameType::List => {}
                     types::ParametrizeNameType::Tuple => {
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = checker.report_diagnostic(
                             PytestParametrizeNamesWrongType {
                                 single_argument: false,
                                 expected: names_type,
@@ -484,10 +482,9 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             format!("({})", checker.generator().expr(&node)),
                             expr.range(),
                         )));
-                        checker.report_diagnostic(diagnostic);
                     }
                     types::ParametrizeNameType::Csv => {
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = checker.report_diagnostic(
                             PytestParametrizeNamesWrongType {
                                 single_argument: false,
                                 expected: names_type,
@@ -502,7 +499,6 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                                 expr.range(),
                             )));
                         }
-                        checker.report_diagnostic(diagnostic);
                     }
                 }
             }
@@ -529,7 +525,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
     match values {
         Expr::List(ast::ExprList { elts, .. }) => {
             if values_type != types::ParametrizeValuesType::List {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
@@ -568,7 +564,6 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                     );
                     Fix::unsafe_edits(values_start, [values_end])
                 });
-                checker.report_diagnostic(diagnostic);
             }
 
             if is_multi_named {
@@ -577,7 +572,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
         }
         Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             if values_type != types::ParametrizeValuesType::Tuple {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
@@ -616,7 +611,6 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
 
                     Fix::unsafe_edits(values_start, [values_end])
                 });
-                checker.report_diagnostic(diagnostic);
             }
 
             if is_multi_named {
@@ -662,7 +656,7 @@ fn check_duplicates(checker: &Checker, values: &Expr) {
         let expr = ComparableExpr::from(element);
         seen.entry(expr)
             .and_modify(|index| {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     PytestDuplicateParametrizeTestCases { index: *index },
                     element.range(),
                 );
@@ -677,7 +671,6 @@ fn check_duplicates(checker: &Checker, values: &Expr) {
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(deletion_range)));
                     }
                 }
-                checker.report_diagnostic(diagnostic);
             })
             .or_insert(index);
         prev = Some(element);
@@ -685,7 +678,7 @@ fn check_duplicates(checker: &Checker, values: &Expr) {
 }
 
 fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalues: &Expr) {
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         PytestParametrizeNamesWrongType {
             single_argument: true,
             expected: types::ParametrizeNameType::Csv,
@@ -728,7 +721,6 @@ fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalue
         Fix::safe_edits(argnames_edit, argvalues_edits)
     };
     diagnostic.set_fix(fix);
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Generate [`Edit`]s to unpack single-element lists or tuples in the given [`Expr`].
@@ -773,7 +765,7 @@ fn handle_value_rows(
         match elt {
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 if values_row_type != types::ParametrizeValuesRowType::Tuple {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         PytestParametrizeValuesWrongType {
                             values: values_type,
                             row: values_row_type,
@@ -811,12 +803,11 @@ fn handle_value_rows(
                         let elt_end = Edit::replacement("]".into(), start, elt.end());
                         Fix::unsafe_edits(elt_start, [elt_end])
                     });
-                    checker.report_diagnostic(diagnostic);
                 }
             }
             Expr::List(ast::ExprList { elts, .. }) => {
                 if values_row_type != types::ParametrizeValuesRowType::List {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         PytestParametrizeValuesWrongType {
                             values: values_type,
                             row: values_row_type,
@@ -855,7 +846,6 @@ fn handle_value_rows(
                         );
                         Fix::unsafe_edits(elt_start, [elt_end])
                     });
-                    checker.report_diagnostic(diagnostic);
                 }
             }
             _ => {}

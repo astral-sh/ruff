@@ -1,7 +1,6 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Stmt};
@@ -11,6 +10,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the presence of unused variables in function scopes.
@@ -37,6 +37,11 @@ use crate::fix::edits::delete_stmt;
 ///     x = 1
 ///     return x
 /// ```
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing an unused variable assignment may
+/// delete comments that are attached to the assignment.
 ///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
@@ -251,7 +256,7 @@ pub(crate) fn unused_variable(checker: &Checker, name: &str, binding: &Binding) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnusedVariable {
             name: name.to_string(),
         },
@@ -260,5 +265,4 @@ pub(crate) fn unused_variable(checker: &Checker, name: &str, binding: &Binding) 
     if let Some(fix) = remove_unused_variable(binding, checker) {
         diagnostic.set_fix(fix);
     }
-    checker.report_diagnostic(diagnostic);
 }

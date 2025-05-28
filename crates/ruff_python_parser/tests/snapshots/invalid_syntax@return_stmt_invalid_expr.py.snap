@@ -186,7 +186,7 @@ Module(
 
   |
 1 | return *
-  |        ^ Syntax Error: can't use starred expression here
+  |        ^ Syntax Error: Starred expression cannot be used here
 2 | return yield x
 3 | return yield from x
   |
@@ -196,5 +196,5 @@ Module(
 3 | return yield from x
 4 | return x := 1
 5 | return *x and y
-  |        ^^^^^^^^ Syntax Error: can't use starred expression here
+  |        ^^^^^^^^ Syntax Error: Starred expression cannot be used here
   |

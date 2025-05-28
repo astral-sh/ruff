@@ -2,10 +2,9 @@ use std::cmp::Ordering;
 
 use anyhow::Result;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
+use ruff_python_ast::stmt_if::{BranchKind, IfElifBranch, if_elif_branches};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Int, StmtIf};
 use ruff_source_file::LineRanges;
@@ -13,6 +12,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{adjust_indentation, delete_stmt};
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -43,6 +43,10 @@ use ruff_python_ast::PythonVersion;
 ///
 /// ## Options
 /// - `target-version`
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe because it will remove all code,
+/// comments, and annotations within unreachable version blocks.
 ///
 /// ## References
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
@@ -125,7 +129,7 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
                     ) {
                         Ok(false) => {}
                         Ok(true) => {
-                            let mut diagnostic = Diagnostic::new(
+                            let mut diagnostic = checker.report_diagnostic(
                                 OutdatedVersionBlock {
                                     reason: if op.is_lt() || op.is_lt_e() {
                                         Reason::AlwaysFalse
@@ -142,15 +146,14 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
                             } {
                                 diagnostic.set_fix(fix);
                             }
-                            checker.report_diagnostic(diagnostic);
                         }
                         Err(_) => {
-                            checker.report_diagnostic(Diagnostic::new(
+                            checker.report_diagnostic(
                                 OutdatedVersionBlock {
                                     reason: Reason::Invalid,
                                 },
                                 comparison.range(),
-                            ));
+                            );
                         }
                     }
                 }
@@ -178,28 +181,30 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
                 };
                 match reason {
                     Reason::AlwaysTrue => {
-                        let mut diagnostic =
-                            Diagnostic::new(OutdatedVersionBlock { reason }, branch.test.range());
+                        let mut diagnostic = checker.report_diagnostic(
+                            OutdatedVersionBlock { reason },
+                            branch.test.range(),
+                        );
                         if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
                             diagnostic.set_fix(fix);
                         }
-                        checker.report_diagnostic(diagnostic);
                     }
                     Reason::AlwaysFalse => {
-                        let mut diagnostic =
-                            Diagnostic::new(OutdatedVersionBlock { reason }, branch.test.range());
+                        let mut diagnostic = checker.report_diagnostic(
+                            OutdatedVersionBlock { reason },
+                            branch.test.range(),
+                        );
                         if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
                             diagnostic.set_fix(fix);
                         }
-                        checker.report_diagnostic(diagnostic);
                     }
                     Reason::Invalid => {
-                        checker.report_diagnostic(Diagnostic::new(
+                        checker.report_diagnostic(
                             OutdatedVersionBlock {
                                 reason: Reason::Invalid,
                             },
                             comparison.range(),
-                        ));
+                        );
                     }
                 }
             }

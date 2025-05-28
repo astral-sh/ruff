@@ -1,11 +1,12 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Comprehension, Expr, StmtFor};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::analyze::typing::is_io_base_expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_readlines_in_for_fix_safe_enabled;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `readlines()` when iterating over a file line-by-line.
@@ -84,9 +85,14 @@ fn readlines_in_iter(checker: &Checker, iter_expr: &Expr) {
         }
     }
 
-    let mut diagnostic = Diagnostic::new(ReadlinesInFor, expr_call.range());
-    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(
-        expr_call.range().add_start(expr_attr.value.range().len()),
-    )));
-    checker.report_diagnostic(diagnostic);
+    let mut diagnostic = checker.report_diagnostic(ReadlinesInFor, expr_call.range());
+    diagnostic.set_fix(if is_readlines_in_for_fix_safe_enabled(checker.settings) {
+        Fix::safe_edit(Edit::range_deletion(
+            expr_call.range().add_start(expr_attr.value.range().len()),
+        ))
+    } else {
+        Fix::unsafe_edit(Edit::range_deletion(
+            expr_call.range().add_start(expr_attr.value.range().len()),
+        ))
+    });
 }

@@ -1,7 +1,7 @@
 [files]
 # https://github.com/crate-ci/typos/issues/868
 extend-exclude = [
-    "crates/red_knot_vendored/vendor/**/*",
+    "crates/ty_vendored/vendor/**/*",
     "**/resources/**/*",
     "**/snapshots/**/*",
 ]

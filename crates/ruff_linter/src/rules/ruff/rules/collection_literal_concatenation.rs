@@ -1,10 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprContext, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::preview::is_support_slices_in_literal_concatenation_enabled;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of the `+` operator to concatenate collections.
@@ -32,6 +33,12 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// foo = [2, 3, 4]
 /// bar = [1, *foo, 5, 6]
 /// ```
+///
+/// ## Fix safety
+///
+/// The fix is always marked as unsafe because the `+` operator uses the `__add__` magic method and
+/// `*`-unpacking uses the `__iter__` magic method. Both of these could have custom
+/// implementations, causing the fix to change program behaviour.
 ///
 /// ## References
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
@@ -191,7 +198,8 @@ pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let should_support_slices = checker.settings.preview.is_enabled();
+    let should_support_slices =
+        is_support_slices_in_literal_concatenation_enabled(checker.settings);
 
     let Some((new_expr, type_)) = concatenate_expressions(expr, should_support_slices) else {
         return;
@@ -202,7 +210,7 @@ pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
         Type::Tuple => format!("({})", checker.generator().expr(&new_expr)),
         Type::List => checker.generator().expr(&new_expr),
     };
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         CollectionLiteralConcatenation {
             expression: SourceCodeSnippet::new(contents.clone()),
         },
@@ -219,5 +227,4 @@ pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
             expr.range(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }

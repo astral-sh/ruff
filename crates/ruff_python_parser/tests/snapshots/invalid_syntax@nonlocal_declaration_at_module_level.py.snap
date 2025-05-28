@@ -1,0 +1,55 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/nonlocal_declaration_at_module_level.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..25,
+        body: [
+            Nonlocal(
+                StmtNonlocal {
+                    range: 0..10,
+                    names: [
+                        Identifier {
+                            id: Name("x"),
+                            range: 9..10,
+                        },
+                    ],
+                },
+            ),
+            Nonlocal(
+                StmtNonlocal {
+                    range: 11..24,
+                    names: [
+                        Identifier {
+                            id: Name("x"),
+                            range: 20..21,
+                        },
+                        Identifier {
+                            id: Name("y"),
+                            range: 23..24,
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | nonlocal x
+  | ^^^^^^^^^^ Syntax Error: nonlocal declaration not allowed at module level
+2 | nonlocal x, y
+  |
+
+
+  |
+1 | nonlocal x
+2 | nonlocal x, y
+  | ^^^^^^^^^^^^^ Syntax Error: nonlocal declaration not allowed at module level
+  |

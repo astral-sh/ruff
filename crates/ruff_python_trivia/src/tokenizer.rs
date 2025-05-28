@@ -2,7 +2,7 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::{is_python_whitespace, Cursor};
+use crate::{Cursor, is_python_whitespace};
 
 /// Searches for the first non-trivia character after `offset`.
 ///
@@ -30,7 +30,7 @@ pub fn find_only_token_in_range(
     let token = tokens.next().expect("Expected a token");
     debug_assert_eq!(token.kind(), token_kind);
     let mut tokens = tokens.skip_while(|token| token.kind == SimpleTokenKind::LParen);
-    #[allow(clippy::debug_assert_with_mut_call)]
+    #[expect(clippy::debug_assert_with_mut_call)]
     {
         debug_assert_eq!(tokens.next(), None);
     }
@@ -114,7 +114,7 @@ pub fn lines_after_ignoring_trivia(offset: TextSize, code: &str) -> u32 {
 
 /// Counts the empty lines after `offset`, ignoring any trailing trivia on the same line as
 /// `offset`.
-#[allow(clippy::cast_possible_truncation)]
+#[expect(clippy::cast_possible_truncation)]
 pub fn lines_after_ignoring_end_of_line_trivia(offset: TextSize, code: &str) -> u32 {
     // SAFETY: We don't support files greater than 4GB, so casting to u32 is safe.
     SimpleTokenizer::starts_at(offset, code)

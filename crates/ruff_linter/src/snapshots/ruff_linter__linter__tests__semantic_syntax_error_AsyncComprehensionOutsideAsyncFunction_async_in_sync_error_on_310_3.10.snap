@@ -1,0 +1,8 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+<filename>:1:27: SyntaxError: cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
+  |
+1 | async def f(): return [[x async for x in foo(n)] for n in range(3)]
+  |                           ^^^^^^^^^^^^^^^^^^^^^
+  |

@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for `super` calls that pass redundant arguments.
@@ -39,6 +39,11 @@ use crate::checkers::ast::Checker;
 ///     def bar(self):
 ///         super().foo()
 /// ```
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing the arguments from a call
+/// may delete comments that are attached to the arguments.
 ///
 /// ## References
 /// - [Python documentation: `super`](https://docs.python.org/3/library/functions.html#super)
@@ -152,12 +157,11 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(SuperCallWithParameters, call.arguments.range());
+    let mut diagnostic = checker.report_diagnostic(SuperCallWithParameters, call.arguments.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
         call.arguments.start() + TextSize::new(1),
         call.arguments.end() - TextSize::new(1),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.

@@ -61,3 +61,26 @@ B028.py:22:1: B028 [*] No explicit `stacklevel` keyword argument found
 26    |-        source = None # no trailing comma
    26 |+        source = None, stacklevel=2 # no trailing comma
 27 27 |     )
+28 28 | 
+29 29 | # https://github.com/astral-sh/ruff/issues/18011
+
+B028.py:32:1: B028 [*] No explicit `stacklevel` keyword argument found
+   |
+30 | warnings.warn("test", skip_file_prefixes=(os.path.dirname(__file__),))
+31 | # trigger diagnostic if `skip_file_prefixes` is present and set to the default value
+32 | warnings.warn("test", skip_file_prefixes=())
+   | ^^^^^^^^^^^^^ B028
+33 |
+34 | _my_prefixes = ("this","that")
+   |
+   = help: Set `stacklevel=2`
+
+ℹ Unsafe fix
+29 29 | # https://github.com/astral-sh/ruff/issues/18011
+30 30 | warnings.warn("test", skip_file_prefixes=(os.path.dirname(__file__),))
+31 31 | # trigger diagnostic if `skip_file_prefixes` is present and set to the default value
+32    |-warnings.warn("test", skip_file_prefixes=())
+   32 |+warnings.warn("test", skip_file_prefixes=(), stacklevel=2)
+33 33 | 
+34 34 | _my_prefixes = ("this","that")
+35 35 | warnings.warn("test", skip_file_prefixes = _my_prefixes)

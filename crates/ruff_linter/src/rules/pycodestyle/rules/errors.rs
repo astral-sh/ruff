@@ -1,5 +1,6 @@
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::Violation;
 
 /// ## What it does
 /// This is not a regular diagnostic; instead, it's raised when a file cannot be read
@@ -66,7 +67,7 @@ impl Violation for IOError {
 #[deprecated(note = "E999 has been removed")]
 pub(crate) struct SyntaxError;
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl Violation for SyntaxError {
     fn message(&self) -> String {
         unreachable!("E999 has been removed")

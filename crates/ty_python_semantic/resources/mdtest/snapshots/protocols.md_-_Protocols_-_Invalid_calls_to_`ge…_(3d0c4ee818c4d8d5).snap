@@ -1,0 +1,84 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: protocols.md - Protocols - Invalid calls to `get_protocol_members()`
+mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import Protocol, get_protocol_members
+ 2 | 
+ 3 | class NotAProtocol: ...
+ 4 | 
+ 5 | get_protocol_members(NotAProtocol)  # error: [invalid-argument-type]
+ 6 | 
+ 7 | class AlsoNotAProtocol(NotAProtocol, object): ...
+ 8 | 
+ 9 | get_protocol_members(AlsoNotAProtocol)  # error: [invalid-argument-type]
+10 | class GenericProtocol[T](Protocol): ...
+11 | 
+12 | get_protocol_members(GenericProtocol[int])  # TODO: should emit a diagnostic here (https://github.com/astral-sh/ruff/issues/17549)
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Invalid argument to `get_protocol_members`
+ --> src/mdtest_snippet.py:5:1
+  |
+3 | class NotAProtocol: ...
+4 |
+5 | get_protocol_members(NotAProtocol)  # error: [invalid-argument-type]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
+6 |
+7 | class AlsoNotAProtocol(NotAProtocol, object): ...
+  |
+info: Only protocol classes can be passed to `get_protocol_members`
+info: `NotAProtocol` is declared here, but it is not a protocol class:
+ --> src/mdtest_snippet.py:3:7
+  |
+1 | from typing_extensions import Protocol, get_protocol_members
+2 |
+3 | class NotAProtocol: ...
+  |       ^^^^^^^^^^^^
+4 |
+5 | get_protocol_members(NotAProtocol)  # error: [invalid-argument-type]
+  |
+info: A class is only a protocol class if it directly inherits from `typing.Protocol` or `typing_extensions.Protocol`
+info: See https://typing.python.org/en/latest/spec/protocol.html#
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Invalid argument to `get_protocol_members`
+  --> src/mdtest_snippet.py:9:1
+   |
+ 7 | class AlsoNotAProtocol(NotAProtocol, object): ...
+ 8 |
+ 9 | get_protocol_members(AlsoNotAProtocol)  # error: [invalid-argument-type]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
+10 | class GenericProtocol[T](Protocol): ...
+   |
+info: Only protocol classes can be passed to `get_protocol_members`
+info: `AlsoNotAProtocol` is declared here, but it is not a protocol class:
+ --> src/mdtest_snippet.py:7:7
+  |
+5 | get_protocol_members(NotAProtocol)  # error: [invalid-argument-type]
+6 |
+7 | class AlsoNotAProtocol(NotAProtocol, object): ...
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+8 |
+9 | get_protocol_members(AlsoNotAProtocol)  # error: [invalid-argument-type]
+  |
+info: A class is only a protocol class if it directly inherits from `typing.Protocol` or `typing_extensions.Protocol`
+info: See https://typing.python.org/en/latest/spec/protocol.html#
+info: rule `invalid-argument-type` is enabled by default
+
+```
