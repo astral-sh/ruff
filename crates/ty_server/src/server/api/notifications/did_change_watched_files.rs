@@ -27,9 +27,6 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
     ) -> Result<()> {
         let mut events_by_db: FxHashMap<_, Vec<ChangeEvent>> = FxHashMap::default();
 
-        // Keep track of whether the ignore files or config files have changed
-        let mut project_changed = false;
-
         for change in params.changes {
             let path = match url_to_any_system_path(&change.uri) {
                 Ok(path) => path,
@@ -56,13 +53,6 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                 );
                 continue;
             };
-
-            if matches!(
-                system_path.file_name(),
-                Some(".gitignore" | ".ignore" | "ty.toml" | "pyproject.toml")
-            ) {
-                project_changed = true;
-            }
 
             let change_event = match change.typ {
                 FileChangeType::CREATED => ChangeEvent::Created {
@@ -96,11 +86,19 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
             return Ok(());
         }
 
+        let mut project_changed = false;
+
         for (root, changes) in events_by_db {
             tracing::debug!("Applying changes to `{root}`");
+
+            // SAFETY: Only paths that are part of the workspace are registered for file watching.
+            // So, virtual paths and paths that are outside of a workspace does not trigger this
+            // notification.
             let db = session.project_db_for_path_mut(&*root).unwrap();
 
-            db.apply_changes(changes, None);
+            let result = db.apply_changes(changes, None);
+
+            project_changed |= result.project_changed();
         }
 
         let client_capabilities = session.client_capabilities();

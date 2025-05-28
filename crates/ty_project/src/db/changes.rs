@@ -11,13 +11,32 @@ use ruff_db::system::SystemPath;
 use rustc_hash::FxHashSet;
 use ty_python_semantic::Program;
 
+/// Represents the result of applying changes to the project database.
+pub struct ChangeResult {
+    project_changed: bool,
+    custom_stdlib_changed: bool,
+}
+
+impl ChangeResult {
+    /// Returns `true` if the project structure has changed, e.g. files were added or removed,
+    /// or the project configuration has changed.
+    pub fn project_changed(&self) -> bool {
+        self.project_changed
+    }
+
+    /// Returns `true` if the custom stdlib's VERSIONS file has changed.
+    pub fn custom_stdlib_changed(&self) -> bool {
+        self.custom_stdlib_changed
+    }
+}
+
 impl ProjectDatabase {
     #[tracing::instrument(level = "debug", skip(self, changes, project_options_overrides))]
     pub fn apply_changes(
         &mut self,
         changes: Vec<ChangeEvent>,
         project_options_overrides: Option<&ProjectOptionsOverrides>,
-    ) {
+    ) -> ChangeResult {
         let mut project = self.project();
         let project_root = project.root(self).to_path_buf();
         let config_file_override =
@@ -32,7 +51,7 @@ impl ProjectDatabase {
         // Are there structural changes to the project
         let mut project_changed = false;
         // Changes to a custom stdlib path's VERSIONS
-        let mut custom_stdlib_change = false;
+        let mut custom_stdlib_changed = false;
         // Paths that were added
         let mut added_paths = FxHashSet::default();
 
@@ -69,7 +88,7 @@ impl ProjectDatabase {
                 }
 
                 if Some(path) == custom_stdlib_versions_path.as_deref() {
-                    custom_stdlib_change = true;
+                    custom_stdlib_changed = true;
                 }
             }
 
@@ -132,7 +151,7 @@ impl ProjectDatabase {
                             .as_ref()
                             .is_some_and(|versions_path| versions_path.starts_with(&path))
                         {
-                            custom_stdlib_change = true;
+                            custom_stdlib_changed = true;
                         }
 
                         if project.is_path_included(self, &path) || path == project_root {
@@ -228,7 +247,7 @@ impl ProjectDatabase {
             }
 
             return;
-        } else if custom_stdlib_change {
+        } else if custom_stdlib_changed {
             let search_paths = project
                 .metadata(self)
                 .to_program_settings(self.system())
@@ -258,5 +277,10 @@ impl ProjectDatabase {
         // implement a `BTreeMap` or similar and only prune the diagnostics from paths that we've
         // re-scanned (or that were removed etc).
         project.replace_index_diagnostics(self, diagnostics);
+
+        ChangeResult {
+            project_changed,
+            custom_stdlib_changed,
+        }
     }
 }
