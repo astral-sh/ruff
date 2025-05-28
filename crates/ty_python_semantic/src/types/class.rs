@@ -1,7 +1,6 @@
 use std::hash::BuildHasherDefault;
 use std::sync::{LazyLock, Mutex};
 
-use super::FunctionSignature;
 use super::{
     IntersectionBuilder, KnownFunction, MemberLookupPolicy, Mro, MroError, MroIterator,
     SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase, infer_expression_type,
@@ -10,7 +9,7 @@ use super::{
 use crate::semantic_index::DeclarationWithConstraint;
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, Specialization};
-use crate::types::signatures::{Parameter, Parameters, Signature};
+use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::{
     CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, TypeMapping,
     TypeVarInstance,
@@ -495,6 +494,8 @@ impl<'db> ClassType<'db> {
             .map_type(|ty| ty.apply_optional_specialization(db, specialization))
     }
 
+    /// Return a `Type::Callable` (or union of `Type::Callable`) that represents the callable
+    /// constructor signature of this class.
     pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
@@ -531,19 +532,21 @@ impl<'db> ClassType<'db> {
             {
                 // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
                 // then we should ignore the `__init__` and just return the `__new__` method.
-                let new_return_ty = match dunder_new_function.signature(db) {
-                    FunctionSignature::Single(signature)
-                    | FunctionSignature::Overloaded(_, Some(signature)) => signature.return_ty,
-                    FunctionSignature::Overloaded(..) => None,
-                };
+                let may_return_non_subtype = dunder_new_function
+                    .signature(db)
+                    .overloads
+                    .iter()
+                    .any(|signature| {
+                        signature.return_ty.is_some_and(|return_ty| {
+                            !return_ty.to_meta_type(db).is_subtype_of(db, self_ty)
+                        })
+                    });
 
                 let dunder_new_bound_method =
                     dunder_new_function.into_bound_method_type(db, self_ty);
 
-                if let Some(new_return_ty) = new_return_ty {
-                    if !new_return_ty.to_meta_type(db).is_subtype_of(db, self_ty) {
-                        return dunder_new_bound_method;
-                    }
+                if may_return_non_subtype {
+                    return dunder_new_bound_method;
                 }
                 Some(dunder_new_bound_method)
             } else {
@@ -561,9 +564,9 @@ impl<'db> ClassType<'db> {
 
         let correct_return_type = self_ty.to_instance(db).unwrap_or_else(Type::unknown);
 
-        // If the class defines an `__init__` method, then we synthesize a `__init__` method
-        // that has the same parameters as the `__init__` method after it is bound, and with the return type
-        // of the concrete value of `Self`.
+        // If the class defines an `__init__` method, then we synthesize a callable type with the
+        // same parameters as the `__init__` method after it is bound, and with the return type of
+        // the concrete type of `Self`.
         let synthesized_dunder_init_callable =
             if let Symbol::Type(Type::FunctionLiteral(dunder_init_function), _) =
                 dunder_init_function_symbol
@@ -573,19 +576,19 @@ impl<'db> ClassType<'db> {
                         .bind_self()
                 };
 
-                let synthesized_dunder_init_signature = match dunder_init_function.signature(db) {
-                    FunctionSignature::Single(signature) => {
-                        CallableType::single(db, synthesized_signature(signature.clone()))
-                    }
-                    FunctionSignature::Overloaded(overloads, _) => CallableType::from_overloads(
-                        db,
-                        overloads
-                            .iter()
-                            .map(Clone::clone)
-                            .map(synthesized_signature),
-                    ),
-                };
-                Some(Type::Callable(synthesized_dunder_init_signature))
+                let synthesized_dunder_init_signature = CallableSignature::from_overloads(
+                    dunder_init_function
+                        .signature(db)
+                        .overloads
+                        .iter()
+                        .cloned()
+                        .map(synthesized_signature),
+                );
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    synthesized_dunder_init_signature,
+                    true,
+                )))
             } else {
                 None
             };
@@ -597,8 +600,9 @@ impl<'db> ClassType<'db> {
                     vec![dunder_new_function, synthesized_dunder_init_callable],
                 )
             }
-            (Some(dunder_constructor_function), None)
-            | (None, Some(dunder_constructor_function)) => dunder_constructor_function,
+            (Some(dunder_new_function), None) | (None, Some(dunder_new_function)) => {
+                dunder_new_function
+            }
             (None, None) => {
                 // If no `__new__` or `__init__` method is found, then we fall back to looking for
                 // an `object.__new__` method.
@@ -614,10 +618,10 @@ impl<'db> ClassType<'db> {
                     new_function.into_bound_method_type(db, self_ty)
                 } else {
                     // Fallback if no `object.__new__` is found.
-                    Type::Callable(CallableType::single(
+                    CallableType::single(
                         db,
                         Signature::new(Parameters::empty(), Some(correct_return_type)),
-                    ))
+                    )
                 }
             }
         }

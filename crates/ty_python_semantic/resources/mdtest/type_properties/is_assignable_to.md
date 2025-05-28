@@ -613,6 +613,11 @@ c: Callable[[str], Any] = int
 
 # error: [invalid-assignment]
 c: Callable[[str], Any] = object
+
+class A:
+    def __init__(self, x: int) -> None: ...
+
+a: Callable[[int], A] = A
 ```
 
 ### Generic class literal types
@@ -624,11 +629,6 @@ python-version = "3.12"
 
 ```py
 from typing import Any, Callable
-
-class A:
-    def __init__(self, x: int) -> None: ...
-
-a: Callable[[int], A] = A
 
 class B[T]:
     def __init__(self, x: T) -> None: ...
