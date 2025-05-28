@@ -1,15 +1,15 @@
 use lsp_server::ErrorCode;
-use lsp_types::DidChangeTextDocumentParams;
 use lsp_types::notification::DidChangeTextDocument;
-
-use ty_project::watch::ChangeEvent;
+use lsp_types::{DidChangeTextDocumentParams, VersionedTextDocumentIdentifier};
 
 use crate::server::Result;
 use crate::server::api::LSPResult;
+use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
-use crate::server::client::{Notifier, Requester};
 use crate::session::Session;
+use crate::session::client::Client;
 use crate::system::{AnySystemPath, url_to_any_system_path};
+use ty_project::watch::ChangeEvent;
 
 pub(crate) struct DidChangeTextDocumentHandler;
 
@@ -20,18 +20,22 @@ impl NotificationHandler for DidChangeTextDocumentHandler {
 impl SyncNotificationHandler for DidChangeTextDocumentHandler {
     fn run(
         session: &mut Session,
-        _notifier: Notifier,
-        _requester: &mut Requester,
+        client: &Client,
         params: DidChangeTextDocumentParams,
     ) -> Result<()> {
-        let Ok(path) = url_to_any_system_path(&params.text_document.uri) else {
+        let DidChangeTextDocumentParams {
+            text_document: VersionedTextDocumentIdentifier { uri, version },
+            content_changes,
+        } = params;
+
+        let Ok(path) = url_to_any_system_path(&uri) else {
             return Ok(());
         };
 
-        let key = session.key_from_url(params.text_document.uri);
+        let key = session.key_from_url(uri.clone());
 
         session
-            .update_text_document(&key, params.content_changes, params.text_document.version)
+            .update_text_document(&key, content_changes, version)
             .with_failure_code(ErrorCode::InternalError)?;
 
         match path {
@@ -48,8 +52,6 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             }
         }
 
-        // TODO(dhruvmanila): Publish diagnostics if the client doesn't support pull diagnostics
-
-        Ok(())
+        publish_diagnostics(session, uri, client)
     }
 }

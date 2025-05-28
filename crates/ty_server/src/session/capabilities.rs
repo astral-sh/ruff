@@ -8,7 +8,12 @@ pub(crate) struct ResolvedClientCapabilities {
     pub(crate) document_changes: bool,
     pub(crate) diagnostics_refresh: bool,
     pub(crate) inlay_refresh: bool,
+
+    /// Whether [pull diagnostics] is supported.
+    ///
+    /// [pull diagnostics]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_pullDiagnostics
     pub(crate) pull_diagnostics: bool,
+
     /// Whether `textDocument.typeDefinition.linkSupport` is `true`
     pub(crate) type_definition_link_support: bool,
 

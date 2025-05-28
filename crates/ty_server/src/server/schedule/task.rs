@@ -1,14 +1,12 @@
 use lsp_server::RequestId;
 use serde::Serialize;
 
-use crate::{
-    server::client::{Notifier, Requester, Responder},
-    session::Session,
-};
+use crate::session::Session;
+use crate::session::client::Client;
 
-type LocalFn = Box<dyn FnOnce(&mut Session, Notifier, &mut Requester, Responder)>;
+type LocalFn = Box<dyn FnOnce(&mut Session, &Client)>;
 
-type BackgroundFn = Box<dyn FnOnce(Notifier, Responder) + Send + 'static>;
+type BackgroundFn = Box<dyn FnOnce(&Client) + Send + 'static>;
 
 type BackgroundFnBuilder = Box<dyn FnOnce(&Session) -> BackgroundFn>;
 
@@ -62,7 +60,7 @@ impl Task {
     /// Creates a new background task.
     pub(crate) fn background<F>(schedule: BackgroundSchedule, func: F) -> Self
     where
-        F: FnOnce(&Session) -> Box<dyn FnOnce(Notifier, Responder) + Send + 'static> + 'static,
+        F: FnOnce(&Session) -> Box<dyn FnOnce(&Client) + Send + 'static> + 'static,
     {
         Self::Background(BackgroundTaskBuilder {
             schedule,
@@ -72,7 +70,7 @@ impl Task {
     /// Creates a new local task.
     pub(crate) fn local<F>(func: F) -> Self
     where
-        F: FnOnce(&mut Session, Notifier, &mut Requester, Responder) + 'static,
+        F: FnOnce(&mut Session, &Client) + 'static,
     {
         Self::Sync(SyncTask {
             func: Box::new(func),
@@ -84,8 +82,8 @@ impl Task {
     where
         R: Serialize + Send + 'static,
     {
-        Self::local(move |_, _, _, responder| {
-            if let Err(err) = responder.respond(id, result) {
+        Self::local(move |_, client| {
+            if let Err(err) = client.respond(&id, result) {
                 tracing::error!("Unable to send immediate response: {err}");
             }
         })
@@ -93,6 +91,6 @@ impl Task {
 
     /// Creates a local task that does nothing.
     pub(crate) fn nothing() -> Self {
-        Self::local(move |_, _, _, _| {})
+        Self::local(move |_, _| {})
     }
 }

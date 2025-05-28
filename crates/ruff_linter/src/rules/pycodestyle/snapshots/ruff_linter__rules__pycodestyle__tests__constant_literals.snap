@@ -106,7 +106,7 @@ constant_literals.py:12:4: F632 [*] Use `==` to compare constant literals
 14 14 | if False == None:  # E711, E712 (fix)
 15 15 |     pass
 
-constant_literals.py:14:4: E712 [*] Avoid equality comparisons to `False`; use `if not None:` for false checks
+constant_literals.py:14:4: E712 [*] Avoid equality comparisons to `False`; use `not None:` for false checks
    |
 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 13 |     pass
@@ -168,7 +168,7 @@ constant_literals.py:16:4: E711 [*] Comparison to `None` should be `cond is None
 18 18 | 
 19 19 | named_var = []
 
-constant_literals.py:16:4: E712 [*] Avoid equality comparisons to `False`; use `if not None:` for false checks
+constant_literals.py:16:4: E712 [*] Avoid equality comparisons to `False`; use `not None:` for false checks
    |
 14 | if False == None:  # E711, E712 (fix)
 15 |     pass
