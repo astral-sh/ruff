@@ -4,7 +4,7 @@ use ruff_source_file::Line;
 
 use crate::rules::pycodestyle::overlong::Overlong;
 use crate::settings::LinterSettings;
-use crate::{Diagnostic, Violation};
+use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for doc lines that exceed the specified maximum character length.
@@ -86,7 +86,7 @@ pub(crate) fn doc_line_too_long(
     line: &Line,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
-) -> Option<Diagnostic> {
+) -> Option<OldDiagnostic> {
     let limit = settings.pycodestyle.max_doc_length?;
     Overlong::try_from_line(
         line,
@@ -100,7 +100,7 @@ pub(crate) fn doc_line_too_long(
         settings.tab_size,
     )
     .map(|overlong| {
-        Diagnostic::new(
+        OldDiagnostic::new(
             DocLineTooLong(overlong.width(), limit.value() as usize),
             overlong.range(),
         )

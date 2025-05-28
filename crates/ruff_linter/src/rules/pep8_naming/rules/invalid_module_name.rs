@@ -9,7 +9,7 @@ use ruff_text_size::TextRange;
 
 use crate::package::PackageRoot;
 use crate::rules::pep8_naming::settings::IgnoreNames;
-use crate::{Diagnostic, Violation};
+use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for module names that do not follow the `snake_case` naming
@@ -54,7 +54,7 @@ pub(crate) fn invalid_module_name(
     path: &Path,
     package: Option<PackageRoot<'_>>,
     ignore_names: &IgnoreNames,
-) -> Option<Diagnostic> {
+) -> Option<OldDiagnostic> {
     if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file_or_stub) {
         return None;
     }
@@ -80,7 +80,7 @@ pub(crate) fn invalid_module_name(
             if ignore_names.matches(&module_name) {
                 return None;
             }
-            return Some(Diagnostic::new(
+            return Some(OldDiagnostic::new(
                 InvalidModuleName {
                     name: module_name.to_string(),
                 },

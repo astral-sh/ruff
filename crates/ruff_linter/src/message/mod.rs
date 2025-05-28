@@ -27,7 +27,7 @@ use crate::Locator;
 use crate::codes::NoqaCode;
 use crate::logging::DisplayParseErrorType;
 use crate::registry::Rule;
-use crate::{Diagnostic, Fix};
+use crate::{Fix, OldDiagnostic};
 
 mod azure;
 mod diff;
@@ -115,11 +115,11 @@ impl Message {
 
     /// Create a [`Message`] from the given [`Diagnostic`] corresponding to a rule violation.
     pub fn from_diagnostic(
-        diagnostic: Diagnostic,
+        diagnostic: OldDiagnostic,
         file: SourceFile,
         noqa_offset: Option<TextSize>,
     ) -> Message {
-        let Diagnostic {
+        let OldDiagnostic {
             body,
             suggestion,
             range,

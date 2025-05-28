@@ -20,11 +20,11 @@ use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
-use crate::{Diagnostic, Edit, Fix};
+use crate::{Edit, Fix, OldDiagnostic};
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<OldDiagnostic>,
     path: &Path,
     locator: &Locator,
     comment_ranges: &CommentRanges,
@@ -136,7 +136,7 @@ pub(crate) fn check_noqa(
                     if matches.is_empty() {
                         let edit = delete_comment(directive.range(), locator);
                         let mut diagnostic =
-                            Diagnostic::new(UnusedNOQA { codes: None }, directive.range());
+                            OldDiagnostic::new(UnusedNOQA { codes: None }, directive.range());
                         diagnostic.set_fix(Fix::safe_edit(edit));
 
                         diagnostics.push(diagnostic);
@@ -212,7 +212,7 @@ pub(crate) fn check_noqa(
                                 directive.range(),
                             )
                         };
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = OldDiagnostic::new(
                             UnusedNOQA {
                                 codes: Some(UnusedCodes {
                                     disabled: disabled_codes

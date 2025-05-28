@@ -73,7 +73,7 @@ use crate::rules::pyflakes::rules::{
 use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{LinterSettings, TargetVersion, flags};
-use crate::{Diagnostic, Edit, Violation};
+use crate::{Edit, OldDiagnostic, Violation};
 use crate::{Locator, docstrings, noqa};
 
 mod analyze;
@@ -225,7 +225,7 @@ pub(crate) struct Checker<'a> {
     /// A set of deferred nodes to be analyzed after the AST traversal (e.g., `for` loops).
     analyze: deferred::Analyze,
     /// The cumulative set of diagnostics computed across all lint rules.
-    diagnostics: RefCell<Vec<Diagnostic>>,
+    diagnostics: RefCell<Vec<OldDiagnostic>>,
     /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations.
     flake8_bugbear_seen: RefCell<FxHashSet<TextRange>>,
     /// The end offset of the last visited statement.
@@ -391,7 +391,7 @@ impl<'a> Checker<'a> {
     ) -> DiagnosticGuard<'chk, 'a> {
         DiagnosticGuard {
             checker: self,
-            diagnostic: Some(Diagnostic::new(kind, range)),
+            diagnostic: Some(OldDiagnostic::new(kind, range)),
         }
     }
 
@@ -405,7 +405,7 @@ impl<'a> Checker<'a> {
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        let diagnostic = Diagnostic::new(kind, range);
+        let diagnostic = OldDiagnostic::new(kind, range);
         if self.enabled(diagnostic.rule()) {
             Some(DiagnosticGuard {
                 checker: self,
@@ -2892,7 +2892,7 @@ impl<'a> Checker<'a> {
                     if self.semantic.global_scope().uses_star_imports() {
                         if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
                             self.diagnostics.get_mut().push(
-                                Diagnostic::new(
+                                OldDiagnostic::new(
                                     pyflakes::rules::UndefinedLocalWithImportStarUsage {
                                         name: name.to_string(),
                                     },
@@ -2907,7 +2907,7 @@ impl<'a> Checker<'a> {
                                 || !self.path.ends_with("__init__.py")
                             {
                                 self.diagnostics.get_mut().push(
-                                    Diagnostic::new(
+                                    OldDiagnostic::new(
                                         pyflakes::rules::UndefinedExport {
                                             name: name.to_string(),
                                         },
@@ -2975,7 +2975,7 @@ pub(crate) fn check_ast(
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
     target_version: TargetVersion,
-) -> (Vec<Diagnostic>, Vec<SemanticSyntaxError>) {
+) -> (Vec<OldDiagnostic>, Vec<SemanticSyntaxError>) {
     let module_path = package
         .map(PackageRoot::path)
         .and_then(|package| to_module_path(package, path));
@@ -3062,7 +3062,7 @@ pub(crate) struct DiagnosticGuard<'a, 'b> {
     /// The diagnostic that we want to report.
     ///
     /// This is always `Some` until the `Drop` (or `defuse`) call.
-    diagnostic: Option<Diagnostic>,
+    diagnostic: Option<OldDiagnostic>,
 }
 
 impl DiagnosticGuard<'_, '_> {
@@ -3076,9 +3076,9 @@ impl DiagnosticGuard<'_, '_> {
 }
 
 impl std::ops::Deref for DiagnosticGuard<'_, '_> {
-    type Target = Diagnostic;
+    type Target = OldDiagnostic;
 
-    fn deref(&self) -> &Diagnostic {
+    fn deref(&self) -> &OldDiagnostic {
         // OK because `self.diagnostic` is only `None` within `Drop`.
         self.diagnostic.as_ref().unwrap()
     }
@@ -3086,7 +3086,7 @@ impl std::ops::Deref for DiagnosticGuard<'_, '_> {
 
 /// Return a mutable borrow of the diagnostic in this guard.
 impl std::ops::DerefMut for DiagnosticGuard<'_, '_> {
-    fn deref_mut(&mut self) -> &mut Diagnostic {
+    fn deref_mut(&mut self) -> &mut OldDiagnostic {
         // OK because `self.diagnostic` is only `None` within `Drop`.
         self.diagnostic.as_mut().unwrap()
     }

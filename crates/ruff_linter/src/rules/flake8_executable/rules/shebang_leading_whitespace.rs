@@ -3,7 +3,7 @@ use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix, OldDiagnostic};
 
 /// ## What it does
 /// Checks for whitespace before a shebang directive.
@@ -47,7 +47,7 @@ impl AlwaysFixableViolation for ShebangLeadingWhitespace {
 pub(crate) fn shebang_leading_whitespace(
     range: TextRange,
     locator: &Locator,
-) -> Option<Diagnostic> {
+) -> Option<OldDiagnostic> {
     // If the shebang is at the beginning of the file, abort.
     if range.start() == TextSize::from(0) {
         return None;
@@ -63,7 +63,7 @@ pub(crate) fn shebang_leading_whitespace(
     }
 
     let prefix = TextRange::up_to(range.start());
-    let mut diagnostic = Diagnostic::new(ShebangLeadingWhitespace, prefix);
+    let mut diagnostic = OldDiagnostic::new(ShebangLeadingWhitespace, prefix);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(prefix)));
     Some(diagnostic)
 }

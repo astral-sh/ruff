@@ -4,8 +4,8 @@ use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::Diagnostic;
 use crate::Locator;
+use crate::OldDiagnostic;
 use crate::line_width::IndentWidth;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::logical_lines::{
@@ -40,7 +40,7 @@ pub(crate) fn check_logical_lines(
     indexer: &Indexer,
     stylist: &Stylist,
     settings: &LinterSettings,
-) -> Vec<Diagnostic> {
+) -> Vec<OldDiagnostic> {
     let mut context = LogicalLinesContext::new(settings);
 
     let mut prev_line = None;
@@ -196,7 +196,7 @@ pub(crate) fn check_logical_lines(
 #[derive(Debug, Clone)]
 pub(crate) struct LogicalLinesContext<'a> {
     settings: &'a LinterSettings,
-    diagnostics: Vec<Diagnostic>,
+    diagnostics: Vec<OldDiagnostic>,
 }
 
 impl<'a> LogicalLinesContext<'a> {
@@ -207,7 +207,7 @@ impl<'a> LogicalLinesContext<'a> {
         }
     }
 
-    pub(crate) fn push_diagnostic(&mut self, diagnostic: Diagnostic) {
+    pub(crate) fn push_diagnostic(&mut self, diagnostic: OldDiagnostic) {
         if self.settings.rules.enabled(diagnostic.rule()) {
             self.diagnostics.push(diagnostic);
         }

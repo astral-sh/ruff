@@ -3,7 +3,7 @@ use ruff_python_parser::{Token, TokenKind};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for strings that contain the control character `BS`.
@@ -181,7 +181,7 @@ impl Violation for InvalidCharacterZeroWidthSpace {
 
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
 pub(crate) fn invalid_string_characters(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<OldDiagnostic>,
     token: &Token,
     locator: &Locator,
 ) {
@@ -197,13 +197,13 @@ pub(crate) fn invalid_string_characters(
         let c = match_.chars().next().unwrap();
         let range = TextRange::at(location, c.text_len());
         let (replacement, mut diagnostic) = match c {
-            '\x08' => ("\\b", Diagnostic::new(InvalidCharacterBackspace, range)),
-            '\x1A' => ("\\x1A", Diagnostic::new(InvalidCharacterSub, range)),
-            '\x1B' => ("\\x1B", Diagnostic::new(InvalidCharacterEsc, range)),
-            '\0' => ("\\0", Diagnostic::new(InvalidCharacterNul, range)),
+            '\x08' => ("\\b", OldDiagnostic::new(InvalidCharacterBackspace, range)),
+            '\x1A' => ("\\x1A", OldDiagnostic::new(InvalidCharacterSub, range)),
+            '\x1B' => ("\\x1B", OldDiagnostic::new(InvalidCharacterEsc, range)),
+            '\0' => ("\\0", OldDiagnostic::new(InvalidCharacterNul, range)),
             '\u{200b}' => (
                 "\\u200b",
-                Diagnostic::new(InvalidCharacterZeroWidthSpace, range),
+                OldDiagnostic::new(InvalidCharacterZeroWidthSpace, range),
             ),
             _ => {
                 continue;

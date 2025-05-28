@@ -163,7 +163,7 @@ mod tests {
     use ruff_text_size::{Ranged, TextSize};
 
     use crate::Locator;
-    use crate::diagnostic::Diagnostic;
+    use crate::diagnostic::OldDiagnostic;
     use crate::fix::{FixResult, apply_fixes};
     use crate::message::Message;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
@@ -177,7 +177,7 @@ mod tests {
         edit.into_iter()
             .map(|edit| {
                 // The choice of rule here is arbitrary.
-                let diagnostic = Diagnostic::new(MissingNewlineAtEndOfFile, edit.range());
+                let diagnostic = OldDiagnostic::new(MissingNewlineAtEndOfFile, edit.range());
                 Message::from_diagnostic(
                     diagnostic.with_fix(Fix::safe_edit(edit)),
                     SourceFileBuilder::new(filename, source).finish(),

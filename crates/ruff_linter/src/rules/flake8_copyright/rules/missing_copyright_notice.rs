@@ -3,7 +3,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
 use crate::settings::LinterSettings;
-use crate::{Diagnostic, Violation};
+use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for the absence of copyright notices within Python files.
@@ -32,7 +32,7 @@ impl Violation for MissingCopyrightNotice {
 pub(crate) fn missing_copyright_notice(
     locator: &Locator,
     settings: &LinterSettings,
-) -> Option<Diagnostic> {
+) -> Option<OldDiagnostic> {
     // Ignore files that are too small to contain a copyright notice.
     if locator.len() < settings.flake8_copyright.min_file_size {
         return None;
@@ -54,7 +54,7 @@ pub(crate) fn missing_copyright_notice(
         }
     }
 
-    Some(Diagnostic::new(
+    Some(OldDiagnostic::new(
         MissingCopyrightNotice,
         TextRange::default(),
     ))
