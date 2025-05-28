@@ -97,10 +97,14 @@ turn a subtype of `str`:
 ```py
 from ty_extensions import static_assert, is_assignable_to
 from typing_extensions import Literal, LiteralString
+from typing import Sequence, Any
 
 static_assert(is_assignable_to(Literal["foo"], Literal["foo"]))
 static_assert(is_assignable_to(Literal["foo"], LiteralString))
 static_assert(is_assignable_to(Literal["foo"], str))
+static_assert(is_assignable_to(Literal["foo"], Sequence))
+static_assert(is_assignable_to(Literal["foo"], Sequence[str]))
+static_assert(is_assignable_to(Literal["foo"], Sequence[Any]))
 
 static_assert(is_assignable_to(LiteralString, str))
 

@@ -1614,17 +1614,6 @@ impl<'db> Type<'db> {
                 true
             }
 
-            (
-                Type::StringLiteral(_)
-                | Type::LiteralString
-                | Type::BooleanLiteral(_)
-                | Type::IntLiteral(_)
-                | Type::BytesLiteral(_)
-                | Type::ModuleLiteral(_),
-                _,
-            ) => (self.literal_fallback_instance(db))
-                .is_some_and(|instance| instance.is_assignable_to(db, target)),
-
             // Any type that is assignable to `type[object]` is also assignable to `type[Any]`,
             // because `type[Any]` can materialize to `type[object]`.
             (Type::NominalInstance(_), Type::SubclassOf(subclass_of_ty))
@@ -1664,6 +1653,20 @@ impl<'db> Type<'db> {
                 } else {
                     false
                 }
+            }
+
+            (
+                Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BooleanLiteral(_)
+                | Type::IntLiteral(_)
+                | Type::BytesLiteral(_)
+                | Type::ModuleLiteral(_),
+                _,
+            ) if (self.literal_fallback_instance(db))
+                .is_some_and(|instance| instance.is_assignable_to(db, target)) =>
+            {
+                true
             }
 
             (Type::ClassLiteral(class_literal), Type::Callable(_)) => {
