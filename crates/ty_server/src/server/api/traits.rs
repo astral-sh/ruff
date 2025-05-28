@@ -28,7 +28,7 @@ pub(super) trait SyncRequestHandler: RequestHandler {
 
 /// A request handler that can be run on a background thread.
 pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
-    /// Should this request be retried if it was cancelled due to a modification to the Salsa database?
+    /// Whether this request be retried if it was cancelled due to a modification to the Salsa database.
     const RETRY_ON_CANCELLATION: bool = false;
 
     fn document_url(

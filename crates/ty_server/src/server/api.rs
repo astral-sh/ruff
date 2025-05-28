@@ -122,24 +122,24 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         })
 }
 
-fn _local_request_task<R: traits::SyncRequestHandler>(req: server::Request) -> super::Result<Task>
+fn _local_request_task<R: traits::SyncRequestHandler>(req: server::Request) -> Result<Task>
 where
-    <<R as RequestHandler>::RequestType as lsp_types::request::Request>::Params: UnwindSafe,
+    <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
 {
     let (id, params) = cast_request::<R>(req)?;
-    Ok(Task::local(|session, client: &Client| {
+    Ok(Task::local(move |session, client: &Client| {
         let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
         let result = R::run(session, client, params);
-        respond::<R>(id, result, client);
+        respond::<R>(&id, result, client);
     }))
 }
 
 fn background_request_task<R: traits::BackgroundDocumentRequestHandler>(
     req: server::Request,
     schedule: BackgroundSchedule,
-) -> super::Result<Task>
+) -> Result<Task>
 where
-    <<R as RequestHandler>::RequestType as lsp_types::request::Request>::Params: UnwindSafe,
+    <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
 {
     let retry = R::RETRY_ON_CANCELLATION.then(|| req.clone());
     let (id, params) = cast_request::<R>(req)?;
@@ -192,7 +192,7 @@ where
             });
 
             if let Some(response) = request_result_to_response::<R>(&id, client, result, retry) {
-                respond::<R>(id, response, client);
+                respond::<R>(&id, response, client);
             }
         })
     }))
@@ -213,7 +213,7 @@ where
     match result {
         Ok(response) => Some(response),
         Err(error) => {
-            // Request was canceled due to some modifications to the salsa database.
+            // Check if the request was canceled due to some modifications to the salsa database.
             if error.payload.downcast_ref::<salsa::Cancelled>().is_some() {
                 // If the query supports retry, re-queue the request.
                 // The query is still likely to succeed if the user modified any other document.
@@ -247,7 +247,7 @@ where
 
 fn local_notification_task<N: traits::SyncNotificationHandler>(
     notif: server::Notification,
-) -> super::Result<Task> {
+) -> Result<Task> {
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::local(move |session, client| {
         let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
@@ -262,11 +262,10 @@ fn local_notification_task<N: traits::SyncNotificationHandler>(
 fn background_notification_thread<N>(
     req: server::Notification,
     schedule: BackgroundSchedule,
-) -> super::Result<Task>
+) -> Result<Task>
 where
     N: traits::BackgroundDocumentNotificationHandler,
-    <<N as NotificationHandler>::NotificationType as lsp_types::notification::Notification>::Params:
-        UnwindSafe,
+    <<N as NotificationHandler>::NotificationType as Notification>::Params: UnwindSafe,
 {
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
@@ -309,13 +308,13 @@ where
 /// implementation.
 fn cast_request<Req>(
     request: server::Request,
-) -> super::Result<(
-    server::RequestId,
-    <<Req as RequestHandler>::RequestType as lsp_types::request::Request>::Params,
+) -> Result<(
+    RequestId,
+    <<Req as RequestHandler>::RequestType as Request>::Params,
 )>
 where
-    Req: traits::RequestHandler,
-    <<Req as RequestHandler>::RequestType as lsp_types::request::Request>::Params: UnwindSafe,
+    Req: RequestHandler,
+    <<Req as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
 {
     request
         .extract(Req::METHOD)
@@ -333,26 +332,24 @@ where
 
 /// Sends back a response to the server using a [`Responder`].
 fn respond<Req>(
-    id: server::RequestId,
-    result: crate::server::Result<
-        <<Req as traits::RequestHandler>::RequestType as lsp_types::request::Request>::Result,
-    >,
+    id: &RequestId,
+    result: Result<<<Req as RequestHandler>::RequestType as Request>::Result>,
     client: &Client,
 ) where
-    Req: traits::RequestHandler,
+    Req: RequestHandler,
 {
     if let Err(err) = &result {
         tracing::error!("An error occurred with request ID {id}: {err}");
         client.show_error_message("ty encountered a problem. Check the logs for more details.");
     }
-    if let Err(err) = client.respond(id, result) {
+    if let Err(err) = client.respond(&id, result) {
         tracing::error!("Failed to send response: {err}");
     }
 }
 
 /// Sends back an error response to the server using a [`Client`] without showing a warning
 /// to the user.
-fn respond_silent_error(id: server::RequestId, client: &Client, error: lsp_server::ResponseError) {
+fn respond_silent_error(id: RequestId, client: &Client, error: lsp_server::ResponseError) {
     if let Err(err) = client.respond_err(id, error) {
         tracing::error!("Failed to send response: {err}");
     }
@@ -362,12 +359,12 @@ fn respond_silent_error(id: server::RequestId, client: &Client, error: lsp_serve
 /// a parameter type for a specific request handler.
 fn cast_notification<N>(
     notification: server::Notification,
-) -> super::Result<
-    (
-        &'static str,
-        <<N as traits::NotificationHandler>::NotificationType as lsp_types::notification::Notification>::Params,
-    )> where
-    N: traits::NotificationHandler,
+) -> Result<(
+    &'static str,
+    <<N as NotificationHandler>::NotificationType as Notification>::Params,
+)>
+where
+    N: NotificationHandler,
 {
     Ok((
         N::METHOD,

@@ -49,20 +49,28 @@ impl Client {
     where
         R: lsp_types::request::Request,
     {
-        let response_handler =
-            Box::new(move |session: &Session, response: lsp_server::Response| {
+        let response_handler = Box::new(
+            move |session: &Session, response: lsp_server::Response| {
+                let _span =
+                    tracing::debug_span!("client_response", id=%response.id, method = R::METHOD)
+                        .entered();
+
                 match (response.error, response.result) {
                     (Some(err), _) => {
                         tracing::error!(
-                            "Got an error from the client (code {}): {}",
-                            err.code,
-                            err.message
+                            "Got an error from the client (code {code}, method {method}): {message}",
+                            code = err.code,
+                            message = err.message,
+                            method = R::METHOD
                         );
                     }
                     (None, Some(response)) => match serde_json::from_value(response) {
                         Ok(response) => response_handler(session, response),
                         Err(error) => {
-                            tracing::error!("Failed to deserialize response from server: {error}");
+                            tracing::error!(
+                                "Failed to deserialize client response (method={method}): {error}",
+                                method = R::METHOD
+                            );
                         }
                     },
                     (None, None) => {
@@ -75,12 +83,14 @@ impl Client {
                             response_handler(session, serde_json::from_value(Value::Null).unwrap());
                         } else {
                             tracing::error!(
-                                "Server response was invalid: did not contain a result or error"
+                                "Invalid client response: did not contain a result or error (method={method})",
+                                method = R::METHOD
                             );
                         }
                     }
                 }
-            });
+            },
+        );
 
         let id = session
             .request_queue()
@@ -92,7 +102,10 @@ impl Client {
                 id,
                 method: R::METHOD.to_string(),
                 params: serde_json::to_value(params).context("Failed to serialize params")?,
-            }))?;
+            }))
+            .with_context(|| {
+                format!("Failed to send request method={method}", method = R::METHOD)
+            })?;
 
         Ok(())
     }
@@ -108,20 +121,25 @@ impl Client {
             .send(lsp_server::Message::Notification(Notification::new(
                 method, params,
             )))
-            .map_err(|error| anyhow!("Failed to send notification: {error}"))
+            .map_err(|error| {
+                anyhow!(
+                    "Failed to send notification (method={method}): {error}",
+                    method = N::METHOD
+                )
+            })
     }
 
     /// Sends a notification without any parameters to the client.
     ///
     /// This is useful for notifications that don't require any data.
     #[expect(dead_code)]
-    pub(crate) fn send_notification_no_params(&self, method: String) -> crate::Result<()> {
+    pub(crate) fn send_notification_no_params(&self, method: &str) -> crate::Result<()> {
         self.client_sender
             .send(lsp_server::Message::Notification(Notification::new(
-                method,
+                method.to_string(),
                 Value::Null,
             )))
-            .map_err(|error| anyhow!("Failed to send notification: {error}"))
+            .map_err(|error| anyhow!("Failed to send notification (method={method}): {error}",))
     }
 
     /// Sends a response to the client for a given request ID.
@@ -130,22 +148,22 @@ impl Client {
     /// and checked for cancellation (each request must have exactly one response).
     pub(crate) fn respond<R>(
         &self,
-        id: RequestId,
+        id: &RequestId,
         result: crate::server::Result<R>,
     ) -> crate::Result<()>
     where
         R: serde::Serialize,
     {
         let response = match result {
-            Ok(res) => lsp_server::Response::new_ok(id, res),
+            Ok(res) => lsp_server::Response::new_ok(id.clone(), res),
             Err(crate::server::Error { code, error }) => {
-                lsp_server::Response::new_err(id, code as i32, error.to_string())
+                lsp_server::Response::new_err(id.clone(), code as i32, error.to_string())
             }
         };
 
         self.main_loop_sender
             .send(Event::Action(Action::SendResponse(response)))
-            .map_err(|error| anyhow!("Failed to send response: {error}"))
+            .map_err(|error| anyhow!("Failed to send response for request {id}: {error}"))
     }
 
     /// Sends an error response to the client for a given request ID.
