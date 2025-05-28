@@ -1655,16 +1655,8 @@ impl<'db> Type<'db> {
                 }
             }
 
-            (
-                Type::StringLiteral(_)
-                | Type::LiteralString
-                | Type::BooleanLiteral(_)
-                | Type::IntLiteral(_)
-                | Type::BytesLiteral(_)
-                | Type::ModuleLiteral(_),
-                _,
-            ) if (self.literal_fallback_instance(db))
-                .is_some_and(|instance| instance.is_assignable_to(db, target)) =>
+            _ if self.literal_fallback_instance(db))
+                .is_some_and(|instance| instance.is_assignable_to(db, target) =>
             {
                 true
             }
