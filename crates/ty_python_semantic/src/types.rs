@@ -3546,15 +3546,16 @@ impl<'db> Type<'db> {
         non_negative_int_literal(db, return_ty)
     }
 
-    /// Returns an empty [`Bindings`] that can be used to analyze a call to this type.
+    /// Returns a [`Bindings`] that can be used to analyze a call to this type. You must call
+    /// [`match_parameters`][Bindings::match_parameters] and [`check_types`][Bindings::check_types]
+    /// to fully analyze a particular call site.
     ///
-    /// Note that all types have valid [`Bindings`], even if the type is not callable.
-    /// Moreover, "callable" can be subtle for a union type, since some union elements might be
-    /// callable and some not. A union is callable if every element type is callable — and even
-    /// then, the elements might be inconsistent, such that there's no argument list that's valid
-    /// for all elements. It's usually best to only worry about "callability" relative to a
-    /// particular argument list, via [`try_call`][Self::try_call] and
-    /// [`CallErrorKind::NotCallable`].
+    /// Note that we return a [`Bindings`] for all types, even if the type is not callable.
+    /// "Callable" can be subtle for a union type, since some union elements might be callable and
+    /// some not. A union is callable if every element type is callable — but even then, the
+    /// elements might be inconsistent, such that there's no argument list that's valid for all
+    /// elements. It's usually best to only worry about "callability" relative to a particular
+    /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db) -> Bindings<'db> {
         match self {
             Type::Callable(callable) => {
