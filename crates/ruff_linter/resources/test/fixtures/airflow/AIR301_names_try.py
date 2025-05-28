@@ -1,17 +1,8 @@
 from __future__ import annotations
 
 try:
-    from airflow.sdk import Asset
+    from airflow.assets.manager import AssetManager
 except ModuleNotFoundError:
-    from airflow.datasets import Dataset as Asset
+    from airflow.datasets.manager import DatasetManager as AssetManager
 
-Asset
-
-try:
-    from airflow.sdk import Asset
-except ModuleNotFoundError:
-    from airflow import datasets
-
-    Asset = datasets.Dataset
-
-asset = Asset()
+AssetManager()

@@ -19,11 +19,10 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::str_prefix::{AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix};
 use crate::{
-    int,
+    Expr, ExprRef, FStringElement, LiteralExpressionRef, OperatorPrecedence, Pattern, Stmt,
+    TypeParam, int,
     name::Name,
     str::{Quote, TripleQuotes},
-    Expr, ExprRef, FStringElement, LiteralExpressionRef, OperatorPrecedence, Pattern, Stmt,
-    TypeParam,
 };
 
 impl StmtClassDef {
@@ -1139,10 +1138,12 @@ impl StringLiteralFlags {
 
     pub const fn prefix(self) -> StringLiteralPrefix {
         if self.0.contains(StringLiteralFlagsInner::U_PREFIX) {
-            debug_assert!(!self.0.intersects(
-                StringLiteralFlagsInner::R_PREFIX_LOWER
-                    .union(StringLiteralFlagsInner::R_PREFIX_UPPER)
-            ));
+            debug_assert!(
+                !self.0.intersects(
+                    StringLiteralFlagsInner::R_PREFIX_LOWER
+                        .union(StringLiteralFlagsInner::R_PREFIX_UPPER)
+                )
+            );
             StringLiteralPrefix::Unicode
         } else if self.0.contains(StringLiteralFlagsInner::R_PREFIX_LOWER) {
             debug_assert!(!self.0.contains(StringLiteralFlagsInner::R_PREFIX_UPPER));
@@ -3120,8 +3121,8 @@ impl From<bool> for Singleton {
 
 #[cfg(test)]
 mod tests {
-    use crate::generated::*;
     use crate::Mod;
+    use crate::generated::*;
 
     #[test]
     #[cfg(target_pointer_width = "64")]

@@ -4,22 +4,23 @@ use camino::Utf8Path;
 use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
+use ruff_db::Upcast;
 use ruff_db::diagnostic::{
-    create_parse_diagnostic, create_unsupported_syntax_diagnostic, Diagnostic,
-    DisplayDiagnosticConfig,
+    Diagnostic, DisplayDiagnosticConfig, create_parse_diagnostic,
+    create_unsupported_syntax_diagnostic,
 };
-use ruff_db::files::{system_path_to_file, File};
+use ruff_db::files::{File, system_path_to_file};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
-use ruff_db::Upcast;
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings, SysPrefixPathOrigin,
+    Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource,
+    PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
 };
 
 mod assertion;
@@ -56,7 +57,10 @@ pub fn run(
     let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
     for test in suite.tests() {
-        if filter.as_ref().is_some_and(|f| !test.name().contains(f)) {
+        if filter
+            .as_ref()
+            .is_some_and(|f| !test.uncontracted_name().contains(f))
+        {
             continue;
         }
 
@@ -257,7 +261,10 @@ fn run_test(
     let configuration = test.configuration();
 
     let settings = ProgramSettings {
-        python_version,
+        python_version: PythonVersionWithSource {
+            version: python_version,
+            source: PythonVersionSource::Cli,
+        },
         python_platform: configuration
             .python_platform()
             .unwrap_or(PythonPlatform::Identifier("linux".to_string())),
@@ -420,7 +427,7 @@ fn create_diagnostic_snapshot(
     let mut snapshot = String::new();
     writeln!(snapshot).unwrap();
     writeln!(snapshot, "---").unwrap();
-    writeln!(snapshot, "mdtest name: {}", test.name()).unwrap();
+    writeln!(snapshot, "mdtest name: {}", test.uncontracted_name()).unwrap();
     writeln!(snapshot, "mdtest path: {relative_fixture_path}").unwrap();
     writeln!(snapshot, "---").unwrap();
     writeln!(snapshot).unwrap();

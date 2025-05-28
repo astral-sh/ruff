@@ -1,13 +1,14 @@
-use crate::checkers::ast::Checker;
-use crate::Locator;
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
-use ruff_python_semantic::SemanticModel;
 use ruff_source_file::find_newline;
 use ruff_text_size::Ranged;
+
+use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for `round()` calls that have no effect on the input.
@@ -100,9 +101,9 @@ pub(crate) fn unnecessary_round(checker: &Checker, call: &ExprCall) {
     let edit = unwrap_round_call(call, rounded, checker.semantic(), checker.locator());
     let fix = Fix::applicable_edit(edit, applicability);
 
-    let diagnostic = Diagnostic::new(UnnecessaryRound, call.range());
-
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(UnnecessaryRound, call.range())
+        .set_fix(fix);
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

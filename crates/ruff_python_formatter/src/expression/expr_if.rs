@@ -1,11 +1,11 @@
-use ruff_formatter::{write, FormatRuleWithOptions};
+use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprIf};
 
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{
-    in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space,
-    is_expression_parenthesized, NeedsParentheses, OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, in_parentheses_only_group,
+    in_parentheses_only_soft_line_break_or_space, is_expression_parenthesized,
 };
 use crate::prelude::*;
 

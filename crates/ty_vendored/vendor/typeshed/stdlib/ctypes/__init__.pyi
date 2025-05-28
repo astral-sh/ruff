@@ -1,6 +1,5 @@
 import sys
 from _ctypes import (
-    POINTER as POINTER,
     RTLD_GLOBAL as RTLD_GLOBAL,
     RTLD_LOCAL as RTLD_LOCAL,
     Array as Array,
@@ -19,7 +18,6 @@ from _ctypes import (
     alignment as alignment,
     byref as byref,
     get_errno as get_errno,
-    pointer as pointer,
     resize as resize,
     set_errno as set_errno,
     sizeof as sizeof,
@@ -27,7 +25,7 @@ from _ctypes import (
 from _typeshed import StrPath
 from ctypes._endian import BigEndianStructure as BigEndianStructure, LittleEndianStructure as LittleEndianStructure
 from types import GenericAlias
-from typing import Any, ClassVar, Generic, Literal, TypeVar, type_check_only
+from typing import Any, ClassVar, Generic, Literal, TypeVar, overload, type_check_only
 from typing_extensions import Self, TypeAlias, deprecated
 
 if sys.platform == "win32":
@@ -36,9 +34,22 @@ if sys.platform == "win32":
 if sys.version_info >= (3, 11):
     from ctypes._endian import BigEndianUnion as BigEndianUnion, LittleEndianUnion as LittleEndianUnion
 
+_CT = TypeVar("_CT", bound=_CData)
 _T = TypeVar("_T", default=Any)
 _DLLT = TypeVar("_DLLT", bound=CDLL)
-_CT = TypeVar("_CT", bound=_CData)
+
+if sys.version_info >= (3, 14):
+    @overload
+    @deprecated("ctypes.POINTER with string")
+    def POINTER(cls: str) -> type[Any]: ...
+    @overload
+    def POINTER(cls: None) -> type[c_void_p]: ...
+    @overload
+    def POINTER(cls: type[_CT]) -> type[_Pointer[_CT]]: ...
+    def pointer(obj: _CT) -> _Pointer[_CT]: ...
+
+else:
+    from _ctypes import POINTER as POINTER, pointer as pointer
 
 DEFAULT_MODE: int
 
@@ -148,7 +159,7 @@ c_buffer = create_string_buffer
 
 def create_unicode_buffer(init: int | str, size: int | None = None) -> Array[c_wchar]: ...
 @deprecated("Deprecated in Python 3.13; removal scheduled for Python 3.15")
-def SetPointerType(pointer: type[_Pointer[Any]], cls: Any) -> None: ...  # noqa: F811
+def SetPointerType(pointer: type[_Pointer[Any]], cls: Any) -> None: ...
 def ARRAY(typ: _CT, len: int) -> Array[_CT]: ...  # Soft Deprecated, no plans to remove
 
 if sys.platform == "win32":

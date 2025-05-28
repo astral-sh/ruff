@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use ruff_diagnostics::Diagnostic;
 use ruff_python_trivia::CommentRanges;
 pub(crate) use shebang_leading_whitespace::*;
 pub(crate) use shebang_missing_executable_file::*;
@@ -8,10 +7,11 @@ pub(crate) use shebang_missing_python::*;
 pub(crate) use shebang_not_executable::*;
 pub(crate) use shebang_not_first_line::*;
 
+use crate::Diagnostic;
+use crate::Locator;
 use crate::codes::Rule;
 use crate::comments::shebang::ShebangDirective;
 use crate::settings::LinterSettings;
-use crate::Locator;
 
 mod shebang_leading_whitespace;
 mod shebang_missing_executable_file;

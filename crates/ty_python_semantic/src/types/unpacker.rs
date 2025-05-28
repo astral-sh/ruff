@@ -5,11 +5,11 @@ use rustc_hash::FxHashMap;
 
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
+use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::symbol::ScopeId;
-use crate::types::{infer_expression_types, todo_type, Type, TypeCheckDiagnostics};
+use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types, todo_type};
 use crate::unpack::{UnpackKind, UnpackValue};
-use crate::Db;
 
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
@@ -287,6 +287,7 @@ impl<'db> Unpacker<'db> {
         UnpackResult {
             diagnostics: self.context.finish(),
             targets: self.targets,
+            cycle_fallback_type: None,
         }
     }
 }
@@ -295,21 +296,46 @@ impl<'db> Unpacker<'db> {
 pub(crate) struct UnpackResult<'db> {
     targets: FxHashMap<ScopedExpressionId, Type<'db>>,
     diagnostics: TypeCheckDiagnostics,
+
+    /// The fallback type for missing expressions.
+    ///
+    /// This is used only when constructing a cycle-recovery `UnpackResult`.
+    cycle_fallback_type: Option<Type<'db>>,
 }
 
 impl<'db> UnpackResult<'db> {
     /// Returns the inferred type for a given sub-expression of the left-hand side target
     /// of an unpacking assignment.
     ///
-    /// Panics if a scoped expression ID is passed in that does not correspond to a sub-
+    /// # Panics
+    ///
+    /// May panic if a scoped expression ID is passed in that does not correspond to a sub-
     /// expression of the target.
     #[track_caller]
     pub(crate) fn expression_type(&self, expr_id: ScopedExpressionId) -> Type<'db> {
-        self.targets[&expr_id]
+        self.try_expression_type(expr_id).expect(
+            "expression should belong to this `UnpackResult` and \
+            `Unpacker` should have inferred a type for it",
+        )
+    }
+
+    pub(crate) fn try_expression_type(&self, expr_id: ScopedExpressionId) -> Option<Type<'db>> {
+        self.targets
+            .get(&expr_id)
+            .copied()
+            .or(self.cycle_fallback_type)
     }
 
     /// Returns the diagnostics in this unpacking assignment.
     pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
         &self.diagnostics
+    }
+
+    pub(crate) fn cycle_fallback(cycle_fallback_type: Type<'db>) -> Self {
+        Self {
+            targets: FxHashMap::default(),
+            diagnostics: TypeCheckDiagnostics::default(),
+            cycle_fallback_type: Some(cycle_fallback_type),
+        }
     }
 }

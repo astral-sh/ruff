@@ -1,3 +1,4 @@
+use crate::Db;
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::predicate::{
@@ -7,17 +8,19 @@ use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    infer_expression_types, IntersectionBuilder, KnownClass, SubclassOfType, Truthiness, Type,
-    UnionBuilder,
+    IntersectionBuilder, KnownClass, SubclassOfType, Truthiness, Type, UnionBuilder,
+    infer_expression_types,
 };
-use crate::Db;
+
+use ruff_python_stdlib::identifiers::is_identifier;
+
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
 
-use super::UnionType;
+use super::{KnownFunction, UnionType};
 
 /// Return the type constraint that `test` (if true) would place on `symbol`, if any.
 ///
@@ -138,23 +141,27 @@ fn negative_constraints_for_expression_cycle_initial<'db>(
     None
 }
 
+/// Functions that can be used to narrow the type of a first argument using a "classinfo" second argument.
+///
+/// A "classinfo" argument is either a class or a tuple of classes, or a tuple of tuples of classes
+/// (etc. for arbitrary levels of recursion)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KnownConstraintFunction {
+pub enum ClassInfoConstraintFunction {
     /// `builtins.isinstance`
     IsInstance,
     /// `builtins.issubclass`
     IsSubclass,
 }
 
-impl KnownConstraintFunction {
+impl ClassInfoConstraintFunction {
     /// Generate a constraint from the type of a `classinfo` argument to `isinstance` or `issubclass`.
     ///
     /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
     /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
         let constraint_fn = |class| match self {
-            KnownConstraintFunction::IsInstance => Type::instance(db, class),
-            KnownConstraintFunction::IsSubclass => SubclassOfType::from(db, class),
+            ClassInfoConstraintFunction::IsInstance => Type::instance(db, class),
+            ClassInfoConstraintFunction::IsSubclass => SubclassOfType::from(db, class),
         };
 
         match classinfo {
@@ -467,7 +474,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     }
                     // Treat `bool` as `Literal[True, False]`.
                     Type::NominalInstance(instance)
-                        if instance.class().is_known(db, KnownClass::Bool) =>
+                        if instance.class.is_known(db, KnownClass::Bool) =>
                     {
                         UnionType::from_elements(
                             db,
@@ -498,7 +505,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         match (lhs_ty, rhs_ty) {
             (Type::NominalInstance(instance), Type::IntLiteral(i))
-                if instance.class().is_known(self.db, KnownClass::Bool) =>
+                if instance.class.is_known(self.db, KnownClass::Bool) =>
             {
                 if i == 0 {
                     Some(Type::BooleanLiteral(false).negate(self.db))
@@ -704,20 +711,38 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
         match callable_ty {
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
-                let function = function_type.known(self.db)?.into_constraint_function()?;
-
-                let (id, class_info) = match &*expr_call.arguments.args {
-                    [first, class_info] => match expr_name(first) {
-                        Some(id) => (id, class_info),
-                        None => return None,
-                    },
-                    _ => return None,
+                let [first_arg, second_arg] = &*expr_call.arguments.args else {
+                    return None;
                 };
+                let first_arg = expr_name(first_arg)?;
+                let function = function_type.known(self.db)?;
+                let symbol = self.expect_expr_name_symbol(first_arg);
 
-                let symbol = self.expect_expr_name_symbol(id);
+                if function == KnownFunction::HasAttr {
+                    let attr = inference
+                        .expression_type(second_arg.scoped_expression_id(self.db, scope))
+                        .into_string_literal()?
+                        .value(self.db);
+
+                    if !is_identifier(attr) {
+                        return None;
+                    }
+
+                    let constraint = Type::synthesized_protocol(
+                        self.db,
+                        [(attr, KnownClass::Object.to_instance(self.db))],
+                    );
+
+                    return Some(NarrowingConstraints::from_iter([(
+                        symbol,
+                        constraint.negate_if(self.db, !is_positive),
+                    )]));
+                }
+
+                let function = function.into_classinfo_constraint_function()?;
 
                 let class_info_ty =
-                    inference.expression_type(class_info.scoped_expression_id(self.db, scope));
+                    inference.expression_type(second_arg.scoped_expression_id(self.db, scope));
 
                 function
                     .generate_constraint(self.db, class_info_ty)
@@ -835,7 +860,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             }
             (BoolOp::Or, true) | (BoolOp::And, false) => {
                 let (first, rest) = sub_constraints.split_first_mut()?;
-                if let Some(ref mut first) = first {
+                if let Some(first) = first {
                     for rest_constraint in rest {
                         if let Some(rest_constraint) = rest_constraint {
                             merge_constraints_or(first, rest_constraint, self.db);

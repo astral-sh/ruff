@@ -1,11 +1,11 @@
-use crate::noqa::{Code, Directive};
-use crate::registry::Rule;
-use crate::Locator;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Locator;
+use crate::noqa::{Code, Directive};
 use crate::noqa::{Codes, NoqaDirectives};
+use crate::registry::Rule;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for `noqa` codes that are invalid.

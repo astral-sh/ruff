@@ -1,8 +1,8 @@
 use insta::assert_debug_snapshot;
 
-use ruff_python_parser::{parse_unchecked, Mode, ParseOptions};
-use ruff_python_trivia::{lines_after, lines_before, CommentRanges, SimpleToken, SimpleTokenizer};
+use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
 use ruff_python_trivia::{BackwardsTokenizer, SimpleTokenKind};
+use ruff_python_trivia::{CommentRanges, SimpleToken, SimpleTokenizer, lines_after, lines_before};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 struct TokenizationTestCase {

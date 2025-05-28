@@ -4,8 +4,8 @@ use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::Ranged;
 
-use crate::rules::isort::types::TrailingComma;
 use crate::Locator;
+use crate::rules::isort::types::TrailingComma;
 
 /// Return `true` if a `Stmt::ImportFrom` statement ends with a magic
 /// trailing comma.

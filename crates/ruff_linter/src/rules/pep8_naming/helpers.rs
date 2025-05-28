@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::{analyze, SemanticModel};
+use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_python_stdlib::str::{is_cased_lowercase, is_cased_uppercase};
 
 pub(super) fn is_camelcase(name: &str) -> bool {

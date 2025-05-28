@@ -1,12 +1,12 @@
 use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
 use crate::types::TypeCheckDiagnostics;
-use crate::{declare_lint, lint::LintId, Db};
+use crate::{Db, declare_lint, lint::LintId};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Span};
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use std::error::Error;
 use std::fmt;
 use std::fmt::Formatter;

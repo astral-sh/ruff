@@ -66,18 +66,68 @@ reveal_type(f("string"))  # revealed: Literal["string"]
 ## Inferring “deep” generic parameter types
 
 The matching up of call arguments and discovery of constraints on typevars can be a recursive
-process for arbitrarily-nested generic types in parameters.
+process for arbitrarily-nested generic classes and protocols in parameters.
+
+TODO: Note that we can currently only infer a specialization for a generic protocol when the
+argument _explicitly_ implements the protocol by listing it as a base class.
 
 ```py
-from typing import TypeVar
+from typing import Protocol, TypeVar
 
 T = TypeVar("T")
 
-def f(x: list[T]) -> T:
+class CanIndex(Protocol[T]):
+    def __getitem__(self, index: int) -> T: ...
+
+class ExplicitlyImplements(CanIndex[T]): ...
+
+def takes_in_list(x: list[T]) -> list[T]:
+    return x
+
+def takes_in_protocol(x: CanIndex[T]) -> T:
     return x[0]
 
-# TODO: revealed: float
-reveal_type(f([1.0, 2.0]))  # revealed: Unknown
+def deep_list(x: list[str]) -> None:
+    reveal_type(takes_in_list(x))  # revealed: list[str]
+    # TODO: revealed: str
+    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+
+def deeper_list(x: list[set[str]]) -> None:
+    reveal_type(takes_in_list(x))  # revealed: list[set[str]]
+    # TODO: revealed: set[str]
+    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+
+def deep_explicit(x: ExplicitlyImplements[str]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: str
+
+def deeper_explicit(x: ExplicitlyImplements[set[str]]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
+
+def takes_in_type(x: type[T]) -> type[T]:
+    return x
+
+reveal_type(takes_in_type(int))  # revealed: @Todo(unsupported type[X] special form)
+```
+
+This also works when passing in arguments that are subclasses of the parameter type.
+
+```py
+class Sub(list[int]): ...
+class GenericSub(list[T]): ...
+
+reveal_type(takes_in_list(Sub()))  # revealed: list[int]
+# TODO: revealed: int
+reveal_type(takes_in_protocol(Sub()))  # revealed: Unknown
+
+reveal_type(takes_in_list(GenericSub[str]()))  # revealed: list[str]
+# TODO: revealed: str
+reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: Unknown
+
+class ExplicitSub(ExplicitlyImplements[int]): ...
+class ExplicitGenericSub(ExplicitlyImplements[T]): ...
+
+reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: int
+reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 ```
 
 ## Inferring a bound typevar
@@ -144,7 +194,7 @@ def good_return(x: T) -> T:
     return x
 
 def bad_return(x: T) -> T:
-    # error: [invalid-return-type] "Return type does not match returned value: Expected `T`, found `int`"
+    # error: [invalid-return-type] "Return type does not match returned value: expected `T`, found `int`"
     return x + 1
 ```
 
@@ -162,7 +212,7 @@ def different_types(cond: bool, t: T, s: S) -> T:
     if cond:
         return t
     else:
-        # error: [invalid-return-type] "Return type does not match returned value: Expected `T`, found `S`"
+        # error: [invalid-return-type] "Return type does not match returned value: expected `T`, found `S`"
         return s
 
 def same_types(cond: bool, t1: T, t2: T) -> T:

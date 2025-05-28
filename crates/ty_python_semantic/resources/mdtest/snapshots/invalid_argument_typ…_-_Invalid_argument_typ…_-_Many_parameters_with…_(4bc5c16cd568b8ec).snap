@@ -1,0 +1,84 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_argument_type.md - Invalid argument type diagnostics - Many parameters with multiple invalid arguments
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_argument_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def foo(x: int, y: int, z: int) -> int:
+2 |     return x * y * z
+3 | 
+4 | # error: [invalid-argument-type]
+5 | # error: [invalid-argument-type]
+6 | # error: [invalid-argument-type]
+7 | foo("a", "b", "c")
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to function `foo` is incorrect
+ --> src/mdtest_snippet.py:7:5
+  |
+5 | # error: [invalid-argument-type]
+6 | # error: [invalid-argument-type]
+7 | foo("a", "b", "c")
+  |     ^^^ Expected `int`, found `Literal["a"]`
+  |
+info: Function defined here
+ --> src/mdtest_snippet.py:1:5
+  |
+1 | def foo(x: int, y: int, z: int) -> int:
+  |     ^^^ ------ Parameter declared here
+2 |     return x * y * z
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `foo` is incorrect
+ --> src/mdtest_snippet.py:7:10
+  |
+5 | # error: [invalid-argument-type]
+6 | # error: [invalid-argument-type]
+7 | foo("a", "b", "c")
+  |          ^^^ Expected `int`, found `Literal["b"]`
+  |
+info: Function defined here
+ --> src/mdtest_snippet.py:1:5
+  |
+1 | def foo(x: int, y: int, z: int) -> int:
+  |     ^^^         ------ Parameter declared here
+2 |     return x * y * z
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `foo` is incorrect
+ --> src/mdtest_snippet.py:7:15
+  |
+5 | # error: [invalid-argument-type]
+6 | # error: [invalid-argument-type]
+7 | foo("a", "b", "c")
+  |               ^^^ Expected `int`, found `Literal["c"]`
+  |
+info: Function defined here
+ --> src/mdtest_snippet.py:1:5
+  |
+1 | def foo(x: int, y: int, z: int) -> int:
+  |     ^^^                 ------ Parameter declared here
+2 |     return x * y * z
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```

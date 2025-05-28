@@ -1,5 +1,5 @@
-use anyhow::{anyhow, Context};
-use ruff_db::files::{system_path_to_file, File};
+use anyhow::{Context, anyhow};
+use ruff_db::files::{File, system_path_to_file};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::visitor::source_order;
@@ -135,11 +135,16 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
             };
             if let Err(err) = result {
                 if !expected_to_fail {
-                    println!("Check failed for {relative_path:?}. Consider fixing it or adding it to KNOWN_FAILURES");
+                    println!(
+                        "Check failed for {relative_path:?}. Consider fixing it or adding it to KNOWN_FAILURES"
+                    );
                     std::panic::resume_unwind(err);
                 }
             } else {
-                assert!(!expected_to_fail, "Expected to panic, but did not. Consider removing this path from KNOWN_FAILURES");
+                assert!(
+                    !expected_to_fail,
+                    "Expected to panic, but did not. Consider removing this path from KNOWN_FAILURES"
+                );
             }
 
             memory_fs.remove_file(path).unwrap();
@@ -289,4 +294,8 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
 
 /// Whether or not the .py/.pyi version of this file is expected to fail
 #[rustfmt::skip]
-const KNOWN_FAILURES: &[(&str, bool, bool)] = &[];
+const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
+    // Fails with too-many-cycle-iterations due to a self-referential
+    // type alias, see https://github.com/astral-sh/ty/issues/256
+    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_34.py", true, true),
+];

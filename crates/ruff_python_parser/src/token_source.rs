@@ -1,9 +1,9 @@
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::Mode;
 use crate::error::LexicalError;
 use crate::lexer::{Lexer, LexerCheckpoint};
 use crate::token::{Token, TokenFlags, TokenKind, TokenValue};
-use crate::Mode;
 
 /// Token source for the parser that skips over any trivia tokens.
 #[derive(Debug)]

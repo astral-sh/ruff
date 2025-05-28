@@ -10,7 +10,7 @@ use crate::format_element::document::Document;
 use crate::format_element::tag::{Condition, GroupMode};
 use crate::format_element::{BestFittingMode, BestFittingVariants, LineMode, PrintMode};
 use crate::prelude::tag::{DedentMode, Tag, TagKind, VerbatimKind};
-use crate::prelude::{tag, TextWidth};
+use crate::prelude::{TextWidth, tag};
 use crate::printer::call_stack::{
     CallStack, FitsCallStack, PrintCallStack, PrintElementArgs, StackFrame,
 };
@@ -1199,7 +1199,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                         text_width: *text_width,
                     },
                     args,
-                ))
+                ));
             }
             FormatElement::SourceCodeSlice { slice, text_width } => {
                 let text = slice.text(self.printer.source_code);
@@ -1597,11 +1597,7 @@ enum Fits {
 
 impl From<bool> for Fits {
     fn from(value: bool) -> Self {
-        if value {
-            Fits::Yes
-        } else {
-            Fits::No
-        }
+        if value { Fits::Yes } else { Fits::No }
     }
 }
 
@@ -1662,8 +1658,8 @@ mod tests {
     use crate::printer::{LineEnding, Printer, PrinterOptions};
     use crate::source_code::SourceCode;
     use crate::{
-        format_args, write, Document, FormatState, IndentStyle, IndentWidth, LineWidth, Printed,
-        VecBuffer,
+        Document, FormatState, IndentStyle, IndentWidth, LineWidth, Printed, VecBuffer,
+        format_args, write,
     };
 
     fn format(root: &dyn Format<SimpleFormatContext>) -> Printed {
@@ -1985,10 +1981,21 @@ two lines`,
                 token("]")
             ]),
             token(";"),
-            line_suffix(&format_args![space(), token("// Using reserved width causes this content to not fit even though it's a line suffix element")], 93)
+            line_suffix(
+                &format_args![
+                    space(),
+                    token(
+                        "// Using reserved width causes this content to not fit even though it's a line suffix element"
+                    )
+                ],
+                93
+            )
         ]);
 
-        assert_eq!(printed.as_code(), "[\n  1, 2, 3\n]; // Using reserved width causes this content to not fit even though it's a line suffix element");
+        assert_eq!(
+            printed.as_code(),
+            "[\n  1, 2, 3\n]; // Using reserved width causes this content to not fit even though it's a line suffix element"
+        );
     }
 
     #[test]
@@ -2002,7 +2009,7 @@ two lines`,
                         token("The referenced group breaks."),
                         hard_line_break()
                     ])
-                    .with_group_id(Some(group_id)),
+                    .with_id(Some(group_id)),
                     group(&format_args![
                         token("This group breaks because:"),
                         soft_line_break_or_space(),
@@ -2015,7 +2022,10 @@ two lines`,
 
         let printed = format(&content);
 
-        assert_eq!(printed.as_code(), "The referenced group breaks.\nThis group breaks because:\nIt measures with the 'if_group_breaks' variant because the referenced group breaks and that's just way too much text.");
+        assert_eq!(
+            printed.as_code(),
+            "The referenced group breaks.\nThis group breaks because:\nIt measures with the 'if_group_breaks' variant because the referenced group breaks and that's just way too much text."
+        );
     }
 
     #[test]
@@ -2027,7 +2037,7 @@ two lines`,
             write!(
                 f,
                 [
-                    group(&token("Group with id-2")).with_group_id(Some(id_2)),
+                    group(&token("Group with id-2")).with_id(Some(id_2)),
                     hard_line_break()
                 ]
             )?;
@@ -2035,7 +2045,7 @@ two lines`,
             write!(
                 f,
                 [
-                    group(&token("Group with id-1 does not fit on the line because it exceeds the line width of 80 characters by")).with_group_id(Some(id_1)),
+                    group(&token("Group with id-1 does not fit on the line because it exceeds the line width of 80 characters by")).with_id(Some(id_1)),
                     hard_line_break()
                 ]
             )?;

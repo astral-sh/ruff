@@ -85,7 +85,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     ");
 
     // Test that we can set to false via config file
-    case.write_file("ty.toml", "respect-ignore-files = false")?;
+    case.write_file("ty.toml", "src.respect-ignore-files = false")?;
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
@@ -104,7 +104,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     ");
 
     // Ensure CLI takes precedence
-    case.write_file("ty.toml", "respect-ignore-files = true")?;
+    case.write_file("ty.toml", "src.respect-ignore-files = true")?;
     assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @r"
     success: false
     exit_code: 1
@@ -157,7 +157,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
     5 | print(sys.last_exc)
       |       ^^^^^^^^^^^^
       |
-    info: `unresolved-attribute` is enabled by default
+    info: rule `unresolved-attribute` is enabled by default
 
     Found 1 diagnostic
 
@@ -241,6 +241,144 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn config_file_annotation_showing_where_python_version_set_typing_error() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            python-version = "3.8"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            aiter
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `aiter` used when not defined
+     --> test.py:2:1
+      |
+    2 | aiter
+      | ^^^^^
+      |
+    info: `aiter` was added as a builtin in Python 3.10
+    info: Python 3.8 was assumed when resolving types
+     --> pyproject.toml:3:18
+      |
+    2 | [tool.ty.environment]
+    3 | python-version = "3.8"
+      |                  ^^^^^ Python 3.8 assumed due to this configuration setting
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `aiter` used when not defined
+     --> test.py:2:1
+      |
+    2 | aiter
+      | ^^^^^
+      |
+    info: `aiter` was added as a builtin in Python 3.10
+    info: Python 3.9 was assumed when resolving types because it was specified on the command line
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn config_file_annotation_showing_where_python_version_set_syntax_error() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            requires-python = ">=3.8"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            match object():
+                case int():
+                    pass
+                case _:
+                    pass
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-syntax]
+     --> test.py:2:1
+      |
+    2 | match object():
+      | ^^^^^ Cannot use `match` statement on Python 3.8 (syntax was added in Python 3.10)
+    3 |     case int():
+    4 |         pass
+      |
+    info: Python 3.8 was assumed when parsing syntax
+     --> pyproject.toml:3:19
+      |
+    2 | [project]
+    3 | requires-python = ">=3.8"
+      |                   ^^^^^^^ Python 3.8 assumed due to this configuration setting
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-syntax]
+     --> test.py:2:1
+      |
+    2 | match object():
+      | ^^^^^ Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    3 |     case int():
+    4 |         pass
+      |
+    info: Python 3.9 was assumed when parsing syntax because it was specified on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
 /// Paths specified on the CLI are relative to the current working directory and not the project root.
 ///
 /// We test this by adding an extra search path from the CLI to the libs directory when
@@ -296,7 +434,8 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     3 |
     4 | stat = add(10, 15)
       |
-    info: `unresolved-import` is enabled by default
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -386,22 +525,11 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
             "#,
     )?;
 
-    // Assert that there's an `unresolved-reference` diagnostic (error)
-    // and a `division-by-zero` diagnostic (error).
-    assert_cmd_snapshot!(case.command(), @r"
+    // Assert that there's an `unresolved-reference` diagnostic (error).
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
-     --> test.py:2:5
-      |
-    2 | y = 4 / 0
-      |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
-      |
-    info: `division-by-zero` is enabled by default
-
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:7:1
       |
@@ -410,19 +538,19 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     7 | prin(x)  # unresolved-reference
       | ^^^^
       |
-    info: `unresolved-reference` is enabled by default
+    info: rule `unresolved-reference` is enabled by default
 
-    Found 2 diagnostics
+    Found 1 diagnostic
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     case.write_file(
         "pyproject.toml",
         r#"
         [tool.ty.rules]
-        division-by-zero = "warn" # demote to warn
+        division-by-zero = "warn" # promote to warn
         unresolved-reference = "ignore"
     "#,
     )?;
@@ -439,7 +567,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
-    info: `division-by-zero` was selected in the configuration file
+    info: rule `division-by-zero` was selected in the configuration file
 
     Found 1 diagnostic
 
@@ -467,9 +595,9 @@ fn cli_rule_severity() -> anyhow::Result<()> {
         "#,
     )?;
 
-    // Assert that there's an `unresolved-reference` diagnostic (error),
-    // a `division-by-zero` (error) and a unresolved-import (error) diagnostic by default.
-    assert_cmd_snapshot!(case.command(), @r"
+    // Assert that there's an `unresolved-reference` diagnostic (error)
+    // and an unresolved-import (error) diagnostic by default.
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -481,19 +609,8 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | y = 4 / 0
       |
-    info: `unresolved-import` is enabled by default
-
-    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
-     --> test.py:4:5
-      |
-    2 | import does_not_exit
-    3 |
-    4 | y = 4 / 0
-      |     ^^^^^
-    5 |
-    6 | for a in range(0, int(y)):
-      |
-    info: `division-by-zero` is enabled by default
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: rule `unresolved-import` is enabled by default
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:9:1
@@ -503,13 +620,13 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     9 | prin(x)  # unresolved-reference
       | ^^^^
       |
-    info: `unresolved-reference` is enabled by default
+    info: rule `unresolved-reference` is enabled by default
 
-    Found 3 diagnostics
+    Found 2 diagnostics
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     assert_cmd_snapshot!(
         case
@@ -532,7 +649,8 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | y = 4 / 0
       |
-    info: `unresolved-import` was selected on the command line
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: rule `unresolved-import` was selected on the command line
 
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:4:5
@@ -544,7 +662,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     5 |
     6 | for a in range(0, int(y)):
       |
-    info: `division-by-zero` was selected on the command line
+    info: rule `division-by-zero` was selected on the command line
 
     Found 2 diagnostics
 
@@ -572,22 +690,11 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
         "#,
     )?;
 
-    // Assert that there's a `unresolved-reference` diagnostic (error)
-    // and a `division-by-zero` (error) by default.
-    assert_cmd_snapshot!(case.command(), @r"
+    // Assert that there's a `unresolved-reference` diagnostic (error) by default.
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
-     --> test.py:2:5
-      |
-    2 | y = 4 / 0
-      |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
-      |
-    info: `division-by-zero` is enabled by default
-
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:7:1
       |
@@ -596,13 +703,13 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     7 | prin(x)  # unresolved-reference
       | ^^^^
       |
-    info: `unresolved-reference` is enabled by default
+    info: rule `unresolved-reference` is enabled by default
 
-    Found 2 diagnostics
+    Found 1 diagnostic
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     assert_cmd_snapshot!(
         case
@@ -611,7 +718,6 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
             .arg("unresolved-reference")
             .arg("--warn")
             .arg("division-by-zero")
-            // Override the error severity with warning
             .arg("--ignore")
             .arg("unresolved-reference"),
         @r"
@@ -626,7 +732,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
-    info: `division-by-zero` was selected on the command line
+    info: rule `division-by-zero` was selected on the command line
 
     Found 1 diagnostic
 
@@ -707,7 +813,7 @@ fn exit_code_only_warnings() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: `unresolved-reference` was selected on the command line
+    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -794,7 +900,7 @@ fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: `unresolved-reference` was selected on the command line
+    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -828,7 +934,7 @@ fn exit_code_no_errors_but_error_on_warning_is_enabled_in_configuration() -> any
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: `unresolved-reference` was selected on the command line
+    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -860,7 +966,7 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
       |       ^
     3 | print(4[1])  # [non-subscriptable]
       |
-    info: `unresolved-reference` was selected on the command line
+    info: rule `unresolved-reference` was selected on the command line
 
     error[non-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
@@ -869,7 +975,7 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
     3 | print(4[1])  # [non-subscriptable]
       |       ^
       |
-    info: `non-subscriptable` is enabled by default
+    info: rule `non-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
@@ -901,7 +1007,7 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
       |       ^
     3 | print(4[1])  # [non-subscriptable]
       |
-    info: `unresolved-reference` was selected on the command line
+    info: rule `unresolved-reference` was selected on the command line
 
     error[non-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
@@ -910,7 +1016,7 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
     3 | print(4[1])  # [non-subscriptable]
       |       ^
       |
-    info: `non-subscriptable` is enabled by default
+    info: rule `non-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
@@ -942,7 +1048,7 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
       |       ^
     3 | print(4[1])  # [non-subscriptable]
       |
-    info: `unresolved-reference` was selected on the command line
+    info: rule `unresolved-reference` was selected on the command line
 
     error[non-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
@@ -951,7 +1057,7 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
     3 | print(4[1])  # [non-subscriptable]
       |       ^
       |
-    info: `non-subscriptable` is enabled by default
+    info: rule `non-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
@@ -1006,7 +1112,7 @@ fn user_configuration() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
-    info: `division-by-zero` was selected in the configuration file
+    info: rule `division-by-zero` was selected in the configuration file
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> main.py:7:1
@@ -1016,7 +1122,7 @@ fn user_configuration() -> anyhow::Result<()> {
     7 | prin(x)
       | ^^^^
       |
-    info: `unresolved-reference` is enabled by default
+    info: rule `unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
@@ -1051,7 +1157,7 @@ fn user_configuration() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
-    info: `division-by-zero` was selected in the configuration file
+    info: rule `division-by-zero` was selected in the configuration file
 
     warning[unresolved-reference]: Name `prin` used when not defined
      --> main.py:7:1
@@ -1061,7 +1167,7 @@ fn user_configuration() -> anyhow::Result<()> {
     7 | prin(x)
       | ^^^^
       |
-    info: `unresolved-reference` was selected in the configuration file
+    info: rule `unresolved-reference` was selected in the configuration file
 
     Found 2 diagnostics
 
@@ -1100,18 +1206,10 @@ fn check_specific_paths() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command(),
-        @r"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
-     --> project/main.py:2:5
-      |
-    2 | y = 4 / 0  # error: division-by-zero
-      |     ^^^^^
-      |
-    info: `division-by-zero` is enabled by default
-
     error[unresolved-import]: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
@@ -1120,7 +1218,8 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
-    info: `unresolved-import` is enabled by default
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
@@ -1128,13 +1227,14 @@ fn check_specific_paths() -> anyhow::Result<()> {
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
-    info: `unresolved-import` is enabled by default
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: rule `unresolved-import` is enabled by default
 
-    Found 3 diagnostics
+    Found 2 diagnostics
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "
+    "###
     );
 
     // Now check only the `tests` and `other.py` files.
@@ -1153,7 +1253,8 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
-    info: `unresolved-import` is enabled by default
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
@@ -1161,7 +1262,8 @@ fn check_specific_paths() -> anyhow::Result<()> {
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
-    info: `unresolved-import` is enabled by default
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
@@ -1337,7 +1439,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
       | ^^^^^^^^^^
       |
-    info: `unresolved-attribute` is enabled by default
+    info: rule `unresolved-attribute` is enabled by default
 
     Found 1 diagnostic
 
@@ -1392,7 +1494,7 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: `unresolved-reference` was selected on the command line
+    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -1411,7 +1513,7 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: `unresolved-reference` is enabled by default
+    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -1423,10 +1525,10 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
 }
 
 #[test]
-fn cli_config_args_overrides_knot_toml() -> anyhow::Result<()> {
+fn cli_config_args_overrides_ty_toml() -> anyhow::Result<()> {
     let case = TestCase::with_files(vec![
         (
-            "knot.toml",
+            "ty.toml",
             r#"
             [terminal]
             error-on-warning = true
@@ -1434,6 +1536,27 @@ fn cli_config_args_overrides_knot_toml() -> anyhow::Result<()> {
         ),
         ("test.py", r"print(x)  # [unresolved-reference]"),
     ])?;
+
+    // Exit code of 1 due to the setting in `ty.toml`
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       ^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // Exit code of 0 because the `ty.toml` setting is overwritten by `--config`
     assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=false"), @r"
     success: true
     exit_code: 0
@@ -1444,7 +1567,7 @@ fn cli_config_args_overrides_knot_toml() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: `unresolved-reference` was selected on the command line
+    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -1468,7 +1591,7 @@ fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: `unresolved-reference` was selected on the command line
+    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -1482,7 +1605,7 @@ fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
 #[test]
 fn cli_config_args_invalid_option() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", r"print(1)")?;
-    assert_cmd_snapshot!(case.command().arg("--config").arg("bad-option=true"), @r"
+    assert_cmd_snapshot!(case.command().arg("--config").arg("bad-option=true"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1492,12 +1615,146 @@ fn cli_config_args_invalid_option() -> anyhow::Result<()> {
       |
     1 | bad-option=true
       | ^^^^^^^^^^
-    unknown field `bad-option`, expected one of `environment`, `src`, `rules`, `terminal`, `respect-ignore-files`
+    unknown field `bad-option`, expected one of `environment`, `src`, `rules`, `terminal`
 
 
     Usage: ty <COMMAND>
 
     For more information, try '--help'.
+    "###);
+
+    Ok(())
+}
+
+/// The `site-packages` directory is used by ty for external import.
+/// Ty does the following checks to discover the `site-packages` directory in the order:
+/// 1) If `VIRTUAL_ENV` environment variable is set
+/// 2) If `CONDA_PREFIX` environment variable is set
+/// 3) If a `.venv` directory exists at the project root
+///
+/// This test is aiming at validating the logic around `CONDA_PREFIX`.
+///
+/// A conda-like environment file structure is used
+/// We test by first not setting the `CONDA_PREFIX` and expect a fail.
+/// Then we test by setting `CONDA_PREFIX` to `conda-env` and expect a pass.
+///
+/// ├── project
+/// │   └── test.py
+/// └── conda-env
+///     └── lib
+///         └── python3.13
+///             └── site-packages
+///                 └── package1
+///                     └── __init__.py
+///
+/// test.py imports package1
+/// And the command is run in the `project` directory.
+#[test]
+fn check_conda_prefix_var_to_resolve_path() -> anyhow::Result<()> {
+    let conda_package1_path = if cfg!(windows) {
+        "conda-env/Lib/site-packages/package1/__init__.py"
+    } else {
+        "conda-env/lib/python3.13/site-packages/package1/__init__.py"
+    };
+
+    let case = TestCase::with_files([
+        (
+            "project/test.py",
+            r#"
+            import package1
+            "#,
+        ),
+        (
+            conda_package1_path,
+            r#"
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("project")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `package1`
+     --> test.py:2:8
+      |
+    2 | import package1
+      |        ^^^^^^^^
+      |
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // do command : CONDA_PREFIX=<temp_dir>/conda_env
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("project")).env("CONDA_PREFIX", case.root().join("conda-env")), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn config_file_override() -> anyhow::Result<()> {
+    // Set `error-on-warning` to true in the configuration file
+    // Explicitly set `--warn unresolved-reference` to ensure the rule warns instead of errors
+    let case = TestCase::with_files(vec![
+        ("test.py", r"print(x)  # [unresolved-reference]"),
+        (
+            "ty-override.toml",
+            r#"
+            [terminal]
+            error-on-warning = true
+            "#,
+        ),
+    ])?;
+
+    // Ensure flag works via CLI arg
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config-file").arg("ty-override.toml"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       ^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // Ensure the flag works via an environment variable
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").env("TY_CONFIG_FILE", "ty-override.toml"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       ^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())

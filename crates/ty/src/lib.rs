@@ -5,7 +5,7 @@ mod version;
 
 pub use args::Cli;
 
-use std::io::{self, stdout, BufWriter, Write};
+use std::io::{self, BufWriter, Write, stdout};
 use std::process::{ExitCode, Termination};
 
 use anyhow::Result;
@@ -13,19 +13,19 @@ use std::sync::Mutex;
 
 use crate::args::{CheckCommand, Command, TerminalColor};
 use crate::logging::setup_tracing;
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
+use ruff_db::Upcast;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use ruff_db::Upcast;
 use salsa::plumbing::ZalsaDatabase;
-use ty_project::metadata::options::Options;
+use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{watch, Db, DummyReporter, Reporter};
+use ty_project::{Db, DummyReporter, Reporter, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
 
@@ -60,7 +60,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let verbosity = args.verbosity.level();
     countme::enable(verbosity.is_trace());
-    let _guard = setup_tracing(verbosity)?;
+    let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
 
     tracing::warn!(
         "ty is pre-release software and not ready for production use. \
@@ -102,13 +102,21 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .map(|path| SystemPath::absolute(path, &cwd))
         .collect();
 
-    let system = OsSystem::new(cwd);
+    let system = OsSystem::new(&cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
+    let config_file = args
+        .config_file
+        .as_ref()
+        .map(|path| SystemPath::absolute(path, &cwd));
 
-    let cli_options = args.into_options();
-    let mut project_metadata = ProjectMetadata::discover(&project_path, &system)?;
-    project_metadata.apply_cli_options(cli_options.clone());
+    let mut project_metadata = match &config_file {
+        Some(config_file) => ProjectMetadata::from_config_file(config_file.clone(), &system)?,
+        None => ProjectMetadata::discover(&project_path, &system)?,
+    };
+
+    let options = args.into_options();
+    project_metadata.apply_options(options.clone());
     project_metadata.apply_configuration_files(&system)?;
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;
@@ -117,7 +125,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         db.project().set_included_paths(&mut db, check_paths);
     }
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_options);
+    let project_options_overrides = ProjectOptionsOverrides::new(config_file, options);
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(project_options_overrides);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -178,11 +187,13 @@ struct MainLoop {
     /// The file system watcher, if running in watch mode.
     watcher: Option<ProjectWatcher>,
 
-    cli_options: Options,
+    project_options_overrides: ProjectOptionsOverrides,
 }
 
 impl MainLoop {
-    fn new(cli_options: Options) -> (Self, MainLoopCancellationToken) {
+    fn new(
+        project_options_overrides: ProjectOptionsOverrides,
+    ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         (
@@ -190,7 +201,7 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
-                cli_options,
+                project_options_overrides,
             },
             MainLoopCancellationToken { sender },
         )
@@ -216,7 +227,10 @@ impl MainLoop {
         self.run_with_progress::<IndicatifReporter>(db)
     }
 
-    fn run_with_progress<R: Reporter>(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
+    fn run_with_progress<R>(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus>
+    where
+        R: Reporter + Default + 'static,
+    {
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
 
         let result = self.main_loop::<R>(db);
@@ -226,7 +240,10 @@ impl MainLoop {
         result
     }
 
-    fn main_loop<R: Reporter>(&mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
+    fn main_loop<R>(&mut self, db: &mut ProjectDatabase) -> Result<ExitStatus>
+    where
+        R: Reporter + Default + 'static,
+    {
         // Schedule the first check.
         tracing::debug!("Starting main loop");
 
@@ -237,12 +254,14 @@ impl MainLoop {
                 MainLoopMessage::CheckWorkspace => {
                     let db = db.clone();
                     let sender = self.sender.clone();
-                    let reporter = R::default();
 
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
-                        match db.check(&reporter) {
+                        match salsa::Cancelled::catch(|| {
+                            let mut reporter = R::default();
+                            db.check_with_reporter(&mut reporter)
+                        }) {
                             Ok(result) => {
                                 // Send the result back to the main loop for printing.
                                 sender
@@ -300,7 +319,9 @@ impl MainLoop {
                             )?;
 
                             if max_severity.is_fatal() {
-                                tracing::warn!("A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details.");
+                                tracing::warn!(
+                                    "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
+                                );
                             }
 
                             if self.watcher.is_none() {
@@ -330,7 +351,7 @@ impl MainLoop {
                 MainLoopMessage::ApplyChanges(changes) => {
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes(changes, Some(&self.cli_options));
+                    db.apply_changes(changes, Some(&self.project_options_overrides));
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
@@ -353,11 +374,12 @@ impl MainLoop {
 }
 
 /// A progress reporter for `ty check`.
-struct IndicatifReporter(indicatif::ProgressBar);
+#[derive(Default)]
+struct IndicatifReporter(Option<indicatif::ProgressBar>);
 
-impl Default for IndicatifReporter {
-    fn default() -> IndicatifReporter {
-        let progress = indicatif::ProgressBar::new(0);
+impl ty_project::Reporter for IndicatifReporter {
+    fn set_files(&mut self, files: usize) {
+        let progress = indicatif::ProgressBar::new(files as u64);
         progress.set_style(
             indicatif::ProgressStyle::with_template(
                 "{msg:8.dim} {bar:60.green/dim} {pos}/{len} files",
@@ -366,17 +388,14 @@ impl Default for IndicatifReporter {
             .progress_chars("--"),
         );
         progress.set_message("Checking");
-        IndicatifReporter(progress)
-    }
-}
 
-impl ty_project::Reporter for IndicatifReporter {
-    fn set_files(&self, files: usize) {
-        self.0.set_length(files as u64);
+        self.0 = Some(progress);
     }
 
     fn report_file(&self, _file: &ruff_db::files::File) {
-        self.0.inc(1);
+        if let Some(ref progress_bar) = self.0 {
+            progress_bar.inc(1);
+        }
     }
 }
 

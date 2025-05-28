@@ -11,14 +11,21 @@
 use std::fmt::Display;
 
 use super::generics::GenericContext;
-use super::{class::KnownClass, ClassType, Truthiness, Type, TypeAliasType, TypeVarInstance};
+use super::{ClassType, Type, TypeAliasType, TypeVarInstance, class::KnownClass};
 use crate::db::Db;
-use crate::module_resolver::{file_to_module, KnownModule};
+use crate::module_resolver::{KnownModule, file_to_module};
 use ruff_db::files::File;
 
 /// Enumeration of specific runtime symbols that are special enough
 /// that they can each be considered to inhabit a unique type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
+///
+/// # Ordering
+///
+/// Ordering between variants is stable and should be the same between runs.
+/// Ordering within variants (for variants that wrap associate data)
+/// is based on the known-instance's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the type var instance was garbage collected and recreated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, PartialOrd, Ord)]
 pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Annotated` (which can also be found as `typing_extensions.Annotated`)
     Annotated,
@@ -101,18 +108,12 @@ pub enum KnownInstanceType<'db> {
 }
 
 impl<'db> KnownInstanceType<'db> {
-    /// Evaluate the known instance in boolean context
-    pub(crate) const fn bool(self) -> Truthiness {
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         match self {
             Self::Annotated
             | Self::Literal
             | Self::LiteralString
             | Self::Optional
-            // This is a legacy `TypeVar` _outside_ of any generic class or function, so it's
-            // AlwaysTrue. The truthiness of a typevar inside of a generic class or function
-            // depends on its bounds and constraints; but that's represented by `Type::TypeVar` and
-            // handled in elsewhere.
-            | Self::TypeVar(_)
             | Self::Union
             | Self::NoReturn
             | Self::Never
@@ -139,17 +140,18 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Deque
             | Self::ChainMap
             | Self::OrderedDict
-            | Self::Protocol(_)
-            | Self::Generic(_)
             | Self::ReadOnly
-            | Self::TypeAliasType(_)
             | Self::Unknown
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
             | Self::Not
             | Self::Intersection
             | Self::TypeOf
-            | Self::CallableTypeOf => Truthiness::AlwaysTrue,
+            | Self::CallableTypeOf => self,
+            Self::TypeVar(tvar) => Self::TypeVar(tvar.normalized(db)),
+            Self::Protocol(ctx) => Self::Protocol(ctx.map(|ctx| ctx.normalized(db))),
+            Self::Generic(ctx) => Self::Generic(ctx.map(|ctx| ctx.normalized(db))),
+            Self::TypeAliasType(alias) => Self::TypeAliasType(alias.normalized(db)),
         }
     }
 
