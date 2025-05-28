@@ -8734,7 +8734,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let signature = CallableSignature::from_overloads(
                         std::iter::once(signature).chain(signature_iter),
                     );
-                    Type::Callable(CallableType::new(db, signature))
+                    Type::Callable(CallableType::new(db, signature, false))
                 }
             },
 

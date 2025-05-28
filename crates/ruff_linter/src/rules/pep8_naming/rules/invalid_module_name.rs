@@ -1,14 +1,15 @@
 use std::ffi::OsStr;
 use std::path::Path;
 
-use crate::package::PackageRoot;
-use crate::rules::pep8_naming::settings::IgnoreNames;
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PySourceType;
 use ruff_python_stdlib::identifiers::{is_migration_name, is_module_name};
 use ruff_python_stdlib::path::is_module_file;
 use ruff_text_size::TextRange;
+
+use crate::package::PackageRoot;
+use crate::rules::pep8_naming::settings::IgnoreNames;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for module names that do not follow the `snake_case` naming

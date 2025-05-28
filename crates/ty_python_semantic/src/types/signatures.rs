@@ -87,6 +87,12 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
+    pub(crate) fn bind_self(&self) -> Self {
+        Self {
+            overloads: self.overloads.iter().map(Signature::bind_self).collect(),
+        }
+    }
+
     /// Check whether this callable type is fully static.
     ///
     /// See [`Type::is_fully_static`] for more details.

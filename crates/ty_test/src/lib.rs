@@ -169,7 +169,6 @@ fn run_test(
 
     let src_path = project_root.clone();
     let custom_typeshed_path = test.configuration().typeshed();
-    let python_path = test.configuration().python();
     let python_version = test.configuration().python_version().unwrap_or_default();
 
     let mut typeshed_files = vec![];
@@ -189,37 +188,35 @@ fn run_test(
 
             let mut full_path = embedded.full_path(&project_root);
 
-            if let Some(typeshed_path) = custom_typeshed_path {
-                if let Ok(relative_path) = full_path.strip_prefix(typeshed_path.join("stdlib")) {
-                    if relative_path.as_str() == "VERSIONS" {
-                        has_custom_versions_file = true;
-                    } else if relative_path.extension().is_some_and(|ext| ext == "pyi") {
-                        typeshed_files.push(relative_path.to_path_buf());
-                    }
+            if let Some(relative_path_to_custom_typeshed) = custom_typeshed_path
+                .and_then(|typeshed| full_path.strip_prefix(typeshed.join("stdlib")).ok())
+            {
+                if relative_path_to_custom_typeshed.as_str() == "VERSIONS" {
+                    has_custom_versions_file = true;
+                } else if relative_path_to_custom_typeshed
+                    .extension()
+                    .is_some_and(|ext| ext == "pyi")
+                {
+                    typeshed_files.push(relative_path_to_custom_typeshed.to_path_buf());
                 }
-            } else if let Some(python_path) = python_path {
-                if let Ok(relative_path) = full_path.strip_prefix(python_path) {
-                    // Construct the path to the site-packages directory
-                    if relative_path.as_str() != "pyvenv.cfg" {
-                        let mut new_path = SystemPathBuf::new();
-                        for component in full_path.components() {
-                            let component = component.as_str();
-                            if component == "<path-to-site-packages>" {
-                                if cfg!(target_os = "windows") {
-                                    new_path.push("Lib");
-                                    new_path.push("site-packages");
-                                } else {
-                                    new_path.push("lib");
-                                    new_path.push(format!("python{python_version}"));
-                                    new_path.push("site-packages");
-                                }
-                            } else {
-                                new_path.push(component);
-                            }
-                        }
-                        full_path = new_path;
-                    }
+            } else if let Some(component_index) = full_path
+                .components()
+                .position(|c| c.as_str() == "<path-to-site-packages>")
+            {
+                // If the path contains `<path-to-site-packages>`, we need to replace it with the
+                // actual site-packages directory based on the Python platform and version.
+                let mut components = full_path.components();
+                let mut new_path: SystemPathBuf =
+                    components.by_ref().take(component_index).collect();
+                if cfg!(target_os = "windows") {
+                    new_path.extend(["Lib", "site-packages"]);
+                } else {
+                    new_path.push("lib");
+                    new_path.push(format!("python{python_version}"));
+                    new_path.push("site-packages");
                 }
+                new_path.extend(components.skip(1));
+                full_path = new_path;
             }
 
             db.write_file(&full_path, &embedded.code).unwrap();

@@ -6,7 +6,7 @@ use std::fmt::Formatter;
 
 use strum_macros::{AsRefStr, EnumIter};
 
-use crate::registry::{AsRule, Linter};
+use crate::registry::Linter;
 use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
@@ -552,6 +552,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "046") => (RuleGroup::Preview, rules::pyupgrade::rules::NonPEP695GenericClass),
         (Pyupgrade, "047") => (RuleGroup::Preview, rules::pyupgrade::rules::NonPEP695GenericFunction),
         (Pyupgrade, "049") => (RuleGroup::Preview, rules::pyupgrade::rules::PrivateTypeParameter),
+        (Pyupgrade, "050") => (RuleGroup::Preview, rules::pyupgrade::rules::UselessClassMetaclassType),
 
         // pydocstyle
         (Pydocstyle, "100") => (RuleGroup::Stable, rules::pydocstyle::rules::UndocumentedPublicModule),
@@ -933,6 +934,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8UsePathlib, "207") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::Glob),
         (Flake8UsePathlib, "208") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsListdir),
         (Flake8UsePathlib, "210") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::InvalidPathlibWithSuffix),
+        (Flake8UsePathlib, "211") => (RuleGroup::Preview, rules::flake8_use_pathlib::violations::OsSymlink),
 
         // flake8-logging-format
         (Flake8LoggingFormat, "001") => (RuleGroup::Stable, rules::flake8_logging_format::violations::LoggingStringFormat),
@@ -1153,4 +1155,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         _ => return None,
     })
+}
+
+impl std::fmt::Display for Rule {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        f.write_str(self.into())
+    }
 }

@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{LineRanges, UniversalNewlineIterator};
@@ -6,6 +5,7 @@ use ruff_text_size::TextRange;
 
 use crate::Locator;
 use crate::settings::LinterSettings;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 use super::super::detection::comment_contains_code;
 

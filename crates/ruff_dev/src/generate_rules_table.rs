@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use std::fmt::Write;
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::FixAvailability;
+use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_linter::upstream_categories::UpstreamCategoryAndPrefix;
 use ruff_options_metadata::OptionsMetadata;

@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::visitor::{self, Visitor};
@@ -6,6 +5,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 
@@ -106,7 +106,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
             {
                 if self.loop_counter == 0 {
                     let open = self.candidates.remove(open);
-                    self.checker.report_diagnostic(Diagnostic::new(
+                    self.checker.report_diagnostic(
                         WriteWholeFile {
                             filename: SourceCodeSnippet::from_str(
                                 &self.checker.generator().expr(open.filename),
@@ -114,7 +114,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                             suggestion: make_suggestion(&open, content, self.checker.generator()),
                         },
                         open.item.range(),
-                    ));
+                    );
                 } else {
                     self.candidates.remove(open);
                 }

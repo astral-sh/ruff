@@ -1269,7 +1269,7 @@ impl<'db> ClassLiteral<'db> {
             }
 
             let signature = Signature::new(Parameters::new(parameters), Some(Type::none(db)));
-            Some(CallableType::single(db, signature))
+            Some(CallableType::function_like(db, signature))
         };
 
         match (field_policy, name) {
@@ -1283,7 +1283,13 @@ impl<'db> ClassLiteral<'db> {
                     return None;
                 }
 
-                signature_from_fields(vec![])
+                let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
+                    // TODO: could be `Self`.
+                    .with_annotated_type(Type::instance(
+                        db,
+                        self.apply_optional_specialization(db, specialization),
+                    ));
+                signature_from_fields(vec![self_parameter])
             }
             (CodeGeneratorKind::NamedTuple, "__new__") => {
                 let cls_parameter = Parameter::positional_or_keyword(Name::new_static("cls"))
@@ -1296,16 +1302,24 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 let signature = Signature::new(
-                    Parameters::new([Parameter::positional_or_keyword(Name::new_static("other"))
-                        // TODO: could be `Self`.
-                        .with_annotated_type(Type::instance(
-                            db,
-                            self.apply_optional_specialization(db, specialization),
-                        ))]),
+                    Parameters::new([
+                        Parameter::positional_or_keyword(Name::new_static("self"))
+                            // TODO: could be `Self`.
+                            .with_annotated_type(Type::instance(
+                                db,
+                                self.apply_optional_specialization(db, specialization),
+                            )),
+                        Parameter::positional_or_keyword(Name::new_static("other"))
+                            // TODO: could be `Self`.
+                            .with_annotated_type(Type::instance(
+                                db,
+                                self.apply_optional_specialization(db, specialization),
+                            )),
+                    ]),
                     Some(KnownClass::Bool.to_instance(db)),
                 );
 
-                Some(CallableType::single(db, signature))
+                Some(CallableType::function_like(db, signature))
             }
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback

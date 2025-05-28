@@ -1,5 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_diagnostics::{Applicability, Edit};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -9,6 +7,8 @@ use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Fix};
+use crate::{Applicability, Edit};
 
 /// ## What it does
 /// Checks for key-existence checks against `dict.keys()` calls.
@@ -103,7 +103,7 @@ fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, pa
     )
     .unwrap_or(right.range());
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         InDictKeys {
             operator: operator.as_str().to_string(),
         },
@@ -158,7 +158,6 @@ fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, pa
             ));
         }
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM118 in a `for` loop.

@@ -1,6 +1,7 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::Line;
+
+use crate::{Diagnostic, Violation};
 
 const BIDI_UNICODE: [char; 10] = [
     '\u{202A}', //{LEFT-TO-RIGHT EMBEDDING}

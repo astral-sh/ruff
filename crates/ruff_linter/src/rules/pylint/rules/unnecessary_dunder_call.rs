@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, OperatorPrecedence, Stmt};
 use ruff_python_semantic::SemanticModel;
@@ -6,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::is_known_dunder_method;
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -202,7 +202,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
         }
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryDunderCall {
             method: attr.to_string(),
             replacement: title,
@@ -237,8 +237,6 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
             call.range(),
         )));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Return `true` if this is a dunder method that is allowed to be called explicitly.

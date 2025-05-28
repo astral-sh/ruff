@@ -1235,6 +1235,14 @@ impl<'db> Type<'db> {
             ) => (self.literal_fallback_instance(db))
                 .is_some_and(|instance| instance.is_subtype_of(db, target)),
 
+            // Function-like callables are subtypes of `FunctionType`
+            (Type::Callable(callable), Type::NominalInstance(target))
+                if callable.is_function_like(db)
+                    && target.class.is_known(db, KnownClass::FunctionType) =>
+            {
+                true
+            }
+
             (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
                 self_function_literal
                     .into_callable_type(db)
@@ -2747,6 +2755,26 @@ impl<'db> Type<'db> {
             instance.display(db),
             owner.display(db)
         );
+        match self {
+            Type::Callable(callable) if callable.is_function_like(db) => {
+                // For "function-like" callables, model the the behavior of `FunctionType.__get__`.
+                //
+                // It is a shortcut to model this in `try_call_dunder_get`. If we want to be really precise,
+                // we should instead return a new method-wrapper type variant for the synthesized `__get__`
+                // method of these synthesized functions. The method-wrapper would then be returned from
+                // `find_name_in_mro` when called on function-like `Callable`s. This would allow us to
+                // correctly model the behavior of *explicit* `SomeDataclass.__init__.__get__` calls.
+                return if instance.is_none(db) {
+                    Some((self, AttributeKind::NormalOrNonDataDescriptor))
+                } else {
+                    Some((
+                        callable.bind_self(db),
+                        AttributeKind::NormalOrNonDataDescriptor,
+                    ))
+                };
+            }
+            _ => {}
+        }
 
         let descr_get = self.class_member(db, "__get__".into()).symbol;
 
@@ -3080,6 +3108,11 @@ impl<'db> Type<'db> {
             Type::Callable(_) | Type::DataclassTransformer(_) if name_str == "__call__" => {
                 Symbol::bound(self).into()
             }
+
+            Type::Callable(callable) if callable.is_function_like(db) => KnownClass::FunctionType
+                .to_instance(db)
+                .member_lookup_with_policy(db, name, policy),
+
             Type::Callable(_) | Type::DataclassTransformer(_) => KnownClass::Object
                 .to_instance(db)
                 .member_lookup_with_policy(db, name, policy),
@@ -5128,6 +5161,9 @@ impl<'db> Type<'db> {
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType.to_class_literal(db),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType.to_class_literal(db),
             Type::DataclassDecorator(_) => KnownClass::FunctionType.to_class_literal(db),
+            Type::Callable(callable) if callable.is_function_like(db) => {
+                KnownClass::FunctionType.to_class_literal(db)
+            }
             Type::Callable(_) | Type::DataclassTransformer(_) => KnownClass::Type.to_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
@@ -6922,7 +6958,11 @@ impl<'db> FunctionType<'db> {
 
     /// Convert the `FunctionType` into a [`Type::Callable`].
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::new(db, self.signature(db).overloads.clone()))
+        Type::Callable(CallableType::new(
+            db,
+            self.signature(db).overloads.clone(),
+            false,
+        ))
     }
 
     /// Convert the `FunctionType` into a [`Type::BoundMethod`].
@@ -7546,6 +7586,7 @@ impl<'db> BoundMethodType<'db> {
                     .iter()
                     .map(signatures::Signature::bind_self),
             ),
+            false,
         ))
     }
 
@@ -7610,17 +7651,45 @@ impl<'db> BoundMethodType<'db> {
 pub struct CallableType<'db> {
     #[returns(ref)]
     signatures: CallableSignature<'db>,
+
+    /// We use `CallableType` to represent function-like objects, like the synthesized methods
+    /// of dataclasses or NamedTuples. These callables act like real functions when accessed
+    /// as attributes on instances, i.e. they bind `self`.
+    is_function_like: bool,
 }
 
 impl<'db> CallableType<'db> {
     /// Create a callable type with a single non-overloaded signature.
     pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
-        Type::Callable(CallableType::new(db, CallableSignature::single(signature)))
+        Type::Callable(CallableType::new(
+            db,
+            CallableSignature::single(signature),
+            false,
+        ))
+    }
+
+    /// Create a non-overloaded, function-like callable type with a single signature.
+    ///
+    /// A function-like callable will bind `self` when accessed as an attribute on an instance.
+    pub(crate) fn function_like(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
+        Type::Callable(CallableType::new(
+            db,
+            CallableSignature::single(signature),
+            true,
+        ))
     }
 
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
     pub(crate) fn unknown(db: &'db dyn Db) -> Type<'db> {
         Self::single(db, Signature::unknown())
+    }
+
+    pub(crate) fn bind_self(self, db: &'db dyn Db) -> Type<'db> {
+        Type::Callable(CallableType::new(
+            db,
+            self.signatures(db).bind_self(),
+            false,
+        ))
     }
 
     /// Create a callable type which represents a fully-static "bottom" callable.
@@ -7636,11 +7705,19 @@ impl<'db> CallableType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     fn normalized(self, db: &'db dyn Db) -> Self {
-        CallableType::new(db, self.signatures(db).normalized(db))
+        CallableType::new(
+            db,
+            self.signatures(db).normalized(db),
+            self.is_function_like(db),
+        )
     }
 
     fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
-        CallableType::new(db, self.signatures(db).apply_type_mapping(db, type_mapping))
+        CallableType::new(
+            db,
+            self.signatures(db).apply_type_mapping(db, type_mapping),
+            self.is_function_like(db),
+        )
     }
 
     fn find_legacy_typevars(
@@ -7662,36 +7739,51 @@ impl<'db> CallableType<'db> {
     ///
     /// See [`Type::is_subtype_of`] for more details.
     fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self.signatures(db).is_subtype_of(db, other.signatures(db))
+        let self_is_function_like = self.is_function_like(db);
+        let other_is_function_like = other.is_function_like(db);
+        (self_is_function_like || !other_is_function_like)
+            && self.signatures(db).is_subtype_of(db, other.signatures(db))
     }
 
     /// Check whether this callable type is assignable to another callable type.
     ///
     /// See [`Type::is_assignable_to`] for more details.
     fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.signatures(db)
-            .is_assignable_to(db, other.signatures(db))
+        let self_is_function_like = self.is_function_like(db);
+        let other_is_function_like = other.is_function_like(db);
+        (self_is_function_like || !other_is_function_like)
+            && self
+                .signatures(db)
+                .is_assignable_to(db, other.signatures(db))
     }
 
     /// Check whether this callable type is equivalent to another callable type.
     ///
     /// See [`Type::is_equivalent_to`] for more details.
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.signatures(db)
-            .is_equivalent_to(db, other.signatures(db))
+        self.is_function_like(db) == other.is_function_like(db)
+            && self
+                .signatures(db)
+                .is_equivalent_to(db, other.signatures(db))
     }
 
     /// Check whether this callable type is gradual equivalent to another callable type.
     ///
     /// See [`Type::is_gradual_equivalent_to`] for more details.
     fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.signatures(db)
-            .is_gradual_equivalent_to(db, other.signatures(db))
+        self.is_function_like(db) == other.is_function_like(db)
+            && self
+                .signatures(db)
+                .is_gradual_equivalent_to(db, other.signatures(db))
     }
 
     /// See [`Type::replace_self_reference`].
     fn replace_self_reference(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
-        CallableType::new(db, self.signatures(db).replace_self_reference(db, class))
+        CallableType::new(
+            db,
+            self.signatures(db).replace_self_reference(db, class),
+            self.is_function_like(db),
+        )
     }
 }
 

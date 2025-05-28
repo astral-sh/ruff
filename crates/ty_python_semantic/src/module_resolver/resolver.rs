@@ -14,7 +14,9 @@ use ruff_python_ast::PythonVersion;
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versions};
-use crate::site_packages::{PythonEnvironment, SitePackagesDiscoveryError, SysPrefixPathOrigin};
+use crate::site_packages::{
+    PythonEnvironment, SitePackagesDiscoveryError, SitePackagesPaths, SysPrefixPathOrigin,
+};
 use crate::{Program, PythonPath, SearchPathSettings};
 
 use super::module::{Module, ModuleKind};
@@ -289,7 +291,7 @@ impl SearchPaths {
                             virtual_env_path,
                             error
                         );
-                        vec![]
+                        SitePackagesPaths::default()
                     };
 
                     match PythonEnvironment::new(
@@ -304,7 +306,7 @@ impl SearchPaths {
                     }
                 } else {
                     tracing::debug!("No virtual environment found");
-                    vec![]
+                    SitePackagesPaths::default()
                 }
             }
 

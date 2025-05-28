@@ -1,6 +1,5 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -12,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `enumerate` that discard either the index or the value
@@ -124,7 +124,7 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) 
             // Both the index and the value are used.
         }
         (true, false) => {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 UnnecessaryEnumerate {
                     subset: EnumerateSubset::Values,
                 },
@@ -143,8 +143,6 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) 
                 stmt_for.target.range(),
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
-
-            checker.report_diagnostic(diagnostic);
         }
         (false, true) => {
             // Ensure the sequence object works with `len`. If it doesn't, the
@@ -167,7 +165,7 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) 
             }
 
             // The value is unused, so replace with `for index in range(len(sequence))`.
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 UnnecessaryEnumerate {
                     subset: EnumerateSubset::Indices,
                 },
@@ -205,7 +203,6 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) 
                     diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
                 }
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

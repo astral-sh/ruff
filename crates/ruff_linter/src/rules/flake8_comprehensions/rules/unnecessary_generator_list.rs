@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::ExprGenerator;
@@ -8,6 +7,7 @@ use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use super::helpers;
 
@@ -94,22 +94,23 @@ pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCall
     if let [generator] = generators.as_slice() {
         if generator.ifs.is_empty() && !generator.is_async {
             if ComparableExpr::from(elt) == ComparableExpr::from(&generator.target) {
-                let diagnostic = Diagnostic::new(
-                    UnnecessaryGeneratorList {
-                        short_circuit: true,
-                    },
-                    call.range(),
-                );
                 let iterator = format!("list({})", checker.locator().slice(generator.iter.range()));
                 let fix = Fix::unsafe_edit(Edit::range_replacement(iterator, call.range()));
-                checker.report_diagnostic(diagnostic.with_fix(fix));
+                checker
+                    .report_diagnostic(
+                        UnnecessaryGeneratorList {
+                            short_circuit: true,
+                        },
+                        call.range(),
+                    )
+                    .set_fix(fix);
                 return;
             }
         }
     }
 
     // Convert `list(f(x) for x in y)` to `[f(x) for x in y]`.
-    let diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryGeneratorList {
             short_circuit: false,
         },
@@ -158,5 +159,5 @@ pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCall
             Fix::unsafe_edits(call_start, [call_end])
         }
     };
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    diagnostic.set_fix(fix);
 }

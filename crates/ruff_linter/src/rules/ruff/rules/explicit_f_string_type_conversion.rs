@@ -1,6 +1,5 @@
 use anyhow::{Result, bail};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_codegen::Stylist;
@@ -12,6 +11,7 @@ use crate::cst::matchers::{
     match_call_mut, match_formatted_string, match_formatted_string_expression, match_name,
     transform_expression,
 };
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `str()`, `repr()`, and `ascii()` as explicit type
@@ -108,11 +108,11 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(ExplicitFStringTypeConversion, expression.range());
+        let mut diagnostic =
+            checker.report_diagnostic(ExplicitFStringTypeConversion, expression.range());
         diagnostic.try_set_fix(|| {
             convert_call_to_conversion_flag(f_string, index, checker.locator(), checker.stylist())
         });
-        checker.report_diagnostic(diagnostic);
     }
 }
 

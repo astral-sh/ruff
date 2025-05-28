@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
@@ -12,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `if` statements that can be replaced with `dict.get` calls.
@@ -216,7 +216,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         IfElseBlockInsteadOfDictGet {
             contents: contents.clone(),
         },
@@ -231,7 +231,6 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
             stmt_if.range(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM401
@@ -305,7 +304,7 @@ pub(crate) fn if_exp_instead_of_dict_get(
 
     let contents = checker.generator().expr(&fixed_node.into());
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         IfElseBlockInsteadOfDictGet {
             contents: contents.clone(),
         },
@@ -320,5 +319,4 @@ pub(crate) fn if_exp_instead_of_dict_get(
             expr.range(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }

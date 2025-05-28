@@ -1,9 +1,10 @@
 use memchr::memchr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::Line;
 use ruff_text_size::{TextRange, TextSize};
+
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for form feed characters preceded by either a space or a tab.

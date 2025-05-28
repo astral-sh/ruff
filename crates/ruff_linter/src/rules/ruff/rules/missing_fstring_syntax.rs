@@ -1,7 +1,6 @@
 use memchr::memchr2_iter;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_literal::format::FormatSpec;
@@ -13,6 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::fastapi::rules::is_fastapi_route_call;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Searches for strings that look like they were meant to be f-strings, but are missing an `f` prefix.
@@ -116,9 +116,9 @@ pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLit
     }
 
     if should_be_fstring(literal, checker.locator(), semantic) {
-        let diagnostic = Diagnostic::new(MissingFStringSyntax, literal.range())
-            .with_fix(fix_fstring_syntax(literal.range()));
-        checker.report_diagnostic(diagnostic);
+        checker
+            .report_diagnostic(MissingFStringSyntax, literal.range())
+            .set_fix(fix_fstring_syntax(literal.range()));
     }
 }
 

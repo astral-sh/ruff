@@ -1,5 +1,3 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::UnqualifiedName;
@@ -7,6 +5,7 @@ use ruff_python_ast::{self as ast, Decorator, Expr, Parameters};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::visibility;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::preview::is_bool_subtype_of_annotation_enabled;
 use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
@@ -158,10 +157,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
-            BooleanTypeHintPositionalArgument,
-            parameter.identifier(),
-        ));
+        checker.report_diagnostic(BooleanTypeHintPositionalArgument, parameter.identifier());
     }
 }
 
