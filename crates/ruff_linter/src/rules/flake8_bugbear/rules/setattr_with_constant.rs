@@ -74,6 +74,11 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     if !is_identifier(name.to_str()) {
         return;
     }
+    // Ignore if the attribute name is `__debug__`. Assigning to the `__debug__` property is a
+    // `SyntaxError`.
+    if name.to_str() == "__debug__" {
+        return;
+    }
     if is_mangled_private(name.to_str()) {
         return;
     }
