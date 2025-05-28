@@ -176,6 +176,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);
             }
+            if checker.enabled(Rule::MissingMaxsplitArg) {
+                pylint::rules::missing_maxsplit_arg(checker, value, slice, expr);
+            }
             pandas_vet::rules::subscript(checker, value, expr);
         }
         Expr::Tuple(ast::ExprTuple {
