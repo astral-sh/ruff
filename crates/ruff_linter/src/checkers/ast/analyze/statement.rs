@@ -428,6 +428,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::UselessObjectInheritance) {
                 pyupgrade::rules::useless_object_inheritance(checker, class_def);
             }
+            if checker.enabled(Rule::UselessClassMetaclassType) {
+                pyupgrade::rules::useless_class_metaclass_type(checker, class_def);
+            }
             if checker.enabled(Rule::ReplaceStrEnum) {
                 if checker.target_version() >= PythonVersion::PY311 {
                     pyupgrade::rules::replace_str_enum(checker, class_def);

@@ -1,8 +1,10 @@
-use ruff_diagnostics::Violation;
+use ruff_diagnostics::AlwaysFixableViolation;
+use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::LineRanges;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 
@@ -33,10 +35,14 @@ use crate::checkers::ast::Checker;
 #[derive(ViolationMetadata)]
 pub(crate) struct ExplicitStringConcatenation;
 
-impl Violation for ExplicitStringConcatenation {
+impl AlwaysFixableViolation for ExplicitStringConcatenation {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Explicitly concatenated string should be implicitly concatenated".to_string()
+    }
+
+    fn fix_title(&self) -> String {
+        "Remove redundant '+' operator to implicitly concatenate".to_string()
     }
 }
 
@@ -50,24 +56,54 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    if let Expr::BinOp(ast::ExprBinOp {
-        left,
-        op,
-        right,
-        range,
-    }) = expr
-    {
-        if matches!(op, Operator::Add) {
-            if matches!(
-                left.as_ref(),
-                Expr::FString(_) | Expr::StringLiteral(_) | Expr::BytesLiteral(_)
-            ) && matches!(
-                right.as_ref(),
-                Expr::FString(_) | Expr::StringLiteral(_) | Expr::BytesLiteral(_)
-            ) && checker.locator().contains_line_break(*range)
+    if let Expr::BinOp(bin_op) = expr {
+        if let ast::ExprBinOp {
+            left,
+            right,
+            op: Operator::Add,
+            ..
+        } = bin_op
+        {
+            let concatable = matches!(
+                (left.as_ref(), right.as_ref()),
+                (
+                    Expr::StringLiteral(_) | Expr::FString(_),
+                    Expr::StringLiteral(_) | Expr::FString(_)
+                ) | (Expr::BytesLiteral(_), Expr::BytesLiteral(_))
+            );
+            if concatable
+                && checker
+                    .locator()
+                    .contains_line_break(TextRange::new(left.end(), right.start()))
             {
-                checker.report_diagnostic(ExplicitStringConcatenation, expr.range());
+                checker
+                    .report_diagnostic(ExplicitStringConcatenation, expr.range())
+                    .set_fix(generate_fix(checker, bin_op));
             }
         }
     }
+}
+
+fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Fix {
+    let ast::ExprBinOp { left, right, .. } = expr_bin_op;
+
+    let between_operands_range = TextRange::new(left.end(), right.start());
+    let between_operands = checker.locator().slice(between_operands_range);
+    let (before_plus, after_plus) = between_operands.split_once('+').unwrap();
+
+    let linebreak_before_operator =
+        before_plus.contains_line_break(TextRange::at(TextSize::new(0), before_plus.text_len()));
+
+    // If removing `+` from first line trim trailing spaces
+    // Preserve indentation when removing `+` from second line
+    let before_plus = if linebreak_before_operator {
+        before_plus
+    } else {
+        before_plus.trim_end_matches(is_python_whitespace)
+    };
+
+    Fix::safe_edit(Edit::range_replacement(
+        format!("{before_plus}{after_plus}"),
+        between_operands_range,
+    ))
 }
