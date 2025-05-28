@@ -655,6 +655,26 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownFunction::HasAttr) => {
+                            if let [Some(obj), Some(Type::StringLiteral(attr_name))] =
+                                overload.parameter_types()
+                            {
+                                match obj.member(db, attr_name.value(db)).symbol {
+                                    Symbol::Type(_, Boundness::Bound) => {
+                                        overload.set_return_type(Type::BooleanLiteral(true));
+                                    }
+                                    Symbol::Type(_, Boundness::PossiblyUnbound) => {
+                                        // Fall back to bool (from typeshed)
+                                    }
+                                    Symbol::Unbound => {
+                                        // Returning `Literal[False]` here seems potentially
+                                        // dangerous. The attribute could have been added
+                                        // dynamically, so fall back to `bool` here to be safe.
+                                    }
+                                }
+                            }
+                        }
+
                         Some(KnownFunction::IsProtocol) => {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(Type::BooleanLiteral(
