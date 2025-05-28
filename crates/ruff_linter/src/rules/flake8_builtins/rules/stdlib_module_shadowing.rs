@@ -5,6 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_stdlib::path::is_module_file;
 use ruff_python_stdlib::sys::is_known_standard_library;
+use ruff_source_file::SourceFile;
 use ruff_text_size::TextRange;
 
 use crate::settings::LinterSettings;
@@ -69,6 +70,7 @@ pub(crate) fn stdlib_module_shadowing(
     mut path: &Path,
     settings: &LinterSettings,
     target_version: PythonVersion,
+    source_file: &SourceFile,
 ) -> Option<OldDiagnostic> {
     if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file) {
         return None;
@@ -112,6 +114,7 @@ pub(crate) fn stdlib_module_shadowing(
             name: module_name.to_string(),
         },
         TextRange::default(),
+        source_file,
     ))
 }
 

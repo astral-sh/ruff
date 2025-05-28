@@ -2,7 +2,7 @@ use ruff_text_size::{TextLen, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::leading_indentation;
-use ruff_source_file::Line;
+use ruff_source_file::{Line, SourceFile};
 
 use crate::{OldDiagnostic, Violation};
 
@@ -37,13 +37,17 @@ impl Violation for MixedSpacesAndTabs {
 }
 
 /// E101
-pub(crate) fn mixed_spaces_and_tabs(line: &Line) -> Option<OldDiagnostic> {
+pub(crate) fn mixed_spaces_and_tabs(
+    line: &Line,
+    source_file: &SourceFile,
+) -> Option<OldDiagnostic> {
     let indent = leading_indentation(line.as_str());
 
     if indent.contains(' ') && indent.contains('\t') {
         Some(OldDiagnostic::new(
             MixedSpacesAndTabs,
             TextRange::at(line.start(), indent.text_len()),
+            source_file,
         ))
     } else {
         None

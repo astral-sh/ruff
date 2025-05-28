@@ -4,6 +4,7 @@ use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_notebook::CellOffsets;
 use ruff_python_parser::{Token, TokenKind, Tokens};
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::{AlwaysFixableViolation, Edit, Fix, OldDiagnostic};
@@ -62,12 +63,17 @@ pub(crate) fn too_many_newlines_at_end_of_file(
     diagnostics: &mut Vec<OldDiagnostic>,
     tokens: &Tokens,
     cell_offsets: Option<&CellOffsets>,
+    source_file: &SourceFile,
 ) {
     let mut tokens_iter = tokens.iter().rev().peekable();
 
     if let Some(cell_offsets) = cell_offsets {
-        diagnostics.extend(notebook_newline_diagnostics(tokens_iter, cell_offsets));
-    } else if let Some(diagnostic) = newline_diagnostic(&mut tokens_iter, false) {
+        diagnostics.extend(notebook_newline_diagnostics(
+            tokens_iter,
+            cell_offsets,
+            source_file,
+        ));
+    } else if let Some(diagnostic) = newline_diagnostic(&mut tokens_iter, false, source_file) {
         diagnostics.push(diagnostic);
     }
 }
@@ -76,6 +82,7 @@ pub(crate) fn too_many_newlines_at_end_of_file(
 fn notebook_newline_diagnostics<'a>(
     mut tokens_iter: Peekable<impl Iterator<Item = &'a Token>>,
     cell_offsets: &CellOffsets,
+    source_file: &SourceFile,
 ) -> Vec<OldDiagnostic> {
     let mut results = Vec::new();
     let offset_iter = cell_offsets.iter().rev();
@@ -88,7 +95,7 @@ fn notebook_newline_diagnostics<'a>(
             .peeking_take_while(|tok| tok.end() >= offset)
             .for_each(drop);
 
-        let Some(diagnostic) = newline_diagnostic(&mut tokens_iter, true) else {
+        let Some(diagnostic) = newline_diagnostic(&mut tokens_iter, true, source_file) else {
             continue;
         };
 
@@ -101,6 +108,7 @@ fn notebook_newline_diagnostics<'a>(
 fn newline_diagnostic<'a>(
     tokens_iter: &mut Peekable<impl Iterator<Item = &'a Token>>,
     in_notebook: bool,
+    source_file: &SourceFile,
 ) -> Option<OldDiagnostic> {
     let mut num_trailing_newlines: u32 = 0;
     let mut newline_range_start: Option<TextSize> = None;
@@ -143,6 +151,7 @@ fn newline_diagnostic<'a>(
                 in_notebook,
             },
             diagnostic_range,
+            source_file,
         )
         .with_fix(Fix::safe_edit(Edit::range_deletion(diagnostic_range))),
     )

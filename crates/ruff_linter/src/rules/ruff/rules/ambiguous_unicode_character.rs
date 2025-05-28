@@ -4,6 +4,7 @@ use bitflags::bitflags;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, StringLike};
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -180,10 +181,11 @@ pub(crate) fn ambiguous_unicode_character_comment(
     locator: &Locator,
     range: TextRange,
     settings: &LinterSettings,
+    source_file: &SourceFile,
 ) {
     let text = locator.slice(range);
     for candidate in ambiguous_unicode_character(text, range, settings) {
-        diagnostics.extend(candidate.into_diagnostic(Context::Comment, settings));
+        diagnostics.extend(candidate.into_diagnostic(Context::Comment, settings, source_file));
     }
 }
 
@@ -342,7 +344,12 @@ impl Candidate {
         }
     }
 
-    fn into_diagnostic(self, context: Context, settings: &LinterSettings) -> Option<OldDiagnostic> {
+    fn into_diagnostic(
+        self,
+        context: Context,
+        settings: &LinterSettings,
+        source_file: &SourceFile,
+    ) -> Option<OldDiagnostic> {
         if !settings.allowed_confusables.contains(&self.confusable) {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());
             let diagnostic = match context {
@@ -352,6 +359,7 @@ impl Candidate {
                         representant: self.representant,
                     },
                     char_range,
+                    source_file,
                 ),
                 Context::Docstring => OldDiagnostic::new(
                     AmbiguousUnicodeCharacterDocstring {
@@ -359,6 +367,7 @@ impl Candidate {
                         representant: self.representant,
                     },
                     char_range,
+                    source_file,
                 ),
                 Context::Comment => OldDiagnostic::new(
                     AmbiguousUnicodeCharacterComment {
@@ -366,6 +375,7 @@ impl Candidate {
                         representant: self.representant,
                     },
                     char_range,
+                    source_file,
                 ),
             };
             if settings.rules.enabled(diagnostic.rule()) {

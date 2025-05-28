@@ -6,6 +6,7 @@ use regex::Regex;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
+use ruff_source_file::SourceFile;
 use ruff_text_size::TextSize;
 
 use crate::Locator;
@@ -55,6 +56,7 @@ pub(crate) fn blanket_type_ignore(
     diagnostics: &mut Vec<OldDiagnostic>,
     comment_ranges: &CommentRanges,
     locator: &Locator,
+    source_file: &SourceFile,
 ) {
     for range in comment_ranges {
         let line = locator.slice(range);
@@ -95,6 +97,7 @@ pub(crate) fn blanket_type_ignore(
                     diagnostics.push(OldDiagnostic::new(
                         BlanketTypeIgnore,
                         range.add_start(TextSize::try_from(start).unwrap()),
+                        source_file,
                     ));
                 }
             }

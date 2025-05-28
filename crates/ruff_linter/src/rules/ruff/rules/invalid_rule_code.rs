@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -52,6 +53,7 @@ pub(crate) fn invalid_noqa_code(
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
     external: &[String],
+    source_file: &SourceFile,
 ) {
     for line in noqa_directives.lines() {
         let Directive::Codes(directive) = &line.directive else {
@@ -69,10 +71,14 @@ pub(crate) fn invalid_noqa_code(
             .partition(|&code| code_is_valid(code, external));
 
         if valid_codes.is_empty() {
-            diagnostics.push(all_codes_invalid_diagnostic(directive, invalid_codes));
+            diagnostics.push(all_codes_invalid_diagnostic(
+                directive,
+                invalid_codes,
+                source_file,
+            ));
         } else {
             diagnostics.extend(invalid_codes.into_iter().map(|invalid_code| {
-                some_codes_are_invalid_diagnostic(directive, invalid_code, locator)
+                some_codes_are_invalid_diagnostic(directive, invalid_code, locator, source_file)
             }));
         }
     }
@@ -86,6 +92,7 @@ fn code_is_valid(code: &Code, external: &[String]) -> bool {
 fn all_codes_invalid_diagnostic(
     directive: &Codes<'_>,
     invalid_codes: Vec<&Code<'_>>,
+    source_file: &SourceFile,
 ) -> OldDiagnostic {
     OldDiagnostic::new(
         InvalidRuleCode {
@@ -96,6 +103,7 @@ fn all_codes_invalid_diagnostic(
                 .join(", "),
         },
         directive.range(),
+        source_file,
     )
     .with_fix(Fix::safe_edit(Edit::range_deletion(directive.range())))
 }
@@ -104,12 +112,14 @@ fn some_codes_are_invalid_diagnostic(
     codes: &Codes,
     invalid_code: &Code,
     locator: &Locator,
+    source_file: &SourceFile,
 ) -> OldDiagnostic {
     let diagnostic = OldDiagnostic::new(
         InvalidRuleCode {
             rule_code: invalid_code.to_string(),
         },
         invalid_code.range(),
+        source_file,
     );
     diagnostic.with_fix(Fix::safe_edit(remove_invalid_noqa(
         codes,

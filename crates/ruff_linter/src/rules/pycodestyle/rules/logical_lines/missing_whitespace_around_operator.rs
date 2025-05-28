@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
@@ -145,6 +146,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundModuloOperator {
 pub(crate) fn missing_whitespace_around_operator(
     line: &LogicalLine,
     context: &mut LogicalLinesContext,
+    source_file: &SourceFile,
 ) {
     let mut definition_state = DefinitionState::from_tokens(line.tokens());
     let mut tokens = line.tokens().iter().peekable();
@@ -253,29 +255,28 @@ pub(crate) fn missing_whitespace_around_operator(
                 // Operator with trailing but no leading space, enforce consistent spacing.
                 (false, true) => {
                     context.push_diagnostic(
-                        diagnostic_kind_for_operator(kind, token.range()).with_fix(Fix::safe_edit(
-                            Edit::insertion(" ".to_string(), token.start()),
-                        )),
+                        diagnostic_kind_for_operator(kind, token.range(), source_file).with_fix(
+                            Fix::safe_edit(Edit::insertion(" ".to_string(), token.start())),
+                        ),
                     );
                 }
                 // Operator with leading but no trailing space, enforce consistent spacing.
                 (true, false) => {
                     context.push_diagnostic(
-                        diagnostic_kind_for_operator(kind, token.range()).with_fix(Fix::safe_edit(
-                            Edit::insertion(" ".to_string(), token.end()),
-                        )),
+                        diagnostic_kind_for_operator(kind, token.range(), source_file).with_fix(
+                            Fix::safe_edit(Edit::insertion(" ".to_string(), token.end())),
+                        ),
                     );
                 }
                 // Operator with no space, require spaces if it is required by the operator.
                 (false, false) => {
                     if needs_space == NeedsSpace::Yes {
                         context.push_diagnostic(
-                            diagnostic_kind_for_operator(kind, token.range()).with_fix(
-                                Fix::safe_edits(
+                            diagnostic_kind_for_operator(kind, token.range(), source_file)
+                                .with_fix(Fix::safe_edits(
                                     Edit::insertion(" ".to_string(), token.start()),
                                     [Edit::insertion(" ".to_string(), token.end())],
-                                ),
-                            ),
+                                )),
                         );
                     }
                 }
@@ -314,15 +315,27 @@ impl From<bool> for NeedsSpace {
     }
 }
 
-fn diagnostic_kind_for_operator(operator: TokenKind, range: TextRange) -> OldDiagnostic {
+fn diagnostic_kind_for_operator(
+    operator: TokenKind,
+    range: TextRange,
+    source_file: &SourceFile,
+) -> OldDiagnostic {
     if operator == TokenKind::Percent {
-        OldDiagnostic::new(MissingWhitespaceAroundModuloOperator, range)
+        OldDiagnostic::new(MissingWhitespaceAroundModuloOperator, range, source_file)
     } else if operator.is_bitwise_or_shift() {
-        OldDiagnostic::new(MissingWhitespaceAroundBitwiseOrShiftOperator, range)
+        OldDiagnostic::new(
+            MissingWhitespaceAroundBitwiseOrShiftOperator,
+            range,
+            source_file,
+        )
     } else if operator.is_arithmetic() {
-        OldDiagnostic::new(MissingWhitespaceAroundArithmeticOperator, range)
+        OldDiagnostic::new(
+            MissingWhitespaceAroundArithmeticOperator,
+            range,
+            source_file,
+        )
     } else {
-        OldDiagnostic::new(MissingWhitespaceAroundOperator, range)
+        OldDiagnostic::new(MissingWhitespaceAroundOperator, range, source_file)
     }
 }
 

@@ -1,7 +1,7 @@
 use memchr::memchr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_source_file::Line;
+use ruff_source_file::{Line, SourceFile};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::{OldDiagnostic, Violation};
@@ -49,7 +49,7 @@ const SPACE: u8 = b' ';
 const TAB: u8 = b'\t';
 
 /// RUF054
-pub(crate) fn indented_form_feed(line: &Line) -> Option<OldDiagnostic> {
+pub(crate) fn indented_form_feed(line: &Line, source_file: &SourceFile) -> Option<OldDiagnostic> {
     let index_relative_to_line = memchr(FORM_FEED, line.as_bytes())?;
 
     if index_relative_to_line == 0 {
@@ -68,5 +68,5 @@ pub(crate) fn indented_form_feed(line: &Line) -> Option<OldDiagnostic> {
     let absolute_index = line.start() + TextSize::new(relative_index);
     let range = TextRange::at(absolute_index, 1.into());
 
-    Some(OldDiagnostic::new(IndentedFormFeed, range))
+    Some(OldDiagnostic::new(IndentedFormFeed, range, source_file))
 }

@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
 use crate::noqa::{Codes, Directive, FileNoqaDirectives, NoqaDirectives};
@@ -46,13 +47,14 @@ impl AlwaysFixableViolation for RedirectedNOQA {
 pub(crate) fn redirected_noqa(
     diagnostics: &mut Vec<OldDiagnostic>,
     noqa_directives: &NoqaDirectives,
+    source_file: &SourceFile,
 ) {
     for line in noqa_directives.lines() {
         let Directive::Codes(directive) = &line.directive else {
             continue;
         };
 
-        build_diagnostics(diagnostics, directive);
+        build_diagnostics(diagnostics, directive, source_file);
     }
 }
 
@@ -60,18 +62,23 @@ pub(crate) fn redirected_noqa(
 pub(crate) fn redirected_file_noqa(
     diagnostics: &mut Vec<OldDiagnostic>,
     noqa_directives: &FileNoqaDirectives,
+    source_file: &SourceFile,
 ) {
     for line in noqa_directives.lines() {
         let Directive::Codes(codes) = &line.parsed_file_exemption else {
             continue;
         };
 
-        build_diagnostics(diagnostics, codes);
+        build_diagnostics(diagnostics, codes, source_file);
     }
 }
 
 /// Convert a sequence of [Codes] into [Diagnostic]s and append them to `diagnostics`.
-fn build_diagnostics(diagnostics: &mut Vec<OldDiagnostic>, codes: &Codes<'_>) {
+fn build_diagnostics(
+    diagnostics: &mut Vec<OldDiagnostic>,
+    codes: &Codes<'_>,
+    source_file: &SourceFile,
+) {
     for code in codes.iter() {
         if let Some(redirected) = get_redirect_target(code.as_str()) {
             let mut diagnostic = OldDiagnostic::new(
@@ -80,6 +87,7 @@ fn build_diagnostics(diagnostics: &mut Vec<OldDiagnostic>, codes: &Codes<'_>) {
                     target: redirected.to_string(),
                 },
                 code.range(),
+                source_file,
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 redirected.to_string(),

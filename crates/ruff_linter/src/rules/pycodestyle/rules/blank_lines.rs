@@ -13,6 +13,7 @@ use ruff_python_parser::TokenIterWithContext;
 use ruff_python_parser::TokenKind;
 use ruff_python_parser::Tokens;
 use ruff_python_trivia::PythonWhitespace;
+use ruff_source_file::SourceFile;
 use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
@@ -699,6 +700,7 @@ pub(crate) struct BlankLinesChecker<'a> {
     lines_between_types: usize,
     source_type: PySourceType,
     cell_offsets: Option<&'a CellOffsets>,
+    source_file: &'a SourceFile,
 }
 
 impl<'a> BlankLinesChecker<'a> {
@@ -708,6 +710,7 @@ impl<'a> BlankLinesChecker<'a> {
         settings: &crate::settings::LinterSettings,
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
+        source_file: &'a SourceFile,
     ) -> BlankLinesChecker<'a> {
         BlankLinesChecker {
             stylist,
@@ -717,6 +720,7 @@ impl<'a> BlankLinesChecker<'a> {
             lines_between_types: settings.isort.lines_between_types,
             source_type,
             cell_offsets,
+            source_file,
         }
     }
 
@@ -842,8 +846,11 @@ impl<'a> BlankLinesChecker<'a> {
             && !self.source_type.is_stub()
         {
             // E301
-            let mut diagnostic =
-                OldDiagnostic::new(BlankLineBetweenMethods, line.first_token_range);
+            let mut diagnostic = OldDiagnostic::new(
+                BlankLineBetweenMethods,
+                line.first_token_range,
+                self.source_file,
+            );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 self.stylist.line_ending().to_string(),
                 self.locator.line_start(state.last_non_comment_line_end),
@@ -903,6 +910,7 @@ impl<'a> BlankLinesChecker<'a> {
                     expected_blank_lines: expected_blank_lines_before_definition,
                 },
                 line.first_token_range,
+                self.source_file,
             );
 
             if let Some(blank_lines_range) = line.blank_lines.range() {
@@ -946,6 +954,7 @@ impl<'a> BlankLinesChecker<'a> {
                     actual_blank_lines: line.blank_lines.count(),
                 },
                 line.first_token_range,
+                self.source_file,
             );
 
             if let Some(blank_lines_range) = line.blank_lines.range() {
@@ -972,6 +981,7 @@ impl<'a> BlankLinesChecker<'a> {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                 },
                 line.first_token_range,
+                self.source_file,
             );
 
             // Get all the lines between the last decorator line (included) and the current line (included).
@@ -1019,6 +1029,7 @@ impl<'a> BlankLinesChecker<'a> {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                 },
                 line.first_token_range,
+                self.source_file,
             );
 
             if let Some(blank_lines_range) = line.blank_lines.range() {
@@ -1057,8 +1068,11 @@ impl<'a> BlankLinesChecker<'a> {
             && !self.source_type.is_stub()
         {
             // E306
-            let mut diagnostic =
-                OldDiagnostic::new(BlankLinesBeforeNestedDefinition, line.first_token_range);
+            let mut diagnostic = OldDiagnostic::new(
+                BlankLinesBeforeNestedDefinition,
+                line.first_token_range,
+                self.source_file,
+            );
 
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 self.stylist.line_ending().to_string(),

@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_source_file::SourceFile;
 use ruff_text_size::TextRange;
 
 #[cfg(target_family = "unix")]
@@ -48,7 +49,11 @@ impl Violation for ShebangNotExecutable {
 
 /// EXE001
 #[cfg(target_family = "unix")]
-pub(crate) fn shebang_not_executable(filepath: &Path, range: TextRange) -> Option<OldDiagnostic> {
+pub(crate) fn shebang_not_executable(
+    filepath: &Path,
+    range: TextRange,
+    source_file: &SourceFile,
+) -> Option<OldDiagnostic> {
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
     if is_wsl::is_wsl() {
@@ -56,13 +61,17 @@ pub(crate) fn shebang_not_executable(filepath: &Path, range: TextRange) -> Optio
     }
 
     if let Ok(false) = is_executable(filepath) {
-        return Some(OldDiagnostic::new(ShebangNotExecutable, range));
+        return Some(OldDiagnostic::new(ShebangNotExecutable, range, source_file));
     }
 
     None
 }
 
 #[cfg(not(target_family = "unix"))]
-pub(crate) fn shebang_not_executable(_filepath: &Path, _range: TextRange) -> Option<OldDiagnostic> {
+pub(crate) fn shebang_not_executable(
+    _filepath: &Path,
+    _range: TextRange,
+    _source_file: &SourceFile,
+) -> Option<OldDiagnostic> {
     None
 }

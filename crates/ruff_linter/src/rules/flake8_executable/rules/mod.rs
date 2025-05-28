@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use ruff_python_trivia::CommentRanges;
+use ruff_source_file::SourceFile;
 pub(crate) use shebang_leading_whitespace::*;
 pub(crate) use shebang_missing_executable_file::*;
 pub(crate) use shebang_missing_python::*;
@@ -25,6 +26,7 @@ pub(crate) fn from_tokens(
     locator: &Locator,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
+    source_file: &SourceFile,
 ) {
     let mut has_any_shebang = false;
     for range in comment_ranges {
@@ -32,21 +34,21 @@ pub(crate) fn from_tokens(
         if let Some(shebang) = ShebangDirective::try_extract(comment) {
             has_any_shebang = true;
 
-            if let Some(diagnostic) = shebang_missing_python(range, &shebang) {
+            if let Some(diagnostic) = shebang_missing_python(range, &shebang, source_file) {
                 diagnostics.push(diagnostic);
             }
 
             if settings.rules.enabled(Rule::ShebangNotExecutable) {
-                if let Some(diagnostic) = shebang_not_executable(path, range) {
+                if let Some(diagnostic) = shebang_not_executable(path, range, source_file) {
                     diagnostics.push(diagnostic);
                 }
             }
 
-            if let Some(diagnostic) = shebang_leading_whitespace(range, locator) {
+            if let Some(diagnostic) = shebang_leading_whitespace(range, locator, source_file) {
                 diagnostics.push(diagnostic);
             }
 
-            if let Some(diagnostic) = shebang_not_first_line(range, locator) {
+            if let Some(diagnostic) = shebang_not_first_line(range, locator, source_file) {
                 diagnostics.push(diagnostic);
             }
         }
@@ -54,7 +56,7 @@ pub(crate) fn from_tokens(
 
     if !has_any_shebang {
         if settings.rules.enabled(Rule::ShebangMissingExecutableFile) {
-            if let Some(diagnostic) = shebang_missing_executable_file(path) {
+            if let Some(diagnostic) = shebang_missing_executable_file(path, source_file) {
                 diagnostics.push(diagnostic);
             }
         }

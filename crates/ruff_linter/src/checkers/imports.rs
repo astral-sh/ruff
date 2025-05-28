@@ -6,6 +6,7 @@ use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Parsed;
+use ruff_source_file::SourceFile;
 
 use crate::Locator;
 use crate::OldDiagnostic;
@@ -28,6 +29,7 @@ pub(crate) fn check_imports(
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
     target_version: PythonVersion,
+    source_file: &SourceFile,
 ) -> Vec<OldDiagnostic> {
     // Extract all import blocks from the AST.
     let tracker = {
@@ -54,6 +56,7 @@ pub(crate) fn check_imports(
                     source_type,
                     parsed.tokens(),
                     target_version,
+                    source_file,
                 ) {
                     diagnostics.push(diagnostic);
                 }
@@ -67,6 +70,7 @@ pub(crate) fn check_imports(
             stylist,
             settings,
             source_type,
+            source_file,
         ));
     }
 

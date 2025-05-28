@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_index::Indexer;
 use ruff_python_parser::TokenKind;
-use ruff_source_file::LineRanges;
+use ruff_source_file::{LineRanges, SourceFile};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
@@ -49,6 +49,7 @@ pub(crate) fn redundant_backslash(
     locator: &Locator,
     indexer: &Indexer,
     context: &mut LogicalLinesContext,
+    source_file: &SourceFile,
 ) {
     let mut parens = 0;
     let continuation_lines = indexer.continuation_line_starts();
@@ -78,6 +79,7 @@ pub(crate) fn redundant_backslash(
                         let mut diagnostic = OldDiagnostic::new(
                             RedundantBackslash,
                             TextRange::new(backslash_start, backslash_end),
+                            source_file,
                         );
                         diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                             backslash_start,

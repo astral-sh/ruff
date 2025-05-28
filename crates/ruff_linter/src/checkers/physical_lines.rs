@@ -2,6 +2,7 @@
 
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_source_file::SourceFile;
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::TextSize;
 
@@ -23,6 +24,7 @@ pub(crate) fn check_physical_lines(
     indexer: &Indexer,
     doc_lines: &[TextSize],
     settings: &LinterSettings,
+    source_file: &SourceFile,
 ) -> Vec<OldDiagnostic> {
     let mut diagnostics: Vec<OldDiagnostic> = vec![];
 
@@ -45,49 +47,53 @@ pub(crate) fn check_physical_lines(
             .is_some()
         {
             if enforce_doc_line_too_long {
-                if let Some(diagnostic) = doc_line_too_long(&line, comment_ranges, settings) {
+                if let Some(diagnostic) =
+                    doc_line_too_long(&line, comment_ranges, settings, source_file)
+                {
                     diagnostics.push(diagnostic);
                 }
             }
         }
 
         if enforce_mixed_spaces_and_tabs {
-            if let Some(diagnostic) = mixed_spaces_and_tabs(&line) {
+            if let Some(diagnostic) = mixed_spaces_and_tabs(&line, source_file) {
                 diagnostics.push(diagnostic);
             }
         }
 
         if enforce_line_too_long {
-            if let Some(diagnostic) = line_too_long(&line, comment_ranges, settings) {
+            if let Some(diagnostic) = line_too_long(&line, comment_ranges, settings, source_file) {
                 diagnostics.push(diagnostic);
             }
         }
 
         if enforce_bidirectional_unicode {
-            diagnostics.extend(pylint::rules::bidirectional_unicode(&line));
+            diagnostics.extend(pylint::rules::bidirectional_unicode(&line, source_file));
         }
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
-            if let Some(diagnostic) = trailing_whitespace(&line, locator, indexer, settings) {
+            if let Some(diagnostic) =
+                trailing_whitespace(&line, locator, indexer, settings, source_file)
+            {
                 diagnostics.push(diagnostic);
             }
         }
 
         if settings.rules.enabled(Rule::IndentedFormFeed) {
-            if let Some(diagnostic) = indented_form_feed(&line) {
+            if let Some(diagnostic) = indented_form_feed(&line, source_file) {
                 diagnostics.push(diagnostic);
             }
         }
     }
 
     if enforce_no_newline_at_end_of_file {
-        if let Some(diagnostic) = no_newline_at_end_of_file(locator, stylist) {
+        if let Some(diagnostic) = no_newline_at_end_of_file(locator, stylist, source_file) {
             diagnostics.push(diagnostic);
         }
     }
 
     if enforce_copyright_notice {
-        if let Some(diagnostic) = missing_copyright_notice(locator, settings) {
+        if let Some(diagnostic) = missing_copyright_notice(locator, settings, source_file) {
             diagnostics.push(diagnostic);
         }
     }
@@ -100,6 +106,7 @@ mod tests {
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_parser::parse_module;
+    use ruff_source_file::SourceFileBuilder;
 
     use crate::Locator;
     use crate::line_width::LineLength;
@@ -130,6 +137,7 @@ mod tests {
                     },
                     ..LinterSettings::for_rule(Rule::LineTooLong)
                 },
+                &SourceFileBuilder::new("<filename>", line).finish(),
             )
         };
         let line_length = LineLength::try_from(8).unwrap();

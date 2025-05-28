@@ -7,7 +7,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Tokens;
 use ruff_python_trivia::{PythonWhitespace, leading_indentation, textwrap::indent};
-use ruff_source_file::{LineRanges, UniversalNewlines};
+use ruff_source_file::{LineRanges, SourceFile, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange};
 
 use super::super::block::Block;
@@ -98,6 +98,7 @@ pub(crate) fn organize_imports(
     source_type: PySourceType,
     tokens: &Tokens,
     target_version: PythonVersion,
+    source_file: &SourceFile,
 ) -> Option<OldDiagnostic> {
     let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
     let indentation = leading_indentation(indentation);
@@ -110,7 +111,7 @@ pub(crate) fn organize_imports(
         || indexer
             .followed_by_multi_statement_line(block.imports.last().unwrap(), locator.contents())
     {
-        return Some(OldDiagnostic::new(UnsortedImports, range));
+        return Some(OldDiagnostic::new(UnsortedImports, range, source_file));
     }
 
     // Extract comments. Take care to grab any inline comments from the last line.
@@ -155,7 +156,7 @@ pub(crate) fn organize_imports(
     if matches_ignoring_indentation(actual, &expected) {
         return None;
     }
-    let mut diagnostic = OldDiagnostic::new(UnsortedImports, range);
+    let mut diagnostic = OldDiagnostic::new(UnsortedImports, range, source_file);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         indent(&expected, indentation).to_string(),
         fix_range,

@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{LineRanges, UniversalNewlineIterator};
+use ruff_source_file::{LineRanges, SourceFile, UniversalNewlineIterator};
 use ruff_text_size::TextRange;
 
 use crate::Locator;
@@ -51,6 +51,7 @@ pub(crate) fn commented_out_code(
     locator: &Locator,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
+    source_file: &SourceFile,
 ) {
     let mut comments = comment_ranges.into_iter().peekable();
     // Iterate over all comments in the document.
@@ -65,7 +66,7 @@ pub(crate) fn commented_out_code(
 
         // Verify that the comment is on its own line, and that it contains code.
         if is_own_line_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
-            let mut diagnostic = OldDiagnostic::new(CommentedOutCode, range);
+            let mut diagnostic = OldDiagnostic::new(CommentedOutCode, range, source_file);
             diagnostic.set_fix(Fix::display_only_edit(Edit::range_deletion(
                 locator.full_lines_range(range),
             )));

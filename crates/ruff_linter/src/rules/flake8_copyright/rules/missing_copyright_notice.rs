@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_source_file::SourceFile;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
@@ -32,6 +33,7 @@ impl Violation for MissingCopyrightNotice {
 pub(crate) fn missing_copyright_notice(
     locator: &Locator,
     settings: &LinterSettings,
+    source_file: &SourceFile,
 ) -> Option<OldDiagnostic> {
     // Ignore files that are too small to contain a copyright notice.
     if locator.len() < settings.flake8_copyright.min_file_size {
@@ -57,5 +59,6 @@ pub(crate) fn missing_copyright_notice(
     Some(OldDiagnostic::new(
         MissingCopyrightNotice,
         TextRange::default(),
+        source_file,
     ))
 }

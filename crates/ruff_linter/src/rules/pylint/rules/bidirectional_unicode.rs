@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_source_file::Line;
+use ruff_source_file::{Line, SourceFile};
 
 use crate::{OldDiagnostic, Violation};
 
@@ -53,10 +53,14 @@ impl Violation for BidirectionalUnicode {
 }
 
 /// PLE2502
-pub(crate) fn bidirectional_unicode(line: &Line) -> Vec<OldDiagnostic> {
+pub(crate) fn bidirectional_unicode(line: &Line, source_file: &SourceFile) -> Vec<OldDiagnostic> {
     let mut diagnostics = Vec::new();
     if line.contains(BIDI_UNICODE) {
-        diagnostics.push(OldDiagnostic::new(BidirectionalUnicode, line.full_range()));
+        diagnostics.push(OldDiagnostic::new(
+            BidirectionalUnicode,
+            line.full_range(),
+            source_file,
+        ));
     }
     diagnostics
 }

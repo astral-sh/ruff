@@ -256,6 +256,7 @@ impl Violation for OverIndented {
 }
 
 /// E111, E112, E113, E114, E115, E116, E117
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn indentation(
     logical_line: &LogicalLine,
     prev_logical_line: Option<&LogicalLine>,
@@ -264,6 +265,7 @@ pub(crate) fn indentation(
     prev_indent_level: Option<usize>,
     indent_size: usize,
     range: TextRange,
+    source_file: &ruff_source_file::SourceFile,
 ) -> Vec<OldDiagnostic> {
     let mut diagnostics = vec![];
 
@@ -274,6 +276,7 @@ pub(crate) fn indentation(
                     indent_width: indent_size,
                 },
                 range,
+                source_file,
             )
         } else {
             OldDiagnostic::new(
@@ -281,6 +284,7 @@ pub(crate) fn indentation(
                     indent_width: indent_size,
                 },
                 range,
+                source_file,
             )
         });
     }
@@ -290,17 +294,17 @@ pub(crate) fn indentation(
 
     if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
         diagnostics.push(if logical_line.is_comment_only() {
-            OldDiagnostic::new(NoIndentedBlockComment, range)
+            OldDiagnostic::new(NoIndentedBlockComment, range, source_file)
         } else {
-            OldDiagnostic::new(NoIndentedBlock, range)
+            OldDiagnostic::new(NoIndentedBlock, range, source_file)
         });
     } else if !indent_expect
         && prev_indent_level.is_some_and(|prev_indent_level| indent_level > prev_indent_level)
     {
         diagnostics.push(if logical_line.is_comment_only() {
-            OldDiagnostic::new(UnexpectedIndentationComment, range)
+            OldDiagnostic::new(UnexpectedIndentationComment, range, source_file)
         } else {
-            OldDiagnostic::new(UnexpectedIndentation, range)
+            OldDiagnostic::new(UnexpectedIndentation, range, source_file)
         });
     }
     if indent_expect {
@@ -312,6 +316,7 @@ pub(crate) fn indentation(
                     is_comment: logical_line.is_comment_only(),
                 },
                 range,
+                source_file,
             ));
         }
     }

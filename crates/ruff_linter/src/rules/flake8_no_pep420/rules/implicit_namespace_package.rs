@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PySourceType;
 use ruff_python_ast::script::ScriptTag;
 use ruff_python_trivia::CommentRanges;
+use ruff_source_file::SourceFile;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
@@ -56,6 +57,7 @@ impl Violation for ImplicitNamespacePackage {
 }
 
 /// INP001
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn implicit_namespace_package(
     path: &Path,
     package: Option<PackageRoot<'_>>,
@@ -64,6 +66,7 @@ pub(crate) fn implicit_namespace_package(
     project_root: &Path,
     src: &[PathBuf],
     allow_nested_roots: bool,
+    source_file: &SourceFile,
 ) -> Option<OldDiagnostic> {
     if package.is_none()
         // Ignore non-`.py` files, which don't require an `__init__.py`.
@@ -89,6 +92,7 @@ pub(crate) fn implicit_namespace_package(
                 parent: None,
             },
             TextRange::default(),
+            source_file,
         ));
     }
 
@@ -106,6 +110,7 @@ pub(crate) fn implicit_namespace_package(
                             parent: Some(fs::relativize_path(parent)),
                         },
                         TextRange::default(),
+                        source_file,
                     ));
                 }
             }

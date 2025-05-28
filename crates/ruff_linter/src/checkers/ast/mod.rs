@@ -57,7 +57,7 @@ use ruff_python_semantic::{
 };
 use ruff_python_stdlib::builtins::{MAGIC_GLOBALS, python_builtins};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{OneIndexed, SourceRow};
+use ruff_source_file::{OneIndexed, SourceFile, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::annotation::AnnotationContext;
@@ -239,6 +239,8 @@ pub(crate) struct Checker<'a> {
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
+    /// The [`SourceFile`] corresponding to the file under analysis.
+    source_file: &'a SourceFile,
 }
 
 impl<'a> Checker<'a> {
@@ -259,6 +261,7 @@ impl<'a> Checker<'a> {
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
         target_version: TargetVersion,
+        source_file: &'a SourceFile,
     ) -> Checker<'a> {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
@@ -288,6 +291,7 @@ impl<'a> Checker<'a> {
             target_version,
             semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
+            source_file,
         }
     }
 }
@@ -391,7 +395,7 @@ impl<'a> Checker<'a> {
     ) -> DiagnosticGuard<'chk, 'a> {
         DiagnosticGuard {
             checker: self,
-            diagnostic: Some(OldDiagnostic::new(kind, range)),
+            diagnostic: Some(OldDiagnostic::new(kind, range, self.source_file)),
         }
     }
 
@@ -405,7 +409,7 @@ impl<'a> Checker<'a> {
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        let diagnostic = OldDiagnostic::new(kind, range);
+        let diagnostic = OldDiagnostic::new(kind, range, self.source_file);
         if self.enabled(diagnostic.rule()) {
             Some(DiagnosticGuard {
                 checker: self,
@@ -2897,6 +2901,7 @@ impl<'a> Checker<'a> {
                                         name: name.to_string(),
                                     },
                                     range,
+                                    self.source_file,
                                 )
                                 .with_parent(definition.start()),
                             );
@@ -2912,6 +2917,7 @@ impl<'a> Checker<'a> {
                                             name: name.to_string(),
                                         },
                                         range,
+                                        self.source_file,
                                     )
                                     .with_parent(definition.start()),
                                 );
@@ -2975,6 +2981,7 @@ pub(crate) fn check_ast(
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
     target_version: TargetVersion,
+    source_file: &SourceFile,
 ) -> (Vec<OldDiagnostic>, Vec<SemanticSyntaxError>) {
     let module_path = package
         .map(PackageRoot::path)
@@ -3015,6 +3022,7 @@ pub(crate) fn check_ast(
         cell_offsets,
         notebook_index,
         target_version,
+        source_file,
     );
     checker.bind_builtins();
 

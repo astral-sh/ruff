@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::cell::LazyCell;
-use std::ops::Deref;
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
@@ -14,7 +13,7 @@ use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions, Parsed, UnsupportedSyntaxError};
-use ruff_source_file::SourceFileBuilder;
+use ruff_source_file::{SourceFile, SourceFileBuilder};
 use ruff_text_size::Ranged;
 
 use crate::OldDiagnostic;
@@ -113,6 +112,17 @@ pub fn check_path(
     parsed: &Parsed<ModModule>,
     target_version: TargetVersion,
 ) -> Vec<Message> {
+    let source_file = LazyCell::new(|| {
+        let mut builder =
+            SourceFileBuilder::new(path.to_string_lossy().as_ref(), locator.contents());
+
+        if let Some(line_index) = locator.line_index() {
+            builder.set_line_index(line_index.clone());
+        }
+
+        builder.finish()
+    });
+
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
 
@@ -145,6 +155,7 @@ pub fn check_path(
             settings,
             source_type,
             source_kind.as_ipy_notebook().map(Notebook::cell_offsets),
+            &source_file,
         ));
     }
 
@@ -161,6 +172,7 @@ pub fn check_path(
             comment_ranges,
             settings,
             target_version.linter_version(),
+            &source_file,
         ));
     }
 
@@ -171,7 +183,12 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
         diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
-            tokens, locator, indexer, stylist, settings,
+            tokens,
+            locator,
+            indexer,
+            stylist,
+            settings,
+            &source_file,
         ));
     }
 
@@ -194,6 +211,7 @@ pub fn check_path(
             cell_offsets,
             notebook_index,
             target_version,
+            &source_file,
         );
         diagnostics.extend(new_diagnostics);
         semantic_syntax_errors.extend(new_semantic_syntax_errors);
@@ -216,6 +234,7 @@ pub fn check_path(
                     source_type,
                     cell_offsets,
                     target_version.linter_version(),
+                    &source_file,
                 );
 
                 diagnostics.extend(import_diagnostics);
@@ -239,7 +258,12 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
         diagnostics.extend(check_physical_lines(
-            locator, stylist, indexer, &doc_lines, settings,
+            locator,
+            stylist,
+            indexer,
+            &doc_lines,
+            settings,
+            &source_file,
         ));
     }
 
@@ -252,40 +276,64 @@ pub fn check_path(
             }
             let diagnostic = match test_rule {
                 Rule::StableTestRule => {
-                    test_rules::StableTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::StableTestRule::diagnostic(locator, comment_ranges, &source_file)
                 }
-                Rule::StableTestRuleSafeFix => {
-                    test_rules::StableTestRuleSafeFix::diagnostic(locator, comment_ranges)
-                }
-                Rule::StableTestRuleUnsafeFix => {
-                    test_rules::StableTestRuleUnsafeFix::diagnostic(locator, comment_ranges)
-                }
+                Rule::StableTestRuleSafeFix => test_rules::StableTestRuleSafeFix::diagnostic(
+                    locator,
+                    comment_ranges,
+                    &source_file,
+                ),
+                Rule::StableTestRuleUnsafeFix => test_rules::StableTestRuleUnsafeFix::diagnostic(
+                    locator,
+                    comment_ranges,
+                    &source_file,
+                ),
                 Rule::StableTestRuleDisplayOnlyFix => {
-                    test_rules::StableTestRuleDisplayOnlyFix::diagnostic(locator, comment_ranges)
+                    test_rules::StableTestRuleDisplayOnlyFix::diagnostic(
+                        locator,
+                        comment_ranges,
+                        &source_file,
+                    )
                 }
                 Rule::PreviewTestRule => {
-                    test_rules::PreviewTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::PreviewTestRule::diagnostic(locator, comment_ranges, &source_file)
                 }
-                Rule::DeprecatedTestRule => {
-                    test_rules::DeprecatedTestRule::diagnostic(locator, comment_ranges)
-                }
+                Rule::DeprecatedTestRule => test_rules::DeprecatedTestRule::diagnostic(
+                    locator,
+                    comment_ranges,
+                    &source_file,
+                ),
                 Rule::AnotherDeprecatedTestRule => {
-                    test_rules::AnotherDeprecatedTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::AnotherDeprecatedTestRule::diagnostic(
+                        locator,
+                        comment_ranges,
+                        &source_file,
+                    )
                 }
                 Rule::RemovedTestRule => {
-                    test_rules::RemovedTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::RemovedTestRule::diagnostic(locator, comment_ranges, &source_file)
                 }
-                Rule::AnotherRemovedTestRule => {
-                    test_rules::AnotherRemovedTestRule::diagnostic(locator, comment_ranges)
-                }
-                Rule::RedirectedToTestRule => {
-                    test_rules::RedirectedToTestRule::diagnostic(locator, comment_ranges)
-                }
-                Rule::RedirectedFromTestRule => {
-                    test_rules::RedirectedFromTestRule::diagnostic(locator, comment_ranges)
-                }
+                Rule::AnotherRemovedTestRule => test_rules::AnotherRemovedTestRule::diagnostic(
+                    locator,
+                    comment_ranges,
+                    &source_file,
+                ),
+                Rule::RedirectedToTestRule => test_rules::RedirectedToTestRule::diagnostic(
+                    locator,
+                    comment_ranges,
+                    &source_file,
+                ),
+                Rule::RedirectedFromTestRule => test_rules::RedirectedFromTestRule::diagnostic(
+                    locator,
+                    comment_ranges,
+                    &source_file,
+                ),
                 Rule::RedirectedFromPrefixTestRule => {
-                    test_rules::RedirectedFromPrefixTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::RedirectedFromPrefixTestRule::diagnostic(
+                        locator,
+                        comment_ranges,
+                        &source_file,
+                    )
                 }
                 _ => unreachable!("All test rules must have an implementation"),
             };
@@ -327,6 +375,7 @@ pub fn check_path(
             parsed.has_valid_syntax(),
             &per_file_ignores,
             settings,
+            &source_file,
         );
         if noqa.is_enabled() {
             for index in ignored.iter().rev() {
@@ -372,9 +421,9 @@ pub fn check_path(
         parsed.errors(),
         syntax_errors,
         &semantic_syntax_errors,
-        path,
         locator,
         directives,
+        &source_file,
     )
 }
 
@@ -507,35 +556,24 @@ fn diagnostics_to_messages(
     parse_errors: &[ParseError],
     unsupported_syntax_errors: &[UnsupportedSyntaxError],
     semantic_syntax_errors: &[SemanticSyntaxError],
-    path: &Path,
     locator: &Locator,
     directives: &Directives,
+    source_file: &SourceFile,
 ) -> Vec<Message> {
-    let file = LazyCell::new(|| {
-        let mut builder =
-            SourceFileBuilder::new(path.to_string_lossy().as_ref(), locator.contents());
-
-        if let Some(line_index) = locator.line_index() {
-            builder.set_line_index(line_index.clone());
-        }
-
-        builder.finish()
-    });
-
     parse_errors
         .iter()
-        .map(|parse_error| Message::from_parse_error(parse_error, locator, file.deref().clone()))
+        .map(|parse_error| Message::from_parse_error(parse_error, locator, source_file.clone()))
         .chain(unsupported_syntax_errors.iter().map(|syntax_error| {
-            Message::from_unsupported_syntax_error(syntax_error, file.deref().clone())
+            Message::from_unsupported_syntax_error(syntax_error, source_file.clone())
         }))
         .chain(
             semantic_syntax_errors
                 .iter()
-                .map(|error| Message::from_semantic_syntax_error(error, file.deref().clone())),
+                .map(|error| Message::from_semantic_syntax_error(error, source_file.clone())),
         )
         .chain(diagnostics.into_iter().map(|diagnostic| {
             let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
-            Message::from_diagnostic(diagnostic, file.deref().clone(), Some(noqa_offset))
+            Message::from_diagnostic(diagnostic, Some(noqa_offset))
         }))
         .collect()
 }

@@ -5,6 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PySourceType;
 use ruff_python_stdlib::identifiers::{is_migration_name, is_module_name};
 use ruff_python_stdlib::path::is_module_file;
+use ruff_source_file::SourceFile;
 use ruff_text_size::TextRange;
 
 use crate::package::PackageRoot;
@@ -54,6 +55,7 @@ pub(crate) fn invalid_module_name(
     path: &Path,
     package: Option<PackageRoot<'_>>,
     ignore_names: &IgnoreNames,
+    source_file: &SourceFile,
 ) -> Option<OldDiagnostic> {
     if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file_or_stub) {
         return None;
@@ -85,6 +87,7 @@ pub(crate) fn invalid_module_name(
                     name: module_name.to_string(),
                 },
                 TextRange::default(),
+                source_file,
             ));
         }
     }
