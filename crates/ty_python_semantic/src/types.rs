@@ -1655,8 +1655,9 @@ impl<'db> Type<'db> {
                 }
             }
 
-            _ if self.literal_fallback_instance(db))
-                .is_some_and(|instance| instance.is_assignable_to(db, target) =>
+            _ if self
+                .literal_fallback_instance(db)
+                .is_some_and(|instance| instance.is_assignable_to(db, target)) =>
             {
                 true
             }

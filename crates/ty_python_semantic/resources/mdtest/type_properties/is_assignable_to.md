@@ -107,6 +107,9 @@ static_assert(is_assignable_to(Literal["foo"], Sequence[str]))
 static_assert(is_assignable_to(Literal["foo"], Sequence[Any]))
 
 static_assert(is_assignable_to(LiteralString, str))
+static_assert(is_assignable_to(LiteralString, Sequence))
+static_assert(is_assignable_to(LiteralString, Sequence[str]))
+static_assert(is_assignable_to(LiteralString, Sequence[Any]))
 
 static_assert(not is_assignable_to(Literal["foo"], Literal["bar"]))
 static_assert(not is_assignable_to(str, Literal["foo"]))
