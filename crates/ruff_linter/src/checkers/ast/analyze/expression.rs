@@ -1364,11 +1364,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             op: Operator::Add, ..
         }) => {
             if checker.enabled(Rule::ExplicitStringConcatenation) {
-                if let Some(diagnostic) = flake8_implicit_str_concat::rules::explicit(
-                    expr,
-                    checker.locator,
-                    checker.settings,
-                ) {
+                if let Some(diagnostic) = flake8_implicit_str_concat::rules::explicit(expr, checker)
+                {
                     checker.report_diagnostic(diagnostic);
                 }
             }
