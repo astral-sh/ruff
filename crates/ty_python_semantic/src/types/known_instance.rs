@@ -11,14 +11,21 @@
 use std::fmt::Display;
 
 use super::generics::GenericContext;
-use super::{class::KnownClass, ClassType, Truthiness, Type, TypeAliasType, TypeVarInstance};
+use super::{ClassType, Type, TypeAliasType, TypeVarInstance, class::KnownClass};
 use crate::db::Db;
-use crate::module_resolver::{file_to_module, KnownModule};
+use crate::module_resolver::{KnownModule, file_to_module};
 use ruff_db::files::File;
 
 /// Enumeration of specific runtime symbols that are special enough
 /// that they can each be considered to inhabit a unique type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
+///
+/// # Ordering
+///
+/// Ordering between variants is stable and should be the same between runs.
+/// Ordering within variants (for variants that wrap associate data)
+/// is based on the known-instance's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the type var instance was garbage collected and recreated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, PartialOrd, Ord)]
 pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Annotated` (which can also be found as `typing_extensions.Annotated`)
     Annotated,
@@ -34,11 +41,6 @@ pub enum KnownInstanceType<'db> {
     NoReturn,
     /// The symbol `typing.Never` available since 3.11 (which can also be found as `typing_extensions.Never`)
     Never,
-    /// The symbol `typing.Any` (which can also be found as `typing_extensions.Any`)
-    /// This is not used since typeshed switched to representing `Any` as a class; now we use
-    /// `KnownClass::Any` instead. But we still support the old `Any = object()` representation, at
-    /// least for now. TODO maybe remove?
-    Any,
     /// The symbol `typing.Tuple` (which can also be found as `typing_extensions.Tuple`)
     Tuple,
     /// The symbol `typing.List` (which can also be found as `typing_extensions.List`)
@@ -106,22 +108,15 @@ pub enum KnownInstanceType<'db> {
 }
 
 impl<'db> KnownInstanceType<'db> {
-    /// Evaluate the known instance in boolean context
-    pub(crate) const fn bool(self) -> Truthiness {
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         match self {
             Self::Annotated
             | Self::Literal
             | Self::LiteralString
             | Self::Optional
-            // This is a legacy `TypeVar` _outside_ of any generic class or function, so it's
-            // AlwaysTrue. The truthiness of a typevar inside of a generic class or function
-            // depends on its bounds and constraints; but that's represented by `Type::TypeVar` and
-            // handled in elsewhere.
-            | Self::TypeVar(_)
             | Self::Union
             | Self::NoReturn
             | Self::Never
-            | Self::Any
             | Self::Tuple
             | Self::Type
             | Self::TypingSelf
@@ -145,17 +140,18 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Deque
             | Self::ChainMap
             | Self::OrderedDict
-            | Self::Protocol(_)
-            | Self::Generic(_)
             | Self::ReadOnly
-            | Self::TypeAliasType(_)
             | Self::Unknown
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
             | Self::Not
             | Self::Intersection
             | Self::TypeOf
-            | Self::CallableTypeOf => Truthiness::AlwaysTrue,
+            | Self::CallableTypeOf => self,
+            Self::TypeVar(tvar) => Self::TypeVar(tvar.normalized(db)),
+            Self::Protocol(ctx) => Self::Protocol(ctx.map(|ctx| ctx.normalized(db))),
+            Self::Generic(ctx) => Self::Generic(ctx.map(|ctx| ctx.normalized(db))),
+            Self::TypeAliasType(alias) => Self::TypeAliasType(alias.normalized(db)),
         }
     }
 
@@ -177,7 +173,6 @@ impl<'db> KnownInstanceType<'db> {
             Self::Union => KnownClass::SpecialForm,
             Self::NoReturn => KnownClass::SpecialForm,
             Self::Never => KnownClass::SpecialForm,
-            Self::Any => KnownClass::Object,
             Self::Tuple => KnownClass::SpecialForm,
             Self::Type => KnownClass::SpecialForm,
             Self::TypingSelf => KnownClass::SpecialForm,
@@ -236,7 +231,6 @@ impl<'db> KnownInstanceType<'db> {
         symbol_name: &str,
     ) -> Option<Self> {
         let candidate = match symbol_name {
-            "Any" => Self::Any,
             "ClassVar" => Self::ClassVar,
             "Deque" => Self::Deque,
             "List" => Self::List,
@@ -291,8 +285,7 @@ impl<'db> KnownInstanceType<'db> {
     /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
     pub(super) fn check_module(self, module: KnownModule) -> bool {
         match self {
-            Self::Any
-            | Self::ClassVar
+            Self::ClassVar
             | Self::Deque
             | Self::List
             | Self::Dict
@@ -359,7 +352,6 @@ impl Display for KnownInstanceRepr<'_> {
             KnownInstanceType::Union => f.write_str("typing.Union"),
             KnownInstanceType::NoReturn => f.write_str("typing.NoReturn"),
             KnownInstanceType::Never => f.write_str("typing.Never"),
-            KnownInstanceType::Any => f.write_str("typing.Any"),
             KnownInstanceType::Tuple => f.write_str("typing.Tuple"),
             KnownInstanceType::Type => f.write_str("typing.Type"),
             KnownInstanceType::TypingSelf => f.write_str("typing.Self"),

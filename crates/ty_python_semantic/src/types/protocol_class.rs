@@ -5,10 +5,12 @@ use itertools::{Either, Itertools};
 use ruff_python_ast::name::Name;
 
 use crate::{
-    db::Db,
     semantic_index::{symbol_table, use_def_map},
     symbol::{symbol_from_bindings, symbol_from_declarations},
-    types::{ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers},
+    types::{
+        ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
+    },
+    {Db, FxOrderSet},
 };
 
 impl<'db> ClassLiteral<'db> {
@@ -56,7 +58,11 @@ impl<'db> Deref for ProtocolClassLiteral<'db> {
     }
 }
 
+/// # Ordering
+/// Ordering is based on the protocol interface member's salsa-assigned id and not on its members.
+/// The id may change between runs, or when the protocol instance members was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub(super) struct ProtocolInterfaceMembers<'db> {
     #[returns(ref)]
     inner: BTreeMap<Name, ProtocolMemberData<'db>>,
@@ -70,6 +76,25 @@ pub(super) enum ProtocolInterface<'db> {
 }
 
 impl<'db> ProtocolInterface<'db> {
+    pub(super) fn with_members<'a, M>(db: &'db dyn Db, members: M) -> Self
+    where
+        M: IntoIterator<Item = (&'a str, Type<'db>)>,
+    {
+        let members: BTreeMap<_, _> = members
+            .into_iter()
+            .map(|(name, ty)| {
+                (
+                    Name::new(name),
+                    ProtocolMemberData {
+                        ty: ty.normalized(db),
+                        qualifiers: TypeQualifiers::default(),
+                    },
+                )
+            })
+            .collect();
+        Self::Members(ProtocolInterfaceMembers::new(db, members))
+    }
+
     fn empty(db: &'db dyn Db) -> Self {
         Self::Members(ProtocolInterfaceMembers::new(db, BTreeMap::default()))
     }
@@ -128,9 +153,14 @@ impl<'db> ProtocolInterface<'db> {
         }
     }
 
-    /// Return `true` if any of the members of this protocol type contain any `Todo` types.
-    pub(super) fn contains_todo(self, db: &'db dyn Db) -> bool {
-        self.members(db).any(|member| member.ty.contains_todo(db))
+    /// Return `true` if the types of any of the members match the closure passed in.
+    pub(super) fn any_over_type(
+        self,
+        db: &'db dyn Db,
+        type_fn: &dyn Fn(Type<'db>) -> bool,
+    ) -> bool {
+        self.members(db)
+            .any(|member| member.ty.any_over_type(db, type_fn))
     }
 
     pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
@@ -150,7 +180,7 @@ impl<'db> ProtocolInterface<'db> {
     pub(super) fn specialized_and_normalized<'a>(
         self,
         db: &'db dyn Db,
-        type_mapping: TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
         match self {
             Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
@@ -169,6 +199,21 @@ impl<'db> ProtocolInterface<'db> {
             Self::SelfReference => Self::SelfReference,
         }
     }
+
+    pub(super) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        match self {
+            Self::Members(members) => {
+                for data in members.inner(db).values() {
+                    data.find_legacy_typevars(db, typevars);
+                }
+            }
+            Self::SelfReference => {}
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]
@@ -185,11 +230,19 @@ impl<'db> ProtocolMemberData<'db> {
         }
     }
 
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         Self {
             ty: self.ty.apply_type_mapping(db, type_mapping),
             qualifiers: self.qualifiers,
         }
+    }
+
+    fn find_legacy_typevars(
+        &self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        self.ty.find_legacy_typevars(db, typevars);
     }
 }
 

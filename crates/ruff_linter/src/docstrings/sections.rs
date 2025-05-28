@@ -444,8 +444,7 @@ fn is_docstring_section(
         if next_line.is_empty() {
             false
         } else {
-            let next_line_is_underline = next_line.chars().all(|char| matches!(char, '-' | '='));
-            next_line_is_underline
+            next_line.chars().all(|char| matches!(char, '-' | '='))
         }
     });
     if next_line_is_underline {

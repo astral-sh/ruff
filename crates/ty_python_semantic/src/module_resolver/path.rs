@@ -4,12 +4,11 @@ use std::fmt;
 use std::sync::Arc;
 
 use camino::{Utf8Path, Utf8PathBuf};
-
-use ruff_db::files::{system_path_to_file, vendored_path_to_file, File, FileError};
+use ruff_db::files::{File, FileError, system_path_to_file, vendored_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
-use super::typeshed::{typeshed_versions, TypeshedVersionsParseError, TypeshedVersionsQueryResult};
+use super::typeshed::{TypeshedVersionsParseError, TypeshedVersionsQueryResult, typeshed_versions};
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::resolver::ResolverContext;
@@ -144,6 +143,23 @@ impl ModulePath {
         }
     }
 
+    pub(super) fn to_system_path(&self) -> Option<SystemPathBuf> {
+        let ModulePath {
+            search_path,
+            relative_path,
+        } = self;
+        match &*search_path.0 {
+            SearchPathInner::Extra(search_path)
+            | SearchPathInner::FirstParty(search_path)
+            | SearchPathInner::SitePackages(search_path)
+            | SearchPathInner::Editable(search_path) => Some(search_path.join(relative_path)),
+            SearchPathInner::StandardLibraryCustom(stdlib_root) => {
+                Some(stdlib_root.join(relative_path))
+            }
+            SearchPathInner::StandardLibraryVendored(_) => None,
+        }
+    }
+
     #[must_use]
     pub(super) fn to_file(&self, resolver: &ResolverContext) -> Option<File> {
         let db = resolver.db.upcast();
@@ -189,7 +205,18 @@ impl ModulePath {
             stdlib_path_to_module_name(relative_path)
         } else {
             let parent = relative_path.parent()?;
-            let parent_components = parent.components().map(|component| component.as_str());
+            let parent_components = parent.components().enumerate().map(|(index, component)| {
+                let component = component.as_str();
+
+                // For stub packages, strip the `-stubs` suffix from the first component
+                // because it isn't a valid module name part AND the module name is the name without the `-stubs`.
+                if index == 0 {
+                    component.strip_suffix("-stubs").unwrap_or(component)
+                } else {
+                    component
+                }
+            });
+
             let skip_final_part =
                 relative_path.ends_with("__init__.py") || relative_path.ends_with("__init__.pyi");
             if skip_final_part {
@@ -923,10 +950,12 @@ mod tests {
         assert!(asyncio_regular_package.is_regular_package(&resolver));
         // Paths to directories don't resolve to VfsFiles
         assert_eq!(asyncio_regular_package.to_file(&resolver), None);
-        assert!(asyncio_regular_package
-            .join("__init__.pyi")
-            .to_file(&resolver)
-            .is_some());
+        assert!(
+            asyncio_regular_package
+                .join("__init__.pyi")
+                .to_file(&resolver)
+                .is_some()
+        );
 
         // The `asyncio` package exists on Python 3.8, but the `asyncio.tasks` submodule does not,
         // according to the `VERSIONS` file in our typeshed mock:
@@ -1056,10 +1085,12 @@ mod tests {
         assert!(collections_regular_package.is_regular_package(&resolver));
         // (This is still `None`, as directories don't resolve to `Vfs` files)
         assert_eq!(collections_regular_package.to_file(&resolver), None);
-        assert!(collections_regular_package
-            .join("__init__.pyi")
-            .to_file(&resolver)
-            .is_some());
+        assert!(
+            collections_regular_package
+                .join("__init__.pyi")
+                .to_file(&resolver)
+                .is_some()
+        );
 
         // ...and so should the `asyncio.tasks` submodule (though it's still not a directory):
         let asyncio_tasks_module = stdlib_path.join("asyncio/tasks.pyi");

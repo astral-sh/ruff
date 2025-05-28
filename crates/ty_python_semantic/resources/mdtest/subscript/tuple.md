@@ -70,7 +70,7 @@ def _(m: int, n: int):
 
     tuple_slice = t[m:n]
     # TODO: Should be `tuple[Literal[1, 'a', b"b"] | None, ...]`
-    reveal_type(tuple_slice)  # revealed: @Todo(full tuple[...] support)
+    reveal_type(tuple_slice)  # revealed: tuple[Unknown, ...]
 ```
 
 ## Inheritance
@@ -83,7 +83,7 @@ python-version = "3.9"
 ```py
 class A(tuple[int, str]): ...
 
-# revealed: tuple[<class 'A'>, <class 'tuple[@Todo(Generic tuple specializations), ...]'>, <class 'Sequence[@Todo(Generic tuple specializations)]'>, <class 'Reversible[@Todo(Generic tuple specializations)]'>, <class 'Collection[@Todo(Generic tuple specializations)]'>, <class 'Iterable[@Todo(Generic tuple specializations)]'>, <class 'Container[@Todo(Generic tuple specializations)]'>, typing.Protocol[_T_co], typing.Generic[_T_co], <class 'object'>]
+# revealed: tuple[<class 'A'>, <class 'tuple[@Todo(Generic tuple specializations), ...]'>, <class 'Sequence[@Todo(Generic tuple specializations)]'>, <class 'Reversible[@Todo(Generic tuple specializations)]'>, <class 'Collection[@Todo(Generic tuple specializations)]'>, <class 'Iterable[@Todo(Generic tuple specializations)]'>, <class 'Container[@Todo(Generic tuple specializations)]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(A.__mro__)
 ```
 
@@ -101,7 +101,7 @@ class A: ...
 def _(c: Tuple, d: Tuple[int, A], e: Tuple[Any, ...]):
     reveal_type(c)  # revealed: tuple[Unknown, ...]
     reveal_type(d)  # revealed: tuple[int, A]
-    reveal_type(e)  # revealed: @Todo(full tuple[...] support)
+    reveal_type(e)  # revealed: tuple[Any, ...]
 ```
 
 ### Inheritance
@@ -114,6 +114,6 @@ from typing import Tuple
 
 class C(Tuple): ...
 
-# revealed: tuple[<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol[_T_co], typing.Generic[_T_co], <class 'object'>]
+# revealed: tuple[<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(C.__mro__)
 ```

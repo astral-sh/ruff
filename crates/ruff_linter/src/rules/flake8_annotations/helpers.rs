@@ -1,9 +1,8 @@
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{
-    pep_604_union, typing_optional, typing_union, ReturnStatementVisitor,
+    ReturnStatementVisitor, pep_604_union, typing_optional, typing_union,
 };
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::Visitor;
@@ -14,6 +13,7 @@ use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::Edit;
 use crate::checkers::ast::Checker;
 use ruff_python_ast::PythonVersion;
 

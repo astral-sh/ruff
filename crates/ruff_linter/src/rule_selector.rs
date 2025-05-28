@@ -202,7 +202,7 @@ impl RuleSelector {
     }
 
     /// Returns rules matching the selector, taking into account rule groups like preview and deprecated.
-    pub fn rules<'a>(&'a self, preview: &PreviewOptions) -> impl Iterator<Item = Rule> + 'a {
+    pub fn rules<'a>(&'a self, preview: &PreviewOptions) -> impl Iterator<Item = Rule> + use<'a> {
         let preview_enabled = preview.mode.is_enabled();
         let preview_require_explicit = preview.require_explicit;
 
@@ -259,21 +259,21 @@ pub struct PreviewOptions {
 #[cfg(feature = "schemars")]
 mod schema {
     use itertools::Itertools;
-    use schemars::JsonSchema;
     use schemars::_serde_json::Value;
+    use schemars::JsonSchema;
     use schemars::schema::{InstanceType, Schema, SchemaObject};
     use strum::IntoEnumIterator;
 
+    use crate::RuleSelector;
     use crate::registry::RuleNamespace;
     use crate::rule_selector::{Linter, RuleCodePrefix};
-    use crate::RuleSelector;
 
     impl JsonSchema for RuleSelector {
         fn schema_name() -> String {
             "RuleSelector".to_string()
         }
 
-        fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
+        fn json_schema(_gen: &mut schemars::r#gen::SchemaGenerator) -> Schema {
             Schema::Object(SchemaObject {
                 instance_type: Some(InstanceType::String.into()),
                 enum_values: Some(
@@ -346,7 +346,9 @@ impl RuleSelector {
                     2 => Specificity::Prefix2Chars,
                     3 => Specificity::Prefix3Chars,
                     4 => Specificity::Prefix4Chars,
-                    _ => panic!("RuleSelector::specificity doesn't yet support codes with so many characters"),
+                    _ => panic!(
+                        "RuleSelector::specificity doesn't yet support codes with so many characters"
+                    ),
                 }
             }
         }
@@ -412,10 +414,10 @@ pub mod clap_completion {
     use strum::IntoEnumIterator;
 
     use crate::{
+        RuleSelector,
         codes::RuleCodePrefix,
         registry::{Linter, RuleNamespace},
         rule_selector::is_single_rule_selector,
-        RuleSelector,
     };
 
     #[derive(Clone)]

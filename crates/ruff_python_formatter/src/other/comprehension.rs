@@ -1,6 +1,6 @@
-use ruff_formatter::{format_args, write, Buffer, FormatResult};
+use ruff_formatter::{Buffer, FormatResult, format_args, write};
 use ruff_python_ast::{Comprehension, Expr};
-use ruff_python_trivia::{find_only_token_in_range, SimpleTokenKind};
+use ruff_python_trivia::{SimpleTokenKind, find_only_token_in_range};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments};

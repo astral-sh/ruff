@@ -188,13 +188,13 @@ impl Ty {
 
                 create_bound_method(db, function, builtins_class)
             }
-            Ty::Callable { params, returns } => Type::Callable(CallableType::single(
+            Ty::Callable { params, returns } => CallableType::single(
                 db,
                 Signature::new(
                     params.into_parameters(db),
                     returns.map(|ty| ty.into_type(db)),
                 ),
-            )),
+            ),
         }
     }
 }
@@ -220,8 +220,6 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
         Ty::KnownClassInstance(KnownClass::Str),
         Ty::KnownClassInstance(KnownClass::Int),
         Ty::KnownClassInstance(KnownClass::Bool),
-        Ty::KnownClassInstance(KnownClass::List),
-        Ty::KnownClassInstance(KnownClass::Tuple),
         Ty::KnownClassInstance(KnownClass::FunctionType),
         Ty::KnownClassInstance(KnownClass::SpecialForm),
         Ty::KnownClassInstance(KnownClass::TypeVar),

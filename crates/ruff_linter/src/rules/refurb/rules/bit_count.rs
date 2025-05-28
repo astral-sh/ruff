@@ -1,5 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
@@ -7,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `bin(...).count("1")` to perform a population count.
@@ -183,7 +183,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         format!("{literal_text}.bit_count()")
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         BitCount {
             existing: SourceCodeSnippet::from_str(literal_text),
             replacement: SourceCodeSnippet::new(replacement.to_string()),
@@ -194,6 +194,4 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         Edit::range_replacement(replacement, call.range()),
         applicability,
     ));
-
-    checker.report_diagnostic(diagnostic);
 }

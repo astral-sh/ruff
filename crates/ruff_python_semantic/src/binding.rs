@@ -4,17 +4,17 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 
 use crate::all::DunderAllName;
-use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_index::{IndexSlice, IndexVec, newtype_index};
 use ruff_python_ast::helpers::extract_handled_exceptions;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::ScopeId;
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
 use crate::nodes::NodeId;
 use crate::reference::ResolvedReferenceId;
-use crate::ScopeId;
 
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {

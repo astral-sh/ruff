@@ -1,6 +1,6 @@
 use crate::metadata::options::Options;
 use crate::metadata::value::{RangedValue, ValueSource, ValueSourceGuard};
-use pep440_rs::{release_specifiers_to_ranges, Version, VersionSpecifiers};
+use pep440_rs::{Version, VersionSpecifiers, release_specifiers_to_ranges};
 use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::Bound;
@@ -85,7 +85,7 @@ impl Project {
             Bound::Unbounded => {
                 return Err(ResolveRequiresPythonError::NoLowerBound(
                     requires_python.to_string(),
-                ))
+                ));
             }
         };
 
@@ -119,7 +119,9 @@ pub enum ResolveRequiresPythonError {
     TooLargeMajor(u64),
     #[error("The minor version `{0}` is larger than the maximum supported value 255")]
     TooLargeMinor(u64),
-    #[error("value `{0}` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.")]
+    #[error(
+        "value `{0}` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`."
+    )]
     NoLowerBound(String),
 }
 
@@ -233,7 +235,8 @@ pub(crate) enum InvalidPackageNameError {
     NonAlphanumericStart(char),
     #[error("name must end with letter or number but it ends with '{0}'")]
     NonAlphanumericEnd(char),
-    #[error("valid name consists only of ASCII letters and numbers, period, underscore and hyphen but name contains '{0}'"
+    #[error(
+        "valid name consists only of ASCII letters and numbers, period, underscore and hyphen but name contains '{0}'"
     )]
     InvalidCharacter(char),
     #[error("name must not be empty")]

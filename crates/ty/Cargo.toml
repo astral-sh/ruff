@@ -22,7 +22,7 @@ ty_server = { workspace = true }
 
 anyhow = { workspace = true }
 argfile = { workspace = true }
-clap = { workspace = true, features = ["wrap_help", "string"] }
+clap = { workspace = true, features = ["wrap_help", "string", "env"] }
 clap_complete_command = { workspace = true }
 colored = { workspace = true }
 countme = { workspace = true, features = ["enable"] }
@@ -33,9 +33,8 @@ jiff = { workspace = true }
 rayon = { workspace = true }
 salsa = { workspace = true }
 tracing = { workspace = true, features = ["release_max_level_debug"] }
-tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+tracing-subscriber = { workspace = true }
 tracing-flame = { workspace = true }
-tracing-tree = { workspace = true }
 wild = { workspace = true }
 
 [dev-dependencies]

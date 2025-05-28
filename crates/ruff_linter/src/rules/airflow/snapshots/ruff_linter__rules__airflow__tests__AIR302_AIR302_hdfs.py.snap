@@ -9,7 +9,7 @@ AIR302_hdfs.py:6:1: AIR302 `airflow.hooks.webhdfs_hook.WebHDFSHook` is moved int
   | ^^^^^^^^^^^ AIR302
 7 | WebHdfsSensor()
   |
-  = help: Install `apache-airflow-providers-apache-hdfs>=1.0.0` and use `airflow.providers.apache.hdfs.hooks.webhdfs.WebHDFSHook` instead.
+  = help: Install `apache-airflow-providers-apache-hdfs>=1.0.0` and use `WebHDFSHook` from `airflow.providers.apache.hdfs.hooks.webhdfs` instead.
 
 AIR302_hdfs.py:7:1: AIR302 `airflow.sensors.web_hdfs_sensor.WebHdfsSensor` is moved into `apache-hdfs` provider in Airflow 3.0;
   |
@@ -17,4 +17,4 @@ AIR302_hdfs.py:7:1: AIR302 `airflow.sensors.web_hdfs_sensor.WebHdfsSensor` is mo
 7 | WebHdfsSensor()
   | ^^^^^^^^^^^^^ AIR302
   |
-  = help: Install `apache-airflow-providers-apache-hdfs>=1.0.0` and use `airflow.providers.apache.hdfs.sensors.web_hdfs.WebHdfsSensor` instead.
+  = help: Install `apache-airflow-providers-apache-hdfs>=1.0.0` and use `WebHdfsSensor` from `airflow.providers.apache.hdfs.sensors.web_hdfs` instead.

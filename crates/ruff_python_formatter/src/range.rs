@@ -2,13 +2,13 @@ use tracing::Level;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{
-    format, FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode,
+    FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode, format,
 };
-use ruff_python_ast::visitor::source_order::{walk_body, SourceOrderVisitor, TraversalSignal};
+use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_body};
 use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch, StmtTry};
-use ruff_python_parser::{parse, ParseOptions};
+use ruff_python_parser::{ParseOptions, parse};
 use ruff_python_trivia::{
-    indentation_at_offset, BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind,
+    BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, indentation_at_offset,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -17,7 +17,7 @@ use crate::context::{IndentLevel, NodeLevel};
 use crate::prelude::*;
 use crate::statement::suite::DocstringStmt;
 use crate::verbatim::{ends_suppression, starts_suppression};
-use crate::{format_module_source, FormatModuleError, PyFormatOptions};
+use crate::{FormatModuleError, PyFormatOptions, format_module_source};
 
 /// Formats the given `range` in source rather than the entire file.
 ///

@@ -114,16 +114,11 @@ from airflow.sensors.sql_sensor import SqlSensor
 SqlSensor()
 
 
-from airflow.operators.jdbc_operator import JdbcOperator
-from airflow.operators.mssql_operator import MsSqlOperator
-from airflow.operators.mysql_operator import MySqlOperator
-from airflow.operators.oracle_operator import OracleOperator
-from airflow.operators.postgres_operator import PostgresOperator
-from airflow.operators.sqlite_operator import SqliteOperator
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 
-JdbcOperator()
-MsSqlOperator()
-MySqlOperator()
-OracleOperator()
-PostgresOperator()
-SqliteOperator()
+SQLExecuteQueryOperator()
+SQLExecuteQueryOperator()
+SQLExecuteQueryOperator()
+SQLExecuteQueryOperator()
+SQLExecuteQueryOperator()
+SQLExecuteQueryOperator()

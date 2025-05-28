@@ -9,7 +9,7 @@ AIR302_postgres.py:6:1: AIR302 `airflow.hooks.postgres_hook.PostgresHook` is mov
   | ^^^^^^^^^^^^ AIR302
 7 | Mapping()
   |
-  = help: Install `apache-airflow-providers-postgres>=1.0.0` and use `airflow.providers.postgres.hooks.postgres.PostgresHook` instead.
+  = help: Install `apache-airflow-providers-postgres>=1.0.0` and use `PostgresHook` from `airflow.providers.postgres.hooks.postgres` instead.
 
 AIR302_postgres.py:7:1: AIR302 `airflow.operators.postgres_operator.Mapping` is removed in Airflow 3.0
   |

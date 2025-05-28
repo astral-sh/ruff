@@ -7,8 +7,8 @@ mod fastapi_redundant_response_model;
 mod fastapi_unused_path_parameter;
 
 use ruff_python_ast as ast;
-use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing;
 
 /// Returns `true` if the function is a FastAPI route.
 pub(crate) fn is_fastapi_route(

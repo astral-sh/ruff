@@ -4,22 +4,23 @@ use camino::Utf8Path;
 use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
+use ruff_db::Upcast;
 use ruff_db::diagnostic::{
-    create_parse_diagnostic, create_unsupported_syntax_diagnostic, Diagnostic,
-    DisplayDiagnosticConfig,
+    Diagnostic, DisplayDiagnosticConfig, create_parse_diagnostic,
+    create_unsupported_syntax_diagnostic,
 };
-use ruff_db::files::{system_path_to_file, File};
+use ruff_db::files::{File, system_path_to_file};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
-use ruff_db::Upcast;
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings, SysPrefixPathOrigin,
+    Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource,
+    PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
 };
 
 mod assertion;
@@ -56,7 +57,10 @@ pub fn run(
     let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
     for test in suite.tests() {
-        if filter.as_ref().is_some_and(|f| !test.name().contains(f)) {
+        if filter
+            .as_ref()
+            .is_some_and(|f| !test.uncontracted_name().contains(f))
+        {
             continue;
         }
 
@@ -165,12 +169,10 @@ fn run_test(
 
     let src_path = project_root.clone();
     let custom_typeshed_path = test.configuration().typeshed();
-    let python_path = test.configuration().python();
     let python_version = test.configuration().python_version().unwrap_or_default();
 
     let mut typeshed_files = vec![];
     let mut has_custom_versions_file = false;
-    let mut has_custom_pyvenv_cfg_file = false;
 
     let test_files: Vec<_> = test
         .files()
@@ -186,38 +188,35 @@ fn run_test(
 
             let mut full_path = embedded.full_path(&project_root);
 
-            if let Some(typeshed_path) = custom_typeshed_path {
-                if let Ok(relative_path) = full_path.strip_prefix(typeshed_path.join("stdlib")) {
-                    if relative_path.as_str() == "VERSIONS" {
-                        has_custom_versions_file = true;
-                    } else if relative_path.extension().is_some_and(|ext| ext == "pyi") {
-                        typeshed_files.push(relative_path.to_path_buf());
-                    }
+            if let Some(relative_path_to_custom_typeshed) = custom_typeshed_path
+                .and_then(|typeshed| full_path.strip_prefix(typeshed.join("stdlib")).ok())
+            {
+                if relative_path_to_custom_typeshed.as_str() == "VERSIONS" {
+                    has_custom_versions_file = true;
+                } else if relative_path_to_custom_typeshed
+                    .extension()
+                    .is_some_and(|ext| ext == "pyi")
+                {
+                    typeshed_files.push(relative_path_to_custom_typeshed.to_path_buf());
                 }
-            } else if let Some(python_path) = python_path {
-                if let Ok(relative_path) = full_path.strip_prefix(python_path) {
-                    if relative_path.as_str() == "pyvenv.cfg" {
-                        has_custom_pyvenv_cfg_file = true;
-                    } else {
-                        let mut new_path = SystemPathBuf::new();
-                        for component in full_path.components() {
-                            let component = component.as_str();
-                            if component == "<path-to-site-packages>" {
-                                if cfg!(target_os = "windows") {
-                                    new_path.push("Lib");
-                                    new_path.push("site-packages");
-                                } else {
-                                    new_path.push("lib");
-                                    new_path.push(format!("python{python_version}"));
-                                    new_path.push("site-packages");
-                                }
-                            } else {
-                                new_path.push(component);
-                            }
-                        }
-                        full_path = new_path;
-                    }
+            } else if let Some(component_index) = full_path
+                .components()
+                .position(|c| c.as_str() == "<path-to-site-packages>")
+            {
+                // If the path contains `<path-to-site-packages>`, we need to replace it with the
+                // actual site-packages directory based on the Python platform and version.
+                let mut components = full_path.components();
+                let mut new_path: SystemPathBuf =
+                    components.by_ref().take(component_index).collect();
+                if cfg!(target_os = "windows") {
+                    new_path.extend(["Lib", "site-packages"]);
+                } else {
+                    new_path.push("lib");
+                    new_path.push(format!("python{python_version}"));
+                    new_path.push("site-packages");
                 }
+                new_path.extend(components.skip(1));
+                full_path = new_path;
             }
 
             db.write_file(&full_path, &embedded.code).unwrap();
@@ -256,20 +255,13 @@ fn run_test(
         }
     }
 
-    if let Some(python_path) = python_path {
-        if !has_custom_pyvenv_cfg_file {
-            let pyvenv_cfg_file = python_path.join("pyvenv.cfg");
-            let home_directory = SystemPathBuf::from(format!("/Python{python_version}"));
-            db.create_directory_all(&home_directory).unwrap();
-            db.write_file(&pyvenv_cfg_file, format!("home = {home_directory}"))
-                .unwrap();
-        }
-    }
-
     let configuration = test.configuration();
 
     let settings = ProgramSettings {
-        python_version,
+        python_version: PythonVersionWithSource {
+            version: python_version,
+            source: PythonVersionSource::Cli,
+        },
         python_platform: configuration
             .python_platform()
             .unwrap_or(PythonPlatform::Identifier("linux".to_string())),
@@ -432,7 +424,7 @@ fn create_diagnostic_snapshot(
     let mut snapshot = String::new();
     writeln!(snapshot).unwrap();
     writeln!(snapshot, "---").unwrap();
-    writeln!(snapshot, "mdtest name: {}", test.name()).unwrap();
+    writeln!(snapshot, "mdtest name: {}", test.uncontracted_name()).unwrap();
     writeln!(snapshot, "mdtest path: {relative_fixture_path}").unwrap();
     writeln!(snapshot, "---").unwrap();
     writeln!(snapshot).unwrap();

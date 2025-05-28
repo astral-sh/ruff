@@ -21,10 +21,7 @@ See the [typing documentation] for more information.
     as `int | float` and `int | float | complex`, respectively.
 
 ```py
-from ty_extensions import is_subtype_of, static_assert, TypeOf
-
-type JustFloat = TypeOf[1.0]
-type JustComplex = TypeOf[1j]
+from ty_extensions import is_subtype_of, static_assert, JustFloat, JustComplex
 
 static_assert(is_subtype_of(bool, bool))
 static_assert(is_subtype_of(bool, int))
@@ -88,9 +85,7 @@ static_assert(is_subtype_of(C, object))
 
 ```py
 from typing_extensions import Literal, LiteralString
-from ty_extensions import is_subtype_of, static_assert, TypeOf
-
-type JustFloat = TypeOf[1.0]
+from ty_extensions import is_subtype_of, static_assert, TypeOf, JustFloat
 
 # Boolean literals
 static_assert(is_subtype_of(Literal[True], bool))
@@ -118,7 +113,7 @@ static_assert(is_subtype_of(Literal[b"foo"], bytes))
 static_assert(is_subtype_of(Literal[b"foo"], object))
 ```
 
-## Tuple types
+## Heterogeneous tuple types
 
 ```py
 from ty_extensions import is_subtype_of, static_assert
@@ -150,9 +145,36 @@ static_assert(not is_subtype_of(tuple[B1, B2], tuple[Unrelated, Unrelated]))
 static_assert(not is_subtype_of(tuple[B1, B2], tuple[()]))
 static_assert(not is_subtype_of(tuple[B1, B2], tuple[A1]))
 static_assert(not is_subtype_of(tuple[B1, B2], tuple[A1, A2, Unrelated]))
+static_assert(is_subtype_of(tuple[int], tuple[object, ...]))
+```
 
-# TODO: should pass
-static_assert(is_subtype_of(tuple[int], tuple[object, ...]))  # error: [static-assert-error]
+## Subtyping of heterogeneous tuple types and homogeneous tuple types
+
+While a homogeneous tuple type is not a subtype of any heterogeneous tuple types, a heterogeneous
+tuple type can be a subtype of a homogeneous tuple type, and homogeneous tuple types can be subtypes
+of `Sequence`:
+
+```py
+from typing import Literal, Any, Sequence
+from ty_extensions import static_assert, is_subtype_of, Not, AlwaysFalsy
+
+static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[Literal[1, 2], ...]))
+static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[int, ...]))
+static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[int | str, ...]))
+static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[Not[AlwaysFalsy], ...]))
+static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], Sequence[int]))
+static_assert(is_subtype_of(tuple[int, ...], Sequence[int]))
+
+static_assert(is_subtype_of(tuple[()], tuple[Literal[1, 2], ...]))
+static_assert(is_subtype_of(tuple[()], tuple[int, ...]))
+static_assert(is_subtype_of(tuple[()], tuple[int | str, ...]))
+static_assert(is_subtype_of(tuple[()], tuple[Not[AlwaysFalsy], ...]))
+static_assert(is_subtype_of(tuple[()], Sequence[int]))
+
+static_assert(not is_subtype_of(tuple[Literal[1], Literal[2]], tuple[Any, ...]))
+static_assert(not is_subtype_of(tuple[int, int], tuple[str, ...]))
+static_assert(not is_subtype_of(tuple[int, ...], Sequence[Any]))
+static_assert(not is_subtype_of(tuple[Any, ...], Sequence[int]))
 ```
 
 ## Union types
@@ -1128,6 +1150,29 @@ static_assert(not is_subtype_of(Callable[[int], int], A))
 def f(fn: Callable[[int], int]) -> None: ...
 
 f(a)
+```
+
+### Classes with `__call__` as attribute
+
+An instance type can be a subtype of a compatible callable type if the instance type's class has a
+callable `__call__` attribute.
+
+TODO: for the moment, we don't consider the callable type as a bound-method descriptor, but this may
+change for better compatibility with mypy/pyright.
+
+```py
+from typing import Callable
+from ty_extensions import static_assert, is_subtype_of
+
+def call_impl(a: int) -> str:
+    return ""
+
+class A:
+    __call__: Callable[[int], str] = call_impl
+
+static_assert(is_subtype_of(A, Callable[[int], str]))
+static_assert(not is_subtype_of(A, Callable[[int], int]))
+reveal_type(A()(1))  # revealed: str
 ```
 
 ### Class literals

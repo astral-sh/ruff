@@ -1,8 +1,9 @@
-use crate::types::generics::{GenericContext, Specialization, TypeMapping};
-use crate::types::{
-    todo_type, ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, Type,
-};
 use crate::Db;
+use crate::types::generics::Specialization;
+use crate::types::{
+    ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, Type,
+    TypeMapping, todo_type,
+};
 
 /// Enumeration of the possible kinds of types we allow in class bases.
 ///
@@ -18,57 +19,24 @@ pub enum ClassBase<'db> {
     Class(ClassType<'db>),
     /// Although `Protocol` is not a class in typeshed's stubs, it is at runtime,
     /// and can appear in the MRO of a class.
-    Protocol(Option<GenericContext<'db>>),
+    Protocol,
     /// Bare `Generic` cannot be subclassed directly in user code,
     /// but nonetheless appears in the MRO of classes that inherit from `Generic[T]`,
     /// `Protocol[T]`, or bare `Protocol`.
-    Generic(Option<GenericContext<'db>>),
+    Generic,
 }
 
 impl<'db> ClassBase<'db> {
-    pub(crate) const fn any() -> Self {
-        Self::Dynamic(DynamicType::Any)
-    }
-
     pub(crate) const fn unknown() -> Self {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
-        struct Display<'db> {
-            base: ClassBase<'db>,
-            db: &'db dyn Db,
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
+            Self::Class(class) => Self::Class(class.normalized(db)),
+            Self::Protocol | Self::Generic => self,
         }
-
-        impl std::fmt::Display for Display<'_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self.base {
-                    ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
-                    ClassBase::Class(class @ ClassType::NonGeneric(_)) => {
-                        write!(f, "<class '{}'>", class.name(self.db))
-                    }
-                    ClassBase::Class(ClassType::Generic(alias)) => {
-                        write!(f, "<class '{}'>", alias.display(self.db))
-                    }
-                    ClassBase::Protocol(generic_context) => {
-                        f.write_str("typing.Protocol")?;
-                        if let Some(generic_context) = generic_context {
-                            generic_context.display(self.db).fmt(f)?;
-                        }
-                        Ok(())
-                    }
-                    ClassBase::Generic(generic_context) => {
-                        f.write_str("typing.Generic")?;
-                        if let Some(generic_context) = generic_context {
-                            generic_context.display(self.db).fmt(f)?;
-                        }
-                        Ok(())
-                    }
-                }
-            }
-        }
-
-        Display { base: self, db }
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
@@ -77,8 +45,8 @@ impl<'db> ClassBase<'db> {
             ClassBase::Dynamic(DynamicType::Any) => "Any",
             ClassBase::Dynamic(DynamicType::Unknown) => "Unknown",
             ClassBase::Dynamic(DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec) => "@Todo",
-            ClassBase::Protocol(_) => "Protocol",
-            ClassBase::Generic(_) => "Generic",
+            ClassBase::Protocol => "Protocol",
+            ClassBase::Generic => "Generic",
         }
     }
 
@@ -107,15 +75,59 @@ impl<'db> ClassBase<'db> {
             }
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
-                if instance.class().is_known(db, KnownClass::GenericAlias) =>
+                if instance.class.is_known(db, KnownClass::GenericAlias) =>
             {
                 Self::try_from_type(db, todo_type!("GenericAlias instance"))
             }
-            Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
-            Type::Intersection(_) => None, // TODO -- probably incorrect?
+            Type::SubclassOf(subclass_of) => subclass_of
+                .subclass_of()
+                .into_dynamic()
+                .map(ClassBase::Dynamic),
+            Type::Intersection(inter) => {
+                let valid_element = inter
+                    .positive(db)
+                    .iter()
+                    .find_map(|elem| ClassBase::try_from_type(db, *elem))?;
+
+                if ty.is_disjoint_from(db, KnownClass::Type.to_instance(db)) {
+                    None
+                } else {
+                    Some(valid_element)
+                }
+            }
+            Type::Union(union) => {
+                // We do not support full unions of MROs (yet). Until we do,
+                // support the cases where one of the types in the union is
+                // a dynamic type such as `Any` or `Unknown`, and all other
+                // types *would be* valid class bases. In this case, we can
+                // "fold" the other potential bases into the dynamic type,
+                // and return `Any`/`Unknown` as the class base to prevent
+                // invalid-base diagnostics and further downstream errors.
+                let Some(Type::Dynamic(dynamic)) = union
+                    .elements(db)
+                    .iter()
+                    .find(|elem| matches!(elem, Type::Dynamic(_)))
+                else {
+                    return None;
+                };
+
+                if union
+                    .elements(db)
+                    .iter()
+                    .all(|elem| ClassBase::try_from_type(db, *elem).is_some())
+                {
+                    Some(ClassBase::Dynamic(*dynamic))
+                } else {
+                    None
+                }
+            }
             Type::NominalInstance(_) => None, // TODO -- handle `__mro_entries__`?
-            Type::PropertyInstance(_) => None,
-            Type::Never
+
+            // This likely means that we're in unreachable code,
+            // in which case we want to treat `Never` in a forgiving way and silence diagnostics
+            Type::Never => Some(ClassBase::unknown()),
+
+            Type::PropertyInstance(_)
             | Type::BooleanLiteral(_)
             | Type::FunctionLiteral(_)
             | Type::Callable(..)
@@ -130,7 +142,6 @@ impl<'db> ClassBase<'db> {
             | Type::LiteralString
             | Type::Tuple(_)
             | Type::ModuleLiteral(_)
-            | Type::SubclassOf(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::ProtocolInstance(_)
@@ -164,7 +175,6 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::AlwaysTruthy
                 | KnownInstanceType::AlwaysFalsy => None,
                 KnownInstanceType::Unknown => Some(Self::unknown()),
-                KnownInstanceType::Any => Some(Self::any()),
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
                 KnownInstanceType::Dict => {
                     Self::try_from_type(db, KnownClass::Dict.to_class_literal(db))
@@ -203,12 +213,8 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::Callable => {
                     Self::try_from_type(db, todo_type!("Support for Callable as a base class"))
                 }
-                KnownInstanceType::Protocol(generic_context) => {
-                    Some(ClassBase::Protocol(generic_context))
-                }
-                KnownInstanceType::Generic(generic_context) => {
-                    Some(ClassBase::Generic(generic_context))
-                }
+                KnownInstanceType::Protocol(_) => Some(ClassBase::Protocol),
+                KnownInstanceType::Generic(_) => Some(ClassBase::Generic),
             },
         }
     }
@@ -216,14 +222,14 @@ impl<'db> ClassBase<'db> {
     pub(super) fn into_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(class) => Some(class),
-            Self::Dynamic(_) | Self::Generic(_) | Self::Protocol(_) => None,
+            Self::Dynamic(_) | Self::Generic | Self::Protocol => None,
         }
     }
 
-    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.apply_type_mapping(db, type_mapping)),
-            Self::Dynamic(_) | Self::Generic(_) | Self::Protocol(_) => self,
+            Self::Dynamic(_) | Self::Generic | Self::Protocol => self,
         }
     }
 
@@ -233,7 +239,7 @@ impl<'db> ClassBase<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         if let Some(specialization) = specialization {
-            self.apply_type_mapping(db, specialization.type_mapping())
+            self.apply_type_mapping(db, &TypeMapping::Specialization(specialization))
         } else {
             self
         }
@@ -247,7 +253,7 @@ impl<'db> ClassBase<'db> {
                     .try_mro(db, specialization)
                     .is_err_and(MroError::is_cycle)
             }
-            ClassBase::Dynamic(_) | ClassBase::Generic(_) | ClassBase::Protocol(_) => false,
+            ClassBase::Dynamic(_) | ClassBase::Generic | ClassBase::Protocol => false,
         }
     }
 
@@ -258,16 +264,16 @@ impl<'db> ClassBase<'db> {
         additional_specialization: Option<Specialization<'db>>,
     ) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
-            ClassBase::Protocol(context) => {
-                ClassBaseMroIterator::length_3(db, self, ClassBase::Generic(context))
-            }
-            ClassBase::Dynamic(_) | ClassBase::Generic(_) => {
-                ClassBaseMroIterator::length_2(db, self)
-            }
+            ClassBase::Protocol => ClassBaseMroIterator::length_3(db, self, ClassBase::Generic),
+            ClassBase::Dynamic(_) | ClassBase::Generic => ClassBaseMroIterator::length_2(db, self),
             ClassBase::Class(class) => {
                 ClassBaseMroIterator::from_class(db, class, additional_specialization)
             }
         }
+    }
+
+    pub(crate) const fn is_dynamic(self) -> bool {
+        matches!(self, Self::Dynamic(_))
     }
 }
 
@@ -282,12 +288,8 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
         match value {
             ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
             ClassBase::Class(class) => class.into(),
-            ClassBase::Protocol(generic_context) => {
-                Type::KnownInstance(KnownInstanceType::Protocol(generic_context))
-            }
-            ClassBase::Generic(generic_context) => {
-                Type::KnownInstance(KnownInstanceType::Generic(generic_context))
-            }
+            ClassBase::Protocol => Type::KnownInstance(KnownInstanceType::Protocol(None)),
+            ClassBase::Generic => Type::KnownInstance(KnownInstanceType::Generic(None)),
         }
     }
 }

@@ -56,13 +56,12 @@ reveal_type(a)  # revealed: tuple[()]
 reveal_type(b)  # revealed: tuple[int]
 reveal_type(c)  # revealed: tuple[str, int]
 reveal_type(d)  # revealed: tuple[tuple[str, str], tuple[int, int]]
+reveal_type(e)  # revealed: tuple[str, ...]
 
-# TODO: homogeneous tuples, PEP-646 tuples, generics
-reveal_type(e)  # revealed: @Todo(full tuple[...] support)
-reveal_type(f)  # revealed: @Todo(full tuple[...] support)
-reveal_type(g)  # revealed: @Todo(full tuple[...] support)
+reveal_type(f)  # revealed: @Todo(PEP 646)
+reveal_type(g)  # revealed: @Todo(PEP 646)
+
 reveal_type(h)  # revealed: tuple[list[int], list[int]]
-
 reveal_type(i)  # revealed: tuple[str | int, str | int]
 reveal_type(j)  # revealed: tuple[str | int]
 ```
@@ -87,6 +86,33 @@ def foo(v: str | int | None, w: str | str | None, x: str | str):
     reveal_type(v)  # revealed: str | int | None
     reveal_type(w)  # revealed: str | None
     reveal_type(x)  # revealed: str
+```
+
+## PEP-604 in non-type-expression context
+
+### In Python 3.10 and later
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+IntOrStr = int | str
+```
+
+### Earlier versions
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+# error: [unsupported-operator]
+IntOrStr = int | str
 ```
 
 ## Attribute expressions in type annotations are understood

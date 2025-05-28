@@ -777,6 +777,30 @@ reveal_type(C.variable_with_class_default1)  # revealed: str
 reveal_type(c_instance.variable_with_class_default1)  # revealed: str
 ```
 
+#### Descriptor attributes as class variables
+
+Whether they are explicitly qualified as `ClassVar`, or just have a class level default, we treat
+descriptor attributes as class variables. This test mainly makes sure that we do *not* treat them as
+instance variables. This would lead to a different outcome, since the `__get__` method would not be
+called (the descriptor protocol is not invoked for instance variables).
+
+```py
+from typing import ClassVar
+
+class Descriptor:
+    def __get__(self, instance, owner) -> int:
+        return 42
+
+class C:
+    a: ClassVar[Descriptor]
+    b: Descriptor = Descriptor()
+    c: ClassVar[Descriptor] = Descriptor()
+
+reveal_type(C().a)  # revealed: int
+reveal_type(C().b)  # revealed: int
+reveal_type(C().c)  # revealed: int
+```
+
 ### Inheritance of class/instance attributes
 
 #### Instance variable defined in a base class
@@ -1462,6 +1486,14 @@ Instance attributes also take precedence over the `__getattr__` method:
 reveal_type(c.instance_attr)  # revealed: str
 ```
 
+Importantly, `__getattr__` is only called if attributes are accessed on instances, not if they are
+accessed on the class itself:
+
+```py
+# error: [unresolved-attribute]
+CustomGetAttr.whatever
+```
+
 ### Type of the `name` parameter
 
 If the `name` parameter of the `__getattr__` method is annotated with a (union of) literal type(s),
@@ -1493,6 +1525,65 @@ import argparse
 
 def _(ns: argparse.Namespace):
     reveal_type(ns.whatever)  # revealed: Any
+```
+
+## Classes with custom `__getattribute__` methods
+
+If a type provides a custom `__getattribute__`, we use its return type as the type for unknown
+attributes. Note that this behavior differs from runtime, where `__getattribute__` is called
+unconditionally, even for known attributes. The rationale for doing this is that it allows users to
+specify more precise types for specific attributes, such as `x: str` in the example below. This
+behavior matches other type checkers such as mypy and pyright.
+
+```py
+from typing import Any
+
+class Foo:
+    x: str
+    def __getattribute__(self, attr: str) -> Any:
+        return 42
+
+reveal_type(Foo().x)  # revealed: str
+reveal_type(Foo().y)  # revealed: Any
+```
+
+A standard library example for a class with a custom `__getattribute__` method is `SimpleNamespace`:
+
+```py
+from types import SimpleNamespace
+
+sn = SimpleNamespace(a="a")
+
+reveal_type(sn.a)  # revealed: Any
+```
+
+`__getattribute__` takes precedence over `__getattr__`:
+
+```py
+class C:
+    def __getattribute__(self, name: str) -> int:
+        return 1
+
+    def __getattr__(self, name: str) -> str:
+        return "a"
+
+c = C()
+
+reveal_type(c.x)  # revealed: int
+```
+
+Like all dunder methods, `__getattribute__` is not looked up on instances:
+
+```py
+def external_getattribute(name) -> int:
+    return 1
+
+class ThisFails:
+    def __init__(self):
+        self.__getattribute__ = external_getattribute
+
+# error: [unresolved-attribute]
+ThisFails().x
 ```
 
 ## Classes with custom `__setattr__` methods
@@ -1666,6 +1757,36 @@ reveal_type(outer.nested.inner.Outer.Nested.Inner.attr)  # revealed: int
 outer.nested.inner.Outer.Nested.Inner.attr = "a"
 ```
 
+### Unions of module attributes
+
+`mod1.py`:
+
+```py
+global_symbol: str = "a"
+```
+
+`mod2.py`:
+
+```py
+global_symbol: str = "a"
+```
+
+```py
+import mod1
+import mod2
+
+def _(flag: bool):
+    if flag:
+        mod = mod1
+    else:
+        mod = mod2
+
+    mod.global_symbol = "b"
+
+    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` on type `<module 'mod1'> | <module 'mod2'>`"
+    mod.global_symbol = 1
+```
+
 ## Literal types
 
 ### Function-literal attributes
@@ -1676,7 +1797,7 @@ functions are instances of that class:
 ```py
 def f(): ...
 
-reveal_type(f.__defaults__)  # revealed: @Todo(full tuple[...] support) | None
+reveal_type(f.__defaults__)  # revealed: tuple[Any, ...] | None
 reveal_type(f.__kwdefaults__)  # revealed: dict[str, Any] | None
 ```
 
@@ -1730,7 +1851,7 @@ All attribute access on literal `bytes` types is currently delegated to `builtin
 ```py
 # revealed: bound method Literal[b"foo"].join(iterable_of_bytes: Iterable[@Todo(Support for `typing.TypeAlias`)], /) -> bytes
 reveal_type(b"foo".join)
-# revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`), start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+# revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`) | tuple[@Todo(Support for `typing.TypeAlias`), ...], start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
 reveal_type(b"foo".endswith)
 ```
 

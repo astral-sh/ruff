@@ -601,4 +601,6 @@ S608.py:164:11: S608 Possible SQL injection vector through string-based query co
 167 | |     FROM ({user_input}) raw
 168 | | """
     | |___^ S608
+169 |
+170 |   # https://github.com/astral-sh/ruff/issues/17967
     |
