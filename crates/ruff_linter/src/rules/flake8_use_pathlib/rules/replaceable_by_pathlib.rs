@@ -38,7 +38,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
                 .arguments
                 .find_argument_value("path", 0)
                 .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
-                || is_argument_non_default(&call.arguments, "dir_fd", 2)
+                || is_keyword_only_argument_non_default(&call.arguments, "dir_fd")
             {
                 return;
             }
@@ -54,7 +54,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //           0     1                2
             // os.mkdir(path, mode=0o777, *, dir_fd=None)
             // ```
-            if is_argument_non_default(&call.arguments, "dir_fd", 2) {
+            if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
                 return;
             }
             Diagnostic::new(OsMkdir, range)
@@ -68,8 +68,8 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //           0    1       2                3
             // os.rename(src, dst, *, src_dir_fd=None, dst_dir_fd=None)
             // ```
-            if is_argument_non_default(&call.arguments, "src_dir_fd", 2)
-                || is_argument_non_default(&call.arguments, "dst_dir_fd", 3)
+            if is_keyword_only_argument_non_default(&call.arguments, "src_dir_fd")
+                || is_keyword_only_argument_non_default(&call.arguments, "dst_dir_fd")
             {
                 return;
             }
@@ -84,8 +84,8 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //              0    1       2                3
             // os.replace(src, dst, *, src_dir_fd=None, dst_dir_fd=None)
             // ```
-            if is_argument_non_default(&call.arguments, "src_dir_fd", 2)
-                || is_argument_non_default(&call.arguments, "dst_dir_fd", 3)
+            if is_keyword_only_argument_non_default(&call.arguments, "src_dir_fd")
+                || is_keyword_only_argument_non_default(&call.arguments, "dst_dir_fd")
             {
                 return;
             }
@@ -99,7 +99,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //            0         1
             // os.rmdir(path, *, dir_fd=None)
             // ```
-            if is_argument_non_default(&call.arguments, "dir_fd", 1) {
+            if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
                 return;
             }
             Diagnostic::new(OsRmdir, range)
@@ -112,7 +112,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //            0         1
             // os.remove(path, *, dir_fd=None)
             // ```
-            if is_argument_non_default(&call.arguments, "dir_fd", 1) {
+            if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
                 return;
             }
             Diagnostic::new(OsRemove, range)
@@ -125,7 +125,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //            0         1
             // os.unlink(path, *, dir_fd=None)
             // ```
-            if is_argument_non_default(&call.arguments, "dir_fd", 1) {
+            if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
                 return;
             }
             Diagnostic::new(OsUnlink, range)
@@ -155,7 +155,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
                 .arguments
                 .find_argument_value("path", 0)
                 .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
-                || is_argument_non_default(&call.arguments, "dir_fd", 1)
+                || is_keyword_only_argument_non_default(&call.arguments, "dir_fd")
             {
                 return;
             }
@@ -210,7 +210,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //            0    1    2                             3
             // os.symlink(src, dst, target_is_directory=False, *, dir_fd=None)
             // ```
-            if is_argument_non_default(&call.arguments, "dir_fd", 3) {
+            if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
                 return;
             }
             Diagnostic::new(OsSymlink, range)
@@ -262,7 +262,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //               0           1              2            3                 4
             // glob.glob(pathname, *, root_dir=None, dir_fd=None, recursive=False, include_hidden=False)
             // ```
-            if is_argument_non_default(&call.arguments, "dir_fd", 2) {
+            if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
                 return;
             }
 
@@ -281,7 +281,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //                0           1              2            3                 4
             // glob.iglob(pathname, *, root_dir=None, dir_fd=None, recursive=False, include_hidden=False)
             // ```
-            if is_argument_non_default(&call.arguments, "dir_fd", 2) {
+            if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
                 return;
             }
 
@@ -301,7 +301,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             //               0         1
             // os.readlink(path, *, dir_fd=None)
             // ```
-            if is_argument_non_default(&call.arguments, "dir_fd", 1) {
+            if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
                 return;
             }
             Diagnostic::new(OsReadlink, range)
@@ -362,4 +362,10 @@ fn is_argument_non_default(arguments: &ast::Arguments, name: &str, position: usi
     arguments
         .find_argument_value(name, position)
         .is_some_and(|expr| !expr.is_none_literal_expr())
+}
+
+fn is_keyword_only_argument_non_default(arguments: &ast::Arguments, name: &str) -> bool {
+    arguments
+        .find_keyword(name)
+        .is_some_and(|keyword| !keyword.value.is_none_literal_expr())
 }
