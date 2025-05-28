@@ -203,7 +203,18 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
         // PTH205
         ["os", "path", "getctime"] => Diagnostic::new(OsPathGetctime, range),
         // PTH211
-        ["os", "symlink"] => Diagnostic::new(OsSymlink, range),
+        ["os", "symlink"] => {
+            // `dir_fd` is not supported by pathlib, so check if there are non-default values.
+            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.symlink)
+            // ```text
+            //            0    1    2                             3
+            // os.symlink(src, dst, target_is_directory=False, *, dir_fd=None)
+            // ```
+            if is_argument_non_default(&call.arguments, "dir_fd", 3) {
+                return;
+            }
+            Diagnostic::new(OsSymlink, range)
+        }
 
         // PTH123
         ["" | "builtins", "open"] => {
