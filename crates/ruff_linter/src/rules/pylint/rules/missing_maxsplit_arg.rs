@@ -1,10 +1,10 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     DictItem, Expr, ExprAttribute, ExprCall, ExprDict, ExprNumberLiteral, ExprStringLiteral,
     ExprSubscript, ExprUnaryOp, Keyword, Number, UnaryOp,
 };
-use ruff_python_semantic::{analyze::typing, SemanticModel};
+use ruff_python_semantic::{SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
