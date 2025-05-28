@@ -342,7 +342,7 @@ fn respond<Req>(
         tracing::error!("An error occurred with request ID {id}: {err}");
         client.show_error_message("ty encountered a problem. Check the logs for more details.");
     }
-    if let Err(err) = client.respond(&id, result) {
+    if let Err(err) = client.respond(id, result) {
         tracing::error!("Failed to send response: {err}");
     }
 }

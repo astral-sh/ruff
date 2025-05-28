@@ -63,6 +63,8 @@ impl Server {
             crate::version(),
         )?;
 
+        // The number 32 was chosen arbitrarily. The main goal was to have enough capacity to queue
+        // some responses before blocking.
         let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
         let client = Client::new(main_loop_sender.clone(), connection.sender());
 
