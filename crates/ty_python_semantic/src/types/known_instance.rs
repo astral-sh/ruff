@@ -88,7 +88,8 @@ pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Callable`
     /// (which can also be found as `typing_extensions.Callable` or as `collections.abc.Callable`)
     Callable,
-    /// The symbol `typing.Self` (which can also be found as `typing_extensions.Self`)
+    /// The symbol `typing.Self` (which can also be found as `typing_extensions.Self` or
+    /// `_typeshed.Self`)
     TypingSelf,
 
     // Various special forms, special aliases and type qualifiers that we don't yet understand
@@ -307,7 +308,6 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Literal
             | Self::LiteralString
             | Self::Never
-            | Self::TypingSelf
             | Self::Final
             | Self::Concatenate
             | Self::Unpack
@@ -321,6 +321,12 @@ impl<'db> KnownInstanceType<'db> {
             | Self::TypeAliasType(_)
             | Self::TypeVar(_) => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
+            }
+            Self::TypingSelf => {
+                matches!(
+                    module,
+                    KnownModule::Typing | KnownModule::TypingExtensions | KnownModule::Typeshed
+                )
             }
             Self::Unknown
             | Self::AlwaysTruthy
