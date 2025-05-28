@@ -341,6 +341,9 @@ class H(F, G):
     def f(self):
         raise NotImplementedError
 
+# We can only reveal `Literal[2]` here, not `Never`, because of potential
+# subclasses of `H`, which are bound by the annotated return types of
+# `F.f` and `G.f`, but are not bound by our inference on `H.f`.
 reveal_type(H().f())  # revealed: Literal[2]
 
 class C2[T]:

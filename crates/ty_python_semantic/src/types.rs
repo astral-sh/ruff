@@ -4425,7 +4425,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Returns the inferred return type of `self` if it is a function literal / bounded method.
+    /// Returns the inferred return type of `self` if it is a function literal / bound method.
     fn inferred_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::FunctionLiteral(function_type) if !function_type.file(db).is_stub(db) => {
