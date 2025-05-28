@@ -494,7 +494,7 @@ impl<'db> ClassType<'db> {
             .map_type(|ty| ty.apply_optional_specialization(db, specialization))
     }
 
-    /// Return a `Type::Callable` (or union of `Type::Callable`) that represents the callable
+    /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
     pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
         let self_ty = Type::from(self);
@@ -521,8 +521,7 @@ impl<'db> ClassType<'db> {
             .member_lookup_with_policy(
                 db,
                 "__new__".into(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
             )
             .symbol;
 
@@ -532,20 +531,26 @@ impl<'db> ClassType<'db> {
             {
                 // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
                 // then we should ignore the `__init__` and just return the `__new__` method.
-                let may_return_non_subtype = dunder_new_function
-                    .signature(db)
-                    .overloads
-                    .iter()
-                    .any(|signature| {
-                        signature.return_ty.is_some_and(|return_ty| {
-                            !return_ty.to_meta_type(db).is_subtype_of(db, self_ty)
-                        })
-                    });
+                let returns_non_subclass =
+                    dunder_new_function
+                        .signature(db)
+                        .overloads
+                        .iter()
+                        .any(|signature| {
+                            signature.return_ty.is_some_and(|return_ty| {
+                                !return_ty.is_assignable_to(
+                                    db,
+                                    self_ty
+                                        .to_instance(db)
+                                        .expect("ClassType should be instantiable"),
+                                )
+                            })
+                        });
 
                 let dunder_new_bound_method =
                     dunder_new_function.into_bound_method_type(db, self_ty);
 
-                if may_return_non_subtype {
+                if returns_non_subclass {
                     return dunder_new_bound_method;
                 }
                 Some(dunder_new_bound_method)
@@ -600,9 +605,7 @@ impl<'db> ClassType<'db> {
                     vec![dunder_new_function, synthesized_dunder_init_callable],
                 )
             }
-            (Some(dunder_new_function), None) | (None, Some(dunder_new_function)) => {
-                dunder_new_function
-            }
+            (Some(constructor), None) | (None, Some(constructor)) => constructor,
             (None, None) => {
                 // If no `__new__` or `__init__` method is found, then we fall back to looking for
                 // an `object.__new__` method.

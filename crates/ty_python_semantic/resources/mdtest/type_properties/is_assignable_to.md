@@ -608,6 +608,7 @@ c: Callable[[Any], str] = A().g
 ```py
 from typing import Any, Callable
 
+c: Callable[[object], type] = type
 c: Callable[[str], Any] = str
 c: Callable[[str], Any] = int
 
