@@ -132,11 +132,15 @@ pub enum PythonVersionSource {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PythonVersionFileSource {
-    pub path: Arc<SystemPathBuf>,
-    pub range: Option<TextRange>,
+    path: Arc<SystemPathBuf>,
+    range: Option<TextRange>,
 }
 
 impl PythonVersionFileSource {
+    pub fn new(path: Arc<SystemPathBuf>, range: Option<TextRange>) -> Self {
+        Self { path, range }
+    }
+
     pub(crate) fn span(&self, db: &dyn Db) -> Option<Span> {
         let file = system_path_to_file(db.upcast(), &*self.path).ok()?;
         Some(Span::from(file).with_optional_range(self.range))

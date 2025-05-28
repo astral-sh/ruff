@@ -18,9 +18,9 @@ use indexmap::IndexSet;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::Cursor;
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextLen, TextRange};
 
-use crate::{PythonVersionSource, PythonVersionWithSource, program::PythonVersionFileSource};
+use crate::{PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource};
 
 type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 
@@ -133,7 +133,7 @@ impl PythonEnvironment {
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
         match self {
-            Self::Virtual(venv) => venv.site_packages_directories(system),
+            Self::Virtual(env) => env.site_packages_directories(system),
             Self::System(env) => env.site_packages_directories(system),
         }
     }
@@ -203,10 +203,6 @@ impl VirtualEnvironment {
         path: SysPrefixPath,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Self> {
-        fn pyvenv_cfg_line_number(index: usize) -> NonZeroUsize {
-            index.checked_add(1).and_then(NonZeroUsize::new).unwrap()
-        }
-
         let pyvenv_cfg_path = path.join("pyvenv.cfg");
         tracing::debug!("Attempting to parse virtual environment metadata at '{pyvenv_cfg_path}'");
 
@@ -221,80 +217,87 @@ impl VirtualEnvironment {
         let mut created_with_uv = false;
         let mut parent_environment = None;
         let mut cursor = Cursor::new(&pyvenv_cfg);
+        let mut line_number = NonZeroUsize::new(1).unwrap();
 
         // A `pyvenv.cfg` file *looks* like a `.ini` file, but actually isn't valid `.ini` syntax!
         // The Python standard-library's `site` module parses these files by splitting each line on
         // '=' characters, so that's what we should do as well.
         //
         // See also: https://snarky.ca/how-virtual-environments-work/
-        for (index, line) in pyvenv_cfg.lines().enumerate() {
-            if let Some(eq_position) = line.find('=') {
-                if !eq_position < line.len() - 1 {
-                    return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
-                        pyvenv_cfg_path,
-                        PyvenvCfgParseErrorKind::MalformedKeyValuePair {
-                            line_number: pyvenv_cfg_line_number(index),
-                        },
-                    ));
-                }
+        while !cursor.is_eof() {
+            if line_number.get() != 1 {
+                line_number = line_number.checked_add(1).unwrap();
+            }
 
-                let key = line[..eq_position].trim();
+            cursor.skip_non_newline_whitespace();
 
-                cursor.skip_bytes(eq_position + 1);
-                cursor.eat_while(char::is_whitespace);
+            let remaining_file = cursor.chars().as_str();
 
-                let value = line[eq_position + 1..].trim();
+            let next_newline_position = remaining_file
+                .find('\n')
+                .unwrap_or(cursor.text_len().to_usize());
 
-                if value.is_empty() {
-                    return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
-                        pyvenv_cfg_path,
-                        PyvenvCfgParseErrorKind::MalformedKeyValuePair {
-                            line_number: pyvenv_cfg_line_number(index),
-                        },
-                    ));
-                }
-
-                let value_offset = cursor.offset();
-                cursor.skip_bytes(value.len());
-
-                match key {
-                    "include-system-site-packages" => {
-                        include_system_site_packages = value.eq_ignore_ascii_case("true");
-                    }
-                    "home" => base_executable_home_path = Some(value),
-                    // `virtualenv` and `uv` call this key `version_info`,
-                    // but the stdlib venv module calls it `version`
-                    "version" | "version_info" => {
-                        let version_range = TextRange::new(value_offset, cursor.offset());
-                        version_info_string = Some((value, version_range));
-                    }
-                    "implementation" => {
-                        implementation = match value.to_ascii_lowercase().as_str() {
-                            "cpython" => PythonImplementation::CPython,
-                            "graalvm" => PythonImplementation::GraalPy,
-                            "pypy" => PythonImplementation::PyPy,
-                            _ => PythonImplementation::Unknown,
-                        };
-                    }
-                    "uv" => created_with_uv = true,
-                    "extends-environment" => parent_environment = Some(value),
-                    "" => {
-                        return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
-                            pyvenv_cfg_path,
-                            PyvenvCfgParseErrorKind::MalformedKeyValuePair {
-                                line_number: pyvenv_cfg_line_number(index),
-                            },
-                        ));
-                    }
-                    _ => {}
-                }
-
-                while !cursor.is_eof() {
-                    if cursor.eat_char('\n') || cursor.eat_char2('\r', '\n') {
-                        break;
-                    }
+            let Some(eq_position) = remaining_file[..next_newline_position].find('=') else {
+                // Skip over any lines that do not contain '=' characters, same as the CPython stdlib
+                // <https://github.com/python/cpython/blob/e64395e8eb8d3a9e35e3e534e87d427ff27ab0a5/Lib/site.py#L625-L632>
+                cursor.skip_bytes(next_newline_position);
+                if !cursor.is_eof() {
                     cursor.bump();
                 }
+                continue;
+            };
+
+            let key = remaining_file[..eq_position].trim();
+
+            cursor.skip_bytes(eq_position + 1);
+            cursor.eat_while(char::is_whitespace);
+
+            let value = remaining_file[eq_position + 1..next_newline_position].trim();
+
+            if value.is_empty() {
+                return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
+                    pyvenv_cfg_path,
+                    PyvenvCfgParseErrorKind::MalformedKeyValuePair { line_number },
+                ));
+            }
+
+            let value_offset = cursor.offset();
+
+            match key {
+                "include-system-site-packages" => {
+                    include_system_site_packages = value.eq_ignore_ascii_case("true");
+                }
+                "home" => base_executable_home_path = Some(value),
+                // `virtualenv` and `uv` call this key `version_info`,
+                // but the stdlib venv module calls it `version`
+                "version" | "version_info" => {
+                    let version_range =
+                        TextRange::new(value_offset, value_offset + value.text_len());
+                    version_info_string = Some((value, version_range));
+                }
+                "implementation" => {
+                    implementation = match value.to_ascii_lowercase().as_str() {
+                        "cpython" => PythonImplementation::CPython,
+                        "graalvm" => PythonImplementation::GraalPy,
+                        "pypy" => PythonImplementation::PyPy,
+                        _ => PythonImplementation::Unknown,
+                    };
+                }
+                "uv" => created_with_uv = true,
+                "extends-environment" => parent_environment = Some(value),
+                "" => {
+                    return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
+                        pyvenv_cfg_path,
+                        PyvenvCfgParseErrorKind::MalformedKeyValuePair { line_number },
+                    ));
+                }
+                _ => {}
+            }
+
+            cursor.eat_while(|c| c != '\n');
+
+            if !cursor.is_eof() {
+                cursor.bump();
             }
         }
 
@@ -345,15 +348,12 @@ impl VirtualEnvironment {
         let version = version_info_string.and_then(|(version_string, range)| {
             let mut version_info_parts = version_string.split('.');
             let (major, minor) = (version_info_parts.next()?, version_info_parts.next()?);
-            PythonVersion::try_from((major, minor))
-                .ok()
-                .map(|version| PythonVersionWithSource {
-                    version,
-                    source: PythonVersionSource::PyvenvCfgFile(PythonVersionFileSource {
-                        path: Arc::new(pyvenv_cfg_path),
-                        range: Some(range),
-                    }),
-                })
+            let version = PythonVersion::try_from((major, minor)).ok()?;
+            let source = PythonVersionSource::PyvenvCfgFile(PythonVersionFileSource::new(
+                Arc::new(pyvenv_cfg_path),
+                Some(range),
+            ));
+            Some(PythonVersionWithSource { version, source })
         });
 
         let metadata = Self {

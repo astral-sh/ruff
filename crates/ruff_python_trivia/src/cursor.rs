@@ -171,6 +171,6 @@ impl<'a> Cursor<'a> {
     }
 
     pub fn skip_non_newline_whitespace(&mut self) {
-        self.eat_while(|c| c.is_whitespace() && !matches!(c, '\n' | '\r'));
+        self.eat_while(|c| c.is_whitespace() && c != '\n');
     }
 }

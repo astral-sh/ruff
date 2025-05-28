@@ -309,6 +309,66 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
 }
 
 #[test]
+fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            python = ".venv"
+            "#,
+        ),
+        (
+            ".venv/pyvenv.cfg",
+            r#"
+            home = foo/bar/bin
+            version = 3.8
+            "#,
+        ),
+        if cfg!(target_os = "windows") {
+            ("foo/bar/bin/python.exe", "")
+        } else {
+            ("foo/bar/bin/python", "")
+        },
+        if cfg!(target_os = "windows") {
+            (".venv/Lib/site-packages/foo.py", "")
+        } else {
+            (".venv/lib/python3.8/site-packages/foo.py", "")
+        },
+        ("test.py", "aiter"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `aiter` used when not defined
+     --> test.py:1:1
+      |
+    1 | aiter
+      | ^^^^^
+      |
+    info: `aiter` was added as a builtin in Python 3.10
+    info: Python 3.8 was assumed when resolving types because of your virtual environment
+     --> .venv/pyvenv.cfg:3:11
+      |
+    2 | home = foo/bar/bin
+    3 | version = 3.8
+      |           ^^^ Python version inferred from virtual environment metadata file
+      |
+    info: No Python version was specified on the command line or in a configuration file
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn config_file_annotation_showing_where_python_version_set_syntax_error() -> anyhow::Result<()> {
     let case = TestCase::with_files([
         (

@@ -88,12 +88,9 @@ impl Options {
                 version: **ranged_version,
                 source: match ranged_version.source() {
                     ValueSource::Cli => PythonVersionSource::Cli,
-                    ValueSource::File(path) => {
-                        PythonVersionSource::ConfigFile(PythonVersionFileSource {
-                            path: path.clone(),
-                            range: ranged_version.range(),
-                        })
-                    }
+                    ValueSource::File(path) => PythonVersionSource::ConfigFile(
+                        PythonVersionFileSource::new(path.clone(), ranged_version.range()),
+                    ),
                 },
             });
         let python_platform = self

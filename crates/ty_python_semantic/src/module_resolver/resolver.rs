@@ -251,8 +251,7 @@ impl SearchPaths {
                 //  than the one resolved in the program settings because it indicates
                 //  that the `target-version` is incorrectly configured or that the
                 //  venv is out of date.
-                PythonEnvironment::new(sys_prefix.clone(), *origin, system)?
-                    .into_settings(system)?
+                PythonEnvironment::new(sys_prefix, *origin, system)?.into_settings(system)?
             }
 
             PythonPath::Resolve(target, origin) => {
