@@ -438,7 +438,7 @@ pub fn add_noqa_to_path(
     )
 }
 
-/// Generate a [`Message`] for each [`Diagnostic`] triggered by the given source
+/// Generate a [`Message`] for each [`OldDiagnostic`] triggered by the given source
 /// code.
 pub fn lint_only(
     path: &Path,
