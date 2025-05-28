@@ -1234,7 +1234,7 @@ impl Violation for OsListdir {
 /// ```python
 /// from pathlib import Path
 ///
-/// Path("usr/bin/python").symlink_to("tmp/python")
+/// Path("tmp/python").symlink_to("usr/bin/python")
 /// ```
 ///
 /// ## Known issues
