@@ -20,6 +20,65 @@ use ruff_python_ast::PythonVersion;
 
 type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 
+/// An ordered, deduplicated set of `site-packages` search paths.
+///
+/// Most environments will only have one `site-packages` directory.
+/// Some virtual environments created with `--system-site-packages`
+/// will also have the system installation's `site-packages` packages
+/// available, however. Ephemeral environments created with `uv` in
+/// `uv run --with` invocations, meanwhile, "extend" a parent environment
+/// (which could be another virtual enviroment or a system installation,
+/// and which could itself have multiple `site-packages` directories).
+///
+/// We use an `IndexSet` here to guard against the (very remote)
+/// possibility that an environment might somehow be marked as being
+/// both a `--system-site-packages` virtual environment *and* an
+/// ephemeral environment that extends the system environment. If this
+/// were the case, the system environment's `site-packages` directory
+/// *might* be added to the `SitePackagesPaths` twice, but we wouldn't
+/// want duplicates to appear in this set.
+#[derive(Debug, PartialEq, Eq, Default)]
+pub(crate) struct SitePackagesPaths(IndexSet<SystemPathBuf>);
+
+impl SitePackagesPaths {
+    pub(crate) fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn single(path: SystemPathBuf) -> Self {
+        Self(IndexSet::from([path]))
+    }
+
+    fn insert(&mut self, path: SystemPathBuf) {
+        self.0.insert(path);
+    }
+
+    fn extend(&mut self, other: Self) {
+        self.0.extend(other.0);
+    }
+}
+
+impl FromIterator<SystemPathBuf> for SitePackagesPaths {
+    fn from_iter<T: IntoIterator<Item = SystemPathBuf>>(iter: T) -> Self {
+        Self(IndexSet::from_iter(iter))
+    }
+}
+
+impl IntoIterator for SitePackagesPaths {
+    type Item = SystemPathBuf;
+    type IntoIter = indexmap::set::IntoIter<SystemPathBuf>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl PartialEq<&[SystemPathBuf]> for SitePackagesPaths {
+    fn eq(&self, other: &&[SystemPathBuf]) -> bool {
+        self.0.as_slice() == *other
+    }
+}
+
 #[derive(Debug)]
 pub(crate) enum PythonEnvironment {
     Virtual(VirtualEnvironment),
@@ -55,7 +114,7 @@ impl PythonEnvironment {
     pub(crate) fn site_packages_directories(
         &self,
         system: &dyn System,
-    ) -> SitePackagesDiscoveryResult<IndexSet<SystemPathBuf>> {
+    ) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
         match self {
             Self::Virtual(env) => env.site_packages_directories(system),
             Self::System(env) => env.site_packages_directories(system),
@@ -264,7 +323,7 @@ impl VirtualEnvironment {
     pub(crate) fn site_packages_directories(
         &self,
         system: &dyn System,
-    ) -> SitePackagesDiscoveryResult<IndexSet<SystemPathBuf>> {
+    ) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
         let VirtualEnvironment {
             root_path,
             base_executable_home_path,
@@ -274,13 +333,9 @@ impl VirtualEnvironment {
             parent_environment,
         } = self;
 
-        let mut site_packages_directories =
-            IndexSet::from([site_packages_directory_from_sys_prefix(
-                root_path,
-                *version,
-                *implementation,
-                system,
-            )?]);
+        let mut site_packages_directories = SitePackagesPaths::single(
+            site_packages_directory_from_sys_prefix(root_path, *version, *implementation, system)?,
+        );
 
         if let Some(parent_env_site_packages) = parent_environment.as_deref() {
             match parent_env_site_packages.site_packages_directories(system) {
@@ -360,15 +415,16 @@ impl SystemEnvironment {
     pub(crate) fn site_packages_directories(
         &self,
         system: &dyn System,
-    ) -> SitePackagesDiscoveryResult<IndexSet<SystemPathBuf>> {
+    ) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
         let SystemEnvironment { root_path } = self;
 
-        let site_packages_directories = IndexSet::from([site_packages_directory_from_sys_prefix(
-            root_path,
-            None,
-            PythonImplementation::Unknown,
-            system,
-        )?]);
+        let site_packages_directories =
+            SitePackagesPaths::single(site_packages_directory_from_sys_prefix(
+                root_path,
+                None,
+                PythonImplementation::Unknown,
+                system,
+            )?);
 
         tracing::debug!(
             "Resolved site-packages directories for this environment are: {site_packages_directories:?}"
@@ -983,16 +1039,19 @@ mod tests {
 
             if self_venv.system_site_packages {
                 assert_eq!(
-                    site_packages_directories.as_slice(),
-                    &[expected_venv_site_packages, expected_system_site_packages]
+                    site_packages_directories,
+                    [expected_venv_site_packages, expected_system_site_packages].as_slice()
                 );
             } else if self_venv.parent_environment.is_none() {
                 assert_eq!(
-                    site_packages_directories.as_slice(),
-                    &[expected_venv_site_packages]
+                    site_packages_directories,
+                    [expected_venv_site_packages].as_slice()
                 );
             } else {
-                assert_eq!(&site_packages_directories[0], &expected_venv_site_packages);
+                assert_eq!(
+                    &site_packages_directories.into_iter().next().unwrap(),
+                    &expected_venv_site_packages
+                );
             }
         }
 
@@ -1035,8 +1094,8 @@ mod tests {
             };
 
             assert_eq!(
-                site_packages_directories.as_slice(),
-                &[expected_site_packages]
+                site_packages_directories,
+                [expected_site_packages].as_slice()
             );
         }
     }
@@ -1452,12 +1511,12 @@ mod tests {
         assert_eq!(site_packages_directories.len(), 2);
         if cfg!(windows) {
             assert_eq!(
-                site_packages_directories[1],
+                site_packages_directories.into_iter().nth(1).unwrap(),
                 SystemPathBuf::from("/parent/env/Lib/site-packages")
             );
         } else {
             assert_eq!(
-                site_packages_directories[1],
+                site_packages_directories.into_iter().nth(1).unwrap(),
                 SystemPathBuf::from("/parent/env/lib/python3.13/site-packages")
             );
         }
