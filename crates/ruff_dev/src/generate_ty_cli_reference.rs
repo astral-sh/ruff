@@ -2,13 +2,13 @@
 use std::cmp::max;
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::{Command, CommandFactory};
 use itertools::Itertools;
 use pretty_assertions::StrComparison;
 
-use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
 use crate::ROOT_DIR;
+use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
 
 use ty::Cli;
 
@@ -29,24 +29,24 @@ pub(crate) fn main(args: &Args) -> Result<()> {
         Mode::DryRun => {
             println!("{reference_string}");
         }
-        Mode::Check => {
-            match std::fs::read_to_string(reference_path) {
-                Ok(current) => {
-                    if current == reference_string {
-                        println!("Up-to-date: {filename}");
-                    } else {
-                        let comparison = StrComparison::new(&current, &reference_string);
-                        bail!("{filename} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}");
-                    }
-                }
-                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                    bail!("{filename} not found, please run `{REGENERATE_ALL_COMMAND}`");
-                }
-                Err(err) => {
-                    bail!("{filename} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{err}");
+        Mode::Check => match std::fs::read_to_string(reference_path) {
+            Ok(current) => {
+                if current == reference_string {
+                    println!("Up-to-date: {filename}");
+                } else {
+                    let comparison = StrComparison::new(&current, &reference_string);
+                    bail!(
+                        "{filename} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}"
+                    );
                 }
             }
-        }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                bail!("{filename} not found, please run `{REGENERATE_ALL_COMMAND}`");
+            }
+            Err(err) => {
+                bail!("{filename} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{err}");
+            }
+        },
         Mode::Write => match std::fs::read_to_string(&reference_path) {
             Ok(current) => {
                 if current == reference_string {
@@ -80,6 +80,7 @@ fn generate() -> String {
 
     let mut parents = Vec::new();
 
+    output.push_str("<!-- WARNING: This file is auto-generated (cargo dev generate-all). Edit the doc comments in 'crates/ty/src/args.rs' if you want to change anything here. -->\n\n");
     output.push_str("# CLI Reference\n\n");
     generate_command(&mut output, &ty, &mut parents);
 
@@ -179,7 +180,7 @@ fn generate_command<'a>(output: &mut String, command: &'a Command, parents: &mut
                 let id = format!("{name_key}--{}", arg.get_id());
                 output.push_str(&format!("<dt id=\"{id}\">"));
                 output.push_str(&format!(
-                    "<a href=\"#{id}\"<code>{}</code></a>",
+                    "<a href=\"#{id}\"><code>{}</code></a>",
                     arg.get_id().to_string().to_uppercase(),
                 ));
                 output.push_str("</dt>");
@@ -325,7 +326,7 @@ mod tests {
 
     use crate::generate_all::Mode;
 
-    use super::{main, Args};
+    use super::{Args, main};
 
     #[test]
     fn ty_cli_reference_is_up_to_date() -> Result<()> {

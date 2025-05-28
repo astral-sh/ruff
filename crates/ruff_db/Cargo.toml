@@ -36,7 +36,6 @@ path-slash = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
-tracing-tree = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
 zip = { workspace = true }
 
@@ -55,4 +54,4 @@ cache = ["ruff_cache"]
 os = ["ignore", "dep:etcetera"]
 serde = ["dep:serde", "camino/serde1"]
 # Exposes testing utilities.
-testing = ["tracing-subscriber", "tracing-tree"]
+testing = ["tracing-subscriber"]

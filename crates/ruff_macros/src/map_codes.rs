@@ -2,10 +2,10 @@ use std::collections::{BTreeMap, HashMap};
 
 use itertools::Itertools;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::{
-    parenthesized, parse::Parse, spanned::Spanned, Attribute, Error, Expr, ExprCall, ExprMatch,
-    Ident, ItemFn, LitStr, Pat, Path, Stmt, Token,
+    Attribute, Error, Expr, ExprCall, ExprMatch, Ident, ItemFn, LitStr, Pat, Path, Stmt, Token,
+    parenthesized, parse::Parse, spanned::Spanned,
 };
 
 use crate::rule_code_prefix::{get_prefix_ident, intersection_all};
@@ -404,8 +404,6 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_fixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
 
-    let mut from_impls_for_diagnostic_kind = quote!();
-
     for Rule {
         name, attrs, path, ..
     } in input
@@ -415,20 +413,17 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             #name,
         });
         // Apply the `attrs` to each arm, like `[cfg(feature = "foo")]`.
-        rule_message_formats_match_arms
-            .extend(quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::message_formats(),});
+        rule_message_formats_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::Violation>::message_formats(),},
+        );
         rule_fixable_match_arms.extend(
-            quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::FIX_AVAILABILITY,},
+            quote! {#(#attrs)* Self::#name => <#path as crate::Violation>::FIX_AVAILABILITY,},
         );
         rule_explanation_match_arms.extend(quote! {#(#attrs)* Self::#name => #path::explain(),});
-
-        // Enable conversion from `DiagnosticKind` to `Rule`.
-        from_impls_for_diagnostic_kind
-            .extend(quote! {#(#attrs)* stringify!(#name) => Rule::#name,});
     }
 
     quote! {
-        use ruff_diagnostics::Violation;
+        use crate::Violation;
 
         #[derive(
             EnumIter,
@@ -443,6 +438,9 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             ::ruff_macros::CacheKey,
             AsRefStr,
             ::strum_macros::IntoStaticStr,
+            ::strum_macros::EnumString,
+            ::serde::Serialize,
+            ::serde::Deserialize,
         )]
         #[repr(u16)]
         #[strum(serialize_all = "kebab-case")]
@@ -456,23 +454,13 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
             /// Returns the documentation for this rule.
             pub fn explanation(&self) -> Option<&'static str> {
-                use ruff_diagnostics::ViolationMetadata;
+                use crate::ViolationMetadata;
                 match self { #rule_explanation_match_arms }
             }
 
             /// Returns the fix status of this rule.
-            pub const fn fixable(&self) -> ruff_diagnostics::FixAvailability {
+            pub const fn fixable(&self) -> crate::FixAvailability {
                 match self { #rule_fixable_match_arms }
-            }
-        }
-
-
-        impl AsRule for ruff_diagnostics::DiagnosticKind {
-            fn rule(&self) -> Rule {
-                match self.name.as_str() {
-                    #from_impls_for_diagnostic_kind
-                    _ => unreachable!("invalid rule name: {}", self.name),
-                }
             }
         }
     }

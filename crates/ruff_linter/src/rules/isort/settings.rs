@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
 use crate::display_settings;
-use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::ImportType;
+use crate::rules::isort::categorize::KnownModules;
 use ruff_macros::CacheKey;
 use ruff_python_semantic::{Alias, MemberNameImport, ModuleNameImport, NameImport};
 

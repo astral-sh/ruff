@@ -8,4 +8,4 @@ AIR302_presto.py:5:1: AIR302 `airflow.hooks.presto_hook.PrestoHook` is moved int
 5 | PrestoHook()
   | ^^^^^^^^^^ AIR302
   |
-  = help: Install `apache-airflow-providers-presto>=1.0.0` and use `airflow.providers.presto.hooks.presto.PrestoHook` instead.
+  = help: Install `apache-airflow-providers-presto>=1.0.0` and use `PrestoHook` from `airflow.providers.presto.hooks.presto` instead.

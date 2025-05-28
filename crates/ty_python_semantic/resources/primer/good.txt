@@ -12,7 +12,6 @@ alerta
 altair
 anyio
 apprise
-arviz
 async-utils
 asynq
 attrs

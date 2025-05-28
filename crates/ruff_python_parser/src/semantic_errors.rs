@@ -6,11 +6,10 @@
 use std::fmt::Display;
 
 use ruff_python_ast::{
-    self as ast,
-    comparable::ComparableExpr,
-    visitor::{walk_expr, Visitor},
-    Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
+    self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtImportFrom,
+    comparable::ComparableExpr,
+    visitor::{Visitor, walk_expr},
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::{FxBuildHasher, FxHashSet};
@@ -770,16 +769,21 @@ impl SemanticSyntaxChecker {
         // We are intentionally not inspecting the async status of the scope for now to mimic F704.
         // await-outside-async is PLE1142 instead, so we'll end up emitting both syntax errors for
         // cases that trigger F704
+
+        if ctx.in_function_scope() {
+            return;
+        }
+
         if kind.is_await() {
-            if ctx.in_await_allowed_context() {
-                return;
-            }
             // `await` is allowed at the top level of a Jupyter notebook.
             // See: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html.
             if ctx.in_module_scope() && ctx.in_notebook() {
                 return;
             }
-        } else if ctx.in_function_scope() {
+            if ctx.in_await_allowed_context() {
+                return;
+            }
+        } else if ctx.in_yield_allowed_context() {
             return;
         }
 
@@ -845,7 +849,7 @@ impl SemanticSyntaxChecker {
         if !ctx.in_sync_comprehension() {
             return;
         }
-        for generator in generators.iter().filter(|gen| gen.is_async) {
+        for generator in generators.iter().filter(|generator| generator.is_async) {
             // test_ok nested_async_comprehension_py311
             // # parse_options: {"target-version": "3.11"}
             // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
@@ -921,7 +925,10 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::WriteToDebug(kind) => match kind {
                 WriteToDebugKind::Store => f.write_str("cannot assign to `__debug__`"),
                 WriteToDebugKind::Delete(python_version) => {
-                    write!(f, "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)")
+                    write!(
+                        f,
+                        "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)"
+                    )
                 }
             },
             SemanticSyntaxErrorKind::InvalidExpression(kind, position) => {
@@ -1716,6 +1723,35 @@ pub trait SemanticSyntaxContext {
     ///
     /// See the trait-level documentation for more details.
     fn in_await_allowed_context(&self) -> bool;
+
+    /// Returns `true` if the visitor is currently in a context where `yield` and `yield from`
+    /// expressions are allowed.
+    ///
+    /// Yield expressions are allowed only in:
+    /// 1. Function definitions
+    /// 2. Lambda expressions
+    ///
+    /// Unlike `await`, yield is not allowed in:
+    /// - Comprehensions (list, set, dict)
+    /// - Generator expressions
+    /// - Class definitions
+    ///
+    /// This method should traverse parent scopes to check if the closest relevant scope
+    /// is a function or lambda, and that no disallowed context (class, comprehension, generator)
+    /// intervenes. For example:
+    ///
+    /// ```python
+    /// def f():
+    ///     yield 1  # okay, in a function
+    ///     lambda: (yield 1)  # okay, in a lambda
+    ///
+    ///     [(yield 1) for x in range(3)]  # error, in a comprehension
+    ///     ((yield 1) for x in range(3))  # error, in a generator expression
+    ///     class C:
+    ///         yield 1  # error, in a class within a function
+    /// ```
+    ///
+    fn in_yield_allowed_context(&self) -> bool;
 
     /// Returns `true` if the visitor is currently inside of a synchronous comprehension.
     ///

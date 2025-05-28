@@ -1,15 +1,15 @@
 use ruff_formatter::prelude::tag::Condition;
-use ruff_formatter::{format_args, write, Argument, Arguments};
+use ruff_formatter::{Argument, Arguments, format_args, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprRef;
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{
-    first_non_trivia_token, BackwardsTokenizer, SimpleToken, SimpleTokenKind,
+    BackwardsTokenizer, SimpleToken, SimpleTokenKind, first_non_trivia_token,
 };
 use ruff_text_size::Ranged;
 
 use crate::comments::{
-    dangling_comments, dangling_open_parenthesis_comments, trailing_comments, SourceComment,
+    SourceComment, dangling_comments, dangling_open_parenthesis_comments, trailing_comments,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
@@ -255,7 +255,7 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatOptionalParentheses<'_, 'ast>
                 soft_line_break(),
                 if_group_breaks(&token(")"))
             ])
-            .with_group_id(Some(parens_id))]
+            .with_id(Some(parens_id))]
         )
     }
 }
@@ -422,9 +422,11 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
         let end_of_line_split = self
             .comments
             .partition_point(|comment| comment.line_position().is_end_of_line());
-        debug_assert!(self.comments[end_of_line_split..]
-            .iter()
-            .all(|comment| comment.line_position().is_own_line()));
+        debug_assert!(
+            self.comments[end_of_line_split..]
+                .iter()
+                .all(|comment| comment.line_position().is_own_line())
+        );
         group(&format_args![
             token(self.left),
             // end-of-line comments

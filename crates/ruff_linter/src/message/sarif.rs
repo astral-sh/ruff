@@ -7,11 +7,11 @@ use serde_json::json;
 
 use ruff_source_file::OneIndexed;
 
+use crate::VERSION;
 use crate::codes::Rule;
 use crate::fs::normalize_path;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::{Linter, RuleNamespace};
-use crate::VERSION;
 
 pub struct SarifEmitter;
 
@@ -123,7 +123,7 @@ impl SarifResult {
         let end_location = message.compute_end_location();
         let path = normalize_path(&*message.filename());
         Ok(Self {
-            rule: message.rule(),
+            rule: message.to_rule(),
             level: "error".to_string(),
             message: message.body().to_string(),
             uri: url::Url::from_file_path(&path)
@@ -143,7 +143,7 @@ impl SarifResult {
         let end_location = message.compute_end_location();
         let path = normalize_path(&*message.filename());
         Ok(Self {
-            rule: message.rule(),
+            rule: message.to_rule(),
             level: "error".to_string(),
             message: message.body().to_string(),
             uri: path.display().to_string(),
@@ -186,10 +186,10 @@ impl Serialize for SarifResult {
 
 #[cfg(test)]
 mod tests {
+    use crate::message::SarifEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
-    use crate::message::SarifEmitter;
 
     fn get_output() -> String {
         let mut emitter = SarifEmitter {};

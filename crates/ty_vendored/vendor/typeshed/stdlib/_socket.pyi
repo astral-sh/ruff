@@ -229,6 +229,28 @@ if sys.platform != "win32":
     IP_RECVOPTS: int
     IP_RECVRETOPTS: int
     IP_RETOPTS: int
+if sys.version_info >= (3, 14):
+    IP_RECVTTL: int
+
+    if sys.platform == "win32" or sys.platform == "linux":
+        IPV6_RECVERR: int
+        IP_RECVERR: int
+        SO_ORIGINAL_DST: int
+
+    if sys.platform == "win32":
+        SOL_RFCOMM: int
+        SO_BTH_ENCRYPT: int
+        SO_BTH_MTU: int
+        SO_BTH_MTU_MAX: int
+        SO_BTH_MTU_MIN: int
+        TCP_QUICKACK: int
+
+    if sys.platform == "linux":
+        CAN_RAW_ERR_FILTER: int
+        IP_FREEBIND: int
+        IP_RECVORIGDSTADDR: int
+        VMADDR_CID_LOCAL: int
+
 if sys.platform != "win32" and sys.platform != "darwin":
     IP_TRANSPARENT: int
 if sys.platform != "win32" and sys.platform != "darwin" and sys.version_info >= (3, 11):
@@ -829,6 +851,11 @@ if sys.platform != "win32":
 
 def if_nameindex() -> list[tuple[int, str]]: ...
 def if_nametoindex(oname: str, /) -> int: ...
-def if_indextoname(index: int, /) -> str: ...
+
+if sys.version_info >= (3, 14):
+    def if_indextoname(if_index: int, /) -> str: ...
+
+else:
+    def if_indextoname(index: int, /) -> str: ...
 
 CAPI: CapsuleType

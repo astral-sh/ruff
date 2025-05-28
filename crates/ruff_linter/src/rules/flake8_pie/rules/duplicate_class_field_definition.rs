@@ -1,14 +1,13 @@
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::{AlwaysFixableViolation, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for duplicate field definitions in classes.
@@ -94,7 +93,7 @@ pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: &[Stmt])
         }
 
         if !seen_targets.insert(target.id.as_str()) {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 DuplicateClassFieldDefinition {
                     name: target.id.to_string(),
                 },
@@ -105,7 +104,6 @@ pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: &[Stmt])
             diagnostic.set_fix(Fix::unsafe_edit(edit).isolate(Checker::isolation(
                 checker.semantic().current_statement_id(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

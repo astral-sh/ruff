@@ -1,8 +1,8 @@
-use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
 use crate::Db;
+use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, Severity, Span};
 use ruff_db::files::system_path_to_file;
-use ruff_db::system::{System, SystemPath};
+use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::{Combine, OptionsMetadata};
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
@@ -10,7 +10,10 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
-use ty_python_semantic::{ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings};
+use ty_python_semantic::{
+    ProgramSettings, PythonPath, PythonPlatform, PythonVersionFileSource, PythonVersionSource,
+    PythonVersionWithSource, SearchPathSettings,
+};
 
 use super::settings::{Settings, TerminalSettings};
 
@@ -31,7 +34,7 @@ pub struct Options {
 
     /// Configures the enabled rules and their severity.
     ///
-    /// See [the rules documentation](https://github.com/astral-sh/ty/blob/main/docs/rules.md) for a list of all available rules.
+    /// See [the rules documentation](https://ty.dev/rules) for a list of all available rules.
     ///
     /// Valid severities are:
     ///
@@ -54,19 +57,6 @@ pub struct Options {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
     pub terminal: Option<TerminalOptions>,
-
-    /// Whether to automatically exclude files that are ignored by `.ignore`,
-    /// `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
-    /// Enabled by default.
-    #[option(
-        default = r#"true"#,
-        value_type = r#"bool"#,
-        example = r#"
-            respect-ignore-files = false
-        "#
-    )]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub respect_ignore_files: Option<bool>,
 }
 
 impl Options {
@@ -87,13 +77,25 @@ impl Options {
     pub(crate) fn to_program_settings(
         &self,
         project_root: &SystemPath,
+        project_name: &str,
         system: &dyn System,
     ) -> ProgramSettings {
         let python_version = self
             .environment
             .as_ref()
-            .and_then(|env| env.python_version.as_deref().copied())
-            .unwrap_or(PythonVersion::latest_ty());
+            .and_then(|env| env.python_version.as_ref())
+            .map(|ranged_version| PythonVersionWithSource {
+                version: **ranged_version,
+                source: match ranged_version.source() {
+                    ValueSource::Cli => PythonVersionSource::Cli,
+                    ValueSource::File(path) => {
+                        PythonVersionSource::ConfigFile(PythonVersionFileSource {
+                            path: path.clone(),
+                            range: ranged_version.range(),
+                        })
+                    }
+                },
+            });
         let python_platform = self
             .environment
             .as_ref()
@@ -104,15 +106,16 @@ impl Options {
                 default
             });
         ProgramSettings {
-            python_version: Some(python_version),
+            python_version,
             python_platform,
-            search_paths: self.to_search_path_settings(project_root, system),
+            search_paths: self.to_search_path_settings(project_root, project_name, system),
         }
     }
 
     fn to_search_path_settings(
         &self,
         project_root: &SystemPath,
+        project_name: &str,
         system: &dyn System,
     ) -> SearchPathSettings {
         let src_roots = if let Some(src_root) = self.src.as_ref().and_then(|src| src.root.as_ref())
@@ -121,12 +124,43 @@ impl Options {
         } else {
             let src = project_root.join("src");
 
-            // Default to `src` and the project root if `src` exists and the root hasn't been specified.
-            if system.is_directory(&src) {
+            let mut roots = if system.is_directory(&src) {
+                // Default to `src` and the project root if `src` exists and the root hasn't been specified.
+                // This corresponds to the `src-layout`
+                tracing::debug!(
+                    "Including `./src` in `src.root` because a `./src` directory exists"
+                );
                 vec![project_root.to_path_buf(), src]
+            } else if system.is_directory(&project_root.join(project_name).join(project_name)) {
+                // `src-layout` but when the folder isn't called `src` but has the same name as the project.
+                // For example, the "src" folder for `psycopg` is called `psycopg` and the python files are in `psycopg/psycopg/_adapters_map.py`
+                tracing::debug!(
+                    "Including `./{project_name}` in `src.root` because a `./{project_name}/{project_name}` directory exists"
+                );
+
+                vec![project_root.to_path_buf(), project_root.join(project_name)]
             } else {
+                // Default to a [flat project structure](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/).
+                tracing::debug!("Defaulting `src.root` to `.`");
                 vec![project_root.to_path_buf()]
+            };
+
+            // Considering pytest test discovery conventions,
+            // we also include the `tests` directory if it exists and is not a package.
+            let tests_dir = project_root.join("tests");
+            if system.is_directory(&tests_dir)
+                && !system.is_file(&tests_dir.join("__init__.py"))
+                && !roots.contains(&tests_dir)
+            {
+                // If the `tests` directory exists and is not a package, include it as a source root.
+                tracing::debug!(
+                    "Including `./tests` in `src.root` because a `./tests` directory exists"
+                );
+
+                roots.push(tests_dir);
             }
+
+            roots
         };
 
         let (extra_paths, python, typeshed) = self
@@ -158,6 +192,11 @@ impl Options {
                         .ok()
                         .map(PythonPath::from_virtual_env_var)
                 })
+                .or_else(|| {
+                    std::env::var("CONDA_PREFIX")
+                        .ok()
+                        .map(PythonPath::from_conda_prefix_var)
+                })
                 .unwrap_or_else(|| PythonPath::Discover(project_root.to_path_buf())),
         }
     }
@@ -166,7 +205,7 @@ impl Options {
     pub(crate) fn to_settings(&self, db: &dyn Db) -> (Settings, Vec<OptionDiagnostic>) {
         let (rules, diagnostics) = self.to_rule_selection(db);
 
-        let mut settings = Settings::new(rules, self.respect_ignore_files);
+        let mut settings = Settings::new(rules, self.src.as_ref());
 
         if let Some(terminal) = self.terminal.as_ref() {
             settings.set_terminal(TerminalSettings {
@@ -353,15 +392,37 @@ pub struct EnvironmentOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SrcOptions {
     /// The root of the project, used for finding first-party modules.
+    ///
+    /// If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:
+    ///
+    /// * if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
+    /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
+    /// * otherwise, default to `.` (flat layout)
+    ///
+    /// Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
+    /// it will also be included in the first party search path.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
-        default = r#"[".", "./src"]"#,
+        default = r#"null"#,
         value_type = "str",
         example = r#"
             root = "./app"
         "#
     )]
     pub root: Option<RelativePathBuf>,
+
+    /// Whether to automatically exclude files that are ignored by `.ignore`,
+    /// `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
+    /// Enabled by default.
+    #[option(
+        default = r#"true"#,
+        value_type = r#"bool"#,
+        example = r#"
+            respect-ignore-files = false
+        "#
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub respect_ignore_files: Option<bool>,
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
@@ -417,11 +478,11 @@ pub struct TerminalOptions {
 #[cfg(feature = "schemars")]
 mod schema {
     use crate::DEFAULT_LINT_REGISTRY;
-    use schemars::gen::SchemaGenerator;
+    use schemars::JsonSchema;
+    use schemars::r#gen::SchemaGenerator;
     use schemars::schema::{
         InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SubschemaValidation,
     };
-    use schemars::JsonSchema;
     use ty_python_semantic::lint::Level;
 
     pub(super) struct Rules;
@@ -431,10 +492,10 @@ mod schema {
             "Rules".to_string()
         }
 
-        fn json_schema(gen: &mut SchemaGenerator) -> Schema {
+        fn json_schema(generator: &mut SchemaGenerator) -> Schema {
             let registry = &*DEFAULT_LINT_REGISTRY;
 
-            let level_schema = gen.subschema_for::<Level>();
+            let level_schema = generator.subschema_for::<Level>();
 
             let properties: schemars::Map<String, Schema> = registry
                 .lints()
@@ -513,6 +574,23 @@ impl OptionDiagnostic {
             diag
         } else {
             Diagnostic::new(self.id, self.severity, &self.message)
+        }
+    }
+}
+
+/// This is a wrapper for options that actually get loaded from configuration files
+/// and the CLI, which also includes a `config_file_override` option that overrides
+/// default configuration discovery with an explicitly-provided path to a configuration file
+pub struct ProjectOptionsOverrides {
+    pub config_file_override: Option<SystemPathBuf>,
+    pub options: Options,
+}
+
+impl ProjectOptionsOverrides {
+    pub fn new(config_file_override: Option<SystemPathBuf>, options: Options) -> Self {
+        Self {
+            config_file_override,
+            options,
         }
     }
 }

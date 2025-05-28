@@ -1,7 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -9,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_argument;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for uses of `open` and related calls without an explicit `encoding`
@@ -91,7 +91,7 @@ pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnspecifiedEncoding {
             function_name,
             mode,
@@ -99,7 +99,6 @@ pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCall) {
         call.func.range(),
     );
     diagnostic.set_fix(generate_keyword_fix(checker, call));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Represents the path of the function or method being called.
@@ -141,9 +140,10 @@ impl<'a> Callee<'a> {
         match self {
             Callee::Qualified(qualified_name) => match qualified_name.segments() {
                 ["" | "codecs" | "_io", "open"] => ModeArgument::Supported,
-                ["tempfile", "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"] => {
-                    ModeArgument::Supported
-                }
+                [
+                    "tempfile",
+                    "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile",
+                ] => ModeArgument::Supported,
                 ["io" | "_io", "TextIOWrapper"] => ModeArgument::Unsupported,
                 _ => ModeArgument::Unsupported,
             },
@@ -215,11 +215,23 @@ fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
                         return false;
                     }
                 }
+
+                let encoding_param_pos = match qualified_name.segments() {
+                    // The `encoding` parameter position for `codecs.open`
+                    ["codecs", _] => 2,
+                    // The `encoding` parameter position for `_io.open` and the builtin `open`
+                    _ => 3,
+                };
+
                 // else mode not specified, defaults to text mode
-                call.arguments.find_argument_value("encoding", 3).is_none()
+                call.arguments
+                    .find_argument_value("encoding", encoding_param_pos)
+                    .is_none()
             }
-            ["tempfile", tempfile_class @ ("TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile")] =>
-            {
+            [
+                "tempfile",
+                tempfile_class @ ("TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"),
+            ] => {
                 let mode_pos = usize::from(*tempfile_class == "SpooledTemporaryFile");
                 if let Some(mode_arg) = call.arguments.find_argument_value("mode", mode_pos) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {

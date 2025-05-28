@@ -5,16 +5,16 @@ use bitflags::bitflags;
 use hashbrown::hash_map::RawEntryMut;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
-use ruff_index::{newtype_index, IndexVec};
+use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHasher;
 
+use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
 use crate::semantic_index::visibility_constraints::ScopedVisibilityConstraintId;
-use crate::semantic_index::{semantic_index, SemanticIndex, SymbolMap};
-use crate::Db;
+use crate::semantic_index::{SemanticIndex, SymbolMap, semantic_index};
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct Symbol {
@@ -426,40 +426,42 @@ impl NodeWithScopeRef<'_> {
     /// The node wrapped by `self` must be a child of `module`.
     #[expect(unsafe_code)]
     pub(super) unsafe fn to_kind(self, module: ParsedModule) -> NodeWithScopeKind {
-        match self {
-            NodeWithScopeRef::Module => NodeWithScopeKind::Module,
-            NodeWithScopeRef::Class(class) => {
-                NodeWithScopeKind::Class(AstNodeRef::new(module, class))
-            }
-            NodeWithScopeRef::Function(function) => {
-                NodeWithScopeKind::Function(AstNodeRef::new(module, function))
-            }
-            NodeWithScopeRef::TypeAlias(type_alias) => {
-                NodeWithScopeKind::TypeAlias(AstNodeRef::new(module, type_alias))
-            }
-            NodeWithScopeRef::TypeAliasTypeParameters(type_alias) => {
-                NodeWithScopeKind::TypeAliasTypeParameters(AstNodeRef::new(module, type_alias))
-            }
-            NodeWithScopeRef::Lambda(lambda) => {
-                NodeWithScopeKind::Lambda(AstNodeRef::new(module, lambda))
-            }
-            NodeWithScopeRef::FunctionTypeParameters(function) => {
-                NodeWithScopeKind::FunctionTypeParameters(AstNodeRef::new(module, function))
-            }
-            NodeWithScopeRef::ClassTypeParameters(class) => {
-                NodeWithScopeKind::ClassTypeParameters(AstNodeRef::new(module, class))
-            }
-            NodeWithScopeRef::ListComprehension(comprehension) => {
-                NodeWithScopeKind::ListComprehension(AstNodeRef::new(module, comprehension))
-            }
-            NodeWithScopeRef::SetComprehension(comprehension) => {
-                NodeWithScopeKind::SetComprehension(AstNodeRef::new(module, comprehension))
-            }
-            NodeWithScopeRef::DictComprehension(comprehension) => {
-                NodeWithScopeKind::DictComprehension(AstNodeRef::new(module, comprehension))
-            }
-            NodeWithScopeRef::GeneratorExpression(generator) => {
-                NodeWithScopeKind::GeneratorExpression(AstNodeRef::new(module, generator))
+        unsafe {
+            match self {
+                NodeWithScopeRef::Module => NodeWithScopeKind::Module,
+                NodeWithScopeRef::Class(class) => {
+                    NodeWithScopeKind::Class(AstNodeRef::new(module, class))
+                }
+                NodeWithScopeRef::Function(function) => {
+                    NodeWithScopeKind::Function(AstNodeRef::new(module, function))
+                }
+                NodeWithScopeRef::TypeAlias(type_alias) => {
+                    NodeWithScopeKind::TypeAlias(AstNodeRef::new(module, type_alias))
+                }
+                NodeWithScopeRef::TypeAliasTypeParameters(type_alias) => {
+                    NodeWithScopeKind::TypeAliasTypeParameters(AstNodeRef::new(module, type_alias))
+                }
+                NodeWithScopeRef::Lambda(lambda) => {
+                    NodeWithScopeKind::Lambda(AstNodeRef::new(module, lambda))
+                }
+                NodeWithScopeRef::FunctionTypeParameters(function) => {
+                    NodeWithScopeKind::FunctionTypeParameters(AstNodeRef::new(module, function))
+                }
+                NodeWithScopeRef::ClassTypeParameters(class) => {
+                    NodeWithScopeKind::ClassTypeParameters(AstNodeRef::new(module, class))
+                }
+                NodeWithScopeRef::ListComprehension(comprehension) => {
+                    NodeWithScopeKind::ListComprehension(AstNodeRef::new(module, comprehension))
+                }
+                NodeWithScopeRef::SetComprehension(comprehension) => {
+                    NodeWithScopeKind::SetComprehension(AstNodeRef::new(module, comprehension))
+                }
+                NodeWithScopeRef::DictComprehension(comprehension) => {
+                    NodeWithScopeKind::DictComprehension(AstNodeRef::new(module, comprehension))
+                }
+                NodeWithScopeRef::GeneratorExpression(generator) => {
+                    NodeWithScopeKind::GeneratorExpression(AstNodeRef::new(module, generator))
+                }
             }
         }
     }
@@ -541,6 +543,13 @@ impl NodeWithScopeKind {
         match self {
             Self::Class(class) => class.node(),
             _ => panic!("expected class"),
+        }
+    }
+
+    pub(crate) const fn as_class(&self) -> Option<&ast::StmtClassDef> {
+        match self {
+            Self::Class(class) => Some(class.node()),
+            _ => None,
         }
     }
 

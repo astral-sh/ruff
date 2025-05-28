@@ -1,17 +1,23 @@
+use std::sync::Arc;
+
+use crate::Db;
 use crate::module_resolver::SearchPaths;
 use crate::python_platform::PythonPlatform;
 use crate::site_packages::SysPrefixPathOrigin;
-use crate::Db;
 
 use anyhow::Context;
+use ruff_db::diagnostic::Span;
+use ruff_db::files::system_path_to_file;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
+use ruff_text_size::TextRange;
 use salsa::Durability;
 use salsa::Setter;
 
 #[salsa::input(singleton)]
 pub struct Program {
-    pub python_version: PythonVersion,
+    #[returns(ref)]
+    pub python_version_with_source: PythonVersionWithSource,
 
     #[returns(ref)]
     pub python_platform: PythonPlatform,
@@ -23,7 +29,7 @@ pub struct Program {
 impl Program {
     pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> anyhow::Result<Self> {
         let ProgramSettings {
-            python_version,
+            python_version: python_version_with_source,
             python_platform,
             search_paths,
         } = settings;
@@ -31,17 +37,24 @@ impl Program {
         let search_paths = SearchPaths::from_settings(db, &search_paths)
             .with_context(|| "Invalid search path settings")?;
 
-        let python_version = python_version
-            .or_else(|| search_paths.python_version())
-            .unwrap_or(PythonVersion::latest_ty());
+        let python_version_with_source = python_version_with_source
+            .or_else(|| search_paths.python_version().cloned())
+            .unwrap_or_default();
 
-        tracing::info!("Python version: Python {python_version}, platform: {python_platform}");
+        tracing::info!(
+            "Python version: Python {python_version}, platform: {python_platform}",
+            python_version = python_version_with_source.version
+        );
 
         Ok(
-            Program::builder(python_version, python_platform, search_paths)
+            Program::builder(python_version_with_source, python_platform, search_paths)
                 .durability(Durability::HIGH)
                 .new(db),
         )
+    }
+
+    pub fn python_version(self, db: &dyn Db) -> PythonVersion {
+        self.python_version_with_source(db).version
     }
 
     pub fn update_from_settings(
@@ -61,9 +74,9 @@ impl Program {
         }
 
         if let Some(python_version) = python_version {
-            if python_version != self.python_version(db) {
-                tracing::debug!("Updating python version: Python {python_version}");
-                self.set_python_version(db).to(python_version);
+            if &python_version != self.python_version_with_source(db) {
+                tracing::debug!("Updating python version: Python {python_version:?}");
+                self.set_python_version_with_source(db).to(python_version);
             }
         }
 
@@ -93,11 +106,56 @@ impl Program {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ProgramSettings {
-    pub python_version: Option<PythonVersion>,
+    pub python_version: Option<PythonVersionWithSource>,
     pub python_platform: PythonPlatform,
     pub search_paths: SearchPathSettings,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
+pub enum PythonVersionSource {
+    /// Value loaded from a project's configuration file.
+    ConfigFile(PythonVersionFileSource),
+
+    /// Value loaded from the `pyvenv.cfg` file of the virtual environment.
+    /// The virtual environment might have been configured, activated or inferred.
+    PyvenvCfgFile(PythonVersionFileSource),
+
+    /// The value comes from a CLI argument, while it's left open if specified using a short argument,
+    /// long argument (`--extra-paths`) or `--config key=value`.
+    Cli,
+
+    /// We fell back to a default value because the value was not specified via the CLI or a config file.
+    #[default]
+    Default,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct PythonVersionFileSource {
+    pub path: Arc<SystemPathBuf>,
+    pub range: Option<TextRange>,
+}
+
+impl PythonVersionFileSource {
+    pub(crate) fn span(&self, db: &dyn Db) -> Option<Span> {
+        let file = system_path_to_file(db.upcast(), &*self.path).ok()?;
+        Some(Span::from(file).with_optional_range(self.range))
+    }
+}
+
+#[derive(Eq, PartialEq, Debug, Clone)]
+pub struct PythonVersionWithSource {
+    pub version: PythonVersion,
+    pub source: PythonVersionSource,
+}
+
+impl Default for PythonVersionWithSource {
+    fn default() -> Self {
+        Self {
+            version: PythonVersion::latest_ty(),
+            source: PythonVersionSource::Default,
+        }
+    }
 }
 
 /// Configures the search paths for module resolution.
@@ -167,6 +225,10 @@ pub enum PythonPath {
 impl PythonPath {
     pub fn from_virtual_env_var(path: impl Into<SystemPathBuf>) -> Self {
         Self::SysPrefix(path.into(), SysPrefixPathOrigin::VirtualEnvVar)
+    }
+
+    pub fn from_conda_prefix_var(path: impl Into<SystemPathBuf>) -> Self {
+        Self::Resolve(path.into(), SysPrefixPathOrigin::CondaPrefixVar)
     }
 
     pub fn from_cli_flag(path: SystemPathBuf) -> Self {

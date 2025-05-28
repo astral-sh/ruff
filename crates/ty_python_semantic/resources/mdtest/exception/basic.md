@@ -45,6 +45,8 @@ def foo(
     x: type[AttributeError],
     y: tuple[type[OSError], type[RuntimeError]],
     z: tuple[type[BaseException], ...],
+    zz: tuple[type[TypeError | RuntimeError], ...],
+    zzz: type[BaseException] | tuple[type[BaseException], ...],
 ):
     try:
         help()
@@ -53,8 +55,63 @@ def foo(
     except y as f:
         reveal_type(f)  # revealed: OSError | RuntimeError
     except z as g:
-        # TODO: should be `BaseException`
-        reveal_type(g)  # revealed: @Todo(full tuple[...] support)
+        reveal_type(g)  # revealed: BaseException
+    except zz as h:
+        reveal_type(h)  # revealed: TypeError | RuntimeError
+    except zzz as i:
+        reveal_type(i)  # revealed: BaseException
+```
+
+We do not emit an `invalid-exception-caught` if a class is caught that has `Any` or `Unknown` in its
+MRO, as the dynamic element in the MRO could materialize to some subclass of `BaseException`:
+
+```py
+from compat import BASE_EXCEPTION_CLASS  # error: [unresolved-import] "Cannot resolve imported module `compat`"
+
+class Error(BASE_EXCEPTION_CLASS): ...
+
+try:
+    ...
+except Error as err:
+    ...
+```
+
+## Exception with no captured type
+
+```py
+try:
+    {}.get("foo")
+except TypeError:
+    pass
+```
+
+## Exception which catches typevar
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable
+
+def silence[T: type[BaseException]](
+    func: Callable[[], None],
+    exception_type: T,
+):
+    try:
+        func()
+    except exception_type as e:
+        reveal_type(e)  # revealed: T'instance
+
+def silence2[T: (
+    type[ValueError],
+    type[TypeError],
+)](func: Callable[[], None], exception_type: T,):
+    try:
+        func()
+    except exception_type as e:
+        reveal_type(e)  # revealed: T'instance
 ```
 
 ## Invalid exception handlers
@@ -86,9 +143,15 @@ def foo(
     # error: [invalid-exception-caught]
     except y as f:
         reveal_type(f)  # revealed: OSError | RuntimeError | Unknown
+    # error: [invalid-exception-caught]
     except z as g:
-        # TODO: should emit a diagnostic here:
-        reveal_type(g)  # revealed: @Todo(full tuple[...] support)
+        reveal_type(g)  # revealed: Unknown
+
+try:
+    {}.get("foo")
+# error: [invalid-exception-caught]
+except int:
+    pass
 ```
 
 ## Object raised is not an exception

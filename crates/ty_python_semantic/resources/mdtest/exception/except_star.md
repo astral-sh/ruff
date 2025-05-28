@@ -22,9 +22,7 @@ except* BaseException as e:
 try:
     help()
 except* OSError as e:
-    # TODO: more precise would be `ExceptionGroup[OSError]` --Alex
-    # (needs homogeneous tuples + generics)
-    reveal_type(e)  # revealed: BaseExceptionGroup[BaseException]
+    reveal_type(e)  # revealed: ExceptionGroup[OSError]
 ```
 
 ## `except*` with multiple exceptions
@@ -33,9 +31,7 @@ except* OSError as e:
 try:
     help()
 except* (TypeError, AttributeError) as e:
-    # TODO: more precise would be `ExceptionGroup[TypeError | AttributeError]` --Alex
-    # (needs homogeneous tuples + generics)
-    reveal_type(e)  # revealed: BaseExceptionGroup[BaseException]
+    reveal_type(e)  # revealed: ExceptionGroup[TypeError | AttributeError]
 ```
 
 ## `except*` with mix of `Exception`s and `BaseException`s
@@ -44,20 +40,33 @@ except* (TypeError, AttributeError) as e:
 try:
     help()
 except* (KeyboardInterrupt, AttributeError) as e:
-    # TODO: more precise would be `BaseExceptionGroup[KeyboardInterrupt | AttributeError]` --Alex
-    reveal_type(e)  # revealed: BaseExceptionGroup[BaseException]
+    reveal_type(e)  # revealed: BaseExceptionGroup[KeyboardInterrupt | AttributeError]
 ```
 
-## Invalid `except*` handlers
+## `except*` with no captured exception type
 
 ```py
 try:
     help()
+except* TypeError:
+    pass
+```
+
+## Invalid `except*` handlers with or without a captured exception type
+
+```py
+try:
+    help()
+except* int:  # error: [invalid-exception-caught]
+    pass
+
+try:
+    help()
 except* 3 as e:  # error: [invalid-exception-caught]
-    reveal_type(e)  # revealed: BaseExceptionGroup[BaseException]
+    reveal_type(e)  # revealed: BaseExceptionGroup[Unknown]
 
 try:
     help()
 except* (AttributeError, 42) as e:  # error: [invalid-exception-caught]
-    reveal_type(e)  # revealed: BaseExceptionGroup[BaseException]
+    reveal_type(e)  # revealed: BaseExceptionGroup[AttributeError | Unknown]
 ```

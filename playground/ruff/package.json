@@ -21,7 +21,7 @@
     "monaco-editor": "^0.52.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-resizable-panels": "^2.0.0",
+    "react-resizable-panels": "^3.0.0",
     "ruff_wasm": "file:ruff_wasm",
     "shared": "0.0.0",
     "smol-toml": "^1.3.0"

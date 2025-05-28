@@ -4,7 +4,7 @@ use lsp_server::{Notification, RequestId};
 use rustc_hash::FxHashMap;
 use serde_json::Value;
 
-use super::{schedule::Task, ClientSender};
+use super::{ClientSender, schedule::Task};
 
 type ResponseBuilder<'s> = Box<dyn FnOnce(lsp_server::Response) -> Task<'s>>;
 

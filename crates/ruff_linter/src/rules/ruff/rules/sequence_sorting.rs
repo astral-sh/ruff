@@ -12,7 +12,7 @@ use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_stdlib::str::is_cased_uppercase;
-use ruff_python_trivia::{first_non_trivia_token, leading_indentation, SimpleTokenKind};
+use ruff_python_trivia::{SimpleTokenKind, first_non_trivia_token, leading_indentation};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -587,7 +587,9 @@ fn collect_string_sequence_lines<'a>(
             }
             TokenKind::String => {
                 let Some(string_value) = string_items_iter.next() else {
-                    unreachable!("Expected the number of string tokens to be equal to the number of string items in the sequence");
+                    unreachable!(
+                        "Expected the number of string tokens to be equal to the number of string items in the sequence"
+                    );
                 };
                 line_state.visit_string_token(string_value, token.range());
                 ends_with_trailing_comma = false;

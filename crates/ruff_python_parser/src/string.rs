@@ -125,7 +125,7 @@ impl StringParser {
                     return Err(LexicalError::new(
                         LexicalErrorType::UnicodeError,
                         TextRange::empty(self.position()),
-                    ))
+                    ));
                 }
             }
         }
@@ -471,7 +471,7 @@ mod tests {
     use ruff_python_ast::Suite;
 
     use crate::error::LexicalErrorType;
-    use crate::{parse_module, FStringErrorType, ParseError, ParseErrorType, Parsed};
+    use crate::{FStringErrorType, ParseError, ParseErrorType, Parsed, parse_module};
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";

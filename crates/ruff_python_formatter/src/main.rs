@@ -1,11 +1,11 @@
-use std::io::{stdout, Read, Write};
+use std::io::{Read, Write, stdout};
 use std::path::Path;
 use std::{fs, io};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::Parser as ClapParser;
 
-use ruff_python_formatter::cli::{format_and_debug_print, Cli, Emit};
+use ruff_python_formatter::cli::{Cli, Emit, format_and_debug_print};
 
 /// Read a `String` from `stdin`.
 pub(crate) fn read_from_stdin() -> Result<String> {

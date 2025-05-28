@@ -1,15 +1,15 @@
 use std::panic::{AssertUnwindSafe, RefUnwindSafe};
 use std::sync::Arc;
 
-use crate::{DummyReporter, DEFAULT_LINT_REGISTRY};
+use crate::{DEFAULT_LINT_REGISTRY, DummyReporter};
 use crate::{Project, ProjectMetadata, Reporter};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
+use salsa::Event;
 use salsa::plumbing::ZalsaDatabase;
-use salsa::{Cancelled, Event};
 use ty_ide::Db as IdeDb;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{Db as SemanticDb, Program};
@@ -25,9 +25,17 @@ pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {
 #[derive(Clone)]
 pub struct ProjectDatabase {
     project: Option<Project>,
-    storage: salsa::Storage<ProjectDatabase>,
     files: Files,
+
+    // IMPORTANT: Never return clones of `system` outside `ProjectDatabase` (only return references)
+    // or the "trick" to get a mutable `Arc` in `Self::system_mut` is no longer guaranteed to work.
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
+
+    // IMPORTANT: This field must be the last because we use `zalsa_mut` (drops all other storage references)
+    // to drop all other references to the database, which gives us exclusive access to other `Arc`s stored on this db.
+    // However, for this to work it's important that the `storage` is dropped AFTER any `Arc` that
+    // we try to mutably borrow using `Arc::get_mut` (like `system`).
+    storage: salsa::Storage<ProjectDatabase>,
 }
 
 impl ProjectDatabase {
@@ -68,24 +76,21 @@ impl ProjectDatabase {
     }
 
     /// Checks all open files in the project and its dependencies.
-    pub fn check(&self) -> Result<Vec<Diagnostic>, Cancelled> {
+    pub fn check(&self) -> Vec<Diagnostic> {
         let mut reporter = DummyReporter;
         let reporter = AssertUnwindSafe(&mut reporter as &mut dyn Reporter);
-        self.with_db(|db| db.project().check(db, reporter))
+        self.project().check(self, reporter)
     }
 
     /// Checks all open files in the project and its dependencies, using the given reporter.
-    pub fn check_with_reporter(
-        &self,
-        reporter: &mut dyn Reporter,
-    ) -> Result<Vec<Diagnostic>, Cancelled> {
+    pub fn check_with_reporter(&self, reporter: &mut dyn Reporter) -> Vec<Diagnostic> {
         let reporter = AssertUnwindSafe(reporter);
-        self.with_db(|db| db.project().check(db, reporter))
+        self.project().check(self, reporter)
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub fn check_file(&self, file: File) -> Result<Vec<Diagnostic>, Cancelled> {
-        self.with_db(|db| self.project().check_file(db, file))
+    pub fn check_file(&self, file: File) -> Vec<Diagnostic> {
+        self.project().check_file(self, file)
     }
 
     /// Returns a mutable reference to the system.
@@ -96,14 +101,8 @@ impl ProjectDatabase {
         // https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries
         let _ = self.zalsa_mut();
 
-        Arc::get_mut(&mut self.system).unwrap()
-    }
-
-    pub(crate) fn with_db<F, T>(&self, f: F) -> Result<T, Cancelled>
-    where
-        F: FnOnce(&ProjectDatabase) -> T + std::panic::UnwindSafe,
-    {
-        Cancelled::catch(|| f(self))
+        Arc::get_mut(&mut self.system)
+            .expect("ref count should be 1 because `zalsa_mut` drops all other DB references.")
     }
 }
 
@@ -201,8 +200,8 @@ impl Db for ProjectDatabase {
 #[cfg(feature = "format")]
 mod format {
     use crate::ProjectDatabase;
-    use ruff_db::files::File;
     use ruff_db::Upcast;
+    use ruff_db::files::File;
     use ruff_python_formatter::{Db as FormatDb, PyFormatOptions};
 
     #[salsa::db]
@@ -235,8 +234,8 @@ pub(crate) mod tests {
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
     use ty_python_semantic::{Db as SemanticDb, Program};
 
-    use crate::db::Db;
     use crate::DEFAULT_LINT_REGISTRY;
+    use crate::db::Db;
     use crate::{Project, ProjectMetadata};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;

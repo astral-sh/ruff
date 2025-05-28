@@ -11,7 +11,7 @@ use ruff_linter::source_kind::SourceKind;
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{
-    match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile,
+    PyprojectConfig, ResolvedFile, match_exclusion, python_files_in_path,
 };
 
 use crate::args::ConfigArguments;

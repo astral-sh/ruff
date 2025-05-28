@@ -353,7 +353,10 @@ class DataclassInstance(Protocol):
     __dataclass_fields__: ClassVar[dict[str, Field[Any]]]
 
 # Anything that can be passed to the int/float constructors
-ConvertibleToInt: TypeAlias = str | ReadableBuffer | SupportsInt | SupportsIndex | SupportsTrunc
+if sys.version_info >= (3, 14):
+    ConvertibleToInt: TypeAlias = str | ReadableBuffer | SupportsInt | SupportsIndex
+else:
+    ConvertibleToInt: TypeAlias = str | ReadableBuffer | SupportsInt | SupportsIndex | SupportsTrunc
 ConvertibleToFloat: TypeAlias = str | ReadableBuffer | SupportsFloat | SupportsIndex
 
 # A few classes updated from Foo(str, Enum) to Foo(StrEnum). This is a convenience so these
@@ -364,3 +367,14 @@ else:
     from enum import Enum
 
     class StrEnum(str, Enum): ...
+
+# Objects that appear in annotations or in type expressions.
+# Similar to PEP 747's TypeForm but a little broader.
+AnnotationForm: TypeAlias = Any
+
+if sys.version_info >= (3, 14):
+    from annotationlib import Format
+
+    # These return annotations, which can be arbitrary objects
+    AnnotateFunc: TypeAlias = Callable[[Format], dict[str, AnnotationForm]]
+    EvaluateFunc: TypeAlias = Callable[[Format], AnnotationForm]

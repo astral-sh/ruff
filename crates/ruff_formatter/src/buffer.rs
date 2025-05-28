@@ -1,4 +1,4 @@
-use super::{write, Arguments, FormatElement};
+use super::{Arguments, FormatElement, write};
 use crate::format_element::Interned;
 use crate::prelude::{LineMode, Tag};
 use crate::{FormatResult, FormatState};

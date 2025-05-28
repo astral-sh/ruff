@@ -21,6 +21,11 @@ impl<'a> Cursor<'a> {
         }
     }
 
+    /// Retrieves the current offset of the cursor within the source code.
+    pub fn offset(&self) -> TextSize {
+        self.source_length - self.text_len()
+    }
+
     /// Return the remaining input as a string slice.
     pub fn chars(&self) -> Chars<'a> {
         self.chars.clone()
@@ -163,5 +168,9 @@ impl<'a> Cursor<'a> {
     ///  - If `count` indexes into a multi-byte character.
     pub fn skip_bytes(&mut self, count: usize) {
         self.chars = self.chars.as_str()[count..].chars();
+    }
+
+    pub fn skip_non_newline_whitespace(&mut self) {
+        self.eat_while(|c| c.is_whitespace() && !matches!(c, '\n' | '\r'));
     }
 }

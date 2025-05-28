@@ -596,6 +596,13 @@ impl AsRef<SystemPath> for Utf8PathBuf {
     }
 }
 
+impl AsRef<SystemPath> for camino::Utf8Component<'_> {
+    #[inline]
+    fn as_ref(&self) -> &SystemPath {
+        SystemPath::new(self.as_str())
+    }
+}
+
 impl AsRef<SystemPath> for str {
     #[inline]
     fn as_ref(&self) -> &SystemPath {
@@ -623,6 +630,22 @@ impl Deref for SystemPathBuf {
     #[inline]
     fn deref(&self) -> &Self::Target {
         self.as_path()
+    }
+}
+
+impl<P: AsRef<SystemPath>> FromIterator<P> for SystemPathBuf {
+    fn from_iter<I: IntoIterator<Item = P>>(iter: I) -> Self {
+        let mut buf = SystemPathBuf::new();
+        buf.extend(iter);
+        buf
+    }
+}
+
+impl<P: AsRef<SystemPath>> Extend<P> for SystemPathBuf {
+    fn extend<I: IntoIterator<Item = P>>(&mut self, iter: I) {
+        for path in iter {
+            self.push(path);
+        }
     }
 }
 
