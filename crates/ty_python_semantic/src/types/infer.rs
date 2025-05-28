@@ -8737,6 +8737,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::Callable(CallableType::from_overloads(
                         db,
                         std::iter::once(signature).chain(signature_iter),
+                        false,
                     ))
                 }
             },
