@@ -150,7 +150,7 @@ For the fixers, `ruff` will run `ruff check --fix` (to fix all auto-fixable prob
 </details>
 
 <details>
-<summary>With the <a href="https://github.com/stevearc/conform.nvim"><code>conform.nvim</code></a> plugin for Neovim, especially about organizing imports order.</summary>
+<summary>With the <a href="https://github.com/stevearc/conform.nvim"><code>conform.nvim</code></a> plugin for Neovim.</summary>
 <br>
 
 ```lua
