@@ -172,7 +172,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
 fn pull_types(db: &ProjectDatabase, file: File) {
     let mut visitor = PullTypesVisitor::new(db, file);
 
-    let ast = parsed_module(db, file);
+    let ast = parsed_module(db, file).load(db);
 
     visitor.visit_body(ast.suite());
 }

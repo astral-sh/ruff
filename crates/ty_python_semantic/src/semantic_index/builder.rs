@@ -5,7 +5,7 @@ use except_handlers::TryNodeContextStackManager;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
-use ruff_db::parsed::ParsedModule;
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
@@ -69,20 +69,20 @@ struct ScopeInfo {
     current_loop: Option<Loop>,
 }
 
-pub(super) struct SemanticIndexBuilder<'db> {
+pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
     file: File,
     source_type: PySourceType,
-    module: &'db ParsedModule,
+    module: &'ast ParsedModuleRef,
     scope_stack: Vec<ScopeInfo>,
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec
-    current_assignments: Vec<CurrentAssignment<'db>>,
+    current_assignments: Vec<CurrentAssignment<'ast, 'db>>,
     /// The match case we're currently visiting.
-    current_match_case: Option<CurrentMatchCase<'db>>,
+    current_match_case: Option<CurrentMatchCase<'ast>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
-    current_first_parameter_name: Option<&'db str>,
+    current_first_parameter_name: Option<&'ast str>,
 
     /// Per-scope contexts regarding nested `try`/`except` statements
     try_node_context_stack_manager: TryNodeContextStackManager,
@@ -116,13 +116,13 @@ pub(super) struct SemanticIndexBuilder<'db> {
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 }
 
-impl<'db> SemanticIndexBuilder<'db> {
-    pub(super) fn new(db: &'db dyn Db, file: File, parsed: &'db ParsedModule) -> Self {
+impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
+    pub(super) fn new(db: &'db dyn Db, file: File, module_ref: &'ast ParsedModuleRef) -> Self {
         let mut builder = Self {
             db,
             file,
             source_type: file.source_type(db.upcast()),
-            module: parsed,
+            module: module_ref,
             scope_stack: Vec::new(),
             current_assignments: vec![],
             current_match_case: None,
@@ -423,7 +423,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn add_definition(
         &mut self,
         place: ScopedPlaceId,
-        definition_node: impl Into<DefinitionNodeRef<'db>> + std::fmt::Debug + Copy,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>> + std::fmt::Debug + Copy,
     ) -> Definition<'db> {
         let (definition, num_definitions) = self.push_additional_definition(place, definition_node);
         debug_assert_eq!(
@@ -463,16 +463,18 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn push_additional_definition(
         &mut self,
         place: ScopedPlaceId,
-        definition_node: impl Into<DefinitionNodeRef<'db>>,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
     ) -> (Definition<'db>, usize) {
-        let definition_node: DefinitionNodeRef<'_> = definition_node.into();
+        let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
+
         #[expect(unsafe_code)]
         // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
         let kind = unsafe { definition_node.into_owned(self.module.clone()) };
-        let category = kind.category(self.source_type.is_stub());
+
+        let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
 
-        let definition = Definition::new(
+        let definition: Definition<'db> = Definition::new(
             self.db,
             self.file,
             self.current_scope(),
@@ -658,7 +660,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             .record_reachability_constraint(negated_constraint);
     }
 
-    fn push_assignment(&mut self, assignment: CurrentAssignment<'db>) {
+    fn push_assignment(&mut self, assignment: CurrentAssignment<'ast, 'db>) {
         self.current_assignments.push(assignment);
     }
 
@@ -667,11 +669,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         debug_assert!(popped_assignment.is_some());
     }
 
-    fn current_assignment(&self) -> Option<CurrentAssignment<'db>> {
+    fn current_assignment(&self) -> Option<CurrentAssignment<'ast, 'db>> {
         self.current_assignments.last().copied()
     }
 
-    fn current_assignment_mut(&mut self) -> Option<&mut CurrentAssignment<'db>> {
+    fn current_assignment_mut(&mut self) -> Option<&mut CurrentAssignment<'ast, 'db>> {
         self.current_assignments.last_mut()
     }
 
@@ -792,7 +794,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn with_type_params(
         &mut self,
         with_scope: NodeWithScopeRef,
-        type_params: Option<&'db ast::TypeParams>,
+        type_params: Option<&'ast ast::TypeParams>,
         nested: impl FnOnce(&mut Self) -> FileScopeId,
     ) -> FileScopeId {
         if let Some(type_params) = type_params {
@@ -858,7 +860,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn with_generators_scope(
         &mut self,
         scope: NodeWithScopeRef,
-        generators: &'db [ast::Comprehension],
+        generators: &'ast [ast::Comprehension],
         visit_outer_elt: impl FnOnce(&mut Self),
     ) {
         let mut generators_iter = generators.iter();
@@ -908,7 +910,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.pop_scope();
     }
 
-    fn declare_parameters(&mut self, parameters: &'db ast::Parameters) {
+    fn declare_parameters(&mut self, parameters: &'ast ast::Parameters) {
         for parameter in parameters.iter_non_variadic_params() {
             self.declare_parameter(parameter);
         }
@@ -925,7 +927,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
     }
 
-    fn declare_parameter(&mut self, parameter: &'db ast::ParameterWithDefault) {
+    fn declare_parameter(&mut self, parameter: &'ast ast::ParameterWithDefault) {
         let symbol = self.add_symbol(parameter.name().id().clone());
 
         let definition = self.add_definition(symbol, parameter);
@@ -946,8 +948,8 @@ impl<'db> SemanticIndexBuilder<'db> {
     /// for statements, etc.
     fn add_unpackable_assignment(
         &mut self,
-        unpackable: &Unpackable<'db>,
-        target: &'db ast::Expr,
+        unpackable: &Unpackable<'ast>,
+        target: &'ast ast::Expr,
         value: Expression<'db>,
     ) {
         // We only handle assignments to names and unpackings here, other targets like
@@ -1010,8 +1012,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
-        let module = self.module;
-        self.visit_body(module.suite());
+        self.visit_body(self.module.suite());
 
         // Pop the root scope
         self.pop_scope();
@@ -1081,10 +1082,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 }
 
-impl<'db, 'ast> Visitor<'ast> for SemanticIndexBuilder<'db>
-where
-    'ast: 'db,
-{
+impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
 
@@ -2299,7 +2297,7 @@ where
     }
 }
 
-impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
+impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     fn future_annotations_or_stub(&self) -> bool {
         self.has_future_annotations
     }
@@ -2324,7 +2322,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
             match scope.kind() {
                 ScopeKind::Class | ScopeKind::Lambda => return false,
                 ScopeKind::Function => {
-                    return scope.node().expect_function().is_async;
+                    return scope.node().expect_function(self.module).is_async;
                 }
                 ScopeKind::Comprehension
                 | ScopeKind::Module
@@ -2366,9 +2364,9 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
         for scope_info in self.scope_stack.iter().rev() {
             let scope = &self.scopes[scope_info.file_scope_id];
             let generators = match scope.node() {
-                NodeWithScopeKind::ListComprehension(node) => &node.generators,
-                NodeWithScopeKind::SetComprehension(node) => &node.generators,
-                NodeWithScopeKind::DictComprehension(node) => &node.generators,
+                NodeWithScopeKind::ListComprehension(node) => &node.node(self.module).generators,
+                NodeWithScopeKind::SetComprehension(node) => &node.node(self.module).generators,
+                NodeWithScopeKind::DictComprehension(node) => &node.node(self.module).generators,
                 _ => continue,
             };
             if generators
@@ -2409,31 +2407,31 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-enum CurrentAssignment<'a> {
+enum CurrentAssignment<'ast, 'db> {
     Assign {
-        node: &'a ast::StmtAssign,
-        unpack: Option<(UnpackPosition, Unpack<'a>)>,
+        node: &'ast ast::StmtAssign,
+        unpack: Option<(UnpackPosition, Unpack<'db>)>,
     },
-    AnnAssign(&'a ast::StmtAnnAssign),
-    AugAssign(&'a ast::StmtAugAssign),
+    AnnAssign(&'ast ast::StmtAnnAssign),
+    AugAssign(&'ast ast::StmtAugAssign),
     For {
-        node: &'a ast::StmtFor,
-        unpack: Option<(UnpackPosition, Unpack<'a>)>,
+        node: &'ast ast::StmtFor,
+        unpack: Option<(UnpackPosition, Unpack<'db>)>,
     },
-    Named(&'a ast::ExprNamed),
+    Named(&'ast ast::ExprNamed),
     Comprehension {
-        node: &'a ast::Comprehension,
+        node: &'ast ast::Comprehension,
         first: bool,
-        unpack: Option<(UnpackPosition, Unpack<'a>)>,
+        unpack: Option<(UnpackPosition, Unpack<'db>)>,
     },
     WithItem {
-        item: &'a ast::WithItem,
+        item: &'ast ast::WithItem,
         is_async: bool,
-        unpack: Option<(UnpackPosition, Unpack<'a>)>,
+        unpack: Option<(UnpackPosition, Unpack<'db>)>,
     },
 }
 
-impl CurrentAssignment<'_> {
+impl CurrentAssignment<'_, '_> {
     fn unpack_position_mut(&mut self) -> Option<&mut UnpackPosition> {
         match self {
             Self::Assign { unpack, .. }
@@ -2445,28 +2443,28 @@ impl CurrentAssignment<'_> {
     }
 }
 
-impl<'a> From<&'a ast::StmtAnnAssign> for CurrentAssignment<'a> {
-    fn from(value: &'a ast::StmtAnnAssign) -> Self {
+impl<'ast> From<&'ast ast::StmtAnnAssign> for CurrentAssignment<'ast, '_> {
+    fn from(value: &'ast ast::StmtAnnAssign) -> Self {
         Self::AnnAssign(value)
     }
 }
 
-impl<'a> From<&'a ast::StmtAugAssign> for CurrentAssignment<'a> {
-    fn from(value: &'a ast::StmtAugAssign) -> Self {
+impl<'ast> From<&'ast ast::StmtAugAssign> for CurrentAssignment<'ast, '_> {
+    fn from(value: &'ast ast::StmtAugAssign) -> Self {
         Self::AugAssign(value)
     }
 }
 
-impl<'a> From<&'a ast::ExprNamed> for CurrentAssignment<'a> {
-    fn from(value: &'a ast::ExprNamed) -> Self {
+impl<'ast> From<&'ast ast::ExprNamed> for CurrentAssignment<'ast, '_> {
+    fn from(value: &'ast ast::ExprNamed) -> Self {
         Self::Named(value)
     }
 }
 
 #[derive(Debug, PartialEq)]
-struct CurrentMatchCase<'a> {
+struct CurrentMatchCase<'ast> {
     /// The pattern that's part of the current match case.
-    pattern: &'a ast::Pattern,
+    pattern: &'ast ast::Pattern,
 
     /// The index of the sub-pattern that's being currently visited within the pattern.
     ///
@@ -2488,20 +2486,20 @@ impl<'a> CurrentMatchCase<'a> {
     }
 }
 
-enum Unpackable<'a> {
-    Assign(&'a ast::StmtAssign),
-    For(&'a ast::StmtFor),
+enum Unpackable<'ast> {
+    Assign(&'ast ast::StmtAssign),
+    For(&'ast ast::StmtFor),
     WithItem {
-        item: &'a ast::WithItem,
+        item: &'ast ast::WithItem,
         is_async: bool,
     },
     Comprehension {
         first: bool,
-        node: &'a ast::Comprehension,
+        node: &'ast ast::Comprehension,
     },
 }
 
-impl<'a> Unpackable<'a> {
+impl<'ast> Unpackable<'ast> {
     const fn kind(&self) -> UnpackKind {
         match self {
             Unpackable::Assign(_) => UnpackKind::Assign,
@@ -2510,7 +2508,10 @@ impl<'a> Unpackable<'a> {
         }
     }
 
-    fn as_current_assignment(&self, unpack: Option<Unpack<'a>>) -> CurrentAssignment<'a> {
+    fn as_current_assignment<'db>(
+        &self,
+        unpack: Option<Unpack<'db>>,
+    ) -> CurrentAssignment<'ast, 'db> {
         let unpack = unpack.map(|unpack| (UnpackPosition::First, unpack));
         match self {
             Unpackable::Assign(stmt) => CurrentAssignment::Assign { node: stmt, unpack },

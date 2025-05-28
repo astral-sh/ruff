@@ -1,6 +1,7 @@
 use crate::semantic_index::definition::Definition;
 use crate::{Db, Module};
 use ruff_db::files::FileRange;
+use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_text_size::{TextLen, TextRange};
 
@@ -20,7 +21,10 @@ impl TypeDefinition<'_> {
             Self::Class(definition)
             | Self::Function(definition)
             | Self::TypeVar(definition)
-            | Self::TypeAlias(definition) => Some(definition.focus_range(db)),
+            | Self::TypeAlias(definition) => {
+                let module = parsed_module(db.upcast(), definition.file(db)).load(db.upcast());
+                Some(definition.focus_range(db, &module))
+            }
         }
     }
 
@@ -34,7 +38,10 @@ impl TypeDefinition<'_> {
             Self::Class(definition)
             | Self::Function(definition)
             | Self::TypeVar(definition)
-            | Self::TypeAlias(definition) => Some(definition.full_range(db)),
+            | Self::TypeAlias(definition) => {
+                let module = parsed_module(db.upcast(), definition.file(db)).load(db.upcast());
+                Some(definition.full_range(db, &module))
+            }
         }
     }
 }

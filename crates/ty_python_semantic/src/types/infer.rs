@@ -36,7 +36,7 @@
 use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
@@ -136,11 +136,13 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Ty
     let file = scope.file(db);
     let _span = tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), ?file).entered();
 
+    let module = parsed_module(db.upcast(), file).load(db.upcast());
+
     // Using the index here is fine because the code below depends on the AST anyway.
     // The isolation of the query is by the return inferred types.
     let index = semantic_index(db, file);
 
-    TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index).finish()
+    TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index, &module).finish()
 }
 
 fn scope_cycle_recover<'db>(
@@ -164,16 +166,17 @@ pub(crate) fn infer_definition_types<'db>(
     definition: Definition<'db>,
 ) -> TypeInference<'db> {
     let file = definition.file(db);
+    let module = parsed_module(db.upcast(), file).load(db.upcast());
     let _span = tracing::trace_span!(
         "infer_definition_types",
-        range = ?definition.kind(db).target_range(),
+        range = ?definition.kind(db).target_range(&module),
         ?file
     )
     .entered();
 
     let index = semantic_index(db, file);
 
-    TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index).finish()
+    TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index, &module).finish()
 }
 
 fn definition_cycle_recover<'db>(
@@ -202,17 +205,18 @@ pub(crate) fn infer_deferred_types<'db>(
     definition: Definition<'db>,
 ) -> TypeInference<'db> {
     let file = definition.file(db);
+    let module = parsed_module(db.upcast(), file).load(db.upcast());
     let _span = tracing::trace_span!(
         "infer_deferred_types",
         definition = ?definition.as_id(),
-        range = ?definition.kind(db).target_range(),
+        range = ?definition.kind(db).target_range(&module),
         ?file
     )
     .entered();
 
     let index = semantic_index(db, file);
 
-    TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index).finish()
+    TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index, &module).finish()
 }
 
 fn deferred_cycle_recover<'db>(
@@ -238,17 +242,18 @@ pub(crate) fn infer_expression_types<'db>(
     expression: Expression<'db>,
 ) -> TypeInference<'db> {
     let file = expression.file(db);
+    let module = parsed_module(db.upcast(), file).load(db.upcast());
     let _span = tracing::trace_span!(
         "infer_expression_types",
         expression = ?expression.as_id(),
-        range = ?expression.node_ref(db).range(),
+        range = ?expression.node_ref(db, &module).range(),
         ?file
     )
     .entered();
 
     let index = semantic_index(db, file);
 
-    TypeInferenceBuilder::new(db, InferenceRegion::Expression(expression), index).finish()
+    TypeInferenceBuilder::new(db, InferenceRegion::Expression(expression), index, &module).finish()
 }
 
 fn expression_cycle_recover<'db>(
@@ -275,10 +280,15 @@ fn expression_cycle_initial<'db>(
 pub(super) fn infer_same_file_expression_type<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
+    parsed: &ParsedModuleRef,
 ) -> Type<'db> {
     let inference = infer_expression_types(db, expression);
     let scope = expression.scope(db);
-    inference.expression_type(expression.node_ref(db).scoped_expression_id(db, scope))
+    inference.expression_type(
+        expression
+            .node_ref(db, parsed)
+            .scoped_expression_id(db, scope),
+    )
 }
 
 /// Infers the type of an expression where the expression might come from another file.
@@ -293,8 +303,11 @@ pub(crate) fn infer_expression_type<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> Type<'db> {
+    let file = expression.file(db);
+    let module = parsed_module(db.upcast(), file).load(db.upcast());
+
     // It's okay to call the "same file" version here because we're inside a salsa query.
-    infer_same_file_expression_type(db, expression)
+    infer_same_file_expression_type(db, expression, &module)
 }
 
 fn single_expression_cycle_recover<'db>(
@@ -322,11 +335,12 @@ fn single_expression_cycle_initial<'db>(
 #[salsa::tracked(returns(ref), cycle_fn=unpack_cycle_recover, cycle_initial=unpack_cycle_initial)]
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
-    let _span =
-        tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), ?file).entered();
+    let module = parsed_module(db.upcast(), file).load(db.upcast());
+    let _span = tracing::trace_span!("infer_unpack_types", range=?unpack.range(db, &module), ?file)
+        .entered();
 
-    let mut unpacker = Unpacker::new(db, unpack.target_scope(db), unpack.value_scope(db));
-    unpacker.unpack(unpack.target(db), unpack.value(db));
+    let mut unpacker = Unpacker::new(db, unpack.target_scope(db), unpack.value_scope(db), &module);
+    unpacker.unpack(unpack.target(db, &module), unpack.value(db));
     unpacker.finish()
 }
 
@@ -356,11 +370,12 @@ pub(crate) fn nearest_enclosing_class<'db>(
     db: &'db dyn Db,
     semantic: &SemanticIndex<'db>,
     scope: ScopeId,
+    parsed: &ParsedModuleRef,
 ) -> Option<ClassLiteral<'db>> {
     semantic
         .ancestor_scopes(scope.file_scope_id(db))
         .find_map(|(_, ancestor_scope)| {
-            let class = ancestor_scope.node().as_class()?;
+            let class = ancestor_scope.node().as_class(parsed)?;
             let definition = semantic.expect_single_definition(class);
             infer_definition_types(db, definition)
                 .declaration_type(definition)
@@ -569,8 +584,8 @@ enum DeclaredAndInferredType<'db> {
 /// Similarly, when we encounter a standalone-inferable expression (right-hand side of an
 /// assignment, type narrowing guard), we use the [`infer_expression_types()`] query to ensure we
 /// don't infer its types more than once.
-pub(super) struct TypeInferenceBuilder<'db> {
-    context: InferContext<'db>,
+pub(super) struct TypeInferenceBuilder<'db, 'ast> {
+    context: InferContext<'db, 'ast>,
     index: &'db SemanticIndex<'db>,
     region: InferenceRegion<'db>,
 
@@ -617,7 +632,7 @@ pub(super) struct TypeInferenceBuilder<'db> {
     deferred_state: DeferredExpressionState,
 }
 
-impl<'db> TypeInferenceBuilder<'db> {
+impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// How big a string do we build before bailing?
     ///
     /// This is a fairly arbitrary number. It should be *far* more than enough
@@ -629,11 +644,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         db: &'db dyn Db,
         region: InferenceRegion<'db>,
         index: &'db SemanticIndex<'db>,
+        module: &'ast ParsedModuleRef,
     ) -> Self {
         let scope = region.scope(db);
 
         Self {
-            context: InferContext::new(db, scope),
+            context: InferContext::new(db, scope, module),
             index,
             region,
             return_types_and_ranges: vec![],
@@ -657,6 +673,10 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn file(&self) -> File {
         self.context.file()
+    }
+
+    fn module(&self) -> &'ast ParsedModuleRef {
+        self.context.module()
     }
 
     fn db(&self) -> &'db dyn Db {
@@ -756,35 +776,36 @@ impl<'db> TypeInferenceBuilder<'db> {
         let node = scope.node(self.db());
         match node {
             NodeWithScopeKind::Module => {
-                let parsed = parsed_module(self.db().upcast(), self.file());
-                self.infer_module(parsed.syntax());
+                self.infer_module(self.module().syntax());
             }
-            NodeWithScopeKind::Function(function) => self.infer_function_body(function.node()),
-            NodeWithScopeKind::Lambda(lambda) => self.infer_lambda_body(lambda.node()),
-            NodeWithScopeKind::Class(class) => self.infer_class_body(class.node()),
+            NodeWithScopeKind::Function(function) => {
+                self.infer_function_body(function.node(self.module()));
+            }
+            NodeWithScopeKind::Lambda(lambda) => self.infer_lambda_body(lambda.node(self.module())),
+            NodeWithScopeKind::Class(class) => self.infer_class_body(class.node(self.module())),
             NodeWithScopeKind::ClassTypeParameters(class) => {
-                self.infer_class_type_params(class.node());
+                self.infer_class_type_params(class.node(self.module()));
             }
             NodeWithScopeKind::FunctionTypeParameters(function) => {
-                self.infer_function_type_params(function.node());
+                self.infer_function_type_params(function.node(self.module()));
             }
             NodeWithScopeKind::TypeAliasTypeParameters(type_alias) => {
-                self.infer_type_alias_type_params(type_alias.node());
+                self.infer_type_alias_type_params(type_alias.node(self.module()));
             }
             NodeWithScopeKind::TypeAlias(type_alias) => {
-                self.infer_type_alias(type_alias.node());
+                self.infer_type_alias(type_alias.node(self.module()));
             }
             NodeWithScopeKind::ListComprehension(comprehension) => {
-                self.infer_list_comprehension_expression_scope(comprehension.node());
+                self.infer_list_comprehension_expression_scope(comprehension.node(self.module()));
             }
             NodeWithScopeKind::SetComprehension(comprehension) => {
-                self.infer_set_comprehension_expression_scope(comprehension.node());
+                self.infer_set_comprehension_expression_scope(comprehension.node(self.module()));
             }
             NodeWithScopeKind::DictComprehension(comprehension) => {
-                self.infer_dict_comprehension_expression_scope(comprehension.node());
+                self.infer_dict_comprehension_expression_scope(comprehension.node(self.module()));
             }
             NodeWithScopeKind::GeneratorExpression(generator) => {
-                self.infer_generator_expression_scope(generator.node());
+                self.infer_generator_expression_scope(generator.node(self.module()));
             }
         }
 
@@ -823,7 +844,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let DefinitionKind::Class(class) = definition.kind(self.db()) {
                     ty.inner_type()
                         .into_class_literal()
-                        .map(|class_literal| (class_literal, class.node()))
+                        .map(|class_literal| (class_literal, class.node(self.module())))
                 } else {
                     None
                 }
@@ -1143,7 +1164,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // Check that the overloaded function has at least two overloads
             if let [single_overload] = overloads.as_ref() {
-                let function_node = function.node(self.db(), self.file());
+                let function_node = function.node(self.db(), self.file(), self.module());
                 if let Some(builder) = self
                     .context
                     .report_lint(&INVALID_OVERLOAD, &function_node.name)
@@ -1154,7 +1175,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ));
                     diagnostic.annotate(
                         self.context
-                            .secondary(single_overload.focus_range(self.db()))
+                            .secondary(single_overload.focus_range(self.db(), self.module()))
                             .message(format_args!("Only one overload defined here")),
                     );
                 }
@@ -1169,7 +1190,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let NodeWithScopeKind::Class(class_node_ref) = scope {
                     let class = binding_type(
                         self.db(),
-                        self.index.expect_single_definition(class_node_ref.node()),
+                        self.index
+                            .expect_single_definition(class_node_ref.node(self.module())),
                     )
                     .expect_class_literal();
 
@@ -1187,7 +1209,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 if implementation_required {
-                    let function_node = function.node(self.db(), self.file());
+                    let function_node = function.node(self.db(), self.file(), self.module());
                     if let Some(builder) = self
                         .context
                         .report_lint(&INVALID_OVERLOAD, &function_node.name)
@@ -1222,7 +1244,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     continue;
                 }
 
-                let function_node = function.node(self.db(), self.file());
+                let function_node = function.node(self.db(), self.file(), self.module());
                 if let Some(builder) = self
                     .context
                     .report_lint(&INVALID_OVERLOAD, &function_node.name)
@@ -1235,7 +1257,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     for function in decorator_missing {
                         diagnostic.annotate(
                             self.context
-                                .secondary(function.focus_range(self.db()))
+                                .secondary(function.focus_range(self.db(), self.module()))
                                 .message(format_args!("Missing here")),
                         );
                     }
@@ -1251,7 +1273,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         if !overload.has_known_decorator(self.db(), decorator) {
                             continue;
                         }
-                        let function_node = function.node(self.db(), self.file());
+                        let function_node = function.node(self.db(), self.file(), self.module());
                         let Some(builder) = self
                             .context
                             .report_lint(&INVALID_OVERLOAD, &function_node.name)
@@ -1264,7 +1286,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         ));
                         diagnostic.annotate(
                             self.context
-                                .secondary(implementation.focus_range(self.db()))
+                                .secondary(implementation.focus_range(self.db(), self.module()))
                                 .message(format_args!("Implementation defined here")),
                         );
                     }
@@ -1277,7 +1299,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         if !overload.has_known_decorator(self.db(), decorator) {
                             continue;
                         }
-                        let function_node = function.node(self.db(), self.file());
+                        let function_node = function.node(self.db(), self.file(), self.module());
                         let Some(builder) = self
                             .context
                             .report_lint(&INVALID_OVERLOAD, &function_node.name)
@@ -1290,7 +1312,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         ));
                         diagnostic.annotate(
                             self.context
-                                .secondary(first_overload.focus_range(self.db()))
+                                .secondary(first_overload.focus_range(self.db(), self.module()))
                                 .message(format_args!("First overload defined here")),
                         );
                     }
@@ -1302,24 +1324,34 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
         match definition.kind(self.db()) {
             DefinitionKind::Function(function) => {
-                self.infer_function_definition(function.node(), definition);
+                self.infer_function_definition(function.node(self.module()), definition);
             }
-            DefinitionKind::Class(class) => self.infer_class_definition(class.node(), definition),
+            DefinitionKind::Class(class) => {
+                self.infer_class_definition(class.node(self.module()), definition);
+            }
             DefinitionKind::TypeAlias(type_alias) => {
-                self.infer_type_alias_definition(type_alias.node(), definition);
+                self.infer_type_alias_definition(type_alias.node(self.module()), definition);
             }
             DefinitionKind::Import(import) => {
-                self.infer_import_definition(import.import(), import.alias(), definition);
+                self.infer_import_definition(
+                    import.import(self.module()),
+                    import.alias(self.module()),
+                    definition,
+                );
             }
             DefinitionKind::ImportFrom(import_from) => {
                 self.infer_import_from_definition(
-                    import_from.import(),
-                    import_from.alias(),
+                    import_from.import(self.module()),
+                    import_from.alias(self.module()),
                     definition,
                 );
             }
             DefinitionKind::StarImport(import) => {
-                self.infer_import_from_definition(import.import(), import.alias(), definition);
+                self.infer_import_from_definition(
+                    import.import(self.module()),
+                    import.alias(self.module()),
+                    definition,
+                );
             }
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_definition(assignment, definition);
@@ -1328,32 +1360,47 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_annotated_assignment_definition(annotated_assignment, definition);
             }
             DefinitionKind::AugmentedAssignment(augmented_assignment) => {
-                self.infer_augment_assignment_definition(augmented_assignment.node(), definition);
+                self.infer_augment_assignment_definition(
+                    augmented_assignment.node(self.module()),
+                    definition,
+                );
             }
             DefinitionKind::For(for_statement_definition) => {
                 self.infer_for_statement_definition(for_statement_definition, definition);
             }
             DefinitionKind::NamedExpression(named_expression) => {
-                self.infer_named_expression_definition(named_expression.node(), definition);
+                self.infer_named_expression_definition(
+                    named_expression.node(self.module()),
+                    definition,
+                );
             }
             DefinitionKind::Comprehension(comprehension) => {
                 self.infer_comprehension_definition(comprehension, definition);
             }
             DefinitionKind::VariadicPositionalParameter(parameter) => {
-                self.infer_variadic_positional_parameter_definition(parameter, definition);
+                self.infer_variadic_positional_parameter_definition(
+                    parameter.node(self.module()),
+                    definition,
+                );
             }
             DefinitionKind::VariadicKeywordParameter(parameter) => {
-                self.infer_variadic_keyword_parameter_definition(parameter, definition);
+                self.infer_variadic_keyword_parameter_definition(
+                    parameter.node(self.module()),
+                    definition,
+                );
             }
             DefinitionKind::Parameter(parameter_with_default) => {
-                self.infer_parameter_definition(parameter_with_default, definition);
+                self.infer_parameter_definition(
+                    parameter_with_default.node(self.module()),
+                    definition,
+                );
             }
             DefinitionKind::WithItem(with_item_definition) => {
                 self.infer_with_item_definition(with_item_definition, definition);
             }
             DefinitionKind::MatchPattern(match_pattern) => {
                 self.infer_match_pattern_definition(
-                    match_pattern.pattern(),
+                    match_pattern.pattern(self.module()),
                     match_pattern.index(),
                     definition,
                 );
@@ -1362,13 +1409,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_except_handler_definition(except_handler_definition, definition);
             }
             DefinitionKind::TypeVar(node) => {
-                self.infer_typevar_definition(node, definition);
+                self.infer_typevar_definition(node.node(self.module()), definition);
             }
             DefinitionKind::ParamSpec(node) => {
-                self.infer_paramspec_definition(node, definition);
+                self.infer_paramspec_definition(node.node(self.module()), definition);
             }
             DefinitionKind::TypeVarTuple(node) => {
-                self.infer_typevartuple_definition(node, definition);
+                self.infer_typevartuple_definition(node.node(self.module()), definition);
             }
         }
     }
@@ -1384,8 +1431,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         // implementation to allow this "split" to happen.
 
         match definition.kind(self.db()) {
-            DefinitionKind::Function(function) => self.infer_function_deferred(function.node()),
-            DefinitionKind::Class(class) => self.infer_class_deferred(class.node()),
+            DefinitionKind::Function(function) => {
+                self.infer_function_deferred(function.node(self.module()));
+            }
+            DefinitionKind::Class(class) => self.infer_class_deferred(class.node(self.module())),
             _ => {}
         }
     }
@@ -1393,10 +1442,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_region_expression(&mut self, expression: Expression<'db>) {
         match expression.kind(self.db()) {
             ExpressionKind::Normal => {
-                self.infer_expression_impl(expression.node_ref(self.db()));
+                self.infer_expression_impl(expression.node_ref(self.db(), self.module()));
             }
             ExpressionKind::TypeExpression => {
-                self.infer_type_expression(expression.node_ref(self.db()));
+                self.infer_type_expression(expression.node_ref(self.db(), self.module()));
             }
         }
     }
@@ -1441,7 +1490,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         debug_assert!(
             binding
                 .kind(self.db())
-                .category(self.context.in_stub())
+                .category(self.context.in_stub(), self.module())
                 .is_binding()
         );
 
@@ -1555,7 +1604,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         debug_assert!(
             declaration
                 .kind(self.db())
-                .category(self.context.in_stub())
+                .category(self.context.in_stub(), self.module())
                 .is_declaration()
         );
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
@@ -1601,13 +1650,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         debug_assert!(
             definition
                 .kind(self.db())
-                .category(self.context.in_stub())
+                .category(self.context.in_stub(), self.module())
                 .is_binding()
         );
         debug_assert!(
             definition
                 .kind(self.db())
-                .category(self.context.in_stub())
+                .category(self.context.in_stub(), self.module())
                 .is_declaration()
         );
 
@@ -1763,7 +1812,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             _ => return None,
         };
 
-        let class_stmt = class_scope.node().as_class()?;
+        let class_stmt = class_scope.node().as_class(self.module())?;
         let class_definition = self.index.expect_single_definition(class_stmt);
         binding_type(self.db(), class_definition).into_class_literal()
     }
@@ -1784,17 +1833,21 @@ impl<'db> TypeInferenceBuilder<'db> {
             return false;
         };
 
-        node_ref.decorator_list.iter().any(|decorator| {
-            let decorator_type = self.file_expression_type(&decorator.expression);
+        node_ref
+            .node(self.module())
+            .decorator_list
+            .iter()
+            .any(|decorator| {
+                let decorator_type = self.file_expression_type(&decorator.expression);
 
-            match decorator_type {
-                Type::FunctionLiteral(function) => matches!(
-                    function.known(self.db()),
-                    Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
-                ),
-                _ => false,
-            }
-        })
+                match decorator_type {
+                    Type::FunctionLiteral(function) => matches!(
+                        function.known(self.db()),
+                        Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
+                    ),
+                    _ => false,
+                }
+            })
     }
 
     fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
@@ -2558,8 +2611,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         with_item: &WithItemDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
-        let context_expr = with_item.context_expr();
-        let target = with_item.target();
+        let context_expr = with_item.context_expr(self.module());
+        let target = with_item.target(self.module());
 
         let context_expr_ty = self.infer_standalone_expression(context_expr);
 
@@ -2707,12 +2760,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
     ) {
         let symbol_ty = self.infer_exception(
-            except_handler_definition.handled_exceptions(),
+            except_handler_definition.handled_exceptions(self.module()),
             except_handler_definition.is_star(),
         );
 
         self.add_binding(
-            except_handler_definition.node().into(),
+            except_handler_definition.node(self.module()).into(),
             definition,
             symbol_ty,
         );
@@ -3001,7 +3054,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// `target`.
     fn infer_target<F>(&mut self, target: &ast::Expr, value: &ast::Expr, infer_value_expr: F)
     where
-        F: Fn(&mut TypeInferenceBuilder<'db>, &ast::Expr) -> Type<'db>,
+        F: Fn(&mut TypeInferenceBuilder<'db, '_>, &ast::Expr) -> Type<'db>,
     {
         let assigned_ty = match target {
             ast::Expr::Name(_) => None,
@@ -3542,8 +3595,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         assignment: &AssignmentDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
-        let value = assignment.value();
-        let target = assignment.target();
+        let value = assignment.value(self.module());
+        let target = assignment.target(self.module());
 
         let value_ty = self.infer_standalone_expression(value);
 
@@ -3625,9 +3678,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         assignment: &'db AnnotatedAssignmentDefinitionKind,
         definition: Definition<'db>,
     ) {
-        let annotation = assignment.annotation();
-        let target = assignment.target();
-        let value = assignment.value();
+        let annotation = assignment.annotation(self.module());
+        let target = assignment.target(self.module());
+        let value = assignment.value(self.module());
 
         let mut declared_ty = self.infer_annotation_expression(
             annotation,
@@ -3858,8 +3911,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         for_stmt: &ForStmtDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
-        let iterable = for_stmt.iterable();
-        let target = for_stmt.target();
+        let iterable = for_stmt.iterable(self.module());
+        let target = for_stmt.target(self.module());
 
         let iterable_type = self.infer_standalone_expression(iterable);
 
@@ -3967,7 +4020,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_import_definition(
         &mut self,
         node: &ast::StmtImport,
-        alias: &'db ast::Alias,
+        alias: &ast::Alias,
         definition: Definition<'db>,
     ) {
         let ast::Alias {
@@ -4146,7 +4199,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_import_from_definition(
         &mut self,
-        import_from: &'db ast::StmtImportFrom,
+        import_from: &ast::StmtImportFrom,
         alias: &ast::Alias,
         definition: Definition<'db>,
     ) {
@@ -4804,7 +4857,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `[... for a.x in not_iterable]
             if is_first {
-                infer_same_file_expression_type(builder.db(), builder.index.expression(iter_expr))
+                infer_same_file_expression_type(
+                    builder.db(),
+                    builder.index.expression(iter_expr),
+                    builder.module(),
+                )
             } else {
                 builder.infer_standalone_expression(iter_expr)
             }
@@ -4820,8 +4877,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         comprehension: &ComprehensionDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
-        let iterable = comprehension.iterable();
-        let target = comprehension.target();
+        let iterable = comprehension.iterable(self.module());
+        let target = comprehension.target(self.module());
 
         let expression = self.index.expression(iterable);
         let result = infer_expression_types(self.db(), expression);
@@ -5009,8 +5066,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Returns `None` if the scope is not function-like, or has no parameters.
     fn first_param_type_in_scope(&self, scope: ScopeId) -> Option<Type<'db>> {
         let first_param = match scope.node(self.db()) {
-            NodeWithScopeKind::Function(f) => f.parameters.iter().next(),
-            NodeWithScopeKind::Lambda(l) => l.parameters.as_ref()?.iter().next(),
+            NodeWithScopeKind::Function(f) => f.node(self.module()).parameters.iter().next(),
+            NodeWithScopeKind::Lambda(l) => {
+                l.node(self.module()).parameters.as_ref()?.iter().next()
+            }
             _ => None,
         }?;
 
@@ -5371,6 +5430,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                     self.db(),
                                                     self.index,
                                                     scope,
+                                                    self.module(),
                                                 ) else {
                                                     overload.set_return_type(Type::unknown());
                                                     BoundSuperError::UnavailableImplicitArguments
@@ -5435,7 +5495,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                                         let Some(target) =
                                             assigned_to.as_ref().and_then(|assigned_to| {
-                                                match assigned_to.node().targets.as_slice() {
+                                                match assigned_to
+                                                    .node(self.module())
+                                                    .targets
+                                                    .as_slice()
+                                                {
                                                     [ast::Expr::Name(target)] => Some(target),
                                                     _ => None,
                                                 }
@@ -5605,7 +5669,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                                         let containing_assignment =
                                             assigned_to.as_ref().and_then(|assigned_to| {
-                                                match assigned_to.node().targets.as_slice() {
+                                                match assigned_to
+                                                    .node(self.module())
+                                                    .targets
+                                                    .as_slice()
+                                                {
                                                     [ast::Expr::Name(target)] => Some(
                                                         self.index.expect_single_definition(target),
                                                     ),
@@ -8125,7 +8193,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 }
 
 /// Annotation expressions.
-impl<'db> TypeInferenceBuilder<'db> {
+impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of an annotation expression with the given [`DeferredExpressionState`].
     fn infer_annotation_expression(
         &mut self,
@@ -8314,7 +8382,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 }
 
 /// Type expressions
-impl<'db> TypeInferenceBuilder<'db> {
+impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression.
     fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         let ty = self.infer_type_expression_no_store(expression);
@@ -9340,10 +9408,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn infer_literal_parameter_type<'ast>(
+    fn infer_literal_parameter_type<'param>(
         &mut self,
-        parameters: &'ast ast::Expr,
-    ) -> Result<Type<'db>, Vec<&'ast ast::Expr>> {
+        parameters: &'param ast::Expr,
+    ) -> Result<Type<'db>, Vec<&'param ast::Expr>> {
         Ok(match parameters {
             // TODO handle type aliases
             ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
@@ -9723,6 +9791,7 @@ mod tests {
         symbol_name: &str,
     ) -> Place<'db> {
         let file = system_path_to_file(db, file_name).expect("file to exist");
+        let module = parsed_module(db, file).load(db);
         let index = semantic_index(db, file);
         let mut file_scope_id = FileScopeId::global();
         let mut scope = file_scope_id.to_scope_id(db, file);
@@ -9733,7 +9802,7 @@ mod tests {
                 .unwrap_or_else(|| panic!("scope of {expected_scope_name}"))
                 .0;
             scope = file_scope_id.to_scope_id(db, file);
-            assert_eq!(scope.name(db), *expected_scope_name);
+            assert_eq!(scope.name(db, &module), *expected_scope_name);
         }
 
         symbol(db, scope, symbol_name).place
@@ -10087,7 +10156,7 @@ mod tests {
     fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
             let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-            let ast = parsed_module(db, file_main);
+            let ast = parsed_module(db, file_main).load(db);
             // Get the second statement in `main.py` (x = …) and extract the expression
             // node on the right-hand side:
             let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
@@ -10170,7 +10239,7 @@ mod tests {
     fn dependency_own_instance_member() -> anyhow::Result<()> {
         fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
             let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-            let ast = parsed_module(db, file_main);
+            let ast = parsed_module(db, file_main).load(db);
             // Get the second statement in `main.py` (x = …) and extract the expression
             // node on the right-hand side:
             let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;

@@ -232,7 +232,7 @@ mod tests {
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
-        let ast = parsed_module(&db, foo);
+        let ast = parsed_module(&db, foo).load(&db);
 
         let function = ast.suite()[0].as_function_def_stmt().unwrap();
         let model = SemanticModel::new(&db, foo);
@@ -251,7 +251,7 @@ mod tests {
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
-        let ast = parsed_module(&db, foo);
+        let ast = parsed_module(&db, foo).load(&db);
 
         let class = ast.suite()[0].as_class_def_stmt().unwrap();
         let model = SemanticModel::new(&db, foo);
@@ -271,7 +271,7 @@ mod tests {
 
         let bar = system_path_to_file(&db, "/src/bar.py").unwrap();
 
-        let ast = parsed_module(&db, bar);
+        let ast = parsed_module(&db, bar).load(&db);
 
         let import = ast.suite()[0].as_import_from_stmt().unwrap();
         let alias = &import.names[0];

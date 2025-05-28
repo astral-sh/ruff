@@ -1,5 +1,6 @@
 use infer::nearest_enclosing_class;
 use itertools::Either;
+use ruff_db::parsed::parsed_module;
 
 use std::slice::Iter;
 
@@ -5065,8 +5066,9 @@ impl<'db> Type<'db> {
                 SpecialFormType::Callable => Ok(CallableType::unknown(db)),
 
                 SpecialFormType::TypingSelf => {
+                    let module = parsed_module(db.upcast(), scope_id.file(db)).load(db.upcast());
                     let index = semantic_index(db, scope_id.file(db));
-                    let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
+                    let Some(class) = nearest_enclosing_class(db, index, scope_id, &module) else {
                         return Err(InvalidTypeExpressionError {
                             fallback_type: Type::unknown(),
                             invalid_expressions: smallvec::smallvec![
@@ -6302,7 +6304,7 @@ impl<'db> ContextManagerError<'db> {
 
     fn report_diagnostic(
         &self,
-        context: &InferContext<'db>,
+        context: &InferContext<'db, '_>,
         context_expression_type: Type<'db>,
         context_expression_node: ast::AnyNodeRef,
     ) {
@@ -6475,7 +6477,7 @@ impl<'db> IterationError<'db> {
     /// Reports the diagnostic for this error.
     fn report_diagnostic(
         &self,
-        context: &InferContext<'db>,
+        context: &InferContext<'db, '_>,
         iterable_type: Type<'db>,
         iterable_node: ast::AnyNodeRef,
     ) {
@@ -6951,7 +6953,7 @@ impl<'db> ConstructorCallError<'db> {
 
     fn report_diagnostic(
         &self,
-        context: &InferContext<'db>,
+        context: &InferContext<'db, '_>,
         context_expression_type: Type<'db>,
         context_expression_node: ast::AnyNodeRef,
     ) {
@@ -7578,7 +7580,8 @@ pub struct PEP695TypeAliasType<'db> {
 impl<'db> PEP695TypeAliasType<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let scope = self.rhs_scope(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
+        let module = parsed_module(db.upcast(), scope.file(db)).load(db.upcast());
+        let type_alias_stmt_node = scope.node(db).expect_type_alias(&module);
 
         semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node)
     }
@@ -7586,7 +7589,8 @@ impl<'db> PEP695TypeAliasType<'db> {
     #[salsa::tracked]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
+        let module = parsed_module(db.upcast(), scope.file(db)).load(db.upcast());
+        let type_alias_stmt_node = scope.node(db).expect_type_alias(&module);
         let definition = self.definition(db);
         definition_expression_type(db, definition, &type_alias_stmt_node.value)
     }
@@ -8654,10 +8658,8 @@ pub(crate) mod tests {
         );
         let events = db.take_salsa_events();
 
-        let call = &*parsed_module(&db, bar).syntax().body[1]
-            .as_assign_stmt()
-            .unwrap()
-            .value;
+        let module = parsed_module(&db, bar).load(&db);
+        let call = &*module.syntax().body[1].as_assign_stmt().unwrap().value;
         let foo_call = semantic_index(&db, bar).expression(call);
 
         assert_function_query_was_not_run(&db, infer_expression_types, foo_call, &events);
