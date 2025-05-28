@@ -1318,7 +1318,7 @@ static_assert(not is_subtype_of(TypeOf[D[int]], Callable[[str], D[int]]))
 #### Classes with `__init__` and `__new__`
 
 ```py
-from typing import Callable, overload, Self, Any
+from typing import Callable, overload, Self
 from ty_extensions import TypeOf, static_assert, is_subtype_of
 
 class A:
@@ -1340,11 +1340,12 @@ static_assert(is_subtype_of(TypeOf[B], Callable[[int], int]))
 static_assert(not is_subtype_of(TypeOf[B], Callable[[str], B]))
 
 class C:
-    def __new__(cls, *args: Any, **kwargs: Any) -> "C":
+    def __new__(cls, *args, **kwargs) -> "C":
         return super().__new__(cls)
 
     def __init__(self, x: int) -> None: ...
 
+# Not subtype because __new__ signature is not fully static
 static_assert(not is_subtype_of(TypeOf[C], Callable[[int], C]))
 static_assert(not is_subtype_of(TypeOf[C], Callable[[], C]))
 

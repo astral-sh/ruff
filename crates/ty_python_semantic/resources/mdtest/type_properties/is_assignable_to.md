@@ -618,6 +618,14 @@ class A:
     def __init__(self, x: int) -> None: ...
 
 a: Callable[[int], A] = A
+
+class C:
+    def __new__(cls, *args, **kwargs) -> "C":
+        return super().__new__(cls)
+
+    def __init__(self, x: int) -> None: ...
+
+c: Callable[[int], C] = C
 ```
 
 ### Generic class literal types
@@ -628,7 +636,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Any, Callable
+from typing import Callable
 
 class B[T]:
     def __init__(self, x: T) -> None: ...
@@ -636,7 +644,7 @@ class B[T]:
 b: Callable[[int], B[int]] = B[int]
 
 class C[T]:
-    def __new__(cls, *args: Any, **kwargs: Any) -> "C[T]":
+    def __new__(cls, *args, **kwargs) -> "C[T]":
         return super().__new__(cls)
 
     def __init__(self, x: T) -> None: ...
