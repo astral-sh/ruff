@@ -35,7 +35,7 @@ impl Violation for TabIndentation {
 
 /// W191
 pub(crate) fn tab_indentation(
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
     locator: &Locator,
     indexer: &Indexer,
 ) {
@@ -47,7 +47,7 @@ pub(crate) fn tab_indentation(
 
         // Determine whether the tab is part of the line's indentation.
         if let Some(indent) = tab_indentation_at_line_start(range.start(), locator, indexer) {
-            collector.report_diagnostic(TabIndentation, indent);
+            diagnostics.report_diagnostic(TabIndentation, indent);
         }
 
         // Advance to the next line.

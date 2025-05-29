@@ -52,7 +52,7 @@ impl Violation for ShebangNotExecutable {
 pub(crate) fn shebang_not_executable(
     filepath: &Path,
     range: TextRange,
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
 ) {
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
@@ -62,7 +62,7 @@ pub(crate) fn shebang_not_executable(
     }
 
     if let Ok(false) = is_executable(filepath) {
-        collector.report_diagnostic(ShebangNotExecutable, range);
+        diagnostics.report_diagnostic(ShebangNotExecutable, range);
     }
 }
 
@@ -70,6 +70,6 @@ pub(crate) fn shebang_not_executable(
 pub(crate) fn shebang_not_executable(
     _filepath: &Path,
     _range: TextRange,
-    _collector: &DiagnosticsCollector,
+    _diagnostics: &DiagnosticsCollector,
 ) {
 }

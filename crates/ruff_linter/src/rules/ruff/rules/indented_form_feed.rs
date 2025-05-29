@@ -49,7 +49,7 @@ const SPACE: u8 = b' ';
 const TAB: u8 = b'\t';
 
 /// RUF054
-pub(crate) fn indented_form_feed(line: &Line, collector: &DiagnosticsCollector) {
+pub(crate) fn indented_form_feed(line: &Line, diagnostics: &DiagnosticsCollector) {
     let Some(index_relative_to_line) = memchr(FORM_FEED, line.as_bytes()) else {
         return;
     };
@@ -72,5 +72,5 @@ pub(crate) fn indented_form_feed(line: &Line, collector: &DiagnosticsCollector) 
     let absolute_index = line.start() + TextSize::new(relative_index);
     let range = TextRange::at(absolute_index, 1.into());
 
-    collector.report_diagnostic(IndentedFormFeed, range);
+    diagnostics.report_diagnostic(IndentedFormFeed, range);
 }

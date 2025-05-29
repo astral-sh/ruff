@@ -39,7 +39,7 @@ impl Violation for TypeCommentInStub {
 
 /// PYI033
 pub(crate) fn type_comment_in_stub(
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
     locator: &Locator,
     comment_ranges: &CommentRanges,
 ) {
@@ -47,7 +47,7 @@ pub(crate) fn type_comment_in_stub(
         let comment = locator.slice(range);
 
         if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
-            collector.report_diagnostic(TypeCommentInStub, range);
+            diagnostics.report_diagnostic(TypeCommentInStub, range);
         }
     }
 }

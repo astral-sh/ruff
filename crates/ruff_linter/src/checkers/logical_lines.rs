@@ -41,9 +41,9 @@ pub(crate) fn check_logical_lines(
     indexer: &Indexer,
     stylist: &Stylist,
     settings: &LinterSettings,
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
 ) {
-    let mut context = LogicalLinesContext::new(settings, collector);
+    let mut context = LogicalLinesContext::new(settings, diagnostics);
 
     let mut prev_line = None;
     let mut prev_indent_level = None;
@@ -180,7 +180,7 @@ pub(crate) fn check_logical_lines(
                 prev_indent_level,
                 indent_size,
                 range,
-                collector,
+                diagnostics,
                 settings,
             );
         }
@@ -194,14 +194,14 @@ pub(crate) fn check_logical_lines(
 
 pub(crate) struct LogicalLinesContext<'a, 'b> {
     settings: &'a LinterSettings,
-    collector: &'a DiagnosticsCollector<'b>,
+    diagnostics: &'a DiagnosticsCollector<'b>,
 }
 
 impl<'a, 'b> LogicalLinesContext<'a, 'b> {
-    fn new(settings: &'a LinterSettings, collector: &'a DiagnosticsCollector<'b>) -> Self {
+    fn new(settings: &'a LinterSettings, diagnostics: &'a DiagnosticsCollector<'b>) -> Self {
         Self {
             settings,
-            collector,
+            diagnostics,
         }
     }
 
@@ -210,7 +210,7 @@ impl<'a, 'b> LogicalLinesContext<'a, 'b> {
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        self.collector
+        self.diagnostics
             .report_diagnostic_if_enabled(kind, range, self.settings)
     }
 }

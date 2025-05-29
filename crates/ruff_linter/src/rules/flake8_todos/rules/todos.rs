@@ -249,7 +249,7 @@ static ISSUE_LINK_TODO_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
 });
 
 pub(crate) fn todos(
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
     todo_comments: &[TodoComment],
     locator: &Locator,
     comment_ranges: &CommentRanges,
@@ -268,8 +268,8 @@ pub(crate) fn todos(
             continue;
         }
 
-        directive_errors(collector, directive);
-        static_errors(collector, content, range, directive);
+        directive_errors(diagnostics, directive);
+        static_errors(diagnostics, content, range, directive);
 
         let mut has_issue_link = false;
         // VSCode recommended links on same line are ok:
@@ -308,20 +308,20 @@ pub(crate) fn todos(
 
         if !has_issue_link {
             // TD003
-            collector.report_diagnostic(MissingTodoLink, directive.range);
+            diagnostics.report_diagnostic(MissingTodoLink, directive.range);
         }
     }
 }
 
 /// Check that the directive itself is valid. This function modifies `diagnostics` in-place.
-fn directive_errors(collector: &DiagnosticsCollector, directive: &TodoDirective) {
+fn directive_errors(diagnostics: &DiagnosticsCollector, directive: &TodoDirective) {
     if directive.content == "TODO" {
         return;
     }
 
     if directive.content.to_uppercase() == "TODO" {
         // TD006
-        let mut diagnostic = collector.report_diagnostic(
+        let mut diagnostic = diagnostics.report_diagnostic(
             InvalidTodoCapitalization {
                 tag: directive.content.to_string(),
             },
@@ -334,7 +334,7 @@ fn directive_errors(collector: &DiagnosticsCollector, directive: &TodoDirective)
         )));
     } else {
         // TD001
-        collector.report_diagnostic(
+        diagnostics.report_diagnostic(
             InvalidTodoTag {
                 tag: directive.content.to_string(),
             },
@@ -345,7 +345,7 @@ fn directive_errors(collector: &DiagnosticsCollector, directive: &TodoDirective)
 
 /// Checks for "static" errors in the comment: missing colon, missing author, etc.
 pub(crate) fn static_errors(
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
     comment: &str,
     comment_range: TextRange,
     directive: &TodoDirective,
@@ -366,13 +366,13 @@ pub(crate) fn static_errors(
                 TextSize::try_from(end_index).unwrap()
             } else {
                 // TD002
-                collector.report_diagnostic(MissingTodoAuthor, directive.range);
+                diagnostics.report_diagnostic(MissingTodoAuthor, directive.range);
 
                 TextSize::new(0)
             }
         } else {
             // TD002
-            collector.report_diagnostic(MissingTodoAuthor, directive.range);
+            diagnostics.report_diagnostic(MissingTodoAuthor, directive.range);
 
             TextSize::new(0)
         };
@@ -381,18 +381,18 @@ pub(crate) fn static_errors(
     if let Some(after_colon) = after_author.strip_prefix(':') {
         if after_colon.is_empty() {
             // TD005
-            collector.report_diagnostic(MissingTodoDescription, directive.range);
+            diagnostics.report_diagnostic(MissingTodoDescription, directive.range);
         } else if !after_colon.starts_with(char::is_whitespace) {
             // TD007
-            collector.report_diagnostic(MissingSpaceAfterTodoColon, directive.range);
+            diagnostics.report_diagnostic(MissingSpaceAfterTodoColon, directive.range);
         }
     } else {
         // TD004
-        collector.report_diagnostic(MissingTodoColon, directive.range);
+        diagnostics.report_diagnostic(MissingTodoColon, directive.range);
 
         if after_author.is_empty() {
             // TD005
-            collector.report_diagnostic(MissingTodoDescription, directive.range);
+            diagnostics.report_diagnostic(MissingTodoDescription, directive.range);
         }
     }
 }

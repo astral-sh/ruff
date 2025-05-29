@@ -79,7 +79,7 @@ pub(crate) fn trailing_whitespace(
     locator: &Locator,
     indexer: &Indexer,
     settings: &LinterSettings,
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
 ) {
     let whitespace_len: TextSize = line
         .chars()
@@ -97,7 +97,7 @@ pub(crate) fn trailing_whitespace(
         };
         if range == line.range() {
             if settings.rules.enabled(Rule::BlankLineWithWhitespace) {
-                let mut diagnostic = collector.report_diagnostic(BlankLineWithWhitespace, range);
+                let mut diagnostic = diagnostics.report_diagnostic(BlankLineWithWhitespace, range);
                 // Remove any preceding continuations, to avoid introducing a potential
                 // syntax error.
                 diagnostic.set_fix(Fix::applicable_edit(
@@ -111,7 +111,7 @@ pub(crate) fn trailing_whitespace(
                 ));
             }
         } else if settings.rules.enabled(Rule::TrailingWhitespace) {
-            let mut diagnostic = collector.report_diagnostic(TrailingWhitespace, range);
+            let mut diagnostic = diagnostics.report_diagnostic(TrailingWhitespace, range);
             diagnostic.set_fix(Fix::applicable_edit(
                 Edit::range_deletion(range),
                 applicability,

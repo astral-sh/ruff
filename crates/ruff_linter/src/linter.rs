@@ -123,7 +123,7 @@ pub fn check_path(
     };
 
     // Aggregate all diagnostics.
-    let collector = DiagnosticsCollector::new(&source_file);
+    let diagnostics = DiagnosticsCollector::new(&source_file);
 
     // Aggregate all semantic syntax errors.
     let mut semantic_syntax_errors = vec![];
@@ -154,7 +154,7 @@ pub fn check_path(
             settings,
             source_type,
             source_kind.as_ipy_notebook().map(Notebook::cell_offsets),
-            &collector,
+            &diagnostics,
         );
     }
 
@@ -171,7 +171,7 @@ pub fn check_path(
             comment_ranges,
             settings,
             target_version.linter_version(),
-            &collector,
+            &diagnostics,
         );
     }
 
@@ -182,7 +182,12 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
         crate::checkers::logical_lines::check_logical_lines(
-            tokens, locator, indexer, stylist, settings, &collector,
+            tokens,
+            locator,
+            indexer,
+            stylist,
+            settings,
+            &diagnostics,
         );
     }
 
@@ -205,7 +210,7 @@ pub fn check_path(
             cell_offsets,
             notebook_index,
             target_version,
-            &collector,
+            &diagnostics,
         ));
 
         let use_imports = !directives.isort.skip_file
@@ -226,7 +231,7 @@ pub fn check_path(
                     source_type,
                     cell_offsets,
                     target_version.linter_version(),
-                    &collector,
+                    &diagnostics,
                 );
             }
             if use_doc_lines {
@@ -247,7 +252,14 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
-        check_physical_lines(locator, stylist, indexer, &doc_lines, settings, &collector);
+        check_physical_lines(
+            locator,
+            stylist,
+            indexer,
+            &doc_lines,
+            settings,
+            &diagnostics,
+        );
     }
 
     // Raise violations for internal test rules
@@ -259,61 +271,65 @@ pub fn check_path(
             }
             match test_rule {
                 Rule::StableTestRule => {
-                    test_rules::StableTestRule::diagnostic(locator, comment_ranges, &collector);
+                    test_rules::StableTestRule::diagnostic(locator, comment_ranges, &diagnostics);
                 }
                 Rule::StableTestRuleSafeFix => test_rules::StableTestRuleSafeFix::diagnostic(
                     locator,
                     comment_ranges,
-                    &collector,
+                    &diagnostics,
                 ),
                 Rule::StableTestRuleUnsafeFix => test_rules::StableTestRuleUnsafeFix::diagnostic(
                     locator,
                     comment_ranges,
-                    &collector,
+                    &diagnostics,
                 ),
                 Rule::StableTestRuleDisplayOnlyFix => {
                     test_rules::StableTestRuleDisplayOnlyFix::diagnostic(
                         locator,
                         comment_ranges,
-                        &collector,
+                        &diagnostics,
                     );
                 }
                 Rule::PreviewTestRule => {
-                    test_rules::PreviewTestRule::diagnostic(locator, comment_ranges, &collector);
+                    test_rules::PreviewTestRule::diagnostic(locator, comment_ranges, &diagnostics);
                 }
                 Rule::DeprecatedTestRule => {
-                    test_rules::DeprecatedTestRule::diagnostic(locator, comment_ranges, &collector);
+                    test_rules::DeprecatedTestRule::diagnostic(
+                        locator,
+                        comment_ranges,
+                        &diagnostics,
+                    );
                 }
                 Rule::AnotherDeprecatedTestRule => {
                     test_rules::AnotherDeprecatedTestRule::diagnostic(
                         locator,
                         comment_ranges,
-                        &collector,
+                        &diagnostics,
                     );
                 }
                 Rule::RemovedTestRule => {
-                    test_rules::RemovedTestRule::diagnostic(locator, comment_ranges, &collector);
+                    test_rules::RemovedTestRule::diagnostic(locator, comment_ranges, &diagnostics);
                 }
                 Rule::AnotherRemovedTestRule => test_rules::AnotherRemovedTestRule::diagnostic(
                     locator,
                     comment_ranges,
-                    &collector,
+                    &diagnostics,
                 ),
                 Rule::RedirectedToTestRule => test_rules::RedirectedToTestRule::diagnostic(
                     locator,
                     comment_ranges,
-                    &collector,
+                    &diagnostics,
                 ),
                 Rule::RedirectedFromTestRule => test_rules::RedirectedFromTestRule::diagnostic(
                     locator,
                     comment_ranges,
-                    &collector,
+                    &diagnostics,
                 ),
                 Rule::RedirectedFromPrefixTestRule => {
                     test_rules::RedirectedFromPrefixTestRule::diagnostic(
                         locator,
                         comment_ranges,
-                        &collector,
+                        &diagnostics,
                     );
                 }
                 _ => unreachable!("All test rules must have an implementation"),
@@ -322,7 +338,7 @@ pub fn check_path(
     }
 
     // Ignore diagnostics based on per-file-ignores.
-    let per_file_ignores = if (!collector.is_empty()
+    let per_file_ignores = if (!diagnostics.is_empty()
         || settings
             .rules
             .iter_enabled()
@@ -334,7 +350,7 @@ pub fn check_path(
         RuleSet::empty()
     };
     if !per_file_ignores.is_empty() {
-        collector.retain(|diagnostic| !per_file_ignores.contains(diagnostic.rule()));
+        diagnostics.retain(|diagnostic| !per_file_ignores.contains(diagnostic.rule()));
     }
 
     // Enforce `noqa` directives.
@@ -345,7 +361,7 @@ pub fn check_path(
             .any(|rule_code| rule_code.lint_source().is_noqa())
     {
         let ignored = check_noqa(
-            &collector,
+            &diagnostics,
             path,
             locator,
             comment_ranges,
@@ -356,12 +372,12 @@ pub fn check_path(
         );
         if noqa.is_enabled() {
             for index in ignored.iter().rev() {
-                collector.swap_remove(*index);
+                diagnostics.swap_remove(*index);
             }
         }
     }
 
-    let mut diagnostics = collector.into_diagnostics();
+    let mut diagnostics = diagnostics.into_diagnostics();
 
     if parsed.has_valid_syntax() {
         // Remove fixes for any rules marked as unfixable.

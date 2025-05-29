@@ -53,7 +53,7 @@ impl Violation for BlanketTypeIgnore {
 
 /// PGH003
 pub(crate) fn blanket_type_ignore(
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
     comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {
@@ -93,7 +93,7 @@ pub(crate) fn blanket_type_ignore(
             // Match the optional `[...]` tag.
             if let Ok(codes) = parse_type_ignore_tag(comment) {
                 if codes.is_empty() {
-                    collector.report_diagnostic(
+                    diagnostics.report_diagnostic(
                         BlanketTypeIgnore,
                         range.add_start(TextSize::try_from(start).unwrap()),
                     );

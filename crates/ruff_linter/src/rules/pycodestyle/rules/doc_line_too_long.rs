@@ -87,7 +87,7 @@ pub(crate) fn doc_line_too_long(
     line: &Line,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
 ) {
     let Some(limit) = settings.pycodestyle.max_doc_length else {
         return;
@@ -104,7 +104,7 @@ pub(crate) fn doc_line_too_long(
         },
         settings.tab_size,
     ) {
-        collector.report_diagnostic(
+        diagnostics.report_diagnostic(
             DocLineTooLong(overlong.width(), limit.value() as usize),
             overlong.range(),
         );

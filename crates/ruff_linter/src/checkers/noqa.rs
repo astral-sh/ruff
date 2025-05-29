@@ -25,7 +25,7 @@ use super::ast::DiagnosticsCollector;
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
     path: &Path,
     locator: &Locator,
     comment_ranges: &CommentRanges,
@@ -47,7 +47,7 @@ pub(crate) fn check_noqa(
     let mut ignored_diagnostics = vec![];
 
     // Remove any ignored diagnostics.
-    collector.with_diagnostics(|diagnostics| {
+    diagnostics.with_diagnostics(|diagnostics| {
         'outer: for (index, diagnostic) in diagnostics.iter().enumerate() {
             let rule = diagnostic.rule();
 
@@ -139,7 +139,7 @@ pub(crate) fn check_noqa(
                 Directive::All(directive) => {
                     if matches.is_empty() {
                         let edit = delete_comment(directive.range(), locator);
-                        let mut diagnostic = collector
+                        let mut diagnostic = diagnostics
                             .report_diagnostic(UnusedNOQA { codes: None }, directive.range());
                         diagnostic.set_fix(Fix::safe_edit(edit));
                     }
@@ -161,7 +161,7 @@ pub(crate) fn check_noqa(
 
                         if seen_codes.insert(original_code) {
                             let is_code_used = if is_file_level {
-                                collector.any(|diag| diag.rule().noqa_code() == code)
+                                diagnostics.any(|diag| diag.rule().noqa_code() == code)
                             } else {
                                 matches.iter().any(|match_| *match_ == code)
                             } || settings
@@ -212,7 +212,7 @@ pub(crate) fn check_noqa(
                                 directive.range(),
                             )
                         };
-                        let mut diagnostic = collector.report_diagnostic(
+                        let mut diagnostic = diagnostics.report_diagnostic(
                             UnusedNOQA {
                                 codes: Some(UnusedCodes {
                                     disabled: disabled_codes
@@ -246,8 +246,8 @@ pub(crate) fn check_noqa(
         && !per_file_ignores.contains(Rule::RedirectedNOQA)
         && !exemption.includes(Rule::RedirectedNOQA)
     {
-        ruff::rules::redirected_noqa(collector, &noqa_directives);
-        ruff::rules::redirected_file_noqa(collector, &file_noqa_directives);
+        ruff::rules::redirected_noqa(diagnostics, &noqa_directives);
+        ruff::rules::redirected_file_noqa(diagnostics, &file_noqa_directives);
     }
 
     if settings.rules.enabled(Rule::BlanketNOQA)
@@ -255,7 +255,7 @@ pub(crate) fn check_noqa(
         && !exemption.enumerates(Rule::BlanketNOQA)
     {
         pygrep_hooks::rules::blanket_noqa(
-            collector,
+            diagnostics,
             &noqa_directives,
             locator,
             &file_noqa_directives,
@@ -266,7 +266,7 @@ pub(crate) fn check_noqa(
         && !per_file_ignores.contains(Rule::InvalidRuleCode)
         && !exemption.enumerates(Rule::InvalidRuleCode)
     {
-        ruff::rules::invalid_noqa_code(collector, &noqa_directives, locator, &settings.external);
+        ruff::rules::invalid_noqa_code(diagnostics, &noqa_directives, locator, &settings.external);
     }
 
     ignored_diagnostics.sort_unstable();

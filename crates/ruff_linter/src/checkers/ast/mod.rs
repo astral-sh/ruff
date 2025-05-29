@@ -237,7 +237,7 @@ pub(crate) struct Checker<'a> {
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
-    collector: &'a DiagnosticsCollector<'a>,
+    diagnostics: &'a DiagnosticsCollector<'a>,
 }
 
 impl<'a> Checker<'a> {
@@ -258,7 +258,7 @@ impl<'a> Checker<'a> {
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
         target_version: TargetVersion,
-        collector: &'a DiagnosticsCollector<'a>,
+        diagnostics: &'a DiagnosticsCollector<'a>,
     ) -> Checker<'a> {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
@@ -287,7 +287,7 @@ impl<'a> Checker<'a> {
             target_version,
             semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
-            collector,
+            diagnostics,
         }
     }
 }
@@ -389,7 +389,7 @@ impl<'a> Checker<'a> {
         kind: T,
         range: TextRange,
     ) -> DiagnosticGuard<'chk, 'a> {
-        self.collector.report_diagnostic(kind, range)
+        self.diagnostics.report_diagnostic(kind, range)
     }
 
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
@@ -402,7 +402,7 @@ impl<'a> Checker<'a> {
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        self.collector
+        self.diagnostics
             .report_diagnostic_if_enabled(kind, range, self.settings)
     }
 
@@ -2961,7 +2961,7 @@ pub(crate) fn check_ast(
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
     target_version: TargetVersion,
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
 ) -> Vec<SemanticSyntaxError> {
     let module_path = package
         .map(PackageRoot::path)
@@ -3002,7 +3002,7 @@ pub(crate) fn check_ast(
         cell_offsets,
         notebook_index,
         target_version,
-        collector,
+        diagnostics,
     );
     checker.bind_builtins();
 
@@ -3064,7 +3064,7 @@ impl<'a> DiagnosticsCollector<'a> {
         range: TextRange,
     ) -> DiagnosticGuard<'chk, 'a> {
         DiagnosticGuard {
-            collector: self,
+            diagnostics: self,
             diagnostic: Some(OldDiagnostic::new(kind, range, self.source_file)),
         }
     }
@@ -3083,7 +3083,7 @@ impl<'a> DiagnosticsCollector<'a> {
         let diagnostic = OldDiagnostic::new(kind, range, self.source_file);
         if settings.rules.enabled(diagnostic.rule()) {
             Some(DiagnosticGuard {
-                collector: self,
+                diagnostics: self,
                 diagnostic: Some(diagnostic),
             })
         } else {
@@ -3126,7 +3126,7 @@ impl<'a> DiagnosticsCollector<'a> {
 /// adding fixes or parent ranges.
 pub(crate) struct DiagnosticGuard<'a, 'b> {
     /// The parent checker that will receive the diagnostic on `Drop`.
-    collector: &'a DiagnosticsCollector<'b>,
+    diagnostics: &'a DiagnosticsCollector<'b>,
     /// The diagnostic that we want to report.
     ///
     /// This is always `Some` until the `Drop` (or `defuse`) call.
@@ -3168,7 +3168,7 @@ impl Drop for DiagnosticGuard<'_, '_> {
         }
 
         if let Some(diagnostic) = self.diagnostic.take() {
-            self.collector.diagnostics.borrow_mut().push(diagnostic);
+            self.diagnostics.diagnostics.borrow_mut().push(diagnostic);
         }
     }
 }

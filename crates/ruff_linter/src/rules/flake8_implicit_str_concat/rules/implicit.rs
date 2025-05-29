@@ -104,7 +104,7 @@ impl Violation for MultiLineImplicitStringConcatenation {
 
 /// ISC001, ISC002
 pub(crate) fn implicit(
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
@@ -146,12 +146,12 @@ pub(crate) fn implicit(
         };
 
         if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
-            collector.report_diagnostic(
+            diagnostics.report_diagnostic(
                 MultiLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
             );
         } else {
-            let mut diagnostic = collector.report_diagnostic(
+            let mut diagnostic = diagnostics.report_diagnostic(
                 SingleLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
             );

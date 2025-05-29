@@ -59,16 +59,16 @@ impl AlwaysFixableViolation for TooManyNewlinesAtEndOfFile {
 
 /// W391
 pub(crate) fn too_many_newlines_at_end_of_file(
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
     tokens: &Tokens,
     cell_offsets: Option<&CellOffsets>,
 ) {
     let mut tokens_iter = tokens.iter().rev().peekable();
 
     if let Some(cell_offsets) = cell_offsets {
-        notebook_newline_diagnostics(tokens_iter, cell_offsets, collector);
+        notebook_newline_diagnostics(tokens_iter, cell_offsets, diagnostics);
     } else {
-        newline_diagnostic(&mut tokens_iter, false, collector);
+        newline_diagnostic(&mut tokens_iter, false, diagnostics);
     }
 }
 
@@ -76,7 +76,7 @@ pub(crate) fn too_many_newlines_at_end_of_file(
 fn notebook_newline_diagnostics<'a>(
     mut tokens_iter: Peekable<impl Iterator<Item = &'a Token>>,
     cell_offsets: &CellOffsets,
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
 ) {
     let offset_iter = cell_offsets.iter().rev();
 
@@ -88,7 +88,7 @@ fn notebook_newline_diagnostics<'a>(
             .peeking_take_while(|tok| tok.end() >= offset)
             .for_each(drop);
 
-        newline_diagnostic(&mut tokens_iter, true, collector);
+        newline_diagnostic(&mut tokens_iter, true, diagnostics);
     }
 }
 
@@ -96,7 +96,7 @@ fn notebook_newline_diagnostics<'a>(
 fn newline_diagnostic<'a>(
     tokens_iter: &mut Peekable<impl Iterator<Item = &'a Token>>,
     in_notebook: bool,
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
 ) {
     let mut num_trailing_newlines: u32 = 0;
     let mut newline_range_start: Option<TextSize> = None;
@@ -134,7 +134,7 @@ fn newline_diagnostic<'a>(
     };
 
     let diagnostic_range = TextRange::new(start, end);
-    collector
+    diagnostics
         .report_diagnostic(
             TooManyNewlinesAtEndOfFile {
                 num_trailing_newlines,

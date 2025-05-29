@@ -75,14 +75,14 @@ impl Violation for BlanketNOQA {
 
 /// PGH004
 pub(crate) fn blanket_noqa(
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
     file_noqa_directives: &FileNoqaDirectives,
 ) {
     for line in file_noqa_directives.lines() {
         if let Directive::All(_) = line.parsed_file_exemption {
-            collector.report_diagnostic(
+            diagnostics.report_diagnostic(
                 BlanketNOQA {
                     missing_colon: false,
                     file_exemption: true,
@@ -106,7 +106,7 @@ pub(crate) fn blanket_noqa(
                 // Ex) `# noqa F401`
                 let start = all.end();
                 let end = start + cursor.token_len();
-                let mut diagnostic = collector.report_diagnostic(
+                let mut diagnostic = diagnostics.report_diagnostic(
                     BlanketNOQA {
                         missing_colon: true,
                         file_exemption: false,
@@ -116,7 +116,7 @@ pub(crate) fn blanket_noqa(
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(':'.to_string(), start)));
             } else {
                 // Otherwise, it looks like an intentional blanket `noqa` annotation.
-                collector.report_diagnostic(
+                diagnostics.report_diagnostic(
                     BlanketNOQA {
                         missing_colon: false,
                         file_exemption: false,

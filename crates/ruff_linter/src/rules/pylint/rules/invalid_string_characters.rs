@@ -182,7 +182,7 @@ impl Violation for InvalidCharacterZeroWidthSpace {
 
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
 pub(crate) fn invalid_string_characters(
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
     token: &Token,
     locator: &Locator,
 ) {
@@ -200,23 +200,23 @@ pub(crate) fn invalid_string_characters(
         let (replacement, mut diagnostic) = match c {
             '\x08' => (
                 "\\b",
-                collector.report_diagnostic(InvalidCharacterBackspace, range),
+                diagnostics.report_diagnostic(InvalidCharacterBackspace, range),
             ),
             '\x1A' => (
                 "\\x1A",
-                collector.report_diagnostic(InvalidCharacterSub, range),
+                diagnostics.report_diagnostic(InvalidCharacterSub, range),
             ),
             '\x1B' => (
                 "\\x1B",
-                collector.report_diagnostic(InvalidCharacterEsc, range),
+                diagnostics.report_diagnostic(InvalidCharacterEsc, range),
             ),
             '\0' => (
                 "\\0",
-                collector.report_diagnostic(InvalidCharacterNul, range),
+                diagnostics.report_diagnostic(InvalidCharacterNul, range),
             ),
             '\u{200b}' => (
                 "\\u200b",
-                collector.report_diagnostic(InvalidCharacterZeroWidthSpace, range),
+                diagnostics.report_diagnostic(InvalidCharacterZeroWidthSpace, range),
             ),
             _ => {
                 continue;

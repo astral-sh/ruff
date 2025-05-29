@@ -52,7 +52,7 @@ pub(crate) trait TestRule {
     fn diagnostic(
         locator: &Locator,
         comment_ranges: &CommentRanges,
-        collector: &DiagnosticsCollector,
+        diagnostics: &DiagnosticsCollector,
     );
 }
 
@@ -87,9 +87,9 @@ impl TestRule for StableTestRule {
     fn diagnostic(
         _locator: &Locator,
         _comment_ranges: &CommentRanges,
-        collector: &DiagnosticsCollector,
+        diagnostics: &DiagnosticsCollector,
     ) {
-        collector.report_diagnostic(StableTestRule, ruff_text_size::TextRange::default());
+        diagnostics.report_diagnostic(StableTestRule, ruff_text_size::TextRange::default());
     }
 }
 
@@ -124,11 +124,11 @@ impl TestRule for StableTestRuleSafeFix {
     fn diagnostic(
         locator: &Locator,
         comment_ranges: &CommentRanges,
-        collector: &DiagnosticsCollector,
+        diagnostics: &DiagnosticsCollector,
     ) {
         let comment = "# fix from stable-test-rule-safe-fix\n".to_string();
         if !comment_exists(&comment, locator, comment_ranges) {
-            collector
+            diagnostics
                 .report_diagnostic(StableTestRuleSafeFix, ruff_text_size::TextRange::default())
                 .set_fix(Fix::safe_edit(Edit::insertion(comment, TextSize::new(0))));
         }
@@ -166,11 +166,11 @@ impl TestRule for StableTestRuleUnsafeFix {
     fn diagnostic(
         locator: &Locator,
         comment_ranges: &CommentRanges,
-        collector: &DiagnosticsCollector,
+        diagnostics: &DiagnosticsCollector,
     ) {
         let comment = "# fix from stable-test-rule-unsafe-fix\n".to_string();
         if !comment_exists(&comment, locator, comment_ranges) {
-            collector
+            diagnostics
                 .report_diagnostic(
                     StableTestRuleUnsafeFix,
                     ruff_text_size::TextRange::default(),
@@ -211,11 +211,11 @@ impl TestRule for StableTestRuleDisplayOnlyFix {
     fn diagnostic(
         locator: &Locator,
         comment_ranges: &CommentRanges,
-        collector: &DiagnosticsCollector,
+        diagnostics: &DiagnosticsCollector,
     ) {
         let comment = "# fix from stable-test-rule-display-only-fix\n".to_string();
         if !comment_exists(&comment, locator, comment_ranges) {
-            collector
+            diagnostics
                 .report_diagnostic(
                     StableTestRuleDisplayOnlyFix,
                     ruff_text_size::TextRange::default(),
@@ -259,9 +259,9 @@ impl TestRule for PreviewTestRule {
     fn diagnostic(
         _locator: &Locator,
         _comment_ranges: &CommentRanges,
-        collector: &DiagnosticsCollector,
+        diagnostics: &DiagnosticsCollector,
     ) {
-        collector.report_diagnostic(PreviewTestRule, ruff_text_size::TextRange::default());
+        diagnostics.report_diagnostic(PreviewTestRule, ruff_text_size::TextRange::default());
     }
 }
 
@@ -296,9 +296,9 @@ impl TestRule for DeprecatedTestRule {
     fn diagnostic(
         _locator: &Locator,
         _comment_ranges: &CommentRanges,
-        collector: &DiagnosticsCollector,
+        diagnostics: &DiagnosticsCollector,
     ) {
-        collector.report_diagnostic(DeprecatedTestRule, ruff_text_size::TextRange::default());
+        diagnostics.report_diagnostic(DeprecatedTestRule, ruff_text_size::TextRange::default());
     }
 }
 
@@ -333,9 +333,9 @@ impl TestRule for AnotherDeprecatedTestRule {
     fn diagnostic(
         _locator: &Locator,
         _comment_ranges: &CommentRanges,
-        collector: &DiagnosticsCollector,
+        diagnostics: &DiagnosticsCollector,
     ) {
-        collector.report_diagnostic(
+        diagnostics.report_diagnostic(
             AnotherDeprecatedTestRule,
             ruff_text_size::TextRange::default(),
         );
@@ -373,9 +373,9 @@ impl TestRule for RemovedTestRule {
     fn diagnostic(
         _locator: &Locator,
         _comment_ranges: &CommentRanges,
-        collector: &DiagnosticsCollector,
+        diagnostics: &DiagnosticsCollector,
     ) {
-        collector.report_diagnostic(RemovedTestRule, ruff_text_size::TextRange::default());
+        diagnostics.report_diagnostic(RemovedTestRule, ruff_text_size::TextRange::default());
     }
 }
 
@@ -410,9 +410,9 @@ impl TestRule for AnotherRemovedTestRule {
     fn diagnostic(
         _locator: &Locator,
         _comment_ranges: &CommentRanges,
-        collector: &DiagnosticsCollector,
+        diagnostics: &DiagnosticsCollector,
     ) {
-        collector.report_diagnostic(AnotherRemovedTestRule, ruff_text_size::TextRange::default());
+        diagnostics.report_diagnostic(AnotherRemovedTestRule, ruff_text_size::TextRange::default());
     }
 }
 
@@ -447,9 +447,9 @@ impl TestRule for RedirectedFromTestRule {
     fn diagnostic(
         _locator: &Locator,
         _comment_ranges: &CommentRanges,
-        collector: &DiagnosticsCollector,
+        diagnostics: &DiagnosticsCollector,
     ) {
-        collector.report_diagnostic(RedirectedFromTestRule, ruff_text_size::TextRange::default());
+        diagnostics.report_diagnostic(RedirectedFromTestRule, ruff_text_size::TextRange::default());
     }
 }
 
@@ -484,9 +484,9 @@ impl TestRule for RedirectedToTestRule {
     fn diagnostic(
         _locator: &Locator,
         _comment_ranges: &CommentRanges,
-        collector: &DiagnosticsCollector,
+        diagnostics: &DiagnosticsCollector,
     ) {
-        collector.report_diagnostic(RedirectedToTestRule, ruff_text_size::TextRange::default());
+        diagnostics.report_diagnostic(RedirectedToTestRule, ruff_text_size::TextRange::default());
     }
 }
 
@@ -521,9 +521,9 @@ impl TestRule for RedirectedFromPrefixTestRule {
     fn diagnostic(
         _locator: &Locator,
         _comment_ranges: &CommentRanges,
-        collector: &DiagnosticsCollector,
+        diagnostics: &DiagnosticsCollector,
     ) {
-        collector.report_diagnostic(
+        diagnostics.report_diagnostic(
             RedirectedFromPrefixTestRule,
             ruff_text_size::TextRange::default(),
         );

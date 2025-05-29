@@ -20,7 +20,7 @@ mod shebang_not_executable;
 mod shebang_not_first_line;
 
 pub(crate) fn from_tokens(
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
     path: &Path,
     locator: &Locator,
     comment_ranges: &CommentRanges,
@@ -32,21 +32,21 @@ pub(crate) fn from_tokens(
         if let Some(shebang) = ShebangDirective::try_extract(comment) {
             has_any_shebang = true;
 
-            shebang_missing_python(range, &shebang, collector);
+            shebang_missing_python(range, &shebang, diagnostics);
 
             if settings.rules.enabled(Rule::ShebangNotExecutable) {
-                shebang_not_executable(path, range, collector);
+                shebang_not_executable(path, range, diagnostics);
             }
 
-            shebang_leading_whitespace(collector, range, locator);
+            shebang_leading_whitespace(diagnostics, range, locator);
 
-            shebang_not_first_line(range, locator, collector);
+            shebang_not_first_line(range, locator, diagnostics);
         }
     }
 
     if !has_any_shebang {
         if settings.rules.enabled(Rule::ShebangMissingExecutableFile) {
-            shebang_missing_executable_file(path, collector);
+            shebang_missing_executable_file(path, diagnostics);
         }
     }
 }

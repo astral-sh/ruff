@@ -46,7 +46,7 @@ impl AlwaysFixableViolation for ShebangLeadingWhitespace {
 
 /// EXE004
 pub(crate) fn shebang_leading_whitespace(
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
     range: TextRange,
     locator: &Locator,
 ) {
@@ -65,7 +65,7 @@ pub(crate) fn shebang_leading_whitespace(
     }
 
     let prefix = TextRange::up_to(range.start());
-    collector
+    diagnostics
         .report_diagnostic(ShebangLeadingWhitespace, prefix)
         .set_fix(Fix::safe_edit(Edit::range_deletion(prefix)));
 }

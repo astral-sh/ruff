@@ -45,11 +45,11 @@ impl Violation for ShebangMissingPython {
 pub(crate) fn shebang_missing_python(
     range: TextRange,
     shebang: &ShebangDirective,
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
 ) {
     if shebang.contains("python") || shebang.contains("pytest") || shebang.contains("uv run") {
         return;
     }
 
-    collector.report_diagnostic(ShebangMissingPython, range);
+    diagnostics.report_diagnostic(ShebangMissingPython, range);
 }

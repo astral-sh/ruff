@@ -99,7 +99,7 @@ impl AlwaysFixableViolation for UselessSemicolon {
 
 /// E701, E702, E703
 pub(crate) fn compound_statements(
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
@@ -168,7 +168,7 @@ pub(crate) fn compound_statements(
                                 !has_non_trivia_tokens_till(token_iter.clone(), cell_range.end())
                             }))
                     {
-                        collector
+                        diagnostics
                             .report_diagnostic(UselessSemicolon, range)
                             .set_fix(Fix::safe_edit(Edit::deletion(
                                 indexer
@@ -225,7 +225,7 @@ pub(crate) fn compound_statements(
             | TokenKind::NonLogicalNewline => {}
             _ => {
                 if let Some(range) = semi {
-                    collector.report_diagnostic(MultipleStatementsOnOneLineSemicolon, range);
+                    diagnostics.report_diagnostic(MultipleStatementsOnOneLineSemicolon, range);
 
                     // Reset.
                     semi = None;
@@ -233,7 +233,7 @@ pub(crate) fn compound_statements(
                 }
 
                 if let Some(range) = colon {
-                    collector.report_diagnostic(MultipleStatementsOnOneLineColon, range);
+                    diagnostics.report_diagnostic(MultipleStatementsOnOneLineColon, range);
 
                     // Reset.
                     colon = None;

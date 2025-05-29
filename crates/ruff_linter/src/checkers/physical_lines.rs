@@ -24,7 +24,7 @@ pub(crate) fn check_physical_lines(
     indexer: &Indexer,
     doc_lines: &[TextSize],
     settings: &LinterSettings,
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
 ) {
     let enforce_doc_line_too_long = settings.rules.enabled(Rule::DocLineTooLong);
     let enforce_line_too_long = settings.rules.enabled(Rule::LineTooLong);
@@ -45,37 +45,37 @@ pub(crate) fn check_physical_lines(
             .is_some()
         {
             if enforce_doc_line_too_long {
-                doc_line_too_long(&line, comment_ranges, settings, collector);
+                doc_line_too_long(&line, comment_ranges, settings, diagnostics);
             }
         }
 
         if enforce_mixed_spaces_and_tabs {
-            mixed_spaces_and_tabs(&line, collector);
+            mixed_spaces_and_tabs(&line, diagnostics);
         }
 
         if enforce_line_too_long {
-            line_too_long(&line, comment_ranges, settings, collector);
+            line_too_long(&line, comment_ranges, settings, diagnostics);
         }
 
         if enforce_bidirectional_unicode {
-            pylint::rules::bidirectional_unicode(&line, collector);
+            pylint::rules::bidirectional_unicode(&line, diagnostics);
         }
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
-            trailing_whitespace(&line, locator, indexer, settings, collector);
+            trailing_whitespace(&line, locator, indexer, settings, diagnostics);
         }
 
         if settings.rules.enabled(Rule::IndentedFormFeed) {
-            indented_form_feed(&line, collector);
+            indented_form_feed(&line, diagnostics);
         }
     }
 
     if enforce_no_newline_at_end_of_file {
-        no_newline_at_end_of_file(locator, stylist, collector);
+        no_newline_at_end_of_file(locator, stylist, diagnostics);
     }
 
     if enforce_copyright_notice {
-        missing_copyright_notice(locator, settings, collector);
+        missing_copyright_notice(locator, settings, diagnostics);
     }
 }
 
@@ -105,7 +105,7 @@ mod tests {
 
         let check_with_max_line_length = |line_length: LineLength| {
             let source_file = SourceFileBuilder::new("<filename>", line).finish();
-            let collector = DiagnosticsCollector::new(&source_file);
+            let diagnostics = DiagnosticsCollector::new(&source_file);
             check_physical_lines(
                 &locator,
                 &stylist,
@@ -118,9 +118,9 @@ mod tests {
                     },
                     ..LinterSettings::for_rule(Rule::LineTooLong)
                 },
-                &collector,
+                &diagnostics,
             );
-            collector.into_diagnostics()
+            diagnostics.into_diagnostics()
         };
         let line_length = LineLength::try_from(8).unwrap();
         assert_eq!(check_with_max_line_length(line_length), vec![]);

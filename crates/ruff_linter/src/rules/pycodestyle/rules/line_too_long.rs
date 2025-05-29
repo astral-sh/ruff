@@ -85,7 +85,7 @@ pub(crate) fn line_too_long(
     line: &Line,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
-    collector: &DiagnosticsCollector,
+    diagnostics: &DiagnosticsCollector,
 ) {
     let limit = settings.pycodestyle.max_line_length;
 
@@ -100,7 +100,7 @@ pub(crate) fn line_too_long(
         },
         settings.tab_size,
     ) {
-        collector.report_diagnostic(
+        diagnostics.report_diagnostic(
             LineTooLong(overlong.width(), limit.value() as usize),
             overlong.range(),
         );
