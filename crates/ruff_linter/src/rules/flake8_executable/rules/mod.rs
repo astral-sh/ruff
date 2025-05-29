@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use ruff_diagnostics::Diagnostic;
 use ruff_python_trivia::CommentRanges;
 pub(crate) use shebang_leading_whitespace::*;
 pub(crate) use shebang_missing_executable_file::*;
@@ -9,6 +8,7 @@ pub(crate) use shebang_not_executable::*;
 pub(crate) use shebang_not_first_line::*;
 
 use crate::Locator;
+use crate::OldDiagnostic;
 use crate::codes::Rule;
 use crate::comments::shebang::ShebangDirective;
 use crate::settings::LinterSettings;
@@ -20,7 +20,7 @@ mod shebang_not_executable;
 mod shebang_not_first_line;
 
 pub(crate) fn from_tokens(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<OldDiagnostic>,
     path: &Path,
     locator: &Locator,
     comment_ranges: &CommentRanges,

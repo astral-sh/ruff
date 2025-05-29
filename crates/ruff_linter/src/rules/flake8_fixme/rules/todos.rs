@@ -1,7 +1,7 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::directives::{TodoComment, TodoDirectiveKind};
+use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for "TODO" comments.
@@ -114,19 +114,19 @@ impl Violation for LineContainsHack {
     }
 }
 
-pub(crate) fn todos(diagnostics: &mut Vec<Diagnostic>, directive_ranges: &[TodoComment]) {
+pub(crate) fn todos(diagnostics: &mut Vec<OldDiagnostic>, directive_ranges: &[TodoComment]) {
     diagnostics.extend(
         directive_ranges
             .iter()
             .map(|TodoComment { directive, .. }| match directive.kind {
                 // FIX001
-                TodoDirectiveKind::Fixme => Diagnostic::new(LineContainsFixme, directive.range),
+                TodoDirectiveKind::Fixme => OldDiagnostic::new(LineContainsFixme, directive.range),
                 // FIX002
-                TodoDirectiveKind::Hack => Diagnostic::new(LineContainsHack, directive.range),
+                TodoDirectiveKind::Hack => OldDiagnostic::new(LineContainsHack, directive.range),
                 // FIX003
-                TodoDirectiveKind::Todo => Diagnostic::new(LineContainsTodo, directive.range),
+                TodoDirectiveKind::Todo => OldDiagnostic::new(LineContainsTodo, directive.range),
                 // FIX004
-                TodoDirectiveKind::Xxx => Diagnostic::new(LineContainsXxx, directive.range),
+                TodoDirectiveKind::Xxx => OldDiagnostic::new(LineContainsXxx, directive.range),
             }),
     );
 }

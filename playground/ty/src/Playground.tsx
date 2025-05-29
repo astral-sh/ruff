@@ -20,7 +20,7 @@ export const SETTINGS_FILE_NAME = "ty.json";
 
 export default function Playground() {
   const [theme, setTheme] = useTheme();
-  const [version, setVersion] = useState<string>("0.0.0");
+  const [version, setVersion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const workspacePromiseRef = useRef<Promise<Workspace> | null>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -156,7 +156,7 @@ export default function Playground() {
       <Header
         edit={files.revision}
         theme={theme}
-        logo="ty"
+        tool="ty"
         version={version}
         onChangeTheme={setTheme}
         onShare={handleShare}
@@ -198,7 +198,7 @@ export const DEFAULT_SETTINGS = JSON.stringify(
       "python-version": "3.13",
     },
     rules: {
-      "division-by-zero": "error",
+      "undefined-reveal": "ignore",
     },
   },
   null,
@@ -453,6 +453,7 @@ export interface InitializedPlayground {
 async function startPlayground(): Promise<InitializedPlayground> {
   const ty = await import("../ty_wasm");
   await ty.default();
+  const version = ty.version();
   const monaco = await loader.init();
 
   setupMonaco(monaco, {
@@ -466,7 +467,7 @@ async function startPlayground(): Promise<InitializedPlayground> {
   const workspace = restored ?? DEFAULT_WORKSPACE;
 
   return {
-    version: "0.0.0",
+    version,
     workspace,
   };
 }

@@ -1,10 +1,11 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use crate::checkers::ast::Checker;
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
+
+use crate::Violation;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for uses of `pd.merge` on Pandas objects.
@@ -63,7 +64,7 @@ pub(crate) fn use_of_pd_merge(checker: &Checker, func: &Expr) {
     if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func {
         if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
             if id == "pd" && attr == "merge" {
-                checker.report_diagnostic(Diagnostic::new(PandasUseOfPdMerge, func.range()));
+                checker.report_diagnostic(PandasUseOfPdMerge, func.range());
             }
         }
     }

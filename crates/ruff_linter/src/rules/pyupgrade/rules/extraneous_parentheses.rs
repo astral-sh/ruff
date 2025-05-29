@@ -1,11 +1,11 @@
 use std::slice::Iter;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::{Token, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
+use crate::{AlwaysFixableViolation, Edit, Fix, OldDiagnostic};
 
 /// ## What it does
 /// Checks for extraneous parentheses.
@@ -115,7 +115,7 @@ fn match_extraneous_parentheses(tokens: &mut Iter<'_, Token>) -> Option<(TextRan
 
 /// UP034
 pub(crate) fn extraneous_parentheses(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<OldDiagnostic>,
     tokens: &Tokens,
     locator: &Locator,
 ) {
@@ -129,7 +129,7 @@ pub(crate) fn extraneous_parentheses(
             continue;
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = OldDiagnostic::new(
             ExtraneousParentheses,
             TextRange::new(start_range.start(), end_range.end()),
         );

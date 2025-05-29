@@ -1,6 +1,5 @@
 use memchr::memchr_iter;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{AnyStringFlags, FStringElement, StringLike, StringLikePart};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -8,6 +7,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad_start;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for invalid escape sequences.
@@ -252,7 +252,7 @@ fn check(
     if contains_valid_escape_sequence {
         // Escape with backslash.
         for invalid_escape_char in &invalid_escape_chars {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 InvalidEscapeSequence {
                     ch: invalid_escape_char.ch,
                     fix_title: FixTitle::AddBackslash,
@@ -263,12 +263,11 @@ fn check(
                 r"\".to_string(),
                 invalid_escape_char.start() + TextSize::from(1),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     } else {
         // Turn into raw string.
         for invalid_escape_char in &invalid_escape_chars {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 InvalidEscapeSequence {
                     ch: invalid_escape_char.ch,
                     fix_title: FixTitle::UseRawStringLiteral,
@@ -295,8 +294,6 @@ fn check(
                     )),
                 );
             }
-
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

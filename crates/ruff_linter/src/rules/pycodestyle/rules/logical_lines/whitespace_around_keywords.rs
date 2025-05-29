@@ -1,8 +1,8 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::{AlwaysFixableViolation, Edit, Fix, OldDiagnostic};
 
 use super::{LogicalLine, Whitespace};
 
@@ -133,7 +133,7 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
                 match line.leading_whitespace(token) {
                     (Whitespace::Tab, offset) => {
                         let start = token.start();
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = OldDiagnostic::new(
                             TabBeforeKeyword,
                             TextRange::at(start - offset, offset),
                         );
@@ -145,7 +145,7 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
                     }
                     (Whitespace::Many, offset) => {
                         let start = token.start();
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = OldDiagnostic::new(
                             MultipleSpacesBeforeKeyword,
                             TextRange::at(start - offset, offset),
                         );
@@ -162,7 +162,7 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
             match line.trailing_whitespace(token) {
                 (Whitespace::Tab, len) => {
                     let mut diagnostic =
-                        Diagnostic::new(TabAfterKeyword, TextRange::at(token.end(), len));
+                        OldDiagnostic::new(TabAfterKeyword, TextRange::at(token.end(), len));
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         " ".to_string(),
                         TextRange::at(token.end(), len),
@@ -170,7 +170,7 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
                     context.push_diagnostic(diagnostic);
                 }
                 (Whitespace::Many, len) => {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = OldDiagnostic::new(
                         MultipleSpacesAfterKeyword,
                         TextRange::at(token.end(), len),
                     );

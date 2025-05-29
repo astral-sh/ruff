@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
@@ -8,6 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `if` statements that can be replaced with `bool`.
@@ -305,7 +305,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         .as_ref()
         .map(|expr| checker.generator().expr(expr));
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         NeedlessBool {
             condition: condition.map(SourceCodeSnippet::new),
             negate: inverted,
@@ -318,7 +318,6 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
             range,
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

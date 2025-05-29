@@ -1,7 +1,6 @@
 use itertools::Itertools;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
@@ -10,6 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unnecessary `dict` kwargs.
@@ -92,12 +92,13 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
 
         // Ex) `foo(**{**bar})`
         if let [ast::DictItem { key: None, value }] = dict.items.as_slice() {
-            let diagnostic = Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
             let edit = Edit::range_replacement(
                 format!("**{}", checker.locator().slice(value)),
                 keyword.range(),
             );
-            checker.report_diagnostic(diagnostic.with_fix(Fix::safe_edit(edit)));
+            checker
+                .report_diagnostic(UnnecessaryDictKwargs, keyword.range())
+                .set_fix(Fix::safe_edit(edit));
             continue;
         }
 
@@ -111,7 +112,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
+        let mut diagnostic = checker.report_diagnostic(UnnecessaryDictKwargs, keyword.range());
 
         if dict.is_empty() {
             diagnostic.try_set_fix(|| {
@@ -168,8 +169,6 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
                 }
             }
         }
-
-        checker.report_diagnostic(diagnostic);
     }
 }
 

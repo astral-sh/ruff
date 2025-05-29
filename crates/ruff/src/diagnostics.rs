@@ -12,7 +12,7 @@ use colored::Colorize;
 use log::{debug, warn};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::Diagnostic;
+use ruff_linter::OldDiagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
 use ruff_linter::message::Message;
@@ -25,7 +25,7 @@ use ruff_linter::{IOError, fs};
 use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 use ruff_workspace::Settings;
 
 use crate::cache::{Cache, FileCacheKey, LintCacheData};
@@ -64,14 +64,14 @@ impl Diagnostics {
                     let source_file = SourceFileBuilder::new(name, "").finish();
                     Self::new(
                         vec![Message::from_diagnostic(
-                            Diagnostic::new(
+                            OldDiagnostic::new(
                                 IOError {
                                     message: err.to_string(),
                                 },
                                 TextRange::default(),
                             ),
                             source_file,
-                            TextSize::default(),
+                            None,
                         )],
                         FxHashMap::default(),
                     )

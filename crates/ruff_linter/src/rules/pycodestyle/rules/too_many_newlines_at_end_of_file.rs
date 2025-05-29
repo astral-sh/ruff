@@ -1,11 +1,12 @@
 use std::iter::Peekable;
 
 use itertools::Itertools;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_notebook::CellOffsets;
 use ruff_python_parser::{Token, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+
+use crate::{AlwaysFixableViolation, Edit, Fix, OldDiagnostic};
 
 /// ## What it does
 /// Checks for files with multiple trailing blank lines.
@@ -58,7 +59,7 @@ impl AlwaysFixableViolation for TooManyNewlinesAtEndOfFile {
 
 /// W391
 pub(crate) fn too_many_newlines_at_end_of_file(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<OldDiagnostic>,
     tokens: &Tokens,
     cell_offsets: Option<&CellOffsets>,
 ) {
@@ -75,7 +76,7 @@ pub(crate) fn too_many_newlines_at_end_of_file(
 fn notebook_newline_diagnostics<'a>(
     mut tokens_iter: Peekable<impl Iterator<Item = &'a Token>>,
     cell_offsets: &CellOffsets,
-) -> Vec<Diagnostic> {
+) -> Vec<OldDiagnostic> {
     let mut results = Vec::new();
     let offset_iter = cell_offsets.iter().rev();
 
@@ -100,7 +101,7 @@ fn notebook_newline_diagnostics<'a>(
 fn newline_diagnostic<'a>(
     tokens_iter: &mut Peekable<impl Iterator<Item = &'a Token>>,
     in_notebook: bool,
-) -> Option<Diagnostic> {
+) -> Option<OldDiagnostic> {
     let mut num_trailing_newlines: u32 = 0;
     let mut newline_range_start: Option<TextSize> = None;
     let mut newline_range_end: Option<TextSize> = None;
@@ -136,7 +137,7 @@ fn newline_diagnostic<'a>(
 
     let diagnostic_range = TextRange::new(start, end);
     Some(
-        Diagnostic::new(
+        OldDiagnostic::new(
             TooManyNewlinesAtEndOfFile {
                 num_trailing_newlines,
                 in_notebook,

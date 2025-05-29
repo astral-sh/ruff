@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::{CommentRanges, is_python_whitespace};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
+use crate::{Edit, Fix, FixAvailability, OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for a # symbol appearing on a line not followed by an actual comment.
@@ -45,7 +45,7 @@ impl Violation for EmptyComment {
 
 /// PLR2044
 pub(crate) fn empty_comments(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<OldDiagnostic>,
     comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {
@@ -65,7 +65,7 @@ pub(crate) fn empty_comments(
 }
 
 /// Return a [`Diagnostic`] if the comment at the given [`TextRange`] is empty.
-fn empty_comment(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
+fn empty_comment(range: TextRange, locator: &Locator) -> Option<OldDiagnostic> {
     // Check: is the comment empty?
     if !locator
         .slice(range)
@@ -97,7 +97,7 @@ fn empty_comment(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
         });
 
     Some(
-        Diagnostic::new(EmptyComment, TextRange::new(first_hash_col, line.end())).with_fix(
+        OldDiagnostic::new(EmptyComment, TextRange::new(first_hash_col, line.end())).with_fix(
             Fix::safe_edit(if let Some(deletion_start_col) = deletion_start_col {
                 Edit::deletion(line.start() + deletion_start_col, line.end())
             } else {

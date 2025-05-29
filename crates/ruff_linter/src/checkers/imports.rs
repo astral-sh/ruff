@@ -1,6 +1,5 @@
 //! Lint rules based on import analysis.
 
-use ruff_diagnostics::Diagnostic;
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
@@ -9,6 +8,7 @@ use ruff_python_index::Indexer;
 use ruff_python_parser::Parsed;
 
 use crate::Locator;
+use crate::OldDiagnostic;
 use crate::directives::IsortDirectives;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
@@ -28,7 +28,7 @@ pub(crate) fn check_imports(
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
     target_version: PythonVersion,
-) -> Vec<Diagnostic> {
+) -> Vec<OldDiagnostic> {
     // Extract all import blocks from the AST.
     let tracker = {
         let mut tracker =

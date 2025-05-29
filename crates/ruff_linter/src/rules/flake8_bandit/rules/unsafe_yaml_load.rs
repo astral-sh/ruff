@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -82,16 +82,10 @@ pub(crate) fn unsafe_yaml_load(checker: &Checker, call: &ast::ExprCall) {
                     Expr::Name(ast::ExprName { id, .. }) => Some(id.to_string()),
                     _ => None,
                 };
-                checker.report_diagnostic(Diagnostic::new(
-                    UnsafeYAMLLoad { loader },
-                    loader_arg.range(),
-                ));
+                checker.report_diagnostic(UnsafeYAMLLoad { loader }, loader_arg.range());
             }
         } else {
-            checker.report_diagnostic(Diagnostic::new(
-                UnsafeYAMLLoad { loader: None },
-                call.func.range(),
-            ));
+            checker.report_diagnostic(UnsafeYAMLLoad { loader: None }, call.func.range());
         }
     }
 }

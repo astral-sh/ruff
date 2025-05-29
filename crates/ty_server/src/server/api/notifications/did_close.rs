@@ -1,15 +1,14 @@
-use lsp_server::ErrorCode;
-use lsp_types::DidCloseTextDocumentParams;
-use lsp_types::notification::DidCloseTextDocument;
-use ty_project::watch::ChangeEvent;
-
 use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::clear_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
-use crate::server::client::{Notifier, Requester};
 use crate::session::Session;
+use crate::session::client::Client;
 use crate::system::{AnySystemPath, url_to_any_system_path};
+use lsp_server::ErrorCode;
+use lsp_types::DidCloseTextDocumentParams;
+use lsp_types::notification::DidCloseTextDocument;
+use ty_project::watch::ChangeEvent;
 
 pub(crate) struct DidCloseTextDocumentHandler;
 
@@ -20,8 +19,7 @@ impl NotificationHandler for DidCloseTextDocumentHandler {
 impl SyncNotificationHandler for DidCloseTextDocumentHandler {
     fn run(
         session: &mut Session,
-        notifier: Notifier,
-        _requester: &mut Requester,
+        client: &Client,
         params: DidCloseTextDocumentParams,
     ) -> Result<()> {
         let Ok(path) = url_to_any_system_path(&params.text_document.uri) else {
@@ -38,7 +36,7 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
             db.apply_changes(vec![ChangeEvent::DeletedVirtual(virtual_path)], None);
         }
 
-        clear_diagnostics(key.url(), &notifier)?;
+        clear_diagnostics(key.url(), client)?;
 
         Ok(())
     }

@@ -9,7 +9,6 @@ use itertools::Itertools;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::Diagnostic;
 use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
@@ -18,6 +17,7 @@ use ruff_python_parser::{ParseError, ParseOptions, Parsed, UnsupportedSyntaxErro
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::Ranged;
 
+use crate::OldDiagnostic;
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
@@ -438,7 +438,7 @@ pub fn add_noqa_to_path(
     )
 }
 
-/// Generate a [`Message`] for each [`Diagnostic`] triggered by the given source
+/// Generate a [`Message`] for each [`OldDiagnostic`] triggered by the given source
 /// code.
 pub fn lint_only(
     path: &Path,
@@ -503,7 +503,7 @@ pub fn lint_only(
 
 /// Convert from diagnostics to messages.
 fn diagnostics_to_messages(
-    diagnostics: Vec<Diagnostic>,
+    diagnostics: Vec<OldDiagnostic>,
     parse_errors: &[ParseError],
     unsupported_syntax_errors: &[UnsupportedSyntaxError],
     semantic_syntax_errors: &[SemanticSyntaxError],
@@ -535,7 +535,7 @@ fn diagnostics_to_messages(
         )
         .chain(diagnostics.into_iter().map(|diagnostic| {
             let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
-            Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset)
+            Message::from_diagnostic(diagnostic, file.deref().clone(), Some(noqa_offset))
         }))
         .collect()
 }
@@ -682,7 +682,7 @@ fn collect_rule_codes(rules: impl IntoIterator<Item = Rule>) -> String {
 
 #[expect(clippy::print_stderr)]
 fn report_failed_to_converge_error(path: &Path, transformed: &str, messages: &[Message]) {
-    let codes = collect_rule_codes(messages.iter().filter_map(Message::rule));
+    let codes = collect_rule_codes(messages.iter().filter_map(Message::to_rule));
     if cfg!(debug_assertions) {
         eprintln!(
             "{}{} Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",

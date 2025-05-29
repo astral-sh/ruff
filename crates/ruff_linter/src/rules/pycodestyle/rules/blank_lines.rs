@@ -5,10 +5,6 @@ use std::slice::Iter;
 
 use itertools::Itertools;
 
-use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Edit;
-use ruff_diagnostics::Fix;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
@@ -21,7 +17,11 @@ use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
 
+use crate::AlwaysFixableViolation;
+use crate::Edit;
+use crate::Fix;
 use crate::Locator;
+use crate::OldDiagnostic;
 use crate::checkers::logical_lines::expand_indent;
 use crate::line_width::IndentWidth;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
@@ -721,7 +721,7 @@ impl<'a> BlankLinesChecker<'a> {
     }
 
     /// E301, E302, E303, E304, E305, E306
-    pub(crate) fn check_lines(&self, tokens: &Tokens, diagnostics: &mut Vec<Diagnostic>) {
+    pub(crate) fn check_lines(&self, tokens: &Tokens, diagnostics: &mut Vec<OldDiagnostic>) {
         let mut prev_indent_length: Option<usize> = None;
         let mut prev_logical_line: Option<LogicalLineInfo> = None;
         let mut state = BlankLinesState::default();
@@ -824,7 +824,7 @@ impl<'a> BlankLinesChecker<'a> {
         line: &LogicalLineInfo,
         state: &BlankLinesState,
         prev_indent_length: Option<usize>,
-        diagnostics: &mut Vec<Diagnostic>,
+        diagnostics: &mut Vec<OldDiagnostic>,
     ) {
         if line.preceding_blank_lines == 0
             // Only applies to methods.
@@ -842,7 +842,8 @@ impl<'a> BlankLinesChecker<'a> {
             && !self.source_type.is_stub()
         {
             // E301
-            let mut diagnostic = Diagnostic::new(BlankLineBetweenMethods, line.first_token_range);
+            let mut diagnostic =
+                OldDiagnostic::new(BlankLineBetweenMethods, line.first_token_range);
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 self.stylist.line_ending().to_string(),
                 self.locator.line_start(state.last_non_comment_line_end),
@@ -896,7 +897,7 @@ impl<'a> BlankLinesChecker<'a> {
             && !line.is_beginning_of_cell
         {
             // E302
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = OldDiagnostic::new(
                 BlankLinesTopLevel {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                     expected_blank_lines: expected_blank_lines_before_definition,
@@ -940,7 +941,7 @@ impl<'a> BlankLinesChecker<'a> {
 
         if line.blank_lines > max_blank_lines {
             // E303
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = OldDiagnostic::new(
                 TooManyBlankLines {
                     actual_blank_lines: line.blank_lines.count(),
                 },
@@ -966,7 +967,7 @@ impl<'a> BlankLinesChecker<'a> {
             && line.preceding_blank_lines > 0
         {
             // E304
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = OldDiagnostic::new(
                 BlankLineAfterDecorator {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                 },
@@ -1013,7 +1014,7 @@ impl<'a> BlankLinesChecker<'a> {
             && !line.is_beginning_of_cell
         {
             // E305
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = OldDiagnostic::new(
                 BlankLinesAfterFunctionOrClass {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                 },
@@ -1057,7 +1058,7 @@ impl<'a> BlankLinesChecker<'a> {
         {
             // E306
             let mut diagnostic =
-                Diagnostic::new(BlankLinesBeforeNestedDefinition, line.first_token_range);
+                OldDiagnostic::new(BlankLinesBeforeNestedDefinition, line.first_token_range);
 
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 self.stylist.line_ending().to_string(),

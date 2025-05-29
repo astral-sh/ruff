@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Decorator, Parameters, Stmt, identifier::Identifier};
 use ruff_python_semantic::analyze::visibility::is_property;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -57,6 +57,6 @@ pub(crate) fn property_with_parameters(
     let semantic = checker.semantic();
     let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
     if is_property(decorator_list, extra_property_decorators, semantic) {
-        checker.report_diagnostic(Diagnostic::new(PropertyWithParameters, stmt.identifier()));
+        checker.report_diagnostic(PropertyWithParameters, stmt.identifier());
     }
 }

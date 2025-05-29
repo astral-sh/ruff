@@ -305,4 +305,37 @@ def _(c: Callable[[int], int]):
     reveal_type(c.__call__)  # revealed: (int, /) -> int
 ```
 
+Unlike other type checkers, we do _not_ allow attributes to be accessed that would only be available
+on function-like callables:
+
+```py
+def f_wrong(c: Callable[[], None]):
+    # error: [unresolved-attribute] "Type `() -> None` has no attribute `__qualname__`"
+    c.__qualname__
+
+    # error: [unresolved-attribute] "Unresolved attribute `__qualname__` on type `() -> None`."
+    c.__qualname__ = "my_callable"
+```
+
+We do this, because at runtime, calls to `f_wrong` with a non-function callable would raise an
+`AttributeError`:
+
+```py
+class MyCallable:
+    def __call__(self) -> None:
+        pass
+
+f_wrong(MyCallable())  # raises `AttributeError` at runtime
+```
+
+If users want to write to attributes such as `__qualname__`, they need to check the existence of the
+attribute first:
+
+```py
+def f_okay(c: Callable[[], None]):
+    if hasattr(c, "__qualname__"):
+        c.__qualname__  # okay
+        c.__qualname__ = "my_callable"  # also okay
+```
+
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

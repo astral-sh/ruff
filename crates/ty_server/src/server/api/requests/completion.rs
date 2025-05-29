@@ -9,7 +9,7 @@ use ty_project::ProjectDatabase;
 use crate::DocumentSnapshot;
 use crate::document::PositionExt;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
-use crate::server::client::Notifier;
+use crate::session::client::Client;
 
 pub(crate) struct CompletionRequestHandler;
 
@@ -18,29 +18,31 @@ impl RequestHandler for CompletionRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
+    const RETRY_ON_CANCELLATION: bool = true;
+
     fn document_url(params: &CompletionParams) -> Cow<Url> {
         Cow::Borrowed(&params.text_document_position.text_document.uri)
     }
 
     fn run_with_snapshot(
+        db: &ProjectDatabase,
         snapshot: DocumentSnapshot,
-        db: ProjectDatabase,
-        _notifier: Notifier,
+        _client: &Client,
         params: CompletionParams,
     ) -> crate::server::Result<Option<CompletionResponse>> {
-        let Some(file) = snapshot.file(&db) else {
+        let Some(file) = snapshot.file(db) else {
             tracing::debug!("Failed to resolve file for {:?}", params);
             return Ok(None);
         };
 
-        let source = source_text(&db, file);
-        let line_index = line_index(&db, file);
+        let source = source_text(db, file);
+        let line_index = line_index(db, file);
         let offset = params.text_document_position.position.to_text_size(
             &source,
             &line_index,
             snapshot.encoding(),
         );
-        let completions = completion(&db, file, offset);
+        let completions = completion(db, file, offset);
         if completions.is_empty() {
             return Ok(None);
         }

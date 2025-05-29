@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::Db;
 use crate::module_resolver::SearchPaths;
 use crate::python_platform::PythonPlatform;
@@ -6,12 +8,14 @@ use crate::site_packages::SysPrefixPathOrigin;
 use anyhow::Context;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
+use ruff_text_size::TextRange;
 use salsa::Durability;
 use salsa::Setter;
 
 #[salsa::input(singleton)]
 pub struct Program {
-    pub python_version: PythonVersion,
+    #[returns(ref)]
+    pub python_version_with_source: PythonVersionWithSource,
 
     #[returns(ref)]
     pub python_platform: PythonPlatform,
@@ -23,21 +27,28 @@ pub struct Program {
 impl Program {
     pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> anyhow::Result<Self> {
         let ProgramSettings {
-            python_version,
+            python_version: python_version_with_source,
             python_platform,
             search_paths,
         } = settings;
 
-        tracing::info!("Python version: Python {python_version}, platform: {python_platform}");
+        tracing::info!(
+            "Python version: Python {python_version}, platform: {python_platform}",
+            python_version = python_version_with_source.version
+        );
 
         let search_paths = SearchPaths::from_settings(db, &search_paths)
             .with_context(|| "Invalid search path settings")?;
 
         Ok(
-            Program::builder(python_version, python_platform, search_paths)
+            Program::builder(python_version_with_source, python_platform, search_paths)
                 .durability(Durability::HIGH)
                 .new(db),
         )
+    }
+
+    pub fn python_version(self, db: &dyn Db) -> PythonVersion {
+        self.python_version_with_source(db).version
     }
 
     pub fn update_from_settings(
@@ -56,9 +67,9 @@ impl Program {
             self.set_python_platform(db).to(python_platform);
         }
 
-        if python_version != self.python_version(db) {
-            tracing::debug!("Updating python version: Python {python_version}");
-            self.set_python_version(db).to(python_version);
+        if &python_version != self.python_version_with_source(db) {
+            tracing::debug!("Updating python version: `{python_version:?}`");
+            self.set_python_version_with_source(db).to(python_version);
         }
 
         self.update_search_paths(db, &search_paths)?;
@@ -87,11 +98,39 @@ impl Program {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ProgramSettings {
-    pub python_version: PythonVersion,
+    pub python_version: PythonVersionWithSource,
     pub python_platform: PythonPlatform,
     pub search_paths: SearchPathSettings,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
+pub enum PythonVersionSource {
+    /// Value loaded from a project's configuration file.
+    File(Arc<SystemPathBuf>, Option<TextRange>),
+
+    /// The value comes from a CLI argument, while it's left open if specified using a short argument,
+    /// long argument (`--extra-paths`) or `--config key=value`.
+    Cli,
+
+    /// We fell back to a default value because the value was not specified via the CLI or a config file.
+    #[default]
+    Default,
+}
+
+#[derive(Eq, PartialEq, Debug, Clone)]
+pub struct PythonVersionWithSource {
+    pub version: PythonVersion,
+    pub source: PythonVersionSource,
+}
+
+impl Default for PythonVersionWithSource {
+    fn default() -> Self {
+        Self {
+            version: PythonVersion::latest_ty(),
+            source: PythonVersionSource::Default,
+        }
+    }
 }
 
 /// Configures the search paths for module resolution.
@@ -161,6 +200,10 @@ pub enum PythonPath {
 impl PythonPath {
     pub fn from_virtual_env_var(path: impl Into<SystemPathBuf>) -> Self {
         Self::SysPrefix(path.into(), SysPrefixPathOrigin::VirtualEnvVar)
+    }
+
+    pub fn from_conda_prefix_var(path: impl Into<SystemPathBuf>) -> Self {
+        Self::Resolve(path.into(), SysPrefixPathOrigin::CondaPrefixVar)
     }
 
     pub fn from_cli_flag(path: SystemPathBuf) -> Self {

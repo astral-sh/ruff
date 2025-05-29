@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Operator};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
@@ -10,6 +9,7 @@ use crate::rules::flake8_logging_format::violations::{
     LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
     LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
 };
+use crate::{Edit, Fix};
 
 /// Returns `true` if the attribute is a reserved attribute on the `logging` module's `LogRecord`
 /// class.
@@ -48,12 +48,12 @@ fn check_msg(checker: &Checker, msg: &Expr) {
         Expr::BinOp(ast::ExprBinOp { op, .. }) => match op {
             Operator::Add => {
                 if checker.enabled(Rule::LoggingStringConcat) {
-                    checker.report_diagnostic(Diagnostic::new(LoggingStringConcat, msg.range()));
+                    checker.report_diagnostic(LoggingStringConcat, msg.range());
                 }
             }
             Operator::Mod => {
                 if checker.enabled(Rule::LoggingPercentFormat) {
-                    checker.report_diagnostic(Diagnostic::new(LoggingPercentFormat, msg.range()));
+                    checker.report_diagnostic(LoggingPercentFormat, msg.range());
                 }
             }
             _ => {}
@@ -61,7 +61,7 @@ fn check_msg(checker: &Checker, msg: &Expr) {
         // Check for f-strings.
         Expr::FString(_) => {
             if checker.enabled(Rule::LoggingFString) {
-                checker.report_diagnostic(Diagnostic::new(LoggingFString, msg.range()));
+                checker.report_diagnostic(LoggingFString, msg.range());
             }
         }
         // Check for .format() calls.
@@ -69,8 +69,7 @@ fn check_msg(checker: &Checker, msg: &Expr) {
             if checker.enabled(Rule::LoggingStringFormat) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     if attr == "format" && value.is_literal_expr() {
-                        checker
-                            .report_diagnostic(Diagnostic::new(LoggingStringFormat, msg.range()));
+                        checker.report_diagnostic(LoggingStringFormat, msg.range());
                     }
                 }
             }
@@ -91,10 +90,10 @@ fn check_log_record_attr_clash(checker: &Checker, extra: &Keyword) {
                     None
                 }
             }) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     LoggingExtraAttrClash(invalid_key.value.to_string()),
                     invalid_key.range(),
-                ));
+                );
             }
         }
         Expr::Call(ast::ExprCall {
@@ -106,10 +105,10 @@ fn check_log_record_attr_clash(checker: &Checker, extra: &Keyword) {
                 for keyword in keywords {
                     if let Some(attr) = &keyword.arg {
                         if is_reserved_attr(attr) {
-                            checker.report_diagnostic(Diagnostic::new(
+                            checker.report_diagnostic(
                                 LoggingExtraAttrClash(attr.to_string()),
                                 keyword.range(),
-                            ));
+                            );
                         }
                     }
                 }
@@ -184,12 +183,11 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
             logging_call_type,
             LoggingCallType::LevelCall(LoggingLevel::Warn)
         ) {
-            let mut diagnostic = Diagnostic::new(LoggingWarn, range);
+            let mut diagnostic = checker.report_diagnostic(LoggingWarn, range);
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 "warning".to_string(),
                 range,
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -212,15 +210,12 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
             match logging_level {
                 LoggingLevel::Error => {
                     if checker.enabled(Rule::LoggingExcInfo) {
-                        checker.report_diagnostic(Diagnostic::new(LoggingExcInfo, range));
+                        checker.report_diagnostic(LoggingExcInfo, range);
                     }
                 }
                 LoggingLevel::Exception => {
                     if checker.enabled(Rule::LoggingRedundantExcInfo) {
-                        checker.report_diagnostic(Diagnostic::new(
-                            LoggingRedundantExcInfo,
-                            exc_info.range(),
-                        ));
+                        checker.report_diagnostic(LoggingRedundantExcInfo, exc_info.range());
                     }
                 }
                 _ => {}
