@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
@@ -115,7 +115,7 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
     // "in" might also make sense but we don't currently have one.
     if !matches!(op, CmpOp::Eq | CmpOp::NotEq) {
         if checker.enabled(Rule::UnrecognizedPlatformCheck) {
-            checker.report_diagnostic(Diagnostic::new(UnrecognizedPlatformCheck, test.range()));
+            checker.report_diagnostic(UnrecognizedPlatformCheck, test.range());
         }
         return;
     }
@@ -125,17 +125,17 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
         // This protects against typos.
         if checker.enabled(Rule::UnrecognizedPlatformName) {
             if !matches!(value.to_str(), "linux" | "win32" | "cygwin" | "darwin") {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     UnrecognizedPlatformName {
                         platform: value.to_string(),
                     },
                     right.range(),
-                ));
+                );
             }
         }
     } else {
         if checker.enabled(Rule::UnrecognizedPlatformCheck) {
-            checker.report_diagnostic(Diagnostic::new(UnrecognizedPlatformCheck, test.range()));
+            checker.report_diagnostic(UnrecognizedPlatformCheck, test.range());
         }
     }
 }

@@ -188,13 +188,13 @@ impl Ty {
 
                 create_bound_method(db, function, builtins_class)
             }
-            Ty::Callable { params, returns } => Type::Callable(CallableType::single(
+            Ty::Callable { params, returns } => CallableType::single(
                 db,
                 Signature::new(
                     params.into_parameters(db),
                     returns.map(|ty| ty.into_type(db)),
                 ),
-            )),
+            ),
         }
     }
 }

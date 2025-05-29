@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -49,7 +49,7 @@ impl Violation for AssertOnStringLiteral {
 pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
     match test {
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 AssertOnStringLiteral {
                     kind: if value.is_empty() {
                         Kind::Empty
@@ -58,10 +58,10 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
                     },
                 },
                 test.range(),
-            ));
+            );
         }
         Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 AssertOnStringLiteral {
                     kind: if value.is_empty() {
                         Kind::Empty
@@ -70,7 +70,7 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
                     },
                 },
                 test.range(),
-            ));
+            );
         }
         Expr::FString(ast::ExprFString { value, .. }) => {
             let kind = if value.iter().all(|f_string_part| match f_string_part {
@@ -100,10 +100,7 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
             } else {
                 Kind::Unknown
             };
-            checker.report_diagnostic(Diagnostic::new(
-                AssertOnStringLiteral { kind },
-                test.range(),
-            ));
+            checker.report_diagnostic(AssertOnStringLiteral { kind }, test.range());
         }
         _ => {}
     }

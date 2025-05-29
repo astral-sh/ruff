@@ -608,11 +608,49 @@ c: Callable[[Any], str] = A().g
 ```py
 from typing import Any, Callable
 
+c: Callable[[object], type] = type
 c: Callable[[str], Any] = str
 c: Callable[[str], Any] = int
 
 # error: [invalid-assignment]
 c: Callable[[str], Any] = object
+
+class A:
+    def __init__(self, x: int) -> None: ...
+
+a: Callable[[int], A] = A
+
+class C:
+    def __new__(cls, *args, **kwargs) -> "C":
+        return super().__new__(cls)
+
+    def __init__(self, x: int) -> None: ...
+
+c: Callable[[int], C] = C
+```
+
+### Generic class literal types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable
+
+class B[T]:
+    def __init__(self, x: T) -> None: ...
+
+b: Callable[[int], B[int]] = B[int]
+
+class C[T]:
+    def __new__(cls, *args, **kwargs) -> "C[T]":
+        return super().__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+c: Callable[[int], C[int]] = C[int]
 ```
 
 ### Overloads

@@ -79,7 +79,7 @@ pub enum SpecialFormType {
     /// The symbol `typing.Callable`
     /// (which can also be found as `typing_extensions.Callable` or as `collections.abc.Callable`)
     Callable,
-    /// The symbol `typing.Self` (which can also be found as `typing_extensions.Self`)
+    /// The symbol `typing.Self` (which can also be found as `typing_extensions.Self` or `_typeshed.Self`)
     #[strum(serialize = "Self")]
     TypingSelf,
     /// The symbol `typing.Final` (which can also be found as `typing_extensions.Final`)
@@ -202,7 +202,6 @@ impl SpecialFormType {
             | Self::Literal
             | Self::LiteralString
             | Self::Never
-            | Self::TypingSelf
             | Self::Final
             | Self::Concatenate
             | Self::Unpack
@@ -215,6 +214,10 @@ impl SpecialFormType {
             | Self::ReadOnly => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
+            Self::TypingSelf => matches!(
+                module,
+                KnownModule::Typing | KnownModule::TypingExtensions | KnownModule::Typeshed
+            ),
             Self::Unknown
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy

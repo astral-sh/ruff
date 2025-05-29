@@ -3,7 +3,6 @@ use std::cmp;
 use anyhow::Result;
 use libcst_native::CompOp;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, CmpOp, Expr, UnaryOp};
 use ruff_python_codegen::Stylist;
@@ -16,6 +15,7 @@ use crate::cst::helpers::or_space;
 use crate::cst::matchers::{match_comparison, transform_expression};
 use crate::fix::edits::pad;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for conditions that position a constant on the left-hand side of the
@@ -225,7 +225,7 @@ pub(crate) fn yoda_conditions(
     }
 
     if let Ok(suggestion) = reverse_comparison(expr, checker.locator(), checker.stylist()) {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             YodaConditions {
                 suggestion: Some(SourceCodeSnippet::new(suggestion.clone())),
             },
@@ -235,11 +235,7 @@ pub(crate) fn yoda_conditions(
             pad(suggestion, expr.range(), checker.locator()),
             expr.range(),
         )));
-        checker.report_diagnostic(diagnostic);
     } else {
-        checker.report_diagnostic(Diagnostic::new(
-            YodaConditions { suggestion: None },
-            expr.range(),
-        ));
+        checker.report_diagnostic(YodaConditions { suggestion: None }, expr.range());
     }
 }

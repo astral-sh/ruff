@@ -1,12 +1,10 @@
-use ruff_python_ast::ExprStringLiteral;
-
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprStringLiteral;
+use ruff_python_semantic::Definition;
 use ruff_text_size::Ranged;
 
-use ruff_python_semantic::Definition;
-
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for the presence of docstrings in stub files.
@@ -63,8 +61,6 @@ pub(crate) fn docstring_in_stubs(
         Edit::range_deletion(docstring_range)
     };
 
-    let fix = Fix::unsafe_edit(edit);
-    let diagnostic = Diagnostic::new(DocstringInStub, docstring_range).with_fix(fix);
-
-    checker.report_diagnostic(diagnostic);
+    let mut diagnostic = checker.report_diagnostic(DocstringInStub, docstring_range);
+    diagnostic.set_fix(Fix::unsafe_edit(edit));
 }

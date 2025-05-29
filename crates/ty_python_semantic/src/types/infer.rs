@@ -64,7 +64,9 @@ use crate::symbol::{
     global_symbol, module_type_implicit_global_declaration, module_type_implicit_global_symbol,
     symbol, symbol_from_bindings, symbol_from_declarations, typing_extensions_symbol,
 };
-use crate::types::call::{Argument, Bindings, CallArgumentTypes, CallArguments, CallError};
+use crate::types::call::{
+    Argument, Binding, Bindings, CallArgumentTypes, CallArguments, CallError,
+};
 use crate::types::class::{MetaclassErrorKind, SliceLiteral};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
@@ -81,16 +83,17 @@ use crate::types::diagnostic::{
 };
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
+use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    BareTypeAliasType, CallDunderError, CallableSignature, CallableType, ClassLiteral, ClassType,
-    DataclassParams, DynamicType, FunctionDecorators, FunctionType, GenericAlias,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
-    Parameters, Signature, Signatures, SpecialFormType, StringLiteralType, SubclassOfType, Symbol,
-    SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
+    BareTypeAliasType, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
+    DynamicType, FunctionDecorators, FunctionType, GenericAlias, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownFunction, KnownInstanceType, MemberLookupPolicy,
+    MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters,
+    StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type,
+    TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
+    todo_type, SpecialFormType
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -4854,10 +4857,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // TODO: Useful inference of a lambda's return type will require a different approach,
         // which does the inference of the body expression based on arguments at each call site,
         // rather than eagerly computing a return type without knowing the argument types.
-        Type::Callable(CallableType::single(
-            self.db(),
-            Signature::new(parameters, Some(Type::unknown())),
-        ))
+        CallableType::single(self.db(), Signature::new(parameters, Some(Type::unknown())))
     }
 
     /// Returns the type of the first parameter if the given scope is function-like (i.e. function or lambda).
@@ -4971,8 +4971,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        let signatures = callable_type.signatures(self.db());
-        let bindings = Bindings::match_parameters(signatures, &call_arguments);
+        let bindings = callable_type
+            .bindings(self.db())
+            .match_parameters(&call_arguments);
         let call_argument_types =
             self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
 
@@ -7292,11 +7293,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             _ => CallArgumentTypes::positional([self.infer_type_expression(slice_node)]),
         };
-        let signatures = Signatures::single(CallableSignature::single(
-            value_ty,
-            generic_context.signature(self.db()),
-        ));
-        let bindings = match Bindings::match_parameters(signatures, &call_argument_types)
+        let binding = Binding::single(value_ty, generic_context.signature(self.db()));
+        let bindings = match Bindings::from(binding)
+            .match_parameters(&call_argument_types)
             .check_types(self.db(), &call_argument_types)
         {
             Ok(bindings) => bindings,
@@ -8650,8 +8649,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     CallableType::unknown(db)
                 };
 
-                let callable_type = Type::Callable(callable_type);
-
                 // `Signature` / `Parameters` are not a `Type` variant, so we're storing
                 // the outer callable type on these expressions instead.
                 self.store_expression_type(arguments_slice, callable_type);
@@ -8720,20 +8717,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 _ => {
                     let argument_type = self.infer_expression(arguments_slice);
-                    let signatures = argument_type.signatures(db);
+                    let bindings = argument_type.bindings(db);
 
-                    // SAFETY: This is enforced by the constructor methods on `Signatures` even in
+                    // SAFETY: This is enforced by the constructor methods on `Bindings` even in
                     // the case of a non-callable union.
-                    let callable_signature = signatures
-                        .iter()
+                    let callable_binding = bindings
+                        .into_iter()
                         .next()
-                        .expect("`Signatures` should have at least one `CallableSignature`");
+                        .expect("`Bindings` should have at least one `CallableBinding`");
 
-                    let mut signature_iter = callable_signature.iter().map(|signature| {
+                    let mut signature_iter = callable_binding.into_iter().map(|binding| {
                         if argument_type.is_bound_method() {
-                            signature.bind_self()
+                            binding.signature.bind_self()
                         } else {
-                            signature.clone()
+                            binding.signature.clone()
                         }
                     });
 
@@ -8752,10 +8749,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return Type::unknown();
                     };
 
-                    Type::Callable(CallableType::from_overloads(
-                        db,
+                    let signature = CallableSignature::from_overloads(
                         std::iter::once(signature).chain(signature_iter),
-                    ))
+                    );
+                    Type::Callable(CallableType::new(db, signature, false))
                 }
             },
 

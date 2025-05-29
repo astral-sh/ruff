@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast, Alias, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for submodule imports that are aliased to the submodule name.
@@ -58,7 +58,7 @@ pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ManualFromImport {
             module: module.to_string(),
             name: name.to_string(),
@@ -81,5 +81,4 @@ pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, 
             stmt.range(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }

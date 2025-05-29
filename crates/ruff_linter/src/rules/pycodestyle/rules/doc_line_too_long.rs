@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Line;
 
 use crate::rules::pycodestyle::overlong::Overlong;
 use crate::settings::LinterSettings;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for doc lines that exceed the specified maximum character length.

@@ -10,7 +10,6 @@ use itertools::Itertools;
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Applicability, FixAvailability};
 use ruff_notebook::Notebook;
 #[cfg(not(fuzzing))]
 use ruff_notebook::NotebookError;
@@ -29,6 +28,7 @@ use crate::packaging::detect_package_root;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, flags};
 use crate::source_kind::SourceKind;
+use crate::{Applicability, FixAvailability};
 use crate::{Locator, directives};
 
 #[cfg(not(fuzzing))]

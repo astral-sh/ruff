@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `assert expression, print(message)`.
@@ -62,7 +62,7 @@ pub(crate) fn assert_with_print_message(checker: &Checker, stmt: &ast::StmtAsser
 
         if semantic.match_builtin_expr(&call.func, "print") {
             // This is the confirmed rule condition
-            let mut diagnostic = Diagnostic::new(AssertWithPrintMessage, call.range());
+            let mut diagnostic = checker.report_diagnostic(AssertWithPrintMessage, call.range());
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().stmt(&Stmt::Assert(ast::StmtAssert {
                     test: stmt.test.clone(),
@@ -74,7 +74,6 @@ pub(crate) fn assert_with_print_message(checker: &Checker, stmt: &ast::StmtAsser
                 // will cease to exist.
                 stmt.range(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

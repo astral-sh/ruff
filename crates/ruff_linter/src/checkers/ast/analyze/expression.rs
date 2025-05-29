@@ -1,8 +1,6 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Operator};
 use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 
-use ruff_diagnostics::Diagnostic;
-
 use ruff_python_ast::types::Node;
 use ruff_python_semantic::ScopeKind;
 use ruff_python_semantic::analyze::typing;
@@ -178,6 +176,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);
             }
+            if checker.enabled(Rule::MissingMaxsplitArg) {
+                pylint::rules::missing_maxsplit_arg(checker, value, slice, expr);
+            }
             pandas_vet::rules::subscript(checker, value, expr);
         }
         Expr::Tuple(ast::ExprTuple {
@@ -195,14 +196,13 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 let check_too_many_expressions = checker.enabled(Rule::ExpressionsInStarAssignment);
                 let check_two_starred_expressions =
                     checker.enabled(Rule::MultipleStarredExpressions);
-                if let Some(diagnostic) = pyflakes::rules::starred_expressions(
+                pyflakes::rules::starred_expressions(
+                    checker,
                     elts,
                     check_too_many_expressions,
                     check_two_starred_expressions,
                     expr.range(),
-                ) {
-                    checker.report_diagnostic(diagnostic);
-                }
+                );
             }
         }
         Expr::Name(ast::ExprName { id, ctx, range }) => {
@@ -527,12 +527,12 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             match pyflakes::format::FormatSummary::try_from(string_value.to_str()) {
                                 Err(e) => {
                                     if checker.enabled(Rule::StringDotFormatInvalidFormat) {
-                                        checker.report_diagnostic(Diagnostic::new(
+                                        checker.report_diagnostic(
                                             pyflakes::rules::StringDotFormatInvalidFormat {
                                                 message: pyflakes::format::error_to_string(&e),
                                             },
                                             location,
-                                        ));
+                                        );
                                     }
                                 }
                                 Ok(summary) => {
@@ -936,9 +936,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 pylint::rules::repeated_keyword_argument(checker, call);
             }
             if checker.enabled(Rule::PytestPatchWithLambda) {
-                if let Some(diagnostic) = flake8_pytest_style::rules::patch_with_lambda(call) {
-                    checker.report_diagnostic(diagnostic);
-                }
+                flake8_pytest_style::rules::patch_with_lambda(checker, call);
             }
             if checker.any_enabled(&[
                 Rule::PytestParametrizeNamesWrongType,
@@ -1041,6 +1039,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::OsPathGetctime,
                 Rule::Glob,
                 Rule::OsListdir,
+                Rule::OsSymlink,
             ]) {
                 flake8_use_pathlib::rules::replaceable_by_pathlib(checker, call);
             }
@@ -1285,22 +1284,22 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             ..
                         }) => {
                             if checker.enabled(Rule::PercentFormatUnsupportedFormatCharacter) {
-                                checker.report_diagnostic(Diagnostic::new(
+                                checker.report_diagnostic(
                                     pyflakes::rules::PercentFormatUnsupportedFormatCharacter {
                                         char: c,
                                     },
                                     location,
-                                ));
+                                );
                             }
                         }
                         Err(e) => {
                             if checker.enabled(Rule::PercentFormatInvalidFormat) {
-                                checker.report_diagnostic(Diagnostic::new(
+                                checker.report_diagnostic(
                                     pyflakes::rules::PercentFormatInvalidFormat {
                                         message: e.to_string(),
                                     },
                                     location,
-                                ));
+                                );
                             }
                         }
                         Ok(summary) => {
@@ -1364,13 +1363,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             op: Operator::Add, ..
         }) => {
             if checker.enabled(Rule::ExplicitStringConcatenation) {
-                if let Some(diagnostic) = flake8_implicit_str_concat::rules::explicit(
-                    expr,
-                    checker.locator,
-                    checker.settings,
-                ) {
-                    checker.report_diagnostic(diagnostic);
-                }
+                flake8_implicit_str_concat::rules::explicit(checker, expr);
             }
             if checker.enabled(Rule::CollectionLiteralConcatenation) {
                 ruff::rules::collection_literal_concatenation(checker, expr);

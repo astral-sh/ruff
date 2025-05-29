@@ -12,7 +12,7 @@ use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 
 use ruff_db::panic::catch_unwind;
-use ruff_diagnostics::Diagnostic;
+use ruff_linter::Diagnostic;
 use ruff_linter::message::Message;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;

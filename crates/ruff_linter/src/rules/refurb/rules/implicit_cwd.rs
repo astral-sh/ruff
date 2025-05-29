@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
 use ruff_text_size::Ranged;
 
+use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
 /// ## What it does
@@ -88,7 +88,7 @@ pub(crate) fn no_implicit_cwd(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(ImplicitCwd, call.range());
+    let mut diagnostic = checker.report_diagnostic(ImplicitCwd, call.range());
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -101,6 +101,4 @@ pub(crate) fn no_implicit_cwd(checker: &Checker, call: &ExprCall) {
             [import_edit],
         ))
     });
-
-    checker.report_diagnostic(diagnostic);
 }

@@ -1,7 +1,6 @@
 use ruff_text_size::TextLen;
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::Ranged;
@@ -9,6 +8,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::docstrings::sections::SectionKind;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::pydocstyle::helpers::logical_line;
 
@@ -105,7 +105,8 @@ pub(crate) fn ends_with_punctuation(checker: &Checker, docstring: &Docstring) {
         }
 
         if !trimmed.ends_with(['.', '!', '?']) {
-            let mut diagnostic = Diagnostic::new(MissingTerminalPunctuation, docstring.range());
+            let mut diagnostic =
+                checker.report_diagnostic(MissingTerminalPunctuation, docstring.range());
             // Best-effort fix: avoid adding a period after other punctuation marks.
             if !trimmed.ends_with([':', ';']) {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
@@ -113,7 +114,6 @@ pub(crate) fn ends_with_punctuation(checker: &Checker, docstring: &Docstring) {
                     line.start() + trimmed.text_len(),
                 )));
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

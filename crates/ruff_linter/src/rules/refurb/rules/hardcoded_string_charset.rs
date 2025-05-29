@@ -1,9 +1,10 @@
-use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprStringLiteral;
 use ruff_text_size::TextRange;
+
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of hardcoded charsets, which are defined in Python string module.
@@ -129,7 +130,7 @@ fn check_charset_exact(bytes: &[u8]) -> Option<&NamedCharset> {
 
 fn push_diagnostic(checker: &Checker, range: TextRange, charset: &NamedCharset) {
     let name = charset.name;
-    let mut diagnostic = Diagnostic::new(HardcodedStringCharset { name }, range);
+    let mut diagnostic = checker.report_diagnostic(HardcodedStringCharset { name }, range);
     diagnostic.try_set_fix(|| {
         let (edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("string", name),
@@ -141,5 +142,4 @@ fn push_diagnostic(checker: &Checker, range: TextRange, charset: &NamedCharset) 
             [edit],
         ))
     });
-    checker.report_diagnostic(diagnostic);
 }
