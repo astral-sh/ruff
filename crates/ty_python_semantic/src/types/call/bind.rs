@@ -863,7 +863,7 @@ impl<'db> Bindings<'db> {
                             // applications of the decorator, we will only consider the last one
                             // for the return value, since the prior ones will be over-written.
                             let return_type = function_type
-                                .iter_rev(db)
+                                .iter_overloads_and_implementation(db)
                                 .filter_map(|function_overload| {
                                     function_overload.dataclass_transformer_params(db).map(
                                         |params| {
@@ -1247,10 +1247,8 @@ impl<'db> CallableBinding<'db> {
                     _ => None,
                 };
                 if let Some((kind, function)) = function_type_and_kind {
-                    let (implementation, overloads) =
-                        function.implementation_and_overloads_rev(context.db());
-                    let mut overloads: Vec<_> = overloads.collect();
-                    overloads.reverse();
+                    let (overloads, implementation) =
+                        function.overloads_and_implementation(context.db());
 
                     if let Some(spans) = overloads
                         .first()

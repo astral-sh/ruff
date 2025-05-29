@@ -1,4 +1,3 @@
-use std::iter::Peekable;
 use std::str::FromStr;
 
 use bitflags::bitflags;
@@ -8,9 +7,11 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::module_resolver::{KnownModule, file_to_module};
+use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::ScopeId;
+use crate::symbol::{Boundness, Symbol, symbol_from_bindings};
 use crate::types::generics::GenericContext;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
@@ -168,6 +169,35 @@ impl<'db> OverloadLiteral<'db> {
         index.expect_single_definition(body_scope.node(db).expect_function())
     }
 
+    /// Returns the overload immediately before this one in the AST. Returns `None` if there is no
+    /// previous overload.
+    fn previous_overload(self, db: &'db dyn Db) -> Option<FunctionLiteral<'db>> {
+        // The semantic model records a use for each function on the name node. This is used
+        // here to get the previous function definition with the same name.
+        let scope = self.definition(db).scope(db);
+        let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
+        let use_id = self
+            .body_scope(db)
+            .node(db)
+            .expect_function()
+            .name
+            .scoped_use_id(db, scope);
+
+        let Symbol::Type(Type::FunctionLiteral(previous_type), Boundness::Bound) =
+            symbol_from_bindings(db, use_def.bindings_at_use(use_id))
+        else {
+            return None;
+        };
+
+        let previous_literal = previous_type.literal(db);
+        let previous_overload = previous_literal.current_overload(db);
+        if !previous_overload.is_overload(db) {
+            return None;
+        }
+
+        Some(previous_literal)
+    }
+
     /// Typed internally-visible signature for this function.
     ///
     /// This represents the annotations on the function itself, unmodified by decorators and
@@ -253,7 +283,6 @@ impl<'db> OverloadLiteral<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct FunctionLiteral<'db> {
     pub(crate) current_overload: OverloadLiteral<'db>,
-    pub(crate) previous_overloads: Option<FunctionLiteral<'db>>,
 
     /// The inherited generic context, if this function is a class method being used to infer the
     /// specialization of its generic class. If any of the method's overloads are themselves
@@ -261,6 +290,7 @@ pub struct FunctionLiteral<'db> {
     inherited_generic_context: Option<GenericContext<'db>>,
 }
 
+#[salsa::tracked]
 impl<'db> FunctionLiteral<'db> {
     fn with_inherited_generic_context(
         self,
@@ -272,7 +302,6 @@ impl<'db> FunctionLiteral<'db> {
         Self::new(
             db,
             self.current_overload(db),
-            self.previous_overloads(db),
             Some(inherited_generic_context),
         )
     }
@@ -285,7 +314,6 @@ impl<'db> FunctionLiteral<'db> {
         Self::new(
             db,
             f(self.current_overload(db)),
-            self.previous_overloads(db),
             self.inherited_generic_context(db),
         )
     }
@@ -302,7 +330,7 @@ impl<'db> FunctionLiteral<'db> {
     }
 
     fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
-        self.iter_rev(db)
+        self.iter_overloads_and_implementation(db)
             .any(|overload| overload.decorators(db).contains(decorator))
     }
 
@@ -323,34 +351,40 @@ impl<'db> FunctionLiteral<'db> {
         self.current_overload(db).spans(db)
     }
 
-    fn iter_rev(self, db: &'db dyn Db) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
-        let mut next = Some(self);
-        std::iter::from_fn(move || {
-            next.map(|current| {
-                let result = current.current_overload(db);
-                next = current.previous_overloads(db);
-                result
-            })
-        })
-    }
-
-    fn implementation_and_overloads_rev(
+    #[salsa::tracked(returns(ref))]
+    fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
-    ) -> (
-        Option<OverloadLiteral<'db>>,
-        Peekable<impl Iterator<Item = OverloadLiteral<'db>> + 'db>,
-    ) {
-        let mut iter = self.iter_rev(db).peekable();
-        let implementation = if iter
-            .peek()
-            .is_some_and(|overload| !overload.is_overload(db))
-        {
-            iter.next()
-        } else {
+    ) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
+        let self_overload = self.current_overload(db);
+        let mut current = self_overload;
+        let mut overloads = vec![];
+
+        while let Some(previous) = current.previous_overload(db) {
+            let overload = previous.current_overload(db);
+            overloads.push(overload);
+            current = overload;
+        }
+
+        // Overloads are inserted in reverse order, from bottom to top.
+        overloads.reverse();
+
+        let implementation = if self_overload.is_overload(db) {
+            overloads.push(self_overload);
             None
+        } else {
+            Some(self_overload)
         };
-        (implementation, iter)
+
+        (overloads.into_boxed_slice(), implementation)
+    }
+
+    fn iter_overloads_and_implementation(
+        self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
+        let (implementation, overloads) = self.overloads_and_implementation(db);
+        overloads.iter().chain(implementation).copied()
     }
 
     /// Typed externally-visible signature for this function.
@@ -368,9 +402,9 @@ impl<'db> FunctionLiteral<'db> {
         // We only include an implementation (i.e. a definition not decorated with `@overload`) if
         // it's the only definition.
         let inherited_generic_context = self.inherited_generic_context(db);
-        let (implementation, mut overloads) = self.implementation_and_overloads_rev(db);
+        let (overloads, implementation) = self.overloads_and_implementation(db);
         if let Some(implementation) = implementation {
-            if overloads.peek().is_none() {
+            if overloads.is_empty() {
                 return CallableSignature::single(type_mappings.iter().fold(
                     implementation.signature(db, inherited_generic_context),
                     |ty, mapping| ty.apply_type_mapping(db, mapping),
@@ -378,26 +412,19 @@ impl<'db> FunctionLiteral<'db> {
             }
         }
 
-        let mut signature = CallableSignature::from_overloads(overloads.map(|overload| {
+        CallableSignature::from_overloads(overloads.iter().map(|overload| {
             type_mappings.iter().fold(
                 overload.signature(db, inherited_generic_context),
                 |ty, mapping| ty.apply_type_mapping(db, mapping),
             )
-        }));
-        signature.overloads.reverse();
-        signature
+        }))
     }
 
     fn normalized(self, db: &'db dyn Db) -> Self {
         let context = self
             .inherited_generic_context(db)
             .map(|ctx| ctx.normalized(db));
-        Self::new(
-            db,
-            self.current_overload(db),
-            self.previous_overloads(db),
-            context,
-        )
+        Self::new(db, self.current_overload(db), context)
     }
 }
 
@@ -549,25 +576,22 @@ impl<'db> FunctionType<'db> {
         self.literal(db).spans(db)
     }
 
-    /// Returns an iterator of all of the overloads of this function literal, in reverse source
-    /// order.
-    pub(crate) fn iter_rev(
+    /// Returns all of the overload signatures and the implementation definition, if any, of this
+    /// function. The overload signatures will be in source order.
+    pub(crate) fn overloads_and_implementation(
+        self,
+        db: &'db dyn Db,
+    ) -> &'db (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
+        self.literal(db).overloads_and_implementation(db)
+    }
+
+    /// Returns an iterator of all of the definitions of this function, including both overload
+    /// signatures and any implementation, all in source order.
+    pub(crate) fn iter_overloads_and_implementation(
         self,
         db: &'db dyn Db,
     ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
-        self.literal(db).iter_rev(db)
-    }
-
-    /// Returns the implementation definition of this function (if there is one), along with an
-    /// iterator of all non-implementation overloads in reverse source order.
-    pub(crate) fn implementation_and_overloads_rev(
-        self,
-        db: &'db dyn Db,
-    ) -> (
-        Option<OverloadLiteral<'db>>,
-        impl Iterator<Item = OverloadLiteral<'db>> + 'db,
-    ) {
-        self.literal(db).implementation_and_overloads_rev(db)
+        self.literal(db).iter_overloads_and_implementation(db)
     }
 
     /// Typed externally-visible signature for this function.

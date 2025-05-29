@@ -1131,12 +1131,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         for function in self.called_functions.union(&public_functions) {
-            let (implementation, overloads) = function.implementation_and_overloads_rev(self.db());
-            let mut overloads: Vec<_> = overloads.collect();
-            overloads.reverse();
+            let (overloads, implementation) = function.overloads_and_implementation(self.db());
 
             // Check that the overloaded function has at least two overloads
-            if let [single_overload] = overloads.as_slice() {
+            if let [single_overload] = overloads.as_ref() {
                 let function_node = function.node(self.db(), self.file());
                 if let Some(builder) = self
                     .context
@@ -1199,7 +1197,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let mut decorator_present = false;
                 let mut decorator_missing = vec![];
 
-                for function in overloads.iter().chain(&implementation) {
+                for function in overloads.iter().chain(implementation.as_ref()) {
                     if function.has_known_decorator(self.db(), decorator) {
                         decorator_present = true;
                     } else {
@@ -1241,7 +1239,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 (FunctionDecorators::OVERRIDE, "override"),
             ] {
                 if let Some(implementation) = implementation {
-                    for overload in &overloads {
+                    for overload in overloads.as_ref() {
                         if !overload.has_known_decorator(self.db(), decorator) {
                             continue;
                         }
@@ -2042,32 +2040,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             dataclass_transformer_params,
         );
 
-        // The semantic model records a use for each function on the name node. This is used
-        // here to get the previous function definition with the same name.
-        let use_def = self
-            .index
-            .use_def_map(self.scope().file_scope_id(self.db()));
-        let use_id = name.scoped_use_id(self.db(), self.scope());
-
-        let previous_overloads =
-            match symbol_from_bindings(self.db(), use_def.bindings_at_use(use_id)) {
-                Symbol::Type(Type::FunctionLiteral(previous), Boundness::Bound) => {
-                    let literal = previous.literal(self.db());
-                    literal
-                        .current_overload(self.db())
-                        .is_overload(self.db())
-                        .then_some(literal)
-                }
-                _ => None,
-            };
-
         let inherited_generic_context = None;
-        let function_literal = FunctionLiteral::new(
-            self.db(),
-            overload_literal,
-            previous_overloads,
-            inherited_generic_context,
-        );
+        let function_literal =
+            FunctionLiteral::new(self.db(), overload_literal, inherited_generic_context);
 
         let type_mappings = Box::from([]);
         let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
@@ -2342,7 +2317,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // allowed. We do not try to treat the offenders intelligently -- just use the
                 // params of the last seen usage of `@dataclass_transform`
                 let params = f
-                    .iter_rev(self.db())
+                    .iter_overloads_and_implementation(self.db())
                     .find_map(|overload| overload.dataclass_transformer_params(self.db()));
                 if let Some(params) = params {
                     dataclass_params = Some(params.into());
