@@ -229,7 +229,7 @@ impl VirtualEnvironment {
                 line_number = line_number.checked_add(1).unwrap();
             }
 
-            cursor.skip_non_newline_whitespace();
+            cursor.eat_while(|c| c.is_whitespace() && c != '\n');
 
             let remaining_file = cursor.chars().as_str();
 
