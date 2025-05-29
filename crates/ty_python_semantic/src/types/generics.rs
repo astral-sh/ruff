@@ -569,7 +569,7 @@ impl<'db> SpecializationBuilder<'db> {
                 self.types
                     .get(variable)
                     .copied()
-                    .unwrap_or(variable.default_ty(self.db).unwrap_or(Type::unknown()))
+                    .unwrap_or_else(|| variable.default_ty(self.db).unwrap_or(Type::unknown()))
             })
             .collect();
         Specialization::new(self.db, generic_context, types)
