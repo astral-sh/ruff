@@ -30,7 +30,7 @@ pub(crate) fn check_tokens(
     settings: &LinterSettings,
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &mut DiagnosticsCollector,
 ) {
     let comment_ranges = indexer.comment_ranges();
 

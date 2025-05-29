@@ -3099,7 +3099,7 @@ impl<'a> DiagnosticsCollector<'a> {
         self.diagnostics.borrow().is_empty()
     }
 
-    pub(crate) fn retain(&self, f: impl FnMut(&OldDiagnostic) -> bool) {
+    pub(crate) fn retain(&mut self, f: impl FnMut(&OldDiagnostic) -> bool) {
         self.diagnostics.borrow_mut().retain(f);
     }
 
@@ -3107,7 +3107,7 @@ impl<'a> DiagnosticsCollector<'a> {
         self.diagnostics.borrow().iter().any(f)
     }
 
-    pub(crate) fn swap_remove(&self, index: usize) -> OldDiagnostic {
+    pub(crate) fn swap_remove(&mut self, index: usize) -> OldDiagnostic {
         self.diagnostics.borrow_mut().swap_remove(index)
     }
 

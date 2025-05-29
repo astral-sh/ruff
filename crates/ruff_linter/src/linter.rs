@@ -123,7 +123,7 @@ pub fn check_path(
     };
 
     // Aggregate all diagnostics.
-    let diagnostics = DiagnosticsCollector::new(&source_file);
+    let mut diagnostics = DiagnosticsCollector::new(&source_file);
 
     // Aggregate all semantic syntax errors.
     let mut semantic_syntax_errors = vec![];
@@ -154,7 +154,7 @@ pub fn check_path(
             settings,
             source_type,
             source_kind.as_ipy_notebook().map(Notebook::cell_offsets),
-            &diagnostics,
+            &mut diagnostics,
         );
     }
 
