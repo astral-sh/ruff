@@ -9,14 +9,11 @@ ibis  # too many iterations
 jax  # too many iterations
 packaging  # too many iterations
 pandas  # slow (9s)
-pandas-stubs 
 pandera  # stack overflow
 pip  # vendors packaging, see above
-prefect
 pylint  # cycle panics (self-recursive type alias)
 pyodide  # too many cycle iterations
 pywin32  # bad use-def map (binding with definitely-visible unbound)
-scikit-learn  # success, but mypy-primer hangs processing the output, slow (12s)
 setuptools  # vendors packaging, see above
 spack  # slow, success, but mypy-primer hangs processing the output
 spark  # too many iterations
