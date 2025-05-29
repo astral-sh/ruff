@@ -44,7 +44,11 @@ impl<'db> ClassBase<'db> {
             ClassBase::Class(class) => class.name(db),
             ClassBase::Dynamic(DynamicType::Any) => "Any",
             ClassBase::Dynamic(DynamicType::Unknown) => "Unknown",
-            ClassBase::Dynamic(DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec) => "@Todo",
+            ClassBase::Dynamic(
+                DynamicType::Todo(_)
+                | DynamicType::TodoPEP695ParamSpec
+                | DynamicType::TodoTypedDict,
+            ) => "@Todo",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
         }
@@ -209,7 +213,9 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::OrderedDict => {
                     Self::try_from_type(db, KnownClass::OrderedDict.to_class_literal(db))
                 }
-                KnownInstanceType::TypedDict => Self::try_from_type(db, todo_type!("TypedDict")),
+                KnownInstanceType::TypedDict => {
+                    Self::try_from_type(db, Type::Dynamic(DynamicType::TodoTypedDict))
+                }
                 KnownInstanceType::Callable => {
                     Self::try_from_type(db, todo_type!("Support for Callable as a base class"))
                 }

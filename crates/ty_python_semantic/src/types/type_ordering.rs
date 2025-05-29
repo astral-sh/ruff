@@ -245,5 +245,8 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 
         (DynamicType::TodoPEP695ParamSpec, _) => Ordering::Less,
         (_, DynamicType::TodoPEP695ParamSpec) => Ordering::Greater,
+
+        (DynamicType::TodoTypedDict, _) => Ordering::Less,
+        (_, DynamicType::TodoTypedDict) => Ordering::Greater,
     }
 }

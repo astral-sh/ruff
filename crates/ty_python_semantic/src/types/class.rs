@@ -1179,6 +1179,10 @@ impl<'db> ClassLiteral<'db> {
                 ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
                 }
+
+                ClassBase::Dynamic(DynamicType::TodoTypedDict) if name == "__get__" => {
+                    return Symbol::Unbound.into();
+                }
                 ClassBase::Dynamic(_) => {
                     // Note: calling `Type::from(superclass).member()` would be incorrect here.
                     // What we'd really want is a `Type::Any.own_class_member()` method,
@@ -1865,13 +1869,42 @@ impl<'db> ClassLiteral<'db> {
                     symbol: mut declared @ Symbol::Type(declared_ty, declaredness),
                     qualifiers,
                 }) => {
+                    let implicit = Self::implicit_instance_attribute(db, body_scope, name);
+
                     // For the purpose of finding instance attributes, ignore `ClassVar`
                     // declarations:
                     if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
                         declared = Symbol::Unbound;
                     }
 
-                    // The attribute is declared in the class body.
+                    // Invoke the descriptor protocol on the declared type, to check
+                    // if it is a descriptor attribute.
+                    let declared_resolved = Type::try_call_dunder_get_on_attribute(
+                        db,
+                        SymbolAndQualifiers {
+                            symbol: declared.clone(),
+                            qualifiers,
+                        },
+                        Type::instance(db, self.apply_optional_specialization(db, None)),
+                        Type::ClassLiteral(self),
+                    )
+                    .0
+                    .symbol;
+
+                    if declared != declared_resolved {
+                        // If we end up here, it means that the class-level attribute is a
+                        // non-data descriptor (a data descriptor would have taken precedence
+                        // over the instance attribute). In this method, we look at declared
+                        // types on the class body because they might indicate the declared
+                        // type of implicit instance attributes. However, if the class-level
+                        // attribute is a non-data descriptor, it can not possibly be the
+                        // correct type of the implicit instance attribute. If there are any
+                        // attribute assignments in methods of this class, they would overwrite
+                        // the non-data descriptor. If they do so in a non-compatible way, we
+                        // should emit an error elsewhere. Here, we simply return `Unbound`,
+                        // to signal that there is no instance attribute of this name.
+                        return Symbol::Unbound.into();
+                    }
 
                     let bindings = use_def.public_bindings(symbol_id);
                     let inferred = symbol_from_bindings(db, bindings);
@@ -1880,10 +1913,7 @@ impl<'db> ClassLiteral<'db> {
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
-                        if let Some(implicit_ty) =
-                            Self::implicit_instance_attribute(db, body_scope, name)
-                                .ignore_possibly_unbound()
-                        {
+                        if let Some(implicit_ty) = implicit.ignore_possibly_unbound() {
                             if declaredness == Boundness::Bound {
                                 // If a symbol is definitely declared, and we see
                                 // attribute assignments in methods of the class,
@@ -1915,10 +1945,7 @@ impl<'db> ClassLiteral<'db> {
                         if declaredness == Boundness::Bound {
                             declared.with_qualifiers(qualifiers)
                         } else {
-                            if let Some(implicit_ty) =
-                                Self::implicit_instance_attribute(db, body_scope, name)
-                                    .ignore_possibly_unbound()
-                            {
+                            if let Some(implicit_ty) = implicit.ignore_possibly_unbound() {
                                 Symbol::Type(
                                     UnionType::from_elements(db, [declared_ty, implicit_ty]),
                                     declaredness,

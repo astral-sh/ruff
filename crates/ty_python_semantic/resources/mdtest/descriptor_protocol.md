@@ -193,6 +193,51 @@ reveal_type(C2().attr)  # revealed: Unknown | Literal["non-data", "normal"]
 C2().attr = 1
 ```
 
+This situation changes if the class attribute is declared. Here, we should error if we see an
+incompatible attribute assignment, but otherwise just follow the declared type:
+
+```py
+class C3:
+    attr: NonDataDescriptor = NonDataDescriptor()
+
+    def f(self):
+        # TODO: we should ideally emit an error here. We are overwriting the
+        # non-data descriptor with an integer, which is not compatible with
+        # the `__get__` return type of `NonDataDescriptor` when called on an
+        # instance.
+        self.attr = 1
+
+reveal_type(C3().attr)  # revealed: Literal["non-data"]
+```
+
+The scenario above is similar to a use case where a method on a class is dynamically replaced.
+
+```py
+class C4:
+    def f(self) -> None:
+        print("original f")
+
+    def replacement(self) -> None:
+        print("a replacement")
+
+    def switch(self):
+        # Similar to the `C3` example, we are overwriting a non-data descriptor (the
+        # function `C4.f`) with something (a bound method) that is not compatible with
+        # the return type of `__get__` of `C4.f` (a different bound method). Strictly
+        # speaking, we should also emit an error in this case.
+        self.f = self.replacement
+
+reveal_type(C4.f)  # revealed: def f(self) -> None
+
+c4 = C4()
+
+reveal_type(c4.f)  # revealed: bound method C4.f() -> None
+
+# As a regression test for https://github.com/astral-sh/ty/issues/350, make sure that no
+# error is emitted when calling `c4.f()`:
+c4.f()
+```
+
 ### Descriptors only work when used as class variables
 
 Descriptors only work when used as class variables. When put in instances, they have no effect.

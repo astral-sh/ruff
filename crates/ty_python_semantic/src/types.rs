@@ -5703,6 +5703,7 @@ pub enum DynamicType {
     /// A special Todo-variant for PEP-695 `ParamSpec` types. A temporary variant to detect and special-
     /// case the handling of these types in `Callable` annotations.
     TodoPEP695ParamSpec,
+    TodoTypedDict,
 }
 
 impl DynamicType {
@@ -5723,6 +5724,13 @@ impl std::fmt::Display for DynamicType {
             DynamicType::TodoPEP695ParamSpec => {
                 if cfg!(debug_assertions) {
                     f.write_str("@Todo(ParamSpec)")
+                } else {
+                    f.write_str("@Todo")
+                }
+            }
+            DynamicType::TodoTypedDict => {
+                if cfg!(debug_assertions) {
+                    f.write_str("@Todo(TypedDict)")
                 } else {
                     f.write_str("@Todo")
                 }
