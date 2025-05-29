@@ -287,7 +287,7 @@ the return statement), then we show a diagnostic hint that the return annotation
 `-> None`.
 
 ```py
-# error: [invalid-return-type] "Function always implicitly return `None`, which is not assignable to return type `int`"
+# error: [invalid-return-type]
 def f() -> int:
     print("hello")
 ```
