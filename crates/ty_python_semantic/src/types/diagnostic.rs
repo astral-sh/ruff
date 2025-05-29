@@ -1694,10 +1694,12 @@ pub(super) fn report_implicit_return_type(
     // If no return statement is defined in the function, then the function always return `None`
     let mut diagnostic = if no_return {
         let mut diag = builder.into_diagnostic(format_args!(
-            "Function always implicitly return `None`, which is not assignable to return type `{}`",
+            "Function always implicitly returns `None`, which is not assignable to return type `{}`",
             expected_ty.display(db),
         ));
-        diag.info("Consider changing your return annotation to `-> None`");
+        diag.info(
+            "Consider changing the return annotation to `-> None` or adding a `return` statement",
+        );
         diag
     } else {
         builder.into_diagnostic(format_args!(
