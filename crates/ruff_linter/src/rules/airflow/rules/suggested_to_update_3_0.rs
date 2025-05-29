@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
+use crate::rules::airflow::helpers::{Replacement, is_airflow_builtin_or_provider};
 use crate::rules::airflow::helpers::{
-    Replacement, is_airflow_builtin_or_provider, is_guarded_by_try_except,
+    generate_import_edit, generate_remove_and_runtime_import_edit, is_guarded_by_try_except,
 };
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -301,22 +301,16 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
     if is_guarded_by_try_except(expr, module, name, checker.semantic()) {
         return;
     }
-
-    checker
-        .report_diagnostic(
-            Airflow3SuggestedUpdate {
-                deprecated: qualified_name.to_string(),
-                replacement: replacement.clone(),
-            },
-            range,
-        )
-        .try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(module, name),
-                expr.start(),
-                checker.semantic(),
-            )?;
-            let replacement_edit = Edit::range_replacement(binding, range);
-            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
-        });
+    let mut diagnostic = checker.report_diagnostic(
+        Airflow3SuggestedUpdate {
+            deprecated: qualified_name.to_string(),
+            replacement: replacement.clone(),
+        },
+        range,
+    );
+    if let Some(fix) = generate_import_edit(expr, checker, module, name, range)
+        .or_else(|| generate_remove_and_runtime_import_edit(expr, checker, module, name))
+    {
+        diagnostic.set_fix(fix);
+    }
 }
