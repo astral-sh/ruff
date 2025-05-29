@@ -81,7 +81,8 @@ impl Token {
         }
     }
 
-    /// Returns `true` if this is any kind of string token.
+    /// Returns `true` if this is any kind of string token - including
+    /// tokens in t-strings (which do not have type `str`).
     const fn is_any_string(self) -> bool {
         matches!(
             self.kind,

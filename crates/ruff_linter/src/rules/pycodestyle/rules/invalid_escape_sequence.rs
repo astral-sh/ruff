@@ -1,7 +1,9 @@
 use memchr::memchr_iter;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{AnyStringFlags, FTStringElement, StringLike, StringLikePart};
+use ruff_python_ast::{
+    AnyStringFlags, FTStringElement, FTStringElements, StringLike, StringLikePart,
+};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -70,72 +72,16 @@ pub(crate) fn invalid_escape_sequence(checker: &Checker, string_like: StringLike
             StringLikePart::String(_) | StringLikePart::Bytes(_) => {
                 analyze_escape_chars(locator, part.range(), part.flags())
             }
-            StringLikePart::FString(f_string) => {
-                let flags = AnyStringFlags::from(f_string.flags);
-                let mut escape_chars_state = EscapeCharsState::default();
-                // Whether we suggest converting to a raw string or
-                // adding backslashes depends on the presence of valid
-                // escape characters in the entire f-string. Therefore,
-                // we must analyze escape characters in each f-string
-                // element before pushing a diagnostic and fix.
-                for element in &f_string.elements {
-                    match element {
-                        FTStringElement::Literal(literal) => {
-                            escape_chars_state.update(analyze_escape_chars(
-                                locator,
-                                literal.range(),
-                                flags,
-                            ));
-                        }
-                        FTStringElement::Expression(expression) => {
-                            let Some(format_spec) = expression.format_spec.as_ref() else {
-                                continue;
-                            };
-                            for literal in format_spec.elements.literals() {
-                                escape_chars_state.update(analyze_escape_chars(
-                                    locator,
-                                    literal.range(),
-                                    flags,
-                                ));
-                            }
-                        }
-                    }
-                }
-                escape_chars_state
-            }
-            StringLikePart::TString(t_string) => {
-                let flags = AnyStringFlags::from(t_string.flags);
-                let mut escape_chars_state = EscapeCharsState::default();
-                // Whether we suggest converting to a raw string or
-                // adding backslashes depends on the presence of valid
-                // escape characters in the entire t-string. Therefore,
-                // we must analyze escape characters in each t-string
-                // element before pushing a diagnostic and fix.
-                for element in &t_string.elements {
-                    match element {
-                        FTStringElement::Literal(literal) => {
-                            escape_chars_state.update(analyze_escape_chars(
-                                locator,
-                                literal.range(),
-                                flags,
-                            ));
-                        }
-                        FTStringElement::Expression(interpolation) => {
-                            let Some(format_spec) = interpolation.format_spec.as_ref() else {
-                                continue;
-                            };
-                            for literal in format_spec.elements.literals() {
-                                escape_chars_state.update(analyze_escape_chars(
-                                    locator,
-                                    literal.range(),
-                                    flags,
-                                ));
-                            }
-                        }
-                    }
-                }
-                escape_chars_state
-            }
+            StringLikePart::FString(f_string) => analyze_escape_chars_in_interpolated_string(
+                AnyStringFlags::from(f_string.flags),
+                &f_string.elements,
+                locator,
+            ),
+            StringLikePart::TString(t_string) => analyze_escape_chars_in_interpolated_string(
+                AnyStringFlags::from(t_string.flags),
+                &t_string.elements,
+                locator,
+            ),
         };
         check(checker, locator, part.start(), part.flags(), state);
     }
@@ -261,6 +207,39 @@ fn analyze_escape_chars(
         contains_valid_escape_sequence,
         invalid_escape_chars,
     }
+}
+
+fn analyze_escape_chars_in_interpolated_string(
+    flags: AnyStringFlags,
+    elements: &FTStringElements,
+    locator: &Locator,
+) -> EscapeCharsState {
+    let mut escape_chars_state = EscapeCharsState::default();
+    // Whether we suggest converting to a raw string or
+    // adding backslashes depends on the presence of valid
+    // escape characters in the entire t-string. Therefore,
+    // we must analyze escape characters in each t-string
+    // element before pushing a diagnostic and fix.
+    for element in elements {
+        match element {
+            FTStringElement::Literal(literal) => {
+                escape_chars_state.update(analyze_escape_chars(locator, literal.range(), flags));
+            }
+            FTStringElement::Expression(interpolation) => {
+                let Some(format_spec) = interpolation.format_spec.as_ref() else {
+                    continue;
+                };
+                for literal in format_spec.elements.literals() {
+                    escape_chars_state.update(analyze_escape_chars(
+                        locator,
+                        literal.range(),
+                        flags,
+                    ));
+                }
+            }
+        }
+    }
+    escape_chars_state
 }
 
 /// Pushes a diagnostic and fix depending on escape characters seen so far.

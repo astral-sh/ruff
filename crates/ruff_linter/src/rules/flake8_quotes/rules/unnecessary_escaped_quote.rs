@@ -62,8 +62,16 @@ pub(crate) fn unnecessary_escaped_quote(checker: &Checker, string_like: StringLi
                 bytes_literal.range(),
                 AnyStringFlags::from(bytes_literal.flags),
             ),
-            ast::StringLikePart::FString(f_string) => check_f_string(checker, f_string),
-            ast::StringLikePart::TString(t_string) => check_t_string(checker, t_string),
+            ast::StringLikePart::FString(ast::FString {
+                elements,
+                range,
+                flags,
+            }) => check_ft_string(checker, AnyStringFlags::from(*flags), *range, elements),
+            ast::StringLikePart::TString(ast::TString {
+                elements,
+                range,
+                flags,
+            }) => check_ft_string(checker, AnyStringFlags::from(*flags), *range, elements),
         }
     }
 }
@@ -95,26 +103,6 @@ fn check_string_or_bytes(checker: &Checker, range: TextRange, flags: AnyStringFl
             .to_string(),
         range,
     )));
-}
-
-/// Checks for unnecessary escaped quotes in an f-string.
-fn check_f_string(checker: &Checker, f_string: &ast::FString) {
-    let ast::FString {
-        flags,
-        range,
-        elements,
-    } = f_string;
-    check_ft_string(checker, AnyStringFlags::from(*flags), *range, elements);
-}
-
-/// Checks for unnecessary escaped quotes in a t-string.
-fn check_t_string(checker: &Checker, t_string: &ast::TString) {
-    let ast::TString {
-        flags,
-        range,
-        elements,
-    } = t_string;
-    check_ft_string(checker, AnyStringFlags::from(*flags), *range, elements);
 }
 
 /// Checks for unnecessary escaped quotes in an f-string or t-string.

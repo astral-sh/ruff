@@ -1465,7 +1465,7 @@ impl<'src> Parser<'src> {
         // f"test {a \
         //     } more"                        # line continuation
 
-        // test_ok pep701_t_string_py314
+        // test_ok pep750_t_string_py314
         // # parse_options: {"target-version": "3.14"}
         // t'Magic wand: { bag['wand'] }'     # nested quotes
         // t"{'\n'.join(a)}"                  # escape sequence
