@@ -54,8 +54,8 @@ pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
 use instance::Protocol;
-pub(crate) use instance::{NominalInstanceType, ProtocolInstanceType};
-pub(crate) use special_form::SpecialFormType;
+pub use instance::{NominalInstanceType, ProtocolInstanceType};
+pub use special_form::SpecialFormType;
 
 mod builder;
 mod call;
@@ -511,8 +511,12 @@ pub enum Type<'db> {
     /// The set of Python objects that conform to the interface described by a given protocol.
     /// Construct this variant using the `Type::instance` constructor function.
     ProtocolInstance(ProtocolInstanceType<'db>),
-    /// A single Python object that requires special treatment in the type system
+    /// A single Python object that requires special treatment in the type system,
+    /// and which exists at a location that can be known prior to any analysis by ty.
     SpecialForm(SpecialFormType),
+    /// Singleton types that are heavily special-cased by ty, and which are usually
+    /// created as a result of some runtime operation (e.g. a type-alias statement,
+    /// a typevar definition, or `Generic[T]` in a class's bases list).
     KnownInstance(KnownInstanceType<'db>),
     /// An instance of `builtins.property`
     PropertyInstance(PropertyInstanceType<'db>),
@@ -5717,15 +5721,17 @@ impl<'db> TypeMapping<'_, 'db> {
     }
 }
 
-/// Despite its name, this is quite a different type from `NominalInstanceType`.
-/// For the vast majority of instance-types in Python, we cannot say how many possible
-/// inhabitants there are or could be of that type at runtime. Each variant of the
-/// [`KnownInstanceType`] enum, however, represents a specific runtime symbol
-/// that requires heavy special-casing in the type system. Thus any one `KnownInstance`
-/// variant can only be inhabited by one specific object at runtime.
+/// Singleton types that are heavily special-cased by ty. Despite its name,
+/// quite a different type to [`NominalInstanceType`].
 ///
-/// Conceptually this type is quite similar to `SpecialFormType` and has many similar
-/// methods. Unlike that enum, however, this enum's variants are able to wrap associated data.
+/// In many ways, this enum behaves similarly to [`SpecialFormType`].
+/// Unlike instances of that variant, however, `Type::KnownInstance`s do not exist
+/// at a location that can be known prior to any analysis by ty, and each variant
+/// of `KnownInstanceType` can have multiple instances (as, unlike `SpecialFormType`,
+/// `KnownInstanceType` variants can hold associated data). Instances of this type
+/// are generally created by operations at runtime in some way, such as a type alias
+/// statement, a typevar definition, or an instance of `Generic[T]` in a class's
+/// bases list.
 ///
 /// # Ordering
 ///
@@ -5736,12 +5742,12 @@ impl<'db> TypeMapping<'_, 'db> {
 pub enum KnownInstanceType<'db> {
     /// The type of `Protocol[T]`, `Protocol[U, S]`, etc -- usually only found in a class's bases list.
     ///
-    /// Note that unsubscripted `Protocol` is represented by [`special_form::SpecialFormType::Protocol`], not this type.
+    /// Note that unsubscripted `Protocol` is represented by [`SpecialFormType::Protocol`], not this type.
     SubscriptedProtocol(GenericContext<'db>),
 
     /// The type of `Generic[T]`, `Generic[U, S]`, etc -- usually only found in a class's bases list.
     ///
-    /// Note that unsubscripted `Generic` is represented by [`special_form::SpecialFormType::Generic`], not this type.
+    /// Note that unsubscripted `Generic` is represented by [`SpecialFormType::Generic`], not this type.
     SubscriptedGeneric(GenericContext<'db>),
 
     /// A single instance of `typing.TypeVar`

@@ -108,13 +108,13 @@ pub enum SpecialFormType {
     /// The symbol `typing.Protocol` (which can also be found as `typing_extensions.Protocol`)
     ///
     /// Note that instances of subscripted `typing.Protocol` are not represented by this type;
-    /// see also [`KnownInstanceType::SubscriptedProtocol`].
+    /// see also [`super::KnownInstanceType::SubscriptedProtocol`].
     Protocol,
 
     /// The symbol `typing.Generic` (which can also be found as `typing_extensions.Generic`).
     ///
     /// Note that instances of subscripted `typing.Generic` are not represented by this type;
-    /// see also [`KnownInstanceType::SubscriptedGeneric`].
+    /// see also [`super::KnownInstanceType::SubscriptedGeneric`].
     Generic,
 }
 
