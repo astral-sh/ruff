@@ -4,12 +4,12 @@ use regex::RegexSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::SourceFile;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Locator;
+use crate::checkers::ast::DiagnosticsCollector;
 use crate::directives::{TodoComment, TodoDirective, TodoDirectiveKind};
-use crate::{AlwaysFixableViolation, Edit, Fix, OldDiagnostic, Violation};
+use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 
 /// ## What it does
 /// Checks that a TODO comment is labelled with "TODO".
@@ -249,11 +249,10 @@ static ISSUE_LINK_TODO_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
 });
 
 pub(crate) fn todos(
-    diagnostics: &mut Vec<OldDiagnostic>,
+    collector: &DiagnosticsCollector,
     todo_comments: &[TodoComment],
     locator: &Locator,
     comment_ranges: &CommentRanges,
-    source_file: &SourceFile,
 ) {
     for todo_comment in todo_comments {
         let TodoComment {
@@ -269,8 +268,8 @@ pub(crate) fn todos(
             continue;
         }
 
-        directive_errors(diagnostics, directive, source_file);
-        static_errors(diagnostics, content, range, directive, source_file);
+        directive_errors(collector, directive);
+        static_errors(collector, content, range, directive);
 
         let mut has_issue_link = false;
         // VSCode recommended links on same line are ok:
@@ -309,60 +308,47 @@ pub(crate) fn todos(
 
         if !has_issue_link {
             // TD003
-            diagnostics.push(OldDiagnostic::new(
-                MissingTodoLink,
-                directive.range,
-                source_file,
-            ));
+            collector.report_diagnostic(MissingTodoLink, directive.range);
         }
     }
 }
 
 /// Check that the directive itself is valid. This function modifies `diagnostics` in-place.
-fn directive_errors(
-    diagnostics: &mut Vec<OldDiagnostic>,
-    directive: &TodoDirective,
-    source_file: &SourceFile,
-) {
+fn directive_errors(collector: &DiagnosticsCollector, directive: &TodoDirective) {
     if directive.content == "TODO" {
         return;
     }
 
     if directive.content.to_uppercase() == "TODO" {
         // TD006
-        let mut diagnostic = OldDiagnostic::new(
+        let mut diagnostic = collector.report_diagnostic(
             InvalidTodoCapitalization {
                 tag: directive.content.to_string(),
             },
             directive.range,
-            source_file,
         );
 
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "TODO".to_string(),
             directive.range,
         )));
-
-        diagnostics.push(diagnostic);
     } else {
         // TD001
-        diagnostics.push(OldDiagnostic::new(
+        collector.report_diagnostic(
             InvalidTodoTag {
                 tag: directive.content.to_string(),
             },
             directive.range,
-            source_file,
-        ));
+        );
     }
 }
 
 /// Checks for "static" errors in the comment: missing colon, missing author, etc.
-fn static_errors(
-    diagnostics: &mut Vec<OldDiagnostic>,
+pub(crate) fn static_errors(
+    collector: &DiagnosticsCollector,
     comment: &str,
     comment_range: TextRange,
     directive: &TodoDirective,
-    source_file: &SourceFile,
 ) {
     let post_directive = &comment[usize::from(directive.range.end() - comment_range.start())..];
     let trimmed = post_directive.trim_start();
@@ -380,21 +366,13 @@ fn static_errors(
                 TextSize::try_from(end_index).unwrap()
             } else {
                 // TD002
-                diagnostics.push(OldDiagnostic::new(
-                    MissingTodoAuthor,
-                    directive.range,
-                    source_file,
-                ));
+                collector.report_diagnostic(MissingTodoAuthor, directive.range);
 
                 TextSize::new(0)
             }
         } else {
             // TD002
-            diagnostics.push(OldDiagnostic::new(
-                MissingTodoAuthor,
-                directive.range,
-                source_file,
-            ));
+            collector.report_diagnostic(MissingTodoAuthor, directive.range);
 
             TextSize::new(0)
         };
@@ -403,34 +381,18 @@ fn static_errors(
     if let Some(after_colon) = after_author.strip_prefix(':') {
         if after_colon.is_empty() {
             // TD005
-            diagnostics.push(OldDiagnostic::new(
-                MissingTodoDescription,
-                directive.range,
-                source_file,
-            ));
+            collector.report_diagnostic(MissingTodoDescription, directive.range);
         } else if !after_colon.starts_with(char::is_whitespace) {
             // TD007
-            diagnostics.push(OldDiagnostic::new(
-                MissingSpaceAfterTodoColon,
-                directive.range,
-                source_file,
-            ));
+            collector.report_diagnostic(MissingSpaceAfterTodoColon, directive.range);
         }
     } else {
         // TD004
-        diagnostics.push(OldDiagnostic::new(
-            MissingTodoColon,
-            directive.range,
-            source_file,
-        ));
+        collector.report_diagnostic(MissingTodoColon, directive.range);
 
         if after_author.is_empty() {
             // TD005
-            diagnostics.push(OldDiagnostic::new(
-                MissingTodoDescription,
-                directive.range,
-                source_file,
-            ));
+            collector.report_diagnostic(MissingTodoDescription, directive.range);
         }
     }
 }

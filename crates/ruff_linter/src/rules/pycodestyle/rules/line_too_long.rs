@@ -1,10 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{Line, SourceFile};
+use ruff_source_file::Line;
 
+use crate::Violation;
+use crate::checkers::ast::DiagnosticsCollector;
 use crate::rules::pycodestyle::overlong::Overlong;
 use crate::settings::LinterSettings;
-use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for lines that exceed the specified maximum character length.
@@ -84,11 +85,11 @@ pub(crate) fn line_too_long(
     line: &Line,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
-    source_file: &SourceFile,
-) -> Option<OldDiagnostic> {
+    collector: &DiagnosticsCollector,
+) {
     let limit = settings.pycodestyle.max_line_length;
 
-    Overlong::try_from_line(
+    if let Some(overlong) = Overlong::try_from_line(
         line,
         comment_ranges,
         limit,
@@ -98,12 +99,10 @@ pub(crate) fn line_too_long(
             &[]
         },
         settings.tab_size,
-    )
-    .map(|overlong| {
-        OldDiagnostic::new(
+    ) {
+        collector.report_diagnostic(
             LineTooLong(overlong.width(), limit.value() as usize),
             overlong.range(),
-            source_file,
-        )
-    })
+        );
+    }
 }

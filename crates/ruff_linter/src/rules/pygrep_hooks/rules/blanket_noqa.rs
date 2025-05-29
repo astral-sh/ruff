@@ -1,11 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::Cursor;
-use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
+use crate::checkers::ast::DiagnosticsCollector;
 use crate::noqa::{self, Directive, FileNoqaDirectives, NoqaDirectives};
-use crate::{Edit, Fix, FixAvailability, OldDiagnostic, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Check for `noqa` annotations that suppress all diagnostics, as opposed to
@@ -75,22 +75,20 @@ impl Violation for BlanketNOQA {
 
 /// PGH004
 pub(crate) fn blanket_noqa(
-    diagnostics: &mut Vec<OldDiagnostic>,
+    collector: &DiagnosticsCollector,
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
     file_noqa_directives: &FileNoqaDirectives,
-    source_file: &SourceFile,
 ) {
     for line in file_noqa_directives.lines() {
         if let Directive::All(_) = line.parsed_file_exemption {
-            diagnostics.push(OldDiagnostic::new(
+            collector.report_diagnostic(
                 BlanketNOQA {
                     missing_colon: false,
                     file_exemption: true,
                 },
                 line.range(),
-                source_file,
-            ));
+            );
         }
     }
 
@@ -108,26 +106,23 @@ pub(crate) fn blanket_noqa(
                 // Ex) `# noqa F401`
                 let start = all.end();
                 let end = start + cursor.token_len();
-                let mut diagnostic = OldDiagnostic::new(
+                let mut diagnostic = collector.report_diagnostic(
                     BlanketNOQA {
                         missing_colon: true,
                         file_exemption: false,
                     },
                     TextRange::new(all.start(), end),
-                    source_file,
                 );
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(':'.to_string(), start)));
-                diagnostics.push(diagnostic);
             } else {
                 // Otherwise, it looks like an intentional blanket `noqa` annotation.
-                diagnostics.push(OldDiagnostic::new(
+                collector.report_diagnostic(
                     BlanketNOQA {
                         missing_colon: false,
                         file_exemption: false,
                     },
                     all.range(),
-                    source_file,
-                ));
+                );
             }
         }
     }

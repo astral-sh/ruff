@@ -2,10 +2,9 @@ use std::path::Path;
 
 use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::SourceFile;
 
 use crate::Locator;
-use crate::OldDiagnostic;
+use crate::checkers::ast::DiagnosticsCollector;
 use crate::package::PackageRoot;
 use crate::preview::is_allow_nested_roots_enabled;
 use crate::registry::Rule;
@@ -21,14 +20,12 @@ pub(crate) fn check_file_path(
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
     target_version: PythonVersion,
-    source_file: &SourceFile,
-) -> Vec<OldDiagnostic> {
-    let mut diagnostics: Vec<OldDiagnostic> = vec![];
-
+    collector: &DiagnosticsCollector,
+) {
     // flake8-no-pep420
     if settings.rules.enabled(Rule::ImplicitNamespacePackage) {
         let allow_nested_roots = is_allow_nested_roots_enabled(settings);
-        if let Some(diagnostic) = implicit_namespace_package(
+        implicit_namespace_package(
             path,
             package,
             locator,
@@ -36,32 +33,17 @@ pub(crate) fn check_file_path(
             &settings.project_root,
             &settings.src,
             allow_nested_roots,
-            source_file,
-        ) {
-            diagnostics.push(diagnostic);
-        }
+            collector,
+        );
     }
 
     // pep8-naming
     if settings.rules.enabled(Rule::InvalidModuleName) {
-        if let Some(diagnostic) = invalid_module_name(
-            path,
-            package,
-            &settings.pep8_naming.ignore_names,
-            source_file,
-        ) {
-            diagnostics.push(diagnostic);
-        }
+        invalid_module_name(path, package, &settings.pep8_naming.ignore_names, collector);
     }
 
     // flake8-builtins
     if settings.rules.enabled(Rule::StdlibModuleShadowing) {
-        if let Some(diagnostic) =
-            stdlib_module_shadowing(path, settings, target_version, source_file)
-        {
-            diagnostics.push(diagnostic);
-        }
+        stdlib_module_shadowing(path, settings, target_version, collector);
     }
-
-    diagnostics
 }

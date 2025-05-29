@@ -1,12 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
+use crate::checkers::ast::DiagnosticsCollector;
 use crate::{AlwaysFixableViolation, Violation};
-use crate::{Edit, Fix, OldDiagnostic};
+use crate::{Edit, Fix};
 
 /// Simplified token type.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -239,11 +239,10 @@ impl AlwaysFixableViolation for ProhibitedTrailingComma {
 
 /// COM812, COM818, COM819
 pub(crate) fn trailing_commas(
-    diagnostics: &mut Vec<OldDiagnostic>,
+    collector: &DiagnosticsCollector,
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
-    source_file: &SourceFile,
 ) {
     let mut fstrings = 0u32;
     let simple_tokens = tokens.iter().filter_map(|token| {
@@ -293,10 +292,7 @@ pub(crate) fn trailing_commas(
         // Update the comma context stack.
         let context = update_context(token, prev, prev_prev, &mut stack);
 
-        if let Some(diagnostic) = check_token(token, prev, prev_prev, context, locator, source_file)
-        {
-            diagnostics.push(diagnostic);
-        }
+        check_token(token, prev, prev_prev, context, locator, collector);
 
         // Pop the current context if the current token ended it.
         // The top context is never popped (if unbalanced closing brackets).
@@ -322,8 +318,8 @@ fn check_token(
     prev_prev: SimpleToken,
     context: Context,
     locator: &Locator,
-    source_file: &SourceFile,
-) -> Option<OldDiagnostic> {
+    collector: &DiagnosticsCollector,
+) {
     // Is it allowed to have a trailing comma before this token?
     let comma_allowed = token.ty == TokenType::ClosingBracket
         && match context.ty {
@@ -356,24 +352,22 @@ fn check_token(
     };
 
     if comma_prohibited {
-        let mut diagnostic = OldDiagnostic::new(ProhibitedTrailingComma, prev.range(), source_file);
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(diagnostic.range())));
-        return Some(diagnostic);
+        let mut diagnostic = collector.report_diagnostic(ProhibitedTrailingComma, prev.range());
+        let range = diagnostic.range();
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
+        return;
     }
 
     // Is prev a prohibited trailing comma on a bare tuple?
     // Approximation: any comma followed by a statement-ending newline.
     let bare_comma_prohibited = prev.ty == TokenType::Comma && token.ty == TokenType::Newline;
     if bare_comma_prohibited {
-        return Some(OldDiagnostic::new(
-            TrailingCommaOnBareTuple,
-            prev.range(),
-            source_file,
-        ));
+        collector.report_diagnostic(TrailingCommaOnBareTuple, prev.range());
+        return;
     }
 
     if !comma_allowed {
-        return None;
+        return;
     }
 
     // Comma is required if:
@@ -390,11 +384,8 @@ fn check_token(
                 | TokenType::OpeningCurlyBracket
         );
     if comma_required {
-        let mut diagnostic = OldDiagnostic::new(
-            MissingTrailingComma,
-            TextRange::empty(prev_prev.end()),
-            source_file,
-        );
+        let mut diagnostic =
+            collector.report_diagnostic(MissingTrailingComma, TextRange::empty(prev_prev.end()));
         // Create a replacement that includes the final bracket (or other token),
         // rather than just inserting a comma at the end. This prevents the UP034 fix
         // removing any brackets in the same linter pass - doing both at the same time could
@@ -404,9 +395,6 @@ fn check_token(
             format!("{contents},"),
             prev_prev.range(),
         )));
-        Some(diagnostic)
-    } else {
-        None
     }
 }
 

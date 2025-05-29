@@ -1,10 +1,10 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::is_python_whitespace;
-use ruff_source_file::SourceFile;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
-use crate::{AlwaysFixableViolation, Edit, Fix, OldDiagnostic};
+use crate::checkers::ast::DiagnosticsCollector;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for whitespace before a shebang directive.
@@ -46,13 +46,13 @@ impl AlwaysFixableViolation for ShebangLeadingWhitespace {
 
 /// EXE004
 pub(crate) fn shebang_leading_whitespace(
+    collector: &DiagnosticsCollector,
     range: TextRange,
     locator: &Locator,
-    source_file: &SourceFile,
-) -> Option<OldDiagnostic> {
+) {
     // If the shebang is at the beginning of the file, abort.
     if range.start() == TextSize::from(0) {
-        return None;
+        return;
     }
 
     // If the entire prefix _isn't_ whitespace, abort (this is handled by EXE005).
@@ -61,11 +61,11 @@ pub(crate) fn shebang_leading_whitespace(
         .chars()
         .all(|c| is_python_whitespace(c) || matches!(c, '\r' | '\n'))
     {
-        return None;
+        return;
     }
 
     let prefix = TextRange::up_to(range.start());
-    let mut diagnostic = OldDiagnostic::new(ShebangLeadingWhitespace, prefix, source_file);
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(prefix)));
-    Some(diagnostic)
+    collector
+        .report_diagnostic(ShebangLeadingWhitespace, prefix)
+        .set_fix(Fix::safe_edit(Edit::range_deletion(prefix)));
 }

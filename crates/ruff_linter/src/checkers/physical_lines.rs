@@ -2,12 +2,10 @@
 
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_source_file::SourceFile;
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::TextSize;
 
 use crate::Locator;
-use crate::OldDiagnostic;
 use crate::registry::Rule;
 use crate::rules::flake8_copyright::rules::missing_copyright_notice;
 use crate::rules::pycodestyle::rules::{
@@ -18,16 +16,16 @@ use crate::rules::pylint;
 use crate::rules::ruff::rules::indented_form_feed;
 use crate::settings::LinterSettings;
 
+use super::ast::DiagnosticsCollector;
+
 pub(crate) fn check_physical_lines(
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
     doc_lines: &[TextSize],
     settings: &LinterSettings,
-    source_file: &SourceFile,
-) -> Vec<OldDiagnostic> {
-    let mut diagnostics: Vec<OldDiagnostic> = vec![];
-
+    collector: &DiagnosticsCollector,
+) {
     let enforce_doc_line_too_long = settings.rules.enabled(Rule::DocLineTooLong);
     let enforce_line_too_long = settings.rules.enabled(Rule::LineTooLong);
     let enforce_no_newline_at_end_of_file = settings.rules.enabled(Rule::MissingNewlineAtEndOfFile);
@@ -47,58 +45,38 @@ pub(crate) fn check_physical_lines(
             .is_some()
         {
             if enforce_doc_line_too_long {
-                if let Some(diagnostic) =
-                    doc_line_too_long(&line, comment_ranges, settings, source_file)
-                {
-                    diagnostics.push(diagnostic);
-                }
+                doc_line_too_long(&line, comment_ranges, settings, collector);
             }
         }
 
         if enforce_mixed_spaces_and_tabs {
-            if let Some(diagnostic) = mixed_spaces_and_tabs(&line, source_file) {
-                diagnostics.push(diagnostic);
-            }
+            mixed_spaces_and_tabs(&line, collector);
         }
 
         if enforce_line_too_long {
-            if let Some(diagnostic) = line_too_long(&line, comment_ranges, settings, source_file) {
-                diagnostics.push(diagnostic);
-            }
+            line_too_long(&line, comment_ranges, settings, collector);
         }
 
         if enforce_bidirectional_unicode {
-            diagnostics.extend(pylint::rules::bidirectional_unicode(&line, source_file));
+            pylint::rules::bidirectional_unicode(&line, collector);
         }
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
-            if let Some(diagnostic) =
-                trailing_whitespace(&line, locator, indexer, settings, source_file)
-            {
-                diagnostics.push(diagnostic);
-            }
+            trailing_whitespace(&line, locator, indexer, settings, collector);
         }
 
         if settings.rules.enabled(Rule::IndentedFormFeed) {
-            if let Some(diagnostic) = indented_form_feed(&line, source_file) {
-                diagnostics.push(diagnostic);
-            }
+            indented_form_feed(&line, collector);
         }
     }
 
     if enforce_no_newline_at_end_of_file {
-        if let Some(diagnostic) = no_newline_at_end_of_file(locator, stylist, source_file) {
-            diagnostics.push(diagnostic);
-        }
+        no_newline_at_end_of_file(locator, stylist, collector);
     }
 
     if enforce_copyright_notice {
-        if let Some(diagnostic) = missing_copyright_notice(locator, settings, source_file) {
-            diagnostics.push(diagnostic);
-        }
+        missing_copyright_notice(locator, settings, collector);
     }
-
-    diagnostics
 }
 
 #[cfg(test)]
@@ -109,6 +87,7 @@ mod tests {
     use ruff_source_file::SourceFileBuilder;
 
     use crate::Locator;
+    use crate::checkers::ast::DiagnosticsCollector;
     use crate::line_width::LineLength;
     use crate::registry::Rule;
     use crate::rules::pycodestyle;
@@ -125,6 +104,8 @@ mod tests {
         let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
 
         let check_with_max_line_length = |line_length: LineLength| {
+            let source_file = SourceFileBuilder::new("<filename>", line).finish();
+            let collector = DiagnosticsCollector::new(&source_file);
             check_physical_lines(
                 &locator,
                 &stylist,
@@ -137,8 +118,9 @@ mod tests {
                     },
                     ..LinterSettings::for_rule(Rule::LineTooLong)
                 },
-                &SourceFileBuilder::new("<filename>", line).finish(),
-            )
+                &collector,
+            );
+            collector.into_diagnostics()
         };
         let line_length = LineLength::try_from(8).unwrap();
         assert_eq!(check_with_max_line_length(line_length), vec![]);

@@ -1,11 +1,11 @@
 use std::path::Path;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_source_file::SourceFile;
 
+use crate::Violation;
+use crate::checkers::ast::DiagnosticsCollector;
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::is_executable;
-use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for executable `.py` files that do not have a shebang.
@@ -45,29 +45,21 @@ impl Violation for ShebangMissingExecutableFile {
 
 /// EXE002
 #[cfg(target_family = "unix")]
-pub(crate) fn shebang_missing_executable_file(
-    filepath: &Path,
-    source_file: &SourceFile,
-) -> Option<OldDiagnostic> {
+pub(crate) fn shebang_missing_executable_file(filepath: &Path, collector: &DiagnosticsCollector) {
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
+
     if is_wsl::is_wsl() {
-        return None;
+        return;
     }
     if let Ok(true) = is_executable(filepath) {
-        return Some(OldDiagnostic::new(
+        collector.report_diagnostic(
             ShebangMissingExecutableFile,
             ruff_text_size::TextRange::default(),
-            source_file,
-        ));
+        );
     }
-    None
 }
 
 #[cfg(not(target_family = "unix"))]
-pub(crate) fn shebang_missing_executable_file(
-    _filepath: &Path,
-    _source_file: &SourceFile,
-) -> Option<OldDiagnostic> {
-    None
+pub(crate) fn shebang_missing_executable_file(_filepath: &Path, _collector: &DiagnosticsCollector) {
 }

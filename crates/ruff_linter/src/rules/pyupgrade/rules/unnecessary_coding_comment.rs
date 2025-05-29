@@ -5,11 +5,12 @@ use regex::Regex;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{LineRanges, SourceFile};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
-use crate::{AlwaysFixableViolation, Edit, Fix, OldDiagnostic};
+use crate::checkers::ast::DiagnosticsCollector;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary UTF-8 encoding declarations.
@@ -66,10 +67,9 @@ struct CodingCommentRange {
 
 /// UP009
 pub(crate) fn unnecessary_coding_comment(
-    diagnostics: &mut Vec<OldDiagnostic>,
+    collector: &DiagnosticsCollector,
     locator: &Locator,
     comment_ranges: &CommentRanges,
-    source_file: &SourceFile,
 ) {
     let mut iter = CodingCommentIterator::new(locator, comment_ranges)
         .skip_while(|comment| matches!(comment, CodingComment::NoEncoding));
@@ -107,9 +107,9 @@ pub(crate) fn unnecessary_coding_comment(
     }
 
     let fix = Fix::safe_edit(Edit::range_deletion(range.line));
-    let diagnostic = OldDiagnostic::new(UTF8EncodingDeclaration, range.comment, source_file);
-
-    diagnostics.push(diagnostic.with_fix(fix));
+    collector
+        .report_diagnostic(UTF8EncodingDeclaration, range.comment)
+        .set_fix(fix);
 }
 
 struct CodingCommentIterator<'a> {

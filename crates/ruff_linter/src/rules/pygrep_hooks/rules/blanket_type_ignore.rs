@@ -6,11 +6,11 @@ use regex::Regex;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::SourceFile;
 use ruff_text_size::TextSize;
 
 use crate::Locator;
-use crate::{OldDiagnostic, Violation};
+use crate::Violation;
+use crate::checkers::ast::DiagnosticsCollector;
 
 /// ## What it does
 /// Check for `type: ignore` annotations that suppress all type warnings, as
@@ -53,10 +53,9 @@ impl Violation for BlanketTypeIgnore {
 
 /// PGH003
 pub(crate) fn blanket_type_ignore(
-    diagnostics: &mut Vec<OldDiagnostic>,
+    collector: &DiagnosticsCollector,
     comment_ranges: &CommentRanges,
     locator: &Locator,
-    source_file: &SourceFile,
 ) {
     for range in comment_ranges {
         let line = locator.slice(range);
@@ -94,11 +93,10 @@ pub(crate) fn blanket_type_ignore(
             // Match the optional `[...]` tag.
             if let Ok(codes) = parse_type_ignore_tag(comment) {
                 if codes.is_empty() {
-                    diagnostics.push(OldDiagnostic::new(
+                    collector.report_diagnostic(
                         BlanketTypeIgnore,
                         range.add_start(TextSize::try_from(start).unwrap()),
-                        source_file,
-                    ));
+                    );
                 }
             }
         }

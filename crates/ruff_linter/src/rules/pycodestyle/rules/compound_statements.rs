@@ -3,12 +3,12 @@ use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenIterWithContext, TokenKind, Tokens};
-use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::Locator;
+use crate::checkers::ast::DiagnosticsCollector;
 use crate::{AlwaysFixableViolation, Violation};
-use crate::{Edit, Fix, OldDiagnostic};
+use crate::{Edit, Fix};
 
 /// ## What it does
 /// Checks for compound statements (multiple statements on the same line).
@@ -99,13 +99,12 @@ impl AlwaysFixableViolation for UselessSemicolon {
 
 /// E701, E702, E703
 pub(crate) fn compound_statements(
-    diagnostics: &mut Vec<OldDiagnostic>,
+    collector: &DiagnosticsCollector,
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
-    source_file: &SourceFile,
 ) {
     // Track the last seen instance of a variety of tokens.
     let mut colon = None;
@@ -169,15 +168,14 @@ pub(crate) fn compound_statements(
                                 !has_non_trivia_tokens_till(token_iter.clone(), cell_range.end())
                             }))
                     {
-                        let mut diagnostic =
-                            OldDiagnostic::new(UselessSemicolon, range, source_file);
-                        diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                            indexer
-                                .preceded_by_continuations(range.start(), locator.contents())
-                                .unwrap_or(range.start()),
-                            range.end(),
-                        )));
-                        diagnostics.push(diagnostic);
+                        collector
+                            .report_diagnostic(UselessSemicolon, range)
+                            .set_fix(Fix::safe_edit(Edit::deletion(
+                                indexer
+                                    .preceded_by_continuations(range.start(), locator.contents())
+                                    .unwrap_or(range.start()),
+                                range.end(),
+                            )));
                     }
                 }
 
@@ -227,11 +225,7 @@ pub(crate) fn compound_statements(
             | TokenKind::NonLogicalNewline => {}
             _ => {
                 if let Some(range) = semi {
-                    diagnostics.push(OldDiagnostic::new(
-                        MultipleStatementsOnOneLineSemicolon,
-                        range,
-                        source_file,
-                    ));
+                    collector.report_diagnostic(MultipleStatementsOnOneLineSemicolon, range);
 
                     // Reset.
                     semi = None;
@@ -239,11 +233,7 @@ pub(crate) fn compound_statements(
                 }
 
                 if let Some(range) = colon {
-                    diagnostics.push(OldDiagnostic::new(
-                        MultipleStatementsOnOneLineColon,
-                        range,
-                        source_file,
-                    ));
+                    collector.report_diagnostic(MultipleStatementsOnOneLineColon, range);
 
                     // Reset.
                     colon = None;

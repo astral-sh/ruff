@@ -4,14 +4,14 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PySourceType;
 use ruff_python_ast::script::ScriptTag;
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::SourceFile;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
+use crate::Violation;
+use crate::checkers::ast::DiagnosticsCollector;
 use crate::comments::shebang::ShebangDirective;
 use crate::fs;
 use crate::package::PackageRoot;
-use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for packages that are missing an `__init__.py` file.
@@ -66,8 +66,8 @@ pub(crate) fn implicit_namespace_package(
     project_root: &Path,
     src: &[PathBuf],
     allow_nested_roots: bool,
-    source_file: &SourceFile,
-) -> Option<OldDiagnostic> {
+    collector: &DiagnosticsCollector,
+) {
     if package.is_none()
         // Ignore non-`.py` files, which don't require an `__init__.py`.
         && PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file)
@@ -86,17 +86,14 @@ pub(crate) fn implicit_namespace_package(
         // Ignore PEP 723 scripts.
         && ScriptTag::parse(locator.contents().as_bytes()).is_none()
     {
-        return Some(OldDiagnostic::new(
+        collector.report_diagnostic(
             ImplicitNamespacePackage {
                 filename: fs::relativize_path(path),
                 parent: None,
             },
             TextRange::default(),
-            source_file,
-        ));
-    }
-
-    if allow_nested_roots {
+        );
+    } else if allow_nested_roots {
         if let Some(PackageRoot::Nested { path: root }) = package.as_ref() {
             if path.ends_with("__init__.py") {
                 // Identify the intermediary package that's missing the `__init__.py` file.
@@ -104,18 +101,15 @@ pub(crate) fn implicit_namespace_package(
                     .ancestors()
                     .find(|parent| !parent.join("__init__.py").exists())
                 {
-                    return Some(OldDiagnostic::new(
+                    collector.report_diagnostic(
                         ImplicitNamespacePackage {
                             filename: fs::relativize_path(path),
                             parent: Some(fs::relativize_path(parent)),
                         },
                         TextRange::default(),
-                        source_file,
-                    ));
+                    );
                 }
             }
         }
     }
-
-    None
 }

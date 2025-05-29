@@ -1,10 +1,10 @@
 use memchr::memchr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_source_file::{Line, SourceFile};
+use ruff_source_file::Line;
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::{OldDiagnostic, Violation};
+use crate::{Violation, checkers::ast::DiagnosticsCollector};
 
 /// ## What it does
 /// Checks for form feed characters preceded by either a space or a tab.
@@ -49,11 +49,13 @@ const SPACE: u8 = b' ';
 const TAB: u8 = b'\t';
 
 /// RUF054
-pub(crate) fn indented_form_feed(line: &Line, source_file: &SourceFile) -> Option<OldDiagnostic> {
-    let index_relative_to_line = memchr(FORM_FEED, line.as_bytes())?;
+pub(crate) fn indented_form_feed(line: &Line, collector: &DiagnosticsCollector) {
+    let Some(index_relative_to_line) = memchr(FORM_FEED, line.as_bytes()) else {
+        return;
+    };
 
     if index_relative_to_line == 0 {
-        return None;
+        return;
     }
 
     if line[..index_relative_to_line]
@@ -61,12 +63,14 @@ pub(crate) fn indented_form_feed(line: &Line, source_file: &SourceFile) -> Optio
         .iter()
         .any(|byte| *byte != SPACE && *byte != TAB)
     {
-        return None;
+        return;
     }
 
-    let relative_index = u32::try_from(index_relative_to_line).ok()?;
+    let Ok(relative_index) = u32::try_from(index_relative_to_line) else {
+        return;
+    };
     let absolute_index = line.start() + TextSize::new(relative_index);
     let range = TextRange::at(absolute_index, 1.into());
 
-    Some(OldDiagnostic::new(IndentedFormFeed, range, source_file))
+    collector.report_diagnostic(IndentedFormFeed, range);
 }

@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_source_file::{Line, SourceFile};
+use ruff_source_file::Line;
 
-use crate::{OldDiagnostic, Violation};
+use crate::{Violation, checkers::ast::DiagnosticsCollector};
 
 const BIDI_UNICODE: [char; 10] = [
     '\u{202A}', //{LEFT-TO-RIGHT EMBEDDING}
@@ -53,14 +53,8 @@ impl Violation for BidirectionalUnicode {
 }
 
 /// PLE2502
-pub(crate) fn bidirectional_unicode(line: &Line, source_file: &SourceFile) -> Vec<OldDiagnostic> {
-    let mut diagnostics = Vec::new();
+pub(crate) fn bidirectional_unicode(line: &Line, collector: &DiagnosticsCollector) {
     if line.contains(BIDI_UNICODE) {
-        diagnostics.push(OldDiagnostic::new(
-            BidirectionalUnicode,
-            line.full_range(),
-            source_file,
-        ));
+        collector.report_diagnostic(BidirectionalUnicode, line.full_range());
     }
-    diagnostics
 }

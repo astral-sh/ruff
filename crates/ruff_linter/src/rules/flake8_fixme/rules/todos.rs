@@ -1,8 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_source_file::SourceFile;
 
+use crate::Violation;
+use crate::checkers::ast::DiagnosticsCollector;
 use crate::directives::{TodoComment, TodoDirectiveKind};
-use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for "TODO" comments.
@@ -115,31 +115,25 @@ impl Violation for LineContainsHack {
     }
 }
 
-pub(crate) fn todos(
-    diagnostics: &mut Vec<OldDiagnostic>,
-    directive_ranges: &[TodoComment],
-    source_file: &SourceFile,
-) {
-    diagnostics.extend(
-        directive_ranges
-            .iter()
-            .map(|TodoComment { directive, .. }| match directive.kind {
-                // FIX001
-                TodoDirectiveKind::Fixme => {
-                    OldDiagnostic::new(LineContainsFixme, directive.range, source_file)
-                }
-                // FIX002
-                TodoDirectiveKind::Hack => {
-                    OldDiagnostic::new(LineContainsHack, directive.range, source_file)
-                }
-                // FIX003
-                TodoDirectiveKind::Todo => {
-                    OldDiagnostic::new(LineContainsTodo, directive.range, source_file)
-                }
-                // FIX004
-                TodoDirectiveKind::Xxx => {
-                    OldDiagnostic::new(LineContainsXxx, directive.range, source_file)
-                }
-            }),
-    );
+pub(crate) fn todos(collector: &DiagnosticsCollector, directive_ranges: &[TodoComment]) {
+    for TodoComment { directive, .. } in directive_ranges {
+        match directive.kind {
+            // FIX001
+            TodoDirectiveKind::Fixme => {
+                collector.report_diagnostic(LineContainsFixme, directive.range);
+            }
+            // FIX002
+            TodoDirectiveKind::Hack => {
+                collector.report_diagnostic(LineContainsHack, directive.range);
+            }
+            // FIX003
+            TodoDirectiveKind::Todo => {
+                collector.report_diagnostic(LineContainsTodo, directive.range);
+            }
+            // FIX004
+            TodoDirectiveKind::Xxx => {
+                collector.report_diagnostic(LineContainsXxx, directive.range);
+            }
+        }
+    }
 }

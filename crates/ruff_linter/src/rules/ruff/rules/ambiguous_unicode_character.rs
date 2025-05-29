@@ -4,17 +4,15 @@ use bitflags::bitflags;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, StringLike};
-use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
-use crate::checkers::ast::Checker;
+use crate::Violation;
+use crate::checkers::ast::{Checker, DiagnosticsCollector};
 use crate::preview::is_unicode_to_unicode_confusables_enabled;
-use crate::registry::AsRule;
 use crate::rules::ruff::rules::Context;
 use crate::rules::ruff::rules::confusables::confusable;
 use crate::settings::LinterSettings;
-use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for ambiguous Unicode characters in strings.
@@ -177,15 +175,14 @@ impl Violation for AmbiguousUnicodeCharacterComment {
 
 /// RUF003
 pub(crate) fn ambiguous_unicode_character_comment(
-    diagnostics: &mut Vec<OldDiagnostic>,
+    collector: &DiagnosticsCollector,
     locator: &Locator,
     range: TextRange,
     settings: &LinterSettings,
-    source_file: &SourceFile,
 ) {
     let text = locator.slice(range);
     for candidate in ambiguous_unicode_character(text, range, settings) {
-        diagnostics.extend(candidate.into_diagnostic(Context::Comment, settings, source_file));
+        candidate.into_diagnostic(Context::Comment, settings, collector);
     }
 }
 
@@ -348,41 +345,37 @@ impl Candidate {
         self,
         context: Context,
         settings: &LinterSettings,
-        source_file: &SourceFile,
-    ) -> Option<OldDiagnostic> {
+        collector: &DiagnosticsCollector,
+    ) {
         if !settings.allowed_confusables.contains(&self.confusable) {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());
-            let diagnostic = match context {
-                Context::String => OldDiagnostic::new(
+            match context {
+                Context::String => collector.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterString {
                         confusable: self.confusable,
                         representant: self.representant,
                     },
                     char_range,
-                    source_file,
+                    settings,
                 ),
-                Context::Docstring => OldDiagnostic::new(
+                Context::Docstring => collector.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterDocstring {
                         confusable: self.confusable,
                         representant: self.representant,
                     },
                     char_range,
-                    source_file,
+                    settings,
                 ),
-                Context::Comment => OldDiagnostic::new(
+                Context::Comment => collector.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterComment {
                         confusable: self.confusable,
                         representant: self.representant,
                     },
                     char_range,
-                    source_file,
+                    settings,
                 ),
             };
-            if settings.rules.enabled(diagnostic.rule()) {
-                return Some(diagnostic);
-            }
         }
-        None
     }
 
     fn report_diagnostic(self, checker: &Checker, context: Context) {

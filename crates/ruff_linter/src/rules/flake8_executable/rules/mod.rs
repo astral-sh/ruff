@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::SourceFile;
 pub(crate) use shebang_leading_whitespace::*;
 pub(crate) use shebang_missing_executable_file::*;
 pub(crate) use shebang_missing_python::*;
@@ -9,7 +8,7 @@ pub(crate) use shebang_not_executable::*;
 pub(crate) use shebang_not_first_line::*;
 
 use crate::Locator;
-use crate::OldDiagnostic;
+use crate::checkers::ast::DiagnosticsCollector;
 use crate::codes::Rule;
 use crate::comments::shebang::ShebangDirective;
 use crate::settings::LinterSettings;
@@ -21,12 +20,11 @@ mod shebang_not_executable;
 mod shebang_not_first_line;
 
 pub(crate) fn from_tokens(
-    diagnostics: &mut Vec<OldDiagnostic>,
+    collector: &DiagnosticsCollector,
     path: &Path,
     locator: &Locator,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
-    source_file: &SourceFile,
 ) {
     let mut has_any_shebang = false;
     for range in comment_ranges {
@@ -34,31 +32,21 @@ pub(crate) fn from_tokens(
         if let Some(shebang) = ShebangDirective::try_extract(comment) {
             has_any_shebang = true;
 
-            if let Some(diagnostic) = shebang_missing_python(range, &shebang, source_file) {
-                diagnostics.push(diagnostic);
-            }
+            shebang_missing_python(range, &shebang, collector);
 
             if settings.rules.enabled(Rule::ShebangNotExecutable) {
-                if let Some(diagnostic) = shebang_not_executable(path, range, source_file) {
-                    diagnostics.push(diagnostic);
-                }
+                shebang_not_executable(path, range, collector);
             }
 
-            if let Some(diagnostic) = shebang_leading_whitespace(range, locator, source_file) {
-                diagnostics.push(diagnostic);
-            }
+            shebang_leading_whitespace(collector, range, locator);
 
-            if let Some(diagnostic) = shebang_not_first_line(range, locator, source_file) {
-                diagnostics.push(diagnostic);
-            }
+            shebang_not_first_line(range, locator, collector);
         }
     }
 
     if !has_any_shebang {
         if settings.rules.enabled(Rule::ShebangMissingExecutableFile) {
-            if let Some(diagnostic) = shebang_missing_executable_file(path, source_file) {
-                diagnostics.push(diagnostic);
-            }
+            shebang_missing_executable_file(path, collector);
         }
     }
 }

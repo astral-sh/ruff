@@ -5,11 +5,11 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_stdlib::path::is_module_file;
 use ruff_python_stdlib::sys::is_known_standard_library;
-use ruff_source_file::SourceFile;
 use ruff_text_size::TextRange;
 
+use crate::Violation;
+use crate::checkers::ast::DiagnosticsCollector;
 use crate::settings::LinterSettings;
-use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for modules that use the same names as Python standard-library
@@ -70,10 +70,10 @@ pub(crate) fn stdlib_module_shadowing(
     mut path: &Path,
     settings: &LinterSettings,
     target_version: PythonVersion,
-    source_file: &SourceFile,
-) -> Option<OldDiagnostic> {
+    collector: &DiagnosticsCollector,
+) {
     if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file) {
-        return None;
+        return;
     }
 
     // strip src and root prefixes before converting to a fully-qualified module path
@@ -85,7 +85,8 @@ pub(crate) fn stdlib_module_shadowing(
     // for modules like `modname/__init__.py`, use the parent directory name, otherwise just trim
     // the `.py` extension
     let path = if is_module_file(path) {
-        Cow::from(path.parent()?)
+        let Some(parent) = path.parent() else { return };
+        Cow::from(parent)
     } else {
         Cow::from(path.with_extension(""))
     };
@@ -98,24 +99,25 @@ pub(crate) fn stdlib_module_shadowing(
         .map(|c| c.as_os_str().to_string_lossy())
         .rev();
 
-    let module_name = components.next()?;
+    let Some(module_name) = components.next() else {
+        return;
+    };
 
     if is_allowed_module(settings, target_version, &module_name) {
-        return None;
+        return;
     }
 
     // not allowed generally, but check for a parent in non-strict mode
     if !settings.flake8_builtins.strict_checking && components.next().is_some() {
-        return None;
+        return;
     }
 
-    Some(OldDiagnostic::new(
+    collector.report_diagnostic(
         StdlibModuleShadowing {
             name: module_name.to_string(),
         },
         TextRange::default(),
-        source_file,
-    ))
+    );
 }
 
 /// Return the longest prefix of `path` between `settings.src` and `settings.project_root`.

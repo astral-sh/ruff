@@ -4,10 +4,10 @@ use regex::Regex;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::SourceFile;
 
 use crate::Locator;
-use crate::{OldDiagnostic, Violation};
+use crate::Violation;
+use crate::checkers::ast::DiagnosticsCollector;
 
 /// ## What it does
 /// Checks for the use of type comments (e.g., `x = 1  # type: int`) in stub
@@ -39,16 +39,15 @@ impl Violation for TypeCommentInStub {
 
 /// PYI033
 pub(crate) fn type_comment_in_stub(
-    diagnostics: &mut Vec<OldDiagnostic>,
+    collector: &DiagnosticsCollector,
     locator: &Locator,
     comment_ranges: &CommentRanges,
-    source_file: &SourceFile,
 ) {
     for range in comment_ranges {
         let comment = locator.slice(range);
 
         if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
-            diagnostics.push(OldDiagnostic::new(TypeCommentInStub, range, source_file));
+            collector.report_diagnostic(TypeCommentInStub, range);
         }
     }
 }

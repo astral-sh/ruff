@@ -2,9 +2,9 @@ use ruff_text_size::{TextLen, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::leading_indentation;
-use ruff_source_file::{Line, SourceFile};
+use ruff_source_file::Line;
 
-use crate::{OldDiagnostic, Violation};
+use crate::{Violation, checkers::ast::DiagnosticsCollector};
 
 /// ## What it does
 /// Checks for mixed tabs and spaces in indentation.
@@ -37,19 +37,13 @@ impl Violation for MixedSpacesAndTabs {
 }
 
 /// E101
-pub(crate) fn mixed_spaces_and_tabs(
-    line: &Line,
-    source_file: &SourceFile,
-) -> Option<OldDiagnostic> {
+pub(crate) fn mixed_spaces_and_tabs(line: &Line, collector: &DiagnosticsCollector) {
     let indent = leading_indentation(line.as_str());
 
     if indent.contains(' ') && indent.contains('\t') {
-        Some(OldDiagnostic::new(
+        collector.report_diagnostic(
             MixedSpacesAndTabs,
             TextRange::at(line.start(), indent.text_len()),
-            source_file,
-        ))
-    } else {
-        None
+        );
     }
 }

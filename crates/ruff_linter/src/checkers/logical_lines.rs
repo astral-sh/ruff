@@ -1,13 +1,11 @@
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_source_file::{LineRanges, SourceFile};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::Locator;
-use crate::OldDiagnostic;
 use crate::line_width::IndentWidth;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 use crate::rules::pycodestyle::rules::logical_lines::{
     LogicalLines, TokenFlags, extraneous_whitespace, indentation, missing_whitespace,
     missing_whitespace_after_keyword, missing_whitespace_around_operator, redundant_backslash,
@@ -16,6 +14,9 @@ use crate::rules::pycodestyle::rules::logical_lines::{
     whitespace_before_parameters,
 };
 use crate::settings::LinterSettings;
+use crate::{Locator, Violation};
+
+use super::ast::{DiagnosticGuard, DiagnosticsCollector};
 
 /// Return the amount of indentation, expanding tabs to the next multiple of the settings' tab size.
 pub(crate) fn expand_indent(line: &str, indent_width: IndentWidth) -> usize {
@@ -40,9 +41,9 @@ pub(crate) fn check_logical_lines(
     indexer: &Indexer,
     stylist: &Stylist,
     settings: &LinterSettings,
-    source_file: &SourceFile,
-) -> Vec<OldDiagnostic> {
-    let mut context = LogicalLinesContext::new(settings, source_file);
+    collector: &DiagnosticsCollector,
+) {
+    let mut context = LogicalLinesContext::new(settings, collector);
 
     let mut prev_line = None;
     let mut prev_indent_level = None;
@@ -171,7 +172,7 @@ pub(crate) fn check_logical_lines(
         let indent_size = 4;
 
         if enforce_indentation {
-            for diagnostic in indentation(
+            indentation(
                 &line,
                 prev_line.as_ref(),
                 indent_char,
@@ -179,12 +180,9 @@ pub(crate) fn check_logical_lines(
                 prev_indent_level,
                 indent_size,
                 range,
-                source_file,
-            ) {
-                if settings.rules.enabled(diagnostic.rule()) {
-                    context.push_diagnostic(diagnostic);
-                }
-            }
+                collector,
+                settings,
+            );
         }
 
         if !line.is_comment_only() {
@@ -192,32 +190,27 @@ pub(crate) fn check_logical_lines(
             prev_indent_level = Some(indent_level);
         }
     }
-    context.diagnostics
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct LogicalLinesContext<'a> {
+pub(crate) struct LogicalLinesContext<'a, 'b> {
     settings: &'a LinterSettings,
-    source_file: &'a SourceFile,
-    diagnostics: Vec<OldDiagnostic>,
+    collector: &'a DiagnosticsCollector<'b>,
 }
 
-impl<'a> LogicalLinesContext<'a> {
-    fn new(settings: &'a LinterSettings, source_file: &'a SourceFile) -> Self {
+impl<'a, 'b> LogicalLinesContext<'a, 'b> {
+    fn new(settings: &'a LinterSettings, collector: &'a DiagnosticsCollector<'b>) -> Self {
         Self {
             settings,
-            source_file,
-            diagnostics: Vec::new(),
+            collector,
         }
     }
 
-    pub(crate) fn push_diagnostic(&mut self, diagnostic: OldDiagnostic) {
-        if self.settings.rules.enabled(diagnostic.rule()) {
-            self.diagnostics.push(diagnostic);
-        }
-    }
-
-    pub(crate) fn source_file(&self) -> &SourceFile {
-        self.source_file
+    pub(crate) fn report_diagnostic<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> Option<DiagnosticGuard<'chk, 'a>> {
+        self.collector
+            .report_diagnostic_if_enabled(kind, range, self.settings)
     }
 }

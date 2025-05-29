@@ -4,7 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Edit;
 use crate::checkers::logical_lines::LogicalLinesContext;
-use crate::{AlwaysFixableViolation, Fix, OldDiagnostic};
+use crate::{AlwaysFixableViolation, Fix};
 
 use super::{DefinitionState, LogicalLine};
 
@@ -103,13 +103,14 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesC
                         }
                     }
 
-                    let diagnostic = OldDiagnostic::new(
-                        MissingWhitespace { token: kind },
-                        token.range(),
-                        context.source_file(),
-                    );
-                    let fix = Fix::safe_edit(Edit::insertion(" ".to_string(), token.end()));
-                    context.push_diagnostic(diagnostic.with_fix(fix));
+                    if let Some(mut diagnostic) =
+                        context.report_diagnostic(MissingWhitespace { token: kind }, token.range())
+                    {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                            " ".to_string(),
+                            token.end(),
+                        )));
+                    }
                 }
             }
             _ => {}

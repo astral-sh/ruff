@@ -1,10 +1,10 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::{Token, TokenKind};
-use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
-use crate::{Edit, Fix, FixAvailability, OldDiagnostic, Violation};
+use crate::checkers::ast::DiagnosticsCollector;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for strings that contain the control character `BS`.
@@ -182,10 +182,9 @@ impl Violation for InvalidCharacterZeroWidthSpace {
 
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
 pub(crate) fn invalid_string_characters(
-    diagnostics: &mut Vec<OldDiagnostic>,
+    collector: &DiagnosticsCollector,
     token: &Token,
     locator: &Locator,
-    source_file: &SourceFile,
 ) {
     let text = match token.kind() {
         // We can't use the `value` field since it's decoded and e.g. for f-strings removed a curly
@@ -201,23 +200,23 @@ pub(crate) fn invalid_string_characters(
         let (replacement, mut diagnostic) = match c {
             '\x08' => (
                 "\\b",
-                OldDiagnostic::new(InvalidCharacterBackspace, range, source_file),
+                collector.report_diagnostic(InvalidCharacterBackspace, range),
             ),
             '\x1A' => (
                 "\\x1A",
-                OldDiagnostic::new(InvalidCharacterSub, range, source_file),
+                collector.report_diagnostic(InvalidCharacterSub, range),
             ),
             '\x1B' => (
                 "\\x1B",
-                OldDiagnostic::new(InvalidCharacterEsc, range, source_file),
+                collector.report_diagnostic(InvalidCharacterEsc, range),
             ),
             '\0' => (
                 "\\0",
-                OldDiagnostic::new(InvalidCharacterNul, range, source_file),
+                collector.report_diagnostic(InvalidCharacterNul, range),
             ),
             '\u{200b}' => (
                 "\\u200b",
-                OldDiagnostic::new(InvalidCharacterZeroWidthSpace, range, source_file),
+                collector.report_diagnostic(InvalidCharacterZeroWidthSpace, range),
             ),
             _ => {
                 continue;
@@ -228,7 +227,5 @@ pub(crate) fn invalid_string_characters(
             let edit = Edit::range_replacement(replacement.to_string(), range);
             diagnostic.set_fix(Fix::safe_edit(edit));
         }
-
-        diagnostics.push(diagnostic);
     }
 }

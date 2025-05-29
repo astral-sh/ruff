@@ -6,16 +6,16 @@ use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Parsed;
-use ruff_source_file::SourceFile;
 
 use crate::Locator;
-use crate::OldDiagnostic;
 use crate::directives::IsortDirectives;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
 use crate::rules::isort;
 use crate::rules::isort::block::{Block, BlockBuilder};
 use crate::settings::LinterSettings;
+
+use super::ast::DiagnosticsCollector;
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn check_imports(
@@ -29,8 +29,8 @@ pub(crate) fn check_imports(
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
     target_version: PythonVersion,
-    source_file: &SourceFile,
-) -> Vec<OldDiagnostic> {
+    collector: &DiagnosticsCollector,
+) {
     // Extract all import blocks from the AST.
     let tracker = {
         let mut tracker =
@@ -42,11 +42,10 @@ pub(crate) fn check_imports(
     let blocks: Vec<&Block> = tracker.iter().collect();
 
     // Enforce import rules.
-    let mut diagnostics = vec![];
     if settings.rules.enabled(Rule::UnsortedImports) {
         for block in &blocks {
             if !block.imports.is_empty() {
-                if let Some(diagnostic) = isort::rules::organize_imports(
+                isort::rules::organize_imports(
                     block,
                     locator,
                     stylist,
@@ -56,23 +55,19 @@ pub(crate) fn check_imports(
                     source_type,
                     parsed.tokens(),
                     target_version,
-                    source_file,
-                ) {
-                    diagnostics.push(diagnostic);
-                }
+                    collector,
+                );
             }
         }
     }
     if settings.rules.enabled(Rule::MissingRequiredImport) {
-        diagnostics.extend(isort::rules::add_required_imports(
+        isort::rules::add_required_imports(
             parsed,
             locator,
             stylist,
             settings,
             source_type,
-            source_file,
-        ));
+            collector,
+        );
     }
-
-    diagnostics
 }

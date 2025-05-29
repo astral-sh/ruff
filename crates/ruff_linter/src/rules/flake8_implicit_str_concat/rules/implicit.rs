@@ -6,12 +6,13 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_source_file::{LineRanges, SourceFile};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
+use crate::checkers::ast::DiagnosticsCollector;
 use crate::settings::LinterSettings;
-use crate::{Edit, Fix, FixAvailability, OldDiagnostic, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for implicitly concatenated strings on a single line.
@@ -103,12 +104,11 @@ impl Violation for MultiLineImplicitStringConcatenation {
 
 /// ISC001, ISC002
 pub(crate) fn implicit(
-    diagnostics: &mut Vec<OldDiagnostic>,
+    collector: &DiagnosticsCollector,
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
     settings: &LinterSettings,
-    source_file: &SourceFile,
 ) {
     for (a_token, b_token) in tokens
         .iter()
@@ -146,23 +146,19 @@ pub(crate) fn implicit(
         };
 
         if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
-            diagnostics.push(OldDiagnostic::new(
+            collector.report_diagnostic(
                 MultiLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
-                source_file,
-            ));
+            );
         } else {
-            let mut diagnostic = OldDiagnostic::new(
+            let mut diagnostic = collector.report_diagnostic(
                 SingleLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
-                source_file,
             );
 
             if let Some(fix) = concatenate_strings(a_range, b_range, locator) {
                 diagnostic.set_fix(fix);
             }
-
-            diagnostics.push(diagnostic);
         }
     }
 }
