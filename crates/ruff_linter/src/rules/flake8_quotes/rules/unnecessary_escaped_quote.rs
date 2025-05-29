@@ -104,7 +104,7 @@ fn check_f_string(checker: &Checker, f_string: &ast::FString) {
         range,
         elements,
     } = f_string;
-    check_ft_string(checker, AnyStringFlags::from(*flags), *range, elements)
+    check_ft_string(checker, AnyStringFlags::from(*flags), *range, elements);
 }
 
 /// Checks for unnecessary escaped quotes in a t-string.
@@ -114,7 +114,7 @@ fn check_t_string(checker: &Checker, t_string: &ast::TString) {
         range,
         elements,
     } = t_string;
-    check_ft_string(checker, AnyStringFlags::from(*flags), *range, elements)
+    check_ft_string(checker, AnyStringFlags::from(*flags), *range, elements);
 }
 
 /// Checks for unnecessary escaped quotes in an f-string or t-string.

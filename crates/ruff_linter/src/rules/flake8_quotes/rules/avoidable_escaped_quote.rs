@@ -282,7 +282,7 @@ fn check_f_string(
         AnyStringFlags::from(*flags),
         elements,
         *range,
-    )
+    );
 }
 
 /// Checks for unnecessary escaped quotes in a t-string.
@@ -302,7 +302,7 @@ fn check_t_string(
         AnyStringFlags::from(*flags),
         elements,
         *range,
-    )
+    );
 }
 
 /// Checks for unnecessary escaped quotes in an f-string or t-string.
