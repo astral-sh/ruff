@@ -111,6 +111,7 @@ impl Display for DisplayRepresentation<'_> {
                 SubclassOfInner::Class(class) => write!(f, "type[{}]", class.name(self.db)),
                 SubclassOfInner::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
+            Type::SpecialForm(special_form) => special_form.fmt(f),
             Type::KnownInstance(known_instance) => known_instance.repr(self.db).fmt(f),
             Type::FunctionLiteral(function) => function.display(self.db).fmt(f),
             Type::Callable(callable) => callable.display(self.db).fmt(f),
