@@ -76,6 +76,7 @@ pegen
 poetry
 porcupine
 ppb-vector
+prefect
 psycopg
 pwndbg
 pybind11
@@ -96,6 +97,7 @@ rich
 rotki
 schema_salad
 schemathesis
+scikit-learn
 scipy
 scrapy
 sockeye
