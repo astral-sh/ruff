@@ -89,7 +89,7 @@ impl Options {
                 source: match ranged_version.source() {
                     ValueSource::Cli => PythonVersionSource::Cli,
                     ValueSource::File(path) => PythonVersionSource::ConfigFile(
-                        PythonVersionFileSource::new(path.clone(), ranged_version.range()),
+                        PythonVersionFileSource::new(Some(path.clone()), ranged_version.range()),
                     ),
                 },
             });

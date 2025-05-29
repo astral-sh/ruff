@@ -188,17 +188,17 @@ enum PythonSourcePriority {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PythonVersionFileSource {
-    path: Arc<SystemPathBuf>,
+    path: Option<Arc<SystemPathBuf>>,
     range: Option<TextRange>,
 }
 
 impl PythonVersionFileSource {
-    pub fn new(path: Arc<SystemPathBuf>, range: Option<TextRange>) -> Self {
+    pub fn new(path: Option<Arc<SystemPathBuf>>, range: Option<TextRange>) -> Self {
         Self { path, range }
     }
 
     pub(crate) fn span(&self, db: &dyn Db) -> Option<Span> {
-        let file = system_path_to_file(db.upcast(), &*self.path).ok()?;
+        let file = system_path_to_file(db.upcast(), self.path.as_deref()?).ok()?;
         Some(Span::from(file).with_optional_range(self.range))
     }
 }
