@@ -31,8 +31,12 @@ def _(a) -> TypeGuard[str]: ...
 # error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `TypeIs[str]`"
 def _(a) -> TypeIs[str]: ...
 
-def f(a) -> TypeGuard[str]: return True
-def g(a) -> TypeIs[str]: return True
+def f(a) -> TypeGuard[str]:
+    return True
+
+def g(a) -> TypeIs[str]:
+    return True
+
 def _(a: object):
     # TODO: Should be `TypeGuard[a, str]`
     reveal_type(f(a))  # revealed: @Todo(`TypeGuard[]` special form)
@@ -145,8 +149,12 @@ def g(a: Literal["foo", "bar"]) -> TypeIs[Literal["foo"]]:
 from typing import Any
 from typing_extensions import TypeGuard, TypeIs
 
-def f(a: object) -> TypeGuard[str]: return True
-def g(a: object) -> TypeIs[int]: return True
+def f(a: object) -> TypeGuard[str]:
+    return True
+
+def g(a: object) -> TypeIs[int]:
+    return True
+
 def _(d: Any):
     if f():  # error: [missing-argument]
         ...
@@ -173,8 +181,12 @@ def _(a: tuple[str, int] | tuple[int, str]):
 from typing import Any
 from typing_extensions import TypeGuard, TypeIs
 
-def guard_str(a: object) -> TypeGuard[str]: return True
-def is_int(a: object) -> TypeIs[int]: return True
+def guard_str(a: object) -> TypeGuard[str]:
+    return True
+
+def is_int(a: object) -> TypeIs[int]:
+    return True
+
 def _(a: str | int):
     if guard_str(a):
         # TODO: Should be `str`
@@ -225,8 +237,12 @@ def _(x: str | int, flag: bool) -> None:
 from typing import Any
 from typing_extensions import TypeGuard, TypeIs
 
-def guard_int(a: object) -> TypeGuard[int]: return True
-def is_int(a: object) -> TypeIs[int]: return True
+def guard_int(a: object) -> TypeGuard[int]:
+    return True
+
+def is_int(a: object) -> TypeIs[int]:
+    return True
+
 def does_not_narrow_in_negative_case(a: str | int):
     if not guard_int(a):
         # TODO: Should be `str`
