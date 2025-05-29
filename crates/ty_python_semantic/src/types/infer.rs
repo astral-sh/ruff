@@ -1872,12 +1872,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             if use_def.can_implicit_return(self.db())
                 && !Type::none(self.db()).is_assignable_to(self.db(), declared_ty)
             {
+                let no_return = self.return_types_and_ranges.is_empty();
                 report_implicit_return_type(
                     &self.context,
                     returns.range(),
                     declared_ty,
                     has_empty_body,
                     enclosing_class_context,
+                    no_return,
                 );
             }
         }
