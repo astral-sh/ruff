@@ -72,6 +72,22 @@ def f2():
 
     # TODO: we should mark this as unreachable
     print("unreachable")
+
+def f3():
+    x = object()
+    if True:
+        pass
+    else:
+        reveal_type(x)  # revealed: Never
+        # TODO: we should mark this as unreachable
+        print("unreachable")
+
+def f4():
+    x = object()
+    if False:
+        reveal_type(x)  # revealed: Never
+        # TODO: we should mark this as unreachable
+        print("unreachable")
 ```
 
 ### `Never` / `NoReturn`
@@ -529,7 +545,7 @@ unreachable section should be silenced. Similar problems to the one above can oc
 types as well:
 
 ```py
-from typing import Literal
+from typing import Literal, overload
 
 if False:
     def f(x: int): ...
@@ -574,4 +590,13 @@ if False:
     # TODO
     # error: [division-by-zero]
     1 / number
+
+if False:
+    # TODO
+    @overload
+    def func(x: int) -> int: ...
+    @overload
+    def func(x: None) -> None: ...
+    def func(x: int | None) -> int | None:
+        return x
 ```

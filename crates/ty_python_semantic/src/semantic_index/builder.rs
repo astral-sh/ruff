@@ -2,7 +2,6 @@ use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
-use hashbrown::HashSet;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
@@ -1477,71 +1476,65 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
             ast::Stmt::If(node) => {
-                self.visit_expr(&node.test);
+                let (else_body, elifs) = match node.elif_else_clauses.split_last() {
+                    Some((last, clauses)) => {
+                        let clauses = clauses.iter().map(|clause| {
+                            (
+                                clause
+                                    .test
+                                    .as_ref()
+                                    .expect("only the last clause can be missing a test"),
+                                clause.body.as_slice(),
+                            )
+                        });
+                        let (else_body, last_cond) = match last.test.as_ref() {
+                            Some(test) => (None, Some((test, &last.body[..]))), // if the last clause has a test, there's no else
+                            None => (Some(&last.body[..]), None),
+                        };
+
+                        (else_body, Some(clauses.chain(last_cond)))
+                    }
+                    None => (None, None),
+                };
+
                 let mut no_branch_taken = self.flow_snapshot();
-                let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
-                let mut reachability_constraint =
-                    self.record_reachability_constraint(last_predicate);
-                self.visit_body(&node.body);
-
-                let mut visibility_constraint_id =
-                    self.record_visibility_constraint(last_predicate);
-
-                let mut post_clauses: Vec<FlowSnapshot> = vec![self.flow_snapshot()];
-                let elif_else_clauses = node
-                    .elif_else_clauses
-                    .iter()
-                    .map(|clause| (clause.test.as_ref(), clause.body.as_slice()));
-                let has_else = node
-                    .elif_else_clauses
-                    .last()
-                    .is_some_and(|clause| clause.test.is_none());
-                let elif_else_clauses = elif_else_clauses.chain(if has_else {
-                    // if there's an `else` clause already, we don't need to add another
-                    None
-                } else {
-                    // if there's no `else` branch, we should add a no-op `else` branch
-                    Some((None, Default::default()))
-                });
-                let mut last = false;
-                let mut negated_recorded = HashSet::new();
-                for (clause_test, clause_body) in elif_else_clauses {
-                    debug_assert!(!last);
+                let mut last_visibility_constraint_id = None;
+                let mut post_clauses = Vec::with_capacity(node.elif_else_clauses.len() + 1);
+                for (clause_test, clause_body) in
+                    std::iter::once((node.test.as_ref(), &node.body[..]))
+                        .chain(elifs.into_iter().flatten())
+                {
+                    self.visit_expr(clause_test);
+                    // A test expression is evaluated whether the branch is taken or not
+                    no_branch_taken = self.flow_snapshot();
+                    let predicate = self.build_predicate(clause_test);
+                    let reachability_constraint_id = self.record_reachability_constraint(predicate);
+                    self.record_narrowing_constraint(predicate);
+                    self.visit_body(clause_body);
+                    let v_constraint = self.record_visibility_constraint(predicate);
+                    last_visibility_constraint_id = Some(v_constraint);
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
                     post_clauses.push(self.flow_snapshot());
+
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken
                     self.flow_restore(no_branch_taken.clone());
-                    self.record_negated_narrowing_constraint(last_predicate);
-                    self.record_negated_reachability_constraint(reachability_constraint);
-                    self.record_negated_visibility_constraint(visibility_constraint_id);
-                    negated_recorded.insert(visibility_constraint_id);
-
-                    let elif_predicate = if let Some(elif_test) = clause_test {
-                        self.visit_expr(elif_test);
-                        // A test expression is evaluated whether the branch is taken or not
-                        no_branch_taken = self.flow_snapshot();
-                        let predicate = self.record_expression_narrowing_constraint(elif_test);
-                        reachability_constraint = self.record_reachability_constraint(predicate);
-                        Some(predicate)
-                    } else {
-                        no_branch_taken = self.flow_snapshot();
-                        None
-                    };
-
-                    self.visit_body(clause_body);
-
-                    if let Some(elif_predicate) = elif_predicate {
-                        last_predicate = elif_predicate;
-                        visibility_constraint_id =
-                            self.record_visibility_constraint(elif_predicate);
-                    } else {
-                        last = true;
-                    }
+                    self.record_negated_reachability_constraint(reachability_constraint_id);
+                    self.record_negated_narrowing_constraint(predicate);
+                    self.record_negated_visibility_constraint(v_constraint);
                 }
 
-                self.record_negated_visibility_constraint(visibility_constraint_id);
+                if let Some(else_body) = else_body {
+                    // If there is an `else` clause, we restore the state after the last
+                    // `if` or `elif` clause, and visit the `else` body.
+                    no_branch_taken = self.flow_snapshot();
+                    self.visit_body(else_body);
+                    self.record_negated_visibility_constraint(
+                        last_visibility_constraint_id
+                            .expect("should have at least one negated constraint"),
+                    );
+                }
 
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
