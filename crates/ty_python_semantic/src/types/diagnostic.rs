@@ -1691,7 +1691,7 @@ pub(super) fn report_implicit_return_type(
     };
     let db = context.db();
 
-    // If no return statement is defined in the function, then the function always return `None`
+    // If no return statement is defined in the function, then the function always returns `None`
     let mut diagnostic = if no_return {
         let mut diag = builder.into_diagnostic(format_args!(
             "Function always implicitly returns `None`, which is not assignable to return type `{}`",
