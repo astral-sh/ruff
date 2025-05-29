@@ -699,7 +699,7 @@ fn context_after(source: &SourceCode<'_, '_>, len: usize, start: OneIndexed) -> 
 
 /// Convert an absolute path to be relative to the current working directory.
 fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
-    if let Ok(path) = SystemPath::new(path).strip_prefix(cwd) {
+    if let Ok(path) = dbg!(dbg!(SystemPath::new(path)).strip_prefix(dbg!(cwd))) {
         return path.as_str();
     }
     path
