@@ -9,6 +9,7 @@ from airflow import (
     PY311,
     PY312,
 )
+from airflow.api_connexion.security import requires_access
 from airflow.contrib.aws_athena_hook import AWSAthenaHook
 from airflow.datasets import DatasetAliasEvent
 from airflow.operators.subdag import SubDagOperator
@@ -28,18 +29,16 @@ from airflow.utils.dates import (
 from airflow.utils.db import create_session
 from airflow.utils.decorators import apply_defaults
 from airflow.utils.file import mkdirs
-from airflow.utils.log import secrets_masker
 from airflow.utils.state import SHUTDOWN, terminating_states
 from airflow.utils.trigger_rule import TriggerRule
-from airflow.www.auth import has_access
+from airflow.www.auth import has_access, has_access_dataset
 from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
 
 # airflow root
 PY36, PY37, PY38, PY39, PY310, PY311, PY312
 
-
-
-
+# airflow.api_connexion.security
+requires_access
 
 # airflow.contrib.*
 AWSAthenaHook()
@@ -49,8 +48,6 @@ AWSAthenaHook()
 DatasetAliasEvent()
 
 
-
-
 # airflow.operators.subdag.*
 SubDagOperator()
 
@@ -58,8 +55,6 @@ SubDagOperator()
 # airflow.secrets
 # get_connection
 LocalFilesystemBackend()
-
-
 
 
 # airflow.triggers.external_task
@@ -91,9 +86,7 @@ create_session
 apply_defaults
 
 # airflow.utils.file
-TemporaryDirectory()
 mkdirs
-
 
 
 # airflow.utils.state
@@ -107,8 +100,8 @@ TriggerRule.NONE_FAILED_OR_SKIPPED
 
 # airflow.www.auth
 has_access
+has_access_dataset
 
 # airflow.www.utils
 get_sensitive_variables_fields
 should_hide_value_for_key
-
