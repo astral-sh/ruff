@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::cell::LazyCell;
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
@@ -112,7 +111,7 @@ pub fn check_path(
     parsed: &Parsed<ModModule>,
     target_version: TargetVersion,
 ) -> Vec<Message> {
-    let source_file = LazyCell::new(|| {
+    let source_file = {
         let mut builder =
             SourceFileBuilder::new(path.to_string_lossy().as_ref(), locator.contents());
 
@@ -121,7 +120,7 @@ pub fn check_path(
         }
 
         builder.finish()
-    });
+    };
 
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
