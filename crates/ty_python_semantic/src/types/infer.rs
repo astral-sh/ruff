@@ -73,7 +73,7 @@ use crate::types::diagnostic::{
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
     INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMETER_DEFAULT,
-    INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS, NEGATIVE_SHIFT,
     POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
     report_implicit_return_type, report_invalid_arguments_to_annotated,
@@ -1393,35 +1393,43 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    /// Raise a diagnostic if the given type cannot be divided by zero.
+    /// Raise a diagnostic if the given type cannot be divided by zero, or is shifted by a negative
+    /// value.
     ///
     /// Expects the resolved type of the left side of the binary expression.
-    fn check_division_by_zero(
-        &mut self,
-        node: AnyNodeRef<'_>,
-        op: ast::Operator,
-        left: Type<'db>,
-    ) -> bool {
-        match left {
-            Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
+    fn check_bad_rhs(&mut self, node: AnyNodeRef<'_>, op: ast::Operator, left: Type<'db>) -> bool {
+        let lhs_int = match left {
+            Type::BooleanLiteral(_) | Type::IntLiteral(_) => true,
             Type::NominalInstance(instance)
                 if matches!(
                     instance.class.known(self.db()),
-                    Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
-                ) => {}
-            _ => return false,
-        }
-
-        let (op, by_zero) = match op {
-            ast::Operator::Div => ("divide", "by zero"),
-            ast::Operator::FloorDiv => ("floor divide", "by zero"),
-            ast::Operator::Mod => ("reduce", "modulo zero"),
+                    Some(KnownClass::Int | KnownClass::Bool)
+                ) =>
+            {
+                true
+            }
+            Type::NominalInstance(instance)
+                if matches!(instance.class.known(self.db()), Some(KnownClass::Float)) =>
+            {
+                false
+            }
             _ => return false,
         };
 
-        if let Some(builder) = self.context.report_lint(&DIVISION_BY_ZERO, node) {
+        let (op, by_what, lint) = match (op, lhs_int) {
+            (ast::Operator::Div, _) => ("divide", "by zero", &DIVISION_BY_ZERO),
+            (ast::Operator::FloorDiv, _) => ("floor divide", "by zero", &DIVISION_BY_ZERO),
+            (ast::Operator::Mod, _) => ("reduce", "modulo zero", &DIVISION_BY_ZERO),
+            (ast::Operator::LShift, true) => ("left shift", "by a negative value", &NEGATIVE_SHIFT),
+            (ast::Operator::RShift, true) => {
+                ("right shift", "by a negative value", &NEGATIVE_SHIFT)
+            }
+            _ => return false,
+        };
+
+        if let Some(builder) = self.context.report_lint(lint, node) {
             builder.into_diagnostic(format_args!(
-                "Cannot {op} object of type `{}` {by_zero}",
+                "Cannot {op} object of type `{}` {by_what}",
                 left.display(self.db())
             ));
         }
@@ -5926,7 +5934,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             (_, Type::Never) => Type::Never,
 
             (ast::UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
-            (ast::UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
+            (ast::UnaryOp::USub, Type::IntLiteral(value)) => value
+                .checked_neg()
+                .map(Type::IntLiteral)
+                .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
             (ast::UnaryOp::Invert, Type::IntLiteral(value)) => Type::IntLiteral(!value),
 
             (ast::UnaryOp::UAdd, Type::BooleanLiteral(bool)) => Type::IntLiteral(i64::from(bool)),
@@ -6042,23 +6053,24 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_binary_expression_type(
         &mut self,
         node: AnyNodeRef<'_>,
-        mut emitted_division_by_zero_diagnostic: bool,
+        mut emitted_bad_rhs_diagnostic: bool,
         left_ty: Type<'db>,
         right_ty: Type<'db>,
         op: ast::Operator,
     ) -> Option<Type<'db>> {
-        // Check for division by zero; this doesn't change the inferred type for the expression, but
-        // may emit a diagnostic
-        if !emitted_division_by_zero_diagnostic
-            && matches!(
-                (op, right_ty),
+        // Check for division by zero or shift by a negative value; this doesn't change the inferred
+        // type for the expression, but may emit a diagnostic
+        if !emitted_bad_rhs_diagnostic {
+            emitted_bad_rhs_diagnostic = match (op, right_ty) {
                 (
                     ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod,
-                    Type::IntLiteral(0) | Type::BooleanLiteral(false)
-                )
-            )
-        {
-            emitted_division_by_zero_diagnostic = self.check_division_by_zero(node, op, left_ty);
+                    Type::IntLiteral(0) | Type::BooleanLiteral(false),
+                ) => self.check_bad_rhs(node, op, left_ty),
+                (ast::Operator::LShift | ast::Operator::RShift, Type::IntLiteral(n)) if n < 0 => {
+                    self.check_bad_rhs(node, op, left_ty)
+                }
+                _ => false,
+            };
         }
 
         match (left_ty, right_ty, op) {
@@ -6067,7 +6079,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 for lhs in lhs_union.elements(self.db()) {
                     let result = self.infer_binary_expression_type(
                         node,
-                        emitted_division_by_zero_diagnostic,
+                        emitted_bad_rhs_diagnostic,
                         *lhs,
                         rhs,
                         op,
@@ -6081,7 +6093,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 for rhs in rhs_union.elements(self.db()) {
                     let result = self.infer_binary_expression_type(
                         node,
-                        emitted_division_by_zero_diagnostic,
+                        emitted_bad_rhs_diagnostic,
                         lhs,
                         *rhs,
                         op,
@@ -6179,6 +6191,22 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Some(Type::IntLiteral(n ^ m))
             }
 
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::LShift) => Some(
+                u32::try_from(m)
+                    .ok()
+                    .and_then(|m| n.checked_shl(m))
+                    .map(Type::IntLiteral)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
+            ),
+
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::RShift) => Some(
+                u32::try_from(m)
+                    .ok()
+                    .map(|m| n >> m.clamp(0, 63))
+                    .map(Type::IntLiteral)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
+            ),
+
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
                 let bytes = [lhs.value(self.db()), rhs.value(self.db())].concat();
                 Some(Type::bytes_literal(self.db(), &bytes))
@@ -6244,14 +6272,14 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             (Type::BooleanLiteral(bool_value), right, op) => self.infer_binary_expression_type(
                 node,
-                emitted_division_by_zero_diagnostic,
+                emitted_bad_rhs_diagnostic,
                 Type::IntLiteral(i64::from(bool_value)),
                 right,
                 op,
             ),
             (left, Type::BooleanLiteral(bool_value), op) => self.infer_binary_expression_type(
                 node,
-                emitted_division_by_zero_diagnostic,
+                emitted_bad_rhs_diagnostic,
                 left,
                 Type::IntLiteral(i64::from(bool_value)),
                 op,
