@@ -2178,6 +2178,7 @@ impl<'db> Type<'db> {
                     MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                 );
                 match member.symbol {
+                    // TODO: ideally this would check disjointness of the `__call__` signature and the callable signature
                     Symbol::Type(ty, _) => !ty.is_assignable_to(db, CallableType::unknown(db)),
                     Symbol::Unbound => true,
                 }
