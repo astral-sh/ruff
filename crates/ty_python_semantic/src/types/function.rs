@@ -630,9 +630,18 @@ impl<'db> FunctionType<'db> {
         // our representation of a function type includes any specialization that should be applied
         // to the signature. Different specializations of the same function type are only subtypes
         // of each other if they result in subtype signatures.
-        self.normalized(db) == other.normalized(db)
-            || (self.literal(db) == other.literal(db)
-                && self.signature(db).is_subtype_of(db, other.signature(db)))
+        if self.normalized(db) == other.normalized(db) {
+            return true;
+        }
+        if self.literal(db) != other.literal(db) {
+            return false;
+        }
+        let self_signature = self.signature(db);
+        let other_signature = other.signature(db);
+        if !self_signature.is_fully_static(db) || !other_signature.is_fully_static(db) {
+            return false;
+        }
+        self_signature.is_subtype_of(db, other_signature)
     }
 
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
@@ -645,9 +654,18 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.normalized(db) == other.normalized(db)
-            || (self.literal(db) == other.literal(db)
-                && self.signature(db).is_equivalent_to(db, other.signature(db)))
+        if self.normalized(db) == other.normalized(db) {
+            return true;
+        }
+        if self.literal(db) != other.literal(db) {
+            return false;
+        }
+        let self_signature = self.signature(db);
+        let other_signature = other.signature(db);
+        if !self_signature.is_fully_static(db) || !other_signature.is_fully_static(db) {
+            return false;
+        }
+        self_signature.is_equivalent_to(db, other_signature)
     }
 
     pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
