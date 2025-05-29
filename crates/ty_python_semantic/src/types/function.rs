@@ -106,6 +106,21 @@ pub struct OverloadLiteral<'db> {
 
 #[salsa::tracked]
 impl<'db> OverloadLiteral<'db> {
+    fn with_dataclass_transformer_params(
+        self,
+        db: &'db dyn Db,
+        params: DataclassTransformerParams,
+    ) -> Self {
+        Self::new(
+            db,
+            self.name(db).clone(),
+            self.known(db),
+            self.body_scope(db),
+            self.decorators(db),
+            Some(params),
+        )
+    }
+
     fn file(self, db: &'db dyn Db) -> File {
         // NOTE: Do not use `self.definition(db).file(db)` here, as that could create a
         // cross-module dependency on the full AST.
@@ -151,21 +166,6 @@ impl<'db> OverloadLiteral<'db> {
         let body_scope = self.body_scope(db);
         let index = semantic_index(db, body_scope.file(db));
         index.expect_single_definition(body_scope.node(db).expect_function())
-    }
-
-    fn with_dataclass_transformer_params(
-        self,
-        db: &'db dyn Db,
-        params: DataclassTransformerParams,
-    ) -> Self {
-        Self::new(
-            db,
-            self.name(db).clone(),
-            self.known(db),
-            self.body_scope(db),
-            self.decorators(db),
-            Some(params),
-        )
     }
 
     /// Typed internally-visible signature for this function.
