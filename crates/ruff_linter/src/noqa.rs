@@ -9,16 +9,16 @@ use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
 
-use ruff_diagnostics::Edit;
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Edit;
 use crate::Locator;
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
 use crate::message::Message;
-use crate::registry::{AsRule, Rule, RuleSet};
+use crate::registry::{Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 
 /// Generates an array of edits that matches the length of `messages`.
@@ -105,8 +105,7 @@ impl Codes<'_> {
 
     /// Returns `true` if the string list of `codes` includes `code` (or an alias
     /// thereof).
-    pub(crate) fn includes(&self, needle: Rule) -> bool {
-        let needle = needle.noqa_code();
+    pub(crate) fn includes(&self, needle: NoqaCode) -> bool {
         self.iter()
             .any(|code| needle == get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
     }
@@ -140,7 +139,7 @@ pub(crate) fn rule_is_ignored(
         Ok(Some(NoqaLexerOutput {
             directive: Directive::Codes(codes),
             ..
-        })) => codes.includes(code),
+        })) => codes.includes(code.noqa_code()),
         _ => false,
     }
 }
@@ -846,10 +845,12 @@ fn find_noqa_comments<'a>(
 
     // Mark any non-ignored diagnostics.
     for message in messages {
-        let Message::Diagnostic(diagnostic) = message else {
+        let Some(rule) = message.to_rule() else {
             comments_by_line.push(None);
             continue;
         };
+
+        let code = rule.noqa_code();
 
         match &exemption {
             FileExemption::All(_) => {
@@ -859,7 +860,7 @@ fn find_noqa_comments<'a>(
             }
             FileExemption::Codes(codes) => {
                 // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
-                if codes.contains(&&diagnostic.rule().noqa_code()) {
+                if codes.contains(&&code) {
                     comments_by_line.push(None);
                     continue;
                 }
@@ -867,7 +868,7 @@ fn find_noqa_comments<'a>(
         }
 
         // Is the violation ignored by a `noqa` directive on the parent line?
-        if let Some(parent) = diagnostic.parent {
+        if let Some(parent) = message.parent {
             if let Some(directive_line) =
                 directives.find_line_with_directive(noqa_line_for.resolve(parent))
             {
@@ -877,7 +878,7 @@ fn find_noqa_comments<'a>(
                         continue;
                     }
                     Directive::Codes(codes) => {
-                        if codes.includes(diagnostic.rule()) {
+                        if codes.includes(code) {
                             comments_by_line.push(None);
                             continue;
                         }
@@ -886,9 +887,7 @@ fn find_noqa_comments<'a>(
             }
         }
 
-        let noqa_offset = noqa_line_for.resolve(diagnostic.range.start());
-
-        let rule = diagnostic.rule();
+        let noqa_offset = noqa_line_for.resolve(message.range().start());
 
         // Or ignored by the directive itself?
         if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {
@@ -898,7 +897,7 @@ fn find_noqa_comments<'a>(
                     continue;
                 }
                 directive @ Directive::Codes(codes) => {
-                    if !codes.includes(rule) {
+                    if !codes.includes(code) {
                         comments_by_line.push(Some(NoqaComment {
                             line: directive_line.start(),
                             rule,
@@ -1222,7 +1221,6 @@ mod tests {
 
     use insta::assert_debug_snapshot;
 
-    use ruff_diagnostics::{Diagnostic, Edit};
     use ruff_python_trivia::CommentRanges;
     use ruff_source_file::{LineEnding, SourceFileBuilder};
     use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -1235,6 +1233,7 @@ mod tests {
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
+    use crate::{Edit, OldDiagnostic};
     use crate::{Locator, generate_noqa_edits};
 
     fn assert_lexed_ranges_match_slices(
@@ -1254,13 +1253,13 @@ mod tests {
 
     /// Create a [`Message`] with a placeholder filename and rule code from `diagnostic`.
     fn message_from_diagnostic(
-        diagnostic: Diagnostic,
+        diagnostic: OldDiagnostic,
         path: impl AsRef<Path>,
         source: &str,
     ) -> Message {
         let noqa_offset = diagnostic.start();
         let file = SourceFileBuilder::new(path.as_ref().to_string_lossy(), source).finish();
-        Message::from_diagnostic(diagnostic, file, noqa_offset)
+        Message::from_diagnostic(diagnostic, file, Some(noqa_offset))
     }
 
     #[test]
@@ -2843,7 +2842,7 @@ mod tests {
         assert_eq!(count, 0);
         assert_eq!(output, format!("{contents}"));
 
-        let messages = [Diagnostic::new(
+        let messages = [OldDiagnostic::new(
             UnusedVariable {
                 name: "x".to_string(),
             },
@@ -2866,11 +2865,11 @@ mod tests {
         assert_eq!(output, "x = 1  # noqa: F841\n");
 
         let messages = [
-            Diagnostic::new(
+            OldDiagnostic::new(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
             ),
-            Diagnostic::new(
+            OldDiagnostic::new(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
@@ -2895,11 +2894,11 @@ mod tests {
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
 
         let messages = [
-            Diagnostic::new(
+            OldDiagnostic::new(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
             ),
-            Diagnostic::new(
+            OldDiagnostic::new(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
@@ -2937,7 +2936,7 @@ print(
 )
 "#;
         let noqa_line_for = [TextRange::new(8.into(), 68.into())].into_iter().collect();
-        let messages = [Diagnostic::new(
+        let messages = [OldDiagnostic::new(
             PrintfStringFormatting,
             TextRange::new(12.into(), 79.into()),
         )]
@@ -2969,7 +2968,7 @@ print(
 foo;
 bar =
 ";
-        let messages = [Diagnostic::new(
+        let messages = [OldDiagnostic::new(
             UselessSemicolon,
             TextRange::new(4.into(), 5.into()),
         )]

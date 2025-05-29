@@ -24,7 +24,7 @@ mod tests {
     use crate::Locator;
     use crate::linter::check_path;
     use crate::message::Message;
-    use crate::registry::{AsRule, Linter, Rule};
+    use crate::registry::{Linter, Rule};
     use crate::rules::isort;
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
@@ -776,8 +776,7 @@ mod tests {
         messages.sort_by_key(Ranged::start);
         let actual = messages
             .iter()
-            .filter_map(Message::as_diagnostic_message)
-            .map(AsRule::rule)
+            .filter_map(Message::to_rule)
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
     }

@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_index::Indexer;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
+use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for indentation that uses tabs.
@@ -34,7 +34,7 @@ impl Violation for TabIndentation {
 
 /// W191
 pub(crate) fn tab_indentation(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<OldDiagnostic>,
     locator: &Locator,
     indexer: &Indexer,
 ) {
@@ -46,7 +46,7 @@ pub(crate) fn tab_indentation(
 
         // Determine whether the tab is part of the line's indentation.
         if let Some(indent) = tab_indentation_at_line_start(range.start(), locator, indexer) {
-            diagnostics.push(Diagnostic::new(TabIndentation, indent));
+            diagnostics.push(OldDiagnostic::new(TabIndentation, indent));
         }
 
         // Advance to the next line.

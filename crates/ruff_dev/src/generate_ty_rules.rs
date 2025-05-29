@@ -56,6 +56,10 @@ fn generate_markdown() -> String {
 
     let mut output = String::new();
 
+    let _ = writeln!(
+        &mut output,
+        "<!-- WARNING: This file is auto-generated (cargo dev generate-all). Edit the lint-declarations in 'crates/ty_python_semantic/src/types/diagnostic.rs' if you want to change anything here. -->\n"
+    );
     let _ = writeln!(&mut output, "# Rules\n");
 
     let mut lints: Vec<_> = registry.lints().iter().collect();

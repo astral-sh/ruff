@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum MinMax {
@@ -169,7 +169,8 @@ pub(crate) fn nested_min_max(
         };
         MinMax::try_from_call(func.as_ref(), keywords.as_ref(), checker.semantic()) == Some(min_max)
     }) {
-        let mut diagnostic = Diagnostic::new(NestedMinMax { func: min_max }, expr.range());
+        let mut diagnostic =
+            checker.report_diagnostic(NestedMinMax { func: min_max }, expr.range());
         if !checker
             .comment_ranges()
             .has_comments(expr, checker.source())
@@ -188,6 +189,5 @@ pub(crate) fn nested_min_max(
                 expr.range(),
             )));
         }
-        checker.report_diagnostic(diagnostic);
     }
 }

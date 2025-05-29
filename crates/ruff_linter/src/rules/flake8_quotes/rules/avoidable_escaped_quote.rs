@@ -1,15 +1,13 @@
 use flake8_quotes::helpers::{contains_escaped_quote, raw_contents, unescape_string};
 use flake8_quotes::settings::Quote;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::{Visitor, walk_f_string};
 use ruff_python_ast::{self as ast, AnyStringFlags, PythonVersion, StringFlags, StringLike};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_quotes;
-use crate::settings::LinterSettings;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for strings that include escaped quotes, and suggests changing
@@ -61,11 +59,7 @@ pub(crate) fn avoidable_escaped_quote(checker: &Checker, string_like: StringLike
         return;
     }
 
-    let mut rule_checker = AvoidableEscapedQuoteChecker::new(
-        checker.locator(),
-        checker.settings,
-        checker.target_version(),
-    );
+    let mut rule_checker = AvoidableEscapedQuoteChecker::new(checker, checker.target_version());
 
     for part in string_like.parts() {
         match part {
@@ -78,60 +72,42 @@ pub(crate) fn avoidable_escaped_quote(checker: &Checker, string_like: StringLike
             ast::StringLikePart::FString(f_string) => rule_checker.visit_f_string(f_string),
         }
     }
-
-    checker.report_diagnostics(rule_checker.into_diagnostics());
 }
 
 /// Checks for `Q003` violations using the [`Visitor`] implementation.
-#[derive(Debug)]
-struct AvoidableEscapedQuoteChecker<'a> {
-    locator: &'a Locator<'a>,
+struct AvoidableEscapedQuoteChecker<'a, 'b> {
+    checker: &'a Checker<'b>,
     quotes_settings: &'a flake8_quotes::settings::Settings,
     supports_pep701: bool,
-    diagnostics: Vec<Diagnostic>,
 }
 
-impl<'a> AvoidableEscapedQuoteChecker<'a> {
-    fn new(
-        locator: &'a Locator<'a>,
-        settings: &'a LinterSettings,
-        target_version: PythonVersion,
-    ) -> Self {
+impl<'a, 'b> AvoidableEscapedQuoteChecker<'a, 'b> {
+    fn new(checker: &'a Checker<'b>, target_version: PythonVersion) -> Self {
         Self {
-            locator,
-            quotes_settings: &settings.flake8_quotes,
+            checker,
+            quotes_settings: &checker.settings.flake8_quotes,
             supports_pep701: target_version.supports_pep_701(),
-            diagnostics: vec![],
         }
     }
-
-    /// Consumes the checker and returns a vector of [`Diagnostic`] found during the visit.
-    fn into_diagnostics(self) -> Vec<Diagnostic> {
-        self.diagnostics
-    }
 }
 
-impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_> {
-    fn visit_string_literal(&mut self, string_literal: &'_ ast::StringLiteral) {
-        if let Some(diagnostic) = check_string_or_bytes(
-            self.locator,
+impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_, '_> {
+    fn visit_string_literal(&mut self, string_literal: &ast::StringLiteral) {
+        check_string_or_bytes(
+            self.checker,
             self.quotes_settings,
             string_literal.range(),
             AnyStringFlags::from(string_literal.flags),
-        ) {
-            self.diagnostics.push(diagnostic);
-        }
+        );
     }
 
-    fn visit_bytes_literal(&mut self, bytes_literal: &'_ ast::BytesLiteral) {
-        if let Some(diagnostic) = check_string_or_bytes(
-            self.locator,
+    fn visit_bytes_literal(&mut self, bytes_literal: &ast::BytesLiteral) {
+        check_string_or_bytes(
+            self.checker,
             self.quotes_settings,
             bytes_literal.range(),
             AnyStringFlags::from(bytes_literal.flags),
-        ) {
-            self.diagnostics.push(diagnostic);
-        }
+        );
     }
 
     fn visit_f_string(&mut self, f_string: &'_ ast::FString) {
@@ -203,9 +179,7 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_> {
             .literals()
             .any(|literal| contains_quote(literal, opposite_quote_char))
         {
-            if let Some(diagnostic) = check_f_string(self.locator, self.quotes_settings, f_string) {
-                self.diagnostics.push(diagnostic);
-            }
+            check_f_string(self.checker, self.quotes_settings, f_string);
         }
 
         walk_f_string(self, f_string);
@@ -218,20 +192,22 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_> {
 ///
 /// If the string kind is an f-string.
 fn check_string_or_bytes(
-    locator: &Locator,
+    checker: &Checker,
     quotes_settings: &flake8_quotes::settings::Settings,
     range: TextRange,
     flags: AnyStringFlags,
-) -> Option<Diagnostic> {
+) {
     assert!(!flags.is_f_string());
 
+    let locator = checker.locator();
+
     if flags.is_triple_quoted() || flags.is_raw_string() {
-        return None;
+        return;
     }
 
     // Check if we're using the preferred quotation style.
     if Quote::from(flags.quote_style()) != quotes_settings.inline_quotes {
-        return None;
+        return;
     }
 
     let contents = raw_contents(locator.slice(range), flags);
@@ -239,10 +215,10 @@ fn check_string_or_bytes(
     if !contains_escaped_quote(contents, quotes_settings.inline_quotes.as_char())
         || contains_quote(contents, quotes_settings.inline_quotes.opposite().as_char())
     {
-        return None;
+        return;
     }
 
-    let mut diagnostic = Diagnostic::new(AvoidableEscapedQuote, range);
+    let mut diagnostic = checker.report_diagnostic(AvoidableEscapedQuote, range);
     let fixed_contents = format!(
         "{prefix}{quote}{value}{quote}",
         prefix = flags.prefix(),
@@ -253,24 +229,25 @@ fn check_string_or_bytes(
         fixed_contents,
         range,
     )));
-    Some(diagnostic)
 }
 
 /// Checks for unnecessary escaped quotes in an f-string.
 fn check_f_string(
-    locator: &Locator,
+    checker: &Checker,
     quotes_settings: &flake8_quotes::settings::Settings,
     f_string: &ast::FString,
-) -> Option<Diagnostic> {
+) {
+    let locator = checker.locator();
+
     let ast::FString { flags, range, .. } = f_string;
 
     if flags.is_triple_quoted() || flags.prefix().is_raw() {
-        return None;
+        return;
     }
 
     // Check if we're using the preferred quotation style.
     if Quote::from(flags.quote_style()) != quotes_settings.inline_quotes {
-        return None;
+        return;
     }
 
     let quote_char = quotes_settings.inline_quotes.as_char();
@@ -289,7 +266,7 @@ fn check_f_string(
     }
 
     if edits.is_empty() {
-        return None;
+        return;
     }
 
     // Replacement for the f-string opening quote. We don't perform the check for raw and
@@ -320,9 +297,9 @@ fn check_f_string(
         ),
     ));
 
-    Some(
-        Diagnostic::new(AvoidableEscapedQuote, *range).with_fix(Fix::safe_edits(start_edit, edits)),
-    )
+    checker
+        .report_diagnostic(AvoidableEscapedQuote, *range)
+        .set_fix(Fix::safe_edits(start_edit, edits));
 }
 
 #[derive(Debug, Default)]

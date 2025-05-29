@@ -1,12 +1,12 @@
 use ruff_python_ast as ast;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for an empty type-checking block.
@@ -63,7 +63,7 @@ pub(crate) fn empty_type_checking_block(checker: &Checker, stmt: &ast::StmtIf) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, stmt.range());
+    let mut diagnostic = checker.report_diagnostic(EmptyTypeCheckingBlock, stmt.range());
     // Delete the entire type-checking block.
     let stmt = checker.semantic().current_statement();
     let parent = checker.semantic().current_statement_parent();
@@ -71,5 +71,4 @@ pub(crate) fn empty_type_checking_block(checker: &Checker, stmt: &ast::StmtIf) {
     diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().current_statement_parent_id(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

@@ -1,10 +1,10 @@
 use std::path::Path;
 
-use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::CommentRanges;
 
 use crate::Locator;
+use crate::OldDiagnostic;
 use crate::package::PackageRoot;
 use crate::preview::is_allow_nested_roots_enabled;
 use crate::registry::Rule;
@@ -20,8 +20,8 @@ pub(crate) fn check_file_path(
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
     target_version: PythonVersion,
-) -> Vec<Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = vec![];
+) -> Vec<OldDiagnostic> {
+    let mut diagnostics: Vec<OldDiagnostic> = vec![];
 
     // flake8-no-pep420
     if settings.rules.enabled(Rule::ImplicitNamespacePackage) {

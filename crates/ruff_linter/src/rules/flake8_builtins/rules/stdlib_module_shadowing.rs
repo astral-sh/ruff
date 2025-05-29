@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::path::{Component, Path, PathBuf};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_stdlib::path::is_module_file;
@@ -9,6 +8,7 @@ use ruff_python_stdlib::sys::is_known_standard_library;
 use ruff_text_size::TextRange;
 
 use crate::settings::LinterSettings;
+use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for modules that use the same names as Python standard-library
@@ -69,7 +69,7 @@ pub(crate) fn stdlib_module_shadowing(
     mut path: &Path,
     settings: &LinterSettings,
     target_version: PythonVersion,
-) -> Option<Diagnostic> {
+) -> Option<OldDiagnostic> {
     if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file) {
         return None;
     }
@@ -107,7 +107,7 @@ pub(crate) fn stdlib_module_shadowing(
         return None;
     }
 
-    Some(Diagnostic::new(
+    Some(OldDiagnostic::new(
         StdlibModuleShadowing {
             name: module_name.to_string(),
         },

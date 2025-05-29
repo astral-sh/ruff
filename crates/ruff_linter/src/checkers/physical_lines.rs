@@ -1,12 +1,12 @@
 //! Lint rules based on checking physical lines.
 
-use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::TextSize;
 
 use crate::Locator;
+use crate::OldDiagnostic;
 use crate::registry::Rule;
 use crate::rules::flake8_copyright::rules::missing_copyright_notice;
 use crate::rules::pycodestyle::rules::{
@@ -23,8 +23,8 @@ pub(crate) fn check_physical_lines(
     indexer: &Indexer,
     doc_lines: &[TextSize],
     settings: &LinterSettings,
-) -> Vec<Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = vec![];
+) -> Vec<OldDiagnostic> {
+    let mut diagnostics: Vec<OldDiagnostic> = vec![];
 
     let enforce_doc_line_too_long = settings.rules.enabled(Rule::DocLineTooLong);
     let enforce_line_too_long = settings.rules.enabled(Rule::LineTooLong);

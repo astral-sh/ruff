@@ -1,6 +1,4 @@
 use itertools::Itertools;
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::helpers::map_subscript;
@@ -12,6 +10,7 @@ use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
@@ -873,8 +872,6 @@ pub(crate) fn check_docstring(
     section_contexts: &SectionContexts,
     convention: Option<Convention>,
 ) {
-    let mut diagnostics = Vec::new();
-
     // Only check function docstrings.
     let Some(function_def) = definition.as_function_def() else {
         return;
@@ -927,10 +924,8 @@ pub(crate) fn check_docstring(
                                     semantic,
                                 )
                             {
-                                diagnostics.push(Diagnostic::new(
-                                    DocstringMissingReturns,
-                                    docstring.range(),
-                                ));
+                                checker
+                                    .report_diagnostic(DocstringMissingReturns, docstring.range());
                             }
                         }
                         None if body_entries
@@ -938,8 +933,7 @@ pub(crate) fn check_docstring(
                             .iter()
                             .any(|entry| !entry.is_none_return()) =>
                         {
-                            diagnostics
-                                .push(Diagnostic::new(DocstringMissingReturns, docstring.range()));
+                            checker.report_diagnostic(DocstringMissingReturns, docstring.range());
                         }
                         _ => {}
                     }
@@ -958,12 +952,10 @@ pub(crate) fn check_docstring(
                             |arguments| arguments.first().is_none_or(Expr::is_none_literal_expr),
                         ) =>
                     {
-                        diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
+                        checker.report_diagnostic(DocstringMissingYields, docstring.range());
                     }
                     None if body_entries.yields.iter().any(|entry| !entry.is_none_yield) => {
-                        diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
+                        checker.report_diagnostic(DocstringMissingYields, docstring.range());
                     }
                     _ => {}
                 }
@@ -990,13 +982,12 @@ pub(crate) fn check_docstring(
                         .ends_with(exception.segments())
                 })
             }) {
-                let diagnostic = Diagnostic::new(
+                checker.report_diagnostic(
                     DocstringMissingException {
                         id: (*name).to_string(),
                     },
                     docstring.range(),
                 );
-                diagnostics.push(diagnostic);
             }
         }
     }
@@ -1010,8 +1001,7 @@ pub(crate) fn check_docstring(
                 if body_entries.returns.is_empty()
                     || body_entries.returns.iter().all(ReturnEntry::is_implicit)
                 {
-                    let diagnostic = Diagnostic::new(DocstringExtraneousReturns, docstring.range());
-                    diagnostics.push(diagnostic);
+                    checker.report_diagnostic(DocstringExtraneousReturns, docstring.range());
                 }
             }
         }
@@ -1020,8 +1010,7 @@ pub(crate) fn check_docstring(
         if checker.enabled(Rule::DocstringExtraneousYields) {
             if docstring_sections.yields.is_some() {
                 if body_entries.yields.is_empty() {
-                    let diagnostic = Diagnostic::new(DocstringExtraneousYields, docstring.range());
-                    diagnostics.push(diagnostic);
+                    checker.report_diagnostic(DocstringExtraneousYields, docstring.range());
                 }
             }
         }
@@ -1041,17 +1030,14 @@ pub(crate) fn check_docstring(
                     }
                 }
                 if !extraneous_exceptions.is_empty() {
-                    let diagnostic = Diagnostic::new(
+                    checker.report_diagnostic(
                         DocstringExtraneousException {
                             ids: extraneous_exceptions,
                         },
                         docstring.range(),
                     );
-                    diagnostics.push(diagnostic);
                 }
             }
         }
     }
-
-    checker.report_diagnostics(diagnostics);
 }

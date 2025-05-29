@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::noqa::{self, Directive, FileNoqaDirectives, NoqaDirectives};
+use crate::{Edit, Fix, FixAvailability, OldDiagnostic, Violation};
 
 /// ## What it does
 /// Check for `noqa` annotations that suppress all diagnostics, as opposed to
@@ -74,14 +74,14 @@ impl Violation for BlanketNOQA {
 
 /// PGH004
 pub(crate) fn blanket_noqa(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<OldDiagnostic>,
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
     file_noqa_directives: &FileNoqaDirectives,
 ) {
     for line in file_noqa_directives.lines() {
         if let Directive::All(_) = line.parsed_file_exemption {
-            diagnostics.push(Diagnostic::new(
+            diagnostics.push(OldDiagnostic::new(
                 BlanketNOQA {
                     missing_colon: false,
                     file_exemption: true,
@@ -105,7 +105,7 @@ pub(crate) fn blanket_noqa(
                 // Ex) `# noqa F401`
                 let start = all.end();
                 let end = start + cursor.token_len();
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = OldDiagnostic::new(
                     BlanketNOQA {
                         missing_colon: true,
                         file_exemption: false,
@@ -116,7 +116,7 @@ pub(crate) fn blanket_noqa(
                 diagnostics.push(diagnostic);
             } else {
                 // Otherwise, it looks like an intentional blanket `noqa` annotation.
-                diagnostics.push(Diagnostic::new(
+                diagnostics.push(OldDiagnostic::new(
                     BlanketNOQA {
                         missing_colon: false,
                         file_exemption: false,

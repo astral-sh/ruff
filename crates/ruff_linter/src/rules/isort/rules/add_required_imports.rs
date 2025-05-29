@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::{self as ast, ModModule, PySourceType, Stmt};
@@ -10,6 +9,7 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::Locator;
 use crate::importer::Importer;
 use crate::settings::LinterSettings;
+use crate::{AlwaysFixableViolation, Fix, OldDiagnostic};
 
 /// ## What it does
 /// Adds any required imports, as specified by the user, to the top of the
@@ -91,7 +91,7 @@ fn add_required_import(
     locator: &Locator,
     stylist: &Stylist,
     source_type: PySourceType,
-) -> Option<Diagnostic> {
+) -> Option<OldDiagnostic> {
     // Don't add imports to semantically-empty files.
     if parsed.suite().iter().all(is_docstring_stmt) {
         return None;
@@ -112,7 +112,7 @@ fn add_required_import(
     }
 
     // Always insert the diagnostic at top-of-file.
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = OldDiagnostic::new(
         MissingRequiredImport(required_import.to_string()),
         TextRange::default(),
     );
@@ -129,7 +129,7 @@ pub(crate) fn add_required_imports(
     stylist: &Stylist,
     settings: &LinterSettings,
     source_type: PySourceType,
-) -> Vec<Diagnostic> {
+) -> Vec<OldDiagnostic> {
     settings
         .isort
         .required_imports

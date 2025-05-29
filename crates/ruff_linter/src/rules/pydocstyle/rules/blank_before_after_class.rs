@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::{PythonWhitespace, indentation_at_offset};
 use ruff_source_file::{Line, LineRanges, UniversalNewlineIterator};
@@ -8,6 +7,7 @@ use ruff_text_size::TextRange;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::Rule;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for docstrings on class definitions that are not preceded by a
@@ -193,26 +193,25 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
 
         if checker.enabled(Rule::BlankLineBeforeClass) {
             if blank_lines_before != 0 {
-                let mut diagnostic = Diagnostic::new(BlankLineBeforeClass, docstring.range());
+                let mut diagnostic =
+                    checker.report_diagnostic(BlankLineBeforeClass, docstring.range());
                 // Delete the blank line before the class.
                 diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                     blank_lines_start,
                     docstring.line_start(),
                 )));
-                checker.report_diagnostic(diagnostic);
             }
         }
         if checker.enabled(Rule::IncorrectBlankLineBeforeClass) {
             if blank_lines_before != 1 {
                 let mut diagnostic =
-                    Diagnostic::new(IncorrectBlankLineBeforeClass, docstring.range());
+                    checker.report_diagnostic(IncorrectBlankLineBeforeClass, docstring.range());
                 // Insert one blank line before the class.
                 diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                     checker.stylist().line_ending().to_string(),
                     blank_lines_start,
                     docstring.line_start(),
                 )));
-                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -245,7 +244,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
                 let indentation = indentation_at_offset(docstring.start(), checker.source())
                     .expect("Own line docstring must have indentation");
                 let mut diagnostic =
-                    Diagnostic::new(IncorrectBlankLineAfterClass, docstring.range());
+                    checker.report_diagnostic(IncorrectBlankLineAfterClass, docstring.range());
                 let line_ending = checker.stylist().line_ending().as_str();
                 // We have to trim the whitespace twice, once before the semicolon above and
                 // once after the semicolon here, or we get invalid indents:
@@ -259,7 +258,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
                     replacement_start,
                     first_line.end(),
                 )));
-                checker.report_diagnostic(diagnostic);
+
                 return;
             } else if trailing.starts_with('#') {
                 // Keep the end-of-line comment, start counting empty lines after it
@@ -280,14 +279,14 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
         }
 
         if blank_lines_after != 1 {
-            let mut diagnostic = Diagnostic::new(IncorrectBlankLineAfterClass, docstring.range());
+            let mut diagnostic =
+                checker.report_diagnostic(IncorrectBlankLineAfterClass, docstring.range());
             // Insert a blank line before the class (replacing any existing lines).
             diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                 checker.stylist().line_ending().to_string(),
                 replacement_start,
                 blank_lines_end,
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

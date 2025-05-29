@@ -23,6 +23,14 @@ use ty_project::{Db, ProjectDatabase};
 use ty_python_semantic::Program;
 use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen]
+pub fn version() -> String {
+    option_env!("TY_WASM_COMMIT_SHORT_HASH")
+        .or_else(|| option_env!("CARGO_PKG_VERSION"))
+        .unwrap_or("unknown")
+        .to_string()
+}
+
 #[wasm_bindgen(start)]
 pub fn run() {
     use log::Level;
@@ -179,14 +187,14 @@ impl Workspace {
     /// Checks a single file.
     #[wasm_bindgen(js_name = "checkFile")]
     pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<Diagnostic>, Error> {
-        let result = self.db.check_file(file_id.file).map_err(into_error)?;
+        let result = self.db.check_file(file_id.file);
 
         Ok(result.into_iter().map(Diagnostic::wrap).collect())
     }
 
     /// Checks all open files
     pub fn check(&self) -> Result<Vec<Diagnostic>, Error> {
-        let result = self.db.check().map_err(into_error)?;
+        let result = self.db.check();
 
         Ok(result.into_iter().map(Diagnostic::wrap).collect())
     }

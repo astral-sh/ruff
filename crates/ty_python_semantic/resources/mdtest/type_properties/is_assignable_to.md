@@ -204,6 +204,34 @@ static_assert(is_assignable_to(type[AnyMeta], type[object]))
 static_assert(is_assignable_to(type[AnyMeta], type[Any]))
 ```
 
+## Class-literals that inherit from `Any`
+
+Class-literal types that inherit from `Any` are assignable to any type `T` where `T` is assignable
+to `type`:
+
+```py
+from typing import Any
+from ty_extensions import is_assignable_to, static_assert, TypeOf
+
+def test(x: Any):
+    class Foo(x): ...
+    class Bar(Any): ...
+    static_assert(is_assignable_to(TypeOf[Foo], Any))
+    static_assert(is_assignable_to(TypeOf[Foo], type))
+    static_assert(is_assignable_to(TypeOf[Foo], type[int]))
+    static_assert(is_assignable_to(TypeOf[Foo], type[Any]))
+
+    static_assert(is_assignable_to(TypeOf[Bar], Any))
+    static_assert(is_assignable_to(TypeOf[Bar], type))
+    static_assert(is_assignable_to(TypeOf[Bar], type[int]))
+    static_assert(is_assignable_to(TypeOf[Bar], type[Any]))
+
+    static_assert(not is_assignable_to(TypeOf[Foo], int))
+    static_assert(not is_assignable_to(TypeOf[Bar], int))
+```
+
+This is because the `Any` element in the MRO could materialize to any subtype of `type`.
+
 ## Heterogeneous tuple types
 
 ```py
@@ -580,11 +608,49 @@ c: Callable[[Any], str] = A().g
 ```py
 from typing import Any, Callable
 
+c: Callable[[object], type] = type
 c: Callable[[str], Any] = str
 c: Callable[[str], Any] = int
 
 # error: [invalid-assignment]
 c: Callable[[str], Any] = object
+
+class A:
+    def __init__(self, x: int) -> None: ...
+
+a: Callable[[int], A] = A
+
+class C:
+    def __new__(cls, *args, **kwargs) -> "C":
+        return super().__new__(cls)
+
+    def __init__(self, x: int) -> None: ...
+
+c: Callable[[int], C] = C
+```
+
+### Generic class literal types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable
+
+class B[T]:
+    def __init__(self, x: T) -> None: ...
+
+b: Callable[[int], B[int]] = B[int]
+
+class C[T]:
+    def __new__(cls, *args, **kwargs) -> "C[T]":
+        return super().__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+c: Callable[[int], C[int]] = C[int]
 ```
 
 ### Overloads
@@ -642,6 +708,29 @@ from functools import partial
 def f(x: int, y: str) -> None: ...
 
 c1: Callable[[int], None] = partial(f, y="a")
+```
+
+### Classes with `__call__` as attribute
+
+An instance type is assignable to a compatible callable type if the instance type's class has a
+callable `__call__` attribute.
+
+TODO: for the moment, we don't consider the callable type as a bound-method descriptor, but this may
+change for better compatibility with mypy/pyright.
+
+```py
+from typing import Callable
+from ty_extensions import static_assert, is_assignable_to
+
+def call_impl(a: int) -> str:
+    return ""
+
+class A:
+    __call__: Callable[[int], str] = call_impl
+
+static_assert(is_assignable_to(A, Callable[[int], str]))
+static_assert(not is_assignable_to(A, Callable[[int], int]))
+reveal_type(A()(1))  # revealed: str
 ```
 
 ## Generics

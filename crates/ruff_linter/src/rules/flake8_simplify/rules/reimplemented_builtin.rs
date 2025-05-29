@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
@@ -13,6 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
 use crate::line_width::LineWidthBuilder;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `for` loops that can be replaced with a builtin function, like
@@ -33,6 +33,10 @@ use crate::line_width::LineWidthBuilder;
 /// ```python
 /// return any(predicate(item) for item in iterable)
 /// ```
+///
+/// # Fix safety
+///
+/// This fix is always marked as unsafe because it might remove comments.
 ///
 /// ## References
 /// - [Python documentation: `any`](https://docs.python.org/3/library/functions.html#any)
@@ -107,7 +111,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 ReimplementedBuiltin {
                     replacement: contents.to_string(),
                 },
@@ -120,7 +124,6 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                     terminal.stmt.end(),
                 )));
             }
-            checker.report_diagnostic(diagnostic);
         }
         // Replace with `all`.
         (false, true) => {
@@ -199,7 +202,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 ReimplementedBuiltin {
                     replacement: contents.to_string(),
                 },
@@ -212,7 +215,6 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                     terminal.stmt.end(),
                 )));
             }
-            checker.report_diagnostic(diagnostic);
         }
         _ => {}
     }

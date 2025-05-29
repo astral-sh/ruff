@@ -294,4 +294,8 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
 
 /// Whether or not the .py/.pyi version of this file is expected to fail
 #[rustfmt::skip]
-const KNOWN_FAILURES: &[(&str, bool, bool)] = &[];
+const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
+    // Fails with too-many-cycle-iterations due to a self-referential
+    // type alias, see https://github.com/astral-sh/ty/issues/256
+    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_34.py", true, true),
+];

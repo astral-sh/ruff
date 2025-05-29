@@ -87,8 +87,8 @@ export default function Chrome() {
       <Header
         edit={revision}
         theme={theme}
-        logo="ruff"
-        version={ruffVersion}
+        tool="ruff"
+        version={`v${ruffVersion}`}
         onChangeTheme={setTheme}
         onShare={handleShare}
         onReset={handleResetClicked}

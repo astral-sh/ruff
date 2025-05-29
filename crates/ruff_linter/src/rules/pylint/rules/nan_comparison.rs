@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -66,26 +66,17 @@ fn nan_comparison_impl<'a>(checker: &Checker, comparators: impl Iterator<Item = 
         if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {
             match qualified_name.segments() {
                 ["numpy", "nan" | "NAN" | "NaN"] => {
-                    checker.report_diagnostic(Diagnostic::new(
-                        NanComparison { nan: Nan::NumPy },
-                        expr.range(),
-                    ));
+                    checker.report_diagnostic(NanComparison { nan: Nan::NumPy }, expr.range());
                 }
                 ["math", "nan"] => {
-                    checker.report_diagnostic(Diagnostic::new(
-                        NanComparison { nan: Nan::Math },
-                        expr.range(),
-                    ));
+                    checker.report_diagnostic(NanComparison { nan: Nan::Math }, expr.range());
                 }
                 _ => continue,
             }
         }
 
         if is_nan_float(expr, checker.semantic()) {
-            checker.report_diagnostic(Diagnostic::new(
-                NanComparison { nan: Nan::Math },
-                expr.range(),
-            ));
+            checker.report_diagnostic(NanComparison { nan: Nan::Math }, expr.range());
         }
     }
 }

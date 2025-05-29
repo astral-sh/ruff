@@ -249,6 +249,25 @@ impl Diagnostic {
             diagnostic: self,
         }
     }
+
+    /// Returns all annotations, skipping the first primary annotation.
+    pub fn secondary_annotations(&self) -> impl Iterator<Item = &Annotation> {
+        let mut seen_primary = false;
+        self.inner.annotations.iter().filter(move |ann| {
+            if seen_primary {
+                true
+            } else if ann.is_primary {
+                seen_primary = true;
+                false
+            } else {
+                true
+            }
+        })
+    }
+
+    pub fn sub_diagnostics(&self) -> &[SubDiagnostic] {
+        &self.inner.subs
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -371,6 +390,57 @@ impl SubDiagnostic {
     pub fn annotate(&mut self, ann: Annotation) {
         self.inner.annotations.push(ann);
     }
+
+    pub fn annotations(&self) -> &[Annotation] {
+        &self.inner.annotations
+    }
+
+    /// Returns a shared borrow of the "primary" annotation of this diagnostic
+    /// if one exists.
+    ///
+    /// When there are multiple primary annotations, then the first one that
+    /// was added to this diagnostic is returned.
+    pub fn primary_annotation(&self) -> Option<&Annotation> {
+        self.inner.annotations.iter().find(|ann| ann.is_primary)
+    }
+
+    /// Introspects this diagnostic and returns what kind of "primary" message
+    /// it contains for concise formatting.
+    ///
+    /// When we concisely format diagnostics, we likely want to not only
+    /// include the primary diagnostic message but also the message attached
+    /// to the primary annotation. In particular, the primary annotation often
+    /// contains *essential* information or context for understanding the
+    /// diagnostic.
+    ///
+    /// The reason why we don't just always return both the main diagnostic
+    /// message and the primary annotation message is because this was written
+    /// in the midst of an incremental migration of ty over to the new
+    /// diagnostic data model. At time of writing, diagnostics were still
+    /// constructed in the old model where the main diagnostic message and the
+    /// primary annotation message were not distinguished from each other. So
+    /// for now, we carefully return what kind of messages this diagnostic
+    /// contains. In effect, if this diagnostic has a non-empty main message
+    /// *and* a non-empty primary annotation message, then the diagnostic is
+    /// 100% using the new diagnostic data model and we can format things
+    /// appropriately.
+    ///
+    /// The type returned implements the `std::fmt::Display` trait. In most
+    /// cases, just converting it to a string (or printing it) will do what
+    /// you want.
+    pub fn concise_message(&self) -> ConciseMessage {
+        let main = self.inner.message.as_str();
+        let annotation = self
+            .primary_annotation()
+            .and_then(|ann| ann.get_message())
+            .unwrap_or_default();
+        match (main.is_empty(), annotation.is_empty()) {
+            (false, true) => ConciseMessage::MainDiagnostic(main),
+            (true, false) => ConciseMessage::PrimaryAnnotation(annotation),
+            (false, false) => ConciseMessage::Both { main, annotation },
+            (true, true) => ConciseMessage::Empty,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -491,6 +561,11 @@ impl Annotation {
     /// Returns the `Span` associated with this annotation.
     pub fn get_span(&self) -> &Span {
         &self.span
+    }
+
+    /// Sets the span on this annotation.
+    pub fn set_span(&mut self, span: Span) {
+        self.span = span;
     }
 
     /// Returns the tags associated with this annotation.
@@ -616,7 +691,7 @@ impl DiagnosticId {
     ///
     /// Note that this doesn't include the lint's category. It
     /// only includes the lint's name.
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             DiagnosticId::Panic => "panic",
             DiagnosticId::Io => "io",

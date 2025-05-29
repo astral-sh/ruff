@@ -3,12 +3,11 @@ use std::borrow::Cow;
 use anyhow::Result;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{Binding, Imported, NodeId, Scope};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, DiagnosticGuard};
 use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
@@ -19,6 +18,7 @@ use crate::rules::flake8_type_checking::helpers::{
 use crate::rules::flake8_type_checking::imports::ImportBinding;
 use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::isort::{ImportSection, ImportType, categorize};
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for first-party imports that are only used for type annotations, but
@@ -393,15 +393,18 @@ pub(crate) fn typing_only_runtime_import(
             ..
         } in imports
         {
-            let mut diagnostic =
-                diagnostic_for(import_type, import.qualified_name().to_string(), range);
+            let mut diagnostic = diagnostic_for(
+                checker,
+                import_type,
+                import.qualified_name().to_string(),
+                range,
+            );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
             if let Some(fix) = fix.as_ref() {
                 diagnostic.set_fix(fix.clone());
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -415,12 +418,15 @@ pub(crate) fn typing_only_runtime_import(
             ..
         } in imports
         {
-            let mut diagnostic =
-                diagnostic_for(import_type, import.qualified_name().to_string(), range);
+            let mut diagnostic = diagnostic_for(
+                checker,
+                import_type,
+                import.qualified_name().to_string(),
+                range,
+            );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -436,16 +442,21 @@ fn rule_for(import_type: ImportType) -> Rule {
 }
 
 /// Return the [`Diagnostic`] for the given import type.
-fn diagnostic_for(import_type: ImportType, qualified_name: String, range: TextRange) -> Diagnostic {
+fn diagnostic_for<'a, 'b>(
+    checker: &'a Checker<'b>,
+    import_type: ImportType,
+    qualified_name: String,
+    range: TextRange,
+) -> DiagnosticGuard<'a, 'b> {
     match import_type {
         ImportType::StandardLibrary => {
-            Diagnostic::new(TypingOnlyStandardLibraryImport { qualified_name }, range)
+            checker.report_diagnostic(TypingOnlyStandardLibraryImport { qualified_name }, range)
         }
         ImportType::ThirdParty => {
-            Diagnostic::new(TypingOnlyThirdPartyImport { qualified_name }, range)
+            checker.report_diagnostic(TypingOnlyThirdPartyImport { qualified_name }, range)
         }
         ImportType::FirstParty => {
-            Diagnostic::new(TypingOnlyFirstPartyImport { qualified_name }, range)
+            checker.report_diagnostic(TypingOnlyFirstPartyImport { qualified_name }, range)
         }
         _ => unreachable!("Unexpected import type"),
     }

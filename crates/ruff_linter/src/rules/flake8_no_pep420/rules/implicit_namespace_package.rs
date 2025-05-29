@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PySourceType;
 use ruff_python_ast::script::ScriptTag;
@@ -11,6 +10,7 @@ use crate::Locator;
 use crate::comments::shebang::ShebangDirective;
 use crate::fs;
 use crate::package::PackageRoot;
+use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for packages that are missing an `__init__.py` file.
@@ -64,7 +64,7 @@ pub(crate) fn implicit_namespace_package(
     project_root: &Path,
     src: &[PathBuf],
     allow_nested_roots: bool,
-) -> Option<Diagnostic> {
+) -> Option<OldDiagnostic> {
     if package.is_none()
         // Ignore non-`.py` files, which don't require an `__init__.py`.
         && PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file)
@@ -83,7 +83,7 @@ pub(crate) fn implicit_namespace_package(
         // Ignore PEP 723 scripts.
         && ScriptTag::parse(locator.contents().as_bytes()).is_none()
     {
-        return Some(Diagnostic::new(
+        return Some(OldDiagnostic::new(
             ImplicitNamespacePackage {
                 filename: fs::relativize_path(path),
                 parent: None,
@@ -100,7 +100,7 @@ pub(crate) fn implicit_namespace_package(
                     .ancestors()
                     .find(|parent| !parent.join("__init__.py").exists())
                 {
-                    return Some(Diagnostic::new(
+                    return Some(OldDiagnostic::new(
                         ImplicitNamespacePackage {
                             filename: fs::relativize_path(path),
                             parent: Some(fs::relativize_path(parent)),

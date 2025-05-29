@@ -461,6 +461,7 @@ ISC.py:91:5: ISC001 [*] Implicitly concatenated string literals on one line
    91 |+_ = "\128" # fix should be "\128"
 92 92 | _ = "\12""foo" # fix should be "\12foo"
 93 93 | _ = "\12" ""  # fix should be "\12"
+94 94 | 
 
 ISC.py:92:5: ISC001 [*] Implicitly concatenated string literals on one line
    |
@@ -479,6 +480,8 @@ ISC.py:92:5: ISC001 [*] Implicitly concatenated string literals on one line
 92    |-_ = "\12""foo" # fix should be "\12foo"
    92 |+_ = "\12foo" # fix should be "\12foo"
 93 93 | _ = "\12" ""  # fix should be "\12"
+94 94 | 
+95 95 | 
 
 ISC.py:93:5: ISC001 [*] Implicitly concatenated string literals on one line
    |
@@ -495,3 +498,6 @@ ISC.py:93:5: ISC001 [*] Implicitly concatenated string literals on one line
 92 92 | _ = "\12""foo" # fix should be "\12foo"
 93    |-_ = "\12" ""  # fix should be "\12"
    93 |+_ = "\12"  # fix should be "\12"
+94 94 | 
+95 95 | 
+96 96 | # Mixed literal + non-literal scenarios
