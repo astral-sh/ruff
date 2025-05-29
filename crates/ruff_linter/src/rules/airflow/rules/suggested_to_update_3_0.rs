@@ -211,7 +211,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 name: "AssetAny",
             },
             "expand_alias_to_datasets" => Replacement::AutoImport {
-                module: "airflow.sdk",
+                module: "airflow.models.asset",
                 name: "expand_alias_to_assets",
             },
             _ => return,
@@ -256,7 +256,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             name: (*rest).to_string(),
         },
         ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => Replacement::AutoImport {
-            module: "airflow.sdk.definitions.baseoperatorlink",
+            module: "airflow.sdk",
             name: "BaseOperatorLink",
         },
         // airflow.model..DAG

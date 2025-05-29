@@ -171,13 +171,13 @@ AIR311_names.py:28:1: AIR311 [*] `airflow.datasets.expand_alias_to_datasets` is 
 29 |
 30 | # airflow.decorators
    |
-   = help: Use `expand_alias_to_assets` from `airflow.sdk` instead.
+   = help: Use `expand_alias_to_assets` from `airflow.models.asset` instead.
 
 ℹ Safe fix
 15 15 |     task,
 16 16 |     task_group,
 17 17 | )
-   18 |+from airflow.sdk import expand_alias_to_assets
+   18 |+from airflow.models.asset import expand_alias_to_assets
 18 19 | 
 19 20 | # airflow
 20 21 | DatasetFromRoot()
@@ -521,7 +521,7 @@ AIR311_names.py:65:1: AIR311 [*] `airflow.models.baseoperatorlink.BaseOperatorLi
 66 |
 67 | # airflow.models.dag
    |
-   = help: Use `BaseOperatorLink` from `airflow.sdk.definitions.baseoperatorlink` instead.
+   = help: Use `BaseOperatorLink` from `airflow.sdk` instead.
 
 ℹ Unsafe fix
 41 41 |     Variable,
@@ -529,7 +529,7 @@ AIR311_names.py:65:1: AIR311 [*] `airflow.models.baseoperatorlink.BaseOperatorLi
 43 43 | from airflow.models.baseoperator import chain, chain_linear, cross_downstream
 44    |-from airflow.models.baseoperatorlink import BaseOperatorLink
 45 44 | from airflow.models.dag import DAG as DAGFromDag
-   45 |+from airflow.sdk.definitions.baseoperatorlink import BaseOperatorLink
+   45 |+from airflow.sdk import BaseOperatorLink
 46 46 | 
 47 47 | # airflow.decorators
 48 48 | teardown()
