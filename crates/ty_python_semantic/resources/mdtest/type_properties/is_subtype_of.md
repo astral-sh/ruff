@@ -352,7 +352,7 @@ from typing_extensions import TypeGuard, TypeIs
 
 # TODO: TypeGuard
 # static_assert(is_subtype_of(TypeGuard[int], bool))
-# static_assert(is_subtype_of(TypeIs[str], bool))
+static_assert(is_subtype_of(TypeIs[str], bool))
 ```
 
 `TypeIs` is invariant. `TypeGuard` is covariant.

@@ -2344,8 +2344,7 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
-            | Type::LiteralString
-            | Type::TypeIs(_) => {
+            | Type::LiteralString => {
                 // Note: The literal types included in this pattern are not true singletons.
                 // There can be multiple Python objects (at different memory locations) that
                 // are both of type Literal[345], for example.
@@ -2455,6 +2454,7 @@ impl<'db> Type<'db> {
                 false
             }
             Type::AlwaysTruthy | Type::AlwaysFalsy => false,
+            Type::TypeIs(type_is) => type_is.is_bound(db),
         }
     }
 
@@ -2512,6 +2512,8 @@ impl<'db> Type<'db> {
                 false
             }
 
+            Type::TypeIs(type_is) => type_is.is_bound(db),
+
             Type::Dynamic(_)
             | Type::Never
             | Type::Union(..)
@@ -2522,8 +2524,7 @@ impl<'db> Type<'db> {
             | Type::Callable(_)
             | Type::PropertyInstance(_)
             | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::TypeIs(_) => false,
+            | Type::DataclassTransformer(_) => false,
         }
     }
 
