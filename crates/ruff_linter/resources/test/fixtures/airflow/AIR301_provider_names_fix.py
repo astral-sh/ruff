@@ -9,9 +9,6 @@ from airflow.providers.common.io.dataset.file import (
     convert_dataset_to_openlineage as io_convert_dataset_to_openlineage,
 )
 from airflow.providers.common.io.dataset.file import create_dataset as io_create_dataset
-
-
-
 from airflow.providers.openlineage.utils.utils import (
     DatasetInfo,
     translate_airflow_dataset,
@@ -46,12 +43,14 @@ has_access_dataset
 from airflow.providers.google.datasets.bigquery import (
     create_dataset as bigquery_create_dataset,
 )
+
 bigquery_create_dataset()
 
 # airflow.providers.google.datasets.gcs
-from airflow.providers.google.datasets.gcs import create_dataset as gcs_create_dataset
 from airflow.providers.google.datasets.gcs import (
     convert_dataset_to_openlineage as gcs_convert_dataset_to_openlineage,
 )
+from airflow.providers.google.datasets.gcs import create_dataset as gcs_create_dataset
+
 gcs_create_dataset()
 gcs_convert_dataset_to_openlineage()
