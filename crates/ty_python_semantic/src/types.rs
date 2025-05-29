@@ -2166,6 +2166,25 @@ impl<'db> Type<'db> {
 
             (
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
+                Type::NominalInstance(instance),
+            )
+            | (
+                Type::NominalInstance(instance),
+                Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
+            ) if instance.class.is_final(db) => {
+                let member = self.member_lookup_with_policy(
+                    db,
+                    Name::new_static("__call__"),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                );
+                match member.symbol {
+                    Symbol::Type(ty, _) => !ty.is_assignable_to(db, CallableType::unknown(db)),
+                    Symbol::Unbound => true,
+                }
+            }
+
+            (
+                Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
                 _,
             )
             | (
