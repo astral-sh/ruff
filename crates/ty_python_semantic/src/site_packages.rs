@@ -143,13 +143,14 @@ impl PythonEnvironment {
 ///
 /// We only need to distinguish cases that change the on-disk layout.
 /// Everything else can be treated like CPython.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub(crate) enum PythonImplementation {
     CPython,
     PyPy,
     GraalPy,
     /// Fallback when the value is missing or unrecognised.
     /// We treat it like CPython but keep the information for diagnostics.
+    #[default]
     Unknown,
 }
 
@@ -210,96 +211,24 @@ impl VirtualEnvironment {
             .read_to_string(&pyvenv_cfg_path)
             .map_err(|io_err| SitePackagesDiscoveryError::NoPyvenvCfgFile(path.origin, io_err))?;
 
-        let mut include_system_site_packages = false;
-        let mut base_executable_home_path = None;
-        let mut version_info_string = None;
-        let mut implementation = PythonImplementation::Unknown;
-        let mut created_with_uv = false;
-        let mut parent_environment = None;
-        let mut cursor = Cursor::new(&pyvenv_cfg);
-        let mut line_number = NonZeroUsize::new(1).unwrap();
+        let parsed_pyvenv_cfg =
+            PyvenvCfgParser::new(&pyvenv_cfg)
+                .parse()
+                .map_err(|pyvenv_parse_error| {
+                    SitePackagesDiscoveryError::PyvenvCfgParseError(
+                        pyvenv_cfg_path.clone(),
+                        pyvenv_parse_error,
+                    )
+                })?;
 
-        // A `pyvenv.cfg` file *looks* like a `.ini` file, but actually isn't valid `.ini` syntax!
-        // The Python standard-library's `site` module parses these files by splitting each line on
-        // '=' characters, so that's what we should do as well.
-        //
-        // See also: https://snarky.ca/how-virtual-environments-work/
-        while !cursor.is_eof() {
-            if line_number.get() != 1 {
-                line_number = line_number.checked_add(1).unwrap();
-            }
-
-            cursor.eat_while(|c| c.is_whitespace() && c != '\n');
-
-            let remaining_file = cursor.chars().as_str();
-
-            let next_newline_position = remaining_file
-                .find('\n')
-                .unwrap_or(cursor.text_len().to_usize());
-
-            let Some(eq_position) = remaining_file[..next_newline_position].find('=') else {
-                // Skip over any lines that do not contain '=' characters, same as the CPython stdlib
-                // <https://github.com/python/cpython/blob/e64395e8eb8d3a9e35e3e534e87d427ff27ab0a5/Lib/site.py#L625-L632>
-                cursor.skip_bytes(next_newline_position);
-                if !cursor.is_eof() {
-                    cursor.bump();
-                }
-                continue;
-            };
-
-            let key = remaining_file[..eq_position].trim();
-
-            cursor.skip_bytes(eq_position + 1);
-            cursor.eat_while(char::is_whitespace);
-
-            let value = remaining_file[eq_position + 1..next_newline_position].trim();
-
-            if value.is_empty() {
-                return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
-                    pyvenv_cfg_path,
-                    PyvenvCfgParseErrorKind::MalformedKeyValuePair { line_number },
-                ));
-            }
-
-            let value_offset = cursor.offset();
-
-            match key {
-                "include-system-site-packages" => {
-                    include_system_site_packages = value.eq_ignore_ascii_case("true");
-                }
-                "home" => base_executable_home_path = Some(value),
-                // `virtualenv` and `uv` call this key `version_info`,
-                // but the stdlib venv module calls it `version`
-                "version" | "version_info" => {
-                    let version_range =
-                        TextRange::new(value_offset, value_offset + value.text_len());
-                    version_info_string = Some((value, version_range));
-                }
-                "implementation" => {
-                    implementation = match value.to_ascii_lowercase().as_str() {
-                        "cpython" => PythonImplementation::CPython,
-                        "graalvm" => PythonImplementation::GraalPy,
-                        "pypy" => PythonImplementation::PyPy,
-                        _ => PythonImplementation::Unknown,
-                    };
-                }
-                "uv" => created_with_uv = true,
-                "extends-environment" => parent_environment = Some(value),
-                "" => {
-                    return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
-                        pyvenv_cfg_path,
-                        PyvenvCfgParseErrorKind::MalformedKeyValuePair { line_number },
-                    ));
-                }
-                _ => {}
-            }
-
-            cursor.eat_while(|c| c != '\n');
-
-            if !cursor.is_eof() {
-                cursor.bump();
-            }
-        }
+        let RawPyvenvCfg {
+            include_system_site_packages,
+            base_executable_home_path,
+            version,
+            implementation,
+            created_with_uv,
+            parent_environment,
+        } = parsed_pyvenv_cfg;
 
         // The `home` key is read by the standard library's `site.py` module,
         // so if it's missing from the `pyvenv.cfg` file
@@ -311,6 +240,7 @@ impl VirtualEnvironment {
                 PyvenvCfgParseErrorKind::NoHomeKey,
             ));
         };
+
         let base_executable_home_path = PythonHomePath::new(base_executable_home_path, system)
             .map_err(|io_err| {
                 SitePackagesDiscoveryError::PyvenvCfgParseError(
@@ -345,10 +275,11 @@ impl VirtualEnvironment {
         // created the `pyvenv.cfg` file. Lenient parsing is appropriate here:
         // the file isn't really *invalid* if it doesn't have this key,
         // or if the value doesn't parse according to our expectations.
-        let version = version_info_string.and_then(|(version_string, range)| {
+        let version = version.and_then(|(version_string, range)| {
             let mut version_info_parts = version_string.split('.');
             let (major, minor) = (version_info_parts.next()?, version_info_parts.next()?);
             let version = PythonVersion::try_from((major, minor)).ok()?;
+
             let canonical_path = pyvenv_cfg_path
                 .as_std_path()
                 .canonicalize()
@@ -359,6 +290,7 @@ impl VirtualEnvironment {
                 canonical_path,
                 Some(range),
             ));
+
             Some(PythonVersionWithSource { version, source })
         });
 
@@ -448,6 +380,127 @@ System site-packages will not be used for module resolution.",
         );
         Ok(site_packages_directories)
     }
+}
+
+/// A parser for `pyvenv.cfg` files: metadata files for virtual environments.
+///
+/// Note that a `pyvenv.cfg` file *looks* like a `.ini` file, but actually isn't valid `.ini` syntax!
+///
+/// See also: <https://snarky.ca/how-virtual-environments-work/>
+#[derive(Debug)]
+struct PyvenvCfgParser<'s> {
+    cursor: Cursor<'s>,
+    line_number: NonZeroUsize,
+    data: RawPyvenvCfg<'s>,
+}
+
+impl<'s> PyvenvCfgParser<'s> {
+    fn new(source: &'s str) -> Self {
+        Self {
+            cursor: Cursor::new(source),
+            line_number: NonZeroUsize::new(1).unwrap(),
+            data: RawPyvenvCfg::default(),
+        }
+    }
+
+    fn parse(mut self) -> Result<RawPyvenvCfg<'s>, PyvenvCfgParseErrorKind> {
+        while !self.cursor.is_eof() {
+            self.parse_line()?;
+            self.line_number = self.line_number.checked_add(1).unwrap();
+        }
+        Ok(self.data)
+    }
+
+    fn parse_line(&mut self) -> Result<(), PyvenvCfgParseErrorKind> {
+        let PyvenvCfgParser {
+            cursor,
+            line_number,
+            data,
+        } = self;
+
+        let line_number = *line_number;
+
+        cursor.eat_while(|c| c.is_whitespace() && c != '\n');
+
+        let remaining_file = cursor.chars().as_str();
+
+        let next_newline_position = remaining_file
+            .find('\n')
+            .unwrap_or(cursor.text_len().to_usize());
+
+        // The Python standard-library's `site` module parses these files by splitting each line on
+        // '=' characters, so that's what we should do as well.
+        let Some(eq_position) = remaining_file[..next_newline_position].find('=') else {
+            // Skip over any lines that do not contain '=' characters, same as the CPython stdlib
+            // <https://github.com/python/cpython/blob/e64395e8eb8d3a9e35e3e534e87d427ff27ab0a5/Lib/site.py#L625-L632>
+            cursor.skip_bytes(next_newline_position);
+            if !cursor.is_eof() {
+                cursor.bump();
+            }
+            return Ok(());
+        };
+
+        let key = remaining_file[..eq_position].trim();
+
+        cursor.skip_bytes(eq_position + 1);
+        cursor.eat_while(|c| c.is_whitespace() && c != '\n');
+
+        let value = remaining_file[eq_position + 1..next_newline_position].trim();
+
+        if value.is_empty() {
+            return Err(PyvenvCfgParseErrorKind::MalformedKeyValuePair { line_number });
+        }
+
+        let value_offset = cursor.offset();
+
+        match key {
+            "include-system-site-packages" => {
+                data.include_system_site_packages = value.eq_ignore_ascii_case("true");
+            }
+            "home" => data.base_executable_home_path = Some(value),
+            // `virtualenv` and `uv` call this key `version_info`,
+            // but the stdlib venv module calls it `version`
+            "version" | "version_info" => {
+                let version_range = TextRange::new(value_offset, value_offset + value.text_len());
+                data.version = Some((value, version_range));
+            }
+            "implementation" => {
+                data.implementation = match value.to_ascii_lowercase().as_str() {
+                    "cpython" => PythonImplementation::CPython,
+                    "graalvm" => PythonImplementation::GraalPy,
+                    "pypy" => PythonImplementation::PyPy,
+                    _ => PythonImplementation::Unknown,
+                };
+            }
+            "uv" => data.created_with_uv = true,
+            "extends-environment" => data.parent_environment = Some(value),
+            "" => {
+                return Err(PyvenvCfgParseErrorKind::MalformedKeyValuePair { line_number });
+            }
+            _ => {}
+        }
+
+        cursor.eat_while(|c| c != '\n');
+
+        if !cursor.is_eof() {
+            cursor.bump();
+        }
+
+        Ok(())
+    }
+}
+
+/// A `key:value` mapping derived from parsing a `pyvenv.cfg` file.
+///
+/// This data contained within is still mostly raw and unvalidated.
+#[derive(Debug, Default)]
+struct RawPyvenvCfg<'s> {
+    include_system_site_packages: bool,
+    base_executable_home_path: Option<&'s str>,
+    version: Option<(&'s str, TextRange)>,
+    implementation: PythonImplementation,
+    created_with_uv: bool,
+    parent_environment: Option<&'s str>,
 }
 
 /// A Python environment that is _not_ a virtual environment.
