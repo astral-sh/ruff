@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.11.12
+
+### Preview features
+
+- \[`airflow`\] Revise fix titles (`AIR3`) ([#18215](https://github.com/astral-sh/ruff/pull/18215))
+- \[`pylint`\] Implement `missing-maxsplit-arg` (`PLC0207`) ([#17454](https://github.com/astral-sh/ruff/pull/17454))
+- \[`pyupgrade`\] New rule `UP050` (`useless-class-metaclass-type`) ([#18334](https://github.com/astral-sh/ruff/pull/18334))
+- \[`flake8-use-pathlib`\] Replace `os.symlink` with `Path.symlink_to` (`PTH211`) ([#18337](https://github.com/astral-sh/ruff/pull/18337))
+
+### Bug fixes
+
+- \[`flake8-bugbear`\] Ignore `__debug__` attribute in `B010` ([#18357](https://github.com/astral-sh/ruff/pull/18357))
+- \[`flake8-async`\] Fix `anyio.sleep` argument name (`ASYNC115`, `ASYNC116`) ([#18262](https://github.com/astral-sh/ruff/pull/18262))
+- \[`refurb`\] Fix `FURB129` autofix generating invalid syntax ([#18235](https://github.com/astral-sh/ruff/pull/18235))
+
+### Rule changes
+
+- \[`flake8-implicit-str-concat`\] Add autofix for `ISC003` ([#18256](https://github.com/astral-sh/ruff/pull/18256))
+- \[`pycodestyle`\] Improve the diagnostic message for `E712` ([#18328](https://github.com/astral-sh/ruff/pull/18328))
+- \[`flake8-2020`\] Fix diagnostic message for `!=` comparisons (`YTT201`) ([#18293](https://github.com/astral-sh/ruff/pull/18293))
+- \[`pyupgrade`\] Make fix unsafe if it deletes comments (`UP010`) ([#18291](https://github.com/astral-sh/ruff/pull/18291))
+
+### Documentation
+
+- Simplify rules table to improve readability ([#18297](https://github.com/astral-sh/ruff/pull/18297))
+- Update editor integrations link in README ([#17977](https://github.com/astral-sh/ruff/pull/17977))
+- \[`flake8-bugbear`\] Add fix safety section (`B006`) ([#17652](https://github.com/astral-sh/ruff/pull/17652))
+
 ## 0.11.11
 
 ### Preview features

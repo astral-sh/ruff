@@ -7,7 +7,7 @@ use rustc_hash::FxBuildHasher;
 use crate::Db;
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
-use crate::types::{ClassLiteral, ClassType, KnownInstanceType, Type};
+use crate::types::{ClassLiteral, ClassType, KnownInstanceType, SpecialFormType, Type};
 
 /// The inferred method resolution order of a given class.
 ///
@@ -92,7 +92,7 @@ impl<'db> Mro<'db> {
             original_bases: &[Type<'db>],
             remaining_bases: &[Type<'db>],
         ) {
-            if original_bases.contains(&Type::KnownInstance(KnownInstanceType::Protocol(None))) {
+            if original_bases.contains(&Type::SpecialForm(SpecialFormType::Protocol)) {
                 return;
             }
             if remaining_bases.iter().any(Type::is_generic_alias) {
@@ -146,7 +146,8 @@ impl<'db> Mro<'db> {
                         single_base,
                         Type::GenericAlias(_)
                             | Type::KnownInstance(
-                                KnownInstanceType::Generic(_) | KnownInstanceType::Protocol(_)
+                                KnownInstanceType::SubscriptedGeneric(_)
+                                    | KnownInstanceType::SubscriptedProtocol(_)
                             )
                     ) =>
             {
@@ -178,7 +179,7 @@ impl<'db> Mro<'db> {
                     // (see `infer::TypeInferenceBuilder::check_class_definitions`),
                     // which is why we only care about `KnownInstanceType::Generic(Some(_))`,
                     // not `KnownInstanceType::Generic(None)`.
-                    if let Type::KnownInstance(KnownInstanceType::Generic(Some(_))) = base {
+                    if let Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_)) = base {
                         maybe_add_generic(
                             &mut resolved_bases,
                             original_bases,
@@ -226,7 +227,11 @@ impl<'db> Mro<'db> {
 
                 if class.has_pep_695_type_params(db)
                     && original_bases.iter().any(|base| {
-                        matches!(base, Type::KnownInstance(KnownInstanceType::Generic(_)))
+                        matches!(
+                            base,
+                            Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
+                                | Type::SpecialForm(SpecialFormType::Generic)
+                        )
                     })
                 {
                     return Err(MroErrorKind::Pep695ClassWithGenericInheritance);

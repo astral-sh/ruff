@@ -29,7 +29,7 @@ pub(crate) use self::infer::{
     infer_scope_types,
 };
 pub(crate) use self::narrow::ClassInfoConstraintFunction;
-pub(crate) use self::signatures::{CallableSignature, Signature, Signatures};
+pub(crate) use self::signatures::{CallableSignature, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, file_to_module, resolve_module};
@@ -41,7 +41,7 @@ use crate::suppression::check_suppressions;
 use crate::symbol::{
     Boundness, Symbol, SymbolAndQualifiers, imported_symbol, symbol_from_bindings,
 };
-use crate::types::call::{Bindings, CallArgumentTypes, CallableBinding};
+use crate::types::call::{Binding, Bindings, CallArgumentTypes, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
@@ -54,8 +54,8 @@ pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
 use instance::Protocol;
-pub(crate) use instance::{NominalInstanceType, ProtocolInstanceType};
-pub(crate) use known_instance::KnownInstanceType;
+pub use instance::{NominalInstanceType, ProtocolInstanceType};
+pub use special_form::SpecialFormType;
 
 mod builder;
 mod call;
@@ -67,12 +67,12 @@ mod display;
 mod generics;
 mod infer;
 mod instance;
-mod known_instance;
 mod mro;
 mod narrow;
 mod protocol_class;
 mod signatures;
 mod slots;
+mod special_form;
 mod string_annotation;
 mod subclass_of;
 mod type_ordering;
@@ -511,7 +511,12 @@ pub enum Type<'db> {
     /// The set of Python objects that conform to the interface described by a given protocol.
     /// Construct this variant using the `Type::instance` constructor function.
     ProtocolInstance(ProtocolInstanceType<'db>),
-    /// A single Python object that requires special treatment in the type system
+    /// A single Python object that requires special treatment in the type system,
+    /// and which exists at a location that can be known prior to any analysis by ty.
+    SpecialForm(SpecialFormType),
+    /// Singleton types that are heavily special-cased by ty, and which are usually
+    /// created as a result of some runtime operation (e.g. a type-alias statement,
+    /// a typevar definition, or `Generic[T]` in a class's bases list).
     KnownInstance(KnownInstanceType<'db>),
     /// An instance of `builtins.property`
     PropertyInstance(PropertyInstanceType<'db>),
@@ -664,6 +669,7 @@ impl<'db> Type<'db> {
             | Self::ModuleLiteral(_)
             | Self::ClassLiteral(_)
             | Self::NominalInstance(_)
+            | Self::SpecialForm(_)
             | Self::KnownInstance(_)
             | Self::PropertyInstance(_)
             | Self::BoundMethod(_)
@@ -691,6 +697,7 @@ impl<'db> Type<'db> {
             | Self::ModuleLiteral(_)
             | Self::FunctionLiteral(_)
             | Self::ClassLiteral(_)
+            | Self::SpecialForm(_)
             | Self::KnownInstance(_)
             | Self::StringLiteral(_)
             | Self::IntLiteral(_)
@@ -936,19 +943,6 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::IntLiteral variant")
     }
 
-    pub const fn into_known_instance(self) -> Option<KnownInstanceType<'db>> {
-        match self {
-            Type::KnownInstance(known_instance) => Some(known_instance),
-            _ => None,
-        }
-    }
-
-    #[track_caller]
-    pub fn expect_known_instance(self) -> KnownInstanceType<'db> {
-        self.into_known_instance()
-            .expect("Expected a Type::KnownInstance variant")
-    }
-
     pub const fn into_tuple(self) -> Option<TupleType<'db>> {
         match self {
             Type::Tuple(tuple_type) => Some(tuple_type),
@@ -1042,6 +1036,7 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
+            | Type::SpecialForm(_)
             | Type::IntLiteral(_) => self,
         }
     }
@@ -1351,11 +1346,14 @@ impl<'db> Type<'db> {
             }
 
             (Type::ClassLiteral(class_literal), Type::Callable(_)) => {
-                if let Some(callable) = class_literal.into_callable(db) {
-                    return callable.is_subtype_of(db, target);
-                }
-                false
+                ClassType::NonGeneric(class_literal)
+                    .into_callable(db)
+                    .is_subtype_of(db, target)
             }
+
+            (Type::GenericAlias(alias), Type::Callable(_)) => ClassType::Generic(alias)
+                .into_callable(db)
+                .is_subtype_of(db, target),
 
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
@@ -1382,9 +1380,11 @@ impl<'db> Type<'db> {
                     metaclass_instance_type.is_subtype_of(db, target)
                 }),
 
-            // For example: `Type::KnownInstance(KnownInstanceType::Type)` is a subtype of `Type::NominalInstance(_SpecialForm)`,
-            // because `Type::KnownInstance(KnownInstanceType::Type)` is a set with exactly one runtime value in it
+            // For example: `Type::SpecialForm(SpecialFormType::Type)` is a subtype of `Type::NominalInstance(_SpecialForm)`,
+            // because `Type::SpecialForm(SpecialFormType::Type)` is a set with exactly one runtime value in it
             // (the symbol `typing.Type`), and that symbol is known to be an instance of `typing._SpecialForm` at runtime.
+            (Type::SpecialForm(left), right) => left.instance_fallback(db).is_subtype_of(db, right),
+
             (Type::KnownInstance(left), right) => {
                 left.instance_fallback(db).is_subtype_of(db, right)
             }
@@ -1656,11 +1656,14 @@ impl<'db> Type<'db> {
             }
 
             (Type::ClassLiteral(class_literal), Type::Callable(_)) => {
-                if let Some(callable) = class_literal.into_callable(db) {
-                    return callable.is_assignable_to(db, target);
-                }
-                false
+                ClassType::NonGeneric(class_literal)
+                    .into_callable(db)
+                    .is_assignable_to(db, target)
             }
+
+            (Type::GenericAlias(alias), Type::Callable(_)) => ClassType::Generic(alias)
+                .into_callable(db)
+                .is_assignable_to(db, target),
 
             (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
                 self_function_literal
@@ -1878,6 +1881,7 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
                 | Type::GenericAlias(..)
+                | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
                 right @ (Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
@@ -1890,6 +1894,7 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
                 | Type::GenericAlias(..)
+                | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
             ) => left != right,
 
@@ -2022,6 +2027,11 @@ impl<'db> Type<'db> {
                 | Type::IntLiteral(..)),
             ) => !ty.satisfies_protocol(db, protocol),
 
+            (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
+            | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => !special_form
+                .instance_fallback(db)
+                .satisfies_protocol(db, protocol),
+
             (Type::ProtocolInstance(protocol), Type::KnownInstance(known_instance))
             | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => {
                 !known_instance
@@ -2057,15 +2067,24 @@ impl<'db> Type<'db> {
                     .is_disjoint_from(db, other),
             },
 
+            (Type::SpecialForm(special_form), Type::NominalInstance(instance))
+            | (Type::NominalInstance(instance), Type::SpecialForm(special_form)) => {
+                !special_form.is_instance_of(db, instance.class)
+            }
+
             (Type::KnownInstance(known_instance), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::KnownInstance(known_instance)) => {
                 !known_instance.is_instance_of(db, instance.class)
             }
 
-            (known_instance_ty @ Type::KnownInstance(_), Type::Tuple(tuple))
-            | (Type::Tuple(tuple), known_instance_ty @ Type::KnownInstance(_)) => {
-                known_instance_ty.is_disjoint_from(db, tuple.homogeneous_supertype(db))
-            }
+            (
+                known_instance_ty @ (Type::SpecialForm(_) | Type::KnownInstance(_)),
+                Type::Tuple(tuple),
+            )
+            | (
+                Type::Tuple(tuple),
+                known_instance_ty @ (Type::SpecialForm(_) | Type::KnownInstance(_)),
+            ) => known_instance_ty.is_disjoint_from(db, tuple.homogeneous_supertype(db)),
 
             (Type::BooleanLiteral(..), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::BooleanLiteral(..)) => {
@@ -2225,6 +2244,7 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::BytesLiteral(_)
+            | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -2339,15 +2359,16 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(..)
             | Type::GenericAlias(..)
             | Type::ModuleLiteral(..) => true,
-            Type::KnownInstance(known_instance) => {
-                // Nearly all `KnownInstance` types are singletons, but if a symbol could validly
+            Type::SpecialForm(special_form) => {
+                // Nearly all `SpecialForm` types are singletons, but if a symbol could validly
                 // originate from either `typing` or `typing_extensions` then this is not guaranteed.
-                // E.g. `typing.Protocol` is equivalent to `typing_extensions.Protocol`, so both are treated
-                // as inhabiting the type `KnownInstanceType::Protocol` in our model, but they are actually
+                // E.g. `typing.TypeGuard` is equivalent to `typing_extensions.TypeGuard`, so both are treated
+                // as inhabiting the type `SpecialFormType::TypeGuard` in our model, but they are actually
                 // distinct symbols at different memory addresses at runtime.
-                !(known_instance.check_module(KnownModule::Typing)
-                    && known_instance.check_module(KnownModule::TypingExtensions))
+                !(special_form.check_module(KnownModule::Typing)
+                    && special_form.check_module(KnownModule::TypingExtensions))
             }
+            Type::KnownInstance(_) => false,
             Type::Callable(_) => {
                 // A callable type is never a singleton because for any given signature,
                 // there could be any number of distinct objects that are all callable with that
@@ -2415,6 +2436,7 @@ impl<'db> Type<'db> {
             | Type::BooleanLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
+            | Type::SpecialForm(..)
             | Type::KnownInstance(..) => true,
 
             Type::ProtocolInstance(..) => {
@@ -2569,6 +2591,7 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
+            | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
@@ -2693,7 +2716,7 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .instance_member(db, name),
 
-            Type::KnownInstance(_) => Symbol::Unbound.into(),
+            Type::SpecialForm(_) | Type::KnownInstance(_) => Symbol::Unbound.into(),
 
             Type::PropertyInstance(_) => KnownClass::Property
                 .to_instance(db)
@@ -2768,7 +2791,7 @@ impl<'db> Type<'db> {
                     Some((self, AttributeKind::NormalOrNonDataDescriptor))
                 } else {
                     Some((
-                        Type::Callable(callable.bind_self(db)),
+                        callable.bind_self(db),
                         AttributeKind::NormalOrNonDataDescriptor,
                     ))
                 };
@@ -3168,6 +3191,7 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::Tuple(..)
             | Type::TypeVar(..)
+            | Type::SpecialForm(..)
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..) => {
@@ -3449,6 +3473,7 @@ impl<'db> Type<'db> {
             | Type::PropertyInstance(_)
             | Type::BoundSuper(_)
             | Type::KnownInstance(_)
+            | Type::SpecialForm(_)
             | Type::AlwaysTruthy => Truthiness::AlwaysTrue,
 
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
@@ -3546,28 +3571,28 @@ impl<'db> Type<'db> {
         non_negative_int_literal(db, return_ty)
     }
 
-    /// Returns the call signatures of a type.
+    /// Returns a [`Bindings`] that can be used to analyze a call to this type. You must call
+    /// [`match_parameters`][Bindings::match_parameters] and [`check_types`][Bindings::check_types]
+    /// to fully analyze a particular call site.
     ///
-    /// Note that all types have a valid [`Signatures`], even if the type is not callable.
-    /// Moreover, "callable" can be subtle for a union type, since some union elements might be
-    /// callable and some not. A union is callable if every element type is callable — and even
-    /// then, the elements might be inconsistent, such that there's no argument list that's valid
-    /// for all elements. It's usually best to only worry about "callability" relative to a
-    /// particular argument list, via [`try_call`][Self::try_call] and
-    /// [`CallErrorKind::NotCallable`].
-    fn signatures(self, db: &'db dyn Db) -> Signatures<'db> {
+    /// Note that we return a [`Bindings`] for all types, even if the type is not callable.
+    /// "Callable" can be subtle for a union type, since some union elements might be callable and
+    /// some not. A union is callable if every element type is callable — but even then, the
+    /// elements might be inconsistent, such that there's no argument list that's valid for all
+    /// elements. It's usually best to only worry about "callability" relative to a particular
+    /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
+    fn bindings(self, db: &'db dyn Db) -> Bindings<'db> {
         match self {
-            Type::Callable(callable) => Signatures::single(match callable.signatures(db) {
-                [signature] => CallableSignature::single(self, signature.clone()),
-                signatures => CallableSignature::from_overloads(self, signatures.iter().cloned()),
-            }),
+            Type::Callable(callable) => {
+                CallableBinding::from_overloads(self, callable.signatures(db).iter().cloned())
+                    .into()
+            }
 
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
-                Signatures::single(
-                    CallableSignature::from_overloads(self, signature.overloads.iter().cloned())
-                        .with_bound_type(bound_method.self_instance(db)),
-                )
+                CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
+                    .with_bound_type(bound_method.self_instance(db))
+                    .into()
             }
 
             Type::MethodWrapper(
@@ -3591,7 +3616,7 @@ impl<'db> Type<'db> {
                 // specified yet, they will be dynamically added in `Bindings::evaluate_known_cases`.
 
                 let not_none = Type::none(db).negate(db);
-                let signature = CallableSignature::from_overloads(
+                CallableBinding::from_overloads(
                     self,
                     [
                         Signature::new(
@@ -3617,8 +3642,8 @@ impl<'db> Type<'db> {
                             None,
                         ),
                     ],
-                );
-                Signatures::single(signature)
+                )
+                .into()
             }
 
             Type::WrapperDescriptor(
@@ -3644,7 +3669,7 @@ impl<'db> Type<'db> {
                         unreachable!("Not part of outer match pattern")
                     }
                 };
-                let signature = CallableSignature::from_overloads(
+                CallableBinding::from_overloads(
                     self,
                     [
                         Signature::new(
@@ -3674,86 +3699,85 @@ impl<'db> Type<'db> {
                             None,
                         ),
                     ],
-                );
-                Signatures::single(signature)
+                )
+                .into()
             }
 
-            Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(_)) => {
-                Signatures::single(CallableSignature::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("instance")))
-                                .with_annotated_type(Type::object(db)),
-                            Parameter::positional_only(Some(Name::new_static("value")))
-                                .with_annotated_type(Type::object(db)),
-                        ]),
-                        None,
-                    ),
-                ))
-            }
-            Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderSet) => {
-                Signatures::single(CallableSignature::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("self")))
-                                .with_annotated_type(KnownClass::Property.to_instance(db)),
-                            Parameter::positional_only(Some(Name::new_static("instance")))
-                                .with_annotated_type(Type::object(db)),
-                            Parameter::positional_only(Some(Name::new_static("value")))
-                                .with_annotated_type(Type::object(db)),
-                        ]),
-                        None,
-                    ),
-                ))
-            }
+            Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(_)) => Binding::single(
+                self,
+                Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("instance")))
+                            .with_annotated_type(Type::object(db)),
+                        Parameter::positional_only(Some(Name::new_static("value")))
+                            .with_annotated_type(Type::object(db)),
+                    ]),
+                    None,
+                ),
+            )
+            .into(),
 
-            Type::MethodWrapper(MethodWrapperKind::StrStartswith(_)) => {
-                Signatures::single(CallableSignature::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("prefix")))
-                                .with_annotated_type(UnionType::from_elements(
-                                    db,
-                                    [
-                                        KnownClass::Str.to_instance(db),
-                                        KnownClass::Tuple.to_specialized_instance(
-                                            db,
-                                            [KnownClass::Str.to_instance(db)],
-                                        ),
-                                    ],
-                                )),
-                            Parameter::positional_only(Some(Name::new_static("start")))
-                                .with_annotated_type(UnionType::from_elements(
-                                    db,
-                                    [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
-                                ))
-                                .with_default_type(Type::none(db)),
-                            Parameter::positional_only(Some(Name::new_static("end")))
-                                .with_annotated_type(UnionType::from_elements(
-                                    db,
-                                    [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
-                                ))
-                                .with_default_type(Type::none(db)),
-                        ]),
-                        Some(KnownClass::Bool.to_instance(db)),
-                    ),
-                ))
-            }
+            Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderSet) => Binding::single(
+                self,
+                Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(KnownClass::Property.to_instance(db)),
+                        Parameter::positional_only(Some(Name::new_static("instance")))
+                            .with_annotated_type(Type::object(db)),
+                        Parameter::positional_only(Some(Name::new_static("value")))
+                            .with_annotated_type(Type::object(db)),
+                    ]),
+                    None,
+                ),
+            )
+            .into(),
+
+            Type::MethodWrapper(MethodWrapperKind::StrStartswith(_)) => Binding::single(
+                self,
+                Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("prefix")))
+                            .with_annotated_type(UnionType::from_elements(
+                                db,
+                                [
+                                    KnownClass::Str.to_instance(db),
+                                    KnownClass::Tuple.to_specialized_instance(
+                                        db,
+                                        [KnownClass::Str.to_instance(db)],
+                                    ),
+                                ],
+                            )),
+                        Parameter::positional_only(Some(Name::new_static("start")))
+                            .with_annotated_type(UnionType::from_elements(
+                                db,
+                                [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                            ))
+                            .with_default_type(Type::none(db)),
+                        Parameter::positional_only(Some(Name::new_static("end")))
+                            .with_annotated_type(UnionType::from_elements(
+                                db,
+                                [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                            ))
+                            .with_default_type(Type::none(db)),
+                    ]),
+                    Some(KnownClass::Bool.to_instance(db)),
+                ),
+            )
+            .into(),
 
             // TODO: We should probably also check the original return type of the function
             // that was decorated with `@dataclass_transform`, to see if it is consistent with
             // with what we configure here.
-            Type::DataclassTransformer(_) => Signatures::single(CallableSignature::single(
+            Type::DataclassTransformer(_) => Binding::single(
                 self,
                 Signature::new(
                     Parameters::new([Parameter::positional_only(Some(Name::new_static("func")))
                         .with_annotated_type(Type::object(db))]),
                     None,
                 ),
-            )),
+            )
+            .into(),
 
             Type::FunctionLiteral(function_type) => match function_type.known(db) {
                 Some(
@@ -3762,62 +3786,54 @@ impl<'db> Type<'db> {
                     | KnownFunction::IsAssignableTo
                     | KnownFunction::IsDisjointFrom
                     | KnownFunction::IsGradualEquivalentTo,
-                ) => {
-                    let signature = CallableSignature::single(
-                        self,
-                        Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("a")))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                                Parameter::positional_only(Some(Name::new_static("b")))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                            ]),
-                            Some(KnownClass::Bool.to_instance(db)),
-                        ),
-                    );
-                    Signatures::single(signature)
-                }
+                ) => Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("a")))
+                                .type_form()
+                                .with_annotated_type(Type::any()),
+                            Parameter::positional_only(Some(Name::new_static("b")))
+                                .type_form()
+                                .with_annotated_type(Type::any()),
+                        ]),
+                        Some(KnownClass::Bool.to_instance(db)),
+                    ),
+                )
+                .into(),
 
                 Some(
                     KnownFunction::IsFullyStatic
                     | KnownFunction::IsSingleton
                     | KnownFunction::IsSingleValued,
-                ) => {
-                    let signature = CallableSignature::single(
-                        self,
-                        Signature::new(
-                            Parameters::new([Parameter::positional_only(Some(Name::new_static(
-                                "a",
-                            )))
+                ) => Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new([Parameter::positional_only(Some(Name::new_static("a")))
                             .type_form()
                             .with_annotated_type(Type::any())]),
-                            Some(KnownClass::Bool.to_instance(db)),
-                        ),
-                    );
-                    Signatures::single(signature)
-                }
+                        Some(KnownClass::Bool.to_instance(db)),
+                    ),
+                )
+                .into(),
 
-                Some(KnownFunction::AssertType) => {
-                    let signature = CallableSignature::single(
-                        self,
-                        Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("value")))
-                                    .with_annotated_type(Type::any()),
-                                Parameter::positional_only(Some(Name::new_static("type")))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                            ]),
-                            Some(Type::none(db)),
-                        ),
-                    );
-                    Signatures::single(signature)
-                }
+                Some(KnownFunction::AssertType) => Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("value")))
+                                .with_annotated_type(Type::any()),
+                            Parameter::positional_only(Some(Name::new_static("type")))
+                                .type_form()
+                                .with_annotated_type(Type::any()),
+                        ]),
+                        Some(Type::none(db)),
+                    ),
+                )
+                .into(),
 
                 Some(KnownFunction::AssertNever) => {
-                    let signature = CallableSignature::single(
+                    Binding::single(
                         self,
                         Signature::new(
                             Parameters::new([Parameter::positional_only(Some(Name::new_static(
@@ -3830,29 +3846,27 @@ impl<'db> Type<'db> {
                             .with_annotated_type(Type::any())]),
                             Some(Type::none(db)),
                         ),
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
-                Some(KnownFunction::Cast) => {
-                    let signature = CallableSignature::single(
-                        self,
-                        Signature::new(
-                            Parameters::new([
-                                Parameter::positional_or_keyword(Name::new_static("typ"))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                                Parameter::positional_or_keyword(Name::new_static("val"))
-                                    .with_annotated_type(Type::any()),
-                            ]),
-                            Some(Type::any()),
-                        ),
-                    );
-                    Signatures::single(signature)
-                }
+                Some(KnownFunction::Cast) => Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_or_keyword(Name::new_static("typ"))
+                                .type_form()
+                                .with_annotated_type(Type::any()),
+                            Parameter::positional_or_keyword(Name::new_static("val"))
+                                .with_annotated_type(Type::any()),
+                        ]),
+                        Some(Type::any()),
+                    ),
+                )
+                .into(),
 
                 Some(KnownFunction::Dataclass) => {
-                    let signature = CallableSignature::from_overloads(
+                    CallableBinding::from_overloads(
                         self,
                         [
                             // def dataclass(cls: None, /) -> Callable[[type[_T]], type[_T]]: ...
@@ -3922,12 +3936,15 @@ impl<'db> Type<'db> {
                                 None,
                             ),
                         ],
-                    );
-
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
-                _ => Signatures::single(function_type.signature(db).overloads.clone()),
+                _ => CallableBinding::from_overloads(
+                    self,
+                    function_type.signature(db).overloads.iter().cloned(),
+                )
+                .into(),
             },
 
             Type::ClassLiteral(class) => match class.known(db) {
@@ -3942,7 +3959,7 @@ impl<'db> Type<'db> {
                     // class bool(int):
                     //     def __new__(cls, o: object = ..., /) -> Self: ...
                     // ```
-                    let signature = CallableSignature::single(
+                    Binding::single(
                         self,
                         Signature::new(
                             Parameters::new([Parameter::positional_only(Some(Name::new_static(
@@ -3952,8 +3969,8 @@ impl<'db> Type<'db> {
                             .with_default_type(Type::BooleanLiteral(false))]),
                             Some(KnownClass::Bool.to_instance(db)),
                         ),
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
                 Some(KnownClass::Str) => {
@@ -3964,7 +3981,7 @@ impl<'db> Type<'db> {
                     //     @overload
                     //     def __new__(cls, object: ReadableBuffer, encoding: str = ..., errors: str = ...) -> Self: ...
                     // ```
-                    let signature = CallableSignature::from_overloads(
+                    CallableBinding::from_overloads(
                         self,
                         [
                             Signature::new(
@@ -3997,8 +4014,8 @@ impl<'db> Type<'db> {
                                 Some(KnownClass::Str.to_instance(db)),
                             ),
                         ],
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
                 Some(KnownClass::Type) => {
@@ -4012,7 +4029,7 @@ impl<'db> Type<'db> {
                     //     @overload
                     //     def __init__(self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None: ...
                     // ```
-                    let signature = CallableSignature::from_overloads(
+                    CallableBinding::from_overloads(
                         self,
                         [
                             Signature::new(
@@ -4042,29 +4059,32 @@ impl<'db> Type<'db> {
                                 Some(type_instance),
                             ),
                         ],
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
+
                 Some(KnownClass::NamedTuple) => {
-                    Signatures::single(CallableSignature::todo("functional `NamedTuple` syntax"))
+                    Binding::single(self, Signature::todo("functional `NamedTuple` syntax")).into()
                 }
+
                 Some(KnownClass::Object) => {
                     // ```py
                     // class object:
                     //    def __init__(self) -> None: ...
                     //    def __new__(cls) -> Self: ...
                     // ```
-                    let signature = CallableSignature::from_overloads(
+                    Binding::single(
                         self,
-                        [Signature::new(
+                        Signature::new(
                             Parameters::empty(),
                             Some(KnownClass::Object.to_instance(db)),
-                        )],
-                    );
-                    Signatures::single(signature)
+                        ),
+                    )
+                    .into()
                 }
+
                 Some(KnownClass::Enum) => {
-                    Signatures::single(CallableSignature::todo("functional `Enum` syntax"))
+                    Binding::single(self, Signature::todo("functional `Enum` syntax")).into()
                 }
 
                 Some(KnownClass::Super) => {
@@ -4077,7 +4097,7 @@ impl<'db> Type<'db> {
                     //     @overload
                     //     def __init__(self) -> None: ...
                     // ```
-                    let signature = CallableSignature::from_overloads(
+                    CallableBinding::from_overloads(
                         self,
                         [
                             Signature::new(
@@ -4101,8 +4121,8 @@ impl<'db> Type<'db> {
                                 Some(KnownClass::Super.to_instance(db)),
                             ),
                         ],
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
                 Some(KnownClass::TypeVar) => {
@@ -4119,7 +4139,7 @@ impl<'db> Type<'db> {
                     //         default: Any = ...,
                     //     ) -> Self: ...
                     // ```
-                    let signature = CallableSignature::single(
+                    Binding::single(
                         self,
                         Signature::new(
                             Parameters::new([
@@ -4151,8 +4171,8 @@ impl<'db> Type<'db> {
                             ]),
                             Some(KnownClass::TypeVar.to_instance(db)),
                         ),
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
                 Some(KnownClass::TypeAliasType) => {
@@ -4165,7 +4185,7 @@ impl<'db> Type<'db> {
                     //     type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()
                     // ) -> Self: ...
                     // ```
-                    let signature = CallableSignature::single(
+                    Binding::single(
                         self,
                         Signature::new(
                             Parameters::new([
@@ -4190,8 +4210,8 @@ impl<'db> Type<'db> {
                             ]),
                             None,
                         ),
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
                 Some(KnownClass::Property) => {
@@ -4215,7 +4235,7 @@ impl<'db> Type<'db> {
                         Some(Type::any()),
                     );
 
-                    let signature = CallableSignature::single(
+                    Binding::single(
                         self,
                         Signature::new(
                             Parameters::new([
@@ -4223,10 +4243,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [
-                                            Type::Callable(CallableType::single(
-                                                db,
-                                                getter_signature,
-                                            )),
+                                            CallableType::single(db, getter_signature),
                                             Type::none(db),
                                         ],
                                     ))
@@ -4235,10 +4252,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [
-                                            Type::Callable(CallableType::single(
-                                                db,
-                                                setter_signature,
-                                            )),
+                                            CallableType::single(db, setter_signature),
                                             Type::none(db),
                                         ],
                                     ))
@@ -4247,10 +4261,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [
-                                            Type::Callable(CallableType::single(
-                                                db,
-                                                deleter_signature,
-                                            )),
+                                            CallableType::single(db, deleter_signature),
                                             Type::none(db),
                                         ],
                                     ))
@@ -4264,8 +4275,8 @@ impl<'db> Type<'db> {
                             ]),
                             None,
                         ),
-                    );
-                    Signatures::single(signature)
+                    )
+                    .into()
                 }
 
                 // Most class literal constructor calls are handled by `try_call_constructor` and
@@ -4273,21 +4284,19 @@ impl<'db> Type<'db> {
                 // cases (e.g. evaluating callable subtyping). TODO improve this definition
                 // (intersection of `__new__` and `__init__` signatures? and respect metaclass
                 // `__call__`).
-                _ => {
-                    let signature = CallableSignature::single(
-                        self,
-                        Signature::new_generic(
-                            class.generic_context(db),
-                            Parameters::gradual_form(),
-                            self.to_instance(db),
-                        ),
-                    );
-                    Signatures::single(signature)
-                }
+                _ => Binding::single(
+                    self,
+                    Signature::new_generic(
+                        class.generic_context(db),
+                        Parameters::gradual_form(),
+                        self.to_instance(db),
+                    ),
+                )
+                .into(),
             },
 
-            Type::KnownInstance(KnownInstanceType::TypedDict) => {
-                Signatures::single(CallableSignature::single(
+            Type::SpecialForm(SpecialFormType::TypedDict) => {
+                Binding::single(
                     self,
                     Signature::new(
                         Parameters::new([
@@ -4305,28 +4314,28 @@ impl<'db> Type<'db> {
                         ]),
                         None,
                     ),
-                ))
+                )
+                .into()
             }
 
             Type::GenericAlias(_) => {
                 // TODO annotated return type on `__new__` or metaclass `__call__`
                 // TODO check call vs signatures of `__new__` and/or `__init__`
-                let signature = CallableSignature::single(
+                Binding::single(
                     self,
                     Signature::new(Parameters::gradual_form(), self.to_instance(db)),
-                );
-                Signatures::single(signature)
+                )
+                .into()
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                SubclassOfInner::Dynamic(dynamic_type) => {
-                    Type::Dynamic(dynamic_type).signatures(db)
-                }
+                SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type).bindings(db),
+
                 // Most type[] constructor calls are handled by `try_call_constructor` and not via
                 // getting the signature here. This signature can still be used in some cases (e.g.
                 // evaluating callable subtyping). TODO improve this definition (intersection of
                 // `__new__` and `__init__` signatures? and respect metaclass `__call__`).
-                SubclassOfInner::Class(class) => Type::from(class).signatures(db),
+                SubclassOfInner::Class(class) => Type::from(class).bindings(db),
             },
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
@@ -4344,41 +4353,46 @@ impl<'db> Type<'db> {
                     .symbol
                 {
                     Symbol::Type(dunder_callable, boundness) => {
-                        let mut signatures = dunder_callable.signatures(db).clone();
-                        signatures.replace_callable_type(dunder_callable, self);
+                        let mut bindings = dunder_callable.bindings(db);
+                        bindings.replace_callable_type(dunder_callable, self);
                         if boundness == Boundness::PossiblyUnbound {
-                            signatures.set_dunder_call_is_possibly_unbound();
+                            bindings.set_dunder_call_is_possibly_unbound();
                         }
-                        signatures
+                        bindings
                     }
-                    Symbol::Unbound => Signatures::not_callable(self),
+                    Symbol::Unbound => CallableBinding::not_callable(self).into(),
                 }
             }
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
-            Type::Dynamic(_) | Type::Never => Signatures::single(CallableSignature::dynamic(self)),
+            Type::Dynamic(_) | Type::Never => {
+                Binding::single(self, Signature::dynamic(self)).into()
+            }
 
             // Note that this correctly returns `None` if none of the union elements are callable.
-            Type::Union(union) => Signatures::from_union(
+            Type::Union(union) => Bindings::from_union(
                 self,
                 union
                     .elements(db)
                     .iter()
-                    .map(|element| element.signatures(db)),
+                    .map(|element| element.bindings(db)),
             ),
 
             Type::Intersection(_) => {
-                Signatures::single(CallableSignature::todo("Type::Intersection.call()"))
+                Binding::single(self, Signature::todo("Type::Intersection.call()")).into()
             }
 
             // TODO: these are actually callable
-            Type::MethodWrapper(_) | Type::DataclassDecorator(_) => Signatures::not_callable(self),
+            Type::MethodWrapper(_) | Type::DataclassDecorator(_) => {
+                CallableBinding::not_callable(self).into()
+            }
 
-            // TODO: some `KnownInstance`s are callable (e.g. TypedDicts)
-            Type::KnownInstance(_) => Signatures::not_callable(self),
+            // TODO: some `SpecialForm`s are callable (e.g. TypedDicts)
+            Type::SpecialForm(_) => CallableBinding::not_callable(self).into(),
 
             Type::PropertyInstance(_)
+            | Type::KnownInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::IntLiteral(_)
@@ -4389,7 +4403,7 @@ impl<'db> Type<'db> {
             | Type::Tuple(_)
             | Type::BoundSuper(_)
             | Type::TypeVar(_)
-            | Type::ModuleLiteral(_) => Signatures::not_callable(self),
+            | Type::ModuleLiteral(_) => CallableBinding::not_callable(self).into(),
         }
     }
 
@@ -4404,8 +4418,9 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         argument_types: &CallArgumentTypes<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
-        let signatures = self.signatures(db);
-        Bindings::match_parameters(signatures, argument_types).check_types(db, argument_types)
+        self.bindings(db)
+            .match_parameters(argument_types)
+            .check_types(db, argument_types)
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -4451,8 +4466,9 @@ impl<'db> Type<'db> {
             .symbol
         {
             Symbol::Type(dunder_callable, boundness) => {
-                let signatures = dunder_callable.signatures(db);
-                let bindings = Bindings::match_parameters(signatures, argument_types)
+                let bindings = dunder_callable
+                    .bindings(db)
+                    .match_parameters(argument_types)
                     .check_types(db, argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
@@ -4865,6 +4881,7 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
+            | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::PropertyInstance(_)
             | Type::ModuleLiteral(_)
@@ -4946,33 +4963,43 @@ impl<'db> Type<'db> {
 
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
-                KnownInstanceType::Never | KnownInstanceType::NoReturn => Ok(Type::Never),
-                KnownInstanceType::LiteralString => Ok(Type::LiteralString),
-                KnownInstanceType::Unknown => Ok(Type::unknown()),
-                KnownInstanceType::AlwaysTruthy => Ok(Type::AlwaysTruthy),
-                KnownInstanceType::AlwaysFalsy => Ok(Type::AlwaysFalsy),
+                KnownInstanceType::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
+                KnownInstanceType::SubscriptedProtocol(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
+                    fallback_type: Type::unknown(),
+                }),
+                KnownInstanceType::SubscriptedGeneric(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Generic],
+                    fallback_type: Type::unknown(),
+                }),
+            },
+
+            Type::SpecialForm(special_form) => match special_form {
+                SpecialFormType::Never | SpecialFormType::NoReturn => Ok(Type::Never),
+                SpecialFormType::LiteralString => Ok(Type::LiteralString),
+                SpecialFormType::Unknown => Ok(Type::unknown()),
+                SpecialFormType::AlwaysTruthy => Ok(Type::AlwaysTruthy),
+                SpecialFormType::AlwaysFalsy => Ok(Type::AlwaysFalsy),
 
                 // We treat `typing.Type` exactly the same as `builtins.type`:
-                KnownInstanceType::Type => Ok(KnownClass::Type.to_instance(db)),
-                KnownInstanceType::Tuple => Ok(KnownClass::Tuple.to_instance(db)),
+                SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db)),
+                SpecialFormType::Tuple => Ok(KnownClass::Tuple.to_instance(db)),
 
                 // Legacy `typing` aliases
-                KnownInstanceType::List => Ok(KnownClass::List.to_instance(db)),
-                KnownInstanceType::Dict => Ok(KnownClass::Dict.to_instance(db)),
-                KnownInstanceType::Set => Ok(KnownClass::Set.to_instance(db)),
-                KnownInstanceType::FrozenSet => Ok(KnownClass::FrozenSet.to_instance(db)),
-                KnownInstanceType::ChainMap => Ok(KnownClass::ChainMap.to_instance(db)),
-                KnownInstanceType::Counter => Ok(KnownClass::Counter.to_instance(db)),
-                KnownInstanceType::DefaultDict => Ok(KnownClass::DefaultDict.to_instance(db)),
-                KnownInstanceType::Deque => Ok(KnownClass::Deque.to_instance(db)),
-                KnownInstanceType::OrderedDict => Ok(KnownClass::OrderedDict.to_instance(db)),
-
-                KnownInstanceType::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
+                SpecialFormType::List => Ok(KnownClass::List.to_instance(db)),
+                SpecialFormType::Dict => Ok(KnownClass::Dict.to_instance(db)),
+                SpecialFormType::Set => Ok(KnownClass::Set.to_instance(db)),
+                SpecialFormType::FrozenSet => Ok(KnownClass::FrozenSet.to_instance(db)),
+                SpecialFormType::ChainMap => Ok(KnownClass::ChainMap.to_instance(db)),
+                SpecialFormType::Counter => Ok(KnownClass::Counter.to_instance(db)),
+                SpecialFormType::DefaultDict => Ok(KnownClass::DefaultDict.to_instance(db)),
+                SpecialFormType::Deque => Ok(KnownClass::Deque.to_instance(db)),
+                SpecialFormType::OrderedDict => Ok(KnownClass::OrderedDict.to_instance(db)),
 
                 // TODO: Use an opt-in rule for a bare `Callable`
-                KnownInstanceType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
+                SpecialFormType::Callable => Ok(CallableType::unknown(db)),
 
-                KnownInstanceType::TypingSelf => {
+                SpecialFormType::TypingSelf => {
                     let index = semantic_index(db, scope_id.file(db));
                     let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                         return Err(InvalidTypeExpressionError {
@@ -4995,41 +5022,41 @@ impl<'db> Type<'db> {
                         TypeVarKind::Legacy,
                     )))
                 }
-                KnownInstanceType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
-                KnownInstanceType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
+                SpecialFormType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
+                SpecialFormType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
 
-                KnownInstanceType::Protocol(_) => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
-                    fallback_type: Type::unknown(),
-                }),
-                KnownInstanceType::Generic(_) => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Generic],
-                    fallback_type: Type::unknown(),
-                }),
-
-                KnownInstanceType::Literal
-                | KnownInstanceType::Union
-                | KnownInstanceType::Intersection => Err(InvalidTypeExpressionError {
+                SpecialFormType::Literal
+                | SpecialFormType::Union
+                | SpecialFormType::Intersection => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![
                         InvalidTypeExpression::RequiresArguments(*self)
                     ],
                     fallback_type: Type::unknown(),
                 }),
 
-                KnownInstanceType::Optional
-                | KnownInstanceType::Not
-                | KnownInstanceType::TypeOf
-                | KnownInstanceType::TypeIs
-                | KnownInstanceType::TypeGuard
-                | KnownInstanceType::Unpack
-                | KnownInstanceType::CallableTypeOf => Err(InvalidTypeExpressionError {
+                SpecialFormType::Protocol => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
+                    fallback_type: Type::unknown(),
+                }),
+                SpecialFormType::Generic => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Generic],
+                    fallback_type: Type::unknown(),
+                }),
+
+                SpecialFormType::Optional
+                | SpecialFormType::Not
+                | SpecialFormType::TypeOf
+                | SpecialFormType::TypeIs
+                | SpecialFormType::TypeGuard
+                | SpecialFormType::Unpack
+                | SpecialFormType::CallableTypeOf => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![
                         InvalidTypeExpression::RequiresOneArgument(*self)
                     ],
                     fallback_type: Type::unknown(),
                 }),
 
-                KnownInstanceType::Annotated | KnownInstanceType::Concatenate => {
+                SpecialFormType::Annotated | SpecialFormType::Concatenate => {
                     Err(InvalidTypeExpressionError {
                         invalid_expressions: smallvec::smallvec![
                             InvalidTypeExpression::RequiresTwoArguments(*self)
@@ -5038,20 +5065,20 @@ impl<'db> Type<'db> {
                     })
                 }
 
-                KnownInstanceType::ClassVar | KnownInstanceType::Final => {
+                SpecialFormType::ClassVar | SpecialFormType::Final => {
                     Err(InvalidTypeExpressionError {
                         invalid_expressions: smallvec::smallvec![
-                            InvalidTypeExpression::TypeQualifier(*known_instance)
+                            InvalidTypeExpression::TypeQualifier(*special_form)
                         ],
                         fallback_type: Type::unknown(),
                     })
                 }
 
-                KnownInstanceType::ReadOnly
-                | KnownInstanceType::NotRequired
-                | KnownInstanceType::Required => Err(InvalidTypeExpressionError {
+                SpecialFormType::ReadOnly
+                | SpecialFormType::NotRequired
+                | SpecialFormType::Required => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![
-                        InvalidTypeExpression::TypeQualifierRequiresOneArgument(*known_instance)
+                        InvalidTypeExpression::TypeQualifierRequiresOneArgument(*special_form)
                     ],
                     fallback_type: Type::unknown(),
                 }),
@@ -5162,6 +5189,7 @@ impl<'db> Type<'db> {
             Type::Never => Type::Never,
             Type::NominalInstance(instance) => instance.to_meta_type(db),
             Type::KnownInstance(known_instance) => known_instance.to_meta_type(db),
+            Type::SpecialForm(special_form) => special_form.to_meta_type(db),
             Type::PropertyInstance(_) => KnownClass::Property.to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class_literal(db),
@@ -5363,6 +5391,7 @@ impl<'db> Type<'db> {
             // some other generic context's specialization is applied to it.
             | Type::ClassLiteral(_)
             | Type::BoundSuper(_)
+            | Type::SpecialForm(_)
             | Type::KnownInstance(_) => self,
         }
     }
@@ -5462,6 +5491,7 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
             | Type::BoundSuper(_)
+            | Type::SpecialForm(_)
             | Type::KnownInstance(_) => {}
         }
     }
@@ -5476,6 +5506,7 @@ impl<'db> Type<'db> {
         match self {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
+            Type::SpecialForm(special_form) => Type::string_literal(db, special_form.repr()),
             Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
                 db,
                 known_instance.repr(db).to_string().into_boxed_str(),
@@ -5497,6 +5528,7 @@ impl<'db> Type<'db> {
                 Type::string_literal(db, &format!("'{}'", literal.value(db).escape_default()))
             }
             Type::LiteralString => Type::LiteralString,
+            Type::SpecialForm(special_form) => Type::string_literal(db, special_form.repr()),
             Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
                 db,
                 known_instance.repr(db).to_string().into_boxed_str(),
@@ -5572,6 +5604,7 @@ impl<'db> Type<'db> {
             | Self::Never
             | Self::Callable(_)
             | Self::AlwaysTruthy
+            | Self::SpecialForm(_)
             | Self::AlwaysFalsy => None,
         }
     }
@@ -5684,6 +5717,112 @@ impl<'db> TypeMapping<'_, 'db> {
                 TypeMapping::PartialSpecialization(partial.normalized(db))
             }
             TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
+        }
+    }
+}
+
+/// Singleton types that are heavily special-cased by ty. Despite its name,
+/// quite a different type to [`NominalInstanceType`].
+///
+/// In many ways, this enum behaves similarly to [`SpecialFormType`].
+/// Unlike instances of that variant, however, `Type::KnownInstance`s do not exist
+/// at a location that can be known prior to any analysis by ty, and each variant
+/// of `KnownInstanceType` can have multiple instances (as, unlike `SpecialFormType`,
+/// `KnownInstanceType` variants can hold associated data). Instances of this type
+/// are generally created by operations at runtime in some way, such as a type alias
+/// statement, a typevar definition, or an instance of `Generic[T]` in a class's
+/// bases list.
+///
+/// # Ordering
+///
+/// Ordering between variants is stable and should be the same between runs.
+/// Ordering within variants is based on the wrapped data's salsa-assigned id and not on its values.
+/// The id may change between runs, or when e.g. a `TypeVarInstance` was garbage-collected and recreated.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, Ord, PartialOrd)]
+pub enum KnownInstanceType<'db> {
+    /// The type of `Protocol[T]`, `Protocol[U, S]`, etc -- usually only found in a class's bases list.
+    ///
+    /// Note that unsubscripted `Protocol` is represented by [`SpecialFormType::Protocol`], not this type.
+    SubscriptedProtocol(GenericContext<'db>),
+
+    /// The type of `Generic[T]`, `Generic[U, S]`, etc -- usually only found in a class's bases list.
+    ///
+    /// Note that unsubscripted `Generic` is represented by [`SpecialFormType::Generic`], not this type.
+    SubscriptedGeneric(GenericContext<'db>),
+
+    /// A single instance of `typing.TypeVar`
+    TypeVar(TypeVarInstance<'db>),
+
+    /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
+    TypeAliasType(TypeAliasType<'db>),
+}
+
+impl<'db> KnownInstanceType<'db> {
+    fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::SubscriptedProtocol(context) => Self::SubscriptedProtocol(context.normalized(db)),
+            Self::SubscriptedGeneric(context) => Self::SubscriptedGeneric(context.normalized(db)),
+            Self::TypeVar(typevar) => Self::TypeVar(typevar.normalized(db)),
+            Self::TypeAliasType(type_alias) => Self::TypeAliasType(type_alias.normalized(db)),
+        }
+    }
+
+    const fn class(self) -> KnownClass {
+        match self {
+            Self::SubscriptedProtocol(_) | Self::SubscriptedGeneric(_) => KnownClass::SpecialForm,
+            Self::TypeVar(_) => KnownClass::TypeVar,
+            Self::TypeAliasType(_) => KnownClass::TypeAliasType,
+        }
+    }
+
+    fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
+        self.class().to_class_literal(db)
+    }
+
+    /// Return the instance type which this type is a subtype of.
+    ///
+    /// For example, an alias created using the `type` statement is an instance of
+    /// `typing.TypeAliasType`, so `KnownInstanceType::TypeAliasType(_).instance_fallback(db)`
+    /// returns `Type::NominalInstance(NominalInstanceType { class: <typing.TypeAliasType> })`.
+    fn instance_fallback(self, db: &dyn Db) -> Type {
+        self.class().to_instance(db)
+    }
+
+    /// Return `true` if this symbol is an instance of `class`.
+    fn is_instance_of(self, db: &dyn Db, class: ClassType) -> bool {
+        self.class().is_subclass_of(db, class)
+    }
+
+    /// Return the repr of the symbol at runtime
+    fn repr(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
+        struct KnownInstanceRepr<'db> {
+            known_instance: KnownInstanceType<'db>,
+            db: &'db dyn Db,
+        }
+
+        impl std::fmt::Display for KnownInstanceRepr<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.known_instance {
+                    KnownInstanceType::SubscriptedProtocol(generic_context) => {
+                        f.write_str("typing.Protocol")?;
+                        generic_context.display(self.db).fmt(f)
+                    }
+                    KnownInstanceType::SubscriptedGeneric(generic_context) => {
+                        f.write_str("typing.Generic")?;
+                        generic_context.display(self.db).fmt(f)
+                    }
+                    KnownInstanceType::TypeAliasType(_) => f.write_str("typing.TypeAliasType"),
+                    // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
+                    // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
+                    // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
+                    KnownInstanceType::TypeVar(_) => f.write_str("typing.TypeVar"),
+                }
+            }
+        }
+
+        KnownInstanceRepr {
+            known_instance: self,
+            db,
         }
     }
 }
@@ -5845,10 +5984,10 @@ enum InvalidTypeExpression<'db> {
     Generic,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
-    TypeQualifier(KnownInstanceType<'db>),
+    TypeQualifier(SpecialFormType),
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
-    TypeQualifierRequiresOneArgument(KnownInstanceType<'db>),
+    TypeQualifierRequiresOneArgument(SpecialFormType),
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
 }
@@ -5886,13 +6025,13 @@ impl<'db> InvalidTypeExpression<'db> {
                     }
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,
-                        "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions)",
-                        q = qualifier.repr(self.db)
+                        "Type qualifier `{qualifier}` is not allowed in type expressions \
+                        (only in annotation expressions)",
                     ),
                     InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier) => write!(
                         f,
-                        "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions, and only with exactly one argument)",
-                        q = qualifier.repr(self.db)
+                        "Type qualifier `{qualifier}` is not allowed in type expressions \
+                        (only in annotation expressions, and only with exactly one argument)",
                     ),
                     InvalidTypeExpression::InvalidType(ty, _) => write!(
                         f,
@@ -6896,7 +7035,7 @@ impl<'db> FunctionSignature<'db> {
     /// Returns the "bottom" signature (subtype of all fully-static signatures.)
     pub(crate) fn bottom(db: &'db dyn Db) -> Self {
         FunctionSignature {
-            overloads: CallableSignature::single(Type::any(), Signature::bottom(db)),
+            overloads: CallableSignature::single(Signature::bottom(db)),
             implementation: None,
         }
     }
@@ -6969,9 +7108,9 @@ impl<'db> FunctionType<'db> {
 
     /// Convert the `FunctionType` into a [`Type::Callable`].
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::from_overloads(
+        Type::Callable(CallableType::new(
             db,
-            self.signature(db).overloads.iter().cloned(),
+            self.signature(db).overloads.clone(),
             false,
         ))
     }
@@ -7045,7 +7184,6 @@ impl<'db> FunctionType<'db> {
         if let Some(overloaded) = self.to_overloaded(db) {
             FunctionSignature {
                 overloads: CallableSignature::from_overloads(
-                    Type::FunctionLiteral(self),
                     overloaded.overloads.iter().copied().map(|overload| {
                         type_mappings.iter().fold(
                             overload.internal_signature(db, inherited_generic_context),
@@ -7062,13 +7200,10 @@ impl<'db> FunctionType<'db> {
             }
         } else {
             FunctionSignature {
-                overloads: CallableSignature::single(
-                    Type::FunctionLiteral(self),
-                    type_mappings.iter().fold(
-                        self.internal_signature(db, inherited_generic_context),
-                        |ty, mapping| ty.apply_type_mapping(db, mapping),
-                    ),
-                ),
+                overloads: CallableSignature::single(type_mappings.iter().fold(
+                    self.internal_signature(db, inherited_generic_context),
+                    |ty, mapping| ty.apply_type_mapping(db, mapping),
+                )),
                 implementation: None,
             }
         }
@@ -7592,13 +7727,15 @@ pub struct BoundMethodType<'db> {
 
 impl<'db> BoundMethodType<'db> {
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::from_overloads(
+        Type::Callable(CallableType::new(
             db,
-            self.function(db)
-                .signature(db)
-                .overloads
-                .iter()
-                .map(signatures::Signature::bind_self),
+            CallableSignature::from_overloads(
+                self.function(db)
+                    .signature(db)
+                    .overloads
+                    .iter()
+                    .map(signatures::Signature::bind_self),
+            ),
             false,
         ))
     }
@@ -7662,8 +7799,9 @@ impl<'db> BoundMethodType<'db> {
 #[salsa::interned(debug)]
 #[derive(PartialOrd, Ord)]
 pub struct CallableType<'db> {
-    #[returns(deref)]
-    signatures: Box<[Signature<'db>]>,
+    #[returns(ref)]
+    signatures: CallableSignature<'db>,
+
     /// We use `CallableType` to represent function-like objects, like the synthesized methods
     /// of dataclasses or NamedTuples. These callables act like real functions when accessed
     /// as attributes on instances, i.e. they bind `self`.
@@ -7671,49 +7809,37 @@ pub struct CallableType<'db> {
 }
 
 impl<'db> CallableType<'db> {
-    /// Create a non-overloaded callable type with a single signature.
-    pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> Self {
-        CallableType::new(db, vec![signature].into_boxed_slice(), false)
+    /// Create a callable type with a single non-overloaded signature.
+    pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
+        Type::Callable(CallableType::new(
+            db,
+            CallableSignature::single(signature),
+            false,
+        ))
     }
 
     /// Create a non-overloaded, function-like callable type with a single signature.
     ///
     /// A function-like callable will bind `self` when accessed as an attribute on an instance.
-    pub(crate) fn function_like(db: &'db dyn Db, signature: Signature<'db>) -> Self {
-        CallableType::new(db, vec![signature].into_boxed_slice(), true)
-    }
-
-    /// Create an overloaded callable type with multiple signatures.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `overloads` is empty.
-    pub(crate) fn from_overloads<I>(db: &'db dyn Db, overloads: I, is_function_like: bool) -> Self
-    where
-        I: IntoIterator<Item = Signature<'db>>,
-    {
-        let overloads = overloads.into_iter().collect::<Vec<_>>().into_boxed_slice();
-        assert!(
-            !overloads.is_empty(),
-            "CallableType must have at least one signature"
-        );
-        CallableType::new(db, overloads, is_function_like)
+    pub(crate) fn function_like(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
+        Type::Callable(CallableType::new(
+            db,
+            CallableSignature::single(signature),
+            true,
+        ))
     }
 
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
-    pub(crate) fn unknown(db: &'db dyn Db) -> Self {
-        CallableType::single(
-            db,
-            Signature::new(Parameters::unknown(), Some(Type::unknown())),
-        )
+    pub(crate) fn unknown(db: &'db dyn Db) -> Type<'db> {
+        Self::single(db, Signature::unknown())
     }
 
-    pub(crate) fn bind_self(self, db: &'db dyn Db) -> Self {
-        CallableType::from_overloads(
+    pub(crate) fn bind_self(self, db: &'db dyn Db) -> Type<'db> {
+        Type::Callable(CallableType::new(
             db,
-            self.signatures(db).iter().map(Signature::bind_self),
+            self.signatures(db).bind_self(),
             false,
-        )
+        ))
     }
 
     /// Create a callable type which represents a fully-static "bottom" callable.
@@ -7722,28 +7848,24 @@ impl<'db> CallableType<'db> {
     /// `(*args: object, **kwargs: object) -> Never`.
     #[cfg(test)]
     pub(crate) fn bottom(db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::single(db, Signature::bottom(db)))
+        Self::single(db, Signature::bottom(db))
     }
 
     /// Return a "normalized" version of this `Callable` type.
     ///
     /// See [`Type::normalized`] for more details.
     fn normalized(self, db: &'db dyn Db) -> Self {
-        CallableType::from_overloads(
+        CallableType::new(
             db,
-            self.signatures(db)
-                .iter()
-                .map(|signature| signature.normalized(db)),
+            self.signatures(db).normalized(db),
             self.is_function_like(db),
         )
     }
 
     fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
-        CallableType::from_overloads(
+        CallableType::new(
             db,
-            self.signatures(db)
-                .iter()
-                .map(|signature| signature.apply_type_mapping(db, type_mapping)),
+            self.signatures(db).apply_type_mapping(db, type_mapping),
             self.is_function_like(db),
         )
     }
@@ -7753,148 +7875,63 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
-        for signature in self.signatures(db) {
-            signature.find_legacy_typevars(db, typevars);
-        }
+        self.signatures(db).find_legacy_typevars(db, typevars);
     }
 
     /// Check whether this callable type is fully static.
     ///
     /// See [`Type::is_fully_static`] for more details.
     fn is_fully_static(self, db: &'db dyn Db) -> bool {
-        self.signatures(db)
-            .iter()
-            .all(|signature| signature.is_fully_static(db))
+        self.signatures(db).is_fully_static(db)
     }
 
     /// Check whether this callable type is a subtype of another callable type.
     ///
     /// See [`Type::is_subtype_of`] for more details.
     fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_assignable_to_impl(db, other, &|self_signature, other_signature| {
-            self_signature.is_subtype_of(db, other_signature)
-        })
+        let self_is_function_like = self.is_function_like(db);
+        let other_is_function_like = other.is_function_like(db);
+        (self_is_function_like || !other_is_function_like)
+            && self.signatures(db).is_subtype_of(db, other.signatures(db))
     }
 
     /// Check whether this callable type is assignable to another callable type.
     ///
     /// See [`Type::is_assignable_to`] for more details.
     fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_assignable_to_impl(db, other, &|self_signature, other_signature| {
-            self_signature.is_assignable_to(db, other_signature)
-        })
-    }
-
-    /// Implementation for the various relation checks between two, possible overloaded, callable
-    /// types.
-    ///
-    /// The `check_signature` closure is used to check the relation between two [`Signature`]s.
-    fn is_assignable_to_impl<F>(self, db: &'db dyn Db, other: Self, check_signature: &F) -> bool
-    where
-        F: Fn(&Signature<'db>, &Signature<'db>) -> bool,
-    {
         let self_is_function_like = self.is_function_like(db);
         let other_is_function_like = other.is_function_like(db);
-
-        if !self_is_function_like && other_is_function_like {
-            return false;
-        }
-
-        match (self.signatures(db), other.signatures(db)) {
-            ([self_signature], [other_signature]) => {
-                // Base case: both callable types contain a single signature.
-                check_signature(self_signature, other_signature)
-            }
-
-            // `self` is possibly overloaded while `other` is definitely not overloaded.
-            (self_signatures, [other_signature]) => {
-                let other_callable = CallableType::single(db, other_signature.clone());
-                self_signatures
-                    .iter()
-                    .map(|self_signature| CallableType::single(db, self_signature.clone()))
-                    .any(|self_callable| {
-                        self_callable.is_assignable_to_impl(db, other_callable, check_signature)
-                    })
-            }
-
-            // `self` is definitely not overloaded while `other` is possibly overloaded.
-            ([self_signature], other_signatures) => {
-                let self_callable = CallableType::single(db, self_signature.clone());
-                other_signatures
-                    .iter()
-                    .map(|other_signature| CallableType::single(db, other_signature.clone()))
-                    .all(|other_callable| {
-                        self_callable.is_assignable_to_impl(db, other_callable, check_signature)
-                    })
-            }
-
-            // `self` is definitely overloaded while `other` is possibly overloaded.
-            (_, other_signatures) => other_signatures
-                .iter()
-                .map(|other_signature| CallableType::single(db, other_signature.clone()))
-                .all(|other_callable| {
-                    self.is_assignable_to_impl(db, other_callable, check_signature)
-                }),
-        }
+        (self_is_function_like || !other_is_function_like)
+            && self
+                .signatures(db)
+                .is_assignable_to(db, other.signatures(db))
     }
 
     /// Check whether this callable type is equivalent to another callable type.
     ///
     /// See [`Type::is_equivalent_to`] for more details.
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        if self.is_function_like(db) != other.is_function_like(db) {
-            return false;
-        }
-
-        match (self.signatures(db), other.signatures(db)) {
-            ([self_signature], [other_signature]) => {
-                // Common case: both callable types contain a single signature, use the custom
-                // equivalence check instead of delegating it to the subtype check.
-                self_signature.is_equivalent_to(db, other_signature)
-            }
-            (self_signatures, other_signatures) => {
-                if !self_signatures
-                    .iter()
-                    .chain(other_signatures.iter())
-                    .all(|signature| signature.is_fully_static(db))
-                {
-                    return false;
-                }
-                if self == other {
-                    return true;
-                }
-                self.is_subtype_of(db, other) && other.is_subtype_of(db, self)
-            }
-        }
+        self.is_function_like(db) == other.is_function_like(db)
+            && self
+                .signatures(db)
+                .is_equivalent_to(db, other.signatures(db))
     }
 
     /// Check whether this callable type is gradual equivalent to another callable type.
     ///
     /// See [`Type::is_gradual_equivalent_to`] for more details.
     fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        if self.is_function_like(db) != other.is_function_like(db) {
-            return false;
-        }
-
-        match (self.signatures(db), other.signatures(db)) {
-            ([self_signature], [other_signature]) => {
-                self_signature.is_gradual_equivalent_to(db, other_signature)
-            }
-            _ => {
-                // TODO: overloads
-                false
-            }
-        }
+        self.is_function_like(db) == other.is_function_like(db)
+            && self
+                .signatures(db)
+                .is_gradual_equivalent_to(db, other.signatures(db))
     }
 
     /// See [`Type::replace_self_reference`].
     fn replace_self_reference(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
-        CallableType::from_overloads(
+        CallableType::new(
             db,
-            self.signatures(db)
-                .iter()
-                .cloned()
-                .map(|signature| signature.replace_self_reference(db, class)),
+            self.signatures(db).replace_self_reference(db, class),
             self.is_function_like(db),
         )
     }
@@ -8933,8 +8970,8 @@ impl<'db> SuperOwnerKind<'db> {
             Type::BytesLiteral(_) => {
                 SuperOwnerKind::try_from_type(db, KnownClass::Bytes.to_instance(db))
             }
-            Type::KnownInstance(known_instance) => {
-                SuperOwnerKind::try_from_type(db, known_instance.instance_fallback(db))
+            Type::SpecialForm(special_form) => {
+                SuperOwnerKind::try_from_type(db, special_form.instance_fallback(db))
             }
             _ => None,
         }
