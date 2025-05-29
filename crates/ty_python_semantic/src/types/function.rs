@@ -606,8 +606,9 @@ impl<'db> FunctionType<'db> {
         // our representation of a function type includes any specialization that should be applied
         // to the signature. Different specializations of the same function type are only subtypes
         // of each other if they result in subtype signatures.
-        self.literal(db) == other.literal(db)
-            && self.signature(db).is_subtype_of(db, other.signature(db))
+        self.normalized(db) == other.normalized(db)
+            || (self.literal(db) == other.literal(db)
+                && self.signature(db).is_subtype_of(db, other.signature(db)))
     }
 
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
