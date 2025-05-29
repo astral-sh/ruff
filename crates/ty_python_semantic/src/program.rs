@@ -37,9 +37,8 @@ impl Program {
         let search_paths = SearchPaths::from_settings(db, &search_paths)
             .with_context(|| "Invalid search path settings")?;
 
-        let python_version_with_source = python_version_with_source
-            .or_else(|| search_paths.python_version().cloned())
-            .unwrap_or_default();
+        let python_version_with_source =
+            Self::resolve_python_version(python_version_with_source, search_paths.python_version());
 
         tracing::info!(
             "Python version: Python {python_version}, platform: {python_platform}",
@@ -57,43 +56,76 @@ impl Program {
         self.python_version_with_source(db).version
     }
 
+    fn resolve_python_version(
+        config_value: Option<PythonVersionWithSource>,
+        environment_value: Option<&PythonVersionWithSource>,
+    ) -> PythonVersionWithSource {
+        config_value
+            .or_else(|| environment_value.cloned())
+            .unwrap_or_default()
+    }
+
     pub fn update_from_settings(
         self,
         db: &mut dyn Db,
         settings: ProgramSettings,
     ) -> anyhow::Result<()> {
         let ProgramSettings {
-            python_version,
+            python_version: python_version_with_source,
             python_platform,
             search_paths,
         } = settings;
+
+        let search_paths = SearchPaths::from_settings(db, &search_paths)?;
+
+        let new_python_version =
+            Self::resolve_python_version(python_version_with_source, search_paths.python_version());
+
+        if self.search_paths(db) != &search_paths {
+            tracing::debug!("Updating search paths");
+            self.set_search_paths(db).to(search_paths);
+        }
 
         if &python_platform != self.python_platform(db) {
             tracing::debug!("Updating python platform: `{python_platform:?}`");
             self.set_python_platform(db).to(python_platform);
         }
 
-        if let Some(python_version) = python_version {
-            if &python_version != self.python_version_with_source(db) {
-                tracing::debug!("Updating python version: Python {python_version:?}");
-                self.set_python_version_with_source(db).to(python_version);
-            }
+        if &new_python_version != self.python_version_with_source(db) {
+            tracing::debug!(
+                "Updating python version: Python {version}",
+                version = new_python_version.version
+            );
+            self.set_python_version_with_source(db)
+                .to(new_python_version);
         }
-
-        self.update_search_paths(db, &search_paths)?;
 
         Ok(())
     }
 
+    /// Update the search paths for the program.
     pub fn update_search_paths(
         self,
         db: &mut dyn Db,
-        search_path_settings: &SearchPathSettings,
+        search_paths: &SearchPathSettings,
     ) -> anyhow::Result<()> {
-        let search_paths = SearchPaths::from_settings(db, search_path_settings)?;
+        let search_paths = SearchPaths::from_settings(db, search_paths)?;
+
+        let current_python_version = self.python_version_with_source(db);
+        let python_version_from_environment =
+            search_paths.python_version().cloned().unwrap_or_default();
+
+        if current_python_version != &python_version_from_environment
+            && current_python_version.source.priority()
+                <= python_version_from_environment.source.priority()
+        {
+            tracing::debug!("Updating Python version from environment");
+            self.set_python_version_with_source(db)
+                .to(python_version_from_environment);
+        }
 
         if self.search_paths(db) != &search_paths {
-            tracing::debug!("Update search paths");
+            tracing::debug!("Updating search paths");
             self.set_search_paths(db).to(search_paths);
         }
 
@@ -128,6 +160,30 @@ pub enum PythonVersionSource {
     /// We fell back to a default value because the value was not specified via the CLI or a config file.
     #[default]
     Default,
+}
+
+impl PythonVersionSource {
+    fn priority(&self) -> PythonSourcePriority {
+        match self {
+            PythonVersionSource::Default => PythonSourcePriority::Default,
+            PythonVersionSource::PyvenvCfgFile(_) => PythonSourcePriority::PyvenvCfgFile,
+            PythonVersionSource::ConfigFile(_) => PythonSourcePriority::ConfigFile,
+            PythonVersionSource::Cli => PythonSourcePriority::Cli,
+        }
+    }
+}
+
+/// The priority in which Python version sources are considered.
+/// A higher value means a higher priority.
+///
+/// For example, if a Python version is specified in a pyproject.toml file
+/// but *also* via a CLI argument, the CLI argument will take precedence.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+enum PythonSourcePriority {
+    Default = 0,
+    PyvenvCfgFile = 1,
+    ConfigFile = 2,
+    Cli = 3,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

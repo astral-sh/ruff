@@ -315,11 +315,11 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
             "pyproject.toml",
             r#"
             [tool.ty.environment]
-            python = ".venv"
+            python = "venv"
             "#,
         ),
         (
-            ".venv/pyvenv.cfg",
+            "venv/pyvenv.cfg",
             r#"
             home = foo/bar/bin
             version = 3.8
@@ -331,9 +331,9 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
             ("foo/bar/bin/python", "")
         },
         if cfg!(target_os = "windows") {
-            (".venv/Lib/site-packages/foo.py", "")
+            ("venv/Lib/site-packages/foo.py", "")
         } else {
-            (".venv/lib/python3.8/site-packages/foo.py", "")
+            ("venv/lib/python3.8/site-packages/foo.py", "")
         },
         ("test.py", "aiter"),
     ])?;
@@ -350,7 +350,7 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
       |
     info: `aiter` was added as a builtin in Python 3.10
     info: Python 3.8 was assumed when resolving types because of your virtual environment
-     --> .venv/pyvenv.cfg:3:11
+     --> venv/pyvenv.cfg:3:11
       |
     2 | home = foo/bar/bin
     3 | version = 3.8
