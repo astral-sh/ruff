@@ -8865,7 +8865,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         let diag = builder.into_diagnostic(format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr(self.db())
+                            special_form.repr()
                         ));
                         diagnostic::add_type_expression_reference_link(diag);
                     }

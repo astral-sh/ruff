@@ -563,6 +563,26 @@
             }
           ]
         },
+        "invalid-type-guard-call": {
+          "title": "detects type guard function calls that has no narrowing effect",
+          "description": "## What it does\nChecks for type guard function calls without a valid target.\n\n## Why is this bad?\nThe first non-keyword non-variadic argument to a type guard function\nis its target and must map to a symbol.\n\nStarred (`is_str(*a)`), literal (`is_str(42)`) and other non-symbol-like\nexpressions are invalid as narrowing targets.\n\n## Examples\n```python\nfrom typing import TypeIs\n\ndef f(v: object) -> TypeIs[int]: ...\n\nf()  # Error\nf(*a)  # Error\nf(10)  # Error\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-type-guard-definition": {
+          "title": "detects malformed type guard functions",
+          "description": "## What it does\nChecks for type guard functions without\na first non-self-like non-keyword-only non-variadic parameter.\n\n## Why is this bad?\nType narrowing functions must accept at least one positional argument\n(non-static methods must accept another in addition to `self`/`cls`).\n\nExtra parameters/arguments are allowed but do not affect narrowing.\n\n## Examples\n```python\nfrom typing import TypeIs\n\ndef f() -> TypeIs[int]: ...  # Error, no parameter\ndef f(*, v: object) -> TypeIs[int]: ...  # Error, no positional arguments allowed\ndef f(*args: object) -> TypeIs[int]: ... # Error, expect variadic arguments\nclass C:\n    def f(self) -> TypeIs[int]: ...  # Error, only positional argument expected is `self`\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-type-variable-constraints": {
           "title": "detects invalid type variable constraints",
           "description": "## What it does\nChecks for constrained [type variables] with only one constraint.\n\n## Why is this bad?\nA constrained type variable must have at least two constraints.\n\n## Examples\n```python\nfrom typing import TypeVar\n\nT = TypeVar('T', str)  # invalid constrained TypeVar\n```\n\nUse instead:\n```python\nT = TypeVar('T', str, int)  # valid constrained TypeVar\n# or\nT = TypeVar('T', bound=str)  # valid bound TypeVar\n```\n\n[type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar",
