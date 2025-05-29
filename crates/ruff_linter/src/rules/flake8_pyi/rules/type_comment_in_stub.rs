@@ -6,7 +6,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
 
 use crate::Locator;
-use crate::{Diagnostic, Violation};
+use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for the use of type comments (e.g., `x = 1  # type: int`) in stub
@@ -38,7 +38,7 @@ impl Violation for TypeCommentInStub {
 
 /// PYI033
 pub(crate) fn type_comment_in_stub(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<OldDiagnostic>,
     locator: &Locator,
     comment_ranges: &CommentRanges,
 ) {
@@ -46,7 +46,7 @@ pub(crate) fn type_comment_in_stub(
         let comment = locator.slice(range);
 
         if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
-            diagnostics.push(Diagnostic::new(TypeCommentInStub, range));
+            diagnostics.push(OldDiagnostic::new(TypeCommentInStub, range));
         }
     }
 }

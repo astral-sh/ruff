@@ -19,7 +19,7 @@ use ruff_text_size::TextSize;
 
 use crate::Locator;
 use crate::registry::Rule;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, OldDiagnostic, Violation};
 
 /// Check if a comment exists anywhere in a given file
 fn comment_exists(text: &str, locator: &Locator, comment_ranges: &CommentRanges) -> bool {
@@ -48,7 +48,7 @@ pub(crate) const TEST_RULES: &[Rule] = &[
 ];
 
 pub(crate) trait TestRule {
-    fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<Diagnostic>;
+    fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<OldDiagnostic>;
 }
 
 /// ## What it does
@@ -79,8 +79,8 @@ impl Violation for StableTestRule {
 }
 
 impl TestRule for StableTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        Some(Diagnostic::new(
+    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<OldDiagnostic> {
+        Some(OldDiagnostic::new(
             StableTestRule,
             ruff_text_size::TextRange::default(),
         ))
@@ -115,13 +115,13 @@ impl Violation for StableTestRuleSafeFix {
 }
 
 impl TestRule for StableTestRuleSafeFix {
-    fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<Diagnostic> {
+    fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<OldDiagnostic> {
         let comment = "# fix from stable-test-rule-safe-fix\n".to_string();
         if comment_exists(&comment, locator, comment_ranges) {
             None
         } else {
             Some(
-                Diagnostic::new(StableTestRuleSafeFix, ruff_text_size::TextRange::default())
+                OldDiagnostic::new(StableTestRuleSafeFix, ruff_text_size::TextRange::default())
                     .with_fix(Fix::safe_edit(Edit::insertion(comment, TextSize::new(0)))),
             )
         }
@@ -156,13 +156,13 @@ impl Violation for StableTestRuleUnsafeFix {
 }
 
 impl TestRule for StableTestRuleUnsafeFix {
-    fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<Diagnostic> {
+    fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<OldDiagnostic> {
         let comment = "# fix from stable-test-rule-unsafe-fix\n".to_string();
         if comment_exists(&comment, locator, comment_ranges) {
             None
         } else {
             Some(
-                Diagnostic::new(
+                OldDiagnostic::new(
                     StableTestRuleUnsafeFix,
                     ruff_text_size::TextRange::default(),
                 )
@@ -200,13 +200,13 @@ impl Violation for StableTestRuleDisplayOnlyFix {
 }
 
 impl TestRule for StableTestRuleDisplayOnlyFix {
-    fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<Diagnostic> {
+    fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<OldDiagnostic> {
         let comment = "# fix from stable-test-rule-display-only-fix\n".to_string();
         if comment_exists(&comment, locator, comment_ranges) {
             None
         } else {
             Some(
-                Diagnostic::new(
+                OldDiagnostic::new(
                     StableTestRuleDisplayOnlyFix,
                     ruff_text_size::TextRange::default(),
                 )
@@ -247,8 +247,8 @@ impl Violation for PreviewTestRule {
 }
 
 impl TestRule for PreviewTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        Some(Diagnostic::new(
+    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<OldDiagnostic> {
+        Some(OldDiagnostic::new(
             PreviewTestRule,
             ruff_text_size::TextRange::default(),
         ))
@@ -283,8 +283,8 @@ impl Violation for DeprecatedTestRule {
 }
 
 impl TestRule for DeprecatedTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        Some(Diagnostic::new(
+    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<OldDiagnostic> {
+        Some(OldDiagnostic::new(
             DeprecatedTestRule,
             ruff_text_size::TextRange::default(),
         ))
@@ -319,8 +319,8 @@ impl Violation for AnotherDeprecatedTestRule {
 }
 
 impl TestRule for AnotherDeprecatedTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        Some(Diagnostic::new(
+    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<OldDiagnostic> {
+        Some(OldDiagnostic::new(
             AnotherDeprecatedTestRule,
             ruff_text_size::TextRange::default(),
         ))
@@ -355,8 +355,8 @@ impl Violation for RemovedTestRule {
 }
 
 impl TestRule for RemovedTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        Some(Diagnostic::new(
+    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<OldDiagnostic> {
+        Some(OldDiagnostic::new(
             RemovedTestRule,
             ruff_text_size::TextRange::default(),
         ))
@@ -391,8 +391,8 @@ impl Violation for AnotherRemovedTestRule {
 }
 
 impl TestRule for AnotherRemovedTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        Some(Diagnostic::new(
+    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<OldDiagnostic> {
+        Some(OldDiagnostic::new(
             AnotherRemovedTestRule,
             ruff_text_size::TextRange::default(),
         ))
@@ -427,8 +427,8 @@ impl Violation for RedirectedFromTestRule {
 }
 
 impl TestRule for RedirectedFromTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        Some(Diagnostic::new(
+    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<OldDiagnostic> {
+        Some(OldDiagnostic::new(
             RedirectedFromTestRule,
             ruff_text_size::TextRange::default(),
         ))
@@ -463,8 +463,8 @@ impl Violation for RedirectedToTestRule {
 }
 
 impl TestRule for RedirectedToTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        Some(Diagnostic::new(
+    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<OldDiagnostic> {
+        Some(OldDiagnostic::new(
             RedirectedToTestRule,
             ruff_text_size::TextRange::default(),
         ))
@@ -499,8 +499,8 @@ impl Violation for RedirectedFromPrefixTestRule {
 }
 
 impl TestRule for RedirectedFromPrefixTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        Some(Diagnostic::new(
+    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<OldDiagnostic> {
+        Some(OldDiagnostic::new(
             RedirectedFromPrefixTestRule,
             ruff_text_size::TextRange::default(),
         ))

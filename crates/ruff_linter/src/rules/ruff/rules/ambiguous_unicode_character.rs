@@ -13,7 +13,7 @@ use crate::registry::AsRule;
 use crate::rules::ruff::rules::Context;
 use crate::rules::ruff::rules::confusables::confusable;
 use crate::settings::LinterSettings;
-use crate::{Diagnostic, Violation};
+use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for ambiguous Unicode characters in strings.
@@ -176,7 +176,7 @@ impl Violation for AmbiguousUnicodeCharacterComment {
 
 /// RUF003
 pub(crate) fn ambiguous_unicode_character_comment(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<OldDiagnostic>,
     locator: &Locator,
     range: TextRange,
     settings: &LinterSettings,
@@ -342,25 +342,25 @@ impl Candidate {
         }
     }
 
-    fn into_diagnostic(self, context: Context, settings: &LinterSettings) -> Option<Diagnostic> {
+    fn into_diagnostic(self, context: Context, settings: &LinterSettings) -> Option<OldDiagnostic> {
         if !settings.allowed_confusables.contains(&self.confusable) {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());
             let diagnostic = match context {
-                Context::String => Diagnostic::new(
+                Context::String => OldDiagnostic::new(
                     AmbiguousUnicodeCharacterString {
                         confusable: self.confusable,
                         representant: self.representant,
                     },
                     char_range,
                 ),
-                Context::Docstring => Diagnostic::new(
+                Context::Docstring => OldDiagnostic::new(
                     AmbiguousUnicodeCharacterDocstring {
                         confusable: self.confusable,
                         representant: self.representant,
                     },
                     char_range,
                 ),
-                Context::Comment => Diagnostic::new(
+                Context::Comment => OldDiagnostic::new(
                     AmbiguousUnicodeCharacterComment {
                         confusable: self.confusable,
                         representant: self.representant,

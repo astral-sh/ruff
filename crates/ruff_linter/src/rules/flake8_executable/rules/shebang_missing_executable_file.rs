@@ -9,7 +9,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use crate::registry::AsRule;
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::is_executable;
-use crate::{Diagnostic, Violation};
+use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for executable `.py` files that do not have a shebang.
@@ -49,14 +49,14 @@ impl Violation for ShebangMissingExecutableFile {
 
 /// EXE002
 #[cfg(target_family = "unix")]
-pub(crate) fn shebang_missing_executable_file(filepath: &Path) -> Option<Diagnostic> {
+pub(crate) fn shebang_missing_executable_file(filepath: &Path) -> Option<OldDiagnostic> {
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
     if is_wsl::is_wsl() {
         return None;
     }
     if let Ok(true) = is_executable(filepath) {
-        return Some(Diagnostic::new(
+        return Some(OldDiagnostic::new(
             ShebangMissingExecutableFile,
             TextRange::default(),
         ));
@@ -65,6 +65,6 @@ pub(crate) fn shebang_missing_executable_file(filepath: &Path) -> Option<Diagnos
 }
 
 #[cfg(not(target_family = "unix"))]
-pub(crate) fn shebang_missing_executable_file(_filepath: &Path) -> Option<Diagnostic> {
+pub(crate) fn shebang_missing_executable_file(_filepath: &Path) -> Option<OldDiagnostic> {
     None
 }

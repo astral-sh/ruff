@@ -5,7 +5,7 @@ use crate::Locator;
 use crate::noqa::{Code, Directive};
 use crate::noqa::{Codes, NoqaDirectives};
 use crate::registry::Rule;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix, OldDiagnostic};
 
 /// ## What it does
 /// Checks for `noqa` codes that are invalid.
@@ -48,7 +48,7 @@ impl AlwaysFixableViolation for InvalidRuleCode {
 
 /// RUF102 for invalid noqa codes
 pub(crate) fn invalid_noqa_code(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<OldDiagnostic>,
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
     external: &[String],
@@ -86,8 +86,8 @@ fn code_is_valid(code: &Code, external: &[String]) -> bool {
 fn all_codes_invalid_diagnostic(
     directive: &Codes<'_>,
     invalid_codes: Vec<&Code<'_>>,
-) -> Diagnostic {
-    Diagnostic::new(
+) -> OldDiagnostic {
+    OldDiagnostic::new(
         InvalidRuleCode {
             rule_code: invalid_codes
                 .into_iter()
@@ -104,8 +104,8 @@ fn some_codes_are_invalid_diagnostic(
     codes: &Codes,
     invalid_code: &Code,
     locator: &Locator,
-) -> Diagnostic {
-    let diagnostic = Diagnostic::new(
+) -> OldDiagnostic {
+    let diagnostic = OldDiagnostic::new(
         InvalidRuleCode {
             rule_code: invalid_code.to_string(),
         },

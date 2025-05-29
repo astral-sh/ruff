@@ -2,7 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::TextRange;
 
-use crate::Diagnostic;
+use crate::OldDiagnostic;
 use crate::Violation;
 
 use super::LogicalLine;
@@ -264,19 +264,19 @@ pub(crate) fn indentation(
     prev_indent_level: Option<usize>,
     indent_size: usize,
     range: TextRange,
-) -> Vec<Diagnostic> {
+) -> Vec<OldDiagnostic> {
     let mut diagnostics = vec![];
 
     if indent_level % indent_size != 0 {
         diagnostics.push(if logical_line.is_comment_only() {
-            Diagnostic::new(
+            OldDiagnostic::new(
                 IndentationWithInvalidMultipleComment {
                     indent_width: indent_size,
                 },
                 range,
             )
         } else {
-            Diagnostic::new(
+            OldDiagnostic::new(
                 IndentationWithInvalidMultiple {
                     indent_width: indent_size,
                 },
@@ -290,24 +290,24 @@ pub(crate) fn indentation(
 
     if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
         diagnostics.push(if logical_line.is_comment_only() {
-            Diagnostic::new(NoIndentedBlockComment, range)
+            OldDiagnostic::new(NoIndentedBlockComment, range)
         } else {
-            Diagnostic::new(NoIndentedBlock, range)
+            OldDiagnostic::new(NoIndentedBlock, range)
         });
     } else if !indent_expect
         && prev_indent_level.is_some_and(|prev_indent_level| indent_level > prev_indent_level)
     {
         diagnostics.push(if logical_line.is_comment_only() {
-            Diagnostic::new(UnexpectedIndentationComment, range)
+            OldDiagnostic::new(UnexpectedIndentationComment, range)
         } else {
-            Diagnostic::new(UnexpectedIndentation, range)
+            OldDiagnostic::new(UnexpectedIndentation, range)
         });
     }
     if indent_expect {
         let expected_indent_amount = if indent_char == '\t' { 8 } else { 4 };
         let expected_indent_level = prev_indent_level.unwrap_or(0) + expected_indent_amount;
         if indent_level > expected_indent_level {
-            diagnostics.push(Diagnostic::new(
+            diagnostics.push(OldDiagnostic::new(
                 OverIndented {
                     is_comment: logical_line.is_comment_only(),
                 },

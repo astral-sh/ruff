@@ -5,7 +5,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::{AlwaysFixableViolation, Violation};
-use crate::{Diagnostic, Edit, Fix};
+use crate::{Edit, Fix, OldDiagnostic};
 
 /// Simplified token type.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -238,7 +238,7 @@ impl AlwaysFixableViolation for ProhibitedTrailingComma {
 
 /// COM812, COM818, COM819
 pub(crate) fn trailing_commas(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<OldDiagnostic>,
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
@@ -319,7 +319,7 @@ fn check_token(
     prev_prev: SimpleToken,
     context: Context,
     locator: &Locator,
-) -> Option<Diagnostic> {
+) -> Option<OldDiagnostic> {
     // Is it allowed to have a trailing comma before this token?
     let comma_allowed = token.ty == TokenType::ClosingBracket
         && match context.ty {
@@ -352,7 +352,7 @@ fn check_token(
     };
 
     if comma_prohibited {
-        let mut diagnostic = Diagnostic::new(ProhibitedTrailingComma, prev.range());
+        let mut diagnostic = OldDiagnostic::new(ProhibitedTrailingComma, prev.range());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(diagnostic.range())));
         return Some(diagnostic);
     }
@@ -361,7 +361,7 @@ fn check_token(
     // Approximation: any comma followed by a statement-ending newline.
     let bare_comma_prohibited = prev.ty == TokenType::Comma && token.ty == TokenType::Newline;
     if bare_comma_prohibited {
-        return Some(Diagnostic::new(TrailingCommaOnBareTuple, prev.range()));
+        return Some(OldDiagnostic::new(TrailingCommaOnBareTuple, prev.range()));
     }
 
     if !comma_allowed {
@@ -383,7 +383,7 @@ fn check_token(
         );
     if comma_required {
         let mut diagnostic =
-            Diagnostic::new(MissingTrailingComma, TextRange::empty(prev_prev.end()));
+            OldDiagnostic::new(MissingTrailingComma, TextRange::empty(prev_prev.end()));
         // Create a replacement that includes the final bracket (or other token),
         // rather than just inserting a comma at the end. This prevents the UP034 fix
         // removing any brackets in the same linter pass - doing both at the same time could

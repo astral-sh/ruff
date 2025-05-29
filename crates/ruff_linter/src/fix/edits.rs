@@ -607,7 +607,7 @@ mod tests {
         add_to_dunder_all, make_redundant_alias, next_stmt_break, trailing_semicolon,
     };
     use crate::message::Message;
-    use crate::{Diagnostic, Edit, Fix};
+    use crate::{Edit, Fix, OldDiagnostic};
 
     /// Parse the given source using [`Mode::Module`] and return the first statement.
     fn parse_first_stmt(source: &str) -> Result<Stmt> {
@@ -738,7 +738,7 @@ x = 1 \
         let diag = {
             use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
             let mut iter = edits.into_iter();
-            let diag = Diagnostic::new(
+            let diag = OldDiagnostic::new(
                 MissingNewlineAtEndOfFile, // The choice of rule here is arbitrary.
                 TextRange::default(),
             )

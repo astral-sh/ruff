@@ -1233,7 +1233,7 @@ mod tests {
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
-    use crate::{Diagnostic, Edit};
+    use crate::{Edit, OldDiagnostic};
     use crate::{Locator, generate_noqa_edits};
 
     fn assert_lexed_ranges_match_slices(
@@ -1253,7 +1253,7 @@ mod tests {
 
     /// Create a [`Message`] with a placeholder filename and rule code from `diagnostic`.
     fn message_from_diagnostic(
-        diagnostic: Diagnostic,
+        diagnostic: OldDiagnostic,
         path: impl AsRef<Path>,
         source: &str,
     ) -> Message {
@@ -2842,7 +2842,7 @@ mod tests {
         assert_eq!(count, 0);
         assert_eq!(output, format!("{contents}"));
 
-        let messages = [Diagnostic::new(
+        let messages = [OldDiagnostic::new(
             UnusedVariable {
                 name: "x".to_string(),
             },
@@ -2865,11 +2865,11 @@ mod tests {
         assert_eq!(output, "x = 1  # noqa: F841\n");
 
         let messages = [
-            Diagnostic::new(
+            OldDiagnostic::new(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
             ),
-            Diagnostic::new(
+            OldDiagnostic::new(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
@@ -2894,11 +2894,11 @@ mod tests {
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
 
         let messages = [
-            Diagnostic::new(
+            OldDiagnostic::new(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
             ),
-            Diagnostic::new(
+            OldDiagnostic::new(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
@@ -2936,7 +2936,7 @@ print(
 )
 "#;
         let noqa_line_for = [TextRange::new(8.into(), 68.into())].into_iter().collect();
-        let messages = [Diagnostic::new(
+        let messages = [OldDiagnostic::new(
             PrintfStringFormatting,
             TextRange::new(12.into(), 79.into()),
         )]
@@ -2968,7 +2968,7 @@ print(
 foo;
 bar =
 ";
-        let messages = [Diagnostic::new(
+        let messages = [OldDiagnostic::new(
             UselessSemicolon,
             TextRange::new(4.into(), 5.into()),
         )]

@@ -8,7 +8,7 @@ use crate::violation::Violation;
 use crate::{Fix, codes::Rule};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Diagnostic {
+pub struct OldDiagnostic {
     /// The message body to display to the user, to explain the diagnostic.
     pub body: String,
     /// The message to display to the user, to explain the suggested fix.
@@ -20,7 +20,7 @@ pub struct Diagnostic {
     pub(crate) rule: Rule,
 }
 
-impl Diagnostic {
+impl OldDiagnostic {
     // TODO(brent) We temporarily allow this to avoid updating all of the call sites to add
     // references. I expect this method to go away or change significantly with the rest of the
     // diagnostic refactor, but if it still exists in this form at the end of the refactor, we
@@ -87,13 +87,13 @@ impl Diagnostic {
     }
 }
 
-impl AsRule for Diagnostic {
+impl AsRule for OldDiagnostic {
     fn rule(&self) -> Rule {
         self.rule
     }
 }
 
-impl Ranged for Diagnostic {
+impl Ranged for OldDiagnostic {
     fn range(&self) -> TextRange {
         self.range
     }

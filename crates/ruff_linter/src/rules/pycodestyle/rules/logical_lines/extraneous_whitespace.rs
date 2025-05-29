@@ -3,9 +3,9 @@ use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::AlwaysFixableViolation;
-use crate::Diagnostic;
 use crate::Edit;
 use crate::Fix;
+use crate::OldDiagnostic;
 use crate::checkers::logical_lines::LogicalLinesContext;
 
 use super::{LogicalLine, Whitespace};
@@ -165,7 +165,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                 BracketOrPunctuation::OpenBracket(symbol) if symbol != '{' || fstrings == 0 => {
                     let (trailing, trailing_len) = line.trailing_whitespace(token);
                     if !matches!(trailing, Whitespace::None) {
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = OldDiagnostic::new(
                             WhitespaceAfterOpenBracket { symbol },
                             TextRange::at(token.end(), trailing_len),
                         );
@@ -179,7 +179,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                         if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
                             line.leading_whitespace(token)
                         {
-                            let mut diagnostic = Diagnostic::new(
+                            let mut diagnostic = OldDiagnostic::new(
                                 WhitespaceBeforeCloseBracket { symbol },
                                 TextRange::at(token.start() - offset, offset),
                             );
@@ -205,7 +205,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                 // If we're in the second half of a double colon, disallow
                                 // any whitespace (e.g., `foo[1: :2]` or `foo[1 : : 2]`).
                                 if matches!(prev_token, Some(TokenKind::Colon)) {
-                                    let mut diagnostic = Diagnostic::new(
+                                    let mut diagnostic = OldDiagnostic::new(
                                         WhitespaceBeforePunctuation { symbol },
                                         TextRange::at(token.start() - offset, offset),
                                     );
@@ -220,7 +220,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                     // Or `foo[index :, 2]`, but not `foo[index  :, 2]`.
                                     if let (Whitespace::Many | Whitespace::Tab, offset) = whitespace
                                     {
-                                        let mut diagnostic = Diagnostic::new(
+                                        let mut diagnostic = OldDiagnostic::new(
                                             WhitespaceBeforePunctuation { symbol },
                                             TextRange::at(token.start() - offset, offset),
                                         );
@@ -245,7 +245,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                     // whitespace before the colon and so should the fix
                                     if let (Whitespace::Many | Whitespace::Tab, offset) = whitespace
                                     {
-                                        let mut diagnostic = Diagnostic::new(
+                                        let mut diagnostic = OldDiagnostic::new(
                                             WhitespaceBeforePunctuation { symbol },
                                             TextRange::at(token.start() - offset, offset),
                                         );
@@ -262,7 +262,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                         .filter(|next| matches!(next.kind(), TokenKind::Colon))
                                         .unwrap_or(&token);
                                     if line.trailing_whitespace(token) != whitespace {
-                                        let mut diagnostic = Diagnostic::new(
+                                        let mut diagnostic = OldDiagnostic::new(
                                             WhitespaceBeforePunctuation { symbol },
                                             TextRange::at(token.start() - offset, offset),
                                         );
@@ -280,7 +280,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                     // Avoid removing any whitespace for f-string debug expressions.
                                     continue;
                                 }
-                                let mut diagnostic = Diagnostic::new(
+                                let mut diagnostic = OldDiagnostic::new(
                                     WhitespaceBeforePunctuation { symbol },
                                     TextRange::at(token.start() - offset, offset),
                                 );

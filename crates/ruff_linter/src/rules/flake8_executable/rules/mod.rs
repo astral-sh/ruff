@@ -7,8 +7,8 @@ pub(crate) use shebang_missing_python::*;
 pub(crate) use shebang_not_executable::*;
 pub(crate) use shebang_not_first_line::*;
 
-use crate::Diagnostic;
 use crate::Locator;
+use crate::OldDiagnostic;
 use crate::codes::Rule;
 use crate::comments::shebang::ShebangDirective;
 use crate::settings::LinterSettings;
@@ -20,7 +20,7 @@ mod shebang_not_executable;
 mod shebang_not_first_line;
 
 pub(crate) fn from_tokens(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<OldDiagnostic>,
     path: &Path,
     locator: &Locator,
     comment_ranges: &CommentRanges,
