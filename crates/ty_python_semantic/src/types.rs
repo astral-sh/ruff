@@ -4960,11 +4960,11 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
                 KnownInstanceType::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
-                KnownInstanceType::Protocol(_) => Err(InvalidTypeExpressionError {
+                KnownInstanceType::SubscriptedProtocol(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
                     fallback_type: Type::unknown(),
                 }),
-                KnownInstanceType::Generic(_) => Err(InvalidTypeExpressionError {
+                KnownInstanceType::SubscriptedGeneric(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
@@ -5027,6 +5027,15 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec::smallvec![
                         InvalidTypeExpression::RequiresArguments(*self)
                     ],
+                    fallback_type: Type::unknown(),
+                }),
+
+                SpecialFormType::Protocol => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
+                    fallback_type: Type::unknown(),
+                }),
+                SpecialFormType::Generic => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
 
@@ -5725,12 +5734,19 @@ impl<'db> TypeMapping<'_, 'db> {
 /// The id may change between runs, or when e.g. a `TypeVarInstance` was garbage-collected and recreated.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, Ord, PartialOrd)]
 pub enum KnownInstanceType<'db> {
-    /// The symbol `typing.Protocol` (which can also be found as `typing_extensions.Protocol`)
-    Protocol(Option<GenericContext<'db>>),
-    /// The symbol `typing.Generic` (which can also be found as `typing_extensions.Generic`)
-    Generic(Option<GenericContext<'db>>),
+    /// The type of `Protocol[T]`, `Protocol[U, S]`, etc -- usually only found in a class's bases list.
+    ///
+    /// Note that unsubscripted `Protocol` is represented by [`special_form::SpecialFormType::Protocol`], not this type.
+    SubscriptedProtocol(GenericContext<'db>),
+
+    /// The type of `Generic[T]`, `Generic[U, S]`, etc -- usually only found in a class's bases list.
+    ///
+    /// Note that unsubscripted `Generic` is represented by [`special_form::SpecialFormType::Generic`], not this type.
+    SubscriptedGeneric(GenericContext<'db>),
+
     /// A single instance of `typing.TypeVar`
     TypeVar(TypeVarInstance<'db>),
+
     /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
     TypeAliasType(TypeAliasType<'db>),
 }
@@ -5738,12 +5754,8 @@ pub enum KnownInstanceType<'db> {
 impl<'db> KnownInstanceType<'db> {
     fn normalized(self, db: &'db dyn Db) -> Self {
         match self {
-            Self::Protocol(generic_context) => {
-                Self::Protocol(generic_context.map(|ctx| ctx.normalized(db)))
-            }
-            Self::Generic(generic_context) => {
-                Self::Generic(generic_context.map(|ctx| ctx.normalized(db)))
-            }
+            Self::SubscriptedProtocol(context) => Self::SubscriptedProtocol(context.normalized(db)),
+            Self::SubscriptedGeneric(context) => Self::SubscriptedGeneric(context.normalized(db)),
             Self::TypeVar(typevar) => Self::TypeVar(typevar.normalized(db)),
             Self::TypeAliasType(type_alias) => Self::TypeAliasType(type_alias.normalized(db)),
         }
@@ -5751,24 +5763,10 @@ impl<'db> KnownInstanceType<'db> {
 
     const fn class(self) -> KnownClass {
         match self {
-            Self::Protocol(_) => KnownClass::SpecialForm, // actually `_ProtocolMeta` at runtime but this is what typeshed says
-            Self::Generic(_) => KnownClass::SpecialForm, // actually `type` at runtime but this is what typeshed says
+            Self::SubscriptedProtocol(_) | Self::SubscriptedGeneric(_) => KnownClass::SpecialForm,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
         }
-    }
-
-    fn try_from_file_and_name(db: &'db dyn Db, file: File, symbol_name: &str) -> Option<Self> {
-        let candidate = match symbol_name {
-            "Protocol" => Self::Protocol(None),
-            "Generic" => Self::Generic(None),
-            _ => return None,
-        };
-        matches!(
-            file_to_module(db, file)?.known()?,
-            KnownModule::Typing | KnownModule::TypingExtensions
-        )
-        .then_some(candidate)
     }
 
     fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
@@ -5799,19 +5797,13 @@ impl<'db> KnownInstanceType<'db> {
         impl std::fmt::Display for KnownInstanceRepr<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.known_instance {
-                    KnownInstanceType::Protocol(generic_context) => {
+                    KnownInstanceType::SubscriptedProtocol(generic_context) => {
                         f.write_str("typing.Protocol")?;
-                        if let Some(generic_context) = generic_context {
-                            generic_context.display(self.db).fmt(f)?;
-                        }
-                        Ok(())
+                        generic_context.display(self.db).fmt(f)
                     }
-                    KnownInstanceType::Generic(generic_context) => {
+                    KnownInstanceType::SubscriptedGeneric(generic_context) => {
                         f.write_str("typing.Generic")?;
-                        if let Some(generic_context) = generic_context {
-                            generic_context.display(self.db).fmt(f)?;
-                        }
-                        Ok(())
+                        generic_context.display(self.db).fmt(f)
                     }
                     KnownInstanceType::TypeAliasType(_) => f.write_str("typing.TypeAliasType"),
                     // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render

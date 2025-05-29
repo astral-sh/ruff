@@ -89,11 +89,11 @@ use crate::types::{
     BareTypeAliasType, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
     DynamicType, FunctionDecorators, FunctionType, GenericAlias, IntersectionBuilder,
     IntersectionType, KnownClass, KnownFunction, KnownInstanceType, MemberLookupPolicy,
-    MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters,
+    MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType,
     StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type,
     TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
     TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
-    todo_type, SpecialFormType
+    todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -850,7 +850,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             //     - If the class is a protocol class: check for inheritance from a non-protocol class
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
                 let base_class = match base_class {
-                    Type::KnownInstance(KnownInstanceType::Generic(None)) => {
+                    Type::SpecialForm(SpecialFormType::Generic) => {
                         if let Some(builder) = self
                             .context
                             .report_lint(&INVALID_BASE, &class_node.bases()[i])
@@ -864,7 +864,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // Note that unlike several of the other errors caught in this function,
                     // this does not lead to the class creation failing at runtime,
                     // but it is semantically invalid.
-                    Type::KnownInstance(KnownInstanceType::Protocol(Some(_))) => {
+                    Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)) => {
                         if class_node.type_params.is_none() {
                             continue;
                         }
@@ -3638,12 +3638,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                         &name_expr.id,
                     ) {
                         declared_ty.inner = Type::SpecialForm(special_form);
-                    } else if let Some(known_instance) = KnownInstanceType::try_from_file_and_name(
-                        self.db(),
-                        self.file(),
-                        &name_expr.id,
-                    ) {
-                        declared_ty.inner = Type::KnownInstance(known_instance);
                     }
                 }
             }
@@ -7442,45 +7436,43 @@ impl<'db> TypeInferenceBuilder<'db> {
                 value_ty,
                 Type::IntLiteral(i64::from(bool)),
             ),
-            (Type::KnownInstance(KnownInstanceType::Protocol(None)), Type::Tuple(typevars), _) => {
-                self.legacy_generic_class_context(
+            (Type::SpecialForm(SpecialFormType::Protocol), Type::Tuple(typevars), _) => self
+                .legacy_generic_class_context(
                     value_node,
                     typevars.elements(self.db()),
                     LegacyGenericBase::Protocol,
                 )
-                .map(|context| Type::KnownInstance(KnownInstanceType::Protocol(Some(context))))
-                .unwrap_or_else(Type::unknown)
-            }
-            (Type::KnownInstance(KnownInstanceType::Protocol(None)), typevar, _) => self
+                .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context)))
+                .unwrap_or_else(Type::unknown),
+            (Type::SpecialForm(SpecialFormType::Protocol), typevar, _) => self
                 .legacy_generic_class_context(
                     value_node,
                     std::slice::from_ref(&typevar),
                     LegacyGenericBase::Protocol,
                 )
-                .map(|context| Type::KnownInstance(KnownInstanceType::Protocol(Some(context))))
+                .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context)))
                 .unwrap_or_else(Type::unknown),
-            (Type::KnownInstance(KnownInstanceType::Protocol(Some(_))), _, _) => {
+            (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _, _) => {
                 // TODO: emit a diagnostic
                 todo_type!("doubly-specialized typing.Protocol")
             }
-            (Type::KnownInstance(KnownInstanceType::Generic(None)), Type::Tuple(typevars), _) => {
-                self.legacy_generic_class_context(
+            (Type::SpecialForm(SpecialFormType::Generic), Type::Tuple(typevars), _) => self
+                .legacy_generic_class_context(
                     value_node,
                     typevars.elements(self.db()),
                     LegacyGenericBase::Generic,
                 )
-                .map(|context| Type::KnownInstance(KnownInstanceType::Generic(Some(context))))
-                .unwrap_or_else(Type::unknown)
-            }
-            (Type::KnownInstance(KnownInstanceType::Generic(None)), typevar, _) => self
+                .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context)))
+                .unwrap_or_else(Type::unknown),
+            (Type::SpecialForm(SpecialFormType::Generic), typevar, _) => self
                 .legacy_generic_class_context(
                     value_node,
                     std::slice::from_ref(&typevar),
                     LegacyGenericBase::Generic,
                 )
-                .map(|context| Type::KnownInstance(KnownInstanceType::Generic(Some(context))))
+                .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context)))
                 .unwrap_or_else(Type::unknown),
-            (Type::KnownInstance(KnownInstanceType::Generic(Some(_))), _, _) => {
+            (Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_)), _, _) => {
                 // TODO: emit a diagnostic
                 todo_type!("doubly-specialized typing.Generic")
             }
@@ -8480,7 +8472,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_parameterized_special_form_type_expression(subscript, special_form)
             }
             Type::KnownInstance(known_instance) => match known_instance {
-                KnownInstanceType::Protocol(_) => {
+                KnownInstanceType::SubscriptedProtocol(_) => {
                     self.infer_type_expression(&subscript.slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
@@ -8489,7 +8481,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                     Type::unknown()
                 }
-                KnownInstanceType::Generic(_) => {
+                KnownInstanceType::SubscriptedGeneric(_) => {
                     self.infer_type_expression(&subscript.slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
@@ -8871,6 +8863,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             SpecialFormType::Type => self.infer_subclass_of_type_expression(arguments_slice),
             SpecialFormType::Tuple => self.infer_tuple_type_expression(arguments_slice),
+            SpecialFormType::Generic | SpecialFormType::Protocol => {
+                self.infer_expression(arguments_slice);
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                    builder.into_diagnostic(format_args!(
+                        "`{special_form}` is not allowed in type expressions",
+                    ));
+                }
+                Type::unknown()
+            }
         }
     }
 

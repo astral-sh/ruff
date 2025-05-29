@@ -149,8 +149,8 @@ impl<'db> ClassBase<'db> {
             | Type::AlwaysTruthy => None,
 
             Type::KnownInstance(known_instance) => match known_instance {
-                KnownInstanceType::Generic(_) => Some(Self::Generic),
-                KnownInstanceType::Protocol(_) => Some(Self::Protocol),
+                KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
+                KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
                 KnownInstanceType::TypeAliasType(_) | KnownInstanceType::TypeVar(_) => None,
             },
 
@@ -181,6 +181,10 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::AlwaysFalsy => None,
 
                 SpecialFormType::Unknown => Some(Self::unknown()),
+
+                SpecialFormType::Protocol => Some(Self::Protocol),
+                SpecialFormType::Generic => Some(Self::Generic),
+
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
                 SpecialFormType::Dict => {
                     Self::try_from_type(db, KnownClass::Dict.to_class_literal(db))
@@ -292,8 +296,8 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
         match value {
             ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
             ClassBase::Class(class) => class.into(),
-            ClassBase::Protocol => Type::KnownInstance(KnownInstanceType::Protocol(None)),
-            ClassBase::Generic => Type::KnownInstance(KnownInstanceType::Generic(None)),
+            ClassBase::Protocol => Type::SpecialForm(SpecialFormType::Protocol),
+            ClassBase::Generic => Type::SpecialForm(SpecialFormType::Generic),
         }
     }
 }

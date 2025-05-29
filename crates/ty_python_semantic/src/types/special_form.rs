@@ -104,50 +104,64 @@ pub enum SpecialFormType {
     TypeIs,
     /// The symbol `typing.ReadOnly` (which can also be found as `typing_extensions.ReadOnly`)
     ReadOnly,
+
+    /// The symbol `typing.Protocol` (which can also be found as `typing_extensions.Protocol`)
+    ///
+    /// Note that instances of subscripted `typing.Protocol` are not represented by this type;
+    /// see also [`KnownInstanceType::SubscriptedProtocol`].
+    Protocol,
+
+    /// The symbol `typing.Generic` (which can also be found as `typing_extensions.Generic`).
+    ///
+    /// Note that instances of subscripted `typing.Generic` are not represented by this type;
+    /// see also [`KnownInstanceType::SubscriptedGeneric`].
+    Generic,
 }
 
 impl SpecialFormType {
     /// Return the [`KnownClass`] which this symbol is an instance of
     pub(crate) const fn class(self) -> KnownClass {
         match self {
-            Self::Annotated => KnownClass::SpecialForm,
-            Self::Literal => KnownClass::SpecialForm,
-            Self::LiteralString => KnownClass::SpecialForm,
-            Self::Optional => KnownClass::SpecialForm,
-            Self::Union => KnownClass::SpecialForm,
-            Self::NoReturn => KnownClass::SpecialForm,
-            Self::Never => KnownClass::SpecialForm,
-            Self::Tuple => KnownClass::SpecialForm,
-            Self::Type => KnownClass::SpecialForm,
-            Self::TypingSelf => KnownClass::SpecialForm,
-            Self::Final => KnownClass::SpecialForm,
-            Self::ClassVar => KnownClass::SpecialForm,
-            Self::Callable => KnownClass::SpecialForm,
-            Self::Concatenate => KnownClass::SpecialForm,
-            Self::Unpack => KnownClass::SpecialForm,
-            Self::Required => KnownClass::SpecialForm,
-            Self::NotRequired => KnownClass::SpecialForm,
-            Self::TypeAlias => KnownClass::SpecialForm,
-            Self::TypeGuard => KnownClass::SpecialForm,
-            Self::TypedDict => KnownClass::SpecialForm,
-            Self::TypeIs => KnownClass::SpecialForm,
-            Self::ReadOnly => KnownClass::SpecialForm,
-            Self::List => KnownClass::StdlibAlias,
-            Self::Dict => KnownClass::StdlibAlias,
-            Self::DefaultDict => KnownClass::StdlibAlias,
-            Self::Set => KnownClass::StdlibAlias,
-            Self::FrozenSet => KnownClass::StdlibAlias,
-            Self::Counter => KnownClass::StdlibAlias,
-            Self::Deque => KnownClass::StdlibAlias,
-            Self::ChainMap => KnownClass::StdlibAlias,
-            Self::OrderedDict => KnownClass::StdlibAlias,
-            Self::TypeOf => KnownClass::SpecialForm,
-            Self::Not => KnownClass::SpecialForm,
-            Self::Intersection => KnownClass::SpecialForm,
-            Self::CallableTypeOf => KnownClass::SpecialForm,
-            Self::Unknown => KnownClass::Object,
-            Self::AlwaysTruthy => KnownClass::Object,
-            Self::AlwaysFalsy => KnownClass::Object,
+            Self::Annotated
+            | Self::Literal
+            | Self::LiteralString
+            | Self::Optional
+            | Self::Union
+            | Self::NoReturn
+            | Self::Never
+            | Self::Tuple
+            | Self::Type
+            | Self::TypingSelf
+            | Self::Final
+            | Self::ClassVar
+            | Self::Callable
+            | Self::Concatenate
+            | Self::Unpack
+            | Self::Required
+            | Self::NotRequired
+            | Self::TypeAlias
+            | Self::TypeGuard
+            | Self::TypedDict
+            | Self::TypeIs
+            | Self::TypeOf
+            | Self::Not
+            | Self::Intersection
+            | Self::CallableTypeOf
+            | Self::Protocol  // actually `_ProtocolMeta` at runtime but this is what typeshed says
+            | Self::Generic  // actually `type` at runtime but this is what typeshed says
+            | Self::ReadOnly => KnownClass::SpecialForm,
+
+            Self::List
+            | Self::Dict
+            | Self::DefaultDict
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Counter
+            | Self::Deque
+            | Self::ChainMap
+            | Self::OrderedDict => KnownClass::StdlibAlias,
+
+            Self::Unknown | Self::AlwaysTruthy | Self::AlwaysFalsy => KnownClass::Object,
         }
     }
 
@@ -197,7 +211,9 @@ impl SpecialFormType {
             | Self::NoReturn
             | Self::Tuple
             | Self::Type
+            | Self::Generic
             | Self::Callable => module.is_typing(),
+
             Self::Annotated
             | Self::Literal
             | Self::LiteralString
@@ -211,13 +227,16 @@ impl SpecialFormType {
             | Self::TypeGuard
             | Self::TypedDict
             | Self::TypeIs
+            | Self::Protocol
             | Self::ReadOnly => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
+
             Self::TypingSelf => matches!(
                 module,
                 KnownModule::Typing | KnownModule::TypingExtensions | KnownModule::Typeshed
             ),
+
             Self::Unknown
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
@@ -273,6 +292,8 @@ impl SpecialFormType {
             SpecialFormType::Intersection => "ty_extensions.Intersection",
             SpecialFormType::TypeOf => "ty_extensions.TypeOf",
             SpecialFormType::CallableTypeOf => "ty_extensions.CallableTypeOf",
+            SpecialFormType::Protocol => "typing.Protocol",
+            SpecialFormType::Generic => "typing.Generic",
         }
     }
 }
