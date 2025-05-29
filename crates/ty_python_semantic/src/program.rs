@@ -202,6 +202,10 @@ impl PythonPath {
         Self::SysPrefix(path.into(), SysPrefixPathOrigin::VirtualEnvVar)
     }
 
+    pub fn from_conda_prefix_var(path: impl Into<SystemPathBuf>) -> Self {
+        Self::Resolve(path.into(), SysPrefixPathOrigin::CondaPrefixVar)
+    }
+
     pub fn from_cli_flag(path: SystemPathBuf) -> Self {
         Self::Resolve(path, SysPrefixPathOrigin::PythonCliFlag)
     }

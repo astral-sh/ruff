@@ -4,12 +4,12 @@ use anyhow::{Result, anyhow};
 use memchr::memchr_iter;
 use regex::Regex;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::TextSize;
 
 use crate::Locator;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Check for `type: ignore` annotations that suppress all type warnings, as

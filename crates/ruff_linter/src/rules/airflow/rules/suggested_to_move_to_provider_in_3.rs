@@ -1,8 +1,9 @@
 use crate::importer::ImportRequest;
 
 use crate::rules::airflow::helpers::{ProviderReplacement, is_guarded_by_try_except};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -30,12 +31,12 @@ use crate::checkers::ast::Checker;
 /// from airflow.providers.standard.operators.python import PythonOperator
 /// ```
 #[derive(ViolationMetadata)]
-pub(crate) struct Airflow3SuggestedToMoveToProvider {
-    deprecated: String,
+pub(crate) struct Airflow3SuggestedToMoveToProvider<'a> {
+    deprecated: QualifiedName<'a>,
     replacement: ProviderReplacement,
 }
 
-impl Violation for Airflow3SuggestedToMoveToProvider {
+impl Violation for Airflow3SuggestedToMoveToProvider<'_> {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -77,7 +78,7 @@ impl Violation for Airflow3SuggestedToMoveToProvider {
                 provider,
                 version,
             } => Some(format!(
-                "Install `apache-airflow-providers-{provider}>={version}` and use `{module}.{name}` instead."
+                "Install `apache-airflow-providers-{provider}>={version}` and use `{name}` from `{module}` instead."
             )),
             ProviderReplacement::SourceModuleMovedToProvider {
                 module,
@@ -85,7 +86,7 @@ impl Violation for Airflow3SuggestedToMoveToProvider {
                 provider,
                 version,
             } => Some(format!(
-                "Install `apache-airflow-providers-{provider}>={version}` and use `{module}.{name}` instead."
+                "Install `apache-airflow-providers-{provider}>={version}` and use `{name}` from `{module}` instead."
             )),
         }
     }
@@ -281,26 +282,36 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         _ => return,
     };
 
-    let mut diagnostic = Diagnostic::new(
-        Airflow3SuggestedToMoveToProvider {
-            deprecated: qualified_name.to_string(),
-            replacement: replacement.clone(),
-        },
-        ranged.range(),
-    );
-
-    let semantic = checker.semantic();
-    if let Some((module, name)) = match &replacement {
-        ProviderReplacement::AutoImport { module, name, .. } => Some((module, *name)),
+    let (module, name) = match &replacement {
+        ProviderReplacement::AutoImport { module, name, .. } => (module, *name),
         ProviderReplacement::SourceModuleMovedToProvider { module, name, .. } => {
-            Some((module, name.as_str()))
+            (module, name.as_str())
         }
-        ProviderReplacement::None => None,
-    } {
-        if is_guarded_by_try_except(expr, module, name, semantic) {
+        ProviderReplacement::None => {
+            checker.report_diagnostic(
+                Airflow3SuggestedToMoveToProvider {
+                    deprecated: qualified_name,
+                    replacement: replacement.clone(),
+                },
+                ranged.range(),
+            );
             return;
         }
-        diagnostic.try_set_fix(|| {
+    };
+
+    if is_guarded_by_try_except(expr, module, name, checker.semantic()) {
+        return;
+    }
+
+    checker
+        .report_diagnostic(
+            Airflow3SuggestedToMoveToProvider {
+                deprecated: qualified_name,
+                replacement: replacement.clone(),
+            },
+            ranged.range(),
+        )
+        .try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from(module, name),
                 expr.start(),
@@ -309,7 +320,4 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             let replacement_edit = Edit::range_replacement(binding, ranged.range());
             Ok(Fix::safe_edits(import_edit, [replacement_edit]))
         });
-    }
-
-    checker.report_diagnostic(diagnostic);
 }

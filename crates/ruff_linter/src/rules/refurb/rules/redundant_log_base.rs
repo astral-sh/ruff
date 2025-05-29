@@ -1,11 +1,11 @@
 use anyhow::Result;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Number};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `math.log` calls with a redundant base.
@@ -96,7 +96,7 @@ pub(crate) fn redundant_log_base(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         RedundantLogBase {
             base,
             arg: checker.locator().slice(arg).into(),
@@ -104,7 +104,6 @@ pub(crate) fn redundant_log_base(checker: &Checker, call: &ast::ExprCall) {
         call.range(),
     );
     diagnostic.try_set_fix(|| generate_fix(checker, call, base, arg));
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

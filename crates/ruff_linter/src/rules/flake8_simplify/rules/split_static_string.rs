@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringLiteral, StringLiteralFlags,
@@ -9,6 +8,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for static `str.split` calls that can be replaced with list literals.
@@ -102,7 +102,7 @@ pub(crate) fn split_static_string(
         split_default(str_value, maxsplit_value, direction)
     };
 
-    let mut diagnostic = Diagnostic::new(SplitStaticString, call.range());
+    let mut diagnostic = checker.report_diagnostic(SplitStaticString, call.range());
     if let Some(ref replacement_expr) = split_replacement {
         diagnostic.set_fix(Fix::applicable_edit(
             Edit::range_replacement(checker.generator().expr(replacement_expr), call.range()),
@@ -114,7 +114,6 @@ pub(crate) fn split_static_string(
             },
         ));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {

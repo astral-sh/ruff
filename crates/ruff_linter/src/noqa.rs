@@ -9,11 +9,11 @@ use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
 
-use ruff_diagnostics::Edit;
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Edit;
 use crate::Locator;
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
@@ -1221,7 +1221,6 @@ mod tests {
 
     use insta::assert_debug_snapshot;
 
-    use ruff_diagnostics::{Diagnostic, Edit};
     use ruff_python_trivia::CommentRanges;
     use ruff_source_file::{LineEnding, SourceFileBuilder};
     use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -1234,6 +1233,7 @@ mod tests {
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
+    use crate::{Diagnostic, Edit};
     use crate::{Locator, generate_noqa_edits};
 
     fn assert_lexed_ranges_match_slices(

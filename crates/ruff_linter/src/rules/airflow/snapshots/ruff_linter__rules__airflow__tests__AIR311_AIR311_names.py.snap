@@ -9,7 +9,7 @@ AIR311_names.py:27:1: AIR311 [*] `airflow.Dataset` is removed in Airflow 3.0; It
 28 |
 29 | # airflow.datasets
    |
-   = help: Use `airflow.sdk.Asset` instead
+   = help: Use `Asset` from `airflow.sdk` instead.
 
 ℹ Safe fix
 22 22 | from airflow.models.dag import DAG as DAGFromDag
@@ -32,7 +32,7 @@ AIR311_names.py:30:1: AIR311 [*] `airflow.datasets.Dataset` is removed in Airflo
 31 | DatasetAlias()
 32 | DatasetAll()
    |
-   = help: Use `airflow.sdk.Asset` instead
+   = help: Use `Asset` from `airflow.sdk` instead.
 
 ℹ Safe fix
 22 22 | from airflow.models.dag import DAG as DAGFromDag
@@ -59,7 +59,7 @@ AIR311_names.py:31:1: AIR311 [*] `airflow.datasets.DatasetAlias` is removed in A
 32 | DatasetAll()
 33 | DatasetAny()
    |
-   = help: Use `airflow.sdk.AssetAlias` instead
+   = help: Use `AssetAlias` from `airflow.sdk` instead.
 
 ℹ Safe fix
 22 22 | from airflow.models.dag import DAG as DAGFromDag
@@ -87,7 +87,7 @@ AIR311_names.py:32:1: AIR311 [*] `airflow.datasets.DatasetAll` is removed in Air
 33 | DatasetAny()
 34 | Metadata()
    |
-   = help: Use `airflow.sdk.AssetAll` instead
+   = help: Use `AssetAll` from `airflow.sdk` instead.
 
 ℹ Safe fix
 22 22 | from airflow.models.dag import DAG as DAGFromDag
@@ -116,7 +116,7 @@ AIR311_names.py:33:1: AIR311 [*] `airflow.datasets.DatasetAny` is removed in Air
 34 | Metadata()
 35 | expand_alias_to_datasets()
    |
-   = help: Use `airflow.sdk.AssetAny` instead
+   = help: Use `AssetAny` from `airflow.sdk` instead.
 
 ℹ Safe fix
 22 22 | from airflow.models.dag import DAG as DAGFromDag
@@ -144,7 +144,7 @@ AIR311_names.py:34:1: AIR311 `airflow.datasets.metadata.Metadata` is removed in 
    | ^^^^^^^^ AIR311
 35 | expand_alias_to_datasets()
    |
-   = help: Use `airflow.sdk.Metadata` instead
+   = help: Use `Metadata` from `airflow.sdk` instead.
 
 AIR311_names.py:35:1: AIR311 [*] `airflow.datasets.expand_alias_to_datasets` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
@@ -155,7 +155,7 @@ AIR311_names.py:35:1: AIR311 [*] `airflow.datasets.expand_alias_to_datasets` is 
 36 |
 37 | # airflow.decorators
    |
-   = help: Use `airflow.sdk.expand_alias_to_assets` instead
+   = help: Use `expand_alias_to_assets` from `airflow.sdk` instead.
 
 ℹ Safe fix
 22 22 | from airflow.models.dag import DAG as DAGFromDag
@@ -183,7 +183,7 @@ AIR311_names.py:38:1: AIR311 `airflow.decorators.dag` is removed in Airflow 3.0;
 39 | task()
 40 | task_group()
    |
-   = help: Use `airflow.sdk.dag` instead
+   = help: Use `dag` from `airflow.sdk` instead.
 
 AIR311_names.py:39:1: AIR311 `airflow.decorators.task` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
@@ -194,7 +194,7 @@ AIR311_names.py:39:1: AIR311 `airflow.decorators.task` is removed in Airflow 3.0
 40 | task_group()
 41 | setup()
    |
-   = help: Use `airflow.sdk.task` instead
+   = help: Use `task` from `airflow.sdk` instead.
 
 AIR311_names.py:40:1: AIR311 `airflow.decorators.task_group` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
@@ -205,7 +205,7 @@ AIR311_names.py:40:1: AIR311 `airflow.decorators.task_group` is removed in Airfl
 41 | setup()
 42 | teardown()
    |
-   = help: Use `airflow.sdk.task_group` instead
+   = help: Use `task_group` from `airflow.sdk` instead.
 
 AIR311_names.py:41:1: AIR311 `airflow.decorators.setup` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
@@ -215,7 +215,7 @@ AIR311_names.py:41:1: AIR311 `airflow.decorators.setup` is removed in Airflow 3.
    | ^^^^^ AIR311
 42 | teardown()
    |
-   = help: Use `airflow.sdk.setup` instead
+   = help: Use `setup` from `airflow.sdk` instead.
 
 AIR311_names.py:42:1: AIR311 `airflow.decorators.teardown` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
@@ -226,7 +226,7 @@ AIR311_names.py:42:1: AIR311 `airflow.decorators.teardown` is removed in Airflow
 43 |
 44 | # airflow.io
    |
-   = help: Use `airflow.sdk.teardown` instead
+   = help: Use `teardown` from `airflow.sdk` instead.
 
 AIR311_names.py:45:1: AIR311 `airflow.io.path.ObjectStoragePath` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
@@ -235,7 +235,7 @@ AIR311_names.py:45:1: AIR311 `airflow.io.path.ObjectStoragePath` is removed in A
    | ^^^^^^^^^^^^^^^^^ AIR311
 46 | attach()
    |
-   = help: Use `airflow.sdk.ObjectStoragePath` instead
+   = help: Use `ObjectStoragePath` from `airflow.sdk` instead.
 
 AIR311_names.py:46:1: AIR311 `airflow.io.storage.attach` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
@@ -246,7 +246,7 @@ AIR311_names.py:46:1: AIR311 `airflow.io.storage.attach` is removed in Airflow 3
 47 |
 48 | # airflow.models
    |
-   = help: Use `airflow.sdk.io.attach` instead
+   = help: Use `attach` from `airflow.sdk.io` instead.
 
 AIR311_names.py:49:1: AIR311 `airflow.models.Connection` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
@@ -256,7 +256,7 @@ AIR311_names.py:49:1: AIR311 `airflow.models.Connection` is removed in Airflow 3
 50 | DAGFromModel()
 51 | Variable()
    |
-   = help: Use `airflow.sdk.Connection` instead
+   = help: Use `Connection` from `airflow.sdk` instead.
 
 AIR311_names.py:50:1: AIR311 [*] `airflow.models.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
@@ -266,7 +266,7 @@ AIR311_names.py:50:1: AIR311 [*] `airflow.models.DAG` is removed in Airflow 3.0;
    | ^^^^^^^^^^^^ AIR311
 51 | Variable()
    |
-   = help: Use `airflow.sdk.DAG` instead
+   = help: Use `DAG` from `airflow.sdk` instead.
 
 ℹ Safe fix
 22 22 | from airflow.models.dag import DAG as DAGFromDag
@@ -295,7 +295,7 @@ AIR311_names.py:51:1: AIR311 `airflow.models.Variable` is removed in Airflow 3.0
 52 |
 53 | # airflow.models.baseoperator
    |
-   = help: Use `airflow.sdk.Variable` instead
+   = help: Use `Variable` from `airflow.sdk` instead.
 
 AIR311_names.py:54:1: AIR311 `airflow.models.baseoperator.chain` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
@@ -305,7 +305,7 @@ AIR311_names.py:54:1: AIR311 `airflow.models.baseoperator.chain` is removed in A
 55 | chain_linear()
 56 | cross_downstream()
    |
-   = help: Use `airflow.sdk.chain` instead
+   = help: Use `chain` from `airflow.sdk` instead.
 
 AIR311_names.py:55:1: AIR311 `airflow.models.baseoperator.chain_linear` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
@@ -315,7 +315,7 @@ AIR311_names.py:55:1: AIR311 `airflow.models.baseoperator.chain_linear` is remov
    | ^^^^^^^^^^^^ AIR311
 56 | cross_downstream()
    |
-   = help: Use `airflow.sdk.chain_linear` instead
+   = help: Use `chain_linear` from `airflow.sdk` instead.
 
 AIR311_names.py:56:1: AIR311 `airflow.models.baseoperator.cross_downstream` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
@@ -326,7 +326,7 @@ AIR311_names.py:56:1: AIR311 `airflow.models.baseoperator.cross_downstream` is r
 57 |
 58 | # airflow.models.baseoperatolinker
    |
-   = help: Use `airflow.sdk.cross_downstream` instead
+   = help: Use `cross_downstream` from `airflow.sdk` instead.
 
 AIR311_names.py:59:1: AIR311 `airflow.models.baseoperatorlink.BaseOperatorLink` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
@@ -336,7 +336,7 @@ AIR311_names.py:59:1: AIR311 `airflow.models.baseoperatorlink.BaseOperatorLink` 
 60 |
 61 | # airflow.models.dag
    |
-   = help: Use `airflow.sdk.definitions.baseoperatorlink.BaseOperatorLink` instead
+   = help: Use `BaseOperatorLink` from `airflow.sdk.definitions.baseoperatorlink` instead.
 
 AIR311_names.py:62:1: AIR311 [*] `airflow.models.dag.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
@@ -346,7 +346,7 @@ AIR311_names.py:62:1: AIR311 [*] `airflow.models.dag.DAG` is removed in Airflow 
 63 | # airflow.timetables.datasets
 64 | DatasetOrTimeSchedule()
    |
-   = help: Use `airflow.sdk.DAG` instead
+   = help: Use `DAG` from `airflow.sdk` instead.
 
 ℹ Safe fix
 22 22 | from airflow.models.dag import DAG as DAGFromDag
@@ -375,7 +375,7 @@ AIR311_names.py:64:1: AIR311 [*] `airflow.timetables.datasets.DatasetOrTimeSched
 65 |
 66 | # airflow.utils.dag_parsing_context
    |
-   = help: Use `airflow.timetables.assets.AssetOrTimeSchedule` instead
+   = help: Use `AssetOrTimeSchedule` from `airflow.timetables.assets` instead.
 
 ℹ Safe fix
 22 22 | from airflow.models.dag import DAG as DAGFromDag
@@ -401,4 +401,4 @@ AIR311_names.py:67:1: AIR311 `airflow.utils.dag_parsing_context.get_parsing_cont
 67 | get_parsing_context()
    | ^^^^^^^^^^^^^^^^^^^ AIR311
    |
-   = help: Use `airflow.sdk.get_parsing_context` instead
+   = help: Use `get_parsing_context` from `airflow.sdk` instead.

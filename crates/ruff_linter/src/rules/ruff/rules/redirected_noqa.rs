@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::noqa::{Codes, Directive, FileNoqaDirectives, NoqaDirectives};
 use crate::rule_redirects::get_redirect_target;
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for `noqa` directives that use redirected rule codes.

@@ -9,10 +9,10 @@ use super::{
 use crate::semantic_index::DeclarationWithConstraint;
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, Specialization};
-use crate::types::signatures::{Parameter, Parameters};
+use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::{
-    CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, Signature,
-    TypeMapping, TypeVarInstance,
+    CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, TypeMapping,
+    TypeVarInstance,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -223,6 +223,13 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    pub(super) fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::NonGeneric(class) => class.has_pep_695_type_params(db),
+            Self::Generic(generic) => generic.origin(db).has_pep_695_type_params(db),
+        }
+    }
+
     /// Returns the class literal and specialization for this class. For a non-generic class, this
     /// is the class itself. For a generic alias, this is the alias's origin.
     pub(crate) fn class_literal(
@@ -352,7 +359,7 @@ impl<'db> ClassType<'db> {
                 ClassBase::Dynamic(_) => false,
 
                 // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol(_) | ClassBase::Generic(_) => false,
+                ClassBase::Protocol | ClassBase::Generic => false,
 
                 ClassBase::Class(base) => match (base, other) {
                     (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
@@ -390,7 +397,7 @@ impl<'db> ClassType<'db> {
                 ClassBase::Dynamic(_) => false,
 
                 // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol(_) | ClassBase::Generic(_) => false,
+                ClassBase::Protocol | ClassBase::Generic => false,
 
                 ClassBase::Class(base) => match (base, other) {
                     (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
@@ -486,6 +493,142 @@ impl<'db> ClassType<'db> {
             .own_instance_member(db, name)
             .map_type(|ty| ty.apply_optional_specialization(db, specialization))
     }
+
+    /// Return a callable type (or union of callable types) that represents the callable
+    /// constructor signature of this class.
+    pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
+        let self_ty = Type::from(self);
+        let metaclass_dunder_call_function_symbol = self_ty
+            .member_lookup_with_policy(
+                db,
+                "__call__".into(),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .symbol;
+
+        if let Symbol::Type(Type::BoundMethod(metaclass_dunder_call_function), _) =
+            metaclass_dunder_call_function_symbol
+        {
+            // TODO: this intentionally diverges from step 1 in
+            // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
+            // by always respecting the signature of the metaclass `__call__`, rather than
+            // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
+            return metaclass_dunder_call_function.into_callable_type(db);
+        }
+
+        let dunder_new_function_symbol = self_ty
+            .member_lookup_with_policy(
+                db,
+                "__new__".into(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+            )
+            .symbol;
+
+        let dunder_new_function =
+            if let Symbol::Type(Type::FunctionLiteral(dunder_new_function), _) =
+                dunder_new_function_symbol
+            {
+                // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
+                // then we should ignore the `__init__` and just return the `__new__` method.
+                let returns_non_subclass =
+                    dunder_new_function
+                        .signature(db)
+                        .overloads
+                        .iter()
+                        .any(|signature| {
+                            signature.return_ty.is_some_and(|return_ty| {
+                                !return_ty.is_assignable_to(
+                                    db,
+                                    self_ty
+                                        .to_instance(db)
+                                        .expect("ClassType should be instantiable"),
+                                )
+                            })
+                        });
+
+                let dunder_new_bound_method =
+                    dunder_new_function.into_bound_method_type(db, self_ty);
+
+                if returns_non_subclass {
+                    return dunder_new_bound_method;
+                }
+                Some(dunder_new_bound_method)
+            } else {
+                None
+            };
+
+        let dunder_init_function_symbol = self_ty
+            .member_lookup_with_policy(
+                db,
+                "__init__".into(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .symbol;
+
+        let correct_return_type = self_ty.to_instance(db).unwrap_or_else(Type::unknown);
+
+        // If the class defines an `__init__` method, then we synthesize a callable type with the
+        // same parameters as the `__init__` method after it is bound, and with the return type of
+        // the concrete type of `Self`.
+        let synthesized_dunder_init_callable =
+            if let Symbol::Type(Type::FunctionLiteral(dunder_init_function), _) =
+                dunder_init_function_symbol
+            {
+                let synthesized_signature = |signature: Signature<'db>| {
+                    Signature::new(signature.parameters().clone(), Some(correct_return_type))
+                        .bind_self()
+                };
+
+                let synthesized_dunder_init_signature = CallableSignature::from_overloads(
+                    dunder_init_function
+                        .signature(db)
+                        .overloads
+                        .iter()
+                        .cloned()
+                        .map(synthesized_signature),
+                );
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    synthesized_dunder_init_signature,
+                    true,
+                )))
+            } else {
+                None
+            };
+
+        match (dunder_new_function, synthesized_dunder_init_callable) {
+            (Some(dunder_new_function), Some(synthesized_dunder_init_callable)) => {
+                UnionType::from_elements(
+                    db,
+                    vec![dunder_new_function, synthesized_dunder_init_callable],
+                )
+            }
+            (Some(constructor), None) | (None, Some(constructor)) => constructor,
+            (None, None) => {
+                // If no `__new__` or `__init__` method is found, then we fall back to looking for
+                // an `object.__new__` method.
+                let new_function_symbol = self_ty
+                    .member_lookup_with_policy(
+                        db,
+                        "__new__".into(),
+                        MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                    )
+                    .symbol;
+
+                if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
+                    new_function.into_bound_method_type(db, self_ty)
+                } else {
+                    // Fallback if no `object.__new__` is found.
+                    CallableType::single(
+                        db,
+                        Signature::new(Parameters::empty(), Some(correct_return_type)),
+                    )
+                }
+            }
+        }
+    }
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
@@ -569,6 +712,10 @@ impl<'db> ClassLiteral<'db> {
             .or_else(|| self.inherited_legacy_generic_context(db))
     }
 
+    pub(crate) fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {
+        self.pep695_generic_context(db).is_some()
+    }
+
     #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial)]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
@@ -600,11 +747,6 @@ impl<'db> ClassLiteral<'db> {
                 .copied()
                 .filter(|ty| matches!(ty, Type::GenericAlias(_))),
         )
-    }
-
-    /// Return `true` if this class represents the builtin class `object`
-    pub(crate) fn is_object(self, db: &'db dyn Db) -> bool {
-        self.is_known(db, KnownClass::Object)
     }
 
     fn file(self, db: &dyn Db) -> File {
@@ -985,40 +1127,6 @@ impl<'db> ClassLiteral<'db> {
         ))
     }
 
-    pub(super) fn into_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let self_ty = Type::from(self);
-        let metaclass_call_function_symbol = self_ty
-            .member_lookup_with_policy(
-                db,
-                "__call__".into(),
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-            )
-            .symbol;
-
-        if let Symbol::Type(Type::BoundMethod(metaclass_call_function), _) =
-            metaclass_call_function_symbol
-        {
-            // TODO: this intentionally diverges from step 1 in
-            // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
-            // by always respecting the signature of the metaclass `__call__`, rather than
-            // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
-            return Some(metaclass_call_function.into_callable_type(db));
-        }
-
-        let dunder_new_method = self_ty
-            .find_name_in_mro(db, "__new__")
-            .expect("find_name_in_mro always succeeds for class literals")
-            .symbol
-            .try_call_dunder_get(db, self_ty);
-
-        if let Symbol::Type(Type::FunctionLiteral(dunder_new_method), _) = dunder_new_method {
-            return Some(dunder_new_method.into_bound_method_type(db, self.into()));
-        }
-        // TODO handle `__init__` also
-        None
-    }
-
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member on the class itself or any of its proper superclasses.
@@ -1068,7 +1176,7 @@ impl<'db> ClassLiteral<'db> {
 
         for superclass in mro_iter {
             match superclass {
-                ClassBase::Generic(_) | ClassBase::Protocol(_) => {
+                ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
                 }
                 ClassBase::Dynamic(_) => {
@@ -1223,13 +1331,15 @@ impl<'db> ClassLiteral<'db> {
                         // the `__set__` method can be called. We build a union of all possible options
                         // to account for possible overloads.
                         let mut value_types = UnionBuilder::new(db);
-                        for signature in &dunder_set.signatures(db) {
-                            for overload in signature {
-                                if let Some(value_param) = overload.parameters().get_positional(2) {
+                        for binding in &dunder_set.bindings(db) {
+                            for overload in binding {
+                                if let Some(value_param) =
+                                    overload.signature.parameters().get_positional(2)
+                                {
                                     value_types = value_types.add(
                                         value_param.annotated_type().unwrap_or_else(Type::unknown),
                                     );
-                                } else if overload.parameters().is_gradual() {
+                                } else if overload.signature.parameters().is_gradual() {
                                     value_types = value_types.add(Type::unknown());
                                 }
                             }
@@ -1261,7 +1371,7 @@ impl<'db> ClassLiteral<'db> {
             }
 
             let signature = Signature::new(Parameters::new(parameters), Some(Type::none(db)));
-            Some(Type::Callable(CallableType::single(db, signature)))
+            Some(CallableType::function_like(db, signature))
         };
 
         match (field_policy, name) {
@@ -1275,7 +1385,13 @@ impl<'db> ClassLiteral<'db> {
                     return None;
                 }
 
-                signature_from_fields(vec![])
+                let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
+                    // TODO: could be `Self`.
+                    .with_annotated_type(Type::instance(
+                        db,
+                        self.apply_optional_specialization(db, specialization),
+                    ));
+                signature_from_fields(vec![self_parameter])
             }
             (CodeGeneratorKind::NamedTuple, "__new__") => {
                 let cls_parameter = Parameter::positional_or_keyword(Name::new_static("cls"))
@@ -1288,16 +1404,24 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 let signature = Signature::new(
-                    Parameters::new([Parameter::positional_or_keyword(Name::new_static("other"))
-                        // TODO: could be `Self`.
-                        .with_annotated_type(Type::instance(
-                            db,
-                            self.apply_optional_specialization(db, specialization),
-                        ))]),
+                    Parameters::new([
+                        Parameter::positional_or_keyword(Name::new_static("self"))
+                            // TODO: could be `Self`.
+                            .with_annotated_type(Type::instance(
+                                db,
+                                self.apply_optional_specialization(db, specialization),
+                            )),
+                        Parameter::positional_or_keyword(Name::new_static("other"))
+                            // TODO: could be `Self`.
+                            .with_annotated_type(Type::instance(
+                                db,
+                                self.apply_optional_specialization(db, specialization),
+                            )),
+                    ]),
                     Some(KnownClass::Bool.to_instance(db)),
                 );
 
-                Some(Type::Callable(CallableType::single(db, signature)))
+                Some(CallableType::function_like(db, signature))
             }
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback
@@ -1427,7 +1551,7 @@ impl<'db> ClassLiteral<'db> {
 
         for superclass in self.iter_mro(db, specialization) {
             match superclass {
-                ClassBase::Generic(_) | ClassBase::Protocol(_) => {
+                ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
                 }
                 ClassBase::Dynamic(_) => {

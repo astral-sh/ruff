@@ -1,4 +1,3 @@
-use ruff_diagnostics::Diagnostic;
 use ruff_python_semantic::Exceptions;
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 
@@ -15,12 +14,12 @@ pub(crate) fn unresolved_references(checker: &Checker) {
     for reference in checker.semantic.unresolved_references() {
         if reference.is_wildcard_import() {
             if checker.enabled(Rule::UndefinedLocalWithImportStarUsage) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     pyflakes::rules::UndefinedLocalWithImportStarUsage {
                         name: reference.name(checker.source()).to_string(),
                     },
                     reference.range(),
-                ));
+                );
             }
         } else {
             if checker.enabled(Rule::UndefinedName) {
@@ -42,13 +41,13 @@ pub(crate) fn unresolved_references(checker: &Checker) {
 
                 let symbol_name = reference.name(checker.source());
 
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     pyflakes::rules::UndefinedName {
                         name: symbol_name.to_string(),
                         minor_version_builtin_added: version_builtin_was_added(symbol_name),
                     },
                     reference.range(),
-                ));
+                );
             }
         }
     }

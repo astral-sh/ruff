@@ -1,3 +1,5 @@
+<!-- WARNING: This file is auto-generated (cargo dev generate-all). Edit the doc comments in 'crates/ty/src/args.rs' if you want to change anything here. -->
+
 # CLI Reference
 
 ## ty
@@ -41,8 +43,13 @@ ty check [OPTIONS] [PATH]...
 <li><code>auto</code>:  Display colors if the output goes to an interactive terminal</li>
 <li><code>always</code>:  Always display colors</li>
 <li><code>never</code>:  Never display colors</li>
-</ul></dd><dt id="ty-check--config"><a href="#ty-check--config"><code>--config</code></a>, <code>-c</code> <i>config-option</i></dt><dd><p>A TOML <code>&lt;KEY&gt; = &lt;VALUE&gt;</code> pair</p>
-</dd><dt id="ty-check--error"><a href="#ty-check--error"><code>--error</code></a> <i>rule</i></dt><dd><p>Treat the given rule as having severity 'error'. Can be specified multiple times.</p>
+</ul></dd><dt id="ty-check--config"><a href="#ty-check--config"><code>--config</code></a>, <code>-c</code> <i>config-option</i></dt><dd><p>A TOML <code>&lt;KEY&gt; = &lt;VALUE&gt;</code> pair (such as you might find in a <code>ty.toml</code> configuration file)
+overriding a specific configuration option.</p>
+<p>Overrides of individual settings using this option always take precedence
+over all configuration files.</p>
+</dd><dt id="ty-check--config-file"><a href="#ty-check--config-file"><code>--config-file</code></a> <i>path</i></dt><dd><p>The path to a <code>ty.toml</code> file to use for configuration.</p>
+<p>While ty configuration can be included in a <code>pyproject.toml</code> file, it is not allowed in this context.</p>
+<p>May also be set with the <code>TY_CONFIG_FILE</code> environment variable.</p></dd><dt id="ty-check--error"><a href="#ty-check--error"><code>--error</code></a> <i>rule</i></dt><dd><p>Treat the given rule as having severity 'error'. Can be specified multiple times.</p>
 </dd><dt id="ty-check--error-on-warning"><a href="#ty-check--error-on-warning"><code>--error-on-warning</code></a></dt><dd><p>Use exit code 1 if there are any warning-level diagnostics</p>
 </dd><dt id="ty-check--exit-zero"><a href="#ty-check--exit-zero"><code>--exit-zero</code></a></dt><dd><p>Always use exit code 0, even when there are error-level diagnostics</p>
 </dd><dt id="ty-check--extra-search-path"><a href="#ty-check--extra-search-path"><code>--extra-search-path</code></a> <i>path</i></dt><dd><p>Additional path to use as a module-resolution source (can be passed multiple times)</p>
@@ -51,7 +58,7 @@ ty check [OPTIONS] [PATH]...
 </dd><dt id="ty-check--output-format"><a href="#ty-check--output-format"><code>--output-format</code></a> <i>output-format</i></dt><dd><p>The format to use for printing diagnostic messages</p>
 <p>Possible values:</p>
 <ul>
-<li><code>full</code>:  Print diagnostics verbosely, with context and helpful hints</li>
+<li><code>full</code>:  Print diagnostics verbosely, with context and helpful hints [default]</li>
 <li><code>concise</code>:  Print diagnostics concisely, one per line</li>
 </ul></dd><dt id="ty-check--project"><a href="#ty-check--project"><code>--project</code></a> <i>project</i></dt><dd><p>Run the command within the given project directory.</p>
 <p>All <code>pyproject.toml</code> files will be discovered by walking up the directory tree from the given project directory, as will the project's virtual environment (<code>.venv</code>) unless the <code>venv-path</code> option is set.</p>

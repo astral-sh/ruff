@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use crate::db::Db;
 
 use super::{
-    DynamicType, KnownInstanceType, SuperOwnerKind, TodoType, Type, class_base::ClassBase,
+    DynamicType, SuperOwnerKind, TodoType, Type, class_base::ClassBase,
     subclass_of::SubclassOfInner,
 };
 
@@ -152,13 +152,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (ClassBase::Class(_), _) => Ordering::Less,
                 (_, ClassBase::Class(_)) => Ordering::Greater,
 
-                (ClassBase::Protocol(left), ClassBase::Protocol(right)) => left.cmp(&right),
-                (ClassBase::Protocol(_), _) => Ordering::Less,
-                (_, ClassBase::Protocol(_)) => Ordering::Greater,
+                (ClassBase::Protocol, _) => Ordering::Less,
+                (_, ClassBase::Protocol) => Ordering::Greater,
 
-                (ClassBase::Generic(left), ClassBase::Generic(right)) => left.cmp(&right),
-                (ClassBase::Generic(_), _) => Ordering::Less,
-                (_, ClassBase::Generic(_)) => Ordering::Greater,
+                (ClassBase::Generic, _) => Ordering::Less,
+                (_, ClassBase::Generic) => Ordering::Greater,
 
                 (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
                     dynamic_elements_ordering(left, right)
@@ -182,144 +180,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (_, Type::BoundSuper(_)) => Ordering::Greater,
 
         (Type::KnownInstance(left_instance), Type::KnownInstance(right_instance)) => {
-            match (left_instance, right_instance) {
-                (KnownInstanceType::Tuple, _) => Ordering::Less,
-                (_, KnownInstanceType::Tuple) => Ordering::Greater,
-
-                (KnownInstanceType::AlwaysFalsy, _) => Ordering::Less,
-                (_, KnownInstanceType::AlwaysFalsy) => Ordering::Greater,
-
-                (KnownInstanceType::AlwaysTruthy, _) => Ordering::Less,
-                (_, KnownInstanceType::AlwaysTruthy) => Ordering::Greater,
-
-                (KnownInstanceType::Annotated, _) => Ordering::Less,
-                (_, KnownInstanceType::Annotated) => Ordering::Greater,
-
-                (KnownInstanceType::Callable, _) => Ordering::Less,
-                (_, KnownInstanceType::Callable) => Ordering::Greater,
-
-                (KnownInstanceType::ChainMap, _) => Ordering::Less,
-                (_, KnownInstanceType::ChainMap) => Ordering::Greater,
-
-                (KnownInstanceType::ClassVar, _) => Ordering::Less,
-                (_, KnownInstanceType::ClassVar) => Ordering::Greater,
-
-                (KnownInstanceType::Concatenate, _) => Ordering::Less,
-                (_, KnownInstanceType::Concatenate) => Ordering::Greater,
-
-                (KnownInstanceType::Counter, _) => Ordering::Less,
-                (_, KnownInstanceType::Counter) => Ordering::Greater,
-
-                (KnownInstanceType::DefaultDict, _) => Ordering::Less,
-                (_, KnownInstanceType::DefaultDict) => Ordering::Greater,
-
-                (KnownInstanceType::Deque, _) => Ordering::Less,
-                (_, KnownInstanceType::Deque) => Ordering::Greater,
-
-                (KnownInstanceType::Dict, _) => Ordering::Less,
-                (_, KnownInstanceType::Dict) => Ordering::Greater,
-
-                (KnownInstanceType::Final, _) => Ordering::Less,
-                (_, KnownInstanceType::Final) => Ordering::Greater,
-
-                (KnownInstanceType::FrozenSet, _) => Ordering::Less,
-                (_, KnownInstanceType::FrozenSet) => Ordering::Greater,
-
-                (KnownInstanceType::TypeGuard, _) => Ordering::Less,
-                (_, KnownInstanceType::TypeGuard) => Ordering::Greater,
-
-                (KnownInstanceType::TypedDict, _) => Ordering::Less,
-                (_, KnownInstanceType::TypedDict) => Ordering::Greater,
-
-                (KnownInstanceType::List, _) => Ordering::Less,
-                (_, KnownInstanceType::List) => Ordering::Greater,
-
-                (KnownInstanceType::Literal, _) => Ordering::Less,
-                (_, KnownInstanceType::Literal) => Ordering::Greater,
-
-                (KnownInstanceType::LiteralString, _) => Ordering::Less,
-                (_, KnownInstanceType::LiteralString) => Ordering::Greater,
-
-                (KnownInstanceType::Optional, _) => Ordering::Less,
-                (_, KnownInstanceType::Optional) => Ordering::Greater,
-
-                (KnownInstanceType::OrderedDict, _) => Ordering::Less,
-                (_, KnownInstanceType::OrderedDict) => Ordering::Greater,
-
-                (KnownInstanceType::Generic(left), KnownInstanceType::Generic(right)) => {
-                    left.cmp(right)
-                }
-                (KnownInstanceType::Generic(_), _) => Ordering::Less,
-                (_, KnownInstanceType::Generic(_)) => Ordering::Greater,
-
-                (KnownInstanceType::Protocol(left), KnownInstanceType::Protocol(right)) => {
-                    left.cmp(right)
-                }
-                (KnownInstanceType::Protocol(_), _) => Ordering::Less,
-                (_, KnownInstanceType::Protocol(_)) => Ordering::Greater,
-
-                (KnownInstanceType::NoReturn, _) => Ordering::Less,
-                (_, KnownInstanceType::NoReturn) => Ordering::Greater,
-
-                (KnownInstanceType::Never, _) => Ordering::Less,
-                (_, KnownInstanceType::Never) => Ordering::Greater,
-
-                (KnownInstanceType::Set, _) => Ordering::Less,
-                (_, KnownInstanceType::Set) => Ordering::Greater,
-
-                (KnownInstanceType::Type, _) => Ordering::Less,
-                (_, KnownInstanceType::Type) => Ordering::Greater,
-
-                (KnownInstanceType::TypeAlias, _) => Ordering::Less,
-                (_, KnownInstanceType::TypeAlias) => Ordering::Greater,
-
-                (KnownInstanceType::Unknown, _) => Ordering::Less,
-                (_, KnownInstanceType::Unknown) => Ordering::Greater,
-
-                (KnownInstanceType::Not, _) => Ordering::Less,
-                (_, KnownInstanceType::Not) => Ordering::Greater,
-
-                (KnownInstanceType::Intersection, _) => Ordering::Less,
-                (_, KnownInstanceType::Intersection) => Ordering::Greater,
-
-                (KnownInstanceType::TypeOf, _) => Ordering::Less,
-                (_, KnownInstanceType::TypeOf) => Ordering::Greater,
-
-                (KnownInstanceType::CallableTypeOf, _) => Ordering::Less,
-                (_, KnownInstanceType::CallableTypeOf) => Ordering::Greater,
-
-                (KnownInstanceType::Unpack, _) => Ordering::Less,
-                (_, KnownInstanceType::Unpack) => Ordering::Greater,
-
-                (KnownInstanceType::TypingSelf, _) => Ordering::Less,
-                (_, KnownInstanceType::TypingSelf) => Ordering::Greater,
-
-                (KnownInstanceType::Required, _) => Ordering::Less,
-                (_, KnownInstanceType::Required) => Ordering::Greater,
-
-                (KnownInstanceType::NotRequired, _) => Ordering::Less,
-                (_, KnownInstanceType::NotRequired) => Ordering::Greater,
-
-                (KnownInstanceType::TypeIs, _) => Ordering::Less,
-                (_, KnownInstanceType::TypeIs) => Ordering::Greater,
-
-                (KnownInstanceType::ReadOnly, _) => Ordering::Less,
-                (_, KnownInstanceType::ReadOnly) => Ordering::Greater,
-
-                (KnownInstanceType::Union, _) => Ordering::Less,
-                (_, KnownInstanceType::Union) => Ordering::Greater,
-
-                (
-                    KnownInstanceType::TypeAliasType(left),
-                    KnownInstanceType::TypeAliasType(right),
-                ) => left.cmp(right),
-                (KnownInstanceType::TypeAliasType(_), _) => Ordering::Less,
-                (_, KnownInstanceType::TypeAliasType(_)) => Ordering::Greater,
-
-                (KnownInstanceType::TypeVar(left), KnownInstanceType::TypeVar(right)) => {
-                    left.cmp(right)
-                }
-            }
+            left_instance.cmp(right_instance)
         }
 
         (Type::KnownInstance(_), _) => Ordering::Less,

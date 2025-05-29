@@ -1,31 +1,25 @@
 use lsp_server as lsp;
 use lsp_types::{notification::Notification, request::Request};
-use std::sync::{Arc, Weak};
 
-type ConnectionSender = crossbeam::channel::Sender<lsp::Message>;
+pub(crate) type ConnectionSender = crossbeam::channel::Sender<lsp::Message>;
 type ConnectionReceiver = crossbeam::channel::Receiver<lsp::Message>;
 
 /// A builder for `Connection` that handles LSP initialization.
 pub(crate) struct ConnectionInitializer {
     connection: lsp::Connection,
-    threads: lsp::IoThreads,
 }
 
 /// Handles inbound and outbound messages with the client.
 pub(crate) struct Connection {
-    sender: Arc<ConnectionSender>,
+    sender: ConnectionSender,
     receiver: ConnectionReceiver,
-    threads: lsp::IoThreads,
 }
 
 impl ConnectionInitializer {
     /// Create a new LSP server connection over stdin/stdout.
-    pub(super) fn stdio() -> Self {
+    pub(crate) fn stdio() -> (Self, lsp::IoThreads) {
         let (connection, threads) = lsp::Connection::stdio();
-        Self {
-            connection,
-            threads,
-        }
+        (Self { connection }, threads)
     }
 
     /// Starts the initialization process with the client by listening for an initialization request.
@@ -59,27 +53,25 @@ impl ConnectionInitializer {
         )?;
         let Self {
             connection: lsp::Connection { sender, receiver },
-            threads,
         } = self;
-        Ok(Connection {
-            sender: Arc::new(sender),
-            receiver,
-            threads,
-        })
+        Ok(Connection { sender, receiver })
     }
 }
 
 impl Connection {
     /// Make a new `ClientSender` for sending messages to the client.
-    pub(super) fn make_sender(&self) -> ClientSender {
-        ClientSender {
-            weak_sender: Arc::downgrade(&self.sender),
-        }
+    pub(super) fn sender(&self) -> ConnectionSender {
+        self.sender.clone()
+    }
+
+    pub(super) fn send(&self, msg: lsp::Message) -> crate::Result<()> {
+        self.sender.send(msg)?;
+        Ok(())
     }
 
     /// An iterator over incoming messages from the client.
-    pub(super) fn incoming(&self) -> crossbeam::channel::Iter<lsp::Message> {
-        self.receiver.iter()
+    pub(super) fn incoming(&self) -> &crossbeam::channel::Receiver<lsp::Message> {
+        &self.receiver
     }
 
     /// Check and respond to any incoming shutdown requests; returns`true` if the server should be shutdown.
@@ -130,38 +122,5 @@ impl Connection {
             }
             _ => Ok(false),
         }
-    }
-
-    /// Join the I/O threads that underpin this connection.
-    /// This is guaranteed to be nearly immediate since
-    /// we close the only active channels to these threads prior
-    /// to joining them.
-    pub(super) fn close(self) -> crate::Result<()> {
-        std::mem::drop(
-            Arc::into_inner(self.sender)
-                .expect("the client sender shouldn't have more than one strong reference"),
-        );
-        std::mem::drop(self.receiver);
-        self.threads.join()?;
-        Ok(())
-    }
-}
-
-/// A weak reference to an underlying sender channel, used for communication with the client.
-/// If the `Connection` that created this `ClientSender` is dropped, any `send` calls will throw
-/// an error.
-#[derive(Clone, Debug)]
-pub(crate) struct ClientSender {
-    weak_sender: Weak<ConnectionSender>,
-}
-
-// note: additional wrapper functions for senders may be implemented as needed.
-impl ClientSender {
-    pub(crate) fn send(&self, msg: lsp::Message) -> crate::Result<()> {
-        let Some(sender) = self.weak_sender.upgrade() else {
-            anyhow::bail!("The connection with the client has been closed");
-        };
-
-        Ok(sender.send(msg)?)
     }
 }

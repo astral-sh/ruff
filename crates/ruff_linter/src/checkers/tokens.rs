@@ -2,13 +2,13 @@
 
 use std::path::Path;
 
-use ruff_diagnostics::Diagnostic;
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Tokens;
 
+use crate::Diagnostic;
 use crate::Locator;
 use crate::directives::TodoComment;
 use crate::registry::{AsRule, Rule};

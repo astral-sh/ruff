@@ -1,11 +1,12 @@
 use std::iter::Peekable;
 
 use itertools::Itertools;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_notebook::CellOffsets;
 use ruff_python_parser::{Token, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+
+use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 
 /// ## What it does
 /// Checks for files with multiple trailing blank lines.

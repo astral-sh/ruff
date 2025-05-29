@@ -4,7 +4,7 @@ use clap::error::ErrorKind;
 use clap::{ArgAction, ArgMatches, Error, Parser};
 use ruff_db::system::SystemPathBuf;
 use ty_project::combine::Combine;
-use ty_project::metadata::options::{EnvironmentOptions, Options, TerminalOptions};
+use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions, TerminalOptions};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
 use ty_python_semantic::lint;
 
@@ -107,6 +107,12 @@ pub(crate) struct CheckCommand {
     #[clap(flatten)]
     pub(crate) config: ConfigsArg,
 
+    /// The path to a `ty.toml` file to use for configuration.
+    ///
+    /// While ty configuration can be included in a `pyproject.toml` file, it is not allowed in this context.
+    #[arg(long, env = "TY_CONFIG_FILE", value_name = "PATH")]
+    pub(crate) config_file: Option<SystemPathBuf>,
+
     /// The format to use for printing diagnostic messages.
     #[arg(long)]
     pub(crate) output_format: Option<OutputFormat>,
@@ -184,9 +190,11 @@ impl CheckCommand {
                     .map(|output_format| RangedValue::cli(output_format.into())),
                 error_on_warning: self.error_on_warning,
             }),
+            src: Some(SrcOptions {
+                respect_ignore_files,
+                ..SrcOptions::default()
+            }),
             rules,
-            respect_ignore_files,
-            ..Default::default()
         };
         // Merge with options passed in via --config
         options.combine(self.config.into_options().unwrap_or_default())
@@ -283,7 +291,7 @@ impl clap::Args for RulesArg {
 /// The diagnostic output format.
 #[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
 pub enum OutputFormat {
-    /// Print diagnostics verbosely, with context and helpful hints.
+    /// Print diagnostics verbosely, with context and helpful hints \[default\].
     ///
     /// Diagnostic messages may include additional context and
     /// annotations on the input to help understand the message.
@@ -322,9 +330,11 @@ pub(crate) enum TerminalColor {
     /// Never display colors.
     Never,
 }
+
 /// A TOML `<KEY> = <VALUE>` pair
 /// (such as you might find in a `ty.toml` configuration file)
 /// overriding a specific configuration option.
+///
 /// Overrides of individual settings using this option always take precedence
 /// over all configuration files.
 #[derive(Debug, Clone)]
@@ -359,7 +369,15 @@ impl clap::Args for ConfigsArg {
                 .short('c')
                 .long("config")
                 .value_name("CONFIG_OPTION")
-                .help("A TOML `<KEY> = <VALUE>` pair")
+                .help("A TOML `<KEY> = <VALUE>` pair overriding a specific configuration option.")
+                .long_help(
+                    "
+A TOML `<KEY> = <VALUE>` pair (such as you might find in a `ty.toml` configuration file)
+overriding a specific configuration option.
+
+Overrides of individual settings using this option always take precedence
+over all configuration files.",
+                )
                 .action(ArgAction::Append),
         )
     }

@@ -1,10 +1,10 @@
-use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Diagnostic;
 use crate::Locator;
 use crate::line_width::IndentWidth;
 use crate::registry::{AsRule, Rule};

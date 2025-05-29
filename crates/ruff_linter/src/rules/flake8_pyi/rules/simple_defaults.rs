@@ -1,5 +1,5 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Operator, Parameters, Stmt, UnaryOp};
 use ruff_python_semantic::{ScopeKind, SemanticModel, analyze::class::is_enumeration};
@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pyi::rules::TypingModule;
-use ruff_python_ast::PythonVersion;
+use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 
 /// ## What it does
 /// Checks for typed function arguments in stubs with complex default values.
@@ -509,14 +509,13 @@ pub(crate) fn typed_argument_simple_defaults(checker: &Checker, parameters: &Par
                 checker.locator(),
                 checker.semantic(),
             ) {
-                let mut diagnostic = Diagnostic::new(TypedArgumentDefaultInStub, default.range());
+                let mut diagnostic =
+                    checker.report_diagnostic(TypedArgumentDefaultInStub, default.range());
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "...".to_string(),
                     default.range(),
                 )));
-
-                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -535,14 +534,13 @@ pub(crate) fn argument_simple_defaults(checker: &Checker, parameters: &Parameter
                 checker.locator(),
                 checker.semantic(),
             ) {
-                let mut diagnostic = Diagnostic::new(ArgumentDefaultInStub, default.range());
+                let mut diagnostic =
+                    checker.report_diagnostic(ArgumentDefaultInStub, default.range());
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "...".to_string(),
                     default.range(),
                 )));
-
-                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -569,12 +567,11 @@ pub(crate) fn assignment_default_in_stub(checker: &Checker, targets: &[Expr], va
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
+    let mut diagnostic = checker.report_diagnostic(AssignmentDefaultInStub, value.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         value.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// PYI015
@@ -603,12 +600,11 @@ pub(crate) fn annotated_assignment_default_in_stub(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
+    let mut diagnostic = checker.report_diagnostic(AssignmentDefaultInStub, value.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         value.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// PYI052
@@ -638,12 +634,12 @@ pub(crate) fn unannotated_assignment_in_stub(checker: &Checker, targets: &[Expr]
             return;
         }
     }
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         UnannotatedAssignmentInStub {
             name: id.to_string(),
         },
         value.range(),
-    ));
+    );
 }
 
 /// PYI035
@@ -656,12 +652,12 @@ pub(crate) fn unassigned_special_variable_in_stub(checker: &Checker, target: &Ex
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         UnassignedSpecialVariableInStub {
             name: id.to_string(),
         },
         stmt.range(),
-    ));
+    );
 }
 
 /// PYI026
@@ -688,7 +684,7 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         TypeAliasWithoutAnnotation {
             module,
             name: id.to_string(),
@@ -703,5 +699,4 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
             [import_edit],
         ))
     });
-    checker.report_diagnostic(diagnostic);
 }

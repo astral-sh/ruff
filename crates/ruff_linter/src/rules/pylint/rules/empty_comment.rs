@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::{CommentRanges, is_python_whitespace};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
+use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for a # symbol appearing on a line not followed by an actual comment.

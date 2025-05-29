@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
+use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for a shebang directive that is not at the beginning of the file.
