@@ -186,6 +186,8 @@ enum PythonSourcePriority {
     Cli = 3,
 }
 
+/// Information regarding the file and [`TextRange`] of the configuration
+/// from which we inferred the Python version.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PythonVersionFileSource {
     path: Option<Arc<SystemPathBuf>>,
@@ -197,6 +199,11 @@ impl PythonVersionFileSource {
         Self { path, range }
     }
 
+    /// Attempt to resolve a [`Span`] that corresponds to the location of
+    /// the configuration setting that specified the Python version.
+    ///
+    /// Useful for subdiagnostics when informing the user
+    /// what the inferred Python version of their project is.
     pub(crate) fn span(&self, db: &dyn Db) -> Option<Span> {
         let file = system_path_to_file(db.upcast(), self.path.as_deref()?).ok()?;
         Some(Span::from(file).with_optional_range(self.range))

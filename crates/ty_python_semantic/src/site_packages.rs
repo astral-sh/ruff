@@ -403,6 +403,7 @@ impl<'s> PyvenvCfgParser<'s> {
         }
     }
 
+    /// Parse the `pyvenv.cfg` file and return the parsed data.
     fn parse(mut self) -> Result<RawPyvenvCfg<'s>, PyvenvCfgParseErrorKind> {
         while !self.cursor.is_eof() {
             self.parse_line()?;
@@ -411,6 +412,8 @@ impl<'s> PyvenvCfgParser<'s> {
         Ok(self.data)
     }
 
+    /// Parse a single line of the `pyvenv.cfg` file and advance the cursor
+    /// to the beginning of the next line.
     fn parse_line(&mut self) -> Result<(), PyvenvCfgParseErrorKind> {
         let PyvenvCfgParser {
             cursor,

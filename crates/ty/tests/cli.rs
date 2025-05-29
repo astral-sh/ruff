@@ -321,8 +321,8 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
         (
             "venv/pyvenv.cfg",
             r#"
-            home = foo/bar/bin
             version = 3.8
+            home = foo/bar/bin
             "#,
         ),
         if cfg!(target_os = "windows") {
@@ -350,11 +350,11 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
       |
     info: `aiter` was added as a builtin in Python 3.10
     info: Python 3.8 was assumed when resolving types because of your virtual environment
-     --> venv/pyvenv.cfg:3:11
+     --> venv/pyvenv.cfg:2:11
       |
-    2 | home = foo/bar/bin
-    3 | version = 3.8
+    2 | version = 3.8
       |           ^^^ Python version inferred from virtual environment metadata file
+    3 | home = foo/bar/bin
       |
     info: No Python version was specified on the command line or in a configuration file
     info: rule `unresolved-reference` is enabled by default
