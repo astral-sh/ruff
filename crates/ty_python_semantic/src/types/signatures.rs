@@ -53,10 +53,6 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
-    pub(crate) fn as_slice(&self) -> &[Signature<'db>] {
-        self.overloads.as_slice()
-    }
-
     pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
         Self::from_overloads(
             self.overloads
@@ -1538,7 +1534,8 @@ mod tests {
     use super::*;
     use crate::db::tests::{TestDb, setup_db};
     use crate::symbol::global_symbol;
-    use crate::types::{FunctionSignature, FunctionType, KnownClass};
+    use crate::types::KnownClass;
+    use crate::types::function::FunctionType;
     use ruff_db::system::DbWithWritableSystem as _;
 
     #[track_caller]
@@ -1559,9 +1556,11 @@ mod tests {
     fn empty() {
         let mut db = setup_db();
         db.write_dedented("/src/a.py", "def f(): ...").unwrap();
-        let func = get_function_f(&db, "/src/a.py");
+        let func = get_function_f(&db, "/src/a.py")
+            .literal(&db)
+            .current_overload(&db);
 
-        let sig = func.internal_signature(&db, None);
+        let sig = func.signature(&db, None);
 
         assert!(sig.return_ty.is_none());
         assert_params(&sig, &[]);
@@ -1582,9 +1581,11 @@ mod tests {
             ",
         )
         .unwrap();
-        let func = get_function_f(&db, "/src/a.py");
+        let func = get_function_f(&db, "/src/a.py")
+            .literal(&db)
+            .current_overload(&db);
 
-        let sig = func.internal_signature(&db, None);
+        let sig = func.signature(&db, None);
 
         assert_eq!(sig.return_ty.unwrap().display(&db).to_string(), "bytes");
         assert_params(
@@ -1633,9 +1634,11 @@ mod tests {
             ",
         )
         .unwrap();
-        let func = get_function_f(&db, "/src/a.py");
+        let func = get_function_f(&db, "/src/a.py")
+            .literal(&db)
+            .current_overload(&db);
 
-        let sig = func.internal_signature(&db, None);
+        let sig = func.signature(&db, None);
 
         let [
             Parameter {
@@ -1669,9 +1672,11 @@ mod tests {
             ",
         )
         .unwrap();
-        let func = get_function_f(&db, "/src/a.pyi");
+        let func = get_function_f(&db, "/src/a.pyi")
+            .literal(&db)
+            .current_overload(&db);
 
-        let sig = func.internal_signature(&db, None);
+        let sig = func.signature(&db, None);
 
         let [
             Parameter {
@@ -1705,9 +1710,11 @@ mod tests {
             ",
         )
         .unwrap();
-        let func = get_function_f(&db, "/src/a.py");
+        let func = get_function_f(&db, "/src/a.py")
+            .literal(&db)
+            .current_overload(&db);
 
-        let sig = func.internal_signature(&db, None);
+        let sig = func.signature(&db, None);
 
         let [
             Parameter {
@@ -1751,9 +1758,11 @@ mod tests {
             ",
         )
         .unwrap();
-        let func = get_function_f(&db, "/src/a.pyi");
+        let func = get_function_f(&db, "/src/a.pyi")
+            .literal(&db)
+            .current_overload(&db);
 
-        let sig = func.internal_signature(&db, None);
+        let sig = func.signature(&db, None);
 
         let [
             Parameter {
@@ -1789,15 +1798,13 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let expected_sig = func.internal_signature(&db, None);
+        let overload = func.literal(&db).current_overload(&db);
+        let expected_sig = overload.signature(&db, None);
 
         // With no decorators, internal and external signature are the same
         assert_eq!(
             func.signature(&db),
-            &FunctionSignature {
-                overloads: CallableSignature::single(expected_sig),
-                implementation: None
-            },
+            &CallableSignature::single(expected_sig)
         );
     }
 }
