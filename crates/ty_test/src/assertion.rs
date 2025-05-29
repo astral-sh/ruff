@@ -360,12 +360,17 @@ impl<'a> ErrorAssertionParser<'a> {
         }
     }
 
+    /// Consume characters in the assertion comment until we find a non-whitespace character
+    fn skip_whitespace(&mut self) {
+        self.cursor.eat_while(char::is_whitespace);
+    }
+
     /// Attempt to parse the assertion comment into a [`ErrorAssertion`].
     fn parse(mut self) -> Result<ErrorAssertion<'a>, ErrorAssertionParseError<'a>> {
         let mut column = None;
         let mut rule = None;
 
-        self.cursor.skip_non_newline_whitespace();
+        self.skip_whitespace();
 
         while let Some(character) = self.cursor.bump() {
             match character {
@@ -432,7 +437,7 @@ impl<'a> ErrorAssertionParser<'a> {
                 }
             }
 
-            self.cursor.skip_non_newline_whitespace();
+            self.skip_whitespace();
         }
 
         if rule.is_some() {

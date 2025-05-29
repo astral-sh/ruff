@@ -458,6 +458,10 @@ impl<'s> Parser<'s> {
         }
     }
 
+    fn skip_non_newline_whitespace(&mut self) {
+        self.cursor.eat_while(|c| c.is_whitespace() && c != '\n');
+    }
+
     fn skip_to_beginning_of_next_line(&mut self) -> bool {
         if let Some(position) = memchr::memchr(b'\n', self.cursor.as_bytes()) {
             self.cursor.skip_bytes(position + 1);
@@ -539,14 +543,14 @@ impl<'s> Parser<'s> {
                             );
                         }
 
-                        self.cursor.skip_non_newline_whitespace();
+                        self.skip_non_newline_whitespace();
 
                         // Parse the code block language specifier
                         let lang = self
                             .consume_until(|c| matches!(c, ' ' | '\n'))
                             .unwrap_or_default();
 
-                        self.cursor.skip_non_newline_whitespace();
+                        self.skip_non_newline_whitespace();
 
                         if !self.cursor.eat_char('\n') {
                             bail!(
@@ -584,7 +588,7 @@ impl<'s> Parser<'s> {
 
                         if let Some(path) = self.consume_until(|c| matches!(c, '`' | '\n')) {
                             if self.cursor.eat_char('`') {
-                                self.cursor.skip_non_newline_whitespace();
+                                self.skip_non_newline_whitespace();
                                 if self.cursor.eat_char(':') {
                                     self.explicit_path = Some(path);
                                 }
@@ -603,7 +607,7 @@ impl<'s> Parser<'s> {
                     self.explicit_path = None;
 
                     if c.is_whitespace() {
-                        self.cursor.skip_non_newline_whitespace();
+                        self.skip_non_newline_whitespace();
                         if self.cursor.eat_char('`')
                             && self.cursor.eat_char('`')
                             && self.cursor.eat_char('`')
