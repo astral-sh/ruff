@@ -614,7 +614,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.configuration
-        // TODO: check whether we could improve it
         [
             "airflow",
             "configuration",
