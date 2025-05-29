@@ -3112,7 +3112,7 @@ impl<'a> DiagnosticsCollector<'a> {
     }
 
     /// Call `f` with an immutable borrow of the contained diagnostics.
-    pub(crate) fn with_diagnostics(&self, mut f: impl FnMut(&Vec<OldDiagnostic>)) {
+    pub(crate) fn with_diagnostics(&mut self, mut f: impl FnMut(&Vec<OldDiagnostic>)) {
         f(&self.diagnostics.borrow());
     }
 }

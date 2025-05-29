@@ -25,7 +25,7 @@ use super::ast::DiagnosticsCollector;
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &mut DiagnosticsCollector,
     path: &Path,
     locator: &Locator,
     comment_ranges: &CommentRanges,

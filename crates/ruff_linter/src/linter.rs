@@ -361,7 +361,7 @@ pub fn check_path(
             .any(|rule_code| rule_code.lint_source().is_noqa())
     {
         let ignored = check_noqa(
-            &diagnostics,
+            &mut diagnostics,
             path,
             locator,
             comment_ranges,
