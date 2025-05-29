@@ -22,7 +22,7 @@ use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators, FunctionType,
     KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType,
-    TupleType, TypeMapping, UnionType, WrapperDescriptorKind, todo_type,
+    SpecialFormType, TupleType, TypeMapping, UnionType, WrapperDescriptorKind, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -933,7 +933,7 @@ impl<'db> Bindings<'db> {
                         _ => {}
                     },
 
-                    Type::KnownInstance(KnownInstanceType::TypedDict) => {
+                    Type::SpecialForm(SpecialFormType::TypedDict) => {
                         overload.set_return_type(todo_type!("TypedDict"));
                     }
 
