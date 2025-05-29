@@ -224,8 +224,6 @@ pub(crate) struct Checker<'a> {
     visit: deferred::Visit<'a>,
     /// A set of deferred nodes to be analyzed after the AST traversal (e.g., `for` loops).
     analyze: deferred::Analyze,
-    /// The cumulative set of diagnostics computed across all lint rules.
-    diagnostics: RefCell<Vec<OldDiagnostic>>,
     /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations.
     flake8_bugbear_seen: RefCell<FxHashSet<TextRange>>,
     /// The end offset of the last visited statement.
@@ -239,8 +237,7 @@ pub(crate) struct Checker<'a> {
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
-    /// The [`SourceFile`] corresponding to the file under analysis.
-    source_file: &'a SourceFile,
+    collector: DiagnosticsCollector<'a>,
 }
 
 impl<'a> Checker<'a> {
@@ -282,7 +279,6 @@ impl<'a> Checker<'a> {
             semantic,
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
-            diagnostics: RefCell::default(),
             flake8_bugbear_seen: RefCell::default(),
             cell_offsets,
             notebook_index,
@@ -291,7 +287,10 @@ impl<'a> Checker<'a> {
             target_version,
             semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
-            source_file,
+            collector: DiagnosticsCollector {
+                diagnostics: RefCell::default(),
+                source_file,
+            },
         }
     }
 }
@@ -393,10 +392,7 @@ impl<'a> Checker<'a> {
         kind: T,
         range: TextRange,
     ) -> DiagnosticGuard<'chk, 'a> {
-        DiagnosticGuard {
-            checker: self,
-            diagnostic: Some(OldDiagnostic::new(kind, range, self.source_file)),
-        }
+        self.collector.report_diagnostic(kind, range)
     }
 
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
@@ -409,10 +405,10 @@ impl<'a> Checker<'a> {
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        let diagnostic = OldDiagnostic::new(kind, range, self.source_file);
+        let diagnostic = OldDiagnostic::new(kind, range, self.collector.source_file);
         if self.enabled(diagnostic.rule()) {
             Some(DiagnosticGuard {
-                checker: self,
+                collector: &self.collector,
                 diagnostic: Some(diagnostic),
             })
         } else {
@@ -2895,32 +2891,26 @@ impl<'a> Checker<'a> {
                 } else {
                     if self.semantic.global_scope().uses_star_imports() {
                         if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
-                            self.diagnostics.get_mut().push(
-                                OldDiagnostic::new(
-                                    pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                                        name: name.to_string(),
-                                    },
-                                    range,
-                                    self.source_file,
-                                )
-                                .with_parent(definition.start()),
-                            );
+                            self.report_diagnostic(
+                                pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                                    name: name.to_string(),
+                                },
+                                range,
+                            )
+                            .set_parent(definition.start());
                         }
                     } else {
                         if self.enabled(Rule::UndefinedExport) {
                             if is_undefined_export_in_dunder_init_enabled(self.settings)
                                 || !self.path.ends_with("__init__.py")
                             {
-                                self.diagnostics.get_mut().push(
-                                    OldDiagnostic::new(
-                                        pyflakes::rules::UndefinedExport {
-                                            name: name.to_string(),
-                                        },
-                                        range,
-                                        self.source_file,
-                                    )
-                                    .with_parent(definition.start()),
-                                );
+                                self.report_diagnostic(
+                                    pyflakes::rules::UndefinedExport {
+                                        name: name.to_string(),
+                                    },
+                                    range,
+                                )
+                                .set_parent(definition.start());
                             }
                         }
                     }
@@ -3049,12 +3039,38 @@ pub(crate) fn check_ast(
     analyze::deferred_scopes(&checker);
 
     let Checker {
-        diagnostics,
+        collector,
         semantic_errors,
         ..
     } = checker;
 
-    (diagnostics.into_inner(), semantic_errors.into_inner())
+    (collector.into_diagnostics(), semantic_errors.into_inner())
+}
+
+pub(crate) struct DiagnosticsCollector<'a> {
+    diagnostics: RefCell<Vec<OldDiagnostic>>,
+    source_file: &'a SourceFile,
+}
+
+impl<'a> DiagnosticsCollector<'a> {
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic.
+    ///
+    /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
+    /// before it is added to the collection in the collector on `Drop`.
+    pub(crate) fn report_diagnostic<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> DiagnosticGuard<'chk, 'a> {
+        DiagnosticGuard {
+            collector: self,
+            diagnostic: Some(OldDiagnostic::new(kind, range, self.source_file)),
+        }
+    }
+
+    fn into_diagnostics(self) -> Vec<OldDiagnostic> {
+        self.diagnostics.into_inner()
+    }
 }
 
 /// An abstraction for mutating a diagnostic.
@@ -3066,7 +3082,7 @@ pub(crate) fn check_ast(
 /// adding fixes or parent ranges.
 pub(crate) struct DiagnosticGuard<'a, 'b> {
     /// The parent checker that will receive the diagnostic on `Drop`.
-    checker: &'a Checker<'b>,
+    collector: &'a DiagnosticsCollector<'b>,
     /// The diagnostic that we want to report.
     ///
     /// This is always `Some` until the `Drop` (or `defuse`) call.
@@ -3108,7 +3124,7 @@ impl Drop for DiagnosticGuard<'_, '_> {
         }
 
         if let Some(diagnostic) = self.diagnostic.take() {
-            self.checker.diagnostics.borrow_mut().push(diagnostic);
+            self.collector.diagnostics.borrow_mut().push(diagnostic);
         }
     }
 }
