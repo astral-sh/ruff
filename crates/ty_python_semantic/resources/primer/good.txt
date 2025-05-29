@@ -31,12 +31,14 @@ cwltool
 dacite
 dd-trace-py
 dedupe
+discord.py
 django-stubs
 downforeveryone
 dragonchain
 dulwich
 flake8
 flake8-pyi
+freqtrade
 git-revise
 graphql-core
 httpx-caching
@@ -67,6 +69,7 @@ openlibrary
 operator
 optuna
 paasta
+pandas-stubs
 paroxython
 parso
 pegen
@@ -92,6 +95,7 @@ rclip
 rich
 rotki
 schema_salad
+schemathesis
 scipy
 scrapy
 sockeye
