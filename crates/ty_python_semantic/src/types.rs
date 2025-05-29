@@ -1696,6 +1696,10 @@ impl<'db> Type<'db> {
             (Type::ProtocolInstance(_), _) => false,
             (_, Type::ProtocolInstance(protocol)) => self.satisfies_protocol(db, protocol),
 
+            (Type::TypeIs(_), _) => KnownClass::Bool
+                .to_instance(db)
+                .is_assignable_to(db, target),
+
             // TODO other types containing gradual forms
             _ => self.is_subtype_of(db, target),
         }
