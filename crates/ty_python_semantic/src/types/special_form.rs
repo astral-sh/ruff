@@ -154,7 +154,7 @@ impl SpecialFormType {
     /// Return the instance type which this type is a subtype of.
     ///
     /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
-    /// so `KnownInstanceType::Literal.instance_fallback(db)`
+    /// so `SpecialFormType::Literal.instance_fallback(db)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing._SpecialForm> })`.
     pub(super) fn instance_fallback(self, db: &dyn Db) -> Type {
         self.class().to_instance(db)

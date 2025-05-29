@@ -1365,8 +1365,8 @@ impl<'db> Type<'db> {
                     metaclass_instance_type.is_subtype_of(db, target)
                 }),
 
-            // For example: `Type::KnownInstance(KnownInstanceType::Type)` is a subtype of `Type::NominalInstance(_SpecialForm)`,
-            // because `Type::KnownInstance(KnownInstanceType::Type)` is a set with exactly one runtime value in it
+            // For example: `Type::SpecialForm(SpecialFormType::Type)` is a subtype of `Type::NominalInstance(_SpecialForm)`,
+            // because `Type::SpecialForm(SpecialFormType::Type)` is a set with exactly one runtime value in it
             // (the symbol `typing.Type`), and that symbol is known to be an instance of `typing._SpecialForm` at runtime.
             (Type::SpecialForm(left), right) => left.instance_fallback(db).is_subtype_of(db, right),
 
@@ -2342,10 +2342,10 @@ impl<'db> Type<'db> {
             | Type::GenericAlias(..)
             | Type::ModuleLiteral(..) => true,
             Type::SpecialForm(special_form) => {
-                // Nearly all `KnownInstance` types are singletons, but if a symbol could validly
+                // Nearly all `SpecialForm` types are singletons, but if a symbol could validly
                 // originate from either `typing` or `typing_extensions` then this is not guaranteed.
-                // E.g. `typing.Protocol` is equivalent to `typing_extensions.Protocol`, so both are treated
-                // as inhabiting the type `KnownInstanceType::Protocol` in our model, but they are actually
+                // E.g. `typing.TypeGuard` is equivalent to `typing_extensions.TypeGuard`, so both are treated
+                // as inhabiting the type `SpecialFormType::TypeGuard` in our model, but they are actually
                 // distinct symbols at different memory addresses at runtime.
                 !(special_form.check_module(KnownModule::Typing)
                     && special_form.check_module(KnownModule::TypingExtensions))
