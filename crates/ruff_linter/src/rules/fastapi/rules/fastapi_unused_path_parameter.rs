@@ -288,7 +288,7 @@ impl<'a> Dependency<'a> {
             // that FastAPI will call to create an instance of the class itself.
             // https://fastapi.tiangolo.com/tutorial/dependencies/classes-as-dependencies/#shortcut
             if arguments.is_empty() {
-                Self::from_dependency_name(tuple.elts[0].as_name_expr()?, semantic)
+                Self::from_dependency_name(tuple.elts.first()?.as_name_expr()?, semantic)
             } else {
                 Self::from_depends_call(arguments, semantic)
             }
@@ -363,13 +363,9 @@ impl<'a> Dependency<'a> {
                     .filter_map(|stmt| stmt.as_function_def_stmt())
                     .find(|func_def| func_def.name.as_str() == "__init__")
                 {
-                    // Get non-posonly, non-variadic parameters without `self`
-                    init_def
-                        .parameters
-                        .args
-                        .iter()
+                    // Skip `self` parameter
+                    non_posonly_non_variadic_parameters(init_def)
                         .skip(1)
-                        .chain(&init_def.parameters.kwonlyargs)
                         .map(|param| param.name().as_str())
                         .collect()
                 } else {
@@ -399,19 +395,17 @@ fn depends_arguments<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a
 }
 
 fn is_fastapi_depends(expr: &Expr, semantic: &SemanticModel) -> bool {
-    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
-        return false;
-    };
-
-    matches!(qualified_name.segments(), ["fastapi", "Depends"])
+    semantic
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["fastapi", "Depends"]))
 }
 
 fn is_pydantic_base_model(expr: &Expr, semantic: &SemanticModel) -> bool {
-    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
-        return false;
-    };
-
-    matches!(qualified_name.segments(), ["pydantic", "BaseModel"])
+    semantic
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["pydantic", "BaseModel"])
+        })
 }
 
 /// Extract the expected in-route name for a given parameter, if it has an alias.
