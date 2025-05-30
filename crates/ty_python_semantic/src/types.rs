@@ -2180,23 +2180,22 @@ impl<'db> Type<'db> {
 
             (
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
-                Type::NominalInstance(instance),
+                instance @ Type::NominalInstance(NominalInstanceType { class, .. }),
             )
             | (
-                Type::NominalInstance(instance),
+                instance @ Type::NominalInstance(NominalInstanceType { class, .. }),
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
-            ) if instance.class.is_final(db) => {
-                let member = self.member_lookup_with_policy(
+            ) if class.is_final(db) => instance
+                .member_lookup_with_policy(
                     db,
                     Name::new_static("__call__"),
                     MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                );
-                match member.symbol {
-                    // TODO: ideally this would check disjointness of the `__call__` signature and the callable signature
-                    Symbol::Type(ty, _) => !ty.is_assignable_to(db, CallableType::unknown(db)),
-                    Symbol::Unbound => true,
-                }
-            }
+                )
+                .symbol
+                .ignore_possibly_unbound()
+                .is_none_or(|dunder_call| {
+                    !dunder_call.is_assignable_to(db, CallableType::unknown(db))
+                }),
 
             (
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
