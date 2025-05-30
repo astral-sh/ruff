@@ -118,11 +118,42 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
         self.arguments.iter().zip(self.types.iter().copied())
     }
 
+    /// Returns an iterator on performing [argument type expansion].
+    ///
+    /// Each element of the iterator represents a set of argument lists, where each argument list
+    /// contains the same arguments, but with one or more of the argument types expanded.
+    ///
+    /// [argument type expansion]: https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion
     pub(crate) fn expand(&self, db: &'db dyn Db) -> impl Iterator<Item = Vec<Vec<Type<'db>>>> + '_ {
+        /// Represents the state of the expansion process.
+        ///
+        /// This is useful to avoid cloning the initial types vector if none of the types can be
+        /// expanded.
+        enum State<'a, 'db> {
+            Initial(&'a Vec<Type<'db>>),
+            Expanded(Vec<Vec<Type<'db>>>),
+        }
+
+        impl<'db> State<'_, 'db> {
+            fn len(&self) -> usize {
+                match self {
+                    State::Initial(_) => 1,
+                    State::Expanded(expanded) => expanded.len(),
+                }
+            }
+
+            fn iter(&self) -> impl Iterator<Item = &Vec<Type<'db>>> + '_ {
+                match self {
+                    State::Initial(types) => Either::Left(std::iter::once(*types)),
+                    State::Expanded(expanded) => Either::Right(expanded.iter()),
+                }
+            }
+        }
+
         let mut index = 0;
 
-        // TODO: Avoid cloning if there's no expansion needed
-        std::iter::successors(Some(vec![self.types.clone()]), move |previous| {
+        std::iter::successors(Some(State::Initial(&self.types)), move |previous| {
+            // Find the next type that can be expanded.
             let expanded_types = loop {
                 let arg_type = self.types.get(index)?;
                 if let Some(expanded_types) = expand_type(db, *arg_type) {
@@ -131,10 +162,9 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
                 index += 1;
             };
 
-            // Generate all combinations by expanding the type at `index`
             let mut expanded_arg_types = Vec::with_capacity(expanded_types.len() * previous.len());
 
-            for pre_expanded_types in previous {
+            for pre_expanded_types in previous.iter() {
                 for subtype in &expanded_types {
                     let mut new_expanded_types = pre_expanded_types.clone();
                     new_expanded_types[index] = *subtype;
@@ -142,10 +172,15 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
                 }
             }
 
+            // Increment the index to move to the next argument type for the next iteration.
             index += 1;
-            Some(expanded_arg_types)
+
+            Some(State::Expanded(expanded_arg_types))
         })
-        .skip(1) // Skip the first iteration which is just the original types
+        .filter_map(|state| match state {
+            State::Initial(_) => None, // The initial state has no expanded types.
+            State::Expanded(expanded) => Some(expanded),
+        })
     }
 }
 
@@ -162,15 +197,21 @@ impl<'a> DerefMut for CallArgumentTypes<'a, '_> {
     }
 }
 
+/// Expands a type into its possible subtypes, if applicable.
+///
+/// Returns [`None`] if the type cannot be expanded.
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
     // TODO: Expand enums to their variants
-    Some(match ty {
-        // We don't handle `type[A | B]` here because it's already stored in the expanded form
-        // i.e., `type[A] | type[B]` which is handled by the `Type::Union` case.
+    match ty {
         Type::NominalInstance(instance) if instance.class.is_known(db, KnownClass::Bool) => {
-            vec![Type::BooleanLiteral(true), Type::BooleanLiteral(false)]
+            Some(vec![
+                Type::BooleanLiteral(true),
+                Type::BooleanLiteral(false),
+            ])
         }
         Type::Tuple(tuple) => {
+            // Note: This should only account for tuples of known length, i.e., `tuple[bool, ...]`
+            // should not be expanded here.
             let expanded = tuple
                 .iter(db)
                 .map(|element| {
@@ -180,16 +221,119 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                         Either::Right(std::iter::once(element))
                     }
                 })
-                // TODO: Use a custom implementation?
                 .multi_cartesian_product()
                 .map(|types| TupleType::from_elements(db, types))
                 .collect::<Vec<_>>();
             if expanded.len() == 1 {
-                return None;
+                // There are no elements in the tuple type that can be expanded.
+                None
+            } else {
+                Some(expanded)
             }
-            expanded
         }
-        Type::Union(union) => union.iter(db).copied().collect(),
-        _ => return None,
-    })
+        Type::Union(union) => Some(union.iter(db).copied().collect()),
+        // We don't handle `type[A | B]` here because it's already stored in the expanded form
+        // i.e., `type[A] | type[B]` which is handled by the `Type::Union` case.
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::db::tests::setup_db;
+    use crate::types::{KnownClass, TupleType, Type, UnionType};
+
+    use super::expand_type;
+
+    #[test]
+    fn expand_union_type() {
+        let db = setup_db();
+        let types = [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::Str.to_instance(&db),
+            KnownClass::Bytes.to_instance(&db),
+        ];
+        let union_type = UnionType::from_elements(&db, types);
+        let expanded = expand_type(&db, union_type).unwrap();
+        assert_eq!(expanded.len(), 3);
+        for (expected, actual) in types.iter().zip(expanded) {
+            assert_eq!(expected, &actual);
+        }
+    }
+
+    #[test]
+    fn expand_bool_type() {
+        let db = setup_db();
+        let bool_instance = KnownClass::Bool.to_instance(&db);
+        let expanded = expand_type(&db, bool_instance).unwrap();
+        assert_eq!(expanded.len(), 2);
+        assert_eq!(expanded[0], Type::BooleanLiteral(true));
+        assert_eq!(expanded[1], Type::BooleanLiteral(false));
+    }
+
+    #[test]
+    fn expand_tuple_type() {
+        let db = setup_db();
+
+        let int_ty = KnownClass::Int.to_instance(&db);
+        let str_ty = KnownClass::Str.to_instance(&db);
+        let bytes_ty = KnownClass::Bytes.to_instance(&db);
+        let bool_ty = KnownClass::Bool.to_instance(&db);
+        let true_ty = Type::BooleanLiteral(true);
+        let false_ty = Type::BooleanLiteral(false);
+
+        // Empty tuple
+        let empty_tuple = TupleType::empty(&db);
+        let expanded = expand_type(&db, empty_tuple);
+        assert!(expanded.is_none());
+
+        // None of the elements can be expanded.
+        let tuple_type1 = TupleType::from_elements(&db, [int_ty, str_ty]);
+        let expanded = expand_type(&db, tuple_type1);
+        assert!(expanded.is_none());
+
+        // All elements can be expanded.
+        let tuple_type2 = TupleType::from_elements(
+            &db,
+            [
+                bool_ty,
+                UnionType::from_elements(&db, [int_ty, str_ty, bytes_ty]),
+            ],
+        );
+        let expected_types = [
+            TupleType::from_elements(&db, [true_ty, int_ty]),
+            TupleType::from_elements(&db, [true_ty, str_ty]),
+            TupleType::from_elements(&db, [true_ty, bytes_ty]),
+            TupleType::from_elements(&db, [false_ty, int_ty]),
+            TupleType::from_elements(&db, [false_ty, str_ty]),
+            TupleType::from_elements(&db, [false_ty, bytes_ty]),
+        ];
+        let expanded = expand_type(&db, tuple_type2).unwrap();
+        assert_eq!(expanded.len(), 6);
+        for (expected, actual) in expected_types.iter().zip(expanded) {
+            assert_eq!(expected, &actual);
+        }
+
+        // Mixed set of elements where some can be expanded while others cannot be.
+        let tuple_type3 = TupleType::from_elements(
+            &db,
+            [
+                bool_ty,
+                int_ty,
+                UnionType::from_elements(&db, [str_ty, bytes_ty]),
+                str_ty,
+            ],
+        );
+        let expected_types = [
+            TupleType::from_elements(&db, [true_ty, int_ty, str_ty, str_ty]),
+            TupleType::from_elements(&db, [true_ty, int_ty, bytes_ty, str_ty]),
+            TupleType::from_elements(&db, [false_ty, int_ty, str_ty, str_ty]),
+            TupleType::from_elements(&db, [false_ty, int_ty, bytes_ty, str_ty]),
+        ];
+        let expanded = expand_type(&db, tuple_type3).unwrap();
+        assert_eq!(expanded.len(), 4);
+        for (expected, actual) in expected_types.iter().zip(expanded) {
+            assert_eq!(expected, &actual);
+        }
+    }
 }
