@@ -538,8 +538,6 @@ else:
     x: str = "a"
 
 if False:
-    # TODO We currently emit a false positive here:
-    # error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to `int`"
     other: int = x
 else:
     other: str = x
@@ -567,6 +565,8 @@ if False:
         def __call__(self):
             pass
 
+    # TODO:
+    # error: [invalid-type-form]
     number: Literal[1] = 1
 else:
     def f(x: str): ...
@@ -579,31 +579,22 @@ else:
     number: Literal[0] = 0
 
 if False:
-    # TODO
-    # error: [invalid-argument-type]
     f(2)
 
-    # TODO
-    # error: [unknown-argument]
     g(a=2, b=3)
 
-    # TODO
-    # error: [invalid-assignment]
     C.x = 2
 
     d: D = D()
-    # TODO
-    # error: [call-non-callable]
     d()
 
-    # TODO
-    # error: [division-by-zero]
     1 / number
 
 if False:
-    # TODO
+    # TODO: we don't want this error: it currently happens because the overload decorator is given
+    # type `Never`
     @overload
-    def func(x: int) -> int: ...
+    def func(x: int) -> int: ...  # error: [invalid-return-type]
     @overload
     def func(x: None) -> None: ...
     def func(x: int | None) -> int | None:
