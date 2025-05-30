@@ -111,16 +111,8 @@ pub fn check_path(
     parsed: &Parsed<ModModule>,
     target_version: TargetVersion,
 ) -> Vec<Message> {
-    let source_file = {
-        let mut builder =
-            SourceFileBuilder::new(path.to_string_lossy().as_ref(), locator.contents());
-
-        if let Some(line_index) = locator.line_index() {
-            builder.set_line_index(line_index.clone());
-        }
-
-        builder.finish()
-    };
+    let source_file =
+        SourceFileBuilder::new(path.to_string_lossy().as_ref(), locator.contents()).finish();
 
     // Aggregate all diagnostics.
     let mut diagnostics = LintContext::new(&source_file);
