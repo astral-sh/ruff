@@ -463,11 +463,11 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                 // there are any violations, unless we're explicitly asked to exit zero on
                 // fix.
                 if cli.exit_non_zero_on_fix {
-                    if !diagnostics.fixed.is_empty() || !diagnostics.diagnostics.is_empty() {
+                    if !diagnostics.fixed.is_empty() || !diagnostics.inner.is_empty() {
                         return Ok(ExitStatus::Failure);
                     }
                 } else {
-                    if !diagnostics.diagnostics.is_empty() {
+                    if !diagnostics.inner.is_empty() {
                         return Ok(ExitStatus::Failure);
                     }
                 }
