@@ -60,7 +60,7 @@ pub struct Message {
     pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
     pub(crate) noqa_offset: Option<TextSize>,
-    noqa_code: Option<NoqaCode>,
+    pub(crate) noqa_code: Option<NoqaCode>,
 }
 
 impl Message {
