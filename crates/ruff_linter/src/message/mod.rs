@@ -23,11 +23,11 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
 
-use crate::Locator;
 use crate::codes::NoqaCode;
 use crate::logging::DisplayParseErrorType;
 use crate::registry::Rule;
 use crate::{Fix, OldDiagnostic};
+use crate::{Locator, Violation};
 
 mod azure;
 mod diff;
@@ -178,6 +178,92 @@ impl Message {
             semantic_syntax_error.range,
             file,
         )
+    }
+
+    // TODO(brent) We temporarily allow this to avoid updating all of the call sites to add
+    // references. I expect this method to go away or change significantly with the rest of the
+    // diagnostic refactor, but if it still exists in this form at the end of the refactor, we
+    // should just update the call sites.
+    #[expect(clippy::needless_pass_by_value)]
+    pub fn new<T: Violation>(kind: T, range: TextRange, file: &SourceFile) -> Self {
+        let rule = T::rule();
+
+        let mut diagnostic = db::Diagnostic::new(
+            DiagnosticId::Lint(LintName::of(rule.into())),
+            Severity::Error,
+            Violation::message(&kind),
+        );
+        let span = Span::from(file.clone()).with_range(range);
+        let mut annotation = Annotation::primary(span);
+        if let Some(suggestion) = Violation::fix_title(&kind) {
+            annotation = annotation.message(suggestion);
+        }
+        diagnostic.annotate(annotation);
+
+        Self {
+            diagnostic,
+            fix: None,
+            parent: None,
+            noqa_offset: None,
+            noqa_code: Some(rule.noqa_code()),
+        }
+    }
+
+    /// Consumes `self` and returns a new `Diagnostic` with the given `fix`.
+    #[inline]
+    #[must_use]
+    pub fn with_fix(mut self, fix: Fix) -> Self {
+        self.set_fix(fix);
+        self
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic.
+    #[inline]
+    pub fn set_fix(&mut self, fix: Fix) {
+        self.fix = Some(fix);
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Otherwise, log the error.
+    #[inline]
+    pub fn try_set_fix(&mut self, func: impl FnOnce() -> anyhow::Result<Fix>) {
+        match func() {
+            Ok(fix) => self.fix = Some(fix),
+            Err(err) => log::debug!("Failed to create fix for {}: {}", self.name(), err),
+        }
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Otherwise, log the error.
+    #[inline]
+    pub fn try_set_optional_fix(&mut self, func: impl FnOnce() -> anyhow::Result<Option<Fix>>) {
+        match func() {
+            Ok(None) => {}
+            Ok(Some(fix)) => self.fix = Some(fix),
+            Err(err) => log::debug!("Failed to create fix for {}: {}", self.name(), err),
+        }
+    }
+
+    /// Consumes `self` and returns a new `Diagnostic` with the given parent node.
+    #[inline]
+    #[must_use]
+    pub fn with_parent(mut self, parent: TextSize) -> Self {
+        self.set_parent(parent);
+        self
+    }
+
+    /// Set the location of the diagnostic's parent node.
+    #[inline]
+    pub fn set_parent(&mut self, parent: TextSize) {
+        self.parent = Some(parent);
+    }
+
+    /// Consumes `self` and returns a new `Diagnostic` with the given noqa offset.
+    #[inline]
+    #[must_use]
+    pub fn with_noqa_offset(mut self, noqa_offset: TextSize) -> Self {
+        self.noqa_offset = Some(noqa_offset);
+        self
     }
 
     /// Returns `true` if `self` is a syntax error message.
