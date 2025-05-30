@@ -4,8 +4,8 @@
 
 <!-- snapshot-diagnostics -->
 
-The `ty_extensions.all_members` function allows access to a list of accessible members/attributes on
-a given object. For example, all member functions of `str` are available on `"a"`:
+The `ty_extensions.all_members` function allows access to a tuple of accessible members/attributes
+on a given object. For example, all member functions of `str` are available on `"a"`:
 
 ```py
 from ty_extensions import all_members, static_assert
