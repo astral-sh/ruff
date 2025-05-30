@@ -177,5 +177,7 @@ pub(crate) fn check_tokens(
         pycodestyle::rules::too_many_newlines_at_end_of_file(diagnostics, tokens, cell_offsets);
     }
 
-    diagnostics.retain(|diagnostic| settings.rules.enabled(diagnostic.rule()));
+    diagnostics
+        .as_mut_vec()
+        .retain(|diagnostic| settings.rules.enabled(diagnostic.rule()));
 }

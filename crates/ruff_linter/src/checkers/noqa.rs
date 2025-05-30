@@ -47,66 +47,63 @@ pub(crate) fn check_noqa(
     let mut ignored_diagnostics = vec![];
 
     // Remove any ignored diagnostics.
-    diagnostics.with_diagnostics(|diagnostics| {
-        'outer: for (index, diagnostic) in diagnostics.iter().enumerate() {
-            let rule = diagnostic.rule();
+    'outer: for (index, diagnostic) in diagnostics.iter().enumerate() {
+        let rule = diagnostic.rule();
 
-            if matches!(rule, Rule::BlanketNOQA) {
+        if matches!(rule, Rule::BlanketNOQA) {
+            continue;
+        }
+
+        let code = rule.noqa_code();
+
+        match &exemption {
+            FileExemption::All(_) => {
+                // If the file is exempted, ignore all diagnostics.
+                ignored_diagnostics.push(index);
                 continue;
             }
-
-            let code = rule.noqa_code();
-
-            match &exemption {
-                FileExemption::All(_) => {
-                    // If the file is exempted, ignore all diagnostics.
+            FileExemption::Codes(codes) => {
+                // If the diagnostic is ignored by a global exemption, ignore it.
+                if codes.contains(&&code) {
                     ignored_diagnostics.push(index);
                     continue;
                 }
-                FileExemption::Codes(codes) => {
-                    // If the diagnostic is ignored by a global exemption, ignore it.
-                    if codes.contains(&&code) {
-                        ignored_diagnostics.push(index);
-                        continue;
-                    }
-                }
             }
+        }
 
-            let noqa_offsets = diagnostic
-                .parent
-                .into_iter()
-                .chain(std::iter::once(diagnostic.start()))
-                .map(|position| noqa_line_for.resolve(position))
-                .unique();
+        let noqa_offsets = diagnostic
+            .parent
+            .into_iter()
+            .chain(std::iter::once(diagnostic.start()))
+            .map(|position| noqa_line_for.resolve(position))
+            .unique();
 
-            for noqa_offset in noqa_offsets {
-                if let Some(directive_line) =
-                    noqa_directives.find_line_with_directive_mut(noqa_offset)
-                {
-                    let suppressed = match &directive_line.directive {
-                        Directive::All(_) => {
+        for noqa_offset in noqa_offsets {
+            if let Some(directive_line) = noqa_directives.find_line_with_directive_mut(noqa_offset)
+            {
+                let suppressed = match &directive_line.directive {
+                    Directive::All(_) => {
+                        directive_line.matches.push(code);
+                        ignored_diagnostics.push(index);
+                        true
+                    }
+                    Directive::Codes(directive) => {
+                        if directive.includes(code) {
                             directive_line.matches.push(code);
                             ignored_diagnostics.push(index);
                             true
+                        } else {
+                            false
                         }
-                        Directive::Codes(directive) => {
-                            if directive.includes(code) {
-                                directive_line.matches.push(code);
-                                ignored_diagnostics.push(index);
-                                true
-                            } else {
-                                false
-                            }
-                        }
-                    };
-
-                    if suppressed {
-                        continue 'outer;
                     }
+                };
+
+                if suppressed {
+                    continue 'outer;
                 }
             }
         }
-    });
+    }
 
     // Enforce that the noqa directive was actually used (RUF100), unless RUF100 was itself
     // suppressed.
@@ -161,7 +158,9 @@ pub(crate) fn check_noqa(
 
                         if seen_codes.insert(original_code) {
                             let is_code_used = if is_file_level {
-                                diagnostics.any(|diag| diag.rule().noqa_code() == code)
+                                diagnostics
+                                    .iter()
+                                    .any(|diag| diag.rule().noqa_code() == code)
                             } else {
                                 matches.iter().any(|match_| *match_ == code)
                             } || settings

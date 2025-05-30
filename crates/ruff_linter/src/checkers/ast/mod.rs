@@ -3099,21 +3099,12 @@ impl<'a> DiagnosticsCollector<'a> {
         self.diagnostics.borrow().is_empty()
     }
 
-    pub(crate) fn retain(&mut self, f: impl FnMut(&OldDiagnostic) -> bool) {
-        self.diagnostics.borrow_mut().retain(f);
+    pub(crate) fn as_mut_vec(&mut self) -> &mut Vec<OldDiagnostic> {
+        self.diagnostics.get_mut()
     }
 
-    pub(crate) fn any(&self, f: impl FnMut(&OldDiagnostic) -> bool) -> bool {
-        self.diagnostics.borrow().iter().any(f)
-    }
-
-    pub(crate) fn swap_remove(&mut self, index: usize) -> OldDiagnostic {
-        self.diagnostics.borrow_mut().swap_remove(index)
-    }
-
-    /// Call `f` with an immutable borrow of the contained diagnostics.
-    pub(crate) fn with_diagnostics(&mut self, mut f: impl FnMut(&Vec<OldDiagnostic>)) {
-        f(&self.diagnostics.borrow());
+    pub(crate) fn iter(&mut self) -> impl Iterator<Item = &OldDiagnostic> {
+        self.diagnostics.get_mut().iter()
     }
 }
 

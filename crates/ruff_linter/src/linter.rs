@@ -350,7 +350,9 @@ pub fn check_path(
         RuleSet::empty()
     };
     if !per_file_ignores.is_empty() {
-        diagnostics.retain(|diagnostic| !per_file_ignores.contains(diagnostic.rule()));
+        diagnostics
+            .as_mut_vec()
+            .retain(|diagnostic| !per_file_ignores.contains(diagnostic.rule()));
     }
 
     // Enforce `noqa` directives.
@@ -372,7 +374,7 @@ pub fn check_path(
         );
         if noqa.is_enabled() {
             for index in ignored.iter().rev() {
-                diagnostics.swap_remove(*index);
+                diagnostics.as_mut_vec().swap_remove(*index);
             }
         }
     }
