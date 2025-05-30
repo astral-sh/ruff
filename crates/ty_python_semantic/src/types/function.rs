@@ -1,3 +1,53 @@
+//! Contains representations of function literals. There are several complicating factors:
+//!
+//! - Functions can be overloaded. In some cases we need to consider each overload separately; in
+//!   others we need to consider all of the overloads (and any implementation) as a single collective
+//!   entity.
+//!
+//! - Functions can be generic, and can have specializations applied to them. These are not the
+//!   same thing! For instance, a method of a generic class might not itself be generic, but it can
+//!   still have the class's specialization applied to it.
+//!
+//! - Certain “known” functions need special treatment — for instance, inferring a special return
+//!   type, or raising custom diagnostics.
+//!
+//! - TODO: Some functions don't correspond to a function definition in the AST, and are instead
+//!   synthesized as we mimic the behavior of the Python interpreter. Even though they are
+//!   synthesized, and are “implemented” as Rust code, they are still functions from the POV of the
+//!   rest of the type system.
+//!
+//! Given these constraints, we have the following representation: a function is a list of one or
+//! more overloads, with zero or more specializations (more specifically, “type mappings”) applied
+//! to it. [`FunctionType`] is the outermost type, which is what [`Type::FunctionLiteral`] wraps.
+//! It contains the list of type mappings to apply. It wraps a [`FunctionLiteral`], which collects
+//! together all of the overloads (and implementation) of an overloaded function. An
+//! [`OverloadLiteral`] represents an individual function definition in the AST — that is, each
+//! overload (and implementation) of an overloaded function, or the single definition of a
+//! non-overloaded function.
+//!
+//! Technically, each `FunctionLiteral` wraps a particular overload and all _previous_ overloads.
+//! So it's only true that it wraps _all_ overloads if you are looking at the last definition. For
+//! instance, in
+//!
+//! ```py
+//! @overload
+//! def f(x: int) -> None: ...
+//! # <-- 1
+//!
+//! @overload
+//! def f(x: str) -> None: ...
+//! # <-- 2
+//!
+//! def f(x): pass
+//! # <-- 3
+//! ```
+//!
+//! resolving `f` at each of the three numbered positions will give you a `FunctionType`, which
+//! wraps a `FunctionLiteral`, which contain `OverloadLiteral`s only for the definitions that
+//! appear before that position. We rely on the fact that later definitions shadow earlier ones, so
+//! the public type of `f` is resolved at position 3, correctly giving you all of the overloads
+//! (and the implementation).
+
 use std::str::FromStr;
 
 use bitflags::bitflags;
