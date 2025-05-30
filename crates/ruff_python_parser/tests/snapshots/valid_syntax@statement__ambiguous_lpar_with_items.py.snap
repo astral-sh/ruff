@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/ambiguous_lpar_with_items.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -945,8 +944,8 @@ Module(
                                                 FString {
                                                     range: 1186..1201,
                                                     elements: [
-                                                        Expression(
-                                                            FStringExpressionElement {
+                                                        Interpolation(
+                                                            InterpolatedElement {
                                                                 range: 1188..1200,
                                                                 expression: Name(
                                                                     ExprName {
@@ -958,11 +957,11 @@ Module(
                                                                 debug_text: None,
                                                                 conversion: None,
                                                                 format_spec: Some(
-                                                                    FStringFormatSpec {
+                                                                    InterpolatedStringFormatSpec {
                                                                         range: 1195..1199,
                                                                         elements: [
                                                                             Literal(
-                                                                                FStringLiteralElement {
+                                                                                InterpolatedStringLiteralElement {
                                                                                     range: 1195..1199,
                                                                                     value: "= 42",
                                                                                 },
@@ -1017,8 +1016,8 @@ Module(
                                                 FString {
                                                     range: 1214..1231,
                                                     elements: [
-                                                        Expression(
-                                                            FStringExpressionElement {
+                                                        Interpolation(
+                                                            InterpolatedElement {
                                                                 range: 1216..1230,
                                                                 expression: Named(
                                                                     ExprNamed {

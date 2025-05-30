@@ -5,10 +5,10 @@ pub mod transformer;
 
 use crate::{
     self as ast, Alias, AnyParameterRef, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension,
-    Decorator, ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringElement,
-    FStringPart, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern, PatternArguments,
-    PatternKeyword, Stmt, StringLiteral, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
-    TypeParamTypeVarTuple, TypeParams, UnaryOp, WithItem,
+    Decorator, ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringPart,
+    InterpolatedStringElement, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
+    PatternArguments, PatternKeyword, Stmt, StringLiteral, TString, TStringPart, TypeParam,
+    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -99,8 +99,14 @@ pub trait Visitor<'a> {
     fn visit_f_string(&mut self, f_string: &'a FString) {
         walk_f_string(self, f_string);
     }
-    fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement) {
-        walk_f_string_element(self, f_string_element);
+    fn visit_interpolated_string_element(
+        &mut self,
+        interpolated_string_element: &'a InterpolatedStringElement,
+    ) {
+        walk_interpolated_string_element(self, interpolated_string_element);
+    }
+    fn visit_t_string(&mut self, t_string: &'a TString) {
+        walk_t_string(self, t_string);
     }
     fn visit_string_literal(&mut self, string_literal: &'a StringLiteral) {
         walk_string_literal(self, string_literal);
@@ -484,6 +490,17 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
                 }
             }
         }
+        Expr::TString(ast::ExprTString { value, .. }) => {
+            for part in value {
+                match part {
+                    TStringPart::Literal(string_literal) => {
+                        visitor.visit_string_literal(string_literal);
+                    }
+                    TStringPart::FString(f_string) => visitor.visit_f_string(f_string),
+                    TStringPart::TString(t_string) => visitor.visit_t_string(t_string),
+                }
+            }
+        }
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
             for string_literal in value {
                 visitor.visit_string_literal(string_literal);
@@ -739,27 +756,33 @@ pub fn walk_pattern_keyword<'a, V: Visitor<'a> + ?Sized>(
 }
 
 pub fn walk_f_string<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, f_string: &'a FString) {
-    for f_string_element in &f_string.elements {
-        visitor.visit_f_string_element(f_string_element);
+    for interpolated_string_element in &f_string.elements {
+        visitor.visit_interpolated_string_element(interpolated_string_element);
     }
 }
 
-pub fn walk_f_string_element<'a, V: Visitor<'a> + ?Sized>(
+pub fn walk_interpolated_string_element<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
-    f_string_element: &'a FStringElement,
+    interpolated_string_element: &'a InterpolatedStringElement,
 ) {
-    if let ast::FStringElement::Expression(ast::FStringExpressionElement {
+    if let ast::InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
         expression,
         format_spec,
         ..
-    }) = f_string_element
+    }) = interpolated_string_element
     {
         visitor.visit_expr(expression);
         if let Some(format_spec) = format_spec {
             for spec_element in &format_spec.elements {
-                visitor.visit_f_string_element(spec_element);
+                visitor.visit_interpolated_string_element(spec_element);
             }
         }
+    }
+}
+
+pub fn walk_t_string<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, t_string: &'a TString) {
+    for t_string_element in &t_string.elements {
+        visitor.visit_interpolated_string_element(t_string_element);
     }
 }
 

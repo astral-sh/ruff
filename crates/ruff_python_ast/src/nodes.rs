@@ -2,7 +2,7 @@
 
 use crate::generated::{
     ExprBytesLiteral, ExprDict, ExprFString, ExprList, ExprName, ExprSet, ExprStringLiteral,
-    ExprTuple, StmtClassDef,
+    ExprTString, ExprTuple, StmtClassDef,
 };
 use std::borrow::Cow;
 use std::fmt;
@@ -17,10 +17,12 @@ use itertools::Itertools;
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::str_prefix::{AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix};
+use crate::str_prefix::{
+    AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
+};
 use crate::{
-    Expr, ExprRef, FStringElement, LiteralExpressionRef, OperatorPrecedence, Pattern, Stmt,
-    TypeParam, int,
+    Expr, ExprRef, InterpolatedStringElement, LiteralExpressionRef, OperatorPrecedence, Pattern,
+    Stmt, TypeParam, int,
     name::Name,
     str::{Quote, TripleQuotes},
 };
@@ -312,35 +314,35 @@ impl<'a> IntoIterator for &'a ExprSet {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct FStringFormatSpec {
+pub struct InterpolatedStringFormatSpec {
     pub range: TextRange,
-    pub elements: FStringElements,
+    pub elements: InterpolatedStringElements,
 }
 
 /// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
 #[derive(Clone, Debug, PartialEq)]
-pub struct FStringExpressionElement {
+pub struct InterpolatedElement {
     pub range: TextRange,
     pub expression: Box<Expr>,
     pub debug_text: Option<DebugText>,
     pub conversion: ConversionFlag,
-    pub format_spec: Option<Box<FStringFormatSpec>>,
+    pub format_spec: Option<Box<InterpolatedStringFormatSpec>>,
 }
 
 /// An `FStringLiteralElement` with an empty `value` is an invalid f-string element.
 #[derive(Clone, Debug, PartialEq)]
-pub struct FStringLiteralElement {
+pub struct InterpolatedStringLiteralElement {
     pub range: TextRange,
     pub value: Box<str>,
 }
 
-impl FStringLiteralElement {
+impl InterpolatedStringLiteralElement {
     pub fn is_valid(&self) -> bool {
         !self.value.is_empty()
     }
 }
 
-impl Deref for FStringLiteralElement {
+impl Deref for InterpolatedStringLiteralElement {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -483,7 +485,7 @@ impl FStringValue {
         self.iter().filter_map(|part| part.as_f_string())
     }
 
-    /// Returns an iterator over all the [`FStringElement`] contained in this value.
+    /// Returns an iterator over all the [`InterpolatedStringElement`] contained in this value.
     ///
     /// An f-string element is what makes up an [`FString`] i.e., it is either a
     /// string literal or an expression. In the following example,
@@ -494,7 +496,7 @@ impl FStringValue {
     ///
     /// The f-string elements returned would be string literal (`"bar "`),
     /// expression (`x`) and string literal (`"qux"`).
-    pub fn elements(&self) -> impl Iterator<Item = &FStringElement> {
+    pub fn elements(&self) -> impl Iterator<Item = &InterpolatedStringElement> {
         self.f_strings().flat_map(|fstring| fstring.elements.iter())
     }
 }
@@ -550,6 +552,181 @@ impl Ranged for FStringPart {
         match self {
             FStringPart::Literal(string_literal) => string_literal.range(),
             FStringPart::FString(f_string) => f_string.range(),
+        }
+    }
+}
+
+impl ExprTString {
+    /// Returns the single [`TString`] if the t-string isn't implicitly concatenated, [`None`]
+    /// otherwise.
+    pub const fn as_single_part_tstring(&self) -> Option<&TString> {
+        match &self.value.inner {
+            TStringValueInner::Single(TStringPart::TString(tstring)) => Some(tstring),
+            _ => None,
+        }
+    }
+}
+
+/// The value representing an [`ExprTString`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct TStringValue {
+    inner: TStringValueInner,
+}
+
+impl TStringValue {
+    /// Creates a new t-string literal with a single [`TString`] part.
+    pub fn single(value: TString) -> Self {
+        Self {
+            inner: TStringValueInner::Single(TStringPart::TString(value)),
+        }
+    }
+
+    /// Creates a new t-string with the given values that represents an implicitly
+    /// concatenated t-string.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `values` has less than 2 elements.
+    /// Use [`TStringValue::single`] instead.
+    pub fn concatenated(values: Vec<TStringPart>) -> Self {
+        assert!(
+            values.len() > 1,
+            "Use `TStringValue::single` to create single-part t-strings"
+        );
+        Self {
+            inner: TStringValueInner::Concatenated(values),
+        }
+    }
+
+    /// Returns `true` if the t-string is implicitly concatenated, `false` otherwise.
+    pub fn is_implicit_concatenated(&self) -> bool {
+        matches!(self.inner, TStringValueInner::Concatenated(_))
+    }
+
+    /// Returns a slice of all the [`TStringPart`]s contained in this value.
+    pub fn as_slice(&self) -> &[TStringPart] {
+        match &self.inner {
+            TStringValueInner::Single(part) => std::slice::from_ref(part),
+            TStringValueInner::Concatenated(parts) => parts,
+        }
+    }
+
+    /// Returns a mutable slice of all the [`TStringPart`]s contained in this value.
+    fn as_mut_slice(&mut self) -> &mut [TStringPart] {
+        match &mut self.inner {
+            TStringValueInner::Single(part) => std::slice::from_mut(part),
+            TStringValueInner::Concatenated(parts) => parts,
+        }
+    }
+
+    /// Returns an iterator over all the [`TStringPart`]s contained in this value.
+    pub fn iter(&self) -> Iter<TStringPart> {
+        self.as_slice().iter()
+    }
+
+    /// Returns an iterator over all the [`TStringPart`]s contained in this value
+    /// that allows modification.
+    pub fn iter_mut(&mut self) -> IterMut<TStringPart> {
+        self.as_mut_slice().iter_mut()
+    }
+
+    /// Returns an iterator over the [`StringLiteral`] parts contained in this value.
+    ///
+    /// Note that this doesn't recurse into the t-string parts. For example,
+    ///
+    /// ```python
+    /// "foo" t"bar {x}" "baz" t"qux"
+    /// ```
+    ///
+    /// Here, the string literal parts returned would be `"foo"` and `"baz"`.
+    pub fn literals(&self) -> impl Iterator<Item = &StringLiteral> {
+        self.iter().filter_map(|part| part.as_literal())
+    }
+
+    /// Returns an iterator over the [`TString`] parts contained in this value.
+    ///
+    /// Note that this doesn't recurse into the t-string parts. For example,
+    ///
+    /// ```python
+    /// "foo" t"bar {x}" "baz" t"qux"
+    /// ```
+    ///
+    /// Here, the t-string parts returned would be `f"bar {x}"` and `f"qux"`.
+    pub fn t_strings(&self) -> impl Iterator<Item = &TString> {
+        self.iter().filter_map(|part| part.as_t_string())
+    }
+
+    /// Returns an iterator over all the [`InterpolatedStringElement`] contained in this value.
+    ///
+    /// An t-string element is what makes up an [`TString`] i.e., it is either a
+    /// string literal or an interpolation. In the following example,
+    ///
+    /// ```python
+    /// "foo" t"bar {x}" "baz" t"qux"
+    /// ```
+    ///
+    /// The t-string elements returned would be string literal (`"bar "`),
+    /// interpolation (`x`) and string literal (`"qux"`).
+    pub fn elements(&self) -> impl Iterator<Item = &InterpolatedStringElement> {
+        self.t_strings().flat_map(|fstring| fstring.elements.iter())
+    }
+}
+
+impl<'a> IntoIterator for &'a TStringValue {
+    type Item = &'a TStringPart;
+    type IntoIter = Iter<'a, TStringPart>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut TStringValue {
+    type Item = &'a mut TStringPart;
+    type IntoIter = IterMut<'a, TStringPart>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
+/// An internal representation of [`TStringValue`].
+#[derive(Clone, Debug, PartialEq)]
+enum TStringValueInner {
+    /// A single t-string i.e., `t"foo"`.
+    ///
+    /// This is always going to be `TStringPart::TString` variant which is
+    /// maintained by the `TStringValue::single` constructor.
+    Single(TStringPart),
+
+    /// An implicitly concatenated t-string i.e., `"foo" t"bar {x}"`.
+    Concatenated(Vec<TStringPart>),
+}
+
+/// An t-string part which is either a string literal, an f-string,
+/// or a t-string.
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
+pub enum TStringPart {
+    Literal(StringLiteral),
+    FString(FString),
+    TString(TString),
+}
+
+impl TStringPart {
+    pub fn quote_style(&self) -> Quote {
+        match self {
+            Self::Literal(string_literal) => string_literal.flags.quote_style(),
+            Self::FString(f_string) => f_string.flags.quote_style(),
+            Self::TString(t_string) => t_string.flags.quote_style(),
+        }
+    }
+}
+
+impl Ranged for TStringPart {
+    fn range(&self) -> TextRange {
+        match self {
+            TStringPart::Literal(string_literal) => string_literal.range(),
+            TStringPart::FString(f_string) => f_string.range(),
+            TStringPart::TString(t_string) => t_string.range(),
         }
     }
 }
@@ -635,7 +812,7 @@ impl std::fmt::Display for DisplayFlags<'_> {
 
 bitflags! {
     #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
-    struct FStringFlagsInner: u8 {
+    struct InterpolatedStringFlagsInner: u8 {
         /// The f-string uses double quotes (`"`) for its opener and closer.
         /// If this flag is not set, the f-string uses single quotes (`'`)
         /// for its opener and closer.
@@ -662,6 +839,11 @@ bitflags! {
 /// Flags that can be queried to obtain information
 /// regarding the prefixes and quotes used for an f-string.
 ///
+/// Note: This is identical to [`TStringFlags`] except that
+/// the implementation of the `prefix` method of the
+/// [`StringFlags`] trait returns a variant of
+/// `AnyStringPrefix::Format`.
+///
 /// ## Notes on usage
 ///
 /// If you're using a `Generator` from the `ruff_python_codegen` crate to generate a lint-rule fix
@@ -671,7 +853,7 @@ bitflags! {
 /// will properly handle nested f-strings. For usage that doesn't fit into one of these categories,
 /// the public constructor [`FStringFlags::empty`] can be used.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
-pub struct FStringFlags(FStringFlagsInner);
+pub struct FStringFlags(InterpolatedStringFlagsInner);
 
 impl FStringFlags {
     /// Construct a new [`FStringFlags`] with **no flags set**.
@@ -684,45 +866,159 @@ impl FStringFlags {
     /// situations in which alternative ways to construct this struct should be used, especially
     /// when writing lint rules.
     pub fn empty() -> Self {
-        Self(FStringFlagsInner::empty())
+        Self(InterpolatedStringFlagsInner::empty())
     }
 
     #[must_use]
     pub fn with_quote_style(mut self, quote_style: Quote) -> Self {
-        self.0
-            .set(FStringFlagsInner::DOUBLE, quote_style.is_double());
+        self.0.set(
+            InterpolatedStringFlagsInner::DOUBLE,
+            quote_style.is_double(),
+        );
         self
     }
 
     #[must_use]
     pub fn with_triple_quotes(mut self, triple_quotes: TripleQuotes) -> Self {
-        self.0
-            .set(FStringFlagsInner::TRIPLE_QUOTED, triple_quotes.is_yes());
+        self.0.set(
+            InterpolatedStringFlagsInner::TRIPLE_QUOTED,
+            triple_quotes.is_yes(),
+        );
         self
     }
 
     #[must_use]
     pub fn with_prefix(mut self, prefix: FStringPrefix) -> Self {
         match prefix {
-            FStringPrefix::Regular => {
-                Self(self.0 - FStringFlagsInner::R_PREFIX_LOWER - FStringFlagsInner::R_PREFIX_UPPER)
-            }
+            FStringPrefix::Regular => Self(
+                self.0
+                    - InterpolatedStringFlagsInner::R_PREFIX_LOWER
+                    - InterpolatedStringFlagsInner::R_PREFIX_UPPER,
+            ),
             FStringPrefix::Raw { uppercase_r } => {
-                self.0.set(FStringFlagsInner::R_PREFIX_UPPER, uppercase_r);
-                self.0.set(FStringFlagsInner::R_PREFIX_LOWER, !uppercase_r);
+                self.0
+                    .set(InterpolatedStringFlagsInner::R_PREFIX_UPPER, uppercase_r);
+                self.0
+                    .set(InterpolatedStringFlagsInner::R_PREFIX_LOWER, !uppercase_r);
                 self
             }
         }
     }
 
     pub const fn prefix(self) -> FStringPrefix {
-        if self.0.contains(FStringFlagsInner::R_PREFIX_LOWER) {
-            debug_assert!(!self.0.contains(FStringFlagsInner::R_PREFIX_UPPER));
+        if self
+            .0
+            .contains(InterpolatedStringFlagsInner::R_PREFIX_LOWER)
+        {
+            debug_assert!(
+                !self
+                    .0
+                    .contains(InterpolatedStringFlagsInner::R_PREFIX_UPPER)
+            );
             FStringPrefix::Raw { uppercase_r: false }
-        } else if self.0.contains(FStringFlagsInner::R_PREFIX_UPPER) {
+        } else if self
+            .0
+            .contains(InterpolatedStringFlagsInner::R_PREFIX_UPPER)
+        {
             FStringPrefix::Raw { uppercase_r: true }
         } else {
             FStringPrefix::Regular
+        }
+    }
+}
+
+// TODO(dylan): the documentation about using
+// `Checker::default_tstring_flags` is not yet
+// correct. This method does not yet exist because
+// introducing it would emit a dead code warning
+// until we call it in lint rules.
+/// Flags that can be queried to obtain information
+/// regarding the prefixes and quotes used for an f-string.
+///
+/// Note: This is identical to [`FStringFlags`] except that
+/// the implementation of the `prefix` method of the
+/// [`StringFlags`] trait returns a variant of
+/// `AnyStringPrefix::Template`.
+///
+/// ## Notes on usage
+///
+/// If you're using a `Generator` from the `ruff_python_codegen` crate to generate a lint-rule fix
+/// from an existing t-string literal, consider passing along the [`FString::flags`] field. If you
+/// don't have an existing literal but have a `Checker` from the `ruff_linter` crate available,
+/// consider using `Checker::default_tstring_flags` to create instances of this struct; this method
+/// will properly handle nested t-strings. For usage that doesn't fit into one of these categories,
+/// the public constructor [`TStringFlags::empty`] can be used.
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+pub struct TStringFlags(InterpolatedStringFlagsInner);
+
+impl TStringFlags {
+    /// Construct a new [`TStringFlags`] with **no flags set**.
+    ///
+    /// See [`TStringFlags::with_quote_style`], [`TStringFlags::with_triple_quotes`], and
+    /// [`TStringFlags::with_prefix`] for ways of setting the quote style (single or double),
+    /// enabling triple quotes, and adding prefixes (such as `r`), respectively.
+    ///
+    /// See the documentation for [`TStringFlags`] for additional caveats on this constructor, and
+    /// situations in which alternative ways to construct this struct should be used, especially
+    /// when writing lint rules.
+    pub fn empty() -> Self {
+        Self(InterpolatedStringFlagsInner::empty())
+    }
+
+    #[must_use]
+    pub fn with_quote_style(mut self, quote_style: Quote) -> Self {
+        self.0.set(
+            InterpolatedStringFlagsInner::DOUBLE,
+            quote_style.is_double(),
+        );
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self, triple_quotes: TripleQuotes) -> Self {
+        self.0.set(
+            InterpolatedStringFlagsInner::TRIPLE_QUOTED,
+            triple_quotes.is_yes(),
+        );
+        self
+    }
+
+    #[must_use]
+    pub fn with_prefix(mut self, prefix: TStringPrefix) -> Self {
+        match prefix {
+            TStringPrefix::Regular => Self(
+                self.0
+                    - InterpolatedStringFlagsInner::R_PREFIX_LOWER
+                    - InterpolatedStringFlagsInner::R_PREFIX_UPPER,
+            ),
+            TStringPrefix::Raw { uppercase_r } => {
+                self.0
+                    .set(InterpolatedStringFlagsInner::R_PREFIX_UPPER, uppercase_r);
+                self.0
+                    .set(InterpolatedStringFlagsInner::R_PREFIX_LOWER, !uppercase_r);
+                self
+            }
+        }
+    }
+
+    pub const fn prefix(self) -> TStringPrefix {
+        if self
+            .0
+            .contains(InterpolatedStringFlagsInner::R_PREFIX_LOWER)
+        {
+            debug_assert!(
+                !self
+                    .0
+                    .contains(InterpolatedStringFlagsInner::R_PREFIX_UPPER)
+            );
+            TStringPrefix::Raw { uppercase_r: false }
+        } else if self
+            .0
+            .contains(InterpolatedStringFlagsInner::R_PREFIX_UPPER)
+        {
+            TStringPrefix::Raw { uppercase_r: true }
+        } else {
+            TStringPrefix::Regular
         }
     }
 }
@@ -732,7 +1028,7 @@ impl StringFlags for FStringFlags {
     /// it begins and ends with three consecutive quote characters.
     /// For example: `f"""{bar}"""`
     fn triple_quotes(self) -> TripleQuotes {
-        if self.0.contains(FStringFlagsInner::TRIPLE_QUOTED) {
+        if self.0.contains(InterpolatedStringFlagsInner::TRIPLE_QUOTED) {
             TripleQuotes::Yes
         } else {
             TripleQuotes::No
@@ -744,7 +1040,7 @@ impl StringFlags for FStringFlags {
     /// - `f"{"a"}"` -> `QuoteStyle::Double`
     /// - `f'{"a"}'` -> `QuoteStyle::Single`
     fn quote_style(self) -> Quote {
-        if self.0.contains(FStringFlagsInner::DOUBLE) {
+        if self.0.contains(InterpolatedStringFlagsInner::DOUBLE) {
             Quote::Double
         } else {
             Quote::Single
@@ -766,11 +1062,50 @@ impl fmt::Debug for FStringFlags {
     }
 }
 
+impl StringFlags for TStringFlags {
+    /// Return `true` if the t-string is triple-quoted, i.e.,
+    /// it begins and ends with three consecutive quote characters.
+    /// For example: `t"""{bar}"""`
+    fn triple_quotes(self) -> TripleQuotes {
+        if self.0.contains(InterpolatedStringFlagsInner::TRIPLE_QUOTED) {
+            TripleQuotes::Yes
+        } else {
+            TripleQuotes::No
+        }
+    }
+
+    /// Return the quoting style (single or double quotes)
+    /// used by the t-string's opener and closer:
+    /// - `t"{"a"}"` -> `QuoteStyle::Double`
+    /// - `t'{"a"}'` -> `QuoteStyle::Single`
+    fn quote_style(self) -> Quote {
+        if self.0.contains(InterpolatedStringFlagsInner::DOUBLE) {
+            Quote::Double
+        } else {
+            Quote::Single
+        }
+    }
+
+    fn prefix(self) -> AnyStringPrefix {
+        AnyStringPrefix::Template(self.prefix())
+    }
+}
+
+impl fmt::Debug for TStringFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TStringFlags")
+            .field("quote_style", &self.quote_style())
+            .field("prefix", &self.prefix())
+            .field("triple_quoted", &self.is_triple_quoted())
+            .finish()
+    }
+}
+
 /// An AST node that represents a single f-string which is part of an [`ExprFString`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct FString {
     pub range: TextRange,
-    pub elements: FStringElements,
+    pub elements: InterpolatedStringElements,
     pub flags: FStringFlags,
 }
 
@@ -784,63 +1119,81 @@ impl From<FString> for Expr {
     }
 }
 
-/// A newtype wrapper around a list of [`FStringElement`].
+/// A newtype wrapper around a list of [`InterpolatedStringElement`].
 #[derive(Clone, Default, PartialEq)]
-pub struct FStringElements(Vec<FStringElement>);
+pub struct InterpolatedStringElements(Vec<InterpolatedStringElement>);
 
-impl FStringElements {
-    /// Returns an iterator over all the [`FStringLiteralElement`] nodes contained in this f-string.
-    pub fn literals(&self) -> impl Iterator<Item = &FStringLiteralElement> {
+impl InterpolatedStringElements {
+    /// Returns an iterator over all the [`InterpolatedStringLiteralElement`] nodes contained in this f-string.
+    pub fn literals(&self) -> impl Iterator<Item = &InterpolatedStringLiteralElement> {
         self.iter().filter_map(|element| element.as_literal())
     }
 
-    /// Returns an iterator over all the [`FStringExpressionElement`] nodes contained in this f-string.
-    pub fn expressions(&self) -> impl Iterator<Item = &FStringExpressionElement> {
-        self.iter().filter_map(|element| element.as_expression())
+    /// Returns an iterator over all the [`InterpolatedElement`] nodes contained in this f-string.
+    pub fn interpolations(&self) -> impl Iterator<Item = &InterpolatedElement> {
+        self.iter().filter_map(|element| element.as_interpolation())
     }
 }
 
-impl From<Vec<FStringElement>> for FStringElements {
-    fn from(elements: Vec<FStringElement>) -> Self {
-        FStringElements(elements)
+impl From<Vec<InterpolatedStringElement>> for InterpolatedStringElements {
+    fn from(elements: Vec<InterpolatedStringElement>) -> Self {
+        InterpolatedStringElements(elements)
     }
 }
 
-impl<'a> IntoIterator for &'a FStringElements {
-    type IntoIter = Iter<'a, FStringElement>;
-    type Item = &'a FStringElement;
+impl<'a> IntoIterator for &'a InterpolatedStringElements {
+    type IntoIter = Iter<'a, InterpolatedStringElement>;
+    type Item = &'a InterpolatedStringElement;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut FStringElements {
-    type IntoIter = IterMut<'a, FStringElement>;
-    type Item = &'a mut FStringElement;
+impl<'a> IntoIterator for &'a mut InterpolatedStringElements {
+    type IntoIter = IterMut<'a, InterpolatedStringElement>;
+    type Item = &'a mut InterpolatedStringElement;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
 }
 
-impl Deref for FStringElements {
-    type Target = [FStringElement];
+impl Deref for InterpolatedStringElements {
+    type Target = [InterpolatedStringElement];
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for FStringElements {
+impl DerefMut for InterpolatedStringElements {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl fmt::Debug for FStringElements {
+impl fmt::Debug for InterpolatedStringElements {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.0, f)
+    }
+}
+
+/// An AST node that represents a single t-string which is part of an [`ExprTString`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct TString {
+    pub range: TextRange,
+    pub elements: InterpolatedStringElements,
+    pub flags: TStringFlags,
+}
+
+impl From<TString> for Expr {
+    fn from(payload: TString) -> Self {
+        ExprTString {
+            range: payload.range,
+            value: TStringValue::single(payload),
+        }
+        .into()
     }
 }
 
@@ -1662,18 +2015,23 @@ bitflags! {
         /// but can have no other prefixes.
         const F_PREFIX = 1 << 4;
 
+        /// The string has a `t` or `T` prefix, meaning it is a t-string.
+        /// T-strings can also be raw strings,
+        /// but can have no other prefixes.
+        const T_PREFIX = 1 << 5;
+
         /// The string has an `r` prefix, meaning it is a raw string.
         /// F-strings and byte-strings can be raw,
         /// as can strings with no other prefixes.
         /// U-strings cannot be raw.
-        const R_PREFIX_LOWER = 1 << 5;
+        const R_PREFIX_LOWER = 1 << 6;
 
         /// The string has an `R` prefix, meaning it is a raw string.
         /// The casing of the `r`/`R` has no semantic significance at runtime;
         /// see https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
         /// for why we track the casing of the `r` prefix,
         /// but not for any other prefix
-        const R_PREFIX_UPPER = 1 << 6;
+        const R_PREFIX_UPPER = 1 << 7;
     }
 }
 
@@ -1711,6 +2069,15 @@ impl AnyStringFlags {
             AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: true }) => {
                 AnyStringFlagsInner::F_PREFIX.union(AnyStringFlagsInner::R_PREFIX_UPPER)
             }
+
+            // t-strings
+            AnyStringPrefix::Template(TStringPrefix::Regular) => AnyStringFlagsInner::T_PREFIX,
+            AnyStringPrefix::Template(TStringPrefix::Raw { uppercase_r: false }) => {
+                AnyStringFlagsInner::T_PREFIX.union(AnyStringFlagsInner::R_PREFIX_LOWER)
+            }
+            AnyStringPrefix::Template(TStringPrefix::Raw { uppercase_r: true }) => {
+                AnyStringFlagsInner::T_PREFIX.union(AnyStringFlagsInner::R_PREFIX_UPPER)
+            }
         };
         self
     }
@@ -1734,9 +2101,10 @@ impl AnyStringFlags {
         )
     }
 
-    /// Does the string have an `f` or `F` prefix?
-    pub const fn is_f_string(self) -> bool {
-        self.0.contains(AnyStringFlagsInner::F_PREFIX)
+    /// Does the string have an `f`,`F`,`t`, or `T` prefix?
+    pub const fn is_interpolated_string(self) -> bool {
+        self.0
+            .intersects(AnyStringFlagsInner::F_PREFIX.union(AnyStringFlagsInner::T_PREFIX))
     }
 
     /// Does the string have a `b` or `B` prefix?
@@ -1791,6 +2159,17 @@ impl StringFlags for AnyStringFlags {
                 return AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: true });
             }
             return AnyStringPrefix::Format(FStringPrefix::Regular);
+        }
+
+        // t-strings
+        if flags.contains(AnyStringFlagsInner::T_PREFIX) {
+            if flags.contains(AnyStringFlagsInner::R_PREFIX_LOWER) {
+                return AnyStringPrefix::Template(TStringPrefix::Raw { uppercase_r: false });
+            }
+            if flags.contains(AnyStringFlagsInner::R_PREFIX_UPPER) {
+                return AnyStringPrefix::Template(TStringPrefix::Raw { uppercase_r: true });
+            }
+            return AnyStringPrefix::Template(TStringPrefix::Regular);
         }
 
         // bytestrings
@@ -1872,7 +2251,7 @@ impl From<BytesLiteralFlags> for AnyStringFlags {
 
 impl From<AnyStringFlags> for FStringFlags {
     fn from(value: AnyStringFlags) -> FStringFlags {
-        let AnyStringPrefix::Format(fstring_prefix) = value.prefix() else {
+        let AnyStringPrefix::Format(prefix) = value.prefix() else {
             unreachable!(
                 "Should never attempt to convert {} into an f-string",
                 value.prefix()
@@ -1880,13 +2259,34 @@ impl From<AnyStringFlags> for FStringFlags {
         };
         FStringFlags::empty()
             .with_quote_style(value.quote_style())
-            .with_prefix(fstring_prefix)
+            .with_prefix(prefix)
             .with_triple_quotes(value.triple_quotes())
     }
 }
 
 impl From<FStringFlags> for AnyStringFlags {
     fn from(value: FStringFlags) -> Self {
+        value.as_any_string_flags()
+    }
+}
+
+impl From<AnyStringFlags> for TStringFlags {
+    fn from(value: AnyStringFlags) -> TStringFlags {
+        let AnyStringPrefix::Template(prefix) = value.prefix() else {
+            unreachable!(
+                "Should never attempt to convert {} into a t-string",
+                value.prefix()
+            )
+        };
+        TStringFlags::empty()
+            .with_quote_style(value.quote_style())
+            .with_prefix(prefix)
+            .with_triple_quotes(value.triple_quotes())
+    }
+}
+
+impl From<TStringFlags> for AnyStringFlags {
+    fn from(value: TStringFlags) -> Self {
         value.as_any_string_flags()
     }
 }

@@ -105,9 +105,9 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
             return None;
         }
         if !std::mem::take(&mut first) {
-            f_string_elements.push(helpers::to_f_string_literal_element(joiner));
+            f_string_elements.push(helpers::to_interpolated_string_literal_element(joiner));
         }
-        f_string_elements.push(helpers::to_f_string_element(expr)?);
+        f_string_elements.push(helpers::to_interpolated_string_element(expr)?);
     }
 
     let node = ast::FString {

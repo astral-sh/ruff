@@ -1,6 +1,6 @@
 use ruff_formatter::{FormatError, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{
-    AnyNodeRef, Expr, ExprAttribute, ExprCall, FString, Operator, StmtAssign, StringLike,
+    AnyNodeRef, Expr, ExprAttribute, ExprCall, FString, Operator, StmtAssign, StringLike, TString,
     TypeParams,
 };
 
@@ -17,7 +17,7 @@ use crate::expression::{
     can_omit_optional_parentheses, has_own_parentheses, has_parentheses,
     maybe_parenthesize_expression,
 };
-use crate::other::f_string::FStringLayout;
+use crate::other::interpolated_string::InterpolatedStringLayout;
 use crate::statement::trailing_semicolon;
 use crate::string::StringLikeExtensions;
 use crate::string::implicit::{
@@ -291,15 +291,16 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 let can_inline_comment = should_inline_comments(value, *statement, f.context());
 
                 let string_like = StringLike::try_from(*value).ok();
-                let format_f_string =
-                    string_like.and_then(|string| format_f_string_assignment(string, f.context()));
+                let format_interpolated_string = string_like
+                    .and_then(|string| format_interpolated_string_assignment(string, f.context()));
+
                 let format_implicit_flat = string_like.and_then(|string| {
                     FormatImplicitConcatenatedStringFlat::new(string, f.context())
                 });
 
                 if !can_inline_comment
                     && format_implicit_flat.is_none()
-                    && format_f_string.is_none()
+                    && format_interpolated_string.is_none()
                 {
                     return maybe_parenthesize_expression(
                         value,
@@ -351,7 +352,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         let string = flat.string();
 
                         let flat = format_with(|f| {
-                            if string.is_fstring() {
+                            if string.is_interpolated_string() {
                                 let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
 
                                 write!(buffer, [flat])
@@ -361,7 +362,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         })
                         .memoized();
 
-                        // F-String containing an expression with a magic trailing comma, a comment, or a
+                        // F-string or T-string containing an expression with a magic trailing comma, a comment, or a
                         // multiline debug expression should never be joined. Use the default layout.
                         // ```python
                         // aaaa = f"abcd{[
@@ -369,7 +370,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         //    2,
                         // ]}" "more"
                         // ```
-                        if string.is_fstring() && flat.inspect(f)?.will_break() {
+                        if string.is_interpolated_string() && flat.inspect(f)?.will_break() {
                             inline_comments.mark_unformatted();
 
                             return write!(
@@ -446,24 +447,23 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         best_fitting![single_line, joined_parenthesized, implicit_expanded]
                             .with_mode(BestFittingMode::AllLines)
                             .fmt(f)?;
-                    } else if let Some(format_f_string) = format_f_string {
+                    } else if let Some(format_interpolated_string) = format_interpolated_string {
                         inline_comments.mark_formatted();
 
-                        let f_string_flat = format_with(|f| {
+                        let interpolated_string_flat = format_with(|f| {
                             let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
 
-                            write!(buffer, [format_f_string.format()])
+                            write!(buffer, [format_interpolated_string])
                         })
                         .memoized();
-
-                        // F-String containing an expression with a magic trailing comma, a comment, or a
-                        // multiline debug expression should never be joined. Use the default layout.
+                        // F/T-String containing an interpolation with a magic trailing comma, a comment, or a
+                        // multiline debug interpolation should never be joined. Use the default layout.
                         // ```python
                         // aaaa = f"aaaa {[
                         //     1, 2,
                         // ]} bbbb"
                         // ```
-                        if f_string_flat.inspect(f)?.will_break() {
+                        if interpolated_string_flat.inspect(f)?.will_break() {
                             inline_comments.mark_unformatted();
 
                             return write!(
@@ -482,23 +482,26 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         //     expression}moreeeeeeeeeeeeeeeee"
                         // ```
 
-                        // Flatten the f-string.
+                        // Flatten the f/t-string.
                         // ```python
                         // aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
                         // ```
                         let single_line =
-                            format_with(|f| write!(f, [f_string_flat, inline_comments]));
+                            format_with(|f| write!(f, [interpolated_string_flat, inline_comments]));
 
-                        // Parenthesize the f-string and flatten the f-string.
+                        // Parenthesize the t-string and flatten the t-string.
                         // ```python
                         // aaaaaaaaaaaaaaaaaa = (
-                        //     f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
+                        //     t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
                         // )
                         // ```
                         let joined_parenthesized = format_with(|f| {
                             group(&format_args![
                                 token("("),
-                                soft_block_indent(&format_args![f_string_flat, inline_comments]),
+                                soft_block_indent(&format_args![
+                                    interpolated_string_flat,
+                                    inline_comments
+                                ]),
                                 token(")"),
                             ])
                             .with_id(Some(group_id))
@@ -506,19 +509,24 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                             .fmt(f)
                         });
 
-                        // Avoid flattening or parenthesizing the f-string, keep the original
-                        // f-string formatting.
+                        // Avoid flattening or parenthesizing the f/t-string, keep the original
+                        // f/t-string formatting.
                         // ```python
-                        // aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+                        // aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
                         //     expression
                         // }moreeeeeeeeeeeeeeeee"
                         // ```
-                        let format_f_string =
-                            format_with(|f| write!(f, [format_f_string.format(), inline_comments]));
+                        let format_interpolated_string = format_with(|f| {
+                            write!(f, [format_interpolated_string, inline_comments])
+                        });
 
-                        best_fitting![single_line, joined_parenthesized, format_f_string]
-                            .with_mode(BestFittingMode::AllLines)
-                            .fmt(f)?;
+                        best_fitting![
+                            single_line,
+                            joined_parenthesized,
+                            format_interpolated_string
+                        ]
+                        .with_mode(BestFittingMode::AllLines)
+                        .fmt(f)?;
                     } else {
                         best_fit_parenthesize(&format_once(|f| {
                             inline_comments.mark_formatted();
@@ -559,17 +567,16 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 let should_inline_comments = should_inline_comments(value, *statement, f.context());
 
                 let string_like = StringLike::try_from(*value).ok();
-                let format_f_string =
-                    string_like.and_then(|string| format_f_string_assignment(string, f.context()));
+                let format_interpolated_string = string_like
+                    .and_then(|string| format_interpolated_string_assignment(string, f.context()));
                 let format_implicit_flat = string_like.and_then(|string| {
                     FormatImplicitConcatenatedStringFlat::new(string, f.context())
                 });
-
                 // Use the normal `maybe_parenthesize_layout` for splittable `value`s.
                 if !should_inline_comments
                     && !should_non_inlineable_use_best_fit(value, *statement, f.context())
                     && format_implicit_flat.is_none()
-                    && format_f_string.is_none()
+                    && format_interpolated_string.is_none()
                 {
                     return write!(
                         f,
@@ -593,7 +600,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 // Don't inline comments for attribute and call expressions for black compatibility
                 let inline_comments = if should_inline_comments
                     || format_implicit_flat.is_some()
-                    || format_f_string.is_some()
+                    || format_interpolated_string.is_some()
                 {
                     OptionalParenthesesInlinedComments::new(
                         &expression_comments,
@@ -633,7 +640,9 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 // This is mainly a performance optimisation that avoids unnecessary memoization
                 // and using the costly `BestFitting` layout if it is already known that only the last variant
                 // can ever fit because the left breaks.
-                if format_implicit_flat.is_none() && format_f_string.is_none() && last_target_breaks
+                if format_implicit_flat.is_none()
+                    && format_interpolated_string.is_none()
+                    && last_target_breaks
                 {
                     return write!(
                         f,
@@ -650,7 +659,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
 
                 let format_value = format_with(|f| {
                     if let Some(format_implicit_flat) = format_implicit_flat.as_ref() {
-                        if format_implicit_flat.string().is_fstring() {
+                        if format_implicit_flat.string().is_interpolated_string() {
                             // Remove any soft line breaks emitted by the f-string formatting.
                             // This is important when formatting f-strings as part of an assignment right side
                             // because `best_fit_parenthesize` will otherwise still try to break inner
@@ -660,11 +669,13 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         } else {
                             format_implicit_flat.fmt(f)
                         }
-                    } else if let Some(format_f_string) = format_f_string.as_ref() {
+                    } else if let Some(format_interpolated_string) =
+                        format_interpolated_string.as_ref()
+                    {
                         // Similar to above, remove any soft line breaks emitted by the f-string
                         // formatting.
                         let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
-                        write!(buffer, [format_f_string.format()])
+                        write!(buffer, [format_interpolated_string])
                     } else {
                         value.format().with_options(Parentheses::Never).fmt(f)
                     }
@@ -766,7 +777,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     //    2,
                     // ]}" "more"
                     // ```
-                    if format_implicit_flat.string().is_fstring()
+                    if format_implicit_flat.string().is_interpolated_string()
                         && format_value.inspect(f)?.will_break()
                     {
                         inline_comments.mark_unformatted();
@@ -905,12 +916,12 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         .with_mode(BestFittingMode::AllLines)
                         .fmt(f)
                     }
-                } else if let Some(format_f_string) = &format_f_string {
-                    // F-String containing an expression with a magic trailing comma, a comment, or a
+                } else if let Some(format_interpolated_string) = &format_interpolated_string {
+                    // F/T-String containing an interpolation with a magic trailing comma, a comment, or a
                     // multiline debug expression should never be joined. Use the default layout.
                     //
                     // ```python
-                    // aaaa, bbbb = f"aaaa {[
+                    // aaaa, bbbb = t"aaaa {[
                     //     1, 2,
                     // ]} bbbb"
                     // ```
@@ -933,40 +944,46 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         );
                     }
 
-                    let format_f_string =
-                        format_with(|f| write!(f, [format_f_string.format(), inline_comments]))
+                    let format_interpolated_string =
+                        format_with(|f| write!(f, [format_interpolated_string, inline_comments]))
                             .memoized();
 
                     // Considering the following initial source:
                     //
                     // ```python
                     // aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
-                    //     f"aaaaaaaaaaaaaaaaaaa {
+                    //     t"aaaaaaaaaaaaaaaaaaa {
                     //         aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
                     // )
                     // ```
                     //
-                    // Keep the target flat, and use the regular f-string formatting.
+                    // Keep the target flat, and use the regular f/t-string formatting.
                     //
                     // ```python
-                    // aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = f"aaaaaaaaaaaaaaaaaaa {
+                    // aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = t"aaaaaaaaaaaaaaaaaaa {
                     //     aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc
                     // } ddddddddddddddddddd"
                     // ```
-                    let flat_target_regular_f_string = format_with(|f| {
+                    let flat_target_regular_interpolated_string = format_with(|f| {
                         write!(
                             f,
-                            [last_target, space(), operator, space(), format_f_string]
+                            [
+                                last_target,
+                                space(),
+                                operator,
+                                space(),
+                                format_interpolated_string
+                            ]
                         )
                     });
 
-                    // Expand the parent and parenthesize the flattened f-string.
+                    // Expand the parent and parenthesize the flattened f/t-string.
                     //
                     // ```python
                     // aaaaaaaaaaaa[
                     //     "bbbbbbbbbbbbbbbb"
                     // ] = (
-                    //     f"aaaaaaaaaaaaaaaaaaa {aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
+                    //     t"aaaaaaaaaaaaaaaaaaa {aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
                     // )
                     // ```
                     let split_target_value_parenthesized_flat = format_with(|f| {
@@ -988,16 +1005,16 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         )
                     });
 
-                    // Expand the parent, and use the regular f-string formatting.
+                    // Expand the parent, and use the regular f/t-string formatting.
                     //
                     // ```python
                     // aaaaaaaaaaaa[
                     //     "bbbbbbbbbbbbbbbb"
-                    // ] = f"aaaaaaaaaaaaaaaaaaa {
+                    // ] = t"aaaaaaaaaaaaaaaaaaa {
                     //     aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc
                     // } ddddddddddddddddddd"
                     // ```
-                    let split_target_regular_f_string = format_with(|f| {
+                    let split_target_regular_interpolated_string = format_with(|f| {
                         write!(
                             f,
                             [
@@ -1005,7 +1022,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                 space(),
                                 operator,
                                 space(),
-                                format_f_string,
+                                format_interpolated_string,
                             ]
                         )
                     });
@@ -1016,7 +1033,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         best_fitting![
                             split_target_flat_value,
                             split_target_value_parenthesized_flat,
-                            split_target_regular_f_string,
+                            split_target_regular_interpolated_string,
                         ]
                         .with_mode(BestFittingMode::AllLines)
                         .fmt(f)
@@ -1024,10 +1041,10 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         best_fitting![
                             single_line,
                             flat_target_parenthesize_value,
-                            flat_target_regular_f_string,
+                            flat_target_regular_interpolated_string,
                             split_target_flat_value,
                             split_target_value_parenthesized_flat,
-                            split_target_regular_f_string,
+                            split_target_regular_interpolated_string,
                         ]
                         .with_mode(BestFittingMode::AllLines)
                         .fmt(f)
@@ -1045,13 +1062,31 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
     }
 }
 
-/// Formats an f-string that is at the value position of an assignment statement.
+#[derive(Debug, Copy, Clone)]
+enum InterpolatedString<'a> {
+    FString(&'a FString),
+    TString(&'a TString),
+}
+
+impl Format<PyFormatContext<'_>> for InterpolatedString<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        match self {
+            InterpolatedString::FString(string) => string.format().fmt(f),
+            InterpolatedString::TString(string) => string.format().fmt(f),
+        }
+    }
+}
+
+/// Formats an f/t-string that is at the value position of an assignment statement.
 ///
-/// This is just a wrapper around [`FormatFString`] while considering a special case when the
-/// f-string is at an assignment statement's value position.
+/// For legibility, we discuss only the case of f-strings below, but the
+/// same comments apply to t-strings.
 ///
-/// This is necessary to prevent an instability where an f-string contains a multiline expression
-/// and the f-string fits on the line, but only when it's surrounded by parentheses.
+/// This is just a wrapper around [`FormatFString`] while considering a special
+/// case when the f-string is at an assignment statement's value position.
+/// This is necessary  to prevent an instability where an f-string contains a
+/// multiline expression and the f-string fits on the line, but only when it's
+/// surrounded by parentheses.
 ///
 /// ```python
 /// aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
@@ -1099,30 +1134,40 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
 /// The reason for this is because (a) f-string already has a multiline expression thus it tries to
 /// break the expression and (b) the `BestFit` layout doesn't considers the layout where the
 /// multiline f-string isn't surrounded by parentheses.
-fn format_f_string_assignment<'a>(
+fn format_interpolated_string_assignment<'a>(
     string: StringLike<'a>,
     context: &PyFormatContext,
-) -> Option<&'a FString> {
-    let StringLike::FString(expr) = string else {
-        return None;
+) -> Option<InterpolatedString<'a>> {
+    let (interpolated_string, elements) = match string {
+        StringLike::TString(expr) => {
+            let t_string = expr.as_single_part_tstring()?;
+            (InterpolatedString::TString(t_string), &t_string.elements)
+        }
+        StringLike::FString(expr) => {
+            let f_string = expr.as_single_part_fstring()?;
+            (InterpolatedString::FString(f_string), &f_string.elements)
+        }
+        _ => {
+            return None;
+        }
     };
 
-    let f_string = expr.as_single_part_fstring()?;
-
-    // If the f-string is flat, there are no breakpoints from which it can be made multiline.
-    // This is the case when the f-string has no expressions or if it does then the expressions
+    // If the f/t-string is flat, there are no breakpoints from which it can be made multiline.
+    // This is the case when the f/t-string has no expressions or if it does then the expressions
     // are flat (no newlines).
-    if FStringLayout::from_f_string(f_string, context.source()).is_flat() {
+    if InterpolatedStringLayout::from_interpolated_string_elements(elements, context.source())
+        .is_flat()
+    {
         return None;
     }
 
-    // This checks whether the f-string is multi-line and it can *never* be flattened. Thus,
+    // This checks whether the f/t-string is multi-line and it can *never* be flattened. Thus,
     // it's useless to try the flattened layout.
     if string.is_multiline(context) {
         return None;
     }
 
-    Some(f_string)
+    Some(interpolated_string)
 }
 
 #[derive(Debug, Default)]
@@ -1276,6 +1321,9 @@ fn should_inline_comments(
         }
         Expr::FString(fstring) => {
             fstring.needs_parentheses(parent, context) == OptionalParentheses::BestFit
+        }
+        Expr::TString(tstring) => {
+            tstring.needs_parentheses(parent, context) == OptionalParentheses::BestFit
         }
         _ => false,
     }
