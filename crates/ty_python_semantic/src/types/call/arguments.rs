@@ -177,9 +177,10 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
 
             Some(State::Expanded(expanded_arg_types))
         })
-        .filter_map(|state| match state {
-            State::Initial(_) => None, // The initial state has no expanded types.
-            State::Expanded(expanded) => Some(expanded),
+        .skip(1) // Skip the initial state, which has no expanded types.
+        .map(|state| match state {
+            State::Initial(_) => unreachable!("initial state should be skipped"),
+            State::Expanded(expanded) => expanded,
         })
     }
 }
