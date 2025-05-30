@@ -16,7 +16,7 @@ use ruff_linter::{
     directives::{Flags, extract_directives},
     generate_noqa_edits,
     linter::check_path,
-    message::Message,
+    message::OldDiagnostic,
     package::PackageRoot,
     packaging::detect_package_root,
     settings::flags,
@@ -242,7 +242,7 @@ pub(crate) fn fixes_for_diagnostics(
 /// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
     rule: Rule,
-    diagnostic: &Message,
+    diagnostic: &OldDiagnostic,
     noqa_edit: Option<Edit>,
     source_kind: &SourceKind,
     index: &LineIndex,
@@ -318,7 +318,7 @@ fn to_lsp_diagnostic(
 }
 
 fn syntax_error_to_lsp_diagnostic(
-    syntax_error: &Message,
+    syntax_error: &OldDiagnostic,
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
