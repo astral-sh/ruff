@@ -1130,8 +1130,8 @@ impl<'db> CallableBinding<'db> {
         let argument_types = argument_types.with_self(self.bound_type);
 
         // Step 1: Check the result of the arity check which is done by `match_parameters`
-        match self.matching_overload() {
-            MatchingOverload::None => {
+        match self.matching_overload_index() {
+            MatchingOverloadIndex::None => {
                 // If no candidate overloads remain from the arity check, we can stop here. We
                 // still perform type checking for non-overloaded function to provide better user
                 // experience.
@@ -1140,7 +1140,7 @@ impl<'db> CallableBinding<'db> {
                 }
                 return;
             }
-            MatchingOverload::Single(index) => {
+            MatchingOverloadIndex::Single(index) => {
                 // If only one candidate overload remains, it is the winning match.
                 self.overloads.get_mut(index).unwrap().check_types(
                     db,
@@ -1149,7 +1149,7 @@ impl<'db> CallableBinding<'db> {
                 );
                 return;
             }
-            MatchingOverload::Multiple(_) => {
+            MatchingOverloadIndex::Multiple(_) => {
                 // If two or more candidate overloads remain, proceed to step 2.
             }
         }
@@ -1162,15 +1162,15 @@ impl<'db> CallableBinding<'db> {
             overload.check_types(db, argument_types.as_ref(), argument_types.types());
         }
 
-        match self.matching_overload() {
-            MatchingOverload::None => {
+        match self.matching_overload_index() {
+            MatchingOverloadIndex::None => {
                 // If all overloads result in errors, proceed to step 3.
             }
-            MatchingOverload::Single(_) => {
+            MatchingOverloadIndex::Single(_) => {
                 // If only one overload evaluates without error, it is the winning match.
                 return;
             }
-            MatchingOverload::Multiple(_) => {
+            MatchingOverloadIndex::Multiple(_) => {
                 // If two or more candidate overloads remain, proceed to step 4.
                 // TODO: Step 4 and Step 5 goes here...
                 // We're returning here because this shouldn't lead to argument type expansion.
@@ -1201,10 +1201,12 @@ impl<'db> CallableBinding<'db> {
                     overload.check_types(db, argument_types.as_ref(), expanded_argument_types);
                 }
 
-                let return_type = match self.matching_overload() {
-                    MatchingOverload::None => None,
-                    MatchingOverload::Single(index) => Some(self.overloads[index].return_type()),
-                    MatchingOverload::Multiple(index) => {
+                let return_type = match self.matching_overload_index() {
+                    MatchingOverloadIndex::None => None,
+                    MatchingOverloadIndex::Single(index) => {
+                        Some(self.overloads[index].return_type())
+                    }
+                    MatchingOverloadIndex::Multiple(index) => {
                         // TODO: Step 4 and Step 5 goes here... but for now we just use the return
                         // type of the first matched overload.
                         Some(self.overloads[index].return_type())
@@ -1272,22 +1274,16 @@ impl<'db> CallableBinding<'db> {
         self.matching_overloads().next().is_none()
     }
 
-    /// Returns the index of the only matching overload in the form of [`MatchingOverload`].
-    ///
-    /// If there are no matching overloads, returns [`MatchingOverload::None`].
-    /// If there are multiple matching overloads, returns [`MatchingOverload::Multiple`] with the
-    /// index of the first matching overload.
-    /// If there is exactly one matching overload, returns [`MatchingOverload::Single`] with the
-    /// index of that overload.
-    fn matching_overload(&self) -> MatchingOverload {
+    /// Returns the index of the matching overload in the form of [`MatchingOverloadIndex`].
+    fn matching_overload_index(&self) -> MatchingOverloadIndex {
         let mut matching_overloads = self.matching_overloads();
         match matching_overloads.next() {
-            None => MatchingOverload::None,
+            None => MatchingOverloadIndex::None,
             Some((index, _)) => {
                 if matching_overloads.next().is_some() {
-                    MatchingOverload::Multiple(index)
+                    MatchingOverloadIndex::Multiple(index)
                 } else {
-                    MatchingOverload::Single(index)
+                    MatchingOverloadIndex::Single(index)
                 }
             }
         }
@@ -1467,9 +1463,18 @@ impl<'a, 'db> IntoIterator for &'a CallableBinding<'db> {
 }
 
 #[derive(Debug)]
-enum MatchingOverload {
+enum MatchingOverloadIndex {
+    /// No matching overloads found.
     None,
+
+    /// Exactly one matching overload found.
+    ///
+    /// The index is the position of the matching overload.
     Single(usize),
+
+    /// Multiple matching overloads found.
+    ///
+    /// The index is the position of the first matching overload.
     Multiple(usize),
 }
 
