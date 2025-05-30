@@ -17,6 +17,19 @@ bar = overload(foo)
 reveal_type(bar)  # revealed: def foo(x: int) -> int
 ```
 
+## Another example
+
+```py
+from typing import overload
+
+@overload
+def func() -> None: ...
+@overload
+def func(x: int) -> int: ...
+def func(x: int | None = None) -> int | None:
+    return x
+```
+
 ## Functions
 
 ```py
@@ -174,8 +187,10 @@ if sys.version_info < (3, 10):
 elif sys.version_info <= (3, 12):
     @overload
     def func() -> None: ...
+    # TODO: false positive due to unreachable, causing @overload to be typed at
+    # Never
     @overload
-    def func(x: int) -> int: ...
+    def func(x: int) -> int: ...  # error: [invalid-return-type]
     def func(x: int | None = None) -> int | None:
         return x
 

@@ -65,7 +65,7 @@ def _(x: A | B):
         reveal_type(x)  # revealed: A | B
     else:
         # TODO: should emit an `unreachable code` diagnostic
-        reveal_type(x)  # revealed: B & ~A
+        reveal_type(x)  # revealed: Never
 
     reveal_type(x)  # revealed: A | B
 ```
