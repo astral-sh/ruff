@@ -284,11 +284,8 @@ impl OldDiagnostic {
 
     /// Returns the [`Rule`] corresponding to the diagnostic message.
     pub fn to_rule(&self) -> Option<Rule> {
-        if self.is_syntax_error() {
-            None
-        } else {
-            Some(self.name().parse().expect("Expected a valid rule name"))
-        }
+        self.noqa_code
+            .map(|code| Rule::from_code(&code.to_string()).expect("Expected a valid noqa code"))
     }
 
     /// Returns the [`NoqaCode`] corresponding to the diagnostic message.
