@@ -3080,11 +3080,10 @@ impl<'a> LintContext<'a> {
         range: TextRange,
         settings: &LinterSettings,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        let diagnostic = OldDiagnostic::new(kind, range, self.source_file);
         if settings.rules.enabled(T::rule()) {
             Some(DiagnosticGuard {
                 context: self,
-                diagnostic: Some(diagnostic),
+                diagnostic: Some(OldDiagnostic::new(kind, range, self.source_file)),
             })
         } else {
             None
