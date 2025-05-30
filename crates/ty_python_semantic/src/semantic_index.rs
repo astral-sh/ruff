@@ -123,7 +123,7 @@ pub(crate) fn attribute_assignments<'db, 's>(
                 (child_scope_id, scope)
             };
 
-        function_scope.node().as_function()?;
+        function_scope.node().as_function(db)?;
         let attribute_table = index.instance_attribute_table(function_scope_id);
         let symbol = attribute_table.symbol_id_by_name(name)?;
         let use_def = &index.use_def_maps[function_scope_id];
@@ -986,7 +986,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let DefinitionKind::Comprehension(comprehension) = binding.kind(&db) else {
             panic!("expected generator definition")
         };
-        let target = comprehension.target();
+        let target = comprehension.target(&db);
         let name = target.as_name_expr().unwrap().id().as_str();
 
         assert_eq!(name, "x");
@@ -1242,7 +1242,7 @@ class C[T]:
         let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(num),
             ..
-        }) = assignment.value()
+        }) = assignment.value(&db)
         else {
             panic!("should be a number literal")
         };

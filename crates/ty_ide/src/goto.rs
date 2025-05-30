@@ -1,7 +1,7 @@
 use crate::find_node::covering_node;
 use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::{ParsedModule, parsed_module};
+use ruff_db::parsed::{ParsedModule, ParsedModuleGuard, parsed_module};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -13,8 +13,8 @@ pub fn goto_type_definition(
     file: File,
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
-    let parsed = parsed_module(db.upcast(), file);
-    let goto_target = find_goto_target(parsed, offset)?;
+    let parsed = parsed_module(db.upcast(), file).read(db);
+    let goto_target = find_goto_target(&parsed, offset)?;
 
     let model = SemanticModel::new(db.upcast(), file);
     let ty = goto_target.inferred_type(&model)?;
@@ -24,7 +24,7 @@ pub fn goto_type_definition(
         ty.display(db.upcast())
     );
 
-    let navigation_targets = ty.navigation_targets(db);
+    let navigation_targets = ty.navigation_targets(db, &parsed);
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -183,7 +183,7 @@ impl Ranged for GotoTarget<'_> {
     }
 }
 
-pub(crate) fn find_goto_target(parsed: &ParsedModule, offset: TextSize) -> Option<GotoTarget> {
+pub(crate) fn find_goto_target(parsed: &ParsedModuleGuard, offset: TextSize) -> Option<GotoTarget> {
     let token = parsed
         .tokens()
         .at_offset(offset)

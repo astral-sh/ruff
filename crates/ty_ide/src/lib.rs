@@ -13,7 +13,10 @@ pub use hover::hover;
 pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
 
-use ruff_db::files::{File, FileRange};
+use ruff_db::{
+    files::{File, FileRange},
+    parsed::ParsedModuleGuard,
+};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::ops::{Deref, DerefMut};
@@ -146,15 +149,15 @@ impl FromIterator<NavigationTarget> for NavigationTargets {
 }
 
 pub trait HasNavigationTargets {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets;
+    fn navigation_targets(&self, db: &dyn Db, parsed: &ParsedModuleGuard) -> NavigationTargets;
 }
 
 impl HasNavigationTargets for Type<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
+    fn navigation_targets(&self, db: &dyn Db, parsed: &ParsedModuleGuard) -> NavigationTargets {
         match self {
             Type::Union(union) => union
                 .iter(db.upcast())
-                .flat_map(|target| target.navigation_targets(db))
+                .flat_map(|target| target.navigation_targets(db, parsed))
                 .collect(),
 
             Type::Intersection(intersection) => {
@@ -173,27 +176,30 @@ impl HasNavigationTargets for Type<'_> {
                         // because the type is the intersection of all those types.
                         NavigationTargets::empty()
                     }
-                    None => first.navigation_targets(db),
+                    None => first.navigation_targets(db, parsed),
                 }
             }
 
             ty => ty
                 .definition(db.upcast())
-                .map(|definition| definition.navigation_targets(db))
+                .map(|definition| definition.navigation_targets(db, parsed))
                 .unwrap_or_else(NavigationTargets::empty),
         }
     }
 }
 
 impl HasNavigationTargets for TypeDefinition<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let Some(full_range) = self.full_range(db.upcast()) else {
+    fn navigation_targets(&self, db: &dyn Db, parsed: &ParsedModuleGuard) -> NavigationTargets {
+        let Some(full_range) = self.full_range(db.upcast(), parsed) else {
             return NavigationTargets::empty();
         };
 
         NavigationTargets::single(NavigationTarget {
             file: full_range.file(),
-            focus_range: self.focus_range(db.upcast()).unwrap_or(full_range).range(),
+            focus_range: self
+                .focus_range(db.upcast(), parsed)
+                .unwrap_or(full_range)
+                .range(),
             full_range: full_range.range(),
         })
     }

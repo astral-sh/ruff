@@ -1,6 +1,7 @@
 use crate::semantic_index::definition::Definition;
 use crate::{Db, Module};
 use ruff_db::files::FileRange;
+use ruff_db::parsed::ParsedModuleGuard;
 use ruff_db::source::source_text;
 use ruff_text_size::{TextLen, TextRange};
 
@@ -14,17 +15,17 @@ pub enum TypeDefinition<'db> {
 }
 
 impl TypeDefinition<'_> {
-    pub fn focus_range(&self, db: &dyn Db) -> Option<FileRange> {
+    pub fn focus_range(&self, db: &dyn Db, parsed: &ParsedModuleGuard) -> Option<FileRange> {
         match self {
             Self::Module(_) => None,
             Self::Class(definition)
             | Self::Function(definition)
             | Self::TypeVar(definition)
-            | Self::TypeAlias(definition) => Some(definition.focus_range(db)),
+            | Self::TypeAlias(definition) => Some(definition.focus_range(db, parsed)),
         }
     }
 
-    pub fn full_range(&self, db: &dyn Db) -> Option<FileRange> {
+    pub fn full_range(&self, db: &dyn Db, parsed: &ParsedModuleGuard) -> Option<FileRange> {
         match self {
             Self::Module(module) => {
                 let file = module.file()?;
@@ -34,7 +35,7 @@ impl TypeDefinition<'_> {
             Self::Class(definition)
             | Self::Function(definition)
             | Self::TypeVar(definition)
-            | Self::TypeAlias(definition) => Some(definition.full_range(db)),
+            | Self::TypeAlias(definition) => Some(definition.full_range(db, parsed)),
         }
     }
 }

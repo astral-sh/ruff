@@ -1,7 +1,10 @@
 use std::hash::Hash;
 use std::ops::Deref;
+use std::sync::{Arc, Weak};
 
-use ruff_db::parsed::ParsedModule;
+use ruff_db::parsed::{ParsedModule, ParsedModuleGuard};
+use ruff_python_ast::ModModule;
+use ruff_python_parser::Parsed;
 
 /// Ref-counted owned reference to an AST node.
 ///
@@ -61,18 +64,12 @@ impl<T> AstNodeRef<T> {
     }
 
     /// Returns a reference to the wrapped node.
-    pub const fn node(&self) -> &T {
-        // SAFETY: Holding on to `parsed` ensures that the AST to which `node` belongs is still
+    pub fn node<'guard>(&self, guard: &'guard ParsedModuleGuard) -> &'guard T {
+        assert!(ParsedModule::ptr_eq(guard.module(), &self.parsed));
+
+        // SAFETY: Holding on to `guard` ensures that the AST to which `node` belongs is still
         // alive and not moved.
         unsafe { self.node.as_ref() }
-    }
-}
-
-impl<T> Deref for AstNodeRef<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.node()
     }
 }
 
@@ -81,7 +78,8 @@ where
     T: std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("AstNodeRef").field(&self.node()).finish()
+        f.debug_tuple("AstNodeRef") /*.field(&self.node())*/
+            .finish()
     }
 }
 
@@ -90,14 +88,16 @@ where
     T: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        if self.parsed == other.parsed {
-            // Comparing the pointer addresses is sufficient to determine equality
-            // if the parsed are the same.
-            self.node.eq(&other.node)
-        } else {
-            // Otherwise perform a deep comparison.
-            self.node().eq(other.node())
-        }
+        todo!()
+        // match (self.parsed.upgrade(), other.parsed.upgrade()) {
+        //     // Comparing the pointer addresses is sufficient to determine equality
+        //     // if the parsed are the same.
+        //     (Some(parsed), Some(other_parsed)) if parsed == other_parsed => {
+        //         self.node.eq(&other.node)
+        //     }
+        //     // Otherwise perform a deep comparison.
+        //     _ => self.node().eq(other.node()),
+        // }
     }
 }
 
@@ -108,21 +108,29 @@ where
     T: Hash,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.node().hash(state);
+        todo!()
+        // self.node().hash(state);
     }
 }
 
 #[expect(unsafe_code)]
 unsafe impl<T> salsa::Update for AstNodeRef<T> {
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_ref = unsafe { &mut (*old_pointer) };
+        todo!()
+        // let old_ref = unsafe { &mut (*old_pointer) };
 
-        if old_ref.parsed == new_value.parsed && old_ref.node.eq(&new_value.node) {
-            false
-        } else {
-            *old_ref = new_value;
-            true
-        }
+        // // TODO: need to reparse here?
+        // match (old_ref.parsed.upgrade(), new_value.parsed.upgrade()) {
+        //     (Some(parsed), Some(other_parsed))
+        //         if parsed == other_parsed && old_ref.node.eq(&new_value.node) =>
+        //     {
+        //         false
+        //     }
+        //     _ => {
+        //         *old_ref = new_value;
+        //         true
+        //     }
+        // }
     }
 }
 

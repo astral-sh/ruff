@@ -38,6 +38,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
 zip = { workspace = true }
+arc-swap = "1.7.1"
 
 [target.'cfg(target_arch="wasm32")'.dependencies]
 web-time = { version = "1.1.0" }

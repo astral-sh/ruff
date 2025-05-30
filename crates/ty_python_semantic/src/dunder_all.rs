@@ -35,6 +35,7 @@ pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name
     let module = parsed_module(db.upcast(), file);
     let index = semantic_index(db, file);
     let mut collector = DunderAllNamesCollector::new(db, file, index);
+    let module = module.read(db);
     collector.visit_body(module.suite());
     collector.into_names()
 }

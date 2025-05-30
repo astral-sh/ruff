@@ -5,7 +5,7 @@ use except_handlers::TryNodeContextStackManager;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
-use ruff_db::parsed::ParsedModule;
+use ruff_db::parsed::{ParsedModule, ParsedModuleGuard};
 use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
@@ -76,7 +76,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     db: &'db dyn Db,
     file: File,
     source_type: PySourceType,
-    module: &'db ParsedModule,
+    parsed: ParsedModuleGuard,
     scope_stack: Vec<ScopeInfo>,
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec
@@ -124,8 +124,8 @@ impl<'db> SemanticIndexBuilder<'db> {
         let mut builder = Self {
             db,
             file,
+            parsed: parsed.read(db),
             source_type: file.source_type(db.upcast()),
-            module: parsed,
             scope_stack: Vec::new(),
             current_assignments: vec![],
             current_match_case: None,
@@ -247,7 +247,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         // SAFETY: `node` is guaranteed to be a child of `self.module`
         #[expect(unsafe_code)]
-        let node_with_kind = unsafe { node.to_kind(self.module.clone()) };
+        let node_with_kind = unsafe { node.to_kind(self.parsed.module().clone()) };
 
         let scope = Scope::new(
             parent,
@@ -463,8 +463,8 @@ impl<'db> SemanticIndexBuilder<'db> {
         let definition_node: DefinitionNodeRef<'_> = definition_node.into();
         #[expect(unsafe_code)]
         // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
-        let kind = unsafe { definition_node.into_owned(self.module.clone()) };
-        let category = kind.category(self.source_type.is_stub());
+        let kind = unsafe { definition_node.into_owned(self.parsed.module().clone()) };
+        let category = kind.category(self.source_type.is_stub(), &self.parsed);
         let is_reexported = kind.is_reexported();
 
         let definition = Definition::new(
@@ -807,11 +807,12 @@ impl<'db> SemanticIndexBuilder<'db> {
             self.current_scope(),
             #[expect(unsafe_code)]
             unsafe {
-                AstNodeRef::new(self.module.clone(), expression_node)
+                AstNodeRef::new(self.parsed.module().clone(), expression_node)
             },
             #[expect(unsafe_code)]
-            assigned_to
-                .map(|assigned_to| unsafe { AstNodeRef::new(self.module.clone(), assigned_to) }),
+            assigned_to.map(|assigned_to| unsafe {
+                AstNodeRef::new(self.parsed.module().clone(), assigned_to)
+            }),
             expression_kind,
             countme::Count::default(),
         );
@@ -1015,7 +1016,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                     // SAFETY: `target` belongs to the `self.module` tree
                     #[expect(unsafe_code)]
                     unsafe {
-                        AstNodeRef::new(self.module.clone(), target)
+                        AstNodeRef::new(self.parsed.module().clone(), target)
                     },
                     UnpackValue::new(unpackable.kind(), value),
                     countme::Count::default(),
@@ -1041,7 +1042,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
-        let module = self.module;
+        let module = self.parsed.clone();
         self.visit_body(module.suite());
 
         // Pop the root scope
@@ -2252,8 +2253,10 @@ where
                             #[expect(unsafe_code)]
                             let assignment = AssignmentDefinitionKind::new(
                                 TargetKind::from(unpack),
-                                unsafe { AstNodeRef::new(self.module.clone(), &node.value) },
-                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
+                                unsafe {
+                                    AstNodeRef::new(self.parsed.module().clone(), &node.value)
+                                },
+                                unsafe { AstNodeRef::new(self.parsed.module().clone(), expr) },
                             );
                             self.register_attribute_assignment(
                                 object,
@@ -2267,12 +2270,15 @@ where
                             #[expect(unsafe_code)]
                             let assignment = AnnotatedAssignmentDefinitionKind::new(
                                 unsafe {
-                                    AstNodeRef::new(self.module.clone(), &ann_assign.annotation)
+                                    AstNodeRef::new(
+                                        self.parsed.module().clone(),
+                                        &ann_assign.annotation,
+                                    )
                                 },
                                 ann_assign.value.as_deref().map(|value| unsafe {
-                                    AstNodeRef::new(self.module.clone(), value)
+                                    AstNodeRef::new(self.parsed.module().clone(), value)
                                 }),
-                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
+                                unsafe { AstNodeRef::new(self.parsed.module().clone(), expr) },
                             );
                             self.register_attribute_assignment(
                                 object,
@@ -2285,8 +2291,10 @@ where
                             #[expect(unsafe_code)]
                             let assignment = ForStmtDefinitionKind::new(
                                 TargetKind::from(unpack),
-                                unsafe { AstNodeRef::new(self.module.clone(), &node.iter) },
-                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
+                                unsafe {
+                                    AstNodeRef::new(self.parsed.module().clone(), &node.iter)
+                                },
+                                unsafe { AstNodeRef::new(self.parsed.module().clone(), expr) },
                                 node.is_async,
                             );
                             self.register_attribute_assignment(
@@ -2305,8 +2313,13 @@ where
                             #[expect(unsafe_code)]
                             let assignment = WithItemDefinitionKind::new(
                                 TargetKind::from(unpack),
-                                unsafe { AstNodeRef::new(self.module.clone(), &item.context_expr) },
-                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
+                                unsafe {
+                                    AstNodeRef::new(
+                                        self.parsed.module().clone(),
+                                        &item.context_expr,
+                                    )
+                                },
+                                unsafe { AstNodeRef::new(self.parsed.module().clone(), expr) },
                                 is_async,
                             );
                             self.register_attribute_assignment(
@@ -2325,9 +2338,11 @@ where
                             let assignment = ComprehensionDefinitionKind {
                                 target_kind: TargetKind::from(unpack),
                                 iterable: unsafe {
-                                    AstNodeRef::new(self.module.clone(), &node.iter)
+                                    AstNodeRef::new(self.parsed.module().clone(), &node.iter)
                                 },
-                                target: unsafe { AstNodeRef::new(self.module.clone(), expr) },
+                                target: unsafe {
+                                    AstNodeRef::new(self.parsed.module().clone(), expr)
+                                },
                                 first,
                                 is_async: node.is_async,
                             };
@@ -2455,7 +2470,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
             match scope.kind() {
                 ScopeKind::Class | ScopeKind::Lambda => return false,
                 ScopeKind::Function => {
-                    return scope.node().expect_function().is_async;
+                    return scope.node().expect_function(self.db).is_async;
                 }
                 ScopeKind::Comprehension
                 | ScopeKind::Module
@@ -2497,9 +2512,9 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
         for scope_info in self.scope_stack.iter().rev() {
             let scope = &self.scopes[scope_info.file_scope_id];
             let generators = match scope.node() {
-                NodeWithScopeKind::ListComprehension(node) => &node.generators,
-                NodeWithScopeKind::SetComprehension(node) => &node.generators,
-                NodeWithScopeKind::DictComprehension(node) => &node.generators,
+                NodeWithScopeKind::ListComprehension(node) => &node.node(&self.parsed).generators,
+                NodeWithScopeKind::SetComprehension(node) => &node.node(&self.parsed).generators,
+                NodeWithScopeKind::DictComprehension(node) => &node.node(&self.parsed).generators,
                 _ => continue,
             };
             if generators

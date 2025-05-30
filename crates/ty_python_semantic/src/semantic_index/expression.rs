@@ -41,8 +41,8 @@ pub(crate) struct Expression<'db> {
     /// The expression node.
     #[no_eq]
     #[tracked]
-    #[returns(deref)]
-    pub(crate) node_ref: AstNodeRef<ast::Expr>,
+    #[returns(ref)]
+    pub(crate) _node_ref: AstNodeRef<ast::Expr>,
 
     /// An assignment statement, if this expression is immediately used as the rhs of that
     /// assignment.
@@ -64,5 +64,9 @@ pub(crate) struct Expression<'db> {
 impl<'db> Expression<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
+    }
+
+    pub(crate) fn node_ref(self, db: &'db dyn Db) -> &'db ast::Expr {
+        self._node_ref(db).node(db)
     }
 }

@@ -1,7 +1,7 @@
 use std::fmt::Formatter;
-use std::ops::Deref;
 use std::sync::Arc;
 
+use arc_swap::ArcSwapOption;
 use ruff_python_ast::ModModule;
 use ruff_python_parser::{ParseOptions, Parsed, parse_unchecked};
 
@@ -23,43 +23,74 @@ use crate::source::source_text;
 #[salsa::tracked(returns(ref), no_eq)]
 pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     let _span = tracing::trace_span!("parsed_module", ?file).entered();
+    ParsedModule::new(file, parsed_module_untracked(db, file))
+}
 
+fn parsed_module_untracked(db: &dyn Db, file: File) -> Parsed<ModModule> {
     let source = source_text(db, file);
     let ty = file.source_type(db);
 
     let target_version = db.python_version();
     let options = ParseOptions::from(ty).with_target_version(target_version);
-    let parsed = parse_unchecked(&source, options)
-        .try_into_module()
-        .expect("PySourceType always parses into a module");
 
-    ParsedModule::new(parsed)
+    parse_unchecked(&source, options)
+        .try_into_module()
+        .expect("PySourceType always parses into a module")
 }
 
 /// Cheap cloneable wrapper around the parsed module.
 #[derive(Clone)]
 pub struct ParsedModule {
-    inner: Arc<Parsed<ModModule>>,
+    file: File,
+    inner: Arc<ArcSwapOption<Parsed<ModModule>>>,
 }
 
 impl ParsedModule {
-    pub fn new(parsed: Parsed<ModModule>) -> Self {
+    pub fn new(file: File, parsed: Parsed<ModModule>) -> Self {
         Self {
-            inner: Arc::new(parsed),
+            file,
+            inner: Arc::new(ArcSwapOption::new(Some(Arc::new(parsed)))),
         }
     }
 
-    /// Consumes `self` and returns the Arc storing the parsed module.
-    pub fn into_arc(self) -> Arc<Parsed<ModModule>> {
-        self.inner
+    pub fn read(&self, db: &dyn Db) -> ParsedModuleGuard {
+        let inner = match self.inner.load_full() {
+            Some(module) => module,
+            None => {
+                let module = Arc::new(parsed_module_untracked(db, self.file));
+                self.inner.store(Some(module.clone()));
+                module
+            }
+        };
+
+        ParsedModuleGuard {
+            inner,
+            module: self.clone(),
+        }
+    }
+
+    pub fn ptr_eq(&self, other: &ParsedModule) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
     }
 }
 
-impl Deref for ParsedModule {
+#[derive(Clone)]
+pub struct ParsedModuleGuard {
+    module: ParsedModule,
+    inner: Arc<Parsed<ModModule>>,
+}
+
+impl ParsedModuleGuard {
+    pub fn module(&self) -> &ParsedModule {
+        &self.module
+    }
+}
+
+impl std::ops::Deref for ParsedModuleGuard {
     type Target = Parsed<ModModule>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &*self.inner
     }
 }
 
@@ -100,7 +131,7 @@ mod tests {
 
         let parsed = parsed_module(&db, file);
 
-        assert!(parsed.has_valid_syntax());
+        assert!(parsed.read(&db).has_valid_syntax());
 
         Ok(())
     }
@@ -116,7 +147,7 @@ mod tests {
 
         let parsed = parsed_module(&db, file);
 
-        assert!(parsed.has_valid_syntax());
+        assert!(parsed.read(&db).has_valid_syntax());
 
         Ok(())
     }
@@ -132,7 +163,7 @@ mod tests {
 
         let parsed = parsed_module(&db, virtual_file.file());
 
-        assert!(parsed.has_valid_syntax());
+        assert!(parsed.read(&db).has_valid_syntax());
 
         Ok(())
     }
@@ -148,7 +179,7 @@ mod tests {
 
         let parsed = parsed_module(&db, virtual_file.file());
 
-        assert!(parsed.has_valid_syntax());
+        assert!(parsed.read(&db).has_valid_syntax());
 
         Ok(())
     }
@@ -179,6 +210,6 @@ else:
 
         let parsed = parsed_module(&db, file);
 
-        assert!(parsed.has_valid_syntax());
+        assert!(parsed.read(&db).has_valid_syntax());
     }
 }

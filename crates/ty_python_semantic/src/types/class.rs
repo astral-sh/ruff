@@ -38,6 +38,7 @@ use indexmap::IndexSet;
 use itertools::Itertools as _;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
+use ruff_db::parsed::ParsedModuleGuard;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
@@ -103,6 +104,7 @@ fn try_metaclass_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>>,
     _count: u32,
+    _file: File,
     _self: ClassLiteral<'db>,
 ) -> salsa::CycleRecoveryAction<
     Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>>,
@@ -113,6 +115,7 @@ fn try_metaclass_cycle_recover<'db>(
 #[allow(clippy::unnecessary_wraps)]
 fn try_metaclass_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _file: File,
     _self_: ClassLiteral<'db>,
 ) -> Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>> {
     Err(MetaclassError {
@@ -478,29 +481,40 @@ impl<'db> ClassType<'db> {
     /// defined attribute that is only present in a method (typically `__init__`).
     ///
     /// The attribute might also be defined in a superclass of this class.
-    pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    pub(super) fn instance_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        parsed: &ParsedModuleGuard,
+    ) -> SymbolAndQualifiers<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         class_literal
-            .instance_member(db, specialization, name)
+            .instance_member(db, specialization, name, parsed)
             .map_type(|ty| ty.apply_optional_specialization(db, specialization))
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    fn own_instance_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        parsed: &ParsedModuleGuard,
+    ) -> SymbolAndQualifiers<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         class_literal
-            .own_instance_member(db, name)
+            .own_instance_member(db, name, parsed)
             .map_type(|ty| ty.apply_optional_specialization(db, specialization))
     }
 
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
-    pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn into_callable(self, db: &'db dyn Db, file: File) -> Type<'db> {
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
             .member_lookup_with_policy(
                 db,
+                file,
                 "__call__".into(),
                 MemberLookupPolicy::NO_INSTANCE_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
@@ -520,6 +534,7 @@ impl<'db> ClassType<'db> {
         let dunder_new_function_symbol = self_ty
             .member_lookup_with_policy(
                 db,
+                file,
                 "__new__".into(),
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
             )
@@ -540,6 +555,7 @@ impl<'db> ClassType<'db> {
                             signature.return_ty.is_some_and(|return_ty| {
                                 !return_ty.is_assignable_to(
                                     db,
+                                    file,
                                     self_ty
                                         .to_instance(db)
                                         .expect("ClassType should be instantiable"),
@@ -561,6 +577,7 @@ impl<'db> ClassType<'db> {
         let dunder_init_function_symbol = self_ty
             .member_lookup_with_policy(
                 db,
+                file,
                 "__init__".into(),
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
@@ -612,6 +629,7 @@ impl<'db> ClassType<'db> {
                 let new_function_symbol = self_ty
                     .member_lookup_with_policy(
                         db,
+                        file,
                         "__new__".into(),
                         MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
                     )
@@ -719,7 +737,7 @@ impl<'db> ClassLiteral<'db> {
     #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial)]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
-        let class_def_node = scope.node(db).expect_class();
+        let class_def_node = scope.node(db).expect_class(db);
         class_def_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
             GenericContext::from_type_params(db, index, type_params)
@@ -759,13 +777,13 @@ impl<'db> ClassLiteral<'db> {
     /// Only call this function from queries in the same file or your
     /// query depends on the AST of another file (bad!).
     fn node(self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
-        self.body_scope(db).node(db).expect_class()
+        self.body_scope(db).node(db).expect_class(db)
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
         let index = semantic_index(db, body_scope.file(db));
-        index.expect_single_definition(body_scope.node(db).expect_class())
+        index.expect_single_definition(body_scope.node(db).expect_class(db))
     }
 
     pub(crate) fn apply_optional_specialization(
@@ -1027,6 +1045,7 @@ impl<'db> ClassLiteral<'db> {
     pub(super) fn try_metaclass(
         self,
         db: &'db dyn Db,
+        file: File,
     ) -> Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>> {
         tracing::trace!("ClassLiteral::try_metaclass: {}", self.name(db));
 
@@ -1067,7 +1086,7 @@ impl<'db> ClassLiteral<'db> {
             // TODO: Other keyword arguments?
             let arguments = CallArgumentTypes::positional([name, bases, namespace]);
 
-            let return_ty_result = match metaclass.try_call(db, &arguments) {
+            let return_ty_result = match metaclass.try_call(db, file, &arguments) {
                 Ok(bindings) => Ok(bindings.return_type(db)),
 
                 Err(CallError(CallErrorKind::NotCallable, bindings)) => Err(MetaclassError {
@@ -1547,6 +1566,7 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         name: &str,
+        parsed: &ParsedModuleGuard,
     ) -> SymbolAndQualifiers<'db> {
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
@@ -1565,7 +1585,7 @@ impl<'db> ClassLiteral<'db> {
                     if let member @ SymbolAndQualifiers {
                         symbol: Symbol::Type(ty, boundness),
                         qualifiers,
-                    } = class.own_instance_member(db, name)
+                    } = class.own_instance_member(db, name, parsed)
                     {
                         // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
                         union_qualifiers |= qualifiers;
@@ -1605,6 +1625,7 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
         name: &str,
+        parsed: &ParsedModuleGuard,
     ) -> Symbol<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
@@ -1626,7 +1647,8 @@ impl<'db> ClassLiteral<'db> {
             let method_map = use_def_map(db, method_scope);
 
             // The attribute assignment inherits the visibility of the method which contains it
-            let is_method_visible = if let Some(method_def) = method_scope.node(db).as_function() {
+            let is_method_visible = if let Some(method_def) = method_scope.node(db).as_function(db)
+            {
                 let method = index.expect_single_definition(method_def);
                 let method_symbol = class_table.symbol_id_by_name(&method_def.name).unwrap();
                 class_map
@@ -1695,8 +1717,10 @@ impl<'db> ClassLiteral<'db> {
                         //     self.name: <annotation>
                         //     self.name: <annotation> = …
 
-                        let annotation_ty =
-                            infer_expression_type(db, index.expression(ann_assign.annotation()));
+                        let annotation_ty = infer_expression_type(
+                            db,
+                            index.expression(ann_assign.annotation(parsed)),
+                        );
 
                         // TODO: check if there are conflicting declarations
                         match is_attribute_bound {
@@ -1722,7 +1746,7 @@ impl<'db> ClassLiteral<'db> {
 
                                 let unpacked = infer_unpack_types(db, unpack);
                                 let target_ast_id =
-                                    assign.target().scoped_expression_id(db, method_scope);
+                                    assign.target(parsed).scoped_expression_id(db, method_scope);
                                 let inferred_ty = unpacked.expression_type(target_ast_id);
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
@@ -1732,8 +1756,10 @@ impl<'db> ClassLiteral<'db> {
                                 //
                                 //     self.name = <value>
 
-                                let inferred_ty =
-                                    infer_expression_type(db, index.expression(assign.value()));
+                                let inferred_ty = infer_expression_type(
+                                    db,
+                                    index.expression(assign.value(parsed)),
+                                );
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
@@ -1747,8 +1773,9 @@ impl<'db> ClassLiteral<'db> {
                                 //     for .., self.name, .. in <iterable>:
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let target_ast_id =
-                                    for_stmt.target().scoped_expression_id(db, method_scope);
+                                let target_ast_id = for_stmt
+                                    .target(parsed)
+                                    .scoped_expression_id(db, method_scope);
                                 let inferred_ty = unpacked.expression_type(target_ast_id);
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
@@ -1760,7 +1787,7 @@ impl<'db> ClassLiteral<'db> {
 
                                 let iterable_ty = infer_expression_type(
                                     db,
-                                    index.expression(for_stmt.iterable()),
+                                    index.expression(for_stmt.iterable(parsed)),
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                                 let inferred_ty = iterable_ty.iterate(db);
@@ -1777,8 +1804,9 @@ impl<'db> ClassLiteral<'db> {
                                 //     with <context_manager> as .., self.name, ..:
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let target_ast_id =
-                                    with_item.target().scoped_expression_id(db, method_scope);
+                                let target_ast_id = with_item
+                                    .target(parsed)
+                                    .scoped_expression_id(db, method_scope);
                                 let inferred_ty = unpacked.expression_type(target_ast_id);
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
@@ -1790,7 +1818,7 @@ impl<'db> ClassLiteral<'db> {
 
                                 let context_ty = infer_expression_type(
                                     db,
-                                    index.expression(with_item.context_expr()),
+                                    index.expression(with_item.context_expr(parsed)),
                                 );
                                 let inferred_ty = context_ty.enter(db);
 
@@ -1807,7 +1835,7 @@ impl<'db> ClassLiteral<'db> {
 
                                 let unpacked = infer_unpack_types(db, unpack);
                                 let target_ast_id = comprehension
-                                    .target()
+                                    .target(parsed)
                                     .scoped_expression_id(db, unpack.target_scope(db));
                                 let inferred_ty = unpacked.expression_type(target_ast_id);
 
@@ -1820,7 +1848,7 @@ impl<'db> ClassLiteral<'db> {
 
                                 let iterable_ty = infer_expression_type(
                                     db,
-                                    index.expression(comprehension.iterable()),
+                                    index.expression(comprehension.iterable(parsed)),
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                                 let inferred_ty = iterable_ty.iterate(db);
@@ -1849,7 +1877,12 @@ impl<'db> ClassLiteral<'db> {
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    fn own_instance_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        parsed: &ParsedModuleGuard,
+    ) -> SymbolAndQualifiers<'db> {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
@@ -1883,7 +1916,7 @@ impl<'db> ClassLiteral<'db> {
                         // The attribute is declared and bound in the class body.
 
                         if let Some(implicit_ty) =
-                            Self::implicit_instance_attribute(db, body_scope, name)
+                            Self::implicit_instance_attribute(db, body_scope, name, parsed)
                                 .ignore_possibly_unbound()
                         {
                             if declaredness == Boundness::Bound {
@@ -1918,7 +1951,7 @@ impl<'db> ClassLiteral<'db> {
                             declared.with_qualifiers(qualifiers)
                         } else {
                             if let Some(implicit_ty) =
-                                Self::implicit_instance_attribute(db, body_scope, name)
+                                Self::implicit_instance_attribute(db, body_scope, name, parsed)
                                     .ignore_possibly_unbound()
                             {
                                 Symbol::Type(
@@ -1940,7 +1973,7 @@ impl<'db> ClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_instance_attribute(db, body_scope, name).into()
+                    Self::implicit_instance_attribute(db, body_scope, name, parsed).into()
                 }
                 Err((declared, _conflicting_declarations)) => {
                     // There are conflicting declarations for this attribute in the class body.
@@ -1951,7 +1984,7 @@ impl<'db> ClassLiteral<'db> {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_instance_attribute(db, body_scope, name).into()
+            Self::implicit_instance_attribute(db, body_scope, name, parsed).into()
         }
     }
 
@@ -2023,7 +2056,7 @@ impl<'db> ClassLiteral<'db> {
     /// ```
     pub(super) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let class_scope = self.body_scope(db);
-        let class_node = class_scope.node(db).expect_class();
+        let class_node = class_scope.node(db).expect_class(db);
         let class_name = &class_node.name;
         TextRange::new(
             class_name.start(),

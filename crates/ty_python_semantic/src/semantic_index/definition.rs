@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::ParsedModule;
+use ruff_db::parsed::{ParsedModule, ParsedModuleGuard};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -49,12 +49,12 @@ impl<'db> Definition<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
     }
 
-    pub fn full_range(self, db: &'db dyn Db) -> FileRange {
-        FileRange::new(self.file(db), self.kind(db).full_range())
+    pub fn full_range(self, db: &'db dyn Db, module: &ParsedModuleGuard) -> FileRange {
+        FileRange::new(self.file(db), self.kind(db).full_range(module))
     }
 
-    pub fn focus_range(self, db: &'db dyn Db) -> FileRange {
-        FileRange::new(self.file(db), self.kind(db).target_range())
+    pub fn focus_range(self, db: &'db dyn Db, module: &ParsedModuleGuard) -> FileRange {
+        FileRange::new(self.file(db), self.kind(db).target_range(module))
     }
 }
 
@@ -593,60 +593,74 @@ impl DefinitionKind<'_> {
     ///
     /// A definition target would mainly be the node representing the symbol being defined i.e.,
     /// [`ast::ExprName`] or [`ast::Identifier`] but could also be other nodes.
-    pub(crate) fn target_range(&self) -> TextRange {
+    pub(crate) fn target_range(&self, module: &ParsedModuleGuard) -> TextRange {
         match self {
-            DefinitionKind::Import(import) => import.alias().range(),
-            DefinitionKind::ImportFrom(import) => import.alias().range(),
-            DefinitionKind::StarImport(import) => import.alias().range(),
-            DefinitionKind::Function(function) => function.name.range(),
-            DefinitionKind::Class(class) => class.name.range(),
-            DefinitionKind::TypeAlias(type_alias) => type_alias.name.range(),
-            DefinitionKind::NamedExpression(named) => named.target.range(),
-            DefinitionKind::Assignment(assignment) => assignment.target.range(),
-            DefinitionKind::AnnotatedAssignment(assign) => assign.target.range(),
-            DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.target.range(),
-            DefinitionKind::For(for_stmt) => for_stmt.target.range(),
-            DefinitionKind::Comprehension(comp) => comp.target().range(),
-            DefinitionKind::VariadicPositionalParameter(parameter) => parameter.name.range(),
-            DefinitionKind::VariadicKeywordParameter(parameter) => parameter.name.range(),
-            DefinitionKind::Parameter(parameter) => parameter.parameter.name.range(),
-            DefinitionKind::WithItem(with_item) => with_item.target.range(),
-            DefinitionKind::MatchPattern(match_pattern) => match_pattern.identifier.range(),
-            DefinitionKind::ExceptHandler(handler) => handler.node().range(),
-            DefinitionKind::TypeVar(type_var) => type_var.name.range(),
-            DefinitionKind::ParamSpec(param_spec) => param_spec.name.range(),
-            DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.name.range(),
+            DefinitionKind::Import(import) => import.alias(module).range(),
+            DefinitionKind::ImportFrom(import) => import.alias(module).range(),
+            DefinitionKind::StarImport(import) => import.alias(module).range(),
+            DefinitionKind::Function(function) => function.node(module).name.range(),
+            DefinitionKind::Class(class) => class.node(module).name.range(),
+            DefinitionKind::TypeAlias(type_alias) => type_alias.node(module).name.range(),
+            DefinitionKind::NamedExpression(named) => named.node(module).target.range(),
+            DefinitionKind::Assignment(assignment) => assignment.target.node(module).range(),
+            DefinitionKind::AnnotatedAssignment(assign) => assign.target.node(module).range(),
+            DefinitionKind::AugmentedAssignment(aug_assign) => {
+                aug_assign.node(module).target.range()
+            }
+            DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
+            DefinitionKind::Comprehension(comp) => comp.target(module).range(),
+            DefinitionKind::VariadicPositionalParameter(parameter) => {
+                parameter.node(module).name.range()
+            }
+            DefinitionKind::VariadicKeywordParameter(parameter) => {
+                parameter.node(module).name.range()
+            }
+            DefinitionKind::Parameter(parameter) => parameter.node(module).parameter.name.range(),
+            DefinitionKind::WithItem(with_item) => with_item.target.node(module).range(),
+            DefinitionKind::MatchPattern(match_pattern) => {
+                match_pattern.identifier.node(module).range()
+            }
+            DefinitionKind::ExceptHandler(handler) => handler.node(module).range(),
+            DefinitionKind::TypeVar(type_var) => type_var.node(module).name.range(),
+            DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).name.range(),
+            DefinitionKind::TypeVarTuple(type_var_tuple) => {
+                type_var_tuple.node(module).name.range()
+            }
         }
     }
 
     /// Returns the [`TextRange`] of the entire definition.
-    pub(crate) fn full_range(&self) -> TextRange {
+    pub(crate) fn full_range(&self, module: &ParsedModuleGuard) -> TextRange {
         match self {
-            DefinitionKind::Import(import) => import.alias().range(),
-            DefinitionKind::ImportFrom(import) => import.alias().range(),
-            DefinitionKind::StarImport(import) => import.import().range(),
-            DefinitionKind::Function(function) => function.range(),
-            DefinitionKind::Class(class) => class.range(),
-            DefinitionKind::TypeAlias(type_alias) => type_alias.range(),
-            DefinitionKind::NamedExpression(named) => named.range(),
-            DefinitionKind::Assignment(assignment) => assignment.target.range(),
-            DefinitionKind::AnnotatedAssignment(assign) => assign.target.range(),
-            DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.range(),
-            DefinitionKind::For(for_stmt) => for_stmt.target.range(),
-            DefinitionKind::Comprehension(comp) => comp.target().range(),
-            DefinitionKind::VariadicPositionalParameter(parameter) => parameter.range(),
-            DefinitionKind::VariadicKeywordParameter(parameter) => parameter.range(),
-            DefinitionKind::Parameter(parameter) => parameter.parameter.range(),
-            DefinitionKind::WithItem(with_item) => with_item.target.range(),
-            DefinitionKind::MatchPattern(match_pattern) => match_pattern.identifier.range(),
-            DefinitionKind::ExceptHandler(handler) => handler.node().range(),
-            DefinitionKind::TypeVar(type_var) => type_var.range(),
-            DefinitionKind::ParamSpec(param_spec) => param_spec.range(),
-            DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.range(),
+            DefinitionKind::Import(import) => import.alias(module).range(),
+            DefinitionKind::ImportFrom(import) => import.alias(module).range(),
+            DefinitionKind::StarImport(import) => import.import(module).range(),
+            DefinitionKind::Function(function) => function.node(module).range(),
+            DefinitionKind::Class(class) => class.node(module).range(),
+            DefinitionKind::TypeAlias(type_alias) => type_alias.node(module).range(),
+            DefinitionKind::NamedExpression(named) => named.node(module).range(),
+            DefinitionKind::Assignment(assignment) => assignment.target.node(module).range(),
+            DefinitionKind::AnnotatedAssignment(assign) => assign.target.node(module).range(),
+            DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.node(module).range(),
+            DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
+            DefinitionKind::Comprehension(comp) => comp.target(module).range(),
+            DefinitionKind::VariadicPositionalParameter(parameter) => {
+                parameter.node(module).range()
+            }
+            DefinitionKind::VariadicKeywordParameter(parameter) => parameter.node(module).range(),
+            DefinitionKind::Parameter(parameter) => parameter.node(module).parameter.range(),
+            DefinitionKind::WithItem(with_item) => with_item.target.node(module).range(),
+            DefinitionKind::MatchPattern(match_pattern) => {
+                match_pattern.identifier.node(module).range()
+            }
+            DefinitionKind::ExceptHandler(handler) => handler.node(module).range(),
+            DefinitionKind::TypeVar(type_var) => type_var.node(module).range(),
+            DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).range(),
+            DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.node(module).range(),
         }
     }
 
-    pub(crate) fn category(&self, in_stub: bool) -> DefinitionCategory {
+    pub(crate) fn category(&self, in_stub: bool, module: &ParsedModuleGuard) -> DefinitionCategory {
         match self {
             // functions, classes, and imports always bind, and we consider them declarations
             DefinitionKind::Function(_)
@@ -661,7 +675,7 @@ impl DefinitionKind<'_> {
             // a parameter always binds a value, but is only a declaration if annotated
             DefinitionKind::VariadicPositionalParameter(parameter)
             | DefinitionKind::VariadicKeywordParameter(parameter) => {
-                if parameter.annotation.is_some() {
+                if parameter.node(module).annotation.is_some() {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
                     DefinitionCategory::Binding
@@ -669,7 +683,12 @@ impl DefinitionKind<'_> {
             }
             // presence of a default is irrelevant, same logic as for a no-default parameter
             DefinitionKind::Parameter(parameter_with_default) => {
-                if parameter_with_default.parameter.annotation.is_some() {
+                if parameter_with_default
+                    .node(module)
+                    .parameter
+                    .annotation
+                    .is_some()
+                {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
                     DefinitionCategory::Binding
@@ -719,15 +738,15 @@ pub struct StarImportDefinitionKind {
 }
 
 impl StarImportDefinitionKind {
-    pub(crate) fn import(&self) -> &ast::StmtImportFrom {
-        self.node.node()
+    pub(crate) fn import(&self, module: &ParsedModuleGuard) -> &ast::StmtImportFrom {
+        self.node.node(module)
     }
 
-    pub(crate) fn alias(&self) -> &ast::Alias {
+    pub(crate) fn alias(&self, module: &ParsedModuleGuard) -> &ast::Alias {
         // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
         // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
         self.node
-            .node()
+            .node(module)
             .names
             .iter()
             .find(|alias| &alias.name == "*")
@@ -750,8 +769,8 @@ pub struct MatchPatternDefinitionKind {
 }
 
 impl MatchPatternDefinitionKind {
-    pub(crate) fn pattern(&self) -> &ast::Pattern {
-        self.pattern.node()
+    pub(crate) fn pattern(&self, module: &ParsedModuleGuard) -> &ast::Pattern {
+        self.pattern.node(module)
     }
 
     pub(crate) fn index(&self) -> u32 {
@@ -769,16 +788,16 @@ pub struct ComprehensionDefinitionKind<'db> {
 }
 
 impl<'db> ComprehensionDefinitionKind<'db> {
-    pub(crate) fn iterable(&self) -> &ast::Expr {
-        self.iterable.node()
+    pub(crate) fn iterable(&self, module: &ParsedModuleGuard) -> &ast::Expr {
+        self.iterable.node(module)
     }
 
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
         self.target_kind
     }
 
-    pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+    pub(crate) fn target(&self, module: &ParsedModuleGuard) -> &ast::Expr {
+        self.target.node(module)
     }
 
     pub(crate) fn is_first(&self) -> bool {
@@ -798,12 +817,12 @@ pub struct ImportDefinitionKind {
 }
 
 impl ImportDefinitionKind {
-    pub(crate) fn import(&self) -> &ast::StmtImport {
-        self.node.node()
+    pub(crate) fn import(&self, module: &ParsedModuleGuard) -> &ast::StmtImport {
+        self.node.node(module)
     }
 
-    pub(crate) fn alias(&self) -> &ast::Alias {
-        &self.node.node().names[self.alias_index]
+    pub(crate) fn alias(&self, module: &ParsedModuleGuard) -> &ast::Alias {
+        &self.node.node(module).names[self.alias_index]
     }
 
     pub(crate) fn is_reexported(&self) -> bool {
@@ -819,12 +838,12 @@ pub struct ImportFromDefinitionKind {
 }
 
 impl ImportFromDefinitionKind {
-    pub(crate) fn import(&self) -> &ast::StmtImportFrom {
-        self.node.node()
+    pub(crate) fn import(&self, module: &ParsedModuleGuard) -> &ast::StmtImportFrom {
+        self.node.node(module)
     }
 
-    pub(crate) fn alias(&self) -> &ast::Alias {
-        &self.node.node().names[self.alias_index]
+    pub(crate) fn alias(&self, module: &ParsedModuleGuard) -> &ast::Alias {
+        &self.node.node(module).names[self.alias_index]
     }
 
     pub(crate) fn is_reexported(&self) -> bool {
@@ -856,12 +875,12 @@ impl<'db> AssignmentDefinitionKind<'db> {
         self.target_kind
     }
 
-    pub(crate) fn value(&self) -> &ast::Expr {
-        self.value.node()
+    pub(crate) fn value(&self, module: &ParsedModuleGuard) -> &ast::Expr {
+        self.value.node(module)
     }
 
-    pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+    pub(crate) fn target(&self, module: &ParsedModuleGuard) -> &ast::Expr {
+        self.target.node(module)
     }
 }
 
@@ -885,16 +904,16 @@ impl AnnotatedAssignmentDefinitionKind {
         }
     }
 
-    pub(crate) fn value(&self) -> Option<&ast::Expr> {
-        self.value.as_deref()
+    pub(crate) fn value(&self, module: &ParsedModuleGuard) -> Option<&ast::Expr> {
+        self.value.as_ref().map(|value| value.node(module))
     }
 
-    pub(crate) fn annotation(&self) -> &ast::Expr {
-        self.annotation.node()
+    pub(crate) fn annotation(&self, module: &ParsedModuleGuard) -> &ast::Expr {
+        self.annotation.node(module)
     }
 
-    pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+    pub(crate) fn target(&self, module: &ParsedModuleGuard) -> &ast::Expr {
+        self.target.node(module)
     }
 }
 
@@ -921,16 +940,16 @@ impl<'db> WithItemDefinitionKind<'db> {
         }
     }
 
-    pub(crate) fn context_expr(&self) -> &ast::Expr {
-        self.context_expr.node()
+    pub(crate) fn context_expr(&self, module: &ParsedModuleGuard) -> &ast::Expr {
+        self.context_expr.node(module)
     }
 
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
         self.target_kind
     }
 
-    pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+    pub(crate) fn target(&self, module: &ParsedModuleGuard) -> &ast::Expr {
+        self.target.node(module)
     }
 
     pub(crate) const fn is_async(&self) -> bool {
@@ -961,16 +980,16 @@ impl<'db> ForStmtDefinitionKind<'db> {
         }
     }
 
-    pub(crate) fn iterable(&self) -> &ast::Expr {
-        self.iterable.node()
+    pub(crate) fn iterable(&self, module: &ParsedModuleGuard) -> &ast::Expr {
+        self.iterable.node(module)
     }
 
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
         self.target_kind
     }
 
-    pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+    pub(crate) fn target(&self, module: &ParsedModuleGuard) -> &ast::Expr {
+        self.target.node(module)
     }
 
     pub(crate) const fn is_async(&self) -> bool {
@@ -985,12 +1004,12 @@ pub struct ExceptHandlerDefinitionKind {
 }
 
 impl ExceptHandlerDefinitionKind {
-    pub(crate) fn node(&self) -> &ast::ExceptHandlerExceptHandler {
-        self.handler.node()
+    pub(crate) fn node(&self, module: &ParsedModuleGuard) -> &ast::ExceptHandlerExceptHandler {
+        self.handler.node(module)
     }
 
-    pub(crate) fn handled_exceptions(&self) -> Option<&ast::Expr> {
-        self.node().type_.as_deref()
+    pub(crate) fn handled_exceptions(&self, module: &ParsedModuleGuard) -> Option<&ast::Expr> {
+        self.node(module).type_.as_deref()
     }
 
     pub(crate) fn is_star(&self) -> bool {

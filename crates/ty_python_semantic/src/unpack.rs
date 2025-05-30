@@ -1,4 +1,5 @@
 use ruff_db::files::File;
+use ruff_db::parsed::ParsedModuleGuard;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -37,9 +38,9 @@ pub(crate) struct Unpack<'db> {
     /// The target expression that is being unpacked. For example, in `(a, b) = (1, 2)`, the target
     /// expression is `(a, b)`.
     #[no_eq]
-    #[returns(deref)]
+    #[returns(ref)]
     #[tracked]
-    pub(crate) target: AstNodeRef<ast::Expr>,
+    pub(crate) target_ref: AstNodeRef<ast::Expr>,
 
     /// The ingredient representing the value expression of the unpacking. For example, in
     /// `(a, b) = (1, 2)`, the value expression is `(1, 2)`.
@@ -65,8 +66,13 @@ impl<'db> Unpack<'db> {
     }
 
     /// Returns the range of the unpack target expression.
-    pub(crate) fn range(self, db: &'db dyn Db) -> TextRange {
-        self.target(db).range()
+    pub(crate) fn range(self, db: &'db dyn Db, parsed: &ParsedModuleGuard) -> TextRange {
+        self.target(db, parsed).range()
+    }
+
+    /// Returns the range of the unpack target expression.
+    pub(crate) fn target(self, db: &'db dyn Db, parsed: &ParsedModuleGuard) -> &'db ast::Expr {
+        self.target_ref(db).node(parsed)
     }
 }
 

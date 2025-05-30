@@ -539,34 +539,34 @@ impl NodeWithScopeKind {
         }
     }
 
-    pub fn expect_class(&self) -> &ast::StmtClassDef {
+    pub fn expect_class(&self, db: &dyn Db) -> &ast::StmtClassDef {
         match self {
-            Self::Class(class) => class.node(),
+            Self::Class(class) => class.node(db),
             _ => panic!("expected class"),
         }
     }
 
-    pub(crate) const fn as_class(&self) -> Option<&ast::StmtClassDef> {
+    pub(crate) fn as_class(&self, db: &dyn Db) -> Option<&ast::StmtClassDef> {
         match self {
-            Self::Class(class) => Some(class.node()),
+            Self::Class(class) => Some(class.node(db)),
             _ => None,
         }
     }
 
-    pub fn expect_function(&self) -> &ast::StmtFunctionDef {
-        self.as_function().expect("expected function")
+    pub fn expect_function(&self, db: &dyn Db) -> &ast::StmtFunctionDef {
+        self.as_function(db).expect("expected function")
     }
 
-    pub fn expect_type_alias(&self) -> &ast::StmtTypeAlias {
+    pub fn expect_type_alias(&self, db: &dyn Db) -> &ast::StmtTypeAlias {
         match self {
-            Self::TypeAlias(type_alias) => type_alias.node(),
+            Self::TypeAlias(type_alias) => type_alias.node(db),
             _ => panic!("expected type alias"),
         }
     }
 
-    pub const fn as_function(&self) -> Option<&ast::StmtFunctionDef> {
+    pub fn as_function(&self, db: &dyn Db) -> Option<&ast::StmtFunctionDef> {
         match self {
-            Self::Function(function) => Some(function.node()),
+            Self::Function(function) => Some(function.node(db)),
             _ => None,
         }
     }

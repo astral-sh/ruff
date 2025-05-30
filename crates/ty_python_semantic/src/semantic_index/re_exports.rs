@@ -47,6 +47,7 @@ fn exports_cycle_initial(_db: &dyn Db, _file: File) -> Box<[Name]> {
 pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
     let module = parsed_module(db.upcast(), file);
     let mut finder = ExportFinder::new(db, file);
+    let module = module.read(db);
     finder.visit_body(module.suite());
     finder.resolve_exports()
 }
