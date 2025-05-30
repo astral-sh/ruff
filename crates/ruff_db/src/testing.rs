@@ -13,7 +13,7 @@ pub fn assert_function_query_was_not_run<Db, Q, QDb, I, R>(
     Q: Fn(QDb, I) -> R,
     I: salsa::plumbing::AsId + std::fmt::Debug + Copy,
 {
-    let id = input.as_id().as_u32();
+    let id = input.as_id().index();
     let (query_name, will_execute_event) = find_will_execute_event(db, query, input, events);
 
     db.attach(|_| {
@@ -65,13 +65,13 @@ pub fn assert_function_query_was_run<Db, Q, QDb, I, R>(
     Q: Fn(QDb, I) -> R,
     I: salsa::plumbing::AsId + std::fmt::Debug + Copy,
 {
-    let id = input.as_id().as_u32();
+    let id = input.as_id().index();
     let (query_name, will_execute_event) = find_will_execute_event(db, query, input, events);
 
     db.attach(|_| {
         assert!(
             will_execute_event.is_some(),
-            "Expected query {query_name}({id:?}) to have run but it did not:\n{events:#?}"
+            "Expected query {query_name}({id}) to have run but it did not:\n{events:#?}"
         );
     });
 }
