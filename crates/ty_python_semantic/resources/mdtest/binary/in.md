@@ -23,13 +23,11 @@ x = ("quux", "bar", "baz")
 static_assert("foo" not in x)
 ```
 
-## Statically unknown results in a type error
+## Statically unknown results in a `bool`
 
 ```py
-from ty_extensions import static_assert
-
 def _(a: str, b: str):
-    static_assert("foo" in (a, b))  # error: [static-assert-error]
+    reveal_type("foo" in (a, b))  # revealed: bool
 ```
 
 ## Values being unknown doesn't mean the result is unknown
@@ -46,8 +44,6 @@ def _(a: int, b: int):
 ## Failure cases
 
 ```py
-from ty_extensions import static_assert
-
 # We don't support byte strings.
-static_assert(b"foo" not in (b"quux", b"foo", b"baz"))  # error: [static-assert-error]
+reveal_type(b"foo" not in (b"quux", b"foo", b"baz"))  # revealed: bool
 ```
