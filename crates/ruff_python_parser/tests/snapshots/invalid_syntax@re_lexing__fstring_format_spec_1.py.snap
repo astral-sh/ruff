@@ -22,13 +22,13 @@ Module(
                                             range: 162..192,
                                             elements: [
                                                 Literal(
-                                                    FTStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 164..171,
                                                         value: "middle ",
                                                     },
                                                 ),
-                                                Expression(
-                                                    FTStringInterpolatedElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 171..191,
                                                         expression: StringLiteral(
                                                             ExprStringLiteral {
@@ -51,11 +51,11 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            FTStringFormatSpec {
+                                                            InterpolatedStringFormatSpec {
                                                                 range: 181..191,
                                                                 elements: [
                                                                     Literal(
-                                                                        FTStringLiteralElement {
+                                                                        InterpolatedStringLiteralElement {
                                                                             range: 181..191,
                                                                             value: "        ",
                                                                         },
@@ -116,13 +116,13 @@ Module(
                                             range: 207..228,
                                             elements: [
                                                 Literal(
-                                                    FTStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 209..216,
                                                         value: "middle ",
                                                     },
                                                 ),
-                                                Expression(
-                                                    FTStringInterpolatedElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 216..228,
                                                         expression: StringLiteral(
                                                             ExprStringLiteral {
@@ -145,11 +145,11 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            FTStringFormatSpec {
+                                                            InterpolatedStringFormatSpec {
                                                                 range: 226..228,
                                                                 elements: [
                                                                     Literal(
-                                                                        FTStringLiteralElement {
+                                                                        InterpolatedStringLiteralElement {
                                                                             range: 226..228,
                                                                             value: "\\",
                                                                         },
@@ -209,13 +209,13 @@ Module(
                                             range: 253..285,
                                             elements: [
                                                 Literal(
-                                                    FTStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 255..262,
                                                         value: "middle ",
                                                     },
                                                 ),
-                                                Expression(
-                                                    FTStringInterpolatedElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 262..284,
                                                         expression: StringLiteral(
                                                             ExprStringLiteral {
@@ -238,11 +238,11 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            FTStringFormatSpec {
+                                                            InterpolatedStringFormatSpec {
                                                                 range: 272..284,
                                                                 elements: [
                                                                     Literal(
-                                                                        FTStringLiteralElement {
+                                                                        InterpolatedStringLiteralElement {
                                                                             range: 272..284,
                                                                             value: "\\        ",
                                                                         },

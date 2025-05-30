@@ -13,7 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "\\N",
         ),
         3..5,
@@ -36,7 +36,7 @@ expression: lex_source(source)
         12..13,
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             " normal",
         ),
         13..20,

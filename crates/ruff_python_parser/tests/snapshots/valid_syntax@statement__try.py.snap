@@ -576,13 +576,13 @@ Module(
                                                                                     range: 505..524,
                                                                                     elements: [
                                                                                         Literal(
-                                                                                            FTStringLiteralElement {
+                                                                                            InterpolatedStringLiteralElement {
                                                                                                 range: 507..514,
                                                                                                 value: "caught ",
                                                                                             },
                                                                                         ),
-                                                                                        Expression(
-                                                                                            FTStringInterpolatedElement {
+                                                                                        Interpolation(
+                                                                                            InterpolatedElement {
                                                                                                 range: 514..523,
                                                                                                 expression: Call(
                                                                                                     ExprCall {
@@ -681,13 +681,13 @@ Module(
                                                                                     range: 557..576,
                                                                                     elements: [
                                                                                         Literal(
-                                                                                            FTStringLiteralElement {
+                                                                                            InterpolatedStringLiteralElement {
                                                                                                 range: 559..566,
                                                                                                 value: "caught ",
                                                                                             },
                                                                                         ),
-                                                                                        Expression(
-                                                                                            FTStringInterpolatedElement {
+                                                                                        Interpolation(
+                                                                                            InterpolatedElement {
                                                                                                 range: 566..575,
                                                                                                 expression: Call(
                                                                                                     ExprCall {
@@ -954,13 +954,13 @@ Module(
                                                                                     range: 704..750,
                                                                                     elements: [
                                                                                         Literal(
-                                                                                            FTStringLiteralElement {
+                                                                                            InterpolatedStringLiteralElement {
                                                                                                 range: 706..713,
                                                                                                 value: "caught ",
                                                                                             },
                                                                                         ),
-                                                                                        Expression(
-                                                                                            FTStringInterpolatedElement {
+                                                                                        Interpolation(
+                                                                                            InterpolatedElement {
                                                                                                 range: 713..722,
                                                                                                 expression: Call(
                                                                                                     ExprCall {
@@ -993,13 +993,13 @@ Module(
                                                                                             },
                                                                                         ),
                                                                                         Literal(
-                                                                                            FTStringLiteralElement {
+                                                                                            InterpolatedStringLiteralElement {
                                                                                                 range: 722..735,
                                                                                                 value: " with nested ",
                                                                                             },
                                                                                         ),
-                                                                                        Expression(
-                                                                                            FTStringInterpolatedElement {
+                                                                                        Interpolation(
+                                                                                            InterpolatedElement {
                                                                                                 range: 735..749,
                                                                                                 expression: Attribute(
                                                                                                     ExprAttribute {
@@ -1090,13 +1090,13 @@ Module(
                                                                                     range: 784..830,
                                                                                     elements: [
                                                                                         Literal(
-                                                                                            FTStringLiteralElement {
+                                                                                            InterpolatedStringLiteralElement {
                                                                                                 range: 786..793,
                                                                                                 value: "caught ",
                                                                                             },
                                                                                         ),
-                                                                                        Expression(
-                                                                                            FTStringInterpolatedElement {
+                                                                                        Interpolation(
+                                                                                            InterpolatedElement {
                                                                                                 range: 793..802,
                                                                                                 expression: Call(
                                                                                                     ExprCall {
@@ -1129,13 +1129,13 @@ Module(
                                                                                             },
                                                                                         ),
                                                                                         Literal(
-                                                                                            FTStringLiteralElement {
+                                                                                            InterpolatedStringLiteralElement {
                                                                                                 range: 802..815,
                                                                                                 value: " with nested ",
                                                                                             },
                                                                                         ),
-                                                                                        Expression(
-                                                                                            FTStringInterpolatedElement {
+                                                                                        Interpolation(
+                                                                                            InterpolatedElement {
                                                                                                 range: 815..829,
                                                                                                 expression: Attribute(
                                                                                                     ExprAttribute {

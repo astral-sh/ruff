@@ -21,8 +21,8 @@ Module(
                                         TString {
                                             range: 44..52,
                                             elements: [
-                                                Expression(
-                                                    FTStringInterpolatedElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 46..51,
                                                         expression: Name(
                                                             ExprName {

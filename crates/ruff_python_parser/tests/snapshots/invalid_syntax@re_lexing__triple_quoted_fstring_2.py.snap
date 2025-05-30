@@ -21,8 +21,8 @@ Module(
                                         FString {
                                             range: 167..183,
                                             elements: [
-                                                Expression(
-                                                    FTStringInterpolatedElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 171..180,
                                                         expression: Name(
                                                             ExprName {
@@ -34,11 +34,11 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            FTStringFormatSpec {
+                                                            InterpolatedStringFormatSpec {
                                                                 range: 176..180,
                                                                 elements: [
                                                                     Literal(
-                                                                        FTStringLiteralElement {
+                                                                        InterpolatedStringLiteralElement {
                                                                             range: 176..180,
                                                                             value: ".3f\n",
                                                                         },

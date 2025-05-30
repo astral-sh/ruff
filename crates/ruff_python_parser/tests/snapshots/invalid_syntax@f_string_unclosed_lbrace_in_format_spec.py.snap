@@ -22,13 +22,13 @@ Module(
                                             range: 0..12,
                                             elements: [
                                                 Literal(
-                                                    FTStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 2..8,
                                                         value: "hello ",
                                                     },
                                                 ),
-                                                Expression(
-                                                    FTStringInterpolatedElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 8..11,
                                                         expression: Name(
                                                             ExprName {
@@ -40,7 +40,7 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            FTStringFormatSpec {
+                                                            InterpolatedStringFormatSpec {
                                                                 range: 11..11,
                                                                 elements: [],
                                                             },
@@ -74,13 +74,13 @@ Module(
                                             range: 13..28,
                                             elements: [
                                                 Literal(
-                                                    FTStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 15..21,
                                                         value: "hello ",
                                                     },
                                                 ),
-                                                Expression(
-                                                    FTStringInterpolatedElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 21..27,
                                                         expression: Name(
                                                             ExprName {
@@ -92,11 +92,11 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            FTStringFormatSpec {
+                                                            InterpolatedStringFormatSpec {
                                                                 range: 24..27,
                                                                 elements: [
                                                                     Literal(
-                                                                        FTStringLiteralElement {
+                                                                        InterpolatedStringLiteralElement {
                                                                             range: 24..27,
                                                                             value: ".3f",
                                                                         },

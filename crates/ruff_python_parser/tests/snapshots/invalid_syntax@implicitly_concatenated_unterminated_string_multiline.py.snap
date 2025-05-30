@@ -34,13 +34,13 @@ Module(
                                                 range: 18..31,
                                                 elements: [
                                                     Literal(
-                                                        FTStringLiteralElement {
+                                                        InterpolatedStringLiteralElement {
                                                             range: 20..26,
                                                             value: "world ",
                                                         },
                                                     ),
-                                                    Expression(
-                                                        FTStringInterpolatedElement {
+                                                    Interpolation(
+                                                        InterpolatedElement {
                                                             range: 26..29,
                                                             expression: Name(
                                                                 ExprName {
@@ -132,7 +132,7 @@ Module(
                                             range: 68..76,
                                             elements: [
                                                 Literal(
-                                                    FTStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 70..75,
                                                         value: "third",
                                                     },

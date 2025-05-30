@@ -13,7 +13,7 @@ expression: fstring_single_quote_escape_eol(WINDOWS_EOL)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "text \\\r\n more text",
         ),
         2..20,

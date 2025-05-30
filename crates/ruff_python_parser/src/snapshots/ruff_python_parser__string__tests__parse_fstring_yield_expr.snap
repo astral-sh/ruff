@@ -15,8 +15,8 @@ expression: suite
                                 FString {
                                     range: 0..10,
                                     elements: [
-                                        Expression(
-                                            FTStringInterpolatedElement {
+                                        Interpolation(
+                                            InterpolatedElement {
                                                 range: 2..9,
                                                 expression: Yield(
                                                     ExprYield {

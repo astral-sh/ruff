@@ -21,8 +21,8 @@ Module(
                                         TString {
                                             range: 44..60,
                                             elements: [
-                                                Expression(
-                                                    FTStringInterpolatedElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 46..56,
                                                         expression: Lambda(
                                                             ExprLambda {
@@ -65,7 +65,7 @@ Module(
                                                     },
                                                 ),
                                                 Literal(
-                                                    FTStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 56..58,
                                                         value: " x",
                                                     },

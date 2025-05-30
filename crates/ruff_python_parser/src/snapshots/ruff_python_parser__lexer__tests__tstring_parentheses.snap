@@ -35,7 +35,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "{}",
         ),
         8..12,
@@ -58,7 +58,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             " ",
         ),
         16..17,
@@ -89,7 +89,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "{",
         ),
         23..25,
@@ -106,7 +106,7 @@ expression: lex_source(source)
         26..27,
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "}",
         ),
         27..29,
@@ -129,7 +129,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "{{}}",
         ),
         33..41,
@@ -152,7 +152,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             " ",
         ),
         45..46,
@@ -169,7 +169,7 @@ expression: lex_source(source)
         47..48,
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             " {} {",
         ),
         48..56,
@@ -186,7 +186,7 @@ expression: lex_source(source)
         57..58,
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "} {{}}  ",
         ),
         58..71,

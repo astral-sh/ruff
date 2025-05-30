@@ -16,13 +16,13 @@ expression: suite
                                     range: 0..38,
                                     elements: [
                                         Literal(
-                                            FTStringLiteralElement {
+                                            InterpolatedStringLiteralElement {
                                                 range: 2..6,
                                                 value: "mix ",
                                             },
                                         ),
-                                        Expression(
-                                            FTStringInterpolatedElement {
+                                        Interpolation(
+                                            InterpolatedElement {
                                                 range: 6..13,
                                                 expression: Name(
                                                     ExprName {
@@ -42,13 +42,13 @@ expression: suite
                                             },
                                         ),
                                         Literal(
-                                            FTStringLiteralElement {
+                                            InterpolatedStringLiteralElement {
                                                 range: 13..28,
                                                 value: " with text and ",
                                             },
                                         ),
-                                        Expression(
-                                            FTStringInterpolatedElement {
+                                        Interpolation(
+                                            InterpolatedElement {
                                                 range: 28..37,
                                                 expression: Name(
                                                     ExprName {

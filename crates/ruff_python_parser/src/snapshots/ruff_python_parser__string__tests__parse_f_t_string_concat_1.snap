@@ -17,7 +17,7 @@ expression: suite
                                         range: 0..9,
                                         elements: [
                                             Literal(
-                                                FTStringLiteralElement {
+                                                InterpolatedStringLiteralElement {
                                                     range: 2..8,
                                                     value: "Hello ",
                                                 },
@@ -35,7 +35,7 @@ expression: suite
                                         range: 10..18,
                                         elements: [
                                             Literal(
-                                                FTStringLiteralElement {
+                                                InterpolatedStringLiteralElement {
                                                     range: 12..17,
                                                     value: "world",
                                                 },

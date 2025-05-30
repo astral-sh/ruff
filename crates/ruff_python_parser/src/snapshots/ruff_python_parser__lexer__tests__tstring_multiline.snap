@@ -13,7 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "\nhello\n    world\n",
         ),
         4..21,
@@ -36,7 +36,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "\n    world\nhello\n",
         ),
         29..46,
@@ -59,7 +59,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "some ",
         ),
         52..57,
@@ -79,7 +79,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "multiline\nallowed ",
         ),
         62..80,
@@ -113,7 +113,7 @@ expression: lex_source(source)
         86..87,
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             " string",
         ),
         87..94,

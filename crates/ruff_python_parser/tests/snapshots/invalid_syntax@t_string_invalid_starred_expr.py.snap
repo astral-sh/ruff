@@ -21,8 +21,8 @@ Module(
                                         TString {
                                             range: 121..127,
                                             elements: [
-                                                Expression(
-                                                    FTStringInterpolatedElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 123..126,
                                                         expression: Starred(
                                                             ExprStarred {
@@ -68,8 +68,8 @@ Module(
                                         TString {
                                             range: 128..141,
                                             elements: [
-                                                Expression(
-                                                    FTStringInterpolatedElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 130..140,
                                                         expression: Starred(
                                                             ExprStarred {
@@ -130,8 +130,8 @@ Module(
                                         TString {
                                             range: 142..155,
                                             elements: [
-                                                Expression(
-                                                    FTStringInterpolatedElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 144..154,
                                                         expression: Starred(
                                                             ExprStarred {

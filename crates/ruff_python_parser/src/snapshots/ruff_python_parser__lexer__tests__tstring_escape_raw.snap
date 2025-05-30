@@ -13,7 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "\\",
         ),
         3..4,
@@ -36,7 +36,7 @@ expression: lex_source(source)
         6..7,
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "\\\"\\",
         ),
         7..10,
@@ -63,7 +63,7 @@ expression: lex_source(source)
         13..14,
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             " \\\"\\\"\\\n end",
         ),
         14..25,

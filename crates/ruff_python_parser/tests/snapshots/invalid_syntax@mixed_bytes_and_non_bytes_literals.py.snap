@@ -60,7 +60,7 @@ Module(
                                                 range: 18..26,
                                                 elements: [
                                                     Literal(
-                                                        FTStringLiteralElement {
+                                                        InterpolatedStringLiteralElement {
                                                             range: 20..25,
                                                             value: "first",
                                                         },
@@ -116,7 +116,7 @@ Module(
                                                 range: 45..54,
                                                 elements: [
                                                     Literal(
-                                                        FTStringLiteralElement {
+                                                        InterpolatedStringLiteralElement {
                                                             range: 47..53,
                                                             value: "second",
                                                         },

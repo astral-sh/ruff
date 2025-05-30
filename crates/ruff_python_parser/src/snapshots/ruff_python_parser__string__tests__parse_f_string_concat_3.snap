@@ -28,13 +28,13 @@ expression: suite
                                         range: 9..22,
                                         elements: [
                                             Literal(
-                                                FTStringLiteralElement {
+                                                InterpolatedStringLiteralElement {
                                                     range: 11..16,
                                                     value: "world",
                                                 },
                                             ),
-                                            Expression(
-                                                FTStringInterpolatedElement {
+                                            Interpolation(
+                                                InterpolatedElement {
                                                     range: 16..21,
                                                     expression: StringLiteral(
                                                         ExprStringLiteral {

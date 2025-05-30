@@ -15,8 +15,8 @@ expression: suite
                                 FString {
                                     range: 0..13,
                                     elements: [
-                                        Expression(
-                                            FTStringInterpolatedElement {
+                                        Interpolation(
+                                            InterpolatedElement {
                                                 range: 2..12,
                                                 expression: Compare(
                                                     ExprCompare {

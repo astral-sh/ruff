@@ -222,13 +222,13 @@ Module(
                                             range: 140..150,
                                             elements: [
                                                 Literal(
-                                                    FTStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 142..146,
                                                         value: "foo ",
                                                     },
                                                 ),
-                                                Expression(
-                                                    FTStringInterpolatedElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 146..149,
                                                         expression: Name(
                                                             ExprName {

@@ -27,7 +27,7 @@ expression: lex_source(source)
         4..5,
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "=10",
         ),
         5..8,
@@ -40,7 +40,7 @@ expression: lex_source(source)
         8..9,
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             " ",
         ),
         9..10,
@@ -81,7 +81,7 @@ expression: lex_source(source)
         18..19,
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             " ",
         ),
         19..20,
@@ -132,7 +132,7 @@ expression: lex_source(source)
         30..31,
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             " ",
         ),
         31..32,

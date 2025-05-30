@@ -6,11 +6,11 @@ expression: trace
   - ExprFString
     - StringLiteral
     - FString
-      - FTStringLiteralElement
-      - FTStringInterpolatedElement
+      - InterpolatedStringLiteralElement
+      - InterpolatedElement
         - ExprName
-        - FTStringLiteralElement
-        - FTStringInterpolatedElement
+        - InterpolatedStringLiteralElement
+        - InterpolatedElement
           - ExprName
-        - FTStringLiteralElement
-      - FTStringLiteralElement
+        - InterpolatedStringLiteralElement
+      - InterpolatedStringLiteralElement

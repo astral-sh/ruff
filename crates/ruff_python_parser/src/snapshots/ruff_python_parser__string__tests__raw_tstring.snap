@@ -15,8 +15,8 @@ expression: suite
                                 TString {
                                     range: 0..7,
                                     elements: [
-                                        Expression(
-                                            FTStringInterpolatedElement {
+                                        Interpolation(
+                                            InterpolatedElement {
                                                 range: 3..6,
                                                 expression: Name(
                                                     ExprName {

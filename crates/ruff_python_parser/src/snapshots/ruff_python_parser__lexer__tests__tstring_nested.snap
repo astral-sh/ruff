@@ -13,7 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "foo ",
         ),
         2..6,
@@ -33,7 +33,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "bar ",
         ),
         9..13,
@@ -99,7 +99,7 @@ expression: lex_source(source)
         28..29,
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             " baz",
         ),
         29..33,
@@ -122,7 +122,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "foo ",
         ),
         37..41,
@@ -142,7 +142,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "bar",
         ),
         44..47,
@@ -162,7 +162,7 @@ expression: lex_source(source)
         48..49,
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             " some ",
         ),
         49..55,
@@ -182,7 +182,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        FTStringMiddle(
+        InterpolatedStringMiddle(
             "another",
         ),
         58..65,

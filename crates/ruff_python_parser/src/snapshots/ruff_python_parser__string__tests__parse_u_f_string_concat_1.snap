@@ -28,7 +28,7 @@ expression: suite
                                         range: 10..18,
                                         elements: [
                                             Literal(
-                                                FTStringLiteralElement {
+                                                InterpolatedStringLiteralElement {
                                                     range: 12..17,
                                                     value: "world",
                                                 },

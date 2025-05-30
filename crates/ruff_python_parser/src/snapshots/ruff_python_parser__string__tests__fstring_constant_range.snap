@@ -16,13 +16,13 @@ expression: suite
                                     range: 0..22,
                                     elements: [
                                         Literal(
-                                            FTStringLiteralElement {
+                                            InterpolatedStringLiteralElement {
                                                 range: 2..5,
                                                 value: "aaa",
                                             },
                                         ),
-                                        Expression(
-                                            FTStringInterpolatedElement {
+                                        Interpolation(
+                                            InterpolatedElement {
                                                 range: 5..10,
                                                 expression: Name(
                                                     ExprName {
@@ -37,13 +37,13 @@ expression: suite
                                             },
                                         ),
                                         Literal(
-                                            FTStringLiteralElement {
+                                            InterpolatedStringLiteralElement {
                                                 range: 10..13,
                                                 value: "ccc",
                                             },
                                         ),
-                                        Expression(
-                                            FTStringInterpolatedElement {
+                                        Interpolation(
+                                            InterpolatedElement {
                                                 range: 13..18,
                                                 expression: Name(
                                                     ExprName {
@@ -58,7 +58,7 @@ expression: suite
                                             },
                                         ),
                                         Literal(
-                                            FTStringLiteralElement {
+                                            InterpolatedStringLiteralElement {
                                                 range: 18..21,
                                                 value: "eee",
                                             },
