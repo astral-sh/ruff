@@ -1001,22 +1001,7 @@ mod tests {
                 ))
             };
 
-            let expected_system_site_packages = if cfg!(target_os = "windows") {
-                SystemPathBuf::from(&*format!(
-                    r"\Python3.{}\Lib\site-packages",
-                    self.minor_version
-                ))
-            } else if self.free_threaded {
-                SystemPathBuf::from(&*format!(
-                    "/Python3.{minor_version}/lib/python3.{minor_version}t/site-packages",
-                    minor_version = self.minor_version
-                ))
-            } else {
-                SystemPathBuf::from(&*format!(
-                    "/Python3.{minor_version}/lib/python3.{minor_version}/site-packages",
-                    minor_version = self.minor_version
-                ))
-            };
+            let expected_system_site_packages = self.expected_system_site_packages();
 
             if self_venv.system_site_packages {
                 assert_eq!(
@@ -1051,33 +1036,33 @@ mod tests {
             );
 
             let site_packages_directories = env.site_packages_directories(&self.system).unwrap();
+            let expected_site_packages = self.expected_system_site_packages();
+            assert_eq!(
+                site_packages_directories,
+                std::slice::from_ref(&expected_site_packages)
+            );
+        }
 
-            let expected_site_packages = if cfg!(target_os = "windows") {
-                SystemPathBuf::from(&*format!(
-                    r"\Python3.{}\Lib\site-packages",
-                    self.minor_version
-                ))
+        fn expected_system_site_packages(&self) -> SystemPathBuf {
+            let minor_version = self.minor_version;
+            if cfg!(target_os = "windows") {
+                SystemPathBuf::from(&*format!(r"\Python3.{minor_version}\Lib\site-packages"))
             } else if self.free_threaded {
                 SystemPathBuf::from(&*format!(
-                    "/Python3.{minor_version}/lib/python3.{minor_version}t/site-packages",
-                    minor_version = self.minor_version
+                    "/Python3.{minor_version}/lib/python3.{minor_version}t/site-packages"
                 ))
             } else {
                 SystemPathBuf::from(&*format!(
-                    "/Python3.{minor_version}/lib/python3.{minor_version}/site-packages",
-                    minor_version = self.minor_version
+                    "/Python3.{minor_version}/lib/python3.{minor_version}/site-packages"
                 ))
-            };
-
-            assert_eq!(
-                site_packages_directories,
-                [expected_site_packages].as_slice()
-            );
+            }
         }
     }
 
     #[test]
     fn can_find_site_packages_directory_no_virtual_env() {
+        // Shouldn't be converted to an mdtest because mdtest automatically creates a
+        // pyvenv.cfg file for you if it sees you creating a `site-packages` directory.
         let test = PythonEnvironmentTestCase {
             system: TestSystem::default(),
             minor_version: 12,
@@ -1090,6 +1075,8 @@ mod tests {
 
     #[test]
     fn can_find_site_packages_directory_no_virtual_env_freethreaded() {
+        // Shouldn't be converted to an mdtest because mdtest automatically creates a
+        // pyvenv.cfg file for you if it sees you creating a `site-packages` directory.
         let test = PythonEnvironmentTestCase {
             system: TestSystem::default(),
             minor_version: 13,
@@ -1133,22 +1120,9 @@ mod tests {
     }
 
     #[test]
-    fn can_find_site_packages_directory_no_version_field_in_pyvenv_cfg() {
-        let test = PythonEnvironmentTestCase {
-            system: TestSystem::default(),
-            minor_version: 12,
-            free_threaded: false,
-            origin: SysPrefixPathOrigin::VirtualEnvVar,
-            virtual_env: Some(VirtualEnvironmentTestCase {
-                pyvenv_cfg_version_field: None,
-                ..VirtualEnvironmentTestCase::default()
-            }),
-        };
-        test.run();
-    }
-
-    #[test]
     fn can_find_site_packages_directory_venv_style_version_field_in_pyvenv_cfg() {
+        // Shouldn't be converted to an mdtest because we want to assert
+        // that we parsed the `version` field correctly in `test.run()`.
         let test = PythonEnvironmentTestCase {
             system: TestSystem::default(),
             minor_version: 12,
@@ -1164,6 +1138,8 @@ mod tests {
 
     #[test]
     fn can_find_site_packages_directory_uv_style_version_field_in_pyvenv_cfg() {
+        // Shouldn't be converted to an mdtest because we want to assert
+        // that we parsed the `version` field correctly in `test.run()`.
         let test = PythonEnvironmentTestCase {
             system: TestSystem::default(),
             minor_version: 12,
@@ -1179,6 +1155,8 @@ mod tests {
 
     #[test]
     fn can_find_site_packages_directory_virtualenv_style_version_field_in_pyvenv_cfg() {
+        // Shouldn't be converted to an mdtest because we want to assert
+        // that we parsed the `version` field correctly in `test.run()`.
         let test = PythonEnvironmentTestCase {
             system: TestSystem::default(),
             minor_version: 12,
@@ -1209,6 +1187,9 @@ mod tests {
 
     #[test]
     fn finds_system_site_packages() {
+        // Can't be converted to an mdtest because the system installation's `sys.prefix`
+        // path is at a different location relative to the `pyvenv.cfg` file's `home` value
+        // on Windows.
         let test = PythonEnvironmentTestCase {
             system: TestSystem::default(),
             minor_version: 13,
@@ -1364,25 +1345,6 @@ mod tests {
             ),
             "Got {site_packages:?}",
         );
-    }
-
-    /// See <https://github.com/astral-sh/ty/issues/430>
-    #[test]
-    fn parsing_pyvenv_cfg_with_equals_in_value() {
-        let test = PythonEnvironmentTestCase {
-            system: TestSystem::default(),
-            minor_version: 13,
-            free_threaded: true,
-            origin: SysPrefixPathOrigin::VirtualEnvVar,
-            virtual_env: Some(VirtualEnvironmentTestCase {
-                pyvenv_cfg_version_field: Some("version_info = 3.13"),
-                command_field: Some(
-                    r#"command = /.pyenv/versions/3.13.3/bin/python3.13 -m venv --without-pip --prompt="python-default/3.13.3" /somewhere-else/python/virtualenvs/python-default/3.13.3"#,
-                ),
-                ..VirtualEnvironmentTestCase::default()
-            }),
-        };
-        test.run();
     }
 
     #[test]
