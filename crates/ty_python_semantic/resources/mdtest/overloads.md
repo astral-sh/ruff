@@ -187,9 +187,10 @@ if sys.version_info < (3, 10):
 elif sys.version_info <= (3, 12):
     @overload
     def func() -> None: ...
-    # TODO: false positive due to unreachable, causing @overload to be
-    @overload  # error: [invalid-return-type]
-    def func(x: int) -> int: ...
+    # TODO: false positive due to unreachable, causing @overload to be typed at
+    # Never
+    @overload
+    def func(x: int) -> int: ...  # error: [invalid-return-type]
     def func(x: int | None = None) -> int | None:
         return x
 
