@@ -124,6 +124,19 @@ mod tests {
     }
 
     #[test]
+    fn implicit_f_and_t_string_concat_py314() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF061.py"),
+            &LinterSettings {
+                ..LinterSettings::for_rule(Rule::ImplicitConcatenationFormatAndTemplateString)
+            }
+            .with_target_version(PythonVersion::PY314),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn prefer_parentheses_getitem_tuple() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF031_prefer_parens.py"),
