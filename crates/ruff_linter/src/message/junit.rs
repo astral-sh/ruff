@@ -6,7 +6,7 @@ use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, X
 use ruff_source_file::LineColumn;
 
 use crate::message::{
-    Emitter, EmitterContext, MessageWithLocation, OldDiagnostic, group_messages_by_filename,
+    Emitter, EmitterContext, MessageWithLocation, OldDiagnostic, group_diagnostics_by_filename,
 };
 
 #[derive(Default)]
@@ -16,12 +16,12 @@ impl Emitter for JunitEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[OldDiagnostic],
+        diagnostics: &[OldDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         let mut report = Report::new("ruff");
 
-        if messages.is_empty() {
+        if diagnostics.is_empty() {
             let mut test_suite = TestSuite::new("ruff");
             test_suite
                 .extra
@@ -31,7 +31,7 @@ impl Emitter for JunitEmitter {
             test_suite.add_test_case(case);
             report.add_test_suite(test_suite);
         } else {
-            for (filename, messages) in group_messages_by_filename(messages) {
+            for (filename, messages) in group_diagnostics_by_filename(diagnostics) {
                 let mut test_suite = TestSuite::new(&filename);
                 test_suite
                     .extra
@@ -97,13 +97,13 @@ mod tests {
 
     use crate::message::JunitEmitter;
     use crate::message::tests::{
-        capture_emitter_output, create_messages, create_syntax_error_messages,
+        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     #[test]
     fn output() {
         let mut emitter = JunitEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -111,7 +111,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let mut emitter = JunitEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(content);
     }

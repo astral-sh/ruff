@@ -10,7 +10,7 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::assert_messages;
+    use crate::assert_diagnostics;
     use crate::registry::Rule;
 
     use crate::settings::LinterSettings;
@@ -76,7 +76,7 @@ mod tests {
             Path::new("flake8_bugbear").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -104,7 +104,7 @@ mod tests {
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -115,7 +115,7 @@ mod tests {
             Path::new("flake8_bugbear").join(snapshot).as_path(),
             &LinterSettings::for_rule(Rule::ZipWithoutExplicitStrict),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -134,7 +134,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::MutableArgumentDefault)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -155,7 +155,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::FunctionCallInDefaultArgument)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -171,7 +171,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::MutableContextvarDefault)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

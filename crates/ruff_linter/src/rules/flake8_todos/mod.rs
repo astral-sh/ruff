@@ -10,7 +10,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::InvalidTodoTag, Path::new("TD001.py"))]
     #[test_case(Rule::MissingTodoAuthor, Path::new("TD002.py"))]
@@ -25,7 +25,7 @@ mod tests {
             Path::new("flake8_todos").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

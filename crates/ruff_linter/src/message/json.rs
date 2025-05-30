@@ -18,17 +18,23 @@ impl Emitter for JsonEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[OldDiagnostic],
+        diagnostics: &[OldDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        serde_json::to_writer_pretty(writer, &ExpandedMessages { messages, context })?;
+        serde_json::to_writer_pretty(
+            writer,
+            &ExpandedMessages {
+                diagnostics,
+                context,
+            },
+        )?;
 
         Ok(())
     }
 }
 
 struct ExpandedMessages<'a> {
-    messages: &'a [OldDiagnostic],
+    diagnostics: &'a [OldDiagnostic],
     context: &'a EmitterContext<'a>,
 }
 
@@ -37,9 +43,9 @@ impl Serialize for ExpandedMessages<'_> {
     where
         S: Serializer,
     {
-        let mut s = serializer.serialize_seq(Some(self.messages.len()))?;
+        let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
 
-        for message in self.messages {
+        for message in self.diagnostics {
             let value = message_to_json_value(message, self.context);
             s.serialize_element(&value)?;
         }
@@ -180,14 +186,14 @@ mod tests {
 
     use crate::message::JsonEmitter;
     use crate::message::tests::{
-        capture_emitter_notebook_output, capture_emitter_output, create_messages,
-        create_notebook_messages, create_syntax_error_messages,
+        capture_emitter_notebook_output, capture_emitter_output, create_diagnostics,
+        create_notebook_diagnostics, create_syntax_error_diagnostics,
     };
 
     #[test]
     fn output() {
         let mut emitter = JsonEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -195,7 +201,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let mut emitter = JsonEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -203,8 +209,9 @@ mod tests {
     #[test]
     fn notebook_output() {
         let mut emitter = JsonEmitter;
-        let (messages, notebook_indexes) = create_notebook_messages();
-        let content = capture_emitter_notebook_output(&mut emitter, &messages, &notebook_indexes);
+        let (diagnostics, notebook_indexes) = create_notebook_diagnostics();
+        let content =
+            capture_emitter_notebook_output(&mut emitter, &diagnostics, &notebook_indexes);
 
         assert_snapshot!(content);
     }

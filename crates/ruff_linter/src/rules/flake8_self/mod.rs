@@ -10,7 +10,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::flake8_self;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
     use anyhow::Result;
     use ruff_python_ast::name::Name;
     use test_case::test_case;
@@ -23,7 +23,7 @@ mod tests {
             Path::new("flake8_self").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -38,7 +38,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::PrivateMemberAccess)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

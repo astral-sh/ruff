@@ -50,7 +50,7 @@ pub(crate) fn test_path(
 
 #[cfg(not(fuzzing))]
 pub(crate) struct TestedNotebook {
-    pub(crate) messages: Vec<OldDiagnostic>,
+    pub(crate) diagnostics: Vec<OldDiagnostic>,
     pub(crate) source_notebook: Notebook,
     pub(crate) linted_notebook: Notebook,
 }
@@ -79,7 +79,7 @@ pub(crate) fn assert_notebook_path(
     );
 
     Ok(TestedNotebook {
-        messages,
+        diagnostics: messages,
         source_notebook: source_kind.expect_ipy_notebook(),
         linted_notebook,
     })
@@ -320,18 +320,22 @@ fn print_syntax_errors(
 }
 
 /// Print the [`Message::Diagnostic`]s in `messages`.
-fn print_diagnostics(mut messages: Vec<OldDiagnostic>, path: &Path, source: &SourceKind) -> String {
-    messages.retain(|msg| !msg.is_syntax_error());
+fn print_diagnostics(
+    mut diagnostics: Vec<OldDiagnostic>,
+    path: &Path,
+    source: &SourceKind,
+) -> String {
+    diagnostics.retain(|msg| !msg.is_syntax_error());
 
     if let Some(notebook) = source.as_ipy_notebook() {
-        print_jupyter_messages(&messages, path, notebook)
+        print_jupyter_messages(&diagnostics, path, notebook)
     } else {
-        print_messages(&messages)
+        print_messages(&diagnostics)
     }
 }
 
 pub(crate) fn print_jupyter_messages(
-    messages: &[OldDiagnostic],
+    diagnostics: &[OldDiagnostic],
     path: &Path,
     notebook: &Notebook,
 ) -> String {
@@ -344,7 +348,7 @@ pub(crate) fn print_jupyter_messages(
         .with_unsafe_fixes(UnsafeFixes::Enabled)
         .emit(
             &mut output,
-            messages,
+            diagnostics,
             &EmitterContext::new(&FxHashMap::from_iter([(
                 path.file_name().unwrap().to_string_lossy().to_string(),
                 notebook.index().clone(),
@@ -355,7 +359,7 @@ pub(crate) fn print_jupyter_messages(
     String::from_utf8(output).unwrap()
 }
 
-pub(crate) fn print_messages(messages: &[OldDiagnostic]) -> String {
+pub(crate) fn print_messages(diagnostics: &[OldDiagnostic]) -> String {
     let mut output = Vec::new();
 
     TextEmitter::default()
@@ -365,7 +369,7 @@ pub(crate) fn print_messages(messages: &[OldDiagnostic]) -> String {
         .with_unsafe_fixes(UnsafeFixes::Enabled)
         .emit(
             &mut output,
-            messages,
+            diagnostics,
             &EmitterContext::new(&FxHashMap::default()),
         )
         .unwrap();
@@ -374,7 +378,7 @@ pub(crate) fn print_messages(messages: &[OldDiagnostic]) -> String {
 }
 
 #[macro_export]
-macro_rules! assert_messages {
+macro_rules! assert_diagnostics {
     ($value:expr, $path:expr, $notebook:expr) => {{
         insta::with_settings!({ omit_expression => true }, {
             insta::assert_snapshot!(
