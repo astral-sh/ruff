@@ -1520,8 +1520,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken
                     self.flow_restore(no_branch_taken.clone());
-                    self.record_negated_reachability_constraint(reachability_constraint_id);
                     self.record_negated_narrowing_constraint(predicate);
+                    self.record_negated_reachability_constraint(reachability_constraint_id);
                     self.record_negated_visibility_constraint(v_constraint);
                 }
 
@@ -1530,10 +1530,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // `if` or `elif` clause, and visit the `else` body.
                     no_branch_taken = self.flow_snapshot();
                     self.visit_body(else_body);
-                    self.record_negated_visibility_constraint(
-                        last_visibility_constraint_id
-                            .expect("should have at least one negated constraint"),
-                    );
+                    let last_visibility_constraint_id = last_visibility_constraint_id
+                        .expect("should have at least one negated constraint");
+                    self.record_negated_reachability_constraint(last_visibility_constraint_id);
+                    self.record_negated_visibility_constraint(last_visibility_constraint_id);
                 }
 
                 for post_clause_state in post_clauses {

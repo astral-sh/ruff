@@ -88,6 +88,15 @@ def f4():
         reveal_type(x)  # revealed: Never
         # TODO: we should mark this as unreachable
         print("unreachable")
+
+def f5(flag: bool):
+    x = object()
+    if flag:
+        reveal_type(x)  # revealed: object
+    elif False:
+        reveal_type(x)  # revealed: Never
+        # TODO: we should mark this as unreachable
+        print("unreachable")
 ```
 
 ### `Never` / `NoReturn`
