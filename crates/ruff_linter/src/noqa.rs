@@ -1250,7 +1250,7 @@ mod tests {
     /// Create a [`Message`] with a placeholder filename and rule code from `diagnostic`.
     fn message_from_diagnostic(diagnostic: OldDiagnostic) -> Message {
         let noqa_offset = diagnostic.start();
-        Message::from_diagnostic(diagnostic, Some(noqa_offset))
+        Message::from_diagnostic(diagnostic.with_noqa_offset(noqa_offset))
     }
 
     #[test]

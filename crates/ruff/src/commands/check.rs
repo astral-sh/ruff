@@ -130,10 +130,11 @@ pub(crate) fn check(
                         SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
                     Diagnostics::new(
-                        vec![Message::from_diagnostic(
-                            OldDiagnostic::new(IOError { message }, TextRange::default(), &dummy),
-                            None,
-                        )],
+                        vec![Message::from_diagnostic(OldDiagnostic::new(
+                            IOError { message },
+                            TextRange::default(),
+                            &dummy,
+                        ))],
                         FxHashMap::default(),
                     )
                 } else {
