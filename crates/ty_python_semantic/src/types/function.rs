@@ -190,7 +190,7 @@ impl<'db> OverloadLiteral<'db> {
         };
 
         let previous_literal = previous_type.literal(db);
-        let previous_overload = previous_literal.current_overload(db);
+        let previous_overload = previous_literal.last_definition(db);
         if !previous_overload.is_overload(db) {
             return None;
         }
@@ -282,7 +282,7 @@ impl<'db> OverloadLiteral<'db> {
 #[salsa::interned(debug)]
 #[derive(PartialOrd, Ord)]
 pub struct FunctionLiteral<'db> {
-    pub(crate) current_overload: OverloadLiteral<'db>,
+    pub(crate) last_definition: OverloadLiteral<'db>,
 
     /// The inherited generic context, if this function is a class method being used to infer the
     /// specialization of its generic class. If any of the method's overloads are themselves
@@ -301,32 +301,32 @@ impl<'db> FunctionLiteral<'db> {
         debug_assert!(self.inherited_generic_context(db).is_none());
         Self::new(
             db,
-            self.current_overload(db),
+            self.last_definition(db),
             Some(inherited_generic_context),
         )
     }
 
-    fn update_current_overload(
+    fn update_last_definition(
         self,
         db: &'db dyn Db,
         f: impl FnOnce(OverloadLiteral<'db>) -> OverloadLiteral<'db>,
     ) -> Self {
         Self::new(
             db,
-            f(self.current_overload(db)),
+            f(self.last_definition(db)),
             self.inherited_generic_context(db),
         )
     }
 
     fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         // All of the overloads of a function literal should have the same name.
-        self.current_overload(db).name(db)
+        self.last_definition(db).name(db)
     }
 
     fn known(self, db: &'db dyn Db) -> Option<KnownFunction> {
         // Whether a function is known is based on its name (and its containing module's name), so
         // all overloads should be known (or not) equivalently.
-        self.current_overload(db).known(db)
+        self.last_definition(db).known(db)
     }
 
     fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
@@ -335,7 +335,7 @@ impl<'db> FunctionLiteral<'db> {
     }
 
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        self.current_overload(db).definition(db)
+        self.last_definition(db).definition(db)
     }
 
     fn parameter_span(
@@ -343,12 +343,11 @@ impl<'db> FunctionLiteral<'db> {
         db: &'db dyn Db,
         parameter_index: Option<usize>,
     ) -> Option<(Span, Span)> {
-        self.current_overload(db)
-            .parameter_span(db, parameter_index)
+        self.last_definition(db).parameter_span(db, parameter_index)
     }
 
     fn spans(self, db: &'db dyn Db) -> Option<FunctionSpans> {
-        self.current_overload(db).spans(db)
+        self.last_definition(db).spans(db)
     }
 
     #[salsa::tracked(returns(ref))]
@@ -356,12 +355,12 @@ impl<'db> FunctionLiteral<'db> {
         self,
         db: &'db dyn Db,
     ) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
-        let self_overload = self.current_overload(db);
+        let self_overload = self.last_definition(db);
         let mut current = self_overload;
         let mut overloads = vec![];
 
         while let Some(previous) = current.previous_overload(db) {
-            let overload = previous.current_overload(db);
+            let overload = previous.last_definition(db);
             overloads.push(overload);
             current = overload;
         }
@@ -424,7 +423,7 @@ impl<'db> FunctionLiteral<'db> {
         let context = self
             .inherited_generic_context(db)
             .map(|ctx| ctx.normalized(db));
-        Self::new(db, self.current_overload(db), context)
+        Self::new(db, self.last_definition(db), context)
     }
 }
 
@@ -478,7 +477,7 @@ impl<'db> FunctionType<'db> {
         // previous overloads.
         Self::new(
             db,
-            self.literal(db).update_current_overload(db, |overload| {
+            self.literal(db).update_last_definition(db, |overload| {
                 overload.with_dataclass_transformer_params(db, params)
             }),
             self.type_mappings(db),
@@ -487,12 +486,12 @@ impl<'db> FunctionType<'db> {
 
     /// Returns the [`File`] in which this function is defined.
     pub(crate) fn file(self, db: &'db dyn Db) -> File {
-        self.literal(db).current_overload(db).file(db)
+        self.literal(db).last_definition(db).file(db)
     }
 
     /// Returns the AST node for this function.
     pub(crate) fn node(self, db: &'db dyn Db, file: File) -> &'db ast::StmtFunctionDef {
-        self.literal(db).current_overload(db).node(db, file)
+        self.literal(db).last_definition(db).node(db, file)
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
