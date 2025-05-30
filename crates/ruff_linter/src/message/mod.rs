@@ -114,11 +114,7 @@ impl Message {
     }
 
     /// Create a [`Message`] from the given [`OldDiagnostic`] corresponding to a rule violation.
-    pub fn from_diagnostic(
-        diagnostic: OldDiagnostic,
-        file: SourceFile,
-        noqa_offset: Option<TextSize>,
-    ) -> Message {
+    pub fn from_diagnostic(diagnostic: OldDiagnostic, noqa_offset: Option<TextSize>) -> Message {
         let OldDiagnostic {
             body,
             suggestion,
@@ -126,6 +122,7 @@ impl Message {
             fix,
             parent,
             rule,
+            file,
         } = diagnostic;
         Self::diagnostic(
             body,

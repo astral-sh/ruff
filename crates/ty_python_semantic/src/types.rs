@@ -65,6 +65,7 @@ mod context;
 mod diagnostic;
 mod display;
 mod generics;
+mod ide_support;
 mod infer;
 mod instance;
 mod mro;
@@ -2176,6 +2177,25 @@ impl<'db> Type<'db> {
                 // of `str`, and `str` is not callable. The same applies to other literal types.
                 true
             }
+
+            (
+                Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
+                instance @ Type::NominalInstance(NominalInstanceType { class, .. }),
+            )
+            | (
+                instance @ Type::NominalInstance(NominalInstanceType { class, .. }),
+                Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
+            ) if class.is_final(db) => instance
+                .member_lookup_with_policy(
+                    db,
+                    Name::new_static("__call__"),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .symbol
+                .ignore_possibly_unbound()
+                .is_none_or(|dunder_call| {
+                    !dunder_call.is_assignable_to(db, CallableType::unknown(db))
+                }),
 
             (
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
@@ -7642,6 +7662,8 @@ pub enum KnownFunction {
     GenericContext,
     /// `ty_extensions.dunder_all_names`
     DunderAllNames,
+    /// `ty_extensions.all_members`
+    AllMembers,
 }
 
 impl KnownFunction {
@@ -7701,7 +7723,8 @@ impl KnownFunction {
             | Self::IsSubtypeOf
             | Self::GenericContext
             | Self::DunderAllNames
-            | Self::StaticAssert => module.is_ty_extensions(),
+            | Self::StaticAssert
+            | Self::AllMembers => module.is_ty_extensions(),
         }
     }
 }
@@ -9169,7 +9192,7 @@ impl<'db> BoundSuperType<'db> {
 // Make sure that the `Type` enum does not grow unexpectedly.
 #[cfg(not(debug_assertions))]
 #[cfg(target_pointer_width = "64")]
-static_assertions::assert_eq_size!(Type, [u8; 16]);
+static_assertions::assert_eq_size!(Type, [u8; 24]);
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -9370,7 +9393,8 @@ pub(crate) mod tests {
                 | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
                 | KnownFunction::IsEquivalentTo
-                | KnownFunction::IsGradualEquivalentTo => KnownModule::TyExtensions,
+                | KnownFunction::IsGradualEquivalentTo
+                | KnownFunction::AllMembers => KnownModule::TyExtensions,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)

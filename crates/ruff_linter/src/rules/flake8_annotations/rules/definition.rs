@@ -533,7 +533,7 @@ fn check_dynamically_typed<'a, 'b, F>(
     checker: &'a Checker<'b>,
     annotation: &Expr,
     func: F,
-    diagnostics: &mut Vec<DiagnosticGuard<'a, 'b>>,
+    context: &mut Vec<DiagnosticGuard<'a, 'b>>,
 ) where
     F: FnOnce() -> String,
 {
@@ -545,14 +545,13 @@ fn check_dynamically_typed<'a, 'b, F>(
                 checker,
                 checker.target_version(),
             ) {
-                diagnostics
+                context
                     .push(checker.report_diagnostic(AnyType { name: func() }, annotation.range()));
             }
         }
     } else {
         if type_hint_resolves_to_any(annotation, checker, checker.target_version()) {
-            diagnostics
-                .push(checker.report_diagnostic(AnyType { name: func() }, annotation.range()));
+            context.push(checker.report_diagnostic(AnyType { name: func() }, annotation.range()));
         }
     }
 }

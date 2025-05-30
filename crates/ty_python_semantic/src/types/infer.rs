@@ -1872,12 +1872,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             if use_def.can_implicit_return(self.db())
                 && !Type::none(self.db()).is_assignable_to(self.db(), declared_ty)
             {
+                let no_return = self.return_types_and_ranges.is_empty();
                 report_implicit_return_type(
                     &self.context,
                     returns.range(),
                     declared_ty,
                     has_empty_body,
                     enclosing_class_context,
+                    no_return,
                 );
             }
         }
@@ -6717,6 +6719,37 @@ impl<'db> TypeInferenceBuilder<'db> {
         right: Type<'db>,
         range: TextRange,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
+        let is_str_literal_in_tuple = |literal: Type<'db>, tuple: TupleType<'db>| {
+            // Protect against doing a lot of work for pathologically large
+            // tuples.
+            //
+            // Ref: https://github.com/astral-sh/ruff/pull/18251#discussion_r2115909311
+            if tuple.len(self.db()) > 1 << 12 {
+                return None;
+            }
+
+            let mut definitely_true = false;
+            let mut definitely_false = true;
+            for element in tuple.elements(self.db()) {
+                if element.is_string_literal() {
+                    if literal == *element {
+                        definitely_true = true;
+                        definitely_false = false;
+                    }
+                } else if !literal.is_disjoint_from(self.db(), *element) {
+                    definitely_false = false;
+                }
+            }
+
+            if definitely_true {
+                Some(true)
+            } else if definitely_false {
+                Some(false)
+            } else {
+                None
+            }
+        };
+
         // Note: identity (is, is not) for equal builtin types is unreliable and not part of the
         // language spec.
         // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
@@ -6847,6 +6880,30 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
                 }
+            }
+            (Type::StringLiteral(_), Type::Tuple(tuple)) if op == ast::CmpOp::In => {
+                if let Some(answer) = is_str_literal_in_tuple(left, tuple) {
+                    return Ok(Type::BooleanLiteral(answer));
+                }
+
+                self.infer_binary_type_comparison(
+                    KnownClass::Str.to_instance(self.db()),
+                    op,
+                    right,
+                    range,
+                )
+            }
+            (Type::StringLiteral(_), Type::Tuple(tuple)) if op == ast::CmpOp::NotIn => {
+                if let Some(answer) = is_str_literal_in_tuple(left, tuple) {
+                    return Ok(Type::BooleanLiteral(!answer));
+                }
+
+                self.infer_binary_type_comparison(
+                    KnownClass::Str.to_instance(self.db()),
+                    op,
+                    right,
+                    range,
+                )
             }
             (Type::StringLiteral(_), _) => self.infer_binary_type_comparison(
                 KnownClass::Str.to_instance(self.db()),
