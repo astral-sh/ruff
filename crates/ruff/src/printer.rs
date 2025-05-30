@@ -6,7 +6,7 @@ use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{Itertools, iterate};
-use ruff_linter::codes::NoqaCode;
+use ruff_linter::codes::{NoqaCode, Rule};
 use serde::Serialize;
 
 use ruff_linter::fs::relativize_path;
@@ -498,12 +498,13 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
             relativize_path(filename).bold(),
             ":".cyan()
         )?;
-        for (rule, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
+        for (code, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
+            let code = code.to_string();
             writeln!(
                 writer,
                 "    {count:>num_digits$} × {} ({})",
-                rule.noqa_code().to_string().red().bold(),
-                rule.as_ref(),
+                code.red().bold(),
+                Rule::from_code(&code).map_or(code, |rule| rule.to_string()),
             )?;
         }
     }

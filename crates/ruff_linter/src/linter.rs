@@ -22,6 +22,7 @@ use crate::checkers::imports::check_imports;
 use crate::checkers::noqa::check_noqa;
 use crate::checkers::physical_lines::check_physical_lines;
 use crate::checkers::tokens::check_tokens;
+use crate::codes::NoqaCode;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
@@ -83,7 +84,7 @@ impl LinterResult {
     }
 }
 
-pub type FixTable = FxHashMap<Rule, usize>;
+pub type FixTable = FxHashMap<NoqaCode, usize>;
 
 pub struct FixerResult<'a> {
     /// The result returned by the linter, after applying any fixes.
@@ -707,10 +708,10 @@ pub fn lint_fix<'a>(
     }
 }
 
-fn collect_rule_codes(rules: impl IntoIterator<Item = Rule>) -> String {
+fn collect_rule_codes(rules: impl IntoIterator<Item = NoqaCode>) -> String {
     rules
         .into_iter()
-        .map(|rule| rule.noqa_code().to_string())
+        .map(|rule| rule.to_string())
         .sorted_unstable()
         .dedup()
         .join(", ")
@@ -718,7 +719,7 @@ fn collect_rule_codes(rules: impl IntoIterator<Item = Rule>) -> String {
 
 #[expect(clippy::print_stderr)]
 fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: &[OldDiagnostic]) {
-    let codes = collect_rule_codes(diagnostics.iter().filter_map(OldDiagnostic::to_rule));
+    let codes = collect_rule_codes(diagnostics.iter().filter_map(OldDiagnostic::to_noqa_code));
     if cfg!(debug_assertions) {
         eprintln!(
             "{}{} Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",
@@ -754,7 +755,7 @@ fn report_fix_syntax_error(
     path: &Path,
     transformed: &str,
     error: &ParseError,
-    rules: impl IntoIterator<Item = Rule>,
+    rules: impl IntoIterator<Item = NoqaCode>,
 ) {
     let codes = collect_rule_codes(rules);
     if cfg!(debug_assertions) {
