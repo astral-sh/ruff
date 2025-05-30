@@ -31,7 +31,7 @@ pub fn lint_pyproject_toml(source_file: &SourceFile, settings: &LinterSettings) 
                 if settings.rules.enabled(Rule::IOError) {
                     let diagnostic =
                         OldDiagnostic::new(IOError { message }, TextRange::default(), source_file);
-                    messages.push(Message::from_diagnostic(diagnostic, None));
+                    messages.push(Message::from_diagnostic(diagnostic));
                 } else {
                     warn!(
                         "{}{}{} {message}",
@@ -57,7 +57,7 @@ pub fn lint_pyproject_toml(source_file: &SourceFile, settings: &LinterSettings) 
             range,
             source_file,
         );
-        messages.push(Message::from_diagnostic(diagnostic, None));
+        messages.push(Message::from_diagnostic(diagnostic));
     }
 
     messages

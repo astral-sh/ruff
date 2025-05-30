@@ -745,7 +745,7 @@ x = 1 \
                 iter.next().ok_or(anyhow!("expected edits nonempty"))?,
                 iter,
             ));
-            Message::from_diagnostic(diag, None)
+            Message::from_diagnostic(diag)
         };
         assert_eq!(apply_fixes([diag].iter(), &locator).code, expect);
         Ok(())
