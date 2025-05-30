@@ -1132,6 +1132,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         for function in self.called_functions.union(&public_functions) {
             let (overloads, implementation) = function.overloads_and_implementation(self.db());
+            if overloads.is_empty() {
+                continue;
+            }
 
             // Check that the overloaded function has at least two overloads
             if let [single_overload] = overloads.as_ref() {
