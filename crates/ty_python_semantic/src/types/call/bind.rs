@@ -188,9 +188,9 @@ impl<'db> Bindings<'db> {
     /// types that are not callable, returns `Type::Unknown`.
     pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         if let [binding] = self.elements.as_slice() {
-            return binding.return_type(db);
+            return binding.return_type();
         }
-        UnionType::from_elements(db, self.into_iter().map(|b| b.return_type(db)))
+        UnionType::from_elements(db, self.into_iter().map(CallableBinding::return_type))
     }
 
     /// Report diagnostics for all of the errors that occurred when trying to match actual
@@ -1316,7 +1316,7 @@ impl<'db> CallableBinding<'db> {
     /// function, this is the return type of the function. For an invalid call to an overloaded
     /// function, we return `Type::unknown`, since we cannot make any useful conclusions about
     /// which overload was intended to be called.
-    pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn return_type(&self) -> Type<'db> {
         if let Some(return_type) = self.return_type {
             return return_type;
         }
