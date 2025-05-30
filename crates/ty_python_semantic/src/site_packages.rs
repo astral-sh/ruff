@@ -437,9 +437,14 @@ impl<'s> PyvenvCfgParser<'s> {
             // Skip over any lines that do not contain '=' characters, same as the CPython stdlib
             // <https://github.com/python/cpython/blob/e64395e8eb8d3a9e35e3e534e87d427ff27ab0a5/Lib/site.py#L625-L632>
             cursor.skip_bytes(next_newline_position);
-            if !cursor.is_eof() {
-                cursor.bump();
-            }
+
+            debug_assert!(
+                matches!(cursor.first(), '\n' | ruff_python_trivia::EOF_CHAR,),
+                "{}",
+                cursor.first()
+            );
+
+            cursor.eat_char('\n');
             return Ok(());
         };
 
@@ -454,8 +459,6 @@ impl<'s> PyvenvCfgParser<'s> {
             return Err(PyvenvCfgParseErrorKind::MalformedKeyValuePair { line_number });
         }
 
-        let value_offset = cursor.offset();
-
         match key {
             "include-system-site-packages" => {
                 data.include_system_site_packages = value.eq_ignore_ascii_case("true");
@@ -464,7 +467,7 @@ impl<'s> PyvenvCfgParser<'s> {
             // `virtualenv` and `uv` call this key `version_info`,
             // but the stdlib venv module calls it `version`
             "version" | "version_info" => {
-                let version_range = TextRange::new(value_offset, value_offset + value.text_len());
+                let version_range = TextRange::at(cursor.offset(), value.text_len());
                 data.version = Some((value, version_range));
             }
             "implementation" => {
@@ -484,11 +487,7 @@ impl<'s> PyvenvCfgParser<'s> {
         }
 
         cursor.eat_while(|c| c != '\n');
-
-        if !cursor.is_eof() {
-            cursor.bump();
-        }
-
+        cursor.eat_char('\n');
         Ok(())
     }
 }
