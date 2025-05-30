@@ -49,15 +49,13 @@ pub(crate) fn check_noqa(
     // Remove any ignored diagnostics.
     'outer: for (index, diagnostic) in context.iter().enumerate() {
         // Can't ignore syntax errors.
-        let Some(rule) = diagnostic.to_rule() else {
+        let Some(code) = diagnostic.to_noqa_code() else {
             continue;
         };
 
-        if matches!(rule, Rule::BlanketNOQA) {
+        if code == Rule::BlanketNOQA.noqa_code() {
             continue;
         }
-
-        let code = rule.noqa_code();
 
         match &exemption {
             FileExemption::All(_) => {
