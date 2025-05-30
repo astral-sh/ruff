@@ -119,7 +119,7 @@ impl OldDiagnostic {
         }
     }
 
-    /// Create a [`Message`] from the given [`ParseError`].
+    /// Create an [`OldDiagnostic`] from the given [`ParseError`].
     pub fn from_parse_error(
         parse_error: &ParseError,
         locator: &Locator,
@@ -144,7 +144,7 @@ impl OldDiagnostic {
         )
     }
 
-    /// Create a [`Message`] from the given [`UnsupportedSyntaxError`].
+    /// Create an [`OldDiagnostic`] from the given [`UnsupportedSyntaxError`].
     pub fn from_unsupported_syntax_error(
         unsupported_syntax_error: &UnsupportedSyntaxError,
         file: SourceFile,
@@ -156,7 +156,7 @@ impl OldDiagnostic {
         )
     }
 
-    /// Create a [`Message`] from the given [`SemanticSyntaxError`].
+    /// Create an [`OldDiagnostic`] from the given [`SemanticSyntaxError`].
     pub fn from_semantic_syntax_error(
         semantic_syntax_error: &SemanticSyntaxError,
         file: SourceFile,
@@ -272,12 +272,12 @@ impl OldDiagnostic {
         self.noqa_offset
     }
 
-    /// Returns the [`Fix`] for the message, if there is any.
+    /// Returns the [`Fix`] for the diagnostic, if there is any.
     pub fn fix(&self) -> Option<&Fix> {
         self.fix.as_ref()
     }
 
-    /// Returns `true` if the message contains a [`Fix`].
+    /// Returns `true` if the diagnostic contains a [`Fix`].
     pub fn fixable(&self) -> bool {
         self.fix().is_some()
     }
@@ -386,11 +386,11 @@ fn group_diagnostics_by_filename(
     grouped_messages
 }
 
-/// Display format for a [`Message`]s.
+/// Display format for [`OldDiagnostic`]s.
 ///
-/// The emitter serializes a slice of [`Message`]'s and writes them to a [`Write`].
+/// The emitter serializes a slice of [`OldDiagnostic`]s and writes them to a [`Write`].
 pub trait Emitter {
-    /// Serializes the `messages` and writes the output to `writer`.
+    /// Serializes the `diagnostics` and writes the output to `writer`.
     fn emit(
         &mut self,
         writer: &mut dyn Write,

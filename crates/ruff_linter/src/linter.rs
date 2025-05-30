@@ -142,7 +142,7 @@ pub struct FixerResult<'a> {
     pub fixed: FixTable,
 }
 
-/// Generate [`Message`]s from the source code contents at the given `Path`.
+/// Generate [`OldDiagnostic`]s from the source code contents at the given `Path`.
 #[expect(clippy::too_many_arguments)]
 pub fn check_path(
     path: &Path,
@@ -530,8 +530,7 @@ pub fn add_noqa_to_path(
     )
 }
 
-/// Generate a [`Message`] for each [`OldDiagnostic`] triggered by the given source
-/// code.
+/// Generate an [`OldDiagnostic`] for each diagnostic triggered by the given source code.
 pub fn lint_only(
     path: &Path,
     package: Option<PackageRoot<'_>>,
