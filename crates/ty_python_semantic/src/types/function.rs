@@ -61,10 +61,10 @@ bitflags! {
     /// [1]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
     pub struct DataclassTransformerParams: u8 {
-        const EQ_DEFAULT = 0b0000_0001;
-        const ORDER_DEFAULT = 0b0000_0010;
-        const KW_ONLY_DEFAULT = 0b0000_0100;
-        const FROZEN_DEFAULT = 0b0000_1000;
+        const EQ_DEFAULT = 1 << 0;
+        const ORDER_DEFAULT = 1 << 1;
+        const KW_ONLY_DEFAULT = 1 << 2;
+        const FROZEN_DEFAULT = 1 << 3;
     }
 }
 
