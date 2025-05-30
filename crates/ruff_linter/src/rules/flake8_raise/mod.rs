@@ -10,7 +10,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::UnnecessaryParenOnRaiseException, Path::new("RSE102.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -19,7 +19,7 @@ mod tests {
             Path::new("flake8_raise").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

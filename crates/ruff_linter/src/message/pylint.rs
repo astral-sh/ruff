@@ -14,28 +14,28 @@ impl Emitter for PylintEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[OldDiagnostic],
+        diagnostics: &[OldDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        for message in messages {
-            let row = if context.is_notebook(&message.filename()) {
+        for diagnostic in diagnostics {
+            let row = if context.is_notebook(&diagnostic.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 OneIndexed::from_zero_indexed(0)
             } else {
-                message.compute_start_location().line
+                diagnostic.compute_start_location().line
             };
 
-            let body = if let Some(code) = message.noqa_code() {
-                format!("[{code}] {body}", body = message.body())
+            let body = if let Some(code) = diagnostic.noqa_code() {
+                format!("[{code}] {body}", body = diagnostic.body())
             } else {
-                message.body().to_string()
+                diagnostic.body().to_string()
             };
 
             writeln!(
                 writer,
                 "{path}:{row}: {body}",
-                path = relativize_path(&*message.filename()),
+                path = relativize_path(&*diagnostic.filename()),
             )?;
         }
 
@@ -49,13 +49,13 @@ mod tests {
 
     use crate::message::PylintEmitter;
     use crate::message::tests::{
-        capture_emitter_output, create_messages, create_syntax_error_messages,
+        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     #[test]
     fn output() {
         let mut emitter = PylintEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -63,7 +63,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let mut emitter = PylintEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(content);
     }

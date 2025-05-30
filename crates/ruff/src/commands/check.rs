@@ -166,7 +166,7 @@ pub(crate) fn check(
             |a, b| (a.0 + b.0, a.1 + b.1),
         );
 
-    all_diagnostics.messages.sort();
+    all_diagnostics.diagnostics.sort();
 
     // Store the caches.
     caches.persist()?;
@@ -283,7 +283,7 @@ mod test {
             .with_show_fix_status(true)
             .emit(
                 &mut output,
-                &diagnostics.messages,
+                &diagnostics.diagnostics,
                 &EmitterContext::new(&FxHashMap::default()),
             )
             .unwrap();

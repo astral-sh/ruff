@@ -85,7 +85,7 @@ impl Printer {
                 .sum::<usize>();
 
             if self.flags.intersects(Flags::SHOW_VIOLATIONS) {
-                let remaining = diagnostics.messages.len();
+                let remaining = diagnostics.diagnostics.len();
                 let total = fixed + remaining;
                 if fixed > 0 {
                     let s = if total == 1 { "" } else { "s" };
@@ -229,16 +229,16 @@ impl Printer {
 
         match self.format {
             OutputFormat::Json => {
-                JsonEmitter.emit(writer, &diagnostics.messages, &context)?;
+                JsonEmitter.emit(writer, &diagnostics.diagnostics, &context)?;
             }
             OutputFormat::Rdjson => {
-                RdjsonEmitter.emit(writer, &diagnostics.messages, &context)?;
+                RdjsonEmitter.emit(writer, &diagnostics.diagnostics, &context)?;
             }
             OutputFormat::JsonLines => {
-                JsonLinesEmitter.emit(writer, &diagnostics.messages, &context)?;
+                JsonLinesEmitter.emit(writer, &diagnostics.diagnostics, &context)?;
             }
             OutputFormat::Junit => {
-                JunitEmitter.emit(writer, &diagnostics.messages, &context)?;
+                JunitEmitter.emit(writer, &diagnostics.diagnostics, &context)?;
             }
             OutputFormat::Concise | OutputFormat::Full => {
                 TextEmitter::default()
@@ -246,7 +246,7 @@ impl Printer {
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
                     .with_show_source(self.format == OutputFormat::Full)
                     .with_unsafe_fixes(self.unsafe_fixes)
-                    .emit(writer, &diagnostics.messages, &context)?;
+                    .emit(writer, &diagnostics.diagnostics, &context)?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
@@ -262,7 +262,7 @@ impl Printer {
                 GroupedEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_unsafe_fixes(self.unsafe_fixes)
-                    .emit(writer, &diagnostics.messages, &context)?;
+                    .emit(writer, &diagnostics.diagnostics, &context)?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
@@ -274,19 +274,19 @@ impl Printer {
                 self.write_summary_text(writer, diagnostics)?;
             }
             OutputFormat::Github => {
-                GithubEmitter.emit(writer, &diagnostics.messages, &context)?;
+                GithubEmitter.emit(writer, &diagnostics.diagnostics, &context)?;
             }
             OutputFormat::Gitlab => {
-                GitlabEmitter::default().emit(writer, &diagnostics.messages, &context)?;
+                GitlabEmitter::default().emit(writer, &diagnostics.diagnostics, &context)?;
             }
             OutputFormat::Pylint => {
-                PylintEmitter.emit(writer, &diagnostics.messages, &context)?;
+                PylintEmitter.emit(writer, &diagnostics.diagnostics, &context)?;
             }
             OutputFormat::Azure => {
-                AzureEmitter.emit(writer, &diagnostics.messages, &context)?;
+                AzureEmitter.emit(writer, &diagnostics.diagnostics, &context)?;
             }
             OutputFormat::Sarif => {
-                SarifEmitter.emit(writer, &diagnostics.messages, &context)?;
+                SarifEmitter.emit(writer, &diagnostics.diagnostics, &context)?;
             }
         }
 
@@ -301,7 +301,7 @@ impl Printer {
         writer: &mut dyn Write,
     ) -> Result<()> {
         let statistics: Vec<ExpandedStatistics> = diagnostics
-            .messages
+            .diagnostics
             .iter()
             .map(|message| (message.noqa_code(), message))
             .sorted_by_key(|(code, message)| (*code, message.fixable()))
@@ -416,20 +416,20 @@ impl Printer {
         }
 
         if self.log_level >= LogLevel::Default {
-            let s = if diagnostics.messages.len() == 1 {
+            let s = if diagnostics.diagnostics.len() == 1 {
                 ""
             } else {
                 "s"
             };
             notify_user!(
                 "Found {} error{s}. Watching for file changes.",
-                diagnostics.messages.len()
+                diagnostics.diagnostics.len()
             );
         }
 
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
-        if !diagnostics.messages.is_empty() {
+        if !diagnostics.diagnostics.is_empty() {
             if self.log_level >= LogLevel::Default {
                 writeln!(writer)?;
             }
@@ -439,7 +439,7 @@ impl Printer {
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                 .with_show_source(preview)
                 .with_unsafe_fixes(self.unsafe_fixes)
-                .emit(writer, &diagnostics.messages, &context)?;
+                .emit(writer, &diagnostics.diagnostics, &context)?;
         }
         writer.flush()?;
 
@@ -522,7 +522,7 @@ impl FixableStatistics {
         let mut applicable = 0;
         let mut inapplicable_unsafe = 0;
 
-        for message in &diagnostics.messages {
+        for message in &diagnostics.diagnostics {
             if let Some(fix) = message.fix() {
                 if fix.applies(unsafe_fixes.required_applicability()) {
                     applicable += 1;

@@ -19,10 +19,10 @@ impl Emitter for SarifEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[OldDiagnostic],
+        diagnostics: &[OldDiagnostic],
         _context: &EmitterContext,
     ) -> Result<()> {
-        let results = messages
+        let results = diagnostics
             .iter()
             .map(SarifResult::from_message)
             .collect::<Result<Vec<_>>>()?;
@@ -194,12 +194,12 @@ impl Serialize for SarifResult {
 mod tests {
     use crate::message::SarifEmitter;
     use crate::message::tests::{
-        capture_emitter_output, create_messages, create_syntax_error_messages,
+        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     fn get_output() -> String {
         let mut emitter = SarifEmitter {};
-        capture_emitter_output(&mut emitter, &create_messages())
+        capture_emitter_output(&mut emitter, &create_diagnostics())
     }
 
     #[test]
@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn valid_syntax_error_json() {
         let mut emitter = SarifEmitter {};
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
         serde_json::from_str::<serde_json::Value>(&content).unwrap();
     }
 

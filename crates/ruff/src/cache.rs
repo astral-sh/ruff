@@ -341,7 +341,7 @@ impl FileCache {
     /// Convert the file cache into `Diagnostics`, using `path` as file name.
     pub(crate) fn to_diagnostics(&self, path: &Path) -> Option<Diagnostics> {
         self.data.lint.as_ref().map(|lint| {
-            let messages = if lint.messages.is_empty() {
+            let diagnostics = if lint.messages.is_empty() {
                 Vec::new()
             } else {
                 let file = SourceFileBuilder::new(path.to_string_lossy(), &*lint.source).finish();
@@ -366,7 +366,7 @@ impl FileCache {
             } else {
                 FxHashMap::default()
             };
-            Diagnostics::new(messages, notebook_indexes)
+            Diagnostics::new(diagnostics, notebook_indexes)
         })
     }
 }
@@ -427,17 +427,17 @@ pub(crate) struct LintCacheData {
 }
 
 impl LintCacheData {
-    pub(crate) fn from_messages(
-        messages: &[OldDiagnostic],
+    pub(crate) fn from_diagnostics(
+        diagnostics: &[OldDiagnostic],
         notebook_index: Option<NotebookIndex>,
     ) -> Self {
-        let source = if let Some(msg) = messages.first() {
+        let source = if let Some(msg) = diagnostics.first() {
             msg.source_file().source_text().to_owned()
         } else {
             String::new() // No messages, no need to keep the source!
         };
 
-        let messages = messages
+        let messages = diagnostics
             .iter()
             // Parse the kebab-case rule name into a `Rule`. This will fail for syntax errors, so
             // this also serves to filter them out, but we shouldn't be caching files with syntax
@@ -447,7 +447,7 @@ impl LintCacheData {
                 // Make sure that all message use the same source file.
                 assert_eq!(
                     msg.source_file(),
-                    messages.first().unwrap().source_file(),
+                    diagnostics.first().unwrap().source_file(),
                     "message uses a different source file"
                 );
                 CacheMessage {
@@ -681,7 +681,7 @@ mod tests {
                 )
                 .unwrap();
                 if diagnostics
-                    .messages
+                    .diagnostics
                     .iter()
                     .any(OldDiagnostic::is_syntax_error)
                 {
