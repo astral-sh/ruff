@@ -1,4 +1,5 @@
 use itertools::Itertools;
+
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtClassDef;
