@@ -168,27 +168,16 @@ impl Message {
     // should just update the call sites.
     #[expect(clippy::needless_pass_by_value)]
     pub fn new<T: Violation>(kind: T, range: TextRange, file: &SourceFile) -> Self {
-        let rule = T::rule();
-
-        let mut diagnostic = db::Diagnostic::new(
-            DiagnosticId::Lint(LintName::of(rule.into())),
-            Severity::Error,
+        Self::diagnostic(
             Violation::message(&kind),
-        );
-        let span = Span::from(file.clone()).with_range(range);
-        let mut annotation = Annotation::primary(span);
-        if let Some(suggestion) = Violation::fix_title(&kind) {
-            annotation = annotation.message(suggestion);
-        }
-        diagnostic.annotate(annotation);
-
-        Self {
-            diagnostic,
-            fix: None,
-            parent: None,
-            noqa_offset: None,
-            noqa_code: Some(rule.noqa_code()),
-        }
+            Violation::fix_title(&kind),
+            range,
+            None,
+            None,
+            file.clone(),
+            None,
+            T::rule(),
+        )
     }
 
     /// Consumes `self` and returns a new `Diagnostic` with the given `fix`.
