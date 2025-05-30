@@ -107,9 +107,9 @@ impl Program {
     pub fn update_search_paths(
         self,
         db: &mut dyn Db,
-        search_paths: &SearchPathSettings,
+        search_path_settings: &SearchPathSettings,
     ) -> anyhow::Result<()> {
-        let search_paths = SearchPaths::from_settings(db, search_paths)?;
+        let search_paths = SearchPaths::from_settings(db, search_path_settings)?;
 
         let current_python_version = self.python_version_with_source(db);
         let python_version_from_environment =

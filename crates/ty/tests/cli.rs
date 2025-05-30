@@ -1891,6 +1891,7 @@ impl TestCase {
 
         // Canonicalize the tempdir path because macos uses symlinks for tempdirs
         // and that doesn't play well with our snapshot filtering.
+        // Simplify with dunce because otherwise we get UNC paths on Windows.
         let project_dir = dunce::simplified(
             &temp_dir
                 .path()

@@ -283,7 +283,6 @@ impl VirtualEnvironment {
                 Arc::new(pyvenv_cfg_path),
                 Some(range),
             ));
-
             Some(PythonVersionWithSource { version, source })
         });
 
@@ -382,6 +381,7 @@ System site-packages will not be used for module resolution.",
 /// See also: <https://snarky.ca/how-virtual-environments-work/>
 #[derive(Debug)]
 struct PyvenvCfgParser<'s> {
+    source: &'s str,
     cursor: Cursor<'s>,
     line_number: NonZeroUsize,
     data: RawPyvenvCfg<'s>,
@@ -390,6 +390,7 @@ struct PyvenvCfgParser<'s> {
 impl<'s> PyvenvCfgParser<'s> {
     fn new(source: &'s str) -> Self {
         Self {
+            source,
             cursor: Cursor::new(source),
             line_number: NonZeroUsize::new(1).unwrap(),
             data: RawPyvenvCfg::default(),
@@ -409,6 +410,7 @@ impl<'s> PyvenvCfgParser<'s> {
     /// to the beginning of the next line.
     fn parse_line(&mut self) -> Result<(), PyvenvCfgParseErrorKind> {
         let PyvenvCfgParser {
+            source,
             cursor,
             line_number,
             data,
@@ -418,35 +420,24 @@ impl<'s> PyvenvCfgParser<'s> {
 
         cursor.eat_while(|c| c.is_whitespace() && c != '\n');
 
-        let remaining_file = cursor.chars().as_str();
+        let key_start = cursor.offset();
+        cursor.eat_while(|c| !matches!(c, '\n' | '='));
+        let key_end = cursor.offset();
 
-        let next_newline_position = remaining_file
-            .find('\n')
-            .unwrap_or(cursor.text_len().to_usize());
-
-        // The Python standard-library's `site` module parses these files by splitting each line on
-        // '=' characters, so that's what we should do as well.
-        let Some(eq_position) = remaining_file[..next_newline_position].find('=') else {
+        if !cursor.eat_char('=') {
             // Skip over any lines that do not contain '=' characters, same as the CPython stdlib
             // <https://github.com/python/cpython/blob/e64395e8eb8d3a9e35e3e534e87d427ff27ab0a5/Lib/site.py#L625-L632>
-            cursor.skip_bytes(next_newline_position);
-
-            debug_assert!(
-                matches!(cursor.first(), '\n' | ruff_python_trivia::EOF_CHAR,),
-                "{}",
-                cursor.first()
-            );
-
             cursor.eat_char('\n');
             return Ok(());
-        };
+        }
 
-        let key = remaining_file[..eq_position].trim();
+        let key = source[TextRange::new(key_start, key_end)].trim();
 
-        cursor.skip_bytes(eq_position + 1);
         cursor.eat_while(|c| c.is_whitespace() && c != '\n');
-
-        let value = remaining_file[eq_position + 1..next_newline_position].trim();
+        let value_start = cursor.offset();
+        cursor.eat_while(|c| c != '\n');
+        let value = source[TextRange::new(value_start, cursor.offset())].trim();
+        cursor.eat_char('\n');
 
         if value.is_empty() {
             return Err(PyvenvCfgParseErrorKind::MalformedKeyValuePair { line_number });
@@ -460,7 +451,7 @@ impl<'s> PyvenvCfgParser<'s> {
             // `virtualenv` and `uv` call this key `version_info`,
             // but the stdlib venv module calls it `version`
             "version" | "version_info" => {
-                let version_range = TextRange::at(cursor.offset(), value.text_len());
+                let version_range = TextRange::at(value_start, value.text_len());
                 data.version = Some((value, version_range));
             }
             "implementation" => {
@@ -479,8 +470,6 @@ impl<'s> PyvenvCfgParser<'s> {
             _ => {}
         }
 
-        cursor.eat_while(|c| c != '\n');
-        cursor.eat_char('\n');
         Ok(())
     }
 }
@@ -1576,6 +1565,20 @@ mod tests {
         let pyvenv_cfg = "home = /somewhere/python\r\nversion_info = 3.13\r\nimplementation = PyPy";
         let parsed = PyvenvCfgParser::new(pyvenv_cfg).parse().unwrap();
         assert_eq!(parsed.base_executable_home_path, Some("/somewhere/python"));
+        let version = parsed.version.unwrap();
+        assert_eq!(version.0, "3.13");
+        assert_eq!(&pyvenv_cfg[version.1], version.0);
+        assert_eq!(parsed.implementation, PythonImplementation::PyPy);
+    }
+
+    #[test]
+    fn pyvenv_cfg_with_strange_whitespace_parses() {
+        let pyvenv_cfg = "  home= /a path with whitespace/python\t   \t  \nversion_info =    3.13 \n\n\n\nimplementation    =PyPy";
+        let parsed = PyvenvCfgParser::new(pyvenv_cfg).parse().unwrap();
+        assert_eq!(
+            parsed.base_executable_home_path,
+            Some("/a path with whitespace/python")
+        );
         let version = parsed.version.unwrap();
         assert_eq!(version.0, "3.13");
         assert_eq!(&pyvenv_cfg[version.1], version.0);
