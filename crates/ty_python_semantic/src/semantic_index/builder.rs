@@ -1548,8 +1548,9 @@ where
                     let predicate = self.build_predicate(clause_test);
                     let reachability_constraint_id = self.record_reachability_constraint(predicate);
                     self.record_narrowing_constraint(predicate);
-                    self.visit_body(clause_body);
                     let v_constraint = self.record_visibility_constraint(predicate);
+                    self.visit_body(clause_body);
+                    self.record_visibility_constraint_id(v_constraint);
                     last_visibility_constraint_id = Some(v_constraint);
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
@@ -1568,10 +1569,10 @@ where
                     // `if` or `elif` clause, and visit the `else` body.
                     no_branch_taken = self.flow_snapshot();
                     self.visit_body(else_body);
-                    let last_visibility_constraint_id = last_visibility_constraint_id
-                        .expect("should have at least one negated constraint");
-                    self.record_negated_reachability_constraint(last_visibility_constraint_id);
-                    self.record_negated_visibility_constraint(last_visibility_constraint_id);
+                    self.record_negated_visibility_constraint(
+                        last_visibility_constraint_id
+                            .expect("should have at least one negated constraint"),
+                    );
                 }
 
                 for post_clause_state in post_clauses {
