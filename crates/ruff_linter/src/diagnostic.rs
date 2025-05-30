@@ -1,26 +1,22 @@
 use anyhow::Result;
 use log::debug;
 
+use ruff_db::diagnostic::{self as db, Annotation, DiagnosticId, LintName, Severity, Span};
 use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::codes::NoqaCode;
 use crate::registry::AsRule;
 use crate::violation::Violation;
 use crate::{Fix, codes::Rule};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct OldDiagnostic {
-    /// The message body to display to the user, to explain the diagnostic.
-    pub body: String,
-    /// The message to display to the user, to explain the suggested fix.
-    pub suggestion: Option<String>,
-    pub range: TextRange,
+    pub diagnostic: db::Diagnostic,
     pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
-
-    pub(crate) rule: Rule,
-
-    pub(crate) file: SourceFile,
+    pub(crate) noqa_offset: Option<TextSize>,
+    pub(crate) noqa_code: Option<NoqaCode>,
 }
 
 impl OldDiagnostic {
@@ -30,14 +26,26 @@ impl OldDiagnostic {
     // should just update the call sites.
     #[expect(clippy::needless_pass_by_value)]
     pub fn new<T: Violation>(kind: T, range: TextRange, file: &SourceFile) -> Self {
+        let rule = T::rule();
+
+        let mut diagnostic = db::Diagnostic::new(
+            DiagnosticId::Lint(LintName::of(rule.into())),
+            Severity::Error,
+            Violation::message(&kind),
+        );
+        let span = Span::from(file.clone()).with_range(range);
+        let mut annotation = Annotation::primary(span);
+        if let Some(suggestion) = Violation::fix_title(&kind) {
+            annotation = annotation.message(suggestion);
+        }
+        diagnostic.annotate(annotation);
+
         Self {
-            body: Violation::message(&kind),
-            suggestion: Violation::fix_title(&kind),
-            range,
+            diagnostic,
             fix: None,
             parent: None,
-            rule: T::rule(),
-            file: file.clone(),
+            noqa_offset: None,
+            noqa_code: Some(rule.noqa_code()),
         }
     }
 
@@ -61,7 +69,7 @@ impl OldDiagnostic {
     pub fn try_set_fix(&mut self, func: impl FnOnce() -> Result<Fix>) {
         match func() {
             Ok(fix) => self.fix = Some(fix),
-            Err(err) => debug!("Failed to create fix for {}: {}", self.rule, err),
+            Err(err) => debug!("Failed to create fix for {}: {}", self.rule(), err),
         }
     }
 
@@ -72,7 +80,7 @@ impl OldDiagnostic {
         match func() {
             Ok(None) => {}
             Ok(Some(fix)) => self.fix = Some(fix),
-            Err(err) => debug!("Failed to create fix for {}: {}", self.rule, err),
+            Err(err) => debug!("Failed to create fix for {}: {}", self.rule(), err),
         }
     }
 
@@ -89,16 +97,31 @@ impl OldDiagnostic {
     pub fn set_parent(&mut self, parent: TextSize) {
         self.parent = Some(parent);
     }
+
+    /// Consumes `self` and returns a new `Diagnostic` with the given noqa offset.
+    #[inline]
+    #[must_use]
+    pub fn with_noqa_offset(mut self, noqa_offset: TextSize) -> Self {
+        self.noqa_offset = Some(noqa_offset);
+        self
+    }
 }
 
 impl AsRule for OldDiagnostic {
     fn rule(&self) -> Rule {
-        self.rule
+        self.diagnostic
+            .id()
+            .as_str()
+            .parse()
+            .expect("Expected valid rule name for ruff diagnostic")
     }
 }
 
 impl Ranged for OldDiagnostic {
     fn range(&self) -> TextRange {
-        self.range
+        self.diagnostic
+            .expect_primary_span()
+            .range()
+            .expect("Expected range for ruff span")
     }
 }

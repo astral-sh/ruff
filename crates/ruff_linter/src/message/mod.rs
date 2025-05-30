@@ -114,26 +114,21 @@ impl Message {
     }
 
     /// Create a [`Message`] from the given [`OldDiagnostic`] corresponding to a rule violation.
-    pub fn from_diagnostic(diagnostic: OldDiagnostic, noqa_offset: Option<TextSize>) -> Message {
+    pub fn from_diagnostic(diagnostic: OldDiagnostic) -> Message {
         let OldDiagnostic {
-            body,
-            suggestion,
-            range,
+            diagnostic,
             fix,
             parent,
-            rule,
-            file,
-        } = diagnostic;
-        Self::diagnostic(
-            body,
-            suggestion,
-            range,
-            fix,
-            parent,
-            file,
             noqa_offset,
-            rule,
-        )
+            noqa_code,
+        } = diagnostic;
+        Self {
+            diagnostic,
+            fix,
+            parent,
+            noqa_offset,
+            noqa_code,
+        }
     }
 
     /// Create a [`Message`] from the given [`ParseError`].

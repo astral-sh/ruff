@@ -192,7 +192,7 @@ mod tests {
                     edit.range(),
                     &SourceFileBuilder::new(filename, source).finish(),
                 );
-                Message::from_diagnostic(diagnostic.with_fix(Fix::safe_edit(edit)), None)
+                Message::from_diagnostic(diagnostic.with_fix(Fix::safe_edit(edit)))
             })
             .collect()
     }
