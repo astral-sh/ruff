@@ -1891,10 +1891,13 @@ impl TestCase {
 
         // Canonicalize the tempdir path because macos uses symlinks for tempdirs
         // and that doesn't play well with our snapshot filtering.
-        let project_dir = temp_dir
-            .path()
-            .canonicalize()
-            .context("Failed to canonicalize project path")?;
+        let project_dir = dunce::simplified(
+            &temp_dir
+                .path()
+                .canonicalize()
+                .context("Failed to canonicalize project path")?,
+        )
+        .to_path_buf();
 
         let mut settings = insta::Settings::clone_current();
         settings.add_filter(&tempdir_filter(&project_dir), "<temp_dir>/");

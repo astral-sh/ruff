@@ -279,15 +279,8 @@ impl VirtualEnvironment {
             let mut version_info_parts = version_string.split('.');
             let (major, minor) = (version_info_parts.next()?, version_info_parts.next()?);
             let version = PythonVersion::try_from((major, minor)).ok()?;
-
-            let canonical_path = pyvenv_cfg_path
-                .as_std_path()
-                .canonicalize()
-                .ok()
-                .and_then(|path| SystemPathBuf::from_path_buf(path).ok())
-                .map(Arc::new);
             let source = PythonVersionSource::PyvenvCfgFile(PythonVersionFileSource::new(
-                canonical_path,
+                Arc::new(pyvenv_cfg_path),
                 Some(range),
             ));
 

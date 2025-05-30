@@ -190,12 +190,12 @@ enum PythonSourcePriority {
 /// from which we inferred the Python version.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PythonVersionFileSource {
-    path: Option<Arc<SystemPathBuf>>,
+    path: Arc<SystemPathBuf>,
     range: Option<TextRange>,
 }
 
 impl PythonVersionFileSource {
-    pub fn new(path: Option<Arc<SystemPathBuf>>, range: Option<TextRange>) -> Self {
+    pub fn new(path: Arc<SystemPathBuf>, range: Option<TextRange>) -> Self {
         Self { path, range }
     }
 
@@ -205,7 +205,7 @@ impl PythonVersionFileSource {
     /// Useful for subdiagnostics when informing the user
     /// what the inferred Python version of their project is.
     pub(crate) fn span(&self, db: &dyn Db) -> Option<Span> {
-        let file = system_path_to_file(db.upcast(), self.path.as_deref()?).ok()?;
+        let file = system_path_to_file(db.upcast(), &*self.path).ok()?;
         Some(Span::from(file).with_optional_range(self.range))
     }
 }
