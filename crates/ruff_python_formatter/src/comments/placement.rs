@@ -321,7 +321,7 @@ fn handle_enclosed_comment<'a>(
         },
         AnyNodeRef::FString(fstring) => CommentPlacement::dangling(fstring, comment),
         AnyNodeRef::TString(tstring) => CommentPlacement::dangling(tstring, comment),
-        AnyNodeRef::FTStringInterpolatedElement(_) => {
+        AnyNodeRef::InterpolatedElement(_) => {
             // Handle comments after the format specifier (should be rare):
             //
             // ```python
@@ -335,8 +335,8 @@ fn handle_enclosed_comment<'a>(
             if matches!(
                 comment.preceding_node(),
                 Some(
-                    AnyNodeRef::FTStringInterpolatedElement(_)
-                        | AnyNodeRef::FTStringLiteralElement(_)
+                    AnyNodeRef::InterpolatedElement(_)
+                        | AnyNodeRef::InterpolatedStringLiteralElement(_)
                 )
             ) {
                 CommentPlacement::trailing(comment.enclosing_node(), comment)

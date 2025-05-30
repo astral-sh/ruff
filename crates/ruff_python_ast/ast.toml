@@ -551,9 +551,9 @@ doc = "See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.e
 [ExceptHandler.nodes]
 ExceptHandlerExceptHandler = {}
 
-[FTStringElement.nodes]
-FTStringInterpolatedElement = { variant = "Expression" }
-FTStringLiteralElement = { variant = "Literal" }
+[InterpolatedStringElement.nodes]
+InterpolatedElement = { variant = "Interpolation" }
+InterpolatedStringLiteralElement = { variant = "Literal" }
 
 
 [Pattern]
@@ -578,7 +578,7 @@ TypeParamTypeVarTuple = {}
 TypeParamParamSpec = {}
 
 [ungrouped.nodes]
-FTStringFormatSpec = {}
+InterpolatedStringFormatSpec = {}
 PatternArguments = {}
 PatternKeyword = {}
 Comprehension = {}

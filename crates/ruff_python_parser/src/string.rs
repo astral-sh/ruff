@@ -42,42 +42,42 @@ impl From<StringType> for Expr {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum FTStringKind {
+pub(crate) enum InterpolatedStringKind {
     FString,
     TString,
 }
 
-impl FTStringKind {
+impl InterpolatedStringKind {
     #[inline]
     pub(crate) const fn start_token(self) -> TokenKind {
         match self {
-            FTStringKind::FString => TokenKind::FStringStart,
-            FTStringKind::TString => TokenKind::TStringStart,
+            InterpolatedStringKind::FString => TokenKind::FStringStart,
+            InterpolatedStringKind::TString => TokenKind::TStringStart,
         }
     }
 
     #[inline]
     pub(crate) const fn middle_token(self) -> TokenKind {
         match self {
-            FTStringKind::FString => TokenKind::FStringMiddle,
-            FTStringKind::TString => TokenKind::TStringMiddle,
+            InterpolatedStringKind::FString => TokenKind::FStringMiddle,
+            InterpolatedStringKind::TString => TokenKind::TStringMiddle,
         }
     }
 
     #[inline]
     pub(crate) const fn end_token(self) -> TokenKind {
         match self {
-            FTStringKind::FString => TokenKind::FStringEnd,
-            FTStringKind::TString => TokenKind::TStringEnd,
+            InterpolatedStringKind::FString => TokenKind::FStringEnd,
+            InterpolatedStringKind::TString => TokenKind::TStringEnd,
         }
     }
 }
 
-impl fmt::Display for FTStringKind {
+impl fmt::Display for InterpolatedStringKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            FTStringKind::FString => f.write_str("f-string"),
-            FTStringKind::TString => f.write_str("t-string"),
+            InterpolatedStringKind::FString => f.write_str("f-string"),
+            InterpolatedStringKind::TString => f.write_str("t-string"),
         }
     }
 }
@@ -279,10 +279,12 @@ impl StringParser {
         Ok(Some(EscapedChar::Literal(new_char)))
     }
 
-    fn parse_ftstring_middle(mut self) -> Result<ast::FTStringLiteralElement, LexicalError> {
+    fn parse_interpolated_string_middle(
+        mut self,
+    ) -> Result<ast::InterpolatedStringLiteralElement, LexicalError> {
         // Fast-path: if the f-string or t-string doesn't contain any escape sequences, return the literal.
         let Some(mut index) = memchr::memchr3(b'{', b'}', b'\\', self.source.as_bytes()) else {
-            return Ok(ast::FTStringLiteralElement {
+            return Ok(ast::InterpolatedStringLiteralElement {
                 value: self.source,
                 range: self.range,
             });
@@ -359,7 +361,7 @@ impl StringParser {
             index = next_index;
         }
 
-        Ok(ast::FTStringLiteralElement {
+        Ok(ast::InterpolatedStringLiteralElement {
             value: value.into_boxed_str(),
             range: self.range,
         })
@@ -506,12 +508,12 @@ pub(crate) fn parse_string_literal(
 }
 
 // TODO(dhruvmanila): Move this to the new parser
-pub(crate) fn parse_ftstring_literal_element(
+pub(crate) fn parse_interpolated_string_literal_element(
     source: Box<str>,
     flags: AnyStringFlags,
     range: TextRange,
-) -> Result<ast::FTStringLiteralElement, LexicalError> {
-    StringParser::new(source, flags, range.start(), range).parse_ftstring_middle()
+) -> Result<ast::InterpolatedStringLiteralElement, LexicalError> {
+    StringParser::new(source, flags, range.start(), range).parse_interpolated_string_middle()
 }
 
 #[cfg(test)]
@@ -519,7 +521,7 @@ mod tests {
     use ruff_python_ast::Suite;
 
     use crate::error::LexicalErrorType;
-    use crate::{FTStringErrorType, ParseError, ParseErrorType, Parsed, parse_module};
+    use crate::{InterpolatedStringErrorType, ParseError, ParseErrorType, Parsed, parse_module};
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
@@ -601,7 +603,7 @@ mod tests {
         insta::assert_debug_snapshot!(suite);
     }
 
-    fn parse_fstring_error(source: &str) -> FTStringErrorType {
+    fn parse_fstring_error(source: &str) -> InterpolatedStringErrorType {
         parse_suite(source)
             .map_err(|e| match e.error {
                 ParseErrorType::Lexical(LexicalErrorType::FStringError(e)) => e,
@@ -613,7 +615,7 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_fstring() {
-        use FTStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
+        use InterpolatedStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
 
         assert_eq!(parse_fstring_error(r#"f"{5!x}""#), InvalidConversionFlag);
         assert_eq!(
@@ -713,7 +715,7 @@ mod tests {
         insta::assert_debug_snapshot!(suite);
     }
 
-    fn parse_tstring_error(source: &str) -> FTStringErrorType {
+    fn parse_tstring_error(source: &str) -> InterpolatedStringErrorType {
         parse_suite(source)
             .map_err(|e| match e.error {
                 ParseErrorType::Lexical(LexicalErrorType::TStringError(e)) => e,
@@ -725,7 +727,7 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_tstring() {
-        use FTStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
+        use InterpolatedStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
 
         assert_eq!(parse_tstring_error(r#"t"{5!x}""#), InvalidConversionFlag);
         assert_eq!(

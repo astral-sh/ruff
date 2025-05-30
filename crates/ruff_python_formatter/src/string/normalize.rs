@@ -5,13 +5,13 @@ use std::iter::FusedIterator;
 use ruff_formatter::FormatContext;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{
-    AnyStringFlags, BytesLiteral, FString, FTStringElement, FTStringElements, StringFlags,
-    StringLikePart, StringLiteral,
+    AnyStringFlags, BytesLiteral, FString, InterpolatedStringElement, InterpolatedStringElements,
+    StringFlags, StringLikePart, StringLiteral,
 };
 use ruff_text_size::{Ranged, TextRange, TextSlice};
 
 use crate::QuoteStyle;
-use crate::context::FTStringState;
+use crate::context::InterpolatedStringState;
 use crate::prelude::*;
 use crate::string::{Quote, StringQuotes, TripleQuotes};
 
@@ -47,10 +47,10 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
         let supports_pep_701 = self.context.options().target_version().supports_pep_701();
 
         // For f-strings and t-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
-        if let FTStringState::InsideInterpolatedElement(parent_context) =
-            self.context.ft_string_state()
+        if let InterpolatedStringState::InsideInterpolatedElement(parent_context) =
+            self.context.interpolated_string_state()
         {
-            let parent_flags = parent_context.ft_string().flags();
+            let parent_flags = parent_context.interpolated_string().flags();
             if !parent_flags.is_triple_quoted() || string.flags().is_triple_quoted() {
                 // This logic is even necessary when using preserve and the target python version doesn't support PEP701 because
                 // we might end up joining two f-strings that have different quote styles, in which case we need to alternate the quotes
@@ -91,7 +91,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
 
                 // An f-string expression element contains a debug text and the corresponding
                 // format specifier has a literal element with a quote character.
-                if is_ftstring_with_quoted_format_spec_and_debug(
+                if is_interpolated_string_with_quoted_format_spec_and_debug(
                     &fstring.elements,
                     fstring.flags.into(),
                     self.context,
@@ -100,7 +100,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                 }
             }
             StringLikePart::TString(tstring) => {
-                if is_ftstring_with_quoted_format_spec_and_debug(
+                if is_interpolated_string_with_quoted_format_spec_and_debug(
                     &tstring.elements,
                     tstring.flags.into(),
                     self.context,
@@ -187,7 +187,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
             // The preferred quote style is single or double quotes, and the string contains a quote or
             // another character that may require escaping
             (Ok(preferred_quote), Some(first_quote_or_normalized_char_offset)) => {
-                let metadata = if string.is_ftstring() {
+                let metadata = if string.is_interpolated_string() {
                     QuoteMetadata::from_part(string, self.context, preferred_quote)
                 } else {
                     QuoteMetadata::from_str(
@@ -277,7 +277,7 @@ impl QuoteMetadata {
             StringLikePart::FString(fstring) => {
                 let metadata = QuoteMetadata::from_str("", part.flags(), preferred_quote);
 
-                metadata.merge_ftstring_elements(
+                metadata.merge_interpolated_string_elements(
                     &fstring.elements,
                     fstring.flags.into(),
                     context,
@@ -287,7 +287,7 @@ impl QuoteMetadata {
             StringLikePart::TString(tstring) => {
                 let metadata = QuoteMetadata::from_str("", part.flags(), preferred_quote);
 
-                metadata.merge_ftstring_elements(
+                metadata.merge_interpolated_string_elements(
                     &tstring.elements,
                     tstring.flags.into(),
                     context,
@@ -394,7 +394,7 @@ impl QuoteMetadata {
         })
     }
 
-    /// For f-strings, only consider the quotes inside string-literals but ignore
+    /// For f-strings and t-strings, only consider the quotes inside string-literals but ignore
     /// quotes inside expressions (except inside the format spec). This allows both the outer and the nested literals
     /// to make the optimal local-choice to reduce the total number of quotes necessary.
     /// This doesn't require any pre 312 special handling because an expression
@@ -402,9 +402,9 @@ impl QuoteMetadata {
     /// ```python
     /// f"{'escaping a quote like this \" is a syntax error pre 312'}"
     /// ```
-    fn merge_ftstring_elements(
+    fn merge_interpolated_string_elements(
         self,
-        elements: &FTStringElements,
+        elements: &InterpolatedStringElements,
         flags: AnyStringFlags,
         context: &PyFormatContext,
         preferred_quote: Quote,
@@ -413,7 +413,7 @@ impl QuoteMetadata {
 
         for element in elements {
             match element {
-                FTStringElement::Literal(literal) => {
+                InterpolatedStringElement::Literal(literal) => {
                     merged = merged
                         .merge(&QuoteMetadata::from_str(
                             context.source().slice(literal),
@@ -422,10 +422,10 @@ impl QuoteMetadata {
                         ))
                         .expect("Merge to succeed because all parts have the same flags");
                 }
-                FTStringElement::Expression(expression) => {
+                InterpolatedStringElement::Interpolation(expression) => {
                     if let Some(spec) = expression.format_spec.as_deref() {
                         if expression.debug_text.is_none() {
-                            merged = merged.merge_ftstring_elements(
+                            merged = merged.merge_interpolated_string_elements(
                                 &spec.elements,
                                 flags,
                                 context,
@@ -904,7 +904,7 @@ pub(super) fn is_fstring_with_quoted_debug_expression(
     fstring: &FString,
     context: &PyFormatContext,
 ) -> bool {
-    fstring.elements.expressions().any(|expression| {
+    fstring.elements.interpolations().any(|expression| {
         if expression.debug_text.is_some() {
             let content = context.source().slice(expression);
             contains_opposite_quote(content, fstring.flags.into())
@@ -1011,24 +1011,24 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
 /// t'{x=:a{y:"abcd"}}'
 /// t'{x=:a{y:{z:"abcd"}}}'
 /// ```
-pub(super) fn is_ftstring_with_quoted_format_spec_and_debug(
-    elements: &FTStringElements,
+pub(super) fn is_interpolated_string_with_quoted_format_spec_and_debug(
+    elements: &InterpolatedStringElements,
     flags: AnyStringFlags,
     context: &PyFormatContext,
 ) -> bool {
     fn has_format_spec_with_opposite_quote(
-        elements: &FTStringElements,
+        elements: &InterpolatedStringElements,
         flags: AnyStringFlags,
         context: &PyFormatContext,
         in_debug: bool,
     ) -> bool {
         elements.iter().any(|element| match element {
-            FTStringElement::Literal(literal) => {
+            InterpolatedStringElement::Literal(literal) => {
                 let content = context.source().slice(literal);
 
                 in_debug && contains_opposite_quote(content, flags)
             }
-            FTStringElement::Expression(expression) => {
+            InterpolatedStringElement::Interpolation(expression) => {
                 expression.format_spec.as_deref().is_some_and(|spec| {
                     has_format_spec_with_opposite_quote(
                         &spec.elements,
@@ -1041,7 +1041,7 @@ pub(super) fn is_ftstring_with_quoted_format_spec_and_debug(
         })
     }
 
-    elements.expressions().any(|expression| {
+    elements.interpolations().any(|expression| {
         if let Some(spec) = expression.format_spec.as_deref() {
             return has_format_spec_with_opposite_quote(
                 &spec.elements,

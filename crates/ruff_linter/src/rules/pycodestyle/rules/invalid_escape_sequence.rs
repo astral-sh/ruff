@@ -2,7 +2,8 @@ use memchr::memchr_iter;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    AnyStringFlags, FTStringElement, FTStringElements, StringLike, StringLikePart,
+    AnyStringFlags, InterpolatedStringElement, InterpolatedStringElements, StringLike,
+    StringLikePart,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -125,7 +126,7 @@ fn analyze_escape_chars(
 
         let next_char = match source[i + 1..].chars().next() {
             Some(next_char) => next_char,
-            None if flags.is_ft_string() => {
+            None if flags.is_interpolated_string() => {
                 // If we're at the end of a f-string middle token, the next character
                 // is actually emitted as a different token. For example,
                 //
@@ -211,7 +212,7 @@ fn analyze_escape_chars(
 
 fn analyze_escape_chars_in_interpolated_string(
     flags: AnyStringFlags,
-    elements: &FTStringElements,
+    elements: &InterpolatedStringElements,
     locator: &Locator,
 ) -> EscapeCharsState {
     let mut escape_chars_state = EscapeCharsState::default();
@@ -222,10 +223,10 @@ fn analyze_escape_chars_in_interpolated_string(
     // element before pushing a diagnostic and fix.
     for element in elements {
         match element {
-            FTStringElement::Literal(literal) => {
+            InterpolatedStringElement::Literal(literal) => {
                 escape_chars_state.update(analyze_escape_chars(locator, literal.range(), flags));
             }
-            FTStringElement::Expression(interpolation) => {
+            InterpolatedStringElement::Interpolation(interpolation) => {
                 let Some(format_spec) = interpolation.format_spec.as_ref() else {
                     continue;
                 };

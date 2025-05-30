@@ -87,15 +87,15 @@ impl StringLikeExtensions for ast::StringLike<'_> {
     fn is_multiline(&self, context: &PyFormatContext) -> bool {
         // Helper for f-string and t-string parts
         fn contains_line_break_or_comments(
-            elements: &ast::FTStringElements,
+            elements: &ast::InterpolatedStringElements,
             context: &PyFormatContext,
             triple_quotes: TripleQuotes,
         ) -> bool {
             elements.iter().any(|element| match element {
-                ast::FTStringElement::Literal(literal) => {
+                ast::InterpolatedStringElement::Literal(literal) => {
                     triple_quotes.is_yes() && context.source().contains_line_break(literal.range())
                 }
-                ast::FTStringElement::Expression(expression) => {
+                ast::InterpolatedStringElement::Interpolation(expression) => {
                     // Expressions containing comments can't be joined.
                     //
                     // Format specifiers needs to be checked as well. For example, the

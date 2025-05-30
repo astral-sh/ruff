@@ -3,7 +3,7 @@ use std::fmt::{self, Display};
 use ruff_python_ast::PythonVersion;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{TokenKind, string::FTStringKind};
+use crate::{TokenKind, string::InterpolatedStringKind};
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.
@@ -50,7 +50,7 @@ impl ParseError {
 
 /// Represents the different types of errors that can occur during parsing of an f-string or t-string.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FTStringErrorType {
+pub enum InterpolatedStringErrorType {
     /// Expected a right brace after an opened left brace.
     UnclosedLbrace,
     /// An invalid conversion flag was encountered.
@@ -65,9 +65,9 @@ pub enum FTStringErrorType {
     LambdaWithoutParentheses,
 }
 
-impl std::fmt::Display for FTStringErrorType {
+impl std::fmt::Display for InterpolatedStringErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use FTStringErrorType::{
+        use InterpolatedStringErrorType::{
             InvalidConversionFlag, LambdaWithoutParentheses, SingleRbrace, UnclosedLbrace,
             UnterminatedString, UnterminatedTripleQuotedString,
         };
@@ -177,19 +177,22 @@ pub enum ParseErrorType {
     /// An unexpected token was found at the end of an expression parsing
     UnexpectedExpressionToken,
 
-    /// An f-string error containing the [`FTStringErrorType`].
-    FStringError(FTStringErrorType),
-    /// A t-string error containing the [`FTStringErrorType`].
-    TStringError(FTStringErrorType),
+    /// An f-string error containing the [`InterpolatedStringErrorType`].
+    FStringError(InterpolatedStringErrorType),
+    /// A t-string error containing the [`InterpolatedStringErrorType`].
+    TStringError(InterpolatedStringErrorType),
     /// Parser encountered an error during lexing.
     Lexical(LexicalErrorType),
 }
 
 impl ParseErrorType {
-    pub(crate) fn from_ftstring_error(error: FTStringErrorType, string_kind: FTStringKind) -> Self {
+    pub(crate) fn from_interpolated_string_error(
+        error: InterpolatedStringErrorType,
+        string_kind: InterpolatedStringKind,
+    ) -> Self {
         match string_kind {
-            FTStringKind::FString => Self::FStringError(error),
-            FTStringKind::TString => Self::TStringError(error),
+            InterpolatedStringKind::FString => Self::FStringError(error),
+            InterpolatedStringKind::TString => Self::TStringError(error),
         }
     }
 }
@@ -389,10 +392,10 @@ pub enum LexicalErrorType {
     IndentationError,
     /// An unrecognized token was encountered.
     UnrecognizedToken { tok: char },
-    /// An f-string error containing the [`FTStringErrorType`].
-    FStringError(FTStringErrorType),
-    /// A t-string error containing the [`FTStringErrorType`].
-    TStringError(FTStringErrorType),
+    /// An f-string error containing the [`InterpolatedStringErrorType`].
+    FStringError(InterpolatedStringErrorType),
+    /// A t-string error containing the [`InterpolatedStringErrorType`].
+    TStringError(InterpolatedStringErrorType),
     /// Invalid character encountered in a byte literal.
     InvalidByteLiteral,
     /// An unexpected character was encountered after a line continuation.
@@ -406,10 +409,13 @@ pub enum LexicalErrorType {
 impl std::error::Error for LexicalErrorType {}
 
 impl LexicalErrorType {
-    pub(crate) fn from_ftstring_error(error: FTStringErrorType, string_kind: FTStringKind) -> Self {
+    pub(crate) fn from_interpolated_string_error(
+        error: InterpolatedStringErrorType,
+        string_kind: InterpolatedStringKind,
+    ) -> Self {
         match string_kind {
-            FTStringKind::FString => Self::FStringError(error),
-            FTStringKind::TString => Self::TStringError(error),
+            InterpolatedStringKind::FString => Self::FStringError(error),
+            InterpolatedStringKind::TString => Self::TStringError(error),
         }
     }
 }

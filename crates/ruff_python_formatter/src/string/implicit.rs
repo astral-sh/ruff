@@ -5,7 +5,8 @@ use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
 };
 use ruff_python_ast::{
-    AnyStringFlags, FString, FTStringElement, StringFlags, StringLike, StringLikePart, TString,
+    AnyStringFlags, FString, InterpolatedStringElement, StringFlags, StringLike, StringLikePart,
+    TString,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -13,14 +14,14 @@ use std::borrow::Cow;
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
-use crate::other::f_t_string::{FTStringContext, FTStringLayout};
-use crate::other::f_t_string_element::FormatFTStringInterpolatedElement;
+use crate::other::interpolated_string::{InterpolatedStringContext, InterpolatedStringLayout};
+use crate::other::interpolated_string_element::FormatInterpolatedElement;
 use crate::prelude::*;
 use crate::string::docstring::needs_chaperone_space;
 use crate::string::normalize::{
     QuoteMetadata, is_fstring_with_quoted_debug_expression,
     is_fstring_with_triple_quoted_literal_expression_containing_quotes,
-    is_ftstring_with_quoted_format_spec_and_debug,
+    is_interpolated_string_with_quoted_format_spec_and_debug,
 };
 use crate::string::{StringLikeExtensions, StringNormalizer, StringQuotes, normalize_string};
 
@@ -174,7 +175,7 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                             return None;
                         }
                         if context.options().target_version().supports_pep_701() {
-                            if is_ftstring_with_quoted_format_spec_and_debug(
+                            if is_interpolated_string_with_quoted_format_spec_and_debug(
                                 &fstring.elements,
                                 fstring.flags.into(),
                                 context,
@@ -204,7 +205,7 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                         }
                     }
                     StringLikePart::TString(tstring) => {
-                        if is_ftstring_with_quoted_format_spec_and_debug(
+                        if is_interpolated_string_with_quoted_format_spec_and_debug(
                             &tstring.elements,
                             tstring.flags.into(),
                             context,
@@ -316,7 +317,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                     FormatLiteralContent {
                         range: part.content_range(),
                         flags: self.flags,
-                        is_ftstring: false,
+                        is_interpolated_string: false,
                         trim_start: first_non_empty && self.docstring,
                         trim_end: self.docstring && parts.peek().is_none(),
                     }
@@ -333,11 +334,11 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                 | StringLikePart::TString(TString { elements, .. }) => {
                     for element in elements {
                         match element {
-                            FTStringElement::Literal(literal) => {
+                            InterpolatedStringElement::Literal(literal) => {
                                 FormatLiteralContent {
                                     range: literal.range(),
                                     flags: self.flags,
-                                    is_ftstring: true,
+                                    is_interpolated_string: true,
                                     trim_end: false,
                                     trim_start: false,
                                 }
@@ -345,17 +346,16 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                             }
                             // Formatting the expression here and in the expanded version is safe **only**
                             // because we assert that the f/t-string never contains any comments.
-                            FTStringElement::Expression(expression) => {
-                                let context = FTStringContext::new(
+                            InterpolatedStringElement::Interpolation(expression) => {
+                                let context = InterpolatedStringContext::new(
                                     self.flags,
-                                    FTStringLayout::from_ft_string_elements(
+                                    InterpolatedStringLayout::from_interpolated_string_elements(
                                         elements,
                                         f.context().source(),
                                     ),
                                 );
 
-                                FormatFTStringInterpolatedElement::new(expression, context)
-                                    .fmt(f)?;
+                                FormatInterpolatedElement::new(expression, context).fmt(f)?;
                             }
                         }
                     }
@@ -370,7 +370,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
 struct FormatLiteralContent {
     range: TextRange,
     flags: AnyStringFlags,
-    is_ftstring: bool,
+    is_interpolated_string: bool,
     trim_start: bool,
     trim_end: bool,
 }
@@ -382,7 +382,7 @@ impl Format<PyFormatContext<'_>> for FormatLiteralContent {
             content,
             0,
             self.flags,
-            self.flags.is_ft_string() && !self.is_ftstring,
+            self.flags.is_interpolated_string() && !self.is_interpolated_string,
         );
 
         // Trim the start and end of the string if it's the first or last part of a docstring.

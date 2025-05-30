@@ -1,5 +1,5 @@
-use super::f_t_string_element::FormatFTStringElement;
-use crate::other::f_t_string::{FTStringContext, FTStringLayout};
+use super::interpolated_string_element::FormatInterpolatedStringElement;
+use crate::other::interpolated_string::{InterpolatedStringContext, InterpolatedStringLayout};
 use crate::prelude::*;
 use crate::string::{StringNormalizer, StringQuotes};
 use ruff_formatter::write;
@@ -18,9 +18,12 @@ impl FormatNodeRule<TString> for FormatTString {
 
         let string_kind = normalizer.choose_quotes(item.into()).flags();
 
-        let context = FTStringContext::new(
+        let context = InterpolatedStringContext::new(
             string_kind,
-            FTStringLayout::from_ft_string_elements(&item.elements, f.context().source()),
+            InterpolatedStringLayout::from_interpolated_string_elements(
+                &item.elements,
+                f.context().source(),
+            ),
         );
 
         // Starting prefix and quote
@@ -28,7 +31,7 @@ impl FormatNodeRule<TString> for FormatTString {
         write!(f, [string_kind.prefix(), quotes])?;
 
         for element in &item.elements {
-            FormatFTStringElement::new(element, context).fmt(f)?;
+            FormatInterpolatedStringElement::new(element, context).fmt(f)?;
         }
 
         // Ending quote

@@ -1,16 +1,16 @@
-use ruff_python_ast::{AnyStringFlags, FTStringElements};
+use ruff_python_ast::{AnyStringFlags, InterpolatedStringElements};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct FTStringContext {
+pub(crate) struct InterpolatedStringContext {
     /// The string flags of the enclosing f/t-string part.
     enclosing_flags: AnyStringFlags,
-    layout: FTStringLayout,
+    layout: InterpolatedStringLayout,
 }
 
-impl FTStringContext {
-    pub(crate) const fn new(flags: AnyStringFlags, layout: FTStringLayout) -> Self {
+impl InterpolatedStringContext {
+    pub(crate) const fn new(flags: AnyStringFlags, layout: InterpolatedStringLayout) -> Self {
         Self {
             enclosing_flags: flags,
             layout,
@@ -21,13 +21,13 @@ impl FTStringContext {
         self.enclosing_flags
     }
 
-    pub(crate) const fn layout(self) -> FTStringLayout {
+    pub(crate) const fn layout(self) -> InterpolatedStringLayout {
         self.layout
     }
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) enum FTStringLayout {
+pub(crate) enum InterpolatedStringLayout {
     /// Original f/t-string is flat.
     /// Don't break expressions to keep the string flat.
     Flat,
@@ -36,7 +36,7 @@ pub(crate) enum FTStringLayout {
     Multiline,
 }
 
-impl FTStringLayout {
+impl InterpolatedStringLayout {
     // Heuristic: Allow breaking the f/t-string expressions across multiple lines
     // only if there already is at least one multiline expression. This puts the
     // control in the hands of the user to decide if they want to break the
@@ -49,9 +49,12 @@ impl FTStringLayout {
     // and we assume that the target version of Python supports it (3.12+).
     //
     // Reference: https://prettier.io/docs/en/next/rationale.html#template-literals
-    pub(crate) fn from_ft_string_elements(elements: &FTStringElements, source: &str) -> Self {
+    pub(crate) fn from_interpolated_string_elements(
+        elements: &InterpolatedStringElements,
+        source: &str,
+    ) -> Self {
         if elements
-            .expressions()
+            .interpolations()
             .any(|expr| source.contains_line_break(expr.range()))
         {
             Self::Multiline
@@ -61,10 +64,10 @@ impl FTStringLayout {
     }
 
     pub(crate) const fn is_flat(self) -> bool {
-        matches!(self, FTStringLayout::Flat)
+        matches!(self, InterpolatedStringLayout::Flat)
     }
 
     pub(crate) const fn is_multiline(self) -> bool {
-        matches!(self, FTStringLayout::Multiline)
+        matches!(self, InterpolatedStringLayout::Multiline)
     }
 }

@@ -1329,24 +1329,24 @@ impl<'a> Generator<'a> {
                     self.unparse_string_literal(string_literal);
                 }
                 ast::FStringPart::FString(f_string) => {
-                    self.unparse_ft_string(&f_string.elements, f_string.flags.into());
+                    self.unparse_interpolated_string(&f_string.elements, f_string.flags.into());
                 }
             }
         }
     }
 
-    fn unparse_ft_string_body(&mut self, values: &[ast::FTStringElement]) {
+    fn unparse_interpolated_string_body(&mut self, values: &[ast::InterpolatedStringElement]) {
         for value in values {
-            self.unparse_ft_string_element(value);
+            self.unparse_interpolated_string_element(value);
         }
     }
 
-    fn unparse_ft_string_interpolated_element(
+    fn unparse_interpolated_element(
         &mut self,
         val: &Expr,
         debug_text: Option<&DebugText>,
         conversion: ConversionFlag,
-        spec: Option<&ast::FTStringFormatSpec>,
+        spec: Option<&ast::InterpolatedStringFormatSpec>,
     ) {
         let mut generator = Generator::new(self.indent, self.line_ending);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
@@ -1382,18 +1382,21 @@ impl<'a> Generator<'a> {
         self.p("}");
     }
 
-    fn unparse_ft_string_element(&mut self, element: &ast::FTStringElement) {
+    fn unparse_interpolated_string_element(&mut self, element: &ast::InterpolatedStringElement) {
         match element {
-            ast::FTStringElement::Literal(ast::FTStringLiteralElement { value, .. }) => {
-                self.unparse_ft_string_literal_element(value);
+            ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
+                value,
+                ..
+            }) => {
+                self.unparse_interpolated_string_literal_element(value);
             }
-            ast::FTStringElement::Expression(ast::FTStringInterpolatedElement {
+            ast::InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
                 expression,
                 debug_text,
                 conversion,
                 format_spec,
                 range: _,
-            }) => self.unparse_ft_string_interpolated_element(
+            }) => self.unparse_interpolated_element(
                 expression,
                 debug_text.as_ref(),
                 *conversion,
@@ -1402,20 +1405,24 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_ft_string_literal_element(&mut self, s: &str) {
+    fn unparse_interpolated_string_literal_element(&mut self, s: &str) {
         let s = s.replace('{', "{{").replace('}', "}}");
         self.p(&s);
     }
 
-    fn unparse_f_string_specifier(&mut self, values: &[ast::FTStringElement]) {
-        self.unparse_ft_string_body(values);
+    fn unparse_f_string_specifier(&mut self, values: &[ast::InterpolatedStringElement]) {
+        self.unparse_interpolated_string_body(values);
     }
 
     /// Unparse `values` with [`Generator::unparse_f_string_body`], using `quote` as the preferred
     /// surrounding quote style.
-    fn unparse_ft_string(&mut self, values: &[ast::FTStringElement], flags: AnyStringFlags) {
+    fn unparse_interpolated_string(
+        &mut self,
+        values: &[ast::InterpolatedStringElement],
+        flags: AnyStringFlags,
+    ) {
         let mut generator = Generator::new(self.indent, self.line_ending);
-        generator.unparse_ft_string_body(values);
+        generator.unparse_interpolated_string_body(values);
         let body = &generator.buffer;
         self.p_str_repr(body, flags);
     }
@@ -1429,10 +1436,10 @@ impl<'a> Generator<'a> {
                     self.unparse_string_literal(string_literal);
                 }
                 ast::TStringPart::FString(f_string) => {
-                    self.unparse_ft_string(&f_string.elements, f_string.flags.into());
+                    self.unparse_interpolated_string(&f_string.elements, f_string.flags.into());
                 }
                 ast::TStringPart::TString(t_string) => {
-                    self.unparse_ft_string(&t_string.elements, t_string.flags.into());
+                    self.unparse_interpolated_string(&t_string.elements, t_string.flags.into());
                 }
             }
         }

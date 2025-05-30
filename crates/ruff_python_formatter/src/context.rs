@@ -7,7 +7,7 @@ use ruff_python_parser::Tokens;
 
 use crate::PyFormatOptions;
 use crate::comments::Comments;
-use crate::other::f_t_string_element::FTStringInterpolatedElementContext;
+use crate::other::interpolated_string_element::InterpolatedElementContext;
 
 pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
@@ -26,7 +26,7 @@ pub struct PyFormatContext<'a> {
     /// the formatted Python code will be valid.
     docstring: Option<Quote>,
     /// The state of the formatter with respect to f-strings and t-strings.
-    ft_string_state: FTStringState,
+    interpolated_string_state: InterpolatedStringState,
 }
 
 impl<'a> PyFormatContext<'a> {
@@ -44,7 +44,7 @@ impl<'a> PyFormatContext<'a> {
             node_level: NodeLevel::TopLevel(TopLevelStatementPosition::Other),
             indent_level: IndentLevel::new(0),
             docstring: None,
-            ft_string_state: FTStringState::Outside,
+            interpolated_string_state: InterpolatedStringState::Outside,
         }
     }
 
@@ -97,12 +97,15 @@ impl<'a> PyFormatContext<'a> {
         }
     }
 
-    pub(crate) fn ft_string_state(&self) -> FTStringState {
-        self.ft_string_state
+    pub(crate) fn interpolated_string_state(&self) -> InterpolatedStringState {
+        self.interpolated_string_state
     }
 
-    pub(crate) fn set_ft_string_state(&mut self, ft_string_state: FTStringState) {
-        self.ft_string_state = ft_string_state;
+    pub(crate) fn set_interpolated_string_state(
+        &mut self,
+        interpolated_string_state: InterpolatedStringState,
+    ) {
+        self.interpolated_string_state = interpolated_string_state;
     }
 
     /// Returns `true` if preview mode is enabled.
@@ -135,24 +138,24 @@ impl Debug for PyFormatContext<'_> {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) enum FTStringState {
+pub(crate) enum InterpolatedStringState {
     /// The formatter is inside an f-string expression element i.e., between the
     /// curly brace in `f"foo {x}"`.
     ///
     /// The containing `FStringContext` is the surrounding f-string context.
-    InsideInterpolatedElement(FTStringInterpolatedElementContext),
+    InsideInterpolatedElement(InterpolatedElementContext),
     /// The formatter is outside an f-string.
     #[default]
     Outside,
 }
 
-impl FTStringState {
+impl InterpolatedStringState {
     pub(crate) fn can_contain_line_breaks(self) -> Option<bool> {
         match self {
-            FTStringState::InsideInterpolatedElement(context) => {
+            InterpolatedStringState::InsideInterpolatedElement(context) => {
                 Some(context.can_contain_line_breaks())
             }
-            FTStringState::Outside => None,
+            InterpolatedStringState::Outside => None,
         }
     }
 }
@@ -375,25 +378,25 @@ where
     }
 }
 
-pub(crate) struct WithFTStringState<'a, B, D>
+pub(crate) struct WithInterpolatedStringState<'a, B, D>
 where
     D: DerefMut<Target = B>,
     B: Buffer<Context = PyFormatContext<'a>>,
 {
     buffer: D,
-    saved_location: FTStringState,
+    saved_location: InterpolatedStringState,
 }
 
-impl<'a, B, D> WithFTStringState<'a, B, D>
+impl<'a, B, D> WithInterpolatedStringState<'a, B, D>
 where
     D: DerefMut<Target = B>,
     B: Buffer<Context = PyFormatContext<'a>>,
 {
-    pub(crate) fn new(expr_location: FTStringState, mut buffer: D) -> Self {
+    pub(crate) fn new(expr_location: InterpolatedStringState, mut buffer: D) -> Self {
         let context = buffer.state_mut().context_mut();
-        let saved_location = context.ft_string_state();
+        let saved_location = context.interpolated_string_state();
 
-        context.set_ft_string_state(expr_location);
+        context.set_interpolated_string_state(expr_location);
 
         Self {
             buffer,
@@ -402,7 +405,7 @@ where
     }
 }
 
-impl<'a, B, D> Deref for WithFTStringState<'a, B, D>
+impl<'a, B, D> Deref for WithInterpolatedStringState<'a, B, D>
 where
     D: DerefMut<Target = B>,
     B: Buffer<Context = PyFormatContext<'a>>,
@@ -414,7 +417,7 @@ where
     }
 }
 
-impl<'a, B, D> DerefMut for WithFTStringState<'a, B, D>
+impl<'a, B, D> DerefMut for WithInterpolatedStringState<'a, B, D>
 where
     D: DerefMut<Target = B>,
     B: Buffer<Context = PyFormatContext<'a>>,
@@ -424,7 +427,7 @@ where
     }
 }
 
-impl<'a, B, D> Drop for WithFTStringState<'a, B, D>
+impl<'a, B, D> Drop for WithInterpolatedStringState<'a, B, D>
 where
     D: DerefMut<Target = B>,
     B: Buffer<Context = PyFormatContext<'a>>,
@@ -433,6 +436,6 @@ where
         self.buffer
             .state_mut()
             .context_mut()
-            .set_ft_string_state(self.saved_location);
+            .set_interpolated_string_state(self.saved_location);
     }
 }

@@ -798,7 +798,7 @@ impl WithItemKind {
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
-enum FTStringElementsKind {
+enum InterpolatedStringElementsKind {
     /// The regular f-string elements.
     ///
     /// For example, the `"hello "`, `x`, and `" world"` elements in:
@@ -816,16 +816,16 @@ enum FTStringElementsKind {
     FormatSpec,
 }
 
-impl FTStringElementsKind {
+impl InterpolatedStringElementsKind {
     const fn list_terminators(self) -> TokenSet {
         match self {
-            FTStringElementsKind::Regular => {
+            InterpolatedStringElementsKind::Regular => {
                 TokenSet::new([TokenKind::FStringEnd, TokenKind::TStringEnd])
             }
             // test_ok fstring_format_spec_terminator
             // f"hello {x:} world"
             // f"hello {x:.3f} world"
-            FTStringElementsKind::FormatSpec => TokenSet::new([TokenKind::Rbrace]),
+            InterpolatedStringElementsKind::FormatSpec => TokenSet::new([TokenKind::Rbrace]),
         }
     }
 }
@@ -934,7 +934,7 @@ enum RecoveryContextKind {
     WithItems(WithItemKind),
 
     /// When parsing a list of f-string or t-string elements which are either literal elements, expressions, or interpolations.
-    FTStringElements(FTStringElementsKind),
+    InterpolatedStringElements(InterpolatedStringElementsKind),
 }
 
 impl RecoveryContextKind {
@@ -1118,7 +1118,7 @@ impl RecoveryContextKind {
                     .at(TokenKind::Colon)
                     .then_some(ListTerminatorKind::Regular),
             },
-            RecoveryContextKind::FTStringElements(kind) => {
+            RecoveryContextKind::InterpolatedStringElements(kind) => {
                 if p.at_ts(kind.list_terminators()) {
                     Some(ListTerminatorKind::Regular)
                 } else {
@@ -1175,7 +1175,7 @@ impl RecoveryContextKind {
                 ) || p.at_name_or_soft_keyword()
             }
             RecoveryContextKind::WithItems(_) => p.at_expr(),
-            RecoveryContextKind::FTStringElements(_) => matches!(
+            RecoveryContextKind::InterpolatedStringElements(_) => matches!(
                 p.current_token_kind(),
                 // Literal element
                 TokenKind::FStringMiddle | TokenKind::TStringMiddle
@@ -1269,11 +1269,11 @@ impl RecoveryContextKind {
                     "Expected an expression or the end of the with item list".to_string(),
                 ),
             },
-            RecoveryContextKind::FTStringElements(kind) => match kind {
-                FTStringElementsKind::Regular => ParseErrorType::OtherError(
+            RecoveryContextKind::InterpolatedStringElements(kind) => match kind {
+                InterpolatedStringElementsKind::Regular => ParseErrorType::OtherError(
                     "Expected an f-string or t-string element or the end of the f-string or t-string".to_string(),
                 ),
-                FTStringElementsKind::FormatSpec => ParseErrorType::OtherError(
+                InterpolatedStringElementsKind::FormatSpec => ParseErrorType::OtherError(
                     "Expected an f-string or t-string element or a '}'".to_string(),
                 ),
             },
@@ -1368,9 +1368,9 @@ impl RecoveryContext {
                 }
                 WithItemKind::Unparenthesized => RecoveryContext::WITH_ITEMS_UNPARENTHESIZED,
             },
-            RecoveryContextKind::FTStringElements(kind) => match kind {
-                FTStringElementsKind::Regular => RecoveryContext::FT_STRING_ELEMENTS,
-                FTStringElementsKind::FormatSpec => {
+            RecoveryContextKind::InterpolatedStringElements(kind) => match kind {
+                InterpolatedStringElementsKind::Regular => RecoveryContext::FT_STRING_ELEMENTS,
+                InterpolatedStringElementsKind::FormatSpec => {
                     RecoveryContext::FT_STRING_ELEMENTS_IN_FORMAT_SPEC
                 }
             },
@@ -1440,11 +1440,13 @@ impl RecoveryContext {
             RecoveryContext::WITH_ITEMS_UNPARENTHESIZED => {
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized)
             }
-            RecoveryContext::FT_STRING_ELEMENTS => {
-                RecoveryContextKind::FTStringElements(FTStringElementsKind::Regular)
-            }
+            RecoveryContext::FT_STRING_ELEMENTS => RecoveryContextKind::InterpolatedStringElements(
+                InterpolatedStringElementsKind::Regular,
+            ),
             RecoveryContext::FT_STRING_ELEMENTS_IN_FORMAT_SPEC => {
-                RecoveryContextKind::FTStringElements(FTStringElementsKind::FormatSpec)
+                RecoveryContextKind::InterpolatedStringElements(
+                    InterpolatedStringElementsKind::FormatSpec,
+                )
             }
             _ => return None,
         })

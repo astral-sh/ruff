@@ -90,7 +90,7 @@ pub enum StringLike<'a> {
 }
 
 impl<'a> StringLike<'a> {
-    pub const fn is_ftstring(self) -> bool {
+    pub const fn is_interpolated_string(self) -> bool {
         matches!(self, Self::TString(_) | Self::FString(_))
     }
 
@@ -255,7 +255,7 @@ impl<'a> StringLikePart<'a> {
         }
     }
 
-    pub const fn is_ftstring(self) -> bool {
+    pub const fn is_interpolated_string(self) -> bool {
         matches!(self, Self::FString(_) | Self::TString(_))
     }
 }

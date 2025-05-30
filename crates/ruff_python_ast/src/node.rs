@@ -85,23 +85,23 @@ impl ast::ExprCompare {
     }
 }
 
-impl ast::FTStringFormatSpec {
+impl ast::InterpolatedStringFormatSpec {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         for element in &self.elements {
-            visitor.visit_ft_string_element(element);
+            visitor.visit_interpolated_string_element(element);
         }
     }
 }
 
-impl ast::FTStringInterpolatedElement {
+impl ast::InterpolatedElement {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::FTStringInterpolatedElement {
+        let ast::InterpolatedElement {
             expression,
             format_spec,
             ..
@@ -110,18 +110,18 @@ impl ast::FTStringInterpolatedElement {
 
         if let Some(format_spec) = format_spec {
             for spec_part in &format_spec.elements {
-                visitor.visit_ft_string_element(spec_part);
+                visitor.visit_interpolated_string_element(spec_part);
             }
         }
     }
 }
 
-impl ast::FTStringLiteralElement {
+impl ast::InterpolatedStringLiteralElement {
     pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::FTStringLiteralElement { range: _, value: _ } = self;
+        let ast::InterpolatedStringLiteralElement { range: _, value: _ } = self;
     }
 }
 
@@ -638,7 +638,7 @@ impl ast::FString {
         } = self;
 
         for fstring_element in elements {
-            visitor.visit_ft_string_element(fstring_element);
+            visitor.visit_interpolated_string_element(fstring_element);
         }
     }
 }
@@ -655,7 +655,7 @@ impl ast::TString {
         } = self;
 
         for tstring_element in elements {
-            visitor.visit_ft_string_element(tstring_element);
+            visitor.visit_interpolated_string_element(tstring_element);
         }
     }
 }

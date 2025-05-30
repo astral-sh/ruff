@@ -475,7 +475,7 @@ impl TokenKind {
     }
 
     #[inline]
-    pub const fn is_ft_string_end(self) -> bool {
+    pub const fn is_interpolated_string_end(self) -> bool {
         matches!(self, TokenKind::FStringEnd | TokenKind::TStringEnd)
     }
 
@@ -820,13 +820,13 @@ impl TokenFlags {
     }
 
     /// Returns `true` if the token is a t-string.
-    pub(crate) const fn is_ft_string(self) -> bool {
+    pub(crate) const fn is_interpolated_string(self) -> bool {
         self.intersects(TokenFlags::T_STRING.union(TokenFlags::F_STRING))
     }
 
     /// Returns `true` if the token is a triple-quoted t-string.
-    pub(crate) fn is_triple_quoted_ftstring(self) -> bool {
-        self.intersects(TokenFlags::TRIPLE_QUOTED_STRING) && self.is_ft_string()
+    pub(crate) fn is_triple_quoted_interpolated_string(self) -> bool {
+        self.intersects(TokenFlags::TRIPLE_QUOTED_STRING) && self.is_interpolated_string()
     }
 
     /// Returns `true` if the token is a raw string.
@@ -859,7 +859,7 @@ pub(crate) enum TokenValue {
     String(Box<str>),
     /// Token value that includes the portion of text inside the f-string that's not
     /// part of the expression part and isn't an opening or closing brace.
-    FTStringMiddle(Box<str>),
+    InterpolatedStringMiddle(Box<str>),
     /// Token value for IPython escape commands. These are recognized by the lexer
     /// only when the mode is [`Mode::Ipython`].
     IpyEscapeCommand {

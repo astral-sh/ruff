@@ -1,7 +1,7 @@
 use crate::{
     self as ast, Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator,
-    ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FTStringElement, Keyword, MatchCase,
-    Operator, Parameter, Parameters, Pattern, PatternArguments, PatternKeyword, Stmt,
+    ElifElseClause, ExceptHandler, Expr, ExprContext, FString, InterpolatedStringElement, Keyword,
+    MatchCase, Operator, Parameter, Parameters, Pattern, PatternArguments, PatternKeyword, Stmt,
     StringLiteral, TString, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
     TypeParams, UnaryOp, WithItem,
 };
@@ -86,8 +86,11 @@ pub trait Transformer {
     fn visit_f_string(&self, f_string: &mut FString) {
         walk_f_string(self, f_string);
     }
-    fn visit_ft_string_element(&self, ft_string_element: &mut FTStringElement) {
-        walk_ft_string_element(self, ft_string_element);
+    fn visit_interpolated_string_element(
+        &self,
+        interpolated_string_element: &mut InterpolatedStringElement,
+    ) {
+        walk_interpolated_string_element(self, interpolated_string_element);
     }
     fn visit_t_string(&self, t_string: &mut TString) {
         walk_t_string(self, t_string);
@@ -762,24 +765,24 @@ pub fn walk_pattern_keyword<V: Transformer + ?Sized>(
 
 pub fn walk_f_string<V: Transformer + ?Sized>(visitor: &V, f_string: &mut FString) {
     for element in &mut f_string.elements {
-        visitor.visit_ft_string_element(element);
+        visitor.visit_interpolated_string_element(element);
     }
 }
 
-pub fn walk_ft_string_element<V: Transformer + ?Sized>(
+pub fn walk_interpolated_string_element<V: Transformer + ?Sized>(
     visitor: &V,
-    f_string_element: &mut FTStringElement,
+    interpolated_string_element: &mut InterpolatedStringElement,
 ) {
-    if let ast::FTStringElement::Expression(ast::FTStringInterpolatedElement {
+    if let ast::InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
         expression,
         format_spec,
         ..
-    }) = f_string_element
+    }) = interpolated_string_element
     {
         visitor.visit_expr(expression);
         if let Some(format_spec) = format_spec {
             for spec_element in &mut format_spec.elements {
-                visitor.visit_ft_string_element(spec_element);
+                visitor.visit_interpolated_string_element(spec_element);
             }
         }
     }
@@ -787,7 +790,7 @@ pub fn walk_ft_string_element<V: Transformer + ?Sized>(
 
 pub fn walk_t_string<V: Transformer + ?Sized>(visitor: &V, t_string: &mut TString) {
     for element in &mut t_string.elements {
-        visitor.visit_ft_string_element(element);
+        visitor.visit_interpolated_string_element(element);
     }
 }
 

@@ -1945,9 +1945,9 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return `true` if the model is in an f-string replacement field.
-    pub const fn in_ft_string_replacement_field(&self) -> bool {
+    pub const fn in_interpolated_string_replacement_field(&self) -> bool {
         self.flags
-            .intersects(SemanticModelFlags::FT_STRING_REPLACEMENT_FIELD)
+            .intersects(SemanticModelFlags::INTERPOLATED_STRING_REPLACEMENT_FIELD)
     }
 
     /// Return `true` if the model is in boolean test.
@@ -2466,7 +2466,7 @@ bitflags! {
         /// ```python
         /// f"first {x} second {y}"
         /// ```
-        const FT_STRING_REPLACEMENT_FIELD = 1 << 21;
+        const INTERPOLATED_STRING_REPLACEMENT_FIELD = 1 << 21;
 
         /// The model is visiting the bases tuple of a class.
         ///

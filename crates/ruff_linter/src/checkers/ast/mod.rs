@@ -37,8 +37,8 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, FTStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern,
-    PythonVersion, Stmt, Suite, UnaryOp,
+    ExprContext, InterpolatedStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters,
+    Pattern, PythonVersion, Stmt, Suite, UnaryOp,
 };
 use ruff_python_ast::{PySourceType, helpers, str, visitor};
 use ruff_python_codegen::{Generator, Stylist};
@@ -2135,12 +2135,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
     }
 
-    fn visit_ft_string_element(&mut self, f_string_element: &'a FTStringElement) {
+    fn visit_interpolated_string_element(
+        &mut self,
+        interpolated_string_element: &'a InterpolatedStringElement,
+    ) {
         let snapshot = self.semantic.flags;
-        if f_string_element.is_expression() {
-            self.semantic.flags |= SemanticModelFlags::FT_STRING_REPLACEMENT_FIELD;
+        if interpolated_string_element.is_interpolation() {
+            self.semantic.flags |= SemanticModelFlags::INTERPOLATED_STRING_REPLACEMENT_FIELD;
         }
-        visitor::walk_ft_string_element(self, f_string_element);
+        visitor::walk_interpolated_string_element(self, interpolated_string_element);
         self.semantic.flags = snapshot;
     }
 }

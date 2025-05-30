@@ -101,10 +101,11 @@ pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
 
         // f"select * from table where val = {val}"
         Expr::FString(f_string)
-            if f_string
-                .value
-                .f_strings()
-                .any(|fs| fs.elements.iter().any(ast::FTStringElement::is_expression)) =>
+            if f_string.value.f_strings().any(|fs| {
+                fs.elements
+                    .iter()
+                    .any(ast::InterpolatedStringElement::is_interpolation)
+            }) =>
         {
             concatenated_f_string(f_string, checker.locator())
         }

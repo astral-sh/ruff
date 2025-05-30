@@ -1,8 +1,8 @@
 use crate::{
     Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator, ElifElseClause,
-    ExceptHandler, Expr, FString, FTStringElement, Keyword, MatchCase, Mod, Operator, Parameter,
-    ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword, Singleton, Stmt,
-    StringLiteral, TString, TypeParam, TypeParams, UnaryOp, WithItem,
+    ExceptHandler, Expr, FString, InterpolatedStringElement, Keyword, MatchCase, Mod, Operator,
+    Parameter, ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword,
+    Singleton, Stmt, StringLiteral, TString, TypeParam, TypeParams, UnaryOp, WithItem,
 };
 use crate::{AnyNodeRef, Identifier};
 
@@ -157,8 +157,11 @@ pub trait SourceOrderVisitor<'a> {
     }
 
     #[inline]
-    fn visit_ft_string_element(&mut self, ft_string_element: &'a FTStringElement) {
-        walk_ft_string_element(self, ft_string_element);
+    fn visit_interpolated_string_element(
+        &mut self,
+        interpolated_string_element: &'a InterpolatedStringElement,
+    ) {
+        walk_interpolated_string_element(self, interpolated_string_element);
     }
 
     #[inline]
@@ -503,15 +506,17 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_ft_string_element<'a, V: SourceOrderVisitor<'a> + ?Sized>(
+pub fn walk_interpolated_string_element<'a, V: SourceOrderVisitor<'a> + ?Sized>(
     visitor: &mut V,
-    f_string_element: &'a FTStringElement,
+    f_string_element: &'a InterpolatedStringElement,
 ) {
     let node = AnyNodeRef::from(f_string_element);
     if visitor.enter_node(node).is_traverse() {
         match f_string_element {
-            FTStringElement::Expression(element) => element.visit_source_order(visitor),
-            FTStringElement::Literal(element) => element.visit_source_order(visitor),
+            InterpolatedStringElement::Interpolation(element) => {
+                element.visit_source_order(visitor);
+            }
+            InterpolatedStringElement::Literal(element) => element.visit_source_order(visitor),
         }
     }
     visitor.leave_node(node);

@@ -1,5 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, AnyStringFlags, FTStringElements, StringFlags, StringLike};
+use ruff_python_ast::{
+    self as ast, AnyStringFlags, InterpolatedStringElements, StringFlags, StringLike,
+};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -66,12 +68,16 @@ pub(crate) fn unnecessary_escaped_quote(checker: &Checker, string_like: StringLi
                 elements,
                 range,
                 flags,
-            }) => check_ft_string(checker, AnyStringFlags::from(*flags), *range, elements),
+            }) => {
+                check_interpolated_string(checker, AnyStringFlags::from(*flags), *range, elements);
+            }
             ast::StringLikePart::TString(ast::TString {
                 elements,
                 range,
                 flags,
-            }) => check_ft_string(checker, AnyStringFlags::from(*flags), *range, elements),
+            }) => {
+                check_interpolated_string(checker, AnyStringFlags::from(*flags), *range, elements);
+            }
         }
     }
 }
@@ -82,7 +88,7 @@ pub(crate) fn unnecessary_escaped_quote(checker: &Checker, string_like: StringLi
 ///
 /// If the string kind is an f-string.
 fn check_string_or_bytes(checker: &Checker, range: TextRange, flags: AnyStringFlags) {
-    assert!(!flags.is_ft_string());
+    assert!(!flags.is_interpolated_string());
 
     if flags.is_triple_quoted() || flags.is_raw_string() {
         return;
@@ -106,11 +112,11 @@ fn check_string_or_bytes(checker: &Checker, range: TextRange, flags: AnyStringFl
 }
 
 /// Checks for unnecessary escaped quotes in an f-string or t-string.
-fn check_ft_string(
+fn check_interpolated_string(
     checker: &Checker,
     flags: AnyStringFlags,
     range: TextRange,
-    elements: &FTStringElements,
+    elements: &InterpolatedStringElements,
 ) {
     if flags.is_triple_quoted() || flags.prefix().is_raw() {
         return;

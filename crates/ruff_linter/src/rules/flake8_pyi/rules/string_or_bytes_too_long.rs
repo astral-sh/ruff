@@ -96,8 +96,10 @@ fn count_f_string_chars(f_string: &ast::ExprFString) -> usize {
                 .elements
                 .iter()
                 .map(|element| match element {
-                    ast::FTStringElement::Literal(string) => string.chars().count(),
-                    ast::FTStringElement::Expression(expr) => expr.range().len().to_usize(),
+                    ast::InterpolatedStringElement::Literal(string) => string.chars().count(),
+                    ast::InterpolatedStringElement::Interpolation(expr) => {
+                        expr.range().len().to_usize()
+                    }
                 })
                 .sum(),
         })

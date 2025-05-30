@@ -54,7 +54,7 @@ pub(crate) fn avoidable_escaped_quote(checker: &Checker, string_like: StringLike
         // This rule has support for strings nested inside another f-strings but they're checked
         // via the outermost f-string. This means that we shouldn't be checking any nested string
         // or f-string.
-        || checker.semantic().in_ft_string_replacement_field()
+        || checker.semantic().in_interpolated_string_replacement_field()
     {
         return;
     }
@@ -180,7 +180,13 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_, '_> {
             .literals()
             .any(|literal| contains_quote(literal, opposite_quote_char))
         {
-            check_f_string(self.checker, self.quotes_settings, f_string);
+            check_interpolated_string(
+                self.checker,
+                self.quotes_settings,
+                AnyStringFlags::from(f_string.flags),
+                &f_string.elements,
+                f_string.range,
+            );
         }
 
         walk_f_string(self, f_string);
@@ -213,7 +219,13 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_, '_> {
             .literals()
             .any(|literal| contains_quote(literal, opposite_quote_char))
         {
-            check_t_string(self.checker, self.quotes_settings, t_string);
+            check_interpolated_string(
+                self.checker,
+                self.quotes_settings,
+                AnyStringFlags::from(t_string.flags),
+                &t_string.elements,
+                t_string.range,
+            );
         }
 
         walk_t_string(self, t_string);
@@ -231,7 +243,7 @@ fn check_string_or_bytes(
     range: TextRange,
     flags: AnyStringFlags,
 ) {
-    assert!(!flags.is_ft_string());
+    assert!(!flags.is_interpolated_string());
 
     let locator = checker.locator();
 
@@ -265,52 +277,12 @@ fn check_string_or_bytes(
     )));
 }
 
-/// Checks for unnecessary escaped quotes in an f-string.
-fn check_f_string(
-    checker: &Checker,
-    quotes_settings: &flake8_quotes::settings::Settings,
-    f_string: &ast::FString,
-) {
-    let ast::FString {
-        flags,
-        range,
-        elements,
-    } = f_string;
-    check_ft_string(
-        checker,
-        quotes_settings,
-        AnyStringFlags::from(*flags),
-        elements,
-        *range,
-    );
-}
-
-/// Checks for unnecessary escaped quotes in a t-string.
-fn check_t_string(
-    checker: &Checker,
-    quotes_settings: &flake8_quotes::settings::Settings,
-    t_string: &ast::TString,
-) {
-    let ast::TString {
-        flags,
-        range,
-        elements,
-    } = t_string;
-    check_ft_string(
-        checker,
-        quotes_settings,
-        AnyStringFlags::from(*flags),
-        elements,
-        *range,
-    );
-}
-
 /// Checks for unnecessary escaped quotes in an f-string or t-string.
-fn check_ft_string(
+fn check_interpolated_string(
     checker: &Checker,
     quotes_settings: &flake8_quotes::settings::Settings,
     flags: ast::AnyStringFlags,
-    elements: &ast::FTStringElements,
+    elements: &ast::InterpolatedStringElements,
     range: TextRange,
 ) {
     if flags.is_triple_quoted() || flags.prefix().is_raw() {
