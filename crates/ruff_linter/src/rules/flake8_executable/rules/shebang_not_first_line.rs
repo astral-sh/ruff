@@ -4,7 +4,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
 use crate::Violation;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 
 /// ## What it does
 /// Checks for a shebang directive that is not at the beginning of the file.
@@ -46,7 +46,7 @@ impl Violation for ShebangNotFirstLine {
 pub(crate) fn shebang_not_first_line(
     range: TextRange,
     locator: &Locator,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     // If the shebang is at the beginning of the file, abort.
     if range.start() == TextSize::from(0) {

@@ -3,7 +3,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
 use crate::Violation;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::settings::LinterSettings;
 
 /// ## What it does
@@ -33,7 +33,7 @@ impl Violation for MissingCopyrightNotice {
 pub(crate) fn missing_copyright_notice(
     locator: &Locator,
     settings: &LinterSettings,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     // Ignore files that are too small to contain a copyright notice.
     if locator.len() < settings.flake8_copyright.min_file_size {

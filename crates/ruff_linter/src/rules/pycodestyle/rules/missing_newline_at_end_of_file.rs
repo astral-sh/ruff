@@ -3,7 +3,7 @@ use ruff_python_codegen::Stylist;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -41,7 +41,7 @@ impl AlwaysFixableViolation for MissingNewlineAtEndOfFile {
 pub(crate) fn no_newline_at_end_of_file(
     locator: &Locator,
     stylist: &Stylist,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     let source = locator.contents();
 

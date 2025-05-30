@@ -7,7 +7,7 @@ use ruff_python_trivia::CommentRanges;
 
 use crate::Locator;
 use crate::Violation;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 
 /// ## What it does
 /// Checks for the use of type comments (e.g., `x = 1  # type: int`) in stub
@@ -39,7 +39,7 @@ impl Violation for TypeCommentInStub {
 
 /// PYI033
 pub(crate) fn type_comment_in_stub(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     locator: &Locator,
     comment_ranges: &CommentRanges,
 ) {

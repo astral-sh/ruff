@@ -3,7 +3,7 @@ use ruff_python_parser::{Token, TokenKind};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -182,7 +182,7 @@ impl Violation for InvalidCharacterZeroWidthSpace {
 
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
 pub(crate) fn invalid_string_characters(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     token: &Token,
     locator: &Locator,
 ) {

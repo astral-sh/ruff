@@ -6,7 +6,7 @@ use ruff_python_parser::{TokenIterWithContext, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::{AlwaysFixableViolation, Violation};
 use crate::{Edit, Fix};
 
@@ -99,7 +99,7 @@ impl AlwaysFixableViolation for UselessSemicolon {
 
 /// E701, E702, E703
 pub(crate) fn compound_statements(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,

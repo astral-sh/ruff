@@ -16,7 +16,7 @@ use crate::rules::pycodestyle::rules::logical_lines::{
 use crate::settings::LinterSettings;
 use crate::{Locator, Violation};
 
-use super::ast::{DiagnosticGuard, DiagnosticsCollector};
+use super::ast::{DiagnosticGuard, LintContext};
 
 /// Return the amount of indentation, expanding tabs to the next multiple of the settings' tab size.
 pub(crate) fn expand_indent(line: &str, indent_width: IndentWidth) -> usize {
@@ -41,7 +41,7 @@ pub(crate) fn check_logical_lines(
     indexer: &Indexer,
     stylist: &Stylist,
     settings: &LinterSettings,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     let mut context = LogicalLinesContext::new(settings, diagnostics);
 
@@ -194,11 +194,11 @@ pub(crate) fn check_logical_lines(
 
 pub(crate) struct LogicalLinesContext<'a, 'b> {
     settings: &'a LinterSettings,
-    diagnostics: &'a DiagnosticsCollector<'b>,
+    diagnostics: &'a LintContext<'b>,
 }
 
 impl<'a, 'b> LogicalLinesContext<'a, 'b> {
-    fn new(settings: &'a LinterSettings, diagnostics: &'a DiagnosticsCollector<'b>) -> Self {
+    fn new(settings: &'a LinterSettings, diagnostics: &'a LintContext<'b>) -> Self {
         Self {
             settings,
             diagnostics,

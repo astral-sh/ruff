@@ -8,7 +8,7 @@ pub(crate) use shebang_not_executable::*;
 pub(crate) use shebang_not_first_line::*;
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::codes::Rule;
 use crate::comments::shebang::ShebangDirective;
 use crate::settings::LinterSettings;
@@ -20,7 +20,7 @@ mod shebang_not_executable;
 mod shebang_not_first_line;
 
 pub(crate) fn from_tokens(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     path: &Path,
     locator: &Locator,
     comment_ranges: &CommentRanges,

@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::Violation;
-use crate::checkers::ast::{Checker, DiagnosticsCollector};
+use crate::checkers::ast::{Checker, LintContext};
 use crate::preview::is_unicode_to_unicode_confusables_enabled;
 use crate::rules::ruff::rules::Context;
 use crate::rules::ruff::rules::confusables::confusable;
@@ -175,7 +175,7 @@ impl Violation for AmbiguousUnicodeCharacterComment {
 
 /// RUF003
 pub(crate) fn ambiguous_unicode_character_comment(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     locator: &Locator,
     range: TextRange,
     settings: &LinterSettings,
@@ -345,7 +345,7 @@ impl Candidate {
         self,
         context: Context,
         settings: &LinterSettings,
-        diagnostics: &DiagnosticsCollector,
+        diagnostics: &LintContext,
     ) {
         if !settings.allowed_confusables.contains(&self.confusable) {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());

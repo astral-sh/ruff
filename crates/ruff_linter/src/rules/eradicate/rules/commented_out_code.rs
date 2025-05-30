@@ -4,7 +4,7 @@ use ruff_source_file::{LineRanges, UniversalNewlineIterator};
 use ruff_text_size::TextRange;
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::settings::LinterSettings;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -48,7 +48,7 @@ impl Violation for CommentedOutCode {
 
 /// ERA001
 pub(crate) fn commented_out_code(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     locator: &Locator,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,

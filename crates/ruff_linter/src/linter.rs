@@ -16,7 +16,7 @@ use ruff_source_file::{SourceFile, SourceFileBuilder};
 use ruff_text_size::Ranged;
 
 use crate::OldDiagnostic;
-use crate::checkers::ast::{DiagnosticsCollector, check_ast};
+use crate::checkers::ast::{LintContext, check_ast};
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
 use crate::checkers::noqa::check_noqa;
@@ -123,7 +123,7 @@ pub fn check_path(
     };
 
     // Aggregate all diagnostics.
-    let mut diagnostics = DiagnosticsCollector::new(&source_file);
+    let mut diagnostics = LintContext::new(&source_file);
 
     // Aggregate all semantic syntax errors.
     let mut semantic_syntax_errors = vec![];

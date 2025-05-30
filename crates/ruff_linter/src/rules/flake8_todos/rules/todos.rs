@@ -7,7 +7,7 @@ use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::directives::{TodoComment, TodoDirective, TodoDirectiveKind};
 use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 
@@ -249,7 +249,7 @@ static ISSUE_LINK_TODO_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
 });
 
 pub(crate) fn todos(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     todo_comments: &[TodoComment],
     locator: &Locator,
     comment_ranges: &CommentRanges,
@@ -314,7 +314,7 @@ pub(crate) fn todos(
 }
 
 /// Check that the directive itself is valid. This function modifies `diagnostics` in-place.
-fn directive_errors(diagnostics: &DiagnosticsCollector, directive: &TodoDirective) {
+fn directive_errors(diagnostics: &LintContext, directive: &TodoDirective) {
     if directive.content == "TODO" {
         return;
     }
@@ -345,7 +345,7 @@ fn directive_errors(diagnostics: &DiagnosticsCollector, directive: &TodoDirectiv
 
 /// Checks for "static" errors in the comment: missing colon, missing author, etc.
 pub(crate) fn static_errors(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     comment: &str,
     comment_range: TextRange,
     directive: &TodoDirective,

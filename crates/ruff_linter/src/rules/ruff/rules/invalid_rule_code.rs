@@ -2,7 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::noqa::{Code, Directive};
 use crate::noqa::{Codes, NoqaDirectives};
 use crate::registry::Rule;
@@ -49,7 +49,7 @@ impl AlwaysFixableViolation for InvalidRuleCode {
 
 /// RUF102 for invalid noqa codes
 pub(crate) fn invalid_noqa_code(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
     external: &[String],
@@ -87,7 +87,7 @@ fn code_is_valid(code: &Code, external: &[String]) -> bool {
 fn all_codes_invalid_diagnostic(
     directive: &Codes<'_>,
     invalid_codes: Vec<&Code<'_>>,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     diagnostics
         .report_diagnostic(
@@ -107,7 +107,7 @@ fn some_codes_are_invalid_diagnostic(
     codes: &Codes,
     invalid_code: &Code,
     locator: &Locator,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     diagnostics
         .report_diagnostic(

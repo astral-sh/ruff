@@ -5,7 +5,7 @@ use ruff_python_parser::{Token, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -116,7 +116,7 @@ fn match_extraneous_parentheses(tokens: &mut Iter<'_, Token>) -> Option<(TextRan
 
 /// UP034
 pub(crate) fn extraneous_parentheses(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     tokens: &Tokens,
     locator: &Locator,
 ) {

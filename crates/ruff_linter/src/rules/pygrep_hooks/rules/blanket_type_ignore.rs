@@ -10,7 +10,7 @@ use ruff_text_size::TextSize;
 
 use crate::Locator;
 use crate::Violation;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 
 /// ## What it does
 /// Check for `type: ignore` annotations that suppress all type warnings, as
@@ -53,7 +53,7 @@ impl Violation for BlanketTypeIgnore {
 
 /// PGH003
 pub(crate) fn blanket_type_ignore(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {

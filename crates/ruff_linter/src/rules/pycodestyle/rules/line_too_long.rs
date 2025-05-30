@@ -3,7 +3,7 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Line;
 
 use crate::Violation;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::rules::pycodestyle::overlong::Overlong;
 use crate::settings::LinterSettings;
 
@@ -85,7 +85,7 @@ pub(crate) fn line_too_long(
     line: &Line,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     let limit = settings.pycodestyle.max_line_length;
 

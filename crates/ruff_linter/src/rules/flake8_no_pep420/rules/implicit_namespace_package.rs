@@ -8,7 +8,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
 use crate::Violation;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::comments::shebang::ShebangDirective;
 use crate::fs;
 use crate::package::PackageRoot;
@@ -66,7 +66,7 @@ pub(crate) fn implicit_namespace_package(
     project_root: &Path,
     src: &[PathBuf],
     allow_nested_roots: bool,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     if package.is_none()
         // Ignore non-`.py` files, which don't require an `__init__.py`.

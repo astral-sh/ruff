@@ -3,7 +3,7 @@ use std::path::Path;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::is_executable;
 
@@ -45,7 +45,7 @@ impl Violation for ShebangMissingExecutableFile {
 
 /// EXE002
 #[cfg(target_family = "unix")]
-pub(crate) fn shebang_missing_executable_file(filepath: &Path, diagnostics: &DiagnosticsCollector) {
+pub(crate) fn shebang_missing_executable_file(filepath: &Path, diagnostics: &LintContext) {
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
 
@@ -61,8 +61,4 @@ pub(crate) fn shebang_missing_executable_file(filepath: &Path, diagnostics: &Dia
 }
 
 #[cfg(not(target_family = "unix"))]
-pub(crate) fn shebang_missing_executable_file(
-    _filepath: &Path,
-    _diagnostics: &DiagnosticsCollector,
-) {
-}
+pub(crate) fn shebang_missing_executable_file(_filepath: &Path, _diagnostics: &LintContext) {}

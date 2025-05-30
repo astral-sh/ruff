@@ -3,7 +3,7 @@ use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -46,7 +46,7 @@ impl AlwaysFixableViolation for ShebangLeadingWhitespace {
 
 /// EXE004
 pub(crate) fn shebang_leading_whitespace(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     range: TextRange,
     locator: &Locator,
 ) {

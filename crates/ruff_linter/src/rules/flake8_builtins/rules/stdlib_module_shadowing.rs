@@ -8,7 +8,7 @@ use ruff_python_stdlib::sys::is_known_standard_library;
 use ruff_text_size::TextRange;
 
 use crate::Violation;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::settings::LinterSettings;
 
 /// ## What it does
@@ -70,7 +70,7 @@ pub(crate) fn stdlib_module_shadowing(
     mut path: &Path,
     settings: &LinterSettings,
     target_version: PythonVersion,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file) {
         return;

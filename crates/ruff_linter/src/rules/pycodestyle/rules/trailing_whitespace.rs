@@ -4,7 +4,7 @@ use ruff_source_file::Line;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::registry::Rule;
 use crate::settings::LinterSettings;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
@@ -79,7 +79,7 @@ pub(crate) fn trailing_whitespace(
     locator: &Locator,
     indexer: &Indexer,
     settings: &LinterSettings,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     let whitespace_len: TextSize = line
         .chars()

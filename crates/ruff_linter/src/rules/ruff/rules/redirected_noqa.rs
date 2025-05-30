@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::noqa::{Codes, Directive, FileNoqaDirectives, NoqaDirectives};
 use crate::rule_redirects::get_redirect_target;
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -44,10 +44,7 @@ impl AlwaysFixableViolation for RedirectedNOQA {
 }
 
 /// RUF101 for in-line noqa directives
-pub(crate) fn redirected_noqa(
-    diagnostics: &DiagnosticsCollector,
-    noqa_directives: &NoqaDirectives,
-) {
+pub(crate) fn redirected_noqa(diagnostics: &LintContext, noqa_directives: &NoqaDirectives) {
     for line in noqa_directives.lines() {
         let Directive::Codes(directive) = &line.directive else {
             continue;
@@ -59,7 +56,7 @@ pub(crate) fn redirected_noqa(
 
 /// RUF101 for file noqa directives
 pub(crate) fn redirected_file_noqa(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     noqa_directives: &FileNoqaDirectives,
 ) {
     for line in noqa_directives.lines() {
@@ -72,7 +69,7 @@ pub(crate) fn redirected_file_noqa(
 }
 
 /// Convert a sequence of [Codes] into [Diagnostic]s and append them to `diagnostics`.
-pub(crate) fn build_diagnostics(diagnostics: &DiagnosticsCollector, codes: &Codes<'_>) {
+pub(crate) fn build_diagnostics(diagnostics: &LintContext, codes: &Codes<'_>) {
     for code in codes.iter() {
         if let Some(redirected) = get_redirect_target(code.as_str()) {
             let mut diagnostic = diagnostics.report_diagnostic(

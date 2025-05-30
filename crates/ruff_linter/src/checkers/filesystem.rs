@@ -4,7 +4,7 @@ use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::CommentRanges;
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::package::PackageRoot;
 use crate::preview::is_allow_nested_roots_enabled;
 use crate::registry::Rule;
@@ -20,7 +20,7 @@ pub(crate) fn check_file_path(
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
     target_version: PythonVersion,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     // flake8-no-pep420
     if settings.rules.enabled(Rule::ImplicitNamespacePackage) {

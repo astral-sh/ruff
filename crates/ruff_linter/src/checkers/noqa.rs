@@ -21,11 +21,11 @@ use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
 use crate::{Edit, Fix, Locator};
 
-use super::ast::DiagnosticsCollector;
+use super::ast::LintContext;
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(
-    diagnostics: &mut DiagnosticsCollector,
+    diagnostics: &mut LintContext,
     path: &Path,
     locator: &Locator,
     comment_ranges: &CommentRanges,

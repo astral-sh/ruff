@@ -15,7 +15,7 @@ use crate::rules::isort;
 use crate::rules::isort::block::{Block, BlockBuilder};
 use crate::settings::LinterSettings;
 
-use super::ast::DiagnosticsCollector;
+use super::ast::LintContext;
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn check_imports(
@@ -29,7 +29,7 @@ pub(crate) fn check_imports(
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
     target_version: PythonVersion,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     // Extract all import blocks from the AST.
     let tracker = {

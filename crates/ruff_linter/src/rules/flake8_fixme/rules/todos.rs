@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::directives::{TodoComment, TodoDirectiveKind};
 
 /// ## What it does
@@ -115,7 +115,7 @@ impl Violation for LineContainsHack {
     }
 }
 
-pub(crate) fn todos(diagnostics: &DiagnosticsCollector, directive_ranges: &[TodoComment]) {
+pub(crate) fn todos(diagnostics: &LintContext, directive_ranges: &[TodoComment]) {
     for TodoComment { directive, .. } in directive_ranges {
         match directive.kind {
             // FIX001

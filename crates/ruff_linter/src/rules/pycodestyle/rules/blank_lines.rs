@@ -21,7 +21,7 @@ use crate::AlwaysFixableViolation;
 use crate::Edit;
 use crate::Fix;
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::checkers::logical_lines::expand_indent;
 use crate::line_width::IndentWidth;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
@@ -698,7 +698,7 @@ pub(crate) struct BlankLinesChecker<'a, 'b> {
     lines_between_types: usize,
     source_type: PySourceType,
     cell_offsets: Option<&'a CellOffsets>,
-    diagnostics: &'a DiagnosticsCollector<'b>,
+    diagnostics: &'a LintContext<'b>,
 }
 
 impl<'a, 'b> BlankLinesChecker<'a, 'b> {
@@ -708,7 +708,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
         settings: &crate::settings::LinterSettings,
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
-        diagnostics: &'a DiagnosticsCollector<'b>,
+        diagnostics: &'a LintContext<'b>,
     ) -> BlankLinesChecker<'a, 'b> {
         BlankLinesChecker {
             stylist,

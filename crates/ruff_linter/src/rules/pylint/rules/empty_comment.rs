@@ -4,7 +4,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -46,7 +46,7 @@ impl Violation for EmptyComment {
 
 /// PLR2044
 pub(crate) fn empty_comments(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {
@@ -64,7 +64,7 @@ pub(crate) fn empty_comments(
 }
 
 /// Return a [`Diagnostic`] if the comment at the given [`TextRange`] is empty.
-fn empty_comment(diagnostics: &DiagnosticsCollector, range: TextRange, locator: &Locator) {
+fn empty_comment(diagnostics: &LintContext, range: TextRange, locator: &Locator) {
     // Check: is the comment empty?
     if !locator
         .slice(range)

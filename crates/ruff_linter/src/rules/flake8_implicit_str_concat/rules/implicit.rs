@@ -10,7 +10,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::settings::LinterSettings;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -104,7 +104,7 @@ impl Violation for MultiLineImplicitStringConcatenation {
 
 /// ISC001, ISC002
 pub(crate) fn implicit(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,

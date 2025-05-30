@@ -7,7 +7,7 @@ use ruff_python_semantic::{FutureImport, NameImport};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::importer::Importer;
 use crate::settings::LinterSettings;
 use crate::{AlwaysFixableViolation, Fix};
@@ -92,7 +92,7 @@ fn add_required_import(
     locator: &Locator,
     stylist: &Stylist,
     source_type: PySourceType,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     // Don't add imports to semantically-empty files.
     if parsed.suite().iter().all(is_docstring_stmt) {
@@ -130,7 +130,7 @@ pub(crate) fn add_required_imports(
     stylist: &Stylist,
     settings: &LinterSettings,
     source_type: PySourceType,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     for required_import in &settings.isort.required_imports {
         add_required_import(

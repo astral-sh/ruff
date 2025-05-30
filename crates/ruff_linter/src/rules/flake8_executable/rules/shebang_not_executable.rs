@@ -4,7 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::TextRange;
 
 use crate::Violation;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::is_executable;
 
@@ -49,11 +49,7 @@ impl Violation for ShebangNotExecutable {
 
 /// EXE001
 #[cfg(target_family = "unix")]
-pub(crate) fn shebang_not_executable(
-    filepath: &Path,
-    range: TextRange,
-    diagnostics: &DiagnosticsCollector,
-) {
+pub(crate) fn shebang_not_executable(filepath: &Path, range: TextRange, diagnostics: &LintContext) {
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
 
@@ -70,6 +66,6 @@ pub(crate) fn shebang_not_executable(
 pub(crate) fn shebang_not_executable(
     _filepath: &Path,
     _range: TextRange,
-    _diagnostics: &DiagnosticsCollector,
+    _diagnostics: &LintContext,
 ) {
 }

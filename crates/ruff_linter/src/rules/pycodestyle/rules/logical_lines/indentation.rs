@@ -3,7 +3,7 @@ use ruff_python_parser::TokenKind;
 use ruff_text_size::TextRange;
 
 use crate::Violation;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::settings::LinterSettings;
 
 use super::LogicalLine;
@@ -266,7 +266,7 @@ pub(crate) fn indentation(
     prev_indent_level: Option<usize>,
     indent_size: usize,
     range: TextRange,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     settings: &LinterSettings,
 ) {
     if indent_level % indent_size != 0 {

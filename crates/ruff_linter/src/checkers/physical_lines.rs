@@ -16,7 +16,7 @@ use crate::rules::pylint;
 use crate::rules::ruff::rules::indented_form_feed;
 use crate::settings::LinterSettings;
 
-use super::ast::DiagnosticsCollector;
+use super::ast::LintContext;
 
 pub(crate) fn check_physical_lines(
     locator: &Locator,
@@ -24,7 +24,7 @@ pub(crate) fn check_physical_lines(
     indexer: &Indexer,
     doc_lines: &[TextSize],
     settings: &LinterSettings,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     let enforce_doc_line_too_long = settings.rules.enabled(Rule::DocLineTooLong);
     let enforce_line_too_long = settings.rules.enabled(Rule::LineTooLong);
@@ -87,7 +87,7 @@ mod tests {
     use ruff_source_file::SourceFileBuilder;
 
     use crate::Locator;
-    use crate::checkers::ast::DiagnosticsCollector;
+    use crate::checkers::ast::LintContext;
     use crate::line_width::LineLength;
     use crate::registry::Rule;
     use crate::rules::pycodestyle;
@@ -105,7 +105,7 @@ mod tests {
 
         let check_with_max_line_length = |line_length: LineLength| {
             let source_file = SourceFileBuilder::new("<filename>", line).finish();
-            let diagnostics = DiagnosticsCollector::new(&source_file);
+            let diagnostics = LintContext::new(&source_file);
             check_physical_lines(
                 &locator,
                 &stylist,

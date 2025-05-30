@@ -9,7 +9,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -67,7 +67,7 @@ struct CodingCommentRange {
 
 /// UP009
 pub(crate) fn unnecessary_coding_comment(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     locator: &Locator,
     comment_ranges: &CommentRanges,
 ) {

@@ -13,7 +13,7 @@ use ruff_text_size::{Ranged, TextRange};
 use super::super::block::Block;
 use super::super::{comments, format_imports};
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::line_width::LineWidthBuilder;
 use crate::package::PackageRoot;
 use crate::preview::is_full_path_match_source_strategy_enabled;
@@ -99,7 +99,7 @@ pub(crate) fn organize_imports(
     source_type: PySourceType,
     tokens: &Tokens,
     target_version: PythonVersion,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
     let indentation = leading_indentation(indentation);

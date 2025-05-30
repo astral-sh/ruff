@@ -3,7 +3,7 @@ use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::noqa::{self, Directive, FileNoqaDirectives, NoqaDirectives};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -75,7 +75,7 @@ impl Violation for BlanketNOQA {
 
 /// PGH004
 pub(crate) fn blanket_noqa(
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
     file_noqa_directives: &FileNoqaDirectives,

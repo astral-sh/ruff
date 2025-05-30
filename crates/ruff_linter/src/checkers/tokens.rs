@@ -18,7 +18,7 @@ use crate::rules::{
 };
 use crate::settings::LinterSettings;
 
-use super::ast::DiagnosticsCollector;
+use super::ast::LintContext;
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn check_tokens(
@@ -30,7 +30,7 @@ pub(crate) fn check_tokens(
     settings: &LinterSettings,
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
-    diagnostics: &mut DiagnosticsCollector,
+    diagnostics: &mut LintContext,
 ) {
     let comment_ranges = indexer.comment_ranges();
 

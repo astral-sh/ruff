@@ -237,7 +237,7 @@ pub(crate) struct Checker<'a> {
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
-    diagnostics: &'a DiagnosticsCollector<'a>,
+    diagnostics: &'a LintContext<'a>,
 }
 
 impl<'a> Checker<'a> {
@@ -258,7 +258,7 @@ impl<'a> Checker<'a> {
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
         target_version: TargetVersion,
-        diagnostics: &'a DiagnosticsCollector<'a>,
+        diagnostics: &'a LintContext<'a>,
     ) -> Checker<'a> {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
@@ -2961,7 +2961,7 @@ pub(crate) fn check_ast(
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
     target_version: TargetVersion,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) -> Vec<SemanticSyntaxError> {
     let module_path = package
         .map(PackageRoot::path)
@@ -3037,14 +3037,14 @@ pub(crate) fn check_ast(
 
 /// A type for collecting diagnostics in a given file.
 ///
-/// [`DiagnosticsCollector::report_diagnostic`] can be used to obtain a [`DiagnosticGuard`], which
-/// will push a [`Violation`] to the contained [`OldDiagnostic`] collection on `Drop`.
-pub(crate) struct DiagnosticsCollector<'a> {
+/// [`LintContext::report_diagnostic`] can be used to obtain a [`DiagnosticGuard`], which will push
+/// a [`Violation`] to the contained [`OldDiagnostic`] collection on `Drop`.
+pub(crate) struct LintContext<'a> {
     diagnostics: RefCell<Vec<OldDiagnostic>>,
     source_file: &'a SourceFile,
 }
 
-impl<'a> DiagnosticsCollector<'a> {
+impl<'a> LintContext<'a> {
     /// Create a new collector with the given `source_file` and an empty collection of
     /// `OldDiagnostic`s.
     pub(crate) fn new(source_file: &'a SourceFile) -> Self {
@@ -3117,7 +3117,7 @@ impl<'a> DiagnosticsCollector<'a> {
 /// adding fixes or parent ranges.
 pub(crate) struct DiagnosticGuard<'a, 'b> {
     /// The parent checker that will receive the diagnostic on `Drop`.
-    diagnostics: &'a DiagnosticsCollector<'b>,
+    diagnostics: &'a LintContext<'b>,
     /// The diagnostic that we want to report.
     ///
     /// This is always `Some` until the `Drop` (or `defuse`) call.

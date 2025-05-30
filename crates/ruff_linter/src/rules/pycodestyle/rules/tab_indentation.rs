@@ -5,7 +5,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
 use crate::Violation;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 
 /// ## What it does
 /// Checks for indentation that uses tabs.
@@ -34,11 +34,7 @@ impl Violation for TabIndentation {
 }
 
 /// W191
-pub(crate) fn tab_indentation(
-    diagnostics: &DiagnosticsCollector,
-    locator: &Locator,
-    indexer: &Indexer,
-) {
+pub(crate) fn tab_indentation(diagnostics: &LintContext, locator: &Locator, indexer: &Indexer) {
     let contents = locator.contents().as_bytes();
     let mut offset = 0;
     while let Some(index) = memchr::memchr(b'\t', &contents[offset..]) {

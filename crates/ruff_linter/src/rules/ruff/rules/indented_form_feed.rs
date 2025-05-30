@@ -4,7 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::Line;
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::{Violation, checkers::ast::DiagnosticsCollector};
+use crate::{Violation, checkers::ast::LintContext};
 
 /// ## What it does
 /// Checks for form feed characters preceded by either a space or a tab.
@@ -49,7 +49,7 @@ const SPACE: u8 = b' ';
 const TAB: u8 = b'\t';
 
 /// RUF054
-pub(crate) fn indented_form_feed(line: &Line, diagnostics: &DiagnosticsCollector) {
+pub(crate) fn indented_form_feed(line: &Line, diagnostics: &LintContext) {
     let Some(index_relative_to_line) = memchr(FORM_FEED, line.as_bytes()) else {
         return;
     };

@@ -8,7 +8,7 @@ use ruff_python_stdlib::path::is_module_file;
 use ruff_text_size::TextRange;
 
 use crate::Violation;
-use crate::checkers::ast::DiagnosticsCollector;
+use crate::checkers::ast::LintContext;
 use crate::package::PackageRoot;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
@@ -55,7 +55,7 @@ pub(crate) fn invalid_module_name(
     path: &Path,
     package: Option<PackageRoot<'_>>,
     ignore_names: &IgnoreNames,
-    diagnostics: &DiagnosticsCollector,
+    diagnostics: &LintContext,
 ) {
     if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file_or_stub) {
         return;
