@@ -2,17 +2,17 @@ use std::hash::BuildHasherDefault;
 use std::sync::{LazyLock, Mutex};
 
 use super::{
-    IntersectionBuilder, KnownFunction, MemberLookupPolicy, Mro, MroError, MroIterator,
-    SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
-    infer_expression_type, infer_unpack_types,
+    IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator, SpecialFormType,
+    SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase, infer_expression_type,
+    infer_unpack_types,
 };
 use crate::semantic_index::DeclarationWithConstraint;
 use crate::semantic_index::definition::Definition;
+use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::{
-    CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, TypeMapping,
-    TypeVarInstance,
+    CallableType, DataclassParams, KnownInstanceType, TypeMapping, TypeVarInstance,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,

@@ -7,9 +7,8 @@ use ruff_python_ast::name::Name;
 use crate::{
     semantic_index::{symbol_table, use_def_map},
     symbol::{symbol_from_bindings, symbol_from_declarations},
-    types::{
-        ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
-    },
+    types::function::KnownFunction,
+    types::{ClassBase, ClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarInstance},
     {Db, FxOrderSet},
 };
 
