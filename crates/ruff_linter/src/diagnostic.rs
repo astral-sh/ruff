@@ -3,21 +3,13 @@ use log::debug;
 
 use ruff_db::diagnostic::{self as db, Annotation, DiagnosticId, LintName, Severity, Span};
 use ruff_source_file::SourceFile;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{TextRange, TextSize};
 
-use crate::codes::NoqaCode;
 use crate::registry::AsRule;
 use crate::violation::Violation;
 use crate::{Fix, codes::Rule};
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct OldDiagnostic {
-    pub diagnostic: db::Diagnostic,
-    pub fix: Option<Fix>,
-    pub parent: Option<TextSize>,
-    pub(crate) noqa_offset: Option<TextSize>,
-    pub(crate) noqa_code: Option<NoqaCode>,
-}
+pub type OldDiagnostic = crate::message::Message;
 
 impl OldDiagnostic {
     // TODO(brent) We temporarily allow this to avoid updating all of the call sites to add
@@ -114,14 +106,5 @@ impl AsRule for OldDiagnostic {
             .as_str()
             .parse()
             .expect("Expected valid rule name for ruff diagnostic")
-    }
-}
-
-impl Ranged for OldDiagnostic {
-    fn range(&self) -> TextRange {
-        self.diagnostic
-            .expect_primary_span()
-            .range()
-            .expect("Expected range for ruff span")
     }
 }
