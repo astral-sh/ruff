@@ -28,6 +28,10 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
         _client: &Client,
         params: HoverParams,
     ) -> crate::server::Result<Option<lsp_types::Hover>> {
+        if snapshot.client_settings().is_language_services_disabled() {
+            return Ok(None);
+        }
+
         let Some(file) = snapshot.file(db) else {
             tracing::debug!("Failed to resolve file for {:?}", params);
             return Ok(None);
