@@ -3889,6 +3889,7 @@ dependencies = [
  "countme",
  "crossbeam",
  "ctrlc",
+ "dunce",
  "filetime",
  "indicatif",
  "insta",
