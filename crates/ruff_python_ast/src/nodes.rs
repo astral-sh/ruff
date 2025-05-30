@@ -2217,7 +2217,7 @@ impl From<AnyStringFlags> for FStringFlags {
     fn from(value: AnyStringFlags) -> FStringFlags {
         let AnyStringPrefix::Format(prefix) = value.prefix() else {
             unreachable!(
-                "Should never attempt to convert {} into a t-string",
+                "Should never attempt to convert {} into an f-string",
                 value.prefix()
             )
         };

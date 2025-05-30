@@ -291,10 +291,8 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 let can_inline_comment = should_inline_comments(value, *statement, f.context());
 
                 let string_like = StringLike::try_from(*value).ok();
-                let format_ft_string = string_like.and_then(|string| {
-                    format_f_string_assignment(string, f.context())
-                        .or_else(|| format_t_string_assignment(string, f.context()))
-                });
+                let format_ft_string =
+                    string_like.and_then(|string| format_ft_string_assignment(string, f.context()));
 
                 let format_implicit_flat = string_like.and_then(|string| {
                     FormatImplicitConcatenatedStringFlat::new(string, f.context())
@@ -461,7 +459,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         // F/T-String containing an interpolation with a magic trailing comma, a comment, or a
                         // multiline debug interpolation should never be joined. Use the default layout.
                         // ```python
-                        // aaaa = t"aaaa {[
+                        // aaaa = f"aaaa {[
                         //     1, 2,
                         // ]} bbbb"
                         // ```
@@ -480,13 +478,13 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
 
                         // Considering the following example:
                         // ```python
-                        // aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+                        // aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
                         //     expression}moreeeeeeeeeeeeeeeee"
                         // ```
 
                         // Flatten the f/t-string.
                         // ```python
-                        // aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
+                        // aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
                         // ```
                         let single_line =
                             format_with(|f| write!(f, [ft_string_flat, inline_comments]));
@@ -561,10 +559,8 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 let should_inline_comments = should_inline_comments(value, *statement, f.context());
 
                 let string_like = StringLike::try_from(*value).ok();
-                let format_ft_string = string_like.and_then(|string| {
-                    format_f_string_assignment(string, f.context())
-                        .or_else(|| format_t_string_assignment(string, f.context()))
-                });
+                let format_ft_string =
+                    string_like.and_then(|string| format_ft_string_assignment(string, f.context()));
                 let format_implicit_flat = string_like.and_then(|string| {
                     FormatImplicitConcatenatedStringFlat::new(string, f.context())
                 });
@@ -1064,12 +1060,16 @@ impl Format<PyFormatContext<'_>> for InterpolationString<'_> {
     }
 }
 
-/// Formats an f-string that is at the value position of an assignment statement.
+/// Formats an f/t-string that is at the value position of an assignment statement.
 ///
-/// This is just a wrapper around [`FormatFString`] while considering a special case when the/// f-string is at an assignment statement's value position.
+/// For legibility, we discuss only the case of f-strings below, but the
+/// same comments apply to t-strings.
 ///
-/// This is necessary to prevent an instability where an f-string contains a multiline expression
-/// and the f-string fits on the line, but only when it's surrounded by parentheses.
+/// This is just a wrapper around [`FormatFString`] while considering a special
+/// case when the f-string is at an assignment statement's value position.
+/// This is necessary  to prevent an instability where an f-string contains a
+/// multiline expression and the f-string fits on the line, but only when it's
+/// surrounded by parentheses.
 ///
 /// ```python
 /// aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
@@ -1117,107 +1117,38 @@ impl Format<PyFormatContext<'_>> for InterpolationString<'_> {
 /// The reason for this is because (a) f-string already has a multiline expression thus it tries to
 /// break the expression and (b) the `BestFit` layout doesn't considers the layout where the
 /// multiline f-string isn't surrounded by parentheses.
-fn format_f_string_assignment<'a>(
+fn format_ft_string_assignment<'a>(
     string: StringLike<'a>,
     context: &PyFormatContext,
 ) -> Option<InterpolationString<'a>> {
-    let StringLike::FString(expr) = string else {
-        return None;
+    let (interpolated_string, elements) = match string {
+        StringLike::TString(expr) => {
+            let t_string = expr.as_single_part_tstring()?;
+            (InterpolationString::TString(t_string), &t_string.elements)
+        }
+        StringLike::FString(expr) => {
+            let f_string = expr.as_single_part_fstring()?;
+            (InterpolationString::FString(f_string), &f_string.elements)
+        }
+        _ => {
+            return None;
+        }
     };
-    let f_string = expr.as_single_part_fstring()?;
 
-    // If the f-string is flat, there are no breakpoints from which it can be made multiline.
-    // This is the case when the f-string has no expressions or if it does then the expressions
+    // If the f/t-string is flat, there are no breakpoints from which it can be made multiline.
+    // This is the case when the f/t-string has no expressions or if it does then the expressions
     // are flat (no newlines).
-    if FTStringLayout::from_ft_string_elements(&f_string.elements, context.source()).is_flat() {
+    if FTStringLayout::from_ft_string_elements(elements, context.source()).is_flat() {
         return None;
     }
 
-    // This checks whether the f-string is multi-line and it can *never* be flattened. Thus,
+    // This checks whether the f/t-string is multi-line and it can *never* be flattened. Thus,
     // it's useless to try the flattened layout.
     if string.is_multiline(context) {
         return None;
     }
 
-    Some(InterpolationString::FString(f_string))
-}
-
-/// Formats a t-string that is at the value position of an assignment statement.///
-/// This is just a wrapper around [`FormatTString`] while considering a special case when the
-/// t-string is at an assignment statement's value position.
-///
-/// This is necessary to prevent an instability where a t-string contains a multiline expression
-/// and the t-string fits on the line, but only when it's surrounded by parentheses.
-///
-/// ```python
-/// aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
-///     expression}moreeeeeeeeeeeeeeeee"
-/// ```
-///
-/// Without the special handling, this would get formatted to:
-/// ```python
-/// aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
-///     expression
-/// }moreeeeeeeeeeeeeeeee"
-/// ```
-///
-/// However, if the parentheses already existed in the source like:
-/// ```python
-/// aaaaaaaaaaaaaaaaaa = (
-///     t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
-/// )
-/// ```
-///
-/// Then, it would remain unformatted because it fits on the line. This means that even in the
-/// first example, the t-string should be formatted by surrounding it with parentheses.
-///
-/// One might ask why not just use the `BestFit` layout in this case. Consider the following
-/// example in which the t-string doesn't fit on the line even when surrounded by parentheses:
-/// ```python
-/// xxxxxxx = t"{
-///     {'aaaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
-/// }"
-/// ```
-///
-/// The `BestFit` layout will format this as:
-/// ```python
-/// xxxxxxx = (
-///     t"{
-///         {
-///             'aaaaaaaaaaaaaaaaaaaaaaaaa',
-///             'bbbbbbbbbbbbbbbbbbbbbbbbbbb',
-///             'cccccccccccccccccccccccccc',
-///         }
-///     }"
-/// )
-/// ```
-///
-/// The reason for this is because (a) t-string already has a multiline expression thus it tries to
-/// break the expression and (b) the `BestFit` layout doesn't considers the layout where the
-/// multiline t-string isn't surrounded by parentheses.
-fn format_t_string_assignment<'a>(
-    string: StringLike<'a>,
-    context: &PyFormatContext,
-) -> Option<InterpolationString<'a>> {
-    let StringLike::TString(expr) = string else {
-        return None;
-    };
-    let t_string = expr.as_single_part_tstring()?;
-
-    // If the t-string is flat, there are no breakpoints from which it can be made multiline.
-    // This is the case when the t-string has no expressions or if it does then the expressions
-    // are flat (no newlines).
-    if FTStringLayout::from_ft_string_elements(&t_string.elements, context.source()).is_flat() {
-        return None;
-    }
-
-    // This checks whether the t-string is multi-line and it can *never* be flattened. Thus,
-    // it's useless to try the flattened layout.
-    if string.is_multiline(context) {
-        return None;
-    }
-
-    Some(InterpolationString::TString(t_string))
+    Some(interpolated_string)
 }
 
 #[derive(Debug, Default)]

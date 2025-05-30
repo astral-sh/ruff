@@ -217,8 +217,8 @@ fn analyze_escape_chars_in_interpolated_string(
     let mut escape_chars_state = EscapeCharsState::default();
     // Whether we suggest converting to a raw string or
     // adding backslashes depends on the presence of valid
-    // escape characters in the entire t-string. Therefore,
-    // we must analyze escape characters in each t-string
+    // escape characters in the entire f/t-string. Therefore,
+    // we must analyze escape characters in each f/t-string
     // element before pushing a diagnostic and fix.
     for element in elements {
         match element {
