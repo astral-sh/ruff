@@ -438,7 +438,7 @@ pub struct FunctionType<'db> {
     /// Type mappings that should be applied to the function's parameter and return types. This
     /// might include specializations of enclosing generic contexts (e.g. for non-generic methods
     /// of a specialized generic class).
-    #[returns(ref)]
+    #[returns(deref)]
     type_mappings: Box<[TypeMapping<'db, 'db>]>,
 }
 
