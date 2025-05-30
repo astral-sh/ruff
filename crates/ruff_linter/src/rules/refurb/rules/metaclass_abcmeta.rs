@@ -1,5 +1,5 @@
 use itertools::Itertools;
-
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtClassDef;
 use ruff_text_size::{Ranged, TextRange};
@@ -74,7 +74,10 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         return;
     }
 
-    let has_bases = !class_def.bases().is_empty();  
+    let applicability = match class_def.bases().is_empty() {
+        true => Applicability::Safe,
+        false => Applicability::Unsafe,
+    };
     let mut diagnostic = checker.report_diagnostic(MetaClassABCMeta, keyword.range);
 
     diagnostic.try_set_fix(|| {
@@ -86,8 +89,7 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         Ok(if position > 0 {
             // When the `abc.ABCMeta` is not the first keyword, put `abc.ABC` before the first
             // keyword.
-            make_fix(
-                has_bases,
+            Fix::applicable_edits(
                 // Delete from the previous argument, to the end of the `metaclass` argument.
                 Edit::range_deletion(TextRange::new(
                     class_def.keywords()[position - 1].end(),
@@ -98,24 +100,14 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
                     Edit::insertion(format!("{binding}, "), class_def.keywords()[0].start()),
                     import_edit,
                 ],
+                applicability,
             )
         } else {
-            make_fix(
-                has_bases,
+            Fix::applicable_edits(
                 Edit::range_replacement(binding, keyword.range),
                 [import_edit],
+                applicability,
             )
         })
     });
-}
-
-fn make_fix(has_bases: bool, edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Fix {
-    if has_bases {
-        // If the class has bases, the fix is not safe as the base class might be
-        // validating the class's other base classes (e.g., `typing.Protocol` does this).
-        Fix::unsafe_edits(edit, rest)
-    } else {
-        // If the class doesn't have bases, the fix is safe.
-        Fix::safe_edits(edit, rest)
-    }
 }
