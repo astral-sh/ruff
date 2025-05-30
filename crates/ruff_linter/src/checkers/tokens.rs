@@ -173,7 +173,9 @@ pub(crate) fn check_tokens(
 
     context.as_mut_vec().retain(|diagnostic| {
         diagnostic
-            .to_rule()
+            .name()
+            .parse()
+            .ok()
             .is_none_or(|rule| settings.rules.enabled(rule))
     });
 }

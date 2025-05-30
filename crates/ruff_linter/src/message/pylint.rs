@@ -3,7 +3,7 @@ use std::io::Write;
 use ruff_source_file::OneIndexed;
 
 use crate::fs::relativize_path;
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext, OldDiagnostic};
 
 /// Generate violations in Pylint format.
 /// See: [Flake8 documentation](https://flake8.pycqa.org/en/latest/internal/formatters.html#pylint-formatter)
@@ -14,7 +14,7 @@ impl Emitter for PylintEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        messages: &[OldDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {

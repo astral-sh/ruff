@@ -19,7 +19,7 @@ use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::Fix;
-use ruff_linter::message::Message;
+use ruff_linter::message::OldDiagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
@@ -348,7 +348,7 @@ impl FileCache {
                 lint.messages
                     .iter()
                     .map(|msg| {
-                        Message::diagnostic(
+                        OldDiagnostic::diagnostic(
                             msg.body.clone(),
                             msg.suggestion.clone(),
                             msg.range,
@@ -428,7 +428,7 @@ pub(crate) struct LintCacheData {
 
 impl LintCacheData {
     pub(crate) fn from_messages(
-        messages: &[Message],
+        messages: &[OldDiagnostic],
         notebook_index: Option<NotebookIndex>,
     ) -> Self {
         let source = if let Some(msg) = messages.first() {
@@ -612,7 +612,7 @@ mod tests {
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
-    use ruff_linter::message::Message;
+    use ruff_linter::message::OldDiagnostic;
     use ruff_linter::package::PackageRoot;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
@@ -680,7 +680,11 @@ mod tests {
                     UnsafeFixes::Enabled,
                 )
                 .unwrap();
-                if diagnostics.messages.iter().any(Message::is_syntax_error) {
+                if diagnostics
+                    .messages
+                    .iter()
+                    .any(OldDiagnostic::is_syntax_error)
+                {
                     parse_errors.push(path.clone());
                 }
                 paths.push(path);

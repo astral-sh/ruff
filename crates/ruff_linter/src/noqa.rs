@@ -18,7 +18,7 @@ use crate::Edit;
 use crate::Locator;
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
-use crate::message::Message;
+use crate::message::OldDiagnostic;
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 
@@ -29,7 +29,7 @@ use crate::rule_redirects::get_redirect_target;
 /// simultaneously.
 pub fn generate_noqa_edits(
     path: &Path,
-    messages: &[Message],
+    messages: &[OldDiagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -707,7 +707,7 @@ impl Error for LexicalError {}
 /// Adds noqa comments to suppress all messages of a file.
 pub(crate) fn add_noqa(
     path: &Path,
-    messages: &[Message],
+    messages: &[OldDiagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -730,7 +730,7 @@ pub(crate) fn add_noqa(
 
 fn add_noqa_inner(
     path: &Path,
-    messages: &[Message],
+    messages: &[OldDiagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -835,7 +835,7 @@ struct NoqaComment<'a> {
 }
 
 fn find_noqa_comments<'a>(
-    messages: &'a [Message],
+    messages: &'a [OldDiagnostic],
     locator: &'a Locator,
     exemption: &'a FileExemption,
     directives: &'a NoqaDirectives,
