@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use crate::message::json::message_to_json_value;
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext, OldDiagnostic};
 
 #[derive(Default)]
 pub struct JsonLinesEmitter;
@@ -10,7 +10,7 @@ impl Emitter for JsonLinesEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        messages: &[OldDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {

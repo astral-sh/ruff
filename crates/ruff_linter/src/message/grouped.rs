@@ -11,7 +11,7 @@ use crate::fs::relativize_path;
 use crate::message::diff::calculate_print_width;
 use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
 use crate::message::{
-    Emitter, EmitterContext, Message, MessageWithLocation, group_messages_by_filename,
+    Emitter, EmitterContext, MessageWithLocation, OldDiagnostic, group_messages_by_filename,
 };
 use crate::settings::types::UnsafeFixes;
 
@@ -46,7 +46,7 @@ impl Emitter for GroupedEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        messages: &[OldDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for (filename, messages) in group_messages_by_filename(messages) {

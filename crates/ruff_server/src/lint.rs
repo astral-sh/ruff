@@ -15,7 +15,7 @@ use ruff_linter::{
     directives::{Flags, extract_directives},
     generate_noqa_edits,
     linter::check_path,
-    message::Message,
+    message::OldDiagnostic,
     package::PackageRoot,
     packaging::detect_package_root,
     settings::flags,
@@ -231,7 +231,7 @@ pub(crate) fn fixes_for_diagnostics(
 /// Generates an LSP diagnostic with an associated cell index for the diagnostic to go in.
 /// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
-    diagnostic: &Message,
+    diagnostic: &OldDiagnostic,
     noqa_edit: Option<Edit>,
     source_kind: &SourceKind,
     index: &LineIndex,

@@ -15,7 +15,6 @@ use rustc_hash::FxHashMap;
 use ruff_linter::OldDiagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
-use ruff_linter::message::Message;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::settings::types::UnsafeFixes;
@@ -32,14 +31,14 @@ use crate::cache::{Cache, FileCacheKey, LintCacheData};
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
-    pub(crate) messages: Vec<Message>,
+    pub(crate) messages: Vec<OldDiagnostic>,
     pub(crate) fixed: FixMap,
     pub(crate) notebook_indexes: FxHashMap<String, NotebookIndex>,
 }
 
 impl Diagnostics {
     pub(crate) fn new(
-        messages: Vec<Message>,
+        messages: Vec<OldDiagnostic>,
         notebook_indexes: FxHashMap<String, NotebookIndex>,
     ) -> Self {
         Self {
@@ -99,7 +98,11 @@ impl Diagnostics {
                 let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
                 let dummy = SourceFileBuilder::new(name, "").finish();
                 Self::new(
-                    vec![Message::syntax_error(err, TextRange::default(), dummy)],
+                    vec![OldDiagnostic::syntax_error(
+                        err,
+                        TextRange::default(),
+                        dummy,
+                    )],
                     FxHashMap::default(),
                 )
             }

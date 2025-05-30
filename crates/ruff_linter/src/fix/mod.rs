@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::linter::FixTable;
-use crate::message::Message;
+use crate::message::OldDiagnostic;
 use crate::registry::Rule;
 use crate::settings::types::UnsafeFixes;
 use crate::{Edit, Fix};
@@ -28,7 +28,7 @@ pub(crate) struct FixResult {
 
 /// Fix errors in a file, and write the fixed source code to disk.
 pub(crate) fn fix_file(
-    messages: &[Message],
+    messages: &[OldDiagnostic],
     locator: &Locator,
     unsafe_fixes: UnsafeFixes,
 ) -> Option<FixResult> {
@@ -52,7 +52,7 @@ pub(crate) fn fix_file(
 
 /// Apply a series of fixes.
 fn apply_fixes<'a>(
-    diagnostics: impl Iterator<Item = &'a Message>,
+    diagnostics: impl Iterator<Item = &'a OldDiagnostic>,
     locator: &'a Locator<'a>,
 ) -> FixResult {
     let mut output = String::with_capacity(locator.len());
@@ -175,7 +175,6 @@ mod tests {
     use crate::Locator;
     use crate::OldDiagnostic;
     use crate::fix::{FixResult, apply_fixes};
-    use crate::message::Message;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
     use crate::{Edit, Fix};
 
@@ -183,7 +182,7 @@ mod tests {
         filename: &str,
         source: &str,
         edit: impl IntoIterator<Item = Edit>,
-    ) -> Vec<Message> {
+    ) -> Vec<OldDiagnostic> {
         edit.into_iter()
             .map(|edit| {
                 // The choice of rule here is arbitrary.

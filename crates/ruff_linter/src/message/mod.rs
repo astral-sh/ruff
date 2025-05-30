@@ -53,7 +53,7 @@ mod text;
 /// [`OldDiagnostic::body`], and the primary annotation optionally contains the suggestion accompanying
 /// a fix. The `db::Diagnostic::id` field contains the kebab-case lint name derived from the `Rule`.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Message {
+pub struct OldDiagnostic {
     pub diagnostic: db::Diagnostic,
 
     // these fields are specific to rule violations
@@ -63,12 +63,12 @@ pub struct Message {
     pub(crate) noqa_code: Option<NoqaCode>,
 }
 
-impl Message {
+impl OldDiagnostic {
     pub fn syntax_error(
         message: impl std::fmt::Display,
         range: TextRange,
         file: SourceFile,
-    ) -> Message {
+    ) -> OldDiagnostic {
         let mut diag = db::Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, message);
         let span = Span::from(file).with_range(range);
         diag.annotate(Annotation::primary(span));
@@ -91,7 +91,7 @@ impl Message {
         file: SourceFile,
         noqa_offset: Option<TextSize>,
         rule: Rule,
-    ) -> Message {
+    ) -> OldDiagnostic {
         let mut diagnostic = db::Diagnostic::new(
             DiagnosticId::Lint(LintName::of(rule.into())),
             Severity::Error,
@@ -104,7 +104,7 @@ impl Message {
         }
         diagnostic.annotate(annotation);
 
-        Message {
+        OldDiagnostic {
             diagnostic,
             fix,
             parent,
@@ -118,7 +118,7 @@ impl Message {
         parse_error: &ParseError,
         locator: &Locator,
         file: SourceFile,
-    ) -> Message {
+    ) -> OldDiagnostic {
         // Try to create a non-empty range so that the diagnostic can print a caret at the right
         // position. This requires that we retrieve the next character, if any, and take its length
         // to maintain char-boundaries.
@@ -128,7 +128,7 @@ impl Message {
             .next()
             .map_or(TextSize::new(0), TextLen::text_len);
 
-        Message::syntax_error(
+        OldDiagnostic::syntax_error(
             format_args!(
                 "SyntaxError: {}",
                 DisplayParseErrorType::new(&parse_error.error)
@@ -142,8 +142,8 @@ impl Message {
     pub fn from_unsupported_syntax_error(
         unsupported_syntax_error: &UnsupportedSyntaxError,
         file: SourceFile,
-    ) -> Message {
-        Message::syntax_error(
+    ) -> OldDiagnostic {
+        OldDiagnostic::syntax_error(
             format_args!("SyntaxError: {unsupported_syntax_error}"),
             unsupported_syntax_error.range,
             file,
@@ -154,8 +154,8 @@ impl Message {
     pub fn from_semantic_syntax_error(
         semantic_syntax_error: &SemanticSyntaxError,
         file: SourceFile,
-    ) -> Message {
-        Message::syntax_error(
+    ) -> OldDiagnostic {
+        OldDiagnostic::syntax_error(
             format_args!("SyntaxError: {semantic_syntax_error}"),
             semantic_syntax_error.range,
             file,
@@ -330,19 +330,19 @@ impl Message {
     }
 }
 
-impl Ord for Message {
+impl Ord for OldDiagnostic {
     fn cmp(&self, other: &Self) -> Ordering {
         (self.source_file(), self.start()).cmp(&(other.source_file(), other.start()))
     }
 }
 
-impl PartialOrd for Message {
+impl PartialOrd for OldDiagnostic {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ranged for Message {
+impl Ranged for OldDiagnostic {
     fn range(&self) -> TextRange {
         self.diagnostic
             .expect_primary_span()
@@ -352,19 +352,21 @@ impl Ranged for Message {
 }
 
 struct MessageWithLocation<'a> {
-    message: &'a Message,
+    message: &'a OldDiagnostic,
     start_location: LineColumn,
 }
 
 impl Deref for MessageWithLocation<'_> {
-    type Target = Message;
+    type Target = OldDiagnostic;
 
     fn deref(&self) -> &Self::Target {
         self.message
     }
 }
 
-fn group_messages_by_filename(messages: &[Message]) -> BTreeMap<String, Vec<MessageWithLocation>> {
+fn group_messages_by_filename(
+    messages: &[OldDiagnostic],
+) -> BTreeMap<String, Vec<MessageWithLocation>> {
     let mut grouped_messages = BTreeMap::default();
     for message in messages {
         grouped_messages
@@ -386,7 +388,7 @@ pub trait Emitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        messages: &[OldDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()>;
 }
@@ -423,9 +425,9 @@ mod tests {
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::Locator;
-    use crate::message::{Emitter, EmitterContext, Message};
+    use crate::message::{Emitter, EmitterContext, OldDiagnostic};
 
-    pub(super) fn create_syntax_error_messages() -> Vec<Message> {
+    pub(super) fn create_syntax_error_messages() -> Vec<OldDiagnostic> {
         let source = r"from os import
 
 if call(foo
@@ -438,12 +440,12 @@ if call(foo
             .errors()
             .iter()
             .map(|parse_error| {
-                Message::from_parse_error(parse_error, &locator, source_file.clone())
+                OldDiagnostic::from_parse_error(parse_error, &locator, source_file.clone())
             })
             .collect()
     }
 
-    pub(super) fn create_messages() -> Vec<Message> {
+    pub(super) fn create_messages() -> Vec<OldDiagnostic> {
         let fib = r#"import os
 
 
@@ -461,7 +463,7 @@ def fibonacci(n):
         let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
 
         let unused_import_start = TextSize::from(7);
-        let unused_import = Message::diagnostic(
+        let unused_import = OldDiagnostic::diagnostic(
             "`os` imported but unused".to_string(),
             Some("Remove unused import: `os`".to_string()),
             TextRange::new(unused_import_start, TextSize::from(9)),
@@ -476,7 +478,7 @@ def fibonacci(n):
         );
 
         let unused_variable_start = TextSize::from(94);
-        let unused_variable = Message::diagnostic(
+        let unused_variable = OldDiagnostic::diagnostic(
             "Local variable `x` is assigned to but never used".to_string(),
             Some("Remove assignment to unused variable `x`".to_string()),
             TextRange::new(unused_variable_start, TextSize::from(95)),
@@ -493,7 +495,7 @@ def fibonacci(n):
         let file_2 = r"if a == 1: pass";
 
         let undefined_name_start = TextSize::from(3);
-        let undefined_name = Message::diagnostic(
+        let undefined_name = OldDiagnostic::diagnostic(
             "Undefined name `a`".to_string(),
             None,
             TextRange::new(undefined_name_start, TextSize::from(4)),
@@ -507,7 +509,8 @@ def fibonacci(n):
         vec![unused_import, unused_variable, undefined_name]
     }
 
-    pub(super) fn create_notebook_messages() -> (Vec<Message>, FxHashMap<String, NotebookIndex>) {
+    pub(super) fn create_notebook_messages()
+    -> (Vec<OldDiagnostic>, FxHashMap<String, NotebookIndex>) {
         let notebook = r"# cell 1
 import os
 # cell 2
@@ -523,7 +526,7 @@ def foo():
         let notebook_source = SourceFileBuilder::new("notebook.ipynb", notebook).finish();
 
         let unused_import_os_start = TextSize::from(16);
-        let unused_import_os = Message::diagnostic(
+        let unused_import_os = OldDiagnostic::diagnostic(
             "`os` imported but unused".to_string(),
             Some("Remove unused import: `os`".to_string()),
             TextRange::new(unused_import_os_start, TextSize::from(18)),
@@ -538,7 +541,7 @@ def foo():
         );
 
         let unused_import_math_start = TextSize::from(35);
-        let unused_import_math = Message::diagnostic(
+        let unused_import_math = OldDiagnostic::diagnostic(
             "`math` imported but unused".to_string(),
             Some("Remove unused import: `math`".to_string()),
             TextRange::new(unused_import_math_start, TextSize::from(39)),
@@ -553,7 +556,7 @@ def foo():
         );
 
         let unused_variable_start = TextSize::from(98);
-        let unused_variable = Message::diagnostic(
+        let unused_variable = OldDiagnostic::diagnostic(
             "Local variable `x` is assigned to but never used".to_string(),
             Some("Remove assignment to unused variable `x`".to_string()),
             TextRange::new(unused_variable_start, TextSize::from(99)),
@@ -606,7 +609,7 @@ def foo():
 
     pub(super) fn capture_emitter_output(
         emitter: &mut dyn Emitter,
-        messages: &[Message],
+        messages: &[OldDiagnostic],
     ) -> String {
         let notebook_indexes = FxHashMap::default();
         let context = EmitterContext::new(&notebook_indexes);
@@ -618,7 +621,7 @@ def foo():
 
     pub(super) fn capture_emitter_notebook_output(
         emitter: &mut dyn Emitter,
-        messages: &[Message],
+        messages: &[OldDiagnostic],
         notebook_indexes: &FxHashMap<String, NotebookIndex>,
     ) -> String {
         let context = EmitterContext::new(notebook_indexes);

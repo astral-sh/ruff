@@ -10,7 +10,7 @@ use ruff_source_file::OneIndexed;
 use crate::VERSION;
 use crate::codes::NoqaCode;
 use crate::fs::normalize_path;
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext, OldDiagnostic};
 use crate::registry::{Linter, RuleNamespace};
 
 pub struct SarifEmitter;
@@ -19,7 +19,7 @@ impl Emitter for SarifEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        messages: &[OldDiagnostic],
         _context: &EmitterContext,
     ) -> Result<()> {
         let results = messages
@@ -124,7 +124,7 @@ struct SarifResult {
 
 impl SarifResult {
     #[cfg(not(target_arch = "wasm32"))]
-    fn from_message(message: &Message) -> Result<Self> {
+    fn from_message(message: &OldDiagnostic) -> Result<Self> {
         let start_location = message.compute_start_location();
         let end_location = message.compute_end_location();
         let path = normalize_path(&*message.filename());
@@ -144,7 +144,7 @@ impl SarifResult {
 
     #[cfg(target_arch = "wasm32")]
     #[expect(clippy::unnecessary_wraps)]
-    fn from_message(message: &Message) -> Result<Self> {
+    fn from_message(message: &OldDiagnostic) -> Result<Self> {
         let start_location = message.compute_start_location();
         let end_location = message.compute_end_location();
         let path = normalize_path(&*message.filename());
