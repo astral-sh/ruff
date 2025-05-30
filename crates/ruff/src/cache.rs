@@ -680,11 +680,7 @@ mod tests {
                     UnsafeFixes::Enabled,
                 )
                 .unwrap();
-                if diagnostics
-                    .diagnostics
-                    .iter()
-                    .any(OldDiagnostic::is_syntax_error)
-                {
+                if diagnostics.inner.iter().any(OldDiagnostic::is_syntax_error) {
                     parse_errors.push(path.clone());
                 }
                 paths.push(path);

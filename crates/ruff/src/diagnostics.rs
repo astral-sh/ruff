@@ -31,7 +31,7 @@ use crate::cache::{Cache, FileCacheKey, LintCacheData};
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
-    pub(crate) diagnostics: Vec<OldDiagnostic>,
+    pub(crate) inner: Vec<OldDiagnostic>,
     pub(crate) fixed: FixMap,
     pub(crate) notebook_indexes: FxHashMap<String, NotebookIndex>,
 }
@@ -42,7 +42,7 @@ impl Diagnostics {
         notebook_indexes: FxHashMap<String, NotebookIndex>,
     ) -> Self {
         Self {
-            diagnostics,
+            inner: diagnostics,
             fixed: FixMap::default(),
             notebook_indexes,
         }
@@ -121,7 +121,7 @@ impl Add for Diagnostics {
 
 impl AddAssign for Diagnostics {
     fn add_assign(&mut self, other: Self) {
-        self.diagnostics.extend(other.diagnostics);
+        self.inner.extend(other.inner);
         self.fixed += other.fixed;
         self.notebook_indexes.extend(other.notebook_indexes);
     }
@@ -202,7 +202,7 @@ pub(crate) fn lint_path(
                 if match fix_mode {
                     flags::FixMode::Generate => true,
                     flags::FixMode::Apply | flags::FixMode::Diff => {
-                        diagnostics.diagnostics.is_empty() && diagnostics.fixed.is_empty()
+                        diagnostics.inner.is_empty() && diagnostics.fixed.is_empty()
                     }
                 } {
                     return Ok(diagnostics);
@@ -240,7 +240,7 @@ pub(crate) fn lint_path(
                     vec![]
                 };
                 return Ok(Diagnostics {
-                    diagnostics,
+                    inner: diagnostics,
                     ..Diagnostics::default()
                 });
             }
@@ -357,7 +357,7 @@ pub(crate) fn lint_path(
     };
 
     Ok(Diagnostics {
-        diagnostics,
+        inner: diagnostics,
         fixed: FixMap::from_iter([(fs::relativize_path(path), fixed)]),
         notebook_indexes,
     })
@@ -396,7 +396,7 @@ pub(crate) fn lint_stdin(
                 }
 
                 return Ok(Diagnostics {
-                    diagnostics: lint_pyproject_toml(&source_file, &settings.linter),
+                    inner: lint_pyproject_toml(&source_file, &settings.linter),
                     fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
                     notebook_indexes: FxHashMap::default(),
                 });
@@ -501,7 +501,7 @@ pub(crate) fn lint_stdin(
     };
 
     Ok(Diagnostics {
-        diagnostics,
+        inner: diagnostics,
         fixed: FixMap::from_iter([(
             fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
             fixed,
