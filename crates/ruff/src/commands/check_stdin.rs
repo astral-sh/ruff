@@ -52,6 +52,6 @@ pub(crate) fn check_stdin(
         noqa,
         fix_mode,
     )?;
-    diagnostics.diagnostics.sort_unstable();
+    diagnostics.inner.sort_unstable();
     Ok(diagnostics)
 }
