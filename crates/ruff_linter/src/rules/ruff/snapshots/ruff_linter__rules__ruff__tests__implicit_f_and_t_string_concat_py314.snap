@@ -1,0 +1,41 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF061.py:2:1: RUF065 Implicit concatenation of t-string and f-string
+  |
+1 | # Errors
+2 | t"some user {inputs}"f"and more {unsafe}"
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF065
+3 | f"some user {inputs}"t"and more {unsafe}"
+4 | t"""multiline {stuff}"""\
+  |
+
+RUF061.py:3:1: RUF065 Implicit concatenation of t-string and f-string
+  |
+1 | # Errors
+2 | t"some user {inputs}"f"and more {unsafe}"
+3 | f"some user {inputs}"t"and more {unsafe}"
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF065
+4 | t"""multiline {stuff}"""\
+5 | f"""that's {dangerous}"""
+  |
+
+RUF061.py:4:1: RUF065 Implicit concatenation of t-string and f-string
+  |
+2 |   t"some user {inputs}"f"and more {unsafe}"
+3 |   f"some user {inputs}"t"and more {unsafe}"
+4 | / t"""multiline {stuff}"""\
+5 | | f"""that's {dangerous}"""
+  | |_________________________^ RUF065
+6 |   t"this {isalso}" f"still not the best even without exprs here"
+  |
+
+RUF061.py:6:1: RUF065 Implicit concatenation of t-string and f-string
+  |
+4 | t"""multiline {stuff}"""\
+5 | f"""that's {dangerous}"""
+6 | t"this {isalso}" f"still not the best even without exprs here"
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF065
+7 |
+8 | # Ok
+  |
