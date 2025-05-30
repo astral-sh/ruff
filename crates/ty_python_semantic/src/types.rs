@@ -3608,6 +3608,15 @@ impl<'db> Type<'db> {
                     .into()
             }
 
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => CallableBinding::not_callable(self).into(),
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.bindings(db),
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => Bindings::from_union(
+                    self,
+                    constraints.elements(db).iter().map(|ty| ty.bindings(db)),
+                ),
+            },
+
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
                 CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
@@ -4422,7 +4431,6 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::Tuple(_)
             | Type::BoundSuper(_)
-            | Type::TypeVar(_)
             | Type::ModuleLiteral(_) => CallableBinding::not_callable(self).into(),
         }
     }

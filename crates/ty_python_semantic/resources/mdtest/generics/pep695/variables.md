@@ -746,4 +746,24 @@ def h[T: (P, None)](t: T) -> None:
         p: P = t
 ```
 
+## Callability
+
+A typevar bound to a Callable type is callable:
+
+```py
+from typing import Callable
+
+def bound[T: Callable[[], int]](f: T):
+    reveal_type(f)  # revealed: T
+    reveal_type(f())  # revealed: int
+```
+
+Same with a constrained typevar, as long as all constraints are callable:
+
+```py
+def constrained[T: (Callable[[], int], Callable[[], str])](f: T):
+    reveal_type(f)  # revealed: T
+    reveal_type(f())  # revealed: int | str
+```
+
 [pep 695]: https://peps.python.org/pep-0695/
