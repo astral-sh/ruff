@@ -349,8 +349,8 @@ impl FileCache {
                     .iter()
                     .map(|msg| {
                         OldDiagnostic::lint(
-                            msg.body.clone(),
-                            msg.suggestion.clone(),
+                            &msg.body,
+                            msg.suggestion.as_ref(),
                             msg.range,
                             msg.fix.clone(),
                             msg.parent,

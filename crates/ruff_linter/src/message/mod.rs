@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::fmt::Display;
 use std::io::Write;
 use std::ops::Deref;
 
@@ -66,7 +67,7 @@ pub struct OldDiagnostic {
 
 impl OldDiagnostic {
     pub fn syntax_error(
-        message: impl std::fmt::Display,
+        message: impl Display,
         range: TextRange,
         file: SourceFile,
     ) -> OldDiagnostic {
@@ -83,16 +84,20 @@ impl OldDiagnostic {
     }
 
     #[expect(clippy::too_many_arguments)]
-    pub fn lint(
-        body: String,
-        suggestion: Option<String>,
+    pub fn lint<B, S>(
+        body: B,
+        suggestion: Option<S>,
         range: TextRange,
         fix: Option<Fix>,
         parent: Option<TextSize>,
         file: SourceFile,
         noqa_offset: Option<TextSize>,
         rule: Rule,
-    ) -> OldDiagnostic {
+    ) -> OldDiagnostic
+    where
+        B: Display,
+        S: Display,
+    {
         let mut diagnostic = db::Diagnostic::new(
             DiagnosticId::Lint(LintName::of(rule.into())),
             Severity::Error,
@@ -465,8 +470,8 @@ def fibonacci(n):
 
         let unused_import_start = TextSize::from(7);
         let unused_import = OldDiagnostic::lint(
-            "`os` imported but unused".to_string(),
-            Some("Remove unused import: `os`".to_string()),
+            "`os` imported but unused",
+            Some("Remove unused import: `os`"),
             TextRange::new(unused_import_start, TextSize::from(9)),
             Some(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(0),
@@ -480,8 +485,8 @@ def fibonacci(n):
 
         let unused_variable_start = TextSize::from(94);
         let unused_variable = OldDiagnostic::lint(
-            "Local variable `x` is assigned to but never used".to_string(),
-            Some("Remove assignment to unused variable `x`".to_string()),
+            "Local variable `x` is assigned to but never used",
+            Some("Remove assignment to unused variable `x`"),
             TextRange::new(unused_variable_start, TextSize::from(95)),
             Some(Fix::unsafe_edit(Edit::deletion(
                 TextSize::from(94),
@@ -497,8 +502,8 @@ def fibonacci(n):
 
         let undefined_name_start = TextSize::from(3);
         let undefined_name = OldDiagnostic::lint(
-            "Undefined name `a`".to_string(),
-            None,
+            "Undefined name `a`",
+            Option::<&'static str>::None,
             TextRange::new(undefined_name_start, TextSize::from(4)),
             None,
             None,
@@ -528,8 +533,8 @@ def foo():
 
         let unused_import_os_start = TextSize::from(16);
         let unused_import_os = OldDiagnostic::lint(
-            "`os` imported but unused".to_string(),
-            Some("Remove unused import: `os`".to_string()),
+            "`os` imported but unused",
+            Some("Remove unused import: `os`"),
             TextRange::new(unused_import_os_start, TextSize::from(18)),
             Some(Fix::safe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(9),
@@ -543,8 +548,8 @@ def foo():
 
         let unused_import_math_start = TextSize::from(35);
         let unused_import_math = OldDiagnostic::lint(
-            "`math` imported but unused".to_string(),
-            Some("Remove unused import: `math`".to_string()),
+            "`math` imported but unused",
+            Some("Remove unused import: `math`"),
             TextRange::new(unused_import_math_start, TextSize::from(39)),
             Some(Fix::safe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(28),
@@ -558,8 +563,8 @@ def foo():
 
         let unused_variable_start = TextSize::from(98);
         let unused_variable = OldDiagnostic::lint(
-            "Local variable `x` is assigned to but never used".to_string(),
-            Some("Remove assignment to unused variable `x`".to_string()),
+            "Local variable `x` is assigned to but never used",
+            Some("Remove assignment to unused variable `x`"),
             TextRange::new(unused_variable_start, TextSize::from(99)),
             Some(Fix::unsafe_edit(Edit::deletion(
                 TextSize::from(94),
