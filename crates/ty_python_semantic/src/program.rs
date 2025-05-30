@@ -179,6 +179,7 @@ impl PythonVersionSource {
 /// For example, if a Python version is specified in a pyproject.toml file
 /// but *also* via a CLI argument, the CLI argument will take precedence.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+#[cfg_attr(test, derive(strum_macros::EnumIter))]
 enum PythonSourcePriority {
     Default = 0,
     PyvenvCfgFile = 1,
@@ -300,5 +301,56 @@ impl PythonPath {
 
     pub fn from_cli_flag(path: SystemPathBuf) -> Self {
         Self::Resolve(path, SysPrefixPathOrigin::PythonCliFlag)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use strum::IntoEnumIterator;
+
+    #[test]
+    fn test_python_version_source_priority() {
+        for priority in PythonSourcePriority::iter() {
+            match priority {
+                // CLI source takes priority over all other sources.
+                PythonSourcePriority::Cli => {
+                    for other in PythonSourcePriority::iter() {
+                        assert!(priority >= other, "{other:?}");
+                    }
+                }
+                // Config files have lower priority than CLI arguments,
+                // but higher than pyvenv.cfg files and the fallback default.
+                PythonSourcePriority::ConfigFile => {
+                    for other in PythonSourcePriority::iter() {
+                        match other {
+                            PythonSourcePriority::Cli => assert!(other > priority, "{other:?}"),
+                            PythonSourcePriority::ConfigFile => assert_eq!(priority, other),
+                            PythonSourcePriority::PyvenvCfgFile | PythonSourcePriority::Default => {
+                                assert!(priority > other, "{other:?}");
+                            }
+                        }
+                    }
+                }
+                // Pyvenv.cfg files have lower priority than CLI flags and config files,
+                // but higher than the default fallback.
+                PythonSourcePriority::PyvenvCfgFile => {
+                    for other in PythonSourcePriority::iter() {
+                        match other {
+                            PythonSourcePriority::Cli | PythonSourcePriority::ConfigFile => {
+                                assert!(other > priority, "{other:?}");
+                            }
+                            PythonSourcePriority::PyvenvCfgFile => assert_eq!(priority, other),
+                            PythonSourcePriority::Default => assert!(priority > other, "{other:?}"),
+                        }
+                    }
+                }
+                PythonSourcePriority::Default => {
+                    for other in PythonSourcePriority::iter() {
+                        assert!(priority <= other, "{other:?}");
+                    }
+                }
+            }
+        }
     }
 }

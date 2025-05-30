@@ -1570,4 +1570,15 @@ mod tests {
             if path == pyvenv_cfg_path
         ));
     }
+
+    #[test]
+    fn pyvenv_cfg_with_carriage_return_line_endings_parses() {
+        let pyvenv_cfg = "home = /somewhere/python\r\nversion_info = 3.13\r\nimplementation = PyPy";
+        let parsed = PyvenvCfgParser::new(pyvenv_cfg).parse().unwrap();
+        assert_eq!(parsed.base_executable_home_path, Some("/somewhere/python"));
+        let version = parsed.version.unwrap();
+        assert_eq!(version.0, "3.13");
+        assert_eq!(&pyvenv_cfg[version.1], version.0);
+        assert_eq!(parsed.implementation, PythonImplementation::PyPy);
+    }
 }
