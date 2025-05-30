@@ -1,113 +1,252 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR302_amazon.py:23:1: AIR302 `airflow.hooks.S3_hook.S3Hook` is moved into `amazon` provider in Airflow 3.0;
+AIR302_amazon.py:14:1: AIR302 [*] `airflow.hooks.S3_hook.S3Hook` is moved into `amazon` provider in Airflow 3.0;
    |
-21 | from airflow.sensors.s3_key_sensor import S3KeySensor
-22 |
-23 | S3Hook()
+12 | from airflow.sensors.s3_key_sensor import S3KeySensor
+13 |
+14 | S3Hook()
    | ^^^^^^ AIR302
-24 | provide_bucket_name()
+15 | provide_bucket_name()
    |
    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `S3Hook` from `airflow.providers.amazon.aws.hooks.s3` instead.
 
-AIR302_amazon.py:24:1: AIR302 `airflow.hooks.S3_hook.provide_bucket_name` is moved into `amazon` provider in Airflow 3.0;
+ℹ Unsafe fix
+1  1  | from __future__ import annotations
+2  2  | 
+3  3  | from airflow.hooks.S3_hook import (
+4     |-    S3Hook,
+5  4  |     provide_bucket_name,
+6  5  | )
+7  6  | from airflow.operators.gcs_to_s3 import GCSToS3Operator
+--------------------------------------------------------------------------------
+10 9  | from airflow.operators.s3_file_transform_operator import S3FileTransformOperator
+11 10 | from airflow.operators.s3_to_redshift_operator import S3ToRedshiftOperator
+12 11 | from airflow.sensors.s3_key_sensor import S3KeySensor
+   12 |+from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+13 13 | 
+14 14 | S3Hook()
+15 15 | provide_bucket_name()
+
+AIR302_amazon.py:15:1: AIR302 [*] `airflow.hooks.S3_hook.provide_bucket_name` is moved into `amazon` provider in Airflow 3.0;
    |
-23 | S3Hook()
-24 | provide_bucket_name()
+14 | S3Hook()
+15 | provide_bucket_name()
    | ^^^^^^^^^^^^^^^^^^^ AIR302
-25 |
-26 | GCSToS3Operator()
+16 |
+17 | GCSToS3Operator()
    |
    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `provide_bucket_name` from `airflow.providers.amazon.aws.hooks.s3` instead.
 
-AIR302_amazon.py:26:1: AIR302 `airflow.operators.gcs_to_s3.GCSToS3Operator` is moved into `amazon` provider in Airflow 3.0;
+ℹ Unsafe fix
+2  2  | 
+3  3  | from airflow.hooks.S3_hook import (
+4  4  |     S3Hook,
+5     |-    provide_bucket_name,
+6  5  | )
+7  6  | from airflow.operators.gcs_to_s3 import GCSToS3Operator
+8  7  | from airflow.operators.google_api_to_s3_transfer import GoogleApiToS3Operator
+--------------------------------------------------------------------------------
+10 9  | from airflow.operators.s3_file_transform_operator import S3FileTransformOperator
+11 10 | from airflow.operators.s3_to_redshift_operator import S3ToRedshiftOperator
+12 11 | from airflow.sensors.s3_key_sensor import S3KeySensor
+   12 |+from airflow.providers.amazon.aws.hooks.s3 import provide_bucket_name
+13 13 | 
+14 14 | S3Hook()
+15 15 | provide_bucket_name()
+
+AIR302_amazon.py:17:1: AIR302 [*] `airflow.operators.gcs_to_s3.GCSToS3Operator` is moved into `amazon` provider in Airflow 3.0;
    |
-24 | provide_bucket_name()
-25 |
-26 | GCSToS3Operator()
+15 | provide_bucket_name()
+16 |
+17 | GCSToS3Operator()
    | ^^^^^^^^^^^^^^^ AIR302
-27 |
-28 | GoogleApiToS3Operator()
+18 | GoogleApiToS3Operator()
+19 | RedshiftToS3Operator()
    |
    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `GCSToS3Operator` from `airflow.providers.amazon.aws.transfers.gcs_to_s3` instead.
 
-AIR302_amazon.py:28:1: AIR302 `airflow.operators.google_api_to_s3_transfer.GoogleApiToS3Operator` is moved into `amazon` provider in Airflow 3.0;
+ℹ Unsafe fix
+4  4  |     S3Hook,
+5  5  |     provide_bucket_name,
+6  6  | )
+7     |-from airflow.operators.gcs_to_s3 import GCSToS3Operator
+8  7  | from airflow.operators.google_api_to_s3_transfer import GoogleApiToS3Operator
+9  8  | from airflow.operators.redshift_to_s3_operator import RedshiftToS3Operator
+10 9  | from airflow.operators.s3_file_transform_operator import S3FileTransformOperator
+11 10 | from airflow.operators.s3_to_redshift_operator import S3ToRedshiftOperator
+12 11 | from airflow.sensors.s3_key_sensor import S3KeySensor
+   12 |+from airflow.providers.amazon.aws.transfers.gcs_to_s3 import GCSToS3Operator
+13 13 | 
+14 14 | S3Hook()
+15 15 | provide_bucket_name()
+
+AIR302_amazon.py:18:1: AIR302 [*] `airflow.operators.google_api_to_s3_transfer.GoogleApiToS3Operator` is moved into `amazon` provider in Airflow 3.0;
    |
-26 | GCSToS3Operator()
-27 |
-28 | GoogleApiToS3Operator()
+17 | GCSToS3Operator()
+18 | GoogleApiToS3Operator()
    | ^^^^^^^^^^^^^^^^^^^^^ AIR302
-29 | GoogleApiToS3Transfer()
+19 | RedshiftToS3Operator()
+20 | S3FileTransformOperator()
    |
    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `GoogleApiToS3Operator` from `airflow.providers.amazon.aws.transfers.google_api_to_s3` instead.
 
-AIR302_amazon.py:29:1: AIR302 `airflow.operators.google_api_to_s3_transfer.GoogleApiToS3Transfer` is moved into `amazon` provider in Airflow 3.0;
-   |
-28 | GoogleApiToS3Operator()
-29 | GoogleApiToS3Transfer()
-   | ^^^^^^^^^^^^^^^^^^^^^ AIR302
-30 |
-31 | RedshiftToS3Operator()
-   |
-   = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `GoogleApiToS3Operator` from `airflow.providers.amazon.aws.transfers.google_api_to_s3` instead.
+ℹ Unsafe fix
+5  5  |     provide_bucket_name,
+6  6  | )
+7  7  | from airflow.operators.gcs_to_s3 import GCSToS3Operator
+8     |-from airflow.operators.google_api_to_s3_transfer import GoogleApiToS3Operator
+9  8  | from airflow.operators.redshift_to_s3_operator import RedshiftToS3Operator
+10 9  | from airflow.operators.s3_file_transform_operator import S3FileTransformOperator
+11 10 | from airflow.operators.s3_to_redshift_operator import S3ToRedshiftOperator
+12 11 | from airflow.sensors.s3_key_sensor import S3KeySensor
+   12 |+from airflow.providers.amazon.aws.transfers.google_api_to_s3 import GoogleApiToS3Operator
+13 13 | 
+14 14 | S3Hook()
+15 15 | provide_bucket_name()
 
-AIR302_amazon.py:31:1: AIR302 `airflow.operators.redshift_to_s3_operator.RedshiftToS3Operator` is moved into `amazon` provider in Airflow 3.0;
+AIR302_amazon.py:19:1: AIR302 [*] `airflow.operators.redshift_to_s3_operator.RedshiftToS3Operator` is moved into `amazon` provider in Airflow 3.0;
    |
-29 | GoogleApiToS3Transfer()
-30 |
-31 | RedshiftToS3Operator()
+17 | GCSToS3Operator()
+18 | GoogleApiToS3Operator()
+19 | RedshiftToS3Operator()
    | ^^^^^^^^^^^^^^^^^^^^ AIR302
-32 | RedshiftToS3Transfer()
+20 | S3FileTransformOperator()
+21 | S3ToRedshiftOperator()
    |
    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `RedshiftToS3Operator` from `airflow.providers.amazon.aws.transfers.redshift_to_s3` instead.
 
-AIR302_amazon.py:32:1: AIR302 `airflow.operators.redshift_to_s3_operator.RedshiftToS3Transfer` is moved into `amazon` provider in Airflow 3.0;
-   |
-31 | RedshiftToS3Operator()
-32 | RedshiftToS3Transfer()
-   | ^^^^^^^^^^^^^^^^^^^^ AIR302
-33 |
-34 | S3FileTransformOperator()
-   |
-   = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `RedshiftToS3Operator` from `airflow.providers.amazon.aws.transfers.redshift_to_s3` instead.
+ℹ Unsafe fix
+6  6  | )
+7  7  | from airflow.operators.gcs_to_s3 import GCSToS3Operator
+8  8  | from airflow.operators.google_api_to_s3_transfer import GoogleApiToS3Operator
+9     |-from airflow.operators.redshift_to_s3_operator import RedshiftToS3Operator
+10 9  | from airflow.operators.s3_file_transform_operator import S3FileTransformOperator
+11 10 | from airflow.operators.s3_to_redshift_operator import S3ToRedshiftOperator
+12 11 | from airflow.sensors.s3_key_sensor import S3KeySensor
+   12 |+from airflow.providers.amazon.aws.transfers.redshift_to_s3 import RedshiftToS3Operator
+13 13 | 
+14 14 | S3Hook()
+15 15 | provide_bucket_name()
 
-AIR302_amazon.py:34:1: AIR302 `airflow.operators.s3_file_transform_operator.S3FileTransformOperator` is moved into `amazon` provider in Airflow 3.0;
+AIR302_amazon.py:20:1: AIR302 [*] `airflow.operators.s3_file_transform_operator.S3FileTransformOperator` is moved into `amazon` provider in Airflow 3.0;
    |
-32 | RedshiftToS3Transfer()
-33 |
-34 | S3FileTransformOperator()
+18 | GoogleApiToS3Operator()
+19 | RedshiftToS3Operator()
+20 | S3FileTransformOperator()
    | ^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-35 |
-36 | S3ToRedshiftOperator()
+21 | S3ToRedshiftOperator()
+22 | S3KeySensor()
    |
    = help: Install `apache-airflow-providers-amazon>=3.0.0` and use `S3FileTransformOperator` from `airflow.providers.amazon.aws.operators.s3` instead.
 
-AIR302_amazon.py:36:1: AIR302 `airflow.operators.s3_to_redshift_operator.S3ToRedshiftOperator` is moved into `amazon` provider in Airflow 3.0;
+ℹ Unsafe fix
+7  7  | from airflow.operators.gcs_to_s3 import GCSToS3Operator
+8  8  | from airflow.operators.google_api_to_s3_transfer import GoogleApiToS3Operator
+9  9  | from airflow.operators.redshift_to_s3_operator import RedshiftToS3Operator
+10    |-from airflow.operators.s3_file_transform_operator import S3FileTransformOperator
+11 10 | from airflow.operators.s3_to_redshift_operator import S3ToRedshiftOperator
+12 11 | from airflow.sensors.s3_key_sensor import S3KeySensor
+   12 |+from airflow.providers.amazon.aws.operators.s3 import S3FileTransformOperator
+13 13 | 
+14 14 | S3Hook()
+15 15 | provide_bucket_name()
+
+AIR302_amazon.py:21:1: AIR302 [*] `airflow.operators.s3_to_redshift_operator.S3ToRedshiftOperator` is moved into `amazon` provider in Airflow 3.0;
    |
-34 | S3FileTransformOperator()
-35 |
-36 | S3ToRedshiftOperator()
+19 | RedshiftToS3Operator()
+20 | S3FileTransformOperator()
+21 | S3ToRedshiftOperator()
    | ^^^^^^^^^^^^^^^^^^^^ AIR302
-37 | S3ToRedshiftTransfer()
+22 | S3KeySensor()
    |
    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `S3ToRedshiftOperator` from `airflow.providers.amazon.aws.transfers.s3_to_redshift` instead.
 
-AIR302_amazon.py:37:1: AIR302 `airflow.operators.s3_to_redshift_operator.S3ToRedshiftTransfer` is moved into `amazon` provider in Airflow 3.0;
-   |
-36 | S3ToRedshiftOperator()
-37 | S3ToRedshiftTransfer()
-   | ^^^^^^^^^^^^^^^^^^^^ AIR302
-38 |
-39 | S3KeySensor()
-   |
-   = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `S3ToRedshiftOperator` from `airflow.providers.amazon.aws.transfers.s3_to_redshift` instead.
+ℹ Unsafe fix
+8  8  | from airflow.operators.google_api_to_s3_transfer import GoogleApiToS3Operator
+9  9  | from airflow.operators.redshift_to_s3_operator import RedshiftToS3Operator
+10 10 | from airflow.operators.s3_file_transform_operator import S3FileTransformOperator
+11    |-from airflow.operators.s3_to_redshift_operator import S3ToRedshiftOperator
+12 11 | from airflow.sensors.s3_key_sensor import S3KeySensor
+   12 |+from airflow.providers.amazon.aws.transfers.s3_to_redshift import S3ToRedshiftOperator
+13 13 | 
+14 14 | S3Hook()
+15 15 | provide_bucket_name()
 
-AIR302_amazon.py:39:1: AIR302 `airflow.sensors.s3_key_sensor.S3KeySensor` is moved into `amazon` provider in Airflow 3.0;
+AIR302_amazon.py:22:1: AIR302 [*] `airflow.sensors.s3_key_sensor.S3KeySensor` is moved into `amazon` provider in Airflow 3.0;
    |
-37 | S3ToRedshiftTransfer()
-38 |
-39 | S3KeySensor()
+20 | S3FileTransformOperator()
+21 | S3ToRedshiftOperator()
+22 | S3KeySensor()
    | ^^^^^^^^^^^ AIR302
+23 |
+24 | from airflow.operators.google_api_to_s3_transfer import GoogleApiToS3Transfer
    |
    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `S3KeySensor` from `airflow.providers.amazon.aws.sensors.s3` instead.
+
+ℹ Unsafe fix
+9  9  | from airflow.operators.redshift_to_s3_operator import RedshiftToS3Operator
+10 10 | from airflow.operators.s3_file_transform_operator import S3FileTransformOperator
+11 11 | from airflow.operators.s3_to_redshift_operator import S3ToRedshiftOperator
+12    |-from airflow.sensors.s3_key_sensor import S3KeySensor
+   12 |+from airflow.providers.amazon.aws.sensors.s3 import S3KeySensor
+13 13 | 
+14 14 | S3Hook()
+15 15 | provide_bucket_name()
+
+AIR302_amazon.py:26:1: AIR302 [*] `airflow.operators.google_api_to_s3_transfer.GoogleApiToS3Transfer` is moved into `amazon` provider in Airflow 3.0;
+   |
+24 | from airflow.operators.google_api_to_s3_transfer import GoogleApiToS3Transfer
+25 |
+26 | GoogleApiToS3Transfer()
+   | ^^^^^^^^^^^^^^^^^^^^^ AIR302
+27 |
+28 | from airflow.operators.redshift_to_s3_operator import RedshiftToS3Transfer
+   |
+   = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `GoogleApiToS3Operator` from `airflow.providers.amazon.aws.transfers.google_api_to_s3` instead.
+
+ℹ Unsafe fix
+22 22 | S3KeySensor()
+23 23 | 
+24 24 | from airflow.operators.google_api_to_s3_transfer import GoogleApiToS3Transfer
+   25 |+from airflow.providers.amazon.aws.transfers.google_api_to_s3 import GoogleApiToS3Operator
+25 26 | 
+26 27 | GoogleApiToS3Transfer()
+27 28 | 
+
+AIR302_amazon.py:30:1: AIR302 [*] `airflow.operators.redshift_to_s3_operator.RedshiftToS3Transfer` is moved into `amazon` provider in Airflow 3.0;
+   |
+28 | from airflow.operators.redshift_to_s3_operator import RedshiftToS3Transfer
+29 |
+30 | RedshiftToS3Transfer()
+   | ^^^^^^^^^^^^^^^^^^^^ AIR302
+31 |
+32 | from airflow.operators.s3_to_redshift_operator import S3ToRedshiftTransfer
+   |
+   = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `RedshiftToS3Operator` from `airflow.providers.amazon.aws.transfers.redshift_to_s3` instead.
+
+ℹ Unsafe fix
+26 26 | GoogleApiToS3Transfer()
+27 27 | 
+28 28 | from airflow.operators.redshift_to_s3_operator import RedshiftToS3Transfer
+   29 |+from airflow.providers.amazon.aws.transfers.redshift_to_s3 import RedshiftToS3Operator
+29 30 | 
+30 31 | RedshiftToS3Transfer()
+31 32 | 
+
+AIR302_amazon.py:34:1: AIR302 [*] `airflow.operators.s3_to_redshift_operator.S3ToRedshiftTransfer` is moved into `amazon` provider in Airflow 3.0;
+   |
+32 | from airflow.operators.s3_to_redshift_operator import S3ToRedshiftTransfer
+33 |
+34 | S3ToRedshiftTransfer()
+   | ^^^^^^^^^^^^^^^^^^^^ AIR302
+   |
+   = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `S3ToRedshiftOperator` from `airflow.providers.amazon.aws.transfers.s3_to_redshift` instead.
+
+ℹ Unsafe fix
+30 30 | RedshiftToS3Transfer()
+31 31 | 
+32 32 | from airflow.operators.s3_to_redshift_operator import S3ToRedshiftTransfer
+   33 |+from airflow.providers.amazon.aws.transfers.s3_to_redshift import S3ToRedshiftOperator
+33 34 | 
+34 35 | S3ToRedshiftTransfer()

@@ -11,7 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::settings::LinterSettings;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for implicitly concatenated strings on a single line.
@@ -103,7 +103,7 @@ impl Violation for MultiLineImplicitStringConcatenation {
 
 /// ISC001, ISC002
 pub(crate) fn implicit(
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<OldDiagnostic>,
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
@@ -145,12 +145,12 @@ pub(crate) fn implicit(
         };
 
         if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
-            diagnostics.push(Diagnostic::new(
+            diagnostics.push(OldDiagnostic::new(
                 MultiLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
             ));
         } else {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = OldDiagnostic::new(
                 SingleLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
             );

@@ -17,7 +17,7 @@ use ruff_python_parser::{ParseError, ParseOptions, Parsed, UnsupportedSyntaxErro
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::Ranged;
 
-use crate::Diagnostic;
+use crate::OldDiagnostic;
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
@@ -438,7 +438,7 @@ pub fn add_noqa_to_path(
     )
 }
 
-/// Generate a [`Message`] for each [`Diagnostic`] triggered by the given source
+/// Generate a [`Message`] for each [`OldDiagnostic`] triggered by the given source
 /// code.
 pub fn lint_only(
     path: &Path,
@@ -503,7 +503,7 @@ pub fn lint_only(
 
 /// Convert from diagnostics to messages.
 fn diagnostics_to_messages(
-    diagnostics: Vec<Diagnostic>,
+    diagnostics: Vec<OldDiagnostic>,
     parse_errors: &[ParseError],
     unsupported_syntax_errors: &[UnsupportedSyntaxError],
     semantic_syntax_errors: &[SemanticSyntaxError],

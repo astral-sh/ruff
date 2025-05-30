@@ -3,8 +3,8 @@ use std::sync::{LazyLock, Mutex};
 
 use super::{
     IntersectionBuilder, KnownFunction, MemberLookupPolicy, Mro, MroError, MroIterator,
-    SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase, infer_expression_type,
-    infer_unpack_types,
+    SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
+    infer_expression_type, infer_unpack_types,
 };
 use crate::semantic_index::DeclarationWithConstraint;
 use crate::semantic_index::definition::Definition;
@@ -729,9 +729,9 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn legacy_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.explicit_bases(db).iter().find_map(|base| match base {
             Type::KnownInstance(
-                KnownInstanceType::Generic(generic_context)
-                | KnownInstanceType::Protocol(generic_context),
-            ) => *generic_context,
+                KnownInstanceType::SubscriptedGeneric(generic_context)
+                | KnownInstanceType::SubscriptedProtocol(generic_context),
+            ) => Some(*generic_context),
             _ => None,
         })
     }
@@ -879,11 +879,13 @@ impl<'db> ClassLiteral<'db> {
                 // - OR be the last-but-one base (with the final base being `Generic[]` or `object`)
                 // - OR be the last-but-two base (with the penultimate base being `Generic[]`
                 //                                and the final base being `object`)
-                self.explicit_bases(db)
-                    .iter()
-                    .rev()
-                    .take(3)
-                    .any(|base| matches!(base, Type::KnownInstance(KnownInstanceType::Protocol(_))))
+                self.explicit_bases(db).iter().rev().take(3).any(|base| {
+                    matches!(
+                        base,
+                        Type::SpecialForm(SpecialFormType::Protocol)
+                            | Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_))
+                    )
+                })
             })
     }
 

@@ -5,7 +5,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
 use crate::rules::pycodestyle::rules::logical_lines::{DefinitionState, LogicalLine};
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix, OldDiagnostic};
 
 /// ## What it does
 /// Checks for missing whitespace around all operators.
@@ -314,15 +314,15 @@ impl From<bool> for NeedsSpace {
     }
 }
 
-fn diagnostic_kind_for_operator(operator: TokenKind, range: TextRange) -> Diagnostic {
+fn diagnostic_kind_for_operator(operator: TokenKind, range: TextRange) -> OldDiagnostic {
     if operator == TokenKind::Percent {
-        Diagnostic::new(MissingWhitespaceAroundModuloOperator, range)
+        OldDiagnostic::new(MissingWhitespaceAroundModuloOperator, range)
     } else if operator.is_bitwise_or_shift() {
-        Diagnostic::new(MissingWhitespaceAroundBitwiseOrShiftOperator, range)
+        OldDiagnostic::new(MissingWhitespaceAroundBitwiseOrShiftOperator, range)
     } else if operator.is_arithmetic() {
-        Diagnostic::new(MissingWhitespaceAroundArithmeticOperator, range)
+        OldDiagnostic::new(MissingWhitespaceAroundArithmeticOperator, range)
     } else {
-        Diagnostic::new(MissingWhitespaceAroundOperator, range)
+        OldDiagnostic::new(MissingWhitespaceAroundOperator, range)
     }
 }
 

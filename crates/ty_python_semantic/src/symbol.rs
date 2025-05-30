@@ -1131,7 +1131,7 @@ fn widen_type_for_undeclared_public_symbol<'db>(
     // such.
     let is_known_instance = inferred
         .ignore_possibly_unbound()
-        .is_some_and(|ty| matches!(ty, Type::KnownInstance(_)));
+        .is_some_and(|ty| matches!(ty, Type::SpecialForm(_) | Type::KnownInstance(_)));
 
     if is_considered_non_modifiable || is_known_instance {
         inferred
