@@ -2,8 +2,9 @@ use ruff_text_size::TextRange;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::Violation;
+use crate::checkers::ast::LintContext;
 use crate::comments::shebang::ShebangDirective;
-use crate::{OldDiagnostic, Violation};
 
 /// ## What it does
 /// Checks for a shebang directive in `.py` files that does not contain `python`,
@@ -44,10 +45,11 @@ impl Violation for ShebangMissingPython {
 pub(crate) fn shebang_missing_python(
     range: TextRange,
     shebang: &ShebangDirective,
-) -> Option<OldDiagnostic> {
+    context: &LintContext,
+) {
     if shebang.contains("python") || shebang.contains("pytest") || shebang.contains("uv run") {
-        return None;
+        return;
     }
 
-    Some(OldDiagnostic::new(ShebangMissingPython, range))
+    context.report_diagnostic(ShebangMissingPython, range);
 }
