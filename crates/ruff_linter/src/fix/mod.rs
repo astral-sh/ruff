@@ -173,7 +173,7 @@ mod tests {
     use ruff_text_size::{Ranged, TextSize};
 
     use crate::Locator;
-    use crate::diagnostic::OldDiagnostic;
+    use crate::OldDiagnostic;
     use crate::fix::{FixResult, apply_fixes};
     use crate::message::Message;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
