@@ -42,16 +42,17 @@ mod rdjson;
 mod sarif;
 mod text;
 
-/// Message represents either a diagnostic message corresponding to a rule violation or a syntax
-/// error message.
+/// `OldDiagnostic` represents either a diagnostic message corresponding to a rule violation or a
+/// syntax error message.
 ///
 /// All of the information for syntax errors is captured in the underlying [`db::Diagnostic`], while
 /// rule violations can have the additional optional fields like fixes, suggestions, and (parent)
 /// `noqa` offsets.
 ///
 /// For diagnostic messages, the [`db::Diagnostic`]'s primary message contains the
-/// [`OldDiagnostic::body`], and the primary annotation optionally contains the suggestion accompanying
-/// a fix. The `db::Diagnostic::id` field contains the kebab-case lint name derived from the `Rule`.
+/// [`OldDiagnostic::body`], and the primary annotation optionally contains the suggestion
+/// accompanying a fix. The `db::Diagnostic::id` field contains the kebab-case lint name derived
+/// from the `Rule`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OldDiagnostic {
     pub diagnostic: db::Diagnostic,
@@ -364,17 +365,17 @@ impl Deref for MessageWithLocation<'_> {
     }
 }
 
-fn group_messages_by_filename(
-    messages: &[OldDiagnostic],
+fn group_diagnostics_by_filename(
+    diagnostics: &[OldDiagnostic],
 ) -> BTreeMap<String, Vec<MessageWithLocation>> {
     let mut grouped_messages = BTreeMap::default();
-    for message in messages {
+    for diagnostic in diagnostics {
         grouped_messages
-            .entry(message.filename().to_string())
+            .entry(diagnostic.filename().to_string())
             .or_insert_with(Vec::new)
             .push(MessageWithLocation {
-                message,
-                start_location: message.compute_start_location(),
+                message: diagnostic,
+                start_location: diagnostic.compute_start_location(),
             });
     }
     grouped_messages
@@ -388,7 +389,7 @@ pub trait Emitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[OldDiagnostic],
+        diagnostics: &[OldDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()>;
 }
@@ -427,7 +428,7 @@ mod tests {
     use crate::Locator;
     use crate::message::{Emitter, EmitterContext, OldDiagnostic};
 
-    pub(super) fn create_syntax_error_messages() -> Vec<OldDiagnostic> {
+    pub(super) fn create_syntax_error_diagnostics() -> Vec<OldDiagnostic> {
         let source = r"from os import
 
 if call(foo
@@ -445,7 +446,7 @@ if call(foo
             .collect()
     }
 
-    pub(super) fn create_messages() -> Vec<OldDiagnostic> {
+    pub(super) fn create_diagnostics() -> Vec<OldDiagnostic> {
         let fib = r#"import os
 
 
@@ -509,7 +510,7 @@ def fibonacci(n):
         vec![unused_import, unused_variable, undefined_name]
     }
 
-    pub(super) fn create_notebook_messages()
+    pub(super) fn create_notebook_diagnostics()
     -> (Vec<OldDiagnostic>, FxHashMap<String, NotebookIndex>) {
         let notebook = r"# cell 1
 import os
@@ -609,24 +610,24 @@ def foo():
 
     pub(super) fn capture_emitter_output(
         emitter: &mut dyn Emitter,
-        messages: &[OldDiagnostic],
+        diagnostics: &[OldDiagnostic],
     ) -> String {
         let notebook_indexes = FxHashMap::default();
         let context = EmitterContext::new(&notebook_indexes);
         let mut output: Vec<u8> = Vec::new();
-        emitter.emit(&mut output, messages, &context).unwrap();
+        emitter.emit(&mut output, diagnostics, &context).unwrap();
 
         String::from_utf8(output).expect("Output to be valid UTF-8")
     }
 
     pub(super) fn capture_emitter_notebook_output(
         emitter: &mut dyn Emitter,
-        messages: &[OldDiagnostic],
+        diagnostics: &[OldDiagnostic],
         notebook_indexes: &FxHashMap<String, NotebookIndex>,
     ) -> String {
         let context = EmitterContext::new(notebook_indexes);
         let mut output: Vec<u8> = Vec::new();
-        emitter.emit(&mut output, messages, &context).unwrap();
+        emitter.emit(&mut output, diagnostics, &context).unwrap();
 
         String::from_utf8(output).expect("Output to be valid UTF-8")
     }

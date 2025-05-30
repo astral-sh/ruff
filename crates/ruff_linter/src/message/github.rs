@@ -14,12 +14,12 @@ impl Emitter for GithubEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[OldDiagnostic],
+        diagnostics: &[OldDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        for message in messages {
-            let source_location = message.compute_start_location();
-            let location = if context.is_notebook(&message.filename()) {
+        for diagnostic in diagnostics {
+            let source_location = diagnostic.compute_start_location();
+            let location = if context.is_notebook(&diagnostic.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 LineColumn::default()
@@ -27,15 +27,15 @@ impl Emitter for GithubEmitter {
                 source_location
             };
 
-            let end_location = message.compute_end_location();
+            let end_location = diagnostic.compute_end_location();
 
             write!(
                 writer,
                 "::error title=Ruff{code},file={file},line={row},col={column},endLine={end_row},endColumn={end_column}::",
-                code = message
+                code = diagnostic
                     .noqa_code()
                     .map_or_else(String::new, |code| format!(" ({code})")),
-                file = message.filename(),
+                file = diagnostic.filename(),
                 row = source_location.line,
                 column = source_location.column,
                 end_row = end_location.line,
@@ -45,16 +45,16 @@ impl Emitter for GithubEmitter {
             write!(
                 writer,
                 "{path}:{row}:{column}:",
-                path = relativize_path(&*message.filename()),
+                path = relativize_path(&*diagnostic.filename()),
                 row = location.line,
                 column = location.column,
             )?;
 
-            if let Some(code) = message.noqa_code() {
+            if let Some(code) = diagnostic.noqa_code() {
                 write!(writer, " {code}")?;
             }
 
-            writeln!(writer, " {}", message.body())?;
+            writeln!(writer, " {}", diagnostic.body())?;
         }
 
         Ok(())
@@ -67,13 +67,13 @@ mod tests {
 
     use crate::message::GithubEmitter;
     use crate::message::tests::{
-        capture_emitter_output, create_messages, create_syntax_error_messages,
+        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     #[test]
     fn output() {
         let mut emitter = GithubEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let mut emitter = GithubEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(content);
     }

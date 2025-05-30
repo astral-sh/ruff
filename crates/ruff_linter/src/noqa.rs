@@ -29,7 +29,7 @@ use crate::rule_redirects::get_redirect_target;
 /// simultaneously.
 pub fn generate_noqa_edits(
     path: &Path,
-    messages: &[OldDiagnostic],
+    diagnostics: &[OldDiagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -39,7 +39,7 @@ pub fn generate_noqa_edits(
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
-    let comments = find_noqa_comments(messages, locator, &exemption, &directives, noqa_line_for);
+    let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
     build_noqa_edits_by_diagnostic(comments, locator, line_ending)
 }
 
@@ -707,7 +707,7 @@ impl Error for LexicalError {}
 /// Adds noqa comments to suppress all messages of a file.
 pub(crate) fn add_noqa(
     path: &Path,
-    messages: &[OldDiagnostic],
+    diagnostics: &[OldDiagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -716,7 +716,7 @@ pub(crate) fn add_noqa(
 ) -> Result<usize> {
     let (count, output) = add_noqa_inner(
         path,
-        messages,
+        diagnostics,
         locator,
         comment_ranges,
         external,
@@ -730,7 +730,7 @@ pub(crate) fn add_noqa(
 
 fn add_noqa_inner(
     path: &Path,
-    messages: &[OldDiagnostic],
+    diagnostics: &[OldDiagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -745,7 +745,7 @@ fn add_noqa_inner(
 
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
 
-    let comments = find_noqa_comments(messages, locator, &exemption, &directives, noqa_line_for);
+    let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
 
     let edits = build_noqa_edits_by_line(comments, locator, line_ending);
 
@@ -835,7 +835,7 @@ struct NoqaComment<'a> {
 }
 
 fn find_noqa_comments<'a>(
-    messages: &'a [OldDiagnostic],
+    diagnostics: &'a [OldDiagnostic],
     locator: &'a Locator,
     exemption: &'a FileExemption,
     directives: &'a NoqaDirectives,
@@ -845,7 +845,7 @@ fn find_noqa_comments<'a>(
     let mut comments_by_line: Vec<Option<NoqaComment<'a>>> = vec![];
 
     // Mark any non-ignored diagnostics.
-    for message in messages {
+    for message in diagnostics {
         let Some(code) = message.noqa_code() else {
             comments_by_line.push(None);
             continue;

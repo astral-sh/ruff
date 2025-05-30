@@ -31,18 +31,18 @@ use crate::cache::{Cache, FileCacheKey, LintCacheData};
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
-    pub(crate) messages: Vec<OldDiagnostic>,
+    pub(crate) diagnostics: Vec<OldDiagnostic>,
     pub(crate) fixed: FixMap,
     pub(crate) notebook_indexes: FxHashMap<String, NotebookIndex>,
 }
 
 impl Diagnostics {
     pub(crate) fn new(
-        messages: Vec<OldDiagnostic>,
+        diagnostics: Vec<OldDiagnostic>,
         notebook_indexes: FxHashMap<String, NotebookIndex>,
     ) -> Self {
         Self {
-            messages,
+            diagnostics,
             fixed: FixMap::default(),
             notebook_indexes,
         }
@@ -121,7 +121,7 @@ impl Add for Diagnostics {
 
 impl AddAssign for Diagnostics {
     fn add_assign(&mut self, other: Self) {
-        self.messages.extend(other.messages);
+        self.diagnostics.extend(other.diagnostics);
         self.fixed += other.fixed;
         self.notebook_indexes.extend(other.notebook_indexes);
     }
@@ -202,7 +202,7 @@ pub(crate) fn lint_path(
                 if match fix_mode {
                     flags::FixMode::Generate => true,
                     flags::FixMode::Apply | flags::FixMode::Diff => {
-                        diagnostics.messages.is_empty() && diagnostics.fixed.is_empty()
+                        diagnostics.diagnostics.is_empty() && diagnostics.fixed.is_empty()
                     }
                 } {
                     return Ok(diagnostics);
@@ -222,7 +222,7 @@ pub(crate) fn lint_path(
         Some(source_type) => source_type,
         None => match SourceType::from(path) {
             SourceType::Toml(TomlSourceType::Pyproject) => {
-                let messages = if settings
+                let diagnostics = if settings
                     .rules
                     .iter_enabled()
                     .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
@@ -240,7 +240,7 @@ pub(crate) fn lint_path(
                     vec![]
                 };
                 return Ok(Diagnostics {
-                    messages,
+                    diagnostics,
                     ..Diagnostics::default()
                 });
             }
@@ -324,7 +324,7 @@ pub(crate) fn lint_path(
         };
 
     let has_error = result.has_syntax_errors();
-    let messages = result.messages;
+    let diagnostics = result.diagnostics;
 
     if let Some((cache, relative_path, key)) = caching {
         // We don't cache parsing errors.
@@ -335,14 +335,14 @@ pub(crate) fn lint_path(
             if match fix_mode {
                 flags::FixMode::Generate => true,
                 flags::FixMode::Apply | flags::FixMode::Diff => {
-                    messages.is_empty() && fixed.is_empty()
+                    diagnostics.is_empty() && fixed.is_empty()
                 }
             } {
                 cache.update_lint(
                     relative_path.to_owned(),
                     &key,
-                    LintCacheData::from_messages(
-                        &messages,
+                    LintCacheData::from_diagnostics(
+                        &diagnostics,
                         transformed.as_ipy_notebook().map(Notebook::index).cloned(),
                     ),
                 );
@@ -357,7 +357,7 @@ pub(crate) fn lint_path(
     };
 
     Ok(Diagnostics {
-        messages,
+        diagnostics,
         fixed: FixMap::from_iter([(fs::relativize_path(path), fixed)]),
         notebook_indexes,
     })
@@ -396,7 +396,7 @@ pub(crate) fn lint_stdin(
                 }
 
                 return Ok(Diagnostics {
-                    messages: lint_pyproject_toml(&source_file, &settings.linter),
+                    diagnostics: lint_pyproject_toml(&source_file, &settings.linter),
                     fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
                     notebook_indexes: FxHashMap::default(),
                 });
@@ -417,7 +417,7 @@ pub(crate) fn lint_stdin(
     };
 
     // Lint the inputs.
-    let (LinterResult { messages, .. }, transformed, fixed) =
+    let (LinterResult { diagnostics, .. }, transformed, fixed) =
         if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
             if let Ok(FixerResult {
                 result,
@@ -501,7 +501,7 @@ pub(crate) fn lint_stdin(
     };
 
     Ok(Diagnostics {
-        messages,
+        diagnostics,
         fixed: FixMap::from_iter([(
             fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
             fixed,

@@ -17,7 +17,7 @@ impl Emitter for RdjsonEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[OldDiagnostic],
+        diagnostics: &[OldDiagnostic],
         _context: &EmitterContext,
     ) -> anyhow::Result<()> {
         serde_json::to_writer_pretty(
@@ -28,7 +28,7 @@ impl Emitter for RdjsonEmitter {
                     "url": "https://docs.astral.sh/ruff",
                 },
                 "severity": "warning",
-                "diagnostics": &ExpandedMessages{ messages }
+                "diagnostics": &ExpandedMessages{ diagnostics }
             }),
         )?;
 
@@ -37,7 +37,7 @@ impl Emitter for RdjsonEmitter {
 }
 
 struct ExpandedMessages<'a> {
-    messages: &'a [OldDiagnostic],
+    diagnostics: &'a [OldDiagnostic],
 }
 
 impl Serialize for ExpandedMessages<'_> {
@@ -45,9 +45,9 @@ impl Serialize for ExpandedMessages<'_> {
     where
         S: Serializer,
     {
-        let mut s = serializer.serialize_seq(Some(self.messages.len()))?;
+        let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
 
-        for message in self.messages {
+        for message in self.diagnostics {
             let value = message_to_rdjson_value(message);
             s.serialize_element(&value)?;
         }
@@ -121,13 +121,13 @@ mod tests {
 
     use crate::message::RdjsonEmitter;
     use crate::message::tests::{
-        capture_emitter_output, create_messages, create_syntax_error_messages,
+        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     #[test]
     fn output() {
         let mut emitter = RdjsonEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -135,7 +135,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let mut emitter = RdjsonEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(content);
     }
