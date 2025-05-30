@@ -94,9 +94,9 @@ reveal_type(f(B(), 1))  # revealed: B
 
 This step is performed only if the previous steps resulted in **no matches**.
 
-In this case, the algorithm would perform [argument type
-expansion](https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion) and loops
-over from the type checking step, evaluating the argument lists.
+In this case, the algorithm would perform
+[argument type expansion](https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion)
+and loops over from the type checking step, evaluating the argument lists.
 
 ### Expanding the only argument
 
@@ -157,7 +157,6 @@ from overloaded import A, B, C, D, f
 def _(a_b: A | B):
     reveal_type(f(a_b, C()))  # revealed: A | C
     reveal_type(f(a_b, D()))  # revealed: B | D
-
 
 # But, if it doesn't, it should expand the second argument and try again:
 def _(a_b: A | B, c_d: C | D):
