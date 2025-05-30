@@ -12,7 +12,7 @@ use crate::fix::edits::delete_comment;
 use crate::noqa::{
     Code, Directive, FileExemption, FileNoqaDirectives, NoqaDirectives, NoqaMapping,
 };
-use crate::registry::{AsRule, Rule, RuleSet};
+use crate::registry::{Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
@@ -47,7 +47,10 @@ pub(crate) fn check_noqa(
 
     // Remove any ignored diagnostics.
     'outer: for (index, diagnostic) in context.iter().enumerate() {
-        let rule = diagnostic.rule();
+        // Can't ignore syntax errors.
+        let Some(rule) = diagnostic.to_rule() else {
+            continue;
+        };
 
         if matches!(rule, Rule::BlanketNOQA) {
             continue;
@@ -148,7 +151,9 @@ pub(crate) fn check_noqa(
 
                         if seen_codes.insert(original_code) {
                             let is_code_used = if is_file_level {
-                                context.iter().any(|diag| diag.rule().noqa_code() == code)
+                                context.iter().any(|diag| {
+                                    diag.to_noqa_code().is_some_and(|noqa| noqa == code)
+                                })
                             } else {
                                 matches.iter().any(|match_| *match_ == code)
                             } || settings

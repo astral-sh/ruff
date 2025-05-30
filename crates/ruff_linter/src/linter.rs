@@ -31,7 +31,7 @@ use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
 use crate::preview::is_py314_support_enabled;
-use crate::registry::{AsRule, Rule, RuleSet};
+use crate::registry::{Rule, RuleSet};
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
 use crate::settings::types::UnsafeFixes;
@@ -390,9 +390,11 @@ pub fn check_path(
         RuleSet::empty()
     };
     if !per_file_ignores.is_empty() {
-        diagnostics
-            .as_mut_vec()
-            .retain(|diagnostic| !per_file_ignores.contains(diagnostic.rule()));
+        diagnostics.as_mut_vec().retain(|diagnostic| {
+            diagnostic
+                .to_rule()
+                .is_none_or(|rule| !per_file_ignores.contains(rule))
+        });
     }
 
     // Enforce `noqa` directives.
@@ -424,7 +426,10 @@ pub fn check_path(
     if parsed.has_valid_syntax() {
         // Remove fixes for any rules marked as unfixable.
         for diagnostic in &mut diagnostics {
-            if !settings.rules.should_fix(diagnostic.rule()) {
+            if diagnostic
+                .to_rule()
+                .is_none_or(|rule| !settings.rules.should_fix(rule))
+            {
                 diagnostic.fix = None;
             }
         }
@@ -433,10 +438,12 @@ pub fn check_path(
         if !settings.fix_safety.is_empty() {
             for diagnostic in &mut diagnostics {
                 if let Some(fix) = diagnostic.fix.take() {
-                    let fixed_applicability = settings
-                        .fix_safety
-                        .resolve_applicability(diagnostic.rule(), fix.applicability());
-                    diagnostic.set_fix(fix.with_applicability(fixed_applicability));
+                    if let Some(rule) = diagnostic.to_rule() {
+                        let fixed_applicability = settings
+                            .fix_safety
+                            .resolve_applicability(rule, fix.applicability());
+                        diagnostic.set_fix(fix.with_applicability(fixed_applicability));
+                    }
                 }
             }
         }
