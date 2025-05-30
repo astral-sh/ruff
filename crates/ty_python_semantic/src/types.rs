@@ -8482,15 +8482,12 @@ static_assertions::assert_eq_size!(Type, [u8; 24]);
 pub(crate) mod tests {
     use super::*;
     use crate::db::tests::{TestDbBuilder, setup_db};
-    use crate::symbol::{
-        global_symbol, known_module_symbol, typing_extensions_symbol, typing_symbol,
-    };
+    use crate::symbol::{global_symbol, typing_extensions_symbol, typing_symbol};
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::PythonVersion;
-    use strum::IntoEnumIterator;
     use test_case::test_case;
 
     /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
@@ -8632,70 +8629,5 @@ pub(crate) mod tests {
                 .build()
                 .is_todo()
         );
-    }
-
-    #[test]
-    fn known_function_roundtrip_from_str() {
-        let db = setup_db();
-
-        for function in KnownFunction::iter() {
-            let function_name: &'static str = function.into();
-
-            let module = match function {
-                KnownFunction::Len
-                | KnownFunction::Repr
-                | KnownFunction::IsInstance
-                | KnownFunction::HasAttr
-                | KnownFunction::IsSubclass => KnownModule::Builtins,
-
-                KnownFunction::AbstractMethod => KnownModule::Abc,
-
-                KnownFunction::Dataclass => KnownModule::Dataclasses,
-
-                KnownFunction::GetattrStatic => KnownModule::Inspect,
-
-                KnownFunction::Cast
-                | KnownFunction::Final
-                | KnownFunction::Overload
-                | KnownFunction::Override
-                | KnownFunction::RevealType
-                | KnownFunction::AssertType
-                | KnownFunction::AssertNever
-                | KnownFunction::IsProtocol
-                | KnownFunction::GetProtocolMembers
-                | KnownFunction::RuntimeCheckable
-                | KnownFunction::DataclassTransform
-                | KnownFunction::NoTypeCheck => KnownModule::TypingExtensions,
-
-                KnownFunction::IsSingleton
-                | KnownFunction::IsSubtypeOf
-                | KnownFunction::GenericContext
-                | KnownFunction::DunderAllNames
-                | KnownFunction::StaticAssert
-                | KnownFunction::IsFullyStatic
-                | KnownFunction::IsDisjointFrom
-                | KnownFunction::IsSingleValued
-                | KnownFunction::IsAssignableTo
-                | KnownFunction::IsEquivalentTo
-                | KnownFunction::IsGradualEquivalentTo
-                | KnownFunction::AllMembers => KnownModule::TyExtensions,
-            };
-
-            let function_definition = known_module_symbol(&db, module, function_name)
-                .symbol
-                .expect_type()
-                .expect_function_literal()
-                .definition(&db);
-
-            assert_eq!(
-                KnownFunction::try_from_definition_and_name(
-                    &db,
-                    function_definition,
-                    function_name
-                ),
-                Some(function),
-                "The strum `EnumString` implementation appears to be incorrect for `{function_name}`"
-            );
-        }
     }
 }

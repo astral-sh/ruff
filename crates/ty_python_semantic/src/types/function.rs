@@ -858,3 +858,77 @@ impl KnownFunction {
         }
     }
 }
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use strum::IntoEnumIterator;
+
+    use super::*;
+    use crate::db::tests::setup_db;
+    use crate::symbol::known_module_symbol;
+
+    #[test]
+    fn known_function_roundtrip_from_str() {
+        let db = setup_db();
+
+        for function in KnownFunction::iter() {
+            let function_name: &'static str = function.into();
+
+            let module = match function {
+                KnownFunction::Len
+                | KnownFunction::Repr
+                | KnownFunction::IsInstance
+                | KnownFunction::HasAttr
+                | KnownFunction::IsSubclass => KnownModule::Builtins,
+
+                KnownFunction::AbstractMethod => KnownModule::Abc,
+
+                KnownFunction::Dataclass => KnownModule::Dataclasses,
+
+                KnownFunction::GetattrStatic => KnownModule::Inspect,
+
+                KnownFunction::Cast
+                | KnownFunction::Final
+                | KnownFunction::Overload
+                | KnownFunction::Override
+                | KnownFunction::RevealType
+                | KnownFunction::AssertType
+                | KnownFunction::AssertNever
+                | KnownFunction::IsProtocol
+                | KnownFunction::GetProtocolMembers
+                | KnownFunction::RuntimeCheckable
+                | KnownFunction::DataclassTransform
+                | KnownFunction::NoTypeCheck => KnownModule::TypingExtensions,
+
+                KnownFunction::IsSingleton
+                | KnownFunction::IsSubtypeOf
+                | KnownFunction::GenericContext
+                | KnownFunction::DunderAllNames
+                | KnownFunction::StaticAssert
+                | KnownFunction::IsFullyStatic
+                | KnownFunction::IsDisjointFrom
+                | KnownFunction::IsSingleValued
+                | KnownFunction::IsAssignableTo
+                | KnownFunction::IsEquivalentTo
+                | KnownFunction::IsGradualEquivalentTo
+                | KnownFunction::AllMembers => KnownModule::TyExtensions,
+            };
+
+            let function_definition = known_module_symbol(&db, module, function_name)
+                .symbol
+                .expect_type()
+                .expect_function_literal()
+                .definition(&db);
+
+            assert_eq!(
+                KnownFunction::try_from_definition_and_name(
+                    &db,
+                    function_definition,
+                    function_name
+                ),
+                Some(function),
+                "The strum `EnumString` implementation appears to be incorrect for `{function_name}`"
+            );
+        }
+    }
+}
