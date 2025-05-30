@@ -1016,14 +1016,9 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
 /// If the callable has multiple overloads, the first one that matches is used as the overall
 /// binding match.
 ///
-/// TODO: Implement the call site evaluation algorithm in the [proposed updated typing
-/// spec][overloads], which is much more subtle than “first match wins”.
-///
 /// If the arguments cannot be matched to formal parameters, we store information about the
 /// specific errors that occurred when trying to match them up. If the callable has multiple
 /// overloads, we store this error information for each overload.
-///
-/// [overloads]: https://github.com/python/typing/pull/1839
 #[derive(Debug)]
 pub(crate) struct CallableBinding<'db> {
     /// The type that is (hopefully) callable.
@@ -1104,12 +1099,6 @@ impl<'db> CallableBinding<'db> {
         // before checking.
         let arguments = arguments.with_self(self.bound_type);
 
-        // TODO: This checks every overload. In the proposed more detailed call checking spec [1],
-        // arguments are checked for arity first, and are only checked for type assignability against
-        // the matching overloads. Make sure to implement that as part of separating call binding into
-        // two phases.
-        //
-        // [1] https://typing.python.org/en/latest/spec/overload.html#overload-call-evaluation
         for overload in &mut self.overloads {
             overload.match_parameters(arguments.as_ref(), argument_forms, conflicting_forms);
         }
