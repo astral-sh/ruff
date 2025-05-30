@@ -63,13 +63,13 @@ impl Diagnostics {
                     let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
                     let source_file = SourceFileBuilder::new(name, "").finish();
                     Self::new(
-                        vec![Message::from_diagnostic(OldDiagnostic::new(
+                        vec![OldDiagnostic::new(
                             IOError {
                                 message: err.to_string(),
                             },
                             TextRange::default(),
                             &source_file,
-                        ))],
+                        )],
                         FxHashMap::default(),
                     )
                 } else {

@@ -23,10 +23,10 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
 
+use crate::Fix;
 use crate::codes::NoqaCode;
 use crate::logging::DisplayParseErrorType;
 use crate::registry::Rule;
-use crate::{Fix, OldDiagnostic};
 use crate::{Locator, Violation};
 
 mod azure;
@@ -110,24 +110,6 @@ impl Message {
             parent,
             noqa_offset,
             noqa_code: Some(rule.noqa_code()),
-        }
-    }
-
-    /// Create a [`Message`] from the given [`OldDiagnostic`] corresponding to a rule violation.
-    pub fn from_diagnostic(diagnostic: OldDiagnostic) -> Message {
-        let OldDiagnostic {
-            diagnostic,
-            fix,
-            parent,
-            noqa_offset,
-            noqa_code,
-        } = diagnostic;
-        Self {
-            diagnostic,
-            fix,
-            parent,
-            noqa_offset,
-            noqa_code,
         }
     }
 
