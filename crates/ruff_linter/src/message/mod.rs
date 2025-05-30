@@ -83,7 +83,7 @@ impl OldDiagnostic {
     }
 
     #[expect(clippy::too_many_arguments)]
-    pub fn diagnostic(
+    pub fn lint(
         body: String,
         suggestion: Option<String>,
         range: TextRange,
@@ -169,7 +169,7 @@ impl OldDiagnostic {
     // should just update the call sites.
     #[expect(clippy::needless_pass_by_value)]
     pub fn new<T: Violation>(kind: T, range: TextRange, file: &SourceFile) -> Self {
-        Self::diagnostic(
+        Self::lint(
             Violation::message(&kind),
             Violation::fix_title(&kind),
             range,
@@ -464,7 +464,7 @@ def fibonacci(n):
         let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
 
         let unused_import_start = TextSize::from(7);
-        let unused_import = OldDiagnostic::diagnostic(
+        let unused_import = OldDiagnostic::lint(
             "`os` imported but unused".to_string(),
             Some("Remove unused import: `os`".to_string()),
             TextRange::new(unused_import_start, TextSize::from(9)),
@@ -479,7 +479,7 @@ def fibonacci(n):
         );
 
         let unused_variable_start = TextSize::from(94);
-        let unused_variable = OldDiagnostic::diagnostic(
+        let unused_variable = OldDiagnostic::lint(
             "Local variable `x` is assigned to but never used".to_string(),
             Some("Remove assignment to unused variable `x`".to_string()),
             TextRange::new(unused_variable_start, TextSize::from(95)),
@@ -496,7 +496,7 @@ def fibonacci(n):
         let file_2 = r"if a == 1: pass";
 
         let undefined_name_start = TextSize::from(3);
-        let undefined_name = OldDiagnostic::diagnostic(
+        let undefined_name = OldDiagnostic::lint(
             "Undefined name `a`".to_string(),
             None,
             TextRange::new(undefined_name_start, TextSize::from(4)),
@@ -527,7 +527,7 @@ def foo():
         let notebook_source = SourceFileBuilder::new("notebook.ipynb", notebook).finish();
 
         let unused_import_os_start = TextSize::from(16);
-        let unused_import_os = OldDiagnostic::diagnostic(
+        let unused_import_os = OldDiagnostic::lint(
             "`os` imported but unused".to_string(),
             Some("Remove unused import: `os`".to_string()),
             TextRange::new(unused_import_os_start, TextSize::from(18)),
@@ -542,7 +542,7 @@ def foo():
         );
 
         let unused_import_math_start = TextSize::from(35);
-        let unused_import_math = OldDiagnostic::diagnostic(
+        let unused_import_math = OldDiagnostic::lint(
             "`math` imported but unused".to_string(),
             Some("Remove unused import: `math`".to_string()),
             TextRange::new(unused_import_math_start, TextSize::from(39)),
@@ -557,7 +557,7 @@ def foo():
         );
 
         let unused_variable_start = TextSize::from(98);
-        let unused_variable = OldDiagnostic::diagnostic(
+        let unused_variable = OldDiagnostic::lint(
             "Local variable `x` is assigned to but never used".to_string(),
             Some("Remove assignment to unused variable `x`".to_string()),
             TextRange::new(unused_variable_start, TextSize::from(99)),
