@@ -266,12 +266,12 @@ pub(crate) fn indentation(
     prev_indent_level: Option<usize>,
     indent_size: usize,
     range: TextRange,
-    diagnostics: &LintContext,
+    context: &LintContext,
     settings: &LinterSettings,
 ) {
     if indent_level % indent_size != 0 {
         if logical_line.is_comment_only() {
-            diagnostics.report_diagnostic_if_enabled(
+            context.report_diagnostic_if_enabled(
                 IndentationWithInvalidMultipleComment {
                     indent_width: indent_size,
                 },
@@ -279,7 +279,7 @@ pub(crate) fn indentation(
                 settings,
             );
         } else {
-            diagnostics.report_diagnostic_if_enabled(
+            context.report_diagnostic_if_enabled(
                 IndentationWithInvalidMultiple {
                     indent_width: indent_size,
                 },
@@ -294,24 +294,24 @@ pub(crate) fn indentation(
 
     if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
         if logical_line.is_comment_only() {
-            diagnostics.report_diagnostic_if_enabled(NoIndentedBlockComment, range, settings);
+            context.report_diagnostic_if_enabled(NoIndentedBlockComment, range, settings);
         } else {
-            diagnostics.report_diagnostic_if_enabled(NoIndentedBlock, range, settings);
+            context.report_diagnostic_if_enabled(NoIndentedBlock, range, settings);
         }
     } else if !indent_expect
         && prev_indent_level.is_some_and(|prev_indent_level| indent_level > prev_indent_level)
     {
         if logical_line.is_comment_only() {
-            diagnostics.report_diagnostic_if_enabled(UnexpectedIndentationComment, range, settings);
+            context.report_diagnostic_if_enabled(UnexpectedIndentationComment, range, settings);
         } else {
-            diagnostics.report_diagnostic_if_enabled(UnexpectedIndentation, range, settings);
+            context.report_diagnostic_if_enabled(UnexpectedIndentation, range, settings);
         }
     }
     if indent_expect {
         let expected_indent_amount = if indent_char == '\t' { 8 } else { 4 };
         let expected_indent_level = prev_indent_level.unwrap_or(0) + expected_indent_amount;
         if indent_level > expected_indent_level {
-            diagnostics.report_diagnostic_if_enabled(
+            context.report_diagnostic_if_enabled(
                 OverIndented {
                     is_comment: logical_line.is_comment_only(),
                 },

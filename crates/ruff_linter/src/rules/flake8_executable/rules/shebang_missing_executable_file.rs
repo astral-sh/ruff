@@ -45,7 +45,7 @@ impl Violation for ShebangMissingExecutableFile {
 
 /// EXE002
 #[cfg(target_family = "unix")]
-pub(crate) fn shebang_missing_executable_file(filepath: &Path, diagnostics: &LintContext) {
+pub(crate) fn shebang_missing_executable_file(filepath: &Path, context: &LintContext) {
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
 
@@ -53,7 +53,7 @@ pub(crate) fn shebang_missing_executable_file(filepath: &Path, diagnostics: &Lin
         return;
     }
     if let Ok(true) = is_executable(filepath) {
-        diagnostics.report_diagnostic(
+        context.report_diagnostic(
             ShebangMissingExecutableFile,
             ruff_text_size::TextRange::default(),
         );

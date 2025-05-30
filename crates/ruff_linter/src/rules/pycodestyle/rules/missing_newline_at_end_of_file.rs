@@ -41,7 +41,7 @@ impl AlwaysFixableViolation for MissingNewlineAtEndOfFile {
 pub(crate) fn no_newline_at_end_of_file(
     locator: &Locator,
     stylist: &Stylist,
-    diagnostics: &LintContext,
+    context: &LintContext,
 ) {
     let source = locator.contents();
 
@@ -53,7 +53,7 @@ pub(crate) fn no_newline_at_end_of_file(
     if !source.ends_with(['\n', '\r']) {
         let range = TextRange::empty(locator.contents().text_len());
 
-        let mut diagnostic = diagnostics.report_diagnostic(MissingNewlineAtEndOfFile, range);
+        let mut diagnostic = context.report_diagnostic(MissingNewlineAtEndOfFile, range);
         diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
             stylist.line_ending().to_string(),
             range.start(),

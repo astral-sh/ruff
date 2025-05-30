@@ -48,7 +48,7 @@ impl Violation for CommentedOutCode {
 
 /// ERA001
 pub(crate) fn commented_out_code(
-    diagnostics: &LintContext,
+    context: &LintContext,
     locator: &Locator,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
@@ -66,7 +66,7 @@ pub(crate) fn commented_out_code(
 
         // Verify that the comment is on its own line, and that it contains code.
         if is_own_line_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
-            diagnostics
+            context
                 .report_diagnostic(CommentedOutCode, range)
                 .set_fix(Fix::display_only_edit(Edit::range_deletion(
                     locator.full_lines_range(range),

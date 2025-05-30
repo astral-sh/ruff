@@ -698,7 +698,7 @@ pub(crate) struct BlankLinesChecker<'a, 'b> {
     lines_between_types: usize,
     source_type: PySourceType,
     cell_offsets: Option<&'a CellOffsets>,
-    diagnostics: &'a LintContext<'b>,
+    context: &'a LintContext<'b>,
 }
 
 impl<'a, 'b> BlankLinesChecker<'a, 'b> {
@@ -708,7 +708,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
         settings: &crate::settings::LinterSettings,
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
-        diagnostics: &'a LintContext<'b>,
+        context: &'a LintContext<'b>,
     ) -> BlankLinesChecker<'a, 'b> {
         BlankLinesChecker {
             stylist,
@@ -718,7 +718,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             lines_between_types: settings.isort.lines_between_types,
             source_type,
             cell_offsets,
-            diagnostics,
+            context,
         }
     }
 
@@ -844,7 +844,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
         {
             // E301
             let mut diagnostic = self
-                .diagnostics
+                .context
                 .report_diagnostic(BlankLineBetweenMethods, line.first_token_range);
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 self.stylist.line_ending().to_string(),
@@ -897,7 +897,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             && !line.is_beginning_of_cell
         {
             // E302
-            let mut diagnostic = self.diagnostics.report_diagnostic(
+            let mut diagnostic = self.context.report_diagnostic(
                 BlankLinesTopLevel {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                     expected_blank_lines: expected_blank_lines_before_definition,
@@ -939,7 +939,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
 
         if line.blank_lines > max_blank_lines {
             // E303
-            let mut diagnostic = self.diagnostics.report_diagnostic(
+            let mut diagnostic = self.context.report_diagnostic(
                 TooManyBlankLines {
                     actual_blank_lines: line.blank_lines.count(),
                 },
@@ -963,7 +963,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             && line.preceding_blank_lines > 0
         {
             // E304
-            let mut diagnostic = self.diagnostics.report_diagnostic(
+            let mut diagnostic = self.context.report_diagnostic(
                 BlankLineAfterDecorator {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                 },
@@ -1008,7 +1008,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             && !line.is_beginning_of_cell
         {
             // E305
-            let mut diagnostic = self.diagnostics.report_diagnostic(
+            let mut diagnostic = self.context.report_diagnostic(
                 BlankLinesAfterFunctionOrClass {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                 },
@@ -1050,7 +1050,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
         {
             // E306
             let mut diagnostic = self
-                .diagnostics
+                .context
                 .report_diagnostic(BlankLinesBeforeNestedDefinition, line.first_token_range);
 
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(

@@ -115,11 +115,7 @@ fn match_extraneous_parentheses(tokens: &mut Iter<'_, Token>) -> Option<(TextRan
 }
 
 /// UP034
-pub(crate) fn extraneous_parentheses(
-    diagnostics: &LintContext,
-    tokens: &Tokens,
-    locator: &Locator,
-) {
+pub(crate) fn extraneous_parentheses(context: &LintContext, tokens: &Tokens, locator: &Locator) {
     let mut token_iter = tokens.iter();
     while let Some(token) = token_iter.next() {
         if !matches!(token.kind(), TokenKind::Lpar) {
@@ -130,7 +126,7 @@ pub(crate) fn extraneous_parentheses(
             continue;
         };
 
-        let mut diagnostic = diagnostics.report_diagnostic(
+        let mut diagnostic = context.report_diagnostic(
             ExtraneousParentheses,
             TextRange::new(start_range.start(), end_range.end()),
         );

@@ -67,7 +67,7 @@ struct CodingCommentRange {
 
 /// UP009
 pub(crate) fn unnecessary_coding_comment(
-    diagnostics: &LintContext,
+    context: &LintContext,
     locator: &Locator,
     comment_ranges: &CommentRanges,
 ) {
@@ -107,7 +107,7 @@ pub(crate) fn unnecessary_coding_comment(
     }
 
     let fix = Fix::safe_edit(Edit::range_deletion(range.line));
-    diagnostics
+    context
         .report_diagnostic(UTF8EncodingDeclaration, range.comment)
         .set_fix(fix);
 }

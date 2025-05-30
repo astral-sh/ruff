@@ -41,9 +41,9 @@ pub(crate) fn check_logical_lines(
     indexer: &Indexer,
     stylist: &Stylist,
     settings: &LinterSettings,
-    diagnostics: &LintContext,
+    lint_context: &LintContext,
 ) {
-    let mut context = LogicalLinesContext::new(settings, diagnostics);
+    let mut context = LogicalLinesContext::new(settings, lint_context);
 
     let mut prev_line = None;
     let mut prev_indent_level = None;
@@ -180,7 +180,7 @@ pub(crate) fn check_logical_lines(
                 prev_indent_level,
                 indent_size,
                 range,
-                diagnostics,
+                lint_context,
                 settings,
             );
         }
@@ -194,15 +194,12 @@ pub(crate) fn check_logical_lines(
 
 pub(crate) struct LogicalLinesContext<'a, 'b> {
     settings: &'a LinterSettings,
-    diagnostics: &'a LintContext<'b>,
+    context: &'a LintContext<'b>,
 }
 
 impl<'a, 'b> LogicalLinesContext<'a, 'b> {
-    fn new(settings: &'a LinterSettings, diagnostics: &'a LintContext<'b>) -> Self {
-        Self {
-            settings,
-            diagnostics,
-        }
+    fn new(settings: &'a LinterSettings, context: &'a LintContext<'b>) -> Self {
+        Self { settings, context }
     }
 
     pub(crate) fn report_diagnostic<'chk, T: Violation>(
@@ -210,7 +207,7 @@ impl<'a, 'b> LogicalLinesContext<'a, 'b> {
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        self.diagnostics
+        self.context
             .report_diagnostic_if_enabled(kind, range, self.settings)
     }
 }

@@ -29,7 +29,7 @@ pub(crate) fn check_imports(
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
     target_version: PythonVersion,
-    diagnostics: &LintContext,
+    context: &LintContext,
 ) {
     // Extract all import blocks from the AST.
     let tracker = {
@@ -55,7 +55,7 @@ pub(crate) fn check_imports(
                     source_type,
                     parsed.tokens(),
                     target_version,
-                    diagnostics,
+                    context,
                 );
             }
         }
@@ -67,7 +67,7 @@ pub(crate) fn check_imports(
             stylist,
             settings,
             source_type,
-            diagnostics,
+            context,
         );
     }
 }

@@ -46,7 +46,7 @@ impl Violation for EmptyComment {
 
 /// PLR2044
 pub(crate) fn empty_comments(
-    diagnostics: &LintContext,
+    context: &LintContext,
     comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {
@@ -59,12 +59,12 @@ pub(crate) fn empty_comments(
         }
 
         // If the line contains an empty comment, add a diagnostic.
-        empty_comment(diagnostics, range, locator);
+        empty_comment(context, range, locator);
     }
 }
 
 /// Return a [`Diagnostic`] if the comment at the given [`TextRange`] is empty.
-fn empty_comment(diagnostics: &LintContext, range: TextRange, locator: &Locator) {
+fn empty_comment(context: &LintContext, range: TextRange, locator: &Locator) {
     // Check: is the comment empty?
     if !locator
         .slice(range)
@@ -95,7 +95,7 @@ fn empty_comment(diagnostics: &LintContext, range: TextRange, locator: &Locator)
             }
         });
 
-    diagnostics
+    context
         .report_diagnostic(EmptyComment, TextRange::new(first_hash_col, line.end()))
         .set_fix(Fix::safe_edit(
             if let Some(deletion_start_col) = deletion_start_col {

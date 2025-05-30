@@ -237,7 +237,7 @@ pub(crate) struct Checker<'a> {
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
-    diagnostics: &'a LintContext<'a>,
+    context: &'a LintContext<'a>,
 }
 
 impl<'a> Checker<'a> {
@@ -258,7 +258,7 @@ impl<'a> Checker<'a> {
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
         target_version: TargetVersion,
-        diagnostics: &'a LintContext<'a>,
+        context: &'a LintContext<'a>,
     ) -> Checker<'a> {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
@@ -287,7 +287,7 @@ impl<'a> Checker<'a> {
             target_version,
             semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
-            diagnostics,
+            context,
         }
     }
 }
@@ -389,7 +389,7 @@ impl<'a> Checker<'a> {
         kind: T,
         range: TextRange,
     ) -> DiagnosticGuard<'chk, 'a> {
-        self.diagnostics.report_diagnostic(kind, range)
+        self.context.report_diagnostic(kind, range)
     }
 
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
@@ -402,7 +402,7 @@ impl<'a> Checker<'a> {
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        self.diagnostics
+        self.context
             .report_diagnostic_if_enabled(kind, range, self.settings)
     }
 
@@ -2961,7 +2961,7 @@ pub(crate) fn check_ast(
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
     target_version: TargetVersion,
-    diagnostics: &LintContext,
+    context: &LintContext,
 ) -> Vec<SemanticSyntaxError> {
     let module_path = package
         .map(PackageRoot::path)
@@ -3002,7 +3002,7 @@ pub(crate) fn check_ast(
         cell_offsets,
         notebook_index,
         target_version,
-        diagnostics,
+        context,
     );
     checker.bind_builtins();
 
@@ -3064,7 +3064,7 @@ impl<'a> LintContext<'a> {
         range: TextRange,
     ) -> DiagnosticGuard<'chk, 'a> {
         DiagnosticGuard {
-            diagnostics: self,
+            context: self,
             diagnostic: Some(OldDiagnostic::new(kind, range, self.source_file)),
         }
     }
@@ -3083,7 +3083,7 @@ impl<'a> LintContext<'a> {
         let diagnostic = OldDiagnostic::new(kind, range, self.source_file);
         if settings.rules.enabled(diagnostic.rule()) {
             Some(DiagnosticGuard {
-                diagnostics: self,
+                context: self,
                 diagnostic: Some(diagnostic),
             })
         } else {
@@ -3117,7 +3117,7 @@ impl<'a> LintContext<'a> {
 /// adding fixes or parent ranges.
 pub(crate) struct DiagnosticGuard<'a, 'b> {
     /// The parent checker that will receive the diagnostic on `Drop`.
-    diagnostics: &'a LintContext<'b>,
+    context: &'a LintContext<'b>,
     /// The diagnostic that we want to report.
     ///
     /// This is always `Some` until the `Drop` (or `defuse`) call.
@@ -3159,7 +3159,7 @@ impl Drop for DiagnosticGuard<'_, '_> {
         }
 
         if let Some(diagnostic) = self.diagnostic.take() {
-            self.diagnostics.diagnostics.borrow_mut().push(diagnostic);
+            self.context.diagnostics.borrow_mut().push(diagnostic);
         }
     }
 }

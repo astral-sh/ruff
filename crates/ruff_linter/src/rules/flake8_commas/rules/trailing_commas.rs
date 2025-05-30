@@ -239,7 +239,7 @@ impl AlwaysFixableViolation for ProhibitedTrailingComma {
 
 /// COM812, COM818, COM819
 pub(crate) fn trailing_commas(
-    diagnostics: &LintContext,
+    lint_context: &LintContext,
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
@@ -292,7 +292,7 @@ pub(crate) fn trailing_commas(
         // Update the comma context stack.
         let context = update_context(token, prev, prev_prev, &mut stack);
 
-        check_token(token, prev, prev_prev, context, locator, diagnostics);
+        check_token(token, prev, prev_prev, context, locator, lint_context);
 
         // Pop the current context if the current token ended it.
         // The top context is never popped (if unbalanced closing brackets).
@@ -318,7 +318,7 @@ fn check_token(
     prev_prev: SimpleToken,
     context: Context,
     locator: &Locator,
-    diagnostics: &LintContext,
+    lint_context: &LintContext,
 ) {
     // Is it allowed to have a trailing comma before this token?
     let comma_allowed = token.ty == TokenType::ClosingBracket
@@ -352,7 +352,7 @@ fn check_token(
     };
 
     if comma_prohibited {
-        let mut diagnostic = diagnostics.report_diagnostic(ProhibitedTrailingComma, prev.range());
+        let mut diagnostic = lint_context.report_diagnostic(ProhibitedTrailingComma, prev.range());
         let range = diagnostic.range();
         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
         return;
@@ -362,7 +362,7 @@ fn check_token(
     // Approximation: any comma followed by a statement-ending newline.
     let bare_comma_prohibited = prev.ty == TokenType::Comma && token.ty == TokenType::Newline;
     if bare_comma_prohibited {
-        diagnostics.report_diagnostic(TrailingCommaOnBareTuple, prev.range());
+        lint_context.report_diagnostic(TrailingCommaOnBareTuple, prev.range());
         return;
     }
 
@@ -385,7 +385,7 @@ fn check_token(
         );
     if comma_required {
         let mut diagnostic =
-            diagnostics.report_diagnostic(MissingTrailingComma, TextRange::empty(prev_prev.end()));
+            lint_context.report_diagnostic(MissingTrailingComma, TextRange::empty(prev_prev.end()));
         // Create a replacement that includes the final bracket (or other token),
         // rather than just inserting a comma at the end. This prevents the UP034 fix
         // removing any brackets in the same linter pass - doing both at the same time could

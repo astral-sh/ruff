@@ -49,7 +49,7 @@ impl AlwaysFixableViolation for InvalidRuleCode {
 
 /// RUF102 for invalid noqa codes
 pub(crate) fn invalid_noqa_code(
-    diagnostics: &LintContext,
+    context: &LintContext,
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
     external: &[String],
@@ -70,10 +70,10 @@ pub(crate) fn invalid_noqa_code(
             .partition(|&code| code_is_valid(code, external));
 
         if valid_codes.is_empty() {
-            all_codes_invalid_diagnostic(directive, invalid_codes, diagnostics);
+            all_codes_invalid_diagnostic(directive, invalid_codes, context);
         } else {
             for invalid_code in invalid_codes {
-                some_codes_are_invalid_diagnostic(directive, invalid_code, locator, diagnostics);
+                some_codes_are_invalid_diagnostic(directive, invalid_code, locator, context);
             }
         }
     }
@@ -87,9 +87,9 @@ fn code_is_valid(code: &Code, external: &[String]) -> bool {
 fn all_codes_invalid_diagnostic(
     directive: &Codes<'_>,
     invalid_codes: Vec<&Code<'_>>,
-    diagnostics: &LintContext,
+    context: &LintContext,
 ) {
-    diagnostics
+    context
         .report_diagnostic(
             InvalidRuleCode {
                 rule_code: invalid_codes
@@ -107,9 +107,9 @@ fn some_codes_are_invalid_diagnostic(
     codes: &Codes,
     invalid_code: &Code,
     locator: &Locator,
-    diagnostics: &LintContext,
+    context: &LintContext,
 ) {
-    diagnostics
+    context
         .report_diagnostic(
             InvalidRuleCode {
                 rule_code: invalid_code.to_string(),

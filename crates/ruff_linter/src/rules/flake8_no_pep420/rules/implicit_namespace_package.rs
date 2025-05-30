@@ -66,7 +66,7 @@ pub(crate) fn implicit_namespace_package(
     project_root: &Path,
     src: &[PathBuf],
     allow_nested_roots: bool,
-    diagnostics: &LintContext,
+    context: &LintContext,
 ) {
     if package.is_none()
         // Ignore non-`.py` files, which don't require an `__init__.py`.
@@ -86,7 +86,7 @@ pub(crate) fn implicit_namespace_package(
         // Ignore PEP 723 scripts.
         && ScriptTag::parse(locator.contents().as_bytes()).is_none()
     {
-        diagnostics.report_diagnostic(
+        context.report_diagnostic(
             ImplicitNamespacePackage {
                 filename: fs::relativize_path(path),
                 parent: None,
@@ -101,7 +101,7 @@ pub(crate) fn implicit_namespace_package(
                     .ancestors()
                     .find(|parent| !parent.join("__init__.py").exists())
                 {
-                    diagnostics.report_diagnostic(
+                    context.report_diagnostic(
                         ImplicitNamespacePackage {
                             filename: fs::relativize_path(path),
                             parent: Some(fs::relativize_path(parent)),

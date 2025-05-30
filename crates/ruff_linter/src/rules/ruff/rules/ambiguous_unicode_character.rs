@@ -175,14 +175,14 @@ impl Violation for AmbiguousUnicodeCharacterComment {
 
 /// RUF003
 pub(crate) fn ambiguous_unicode_character_comment(
-    diagnostics: &LintContext,
+    context: &LintContext,
     locator: &Locator,
     range: TextRange,
     settings: &LinterSettings,
 ) {
     let text = locator.slice(range);
     for candidate in ambiguous_unicode_character(text, range, settings) {
-        candidate.into_diagnostic(Context::Comment, settings, diagnostics);
+        candidate.into_diagnostic(Context::Comment, settings, context);
     }
 }
 
@@ -345,12 +345,12 @@ impl Candidate {
         self,
         context: Context,
         settings: &LinterSettings,
-        diagnostics: &LintContext,
+        lint_context: &LintContext,
     ) {
         if !settings.allowed_confusables.contains(&self.confusable) {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());
             match context {
-                Context::String => diagnostics.report_diagnostic_if_enabled(
+                Context::String => lint_context.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterString {
                         confusable: self.confusable,
                         representant: self.representant,
@@ -358,7 +358,7 @@ impl Candidate {
                     char_range,
                     settings,
                 ),
-                Context::Docstring => diagnostics.report_diagnostic_if_enabled(
+                Context::Docstring => lint_context.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterDocstring {
                         confusable: self.confusable,
                         representant: self.representant,
@@ -366,7 +366,7 @@ impl Candidate {
                     char_range,
                     settings,
                 ),
-                Context::Comment => diagnostics.report_diagnostic_if_enabled(
+                Context::Comment => lint_context.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterComment {
                         confusable: self.confusable,
                         representant: self.representant,

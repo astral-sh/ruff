@@ -33,7 +33,7 @@ impl Violation for MissingCopyrightNotice {
 pub(crate) fn missing_copyright_notice(
     locator: &Locator,
     settings: &LinterSettings,
-    diagnostics: &LintContext,
+    context: &LintContext,
 ) {
     // Ignore files that are too small to contain a copyright notice.
     if locator.len() < settings.flake8_copyright.min_file_size {
@@ -56,5 +56,5 @@ pub(crate) fn missing_copyright_notice(
         }
     }
 
-    diagnostics.report_diagnostic(MissingCopyrightNotice, TextRange::default());
+    context.report_diagnostic(MissingCopyrightNotice, TextRange::default());
 }

@@ -44,35 +44,32 @@ impl AlwaysFixableViolation for RedirectedNOQA {
 }
 
 /// RUF101 for in-line noqa directives
-pub(crate) fn redirected_noqa(diagnostics: &LintContext, noqa_directives: &NoqaDirectives) {
+pub(crate) fn redirected_noqa(context: &LintContext, noqa_directives: &NoqaDirectives) {
     for line in noqa_directives.lines() {
         let Directive::Codes(directive) = &line.directive else {
             continue;
         };
 
-        build_diagnostics(diagnostics, directive);
+        build_diagnostics(context, directive);
     }
 }
 
 /// RUF101 for file noqa directives
-pub(crate) fn redirected_file_noqa(
-    diagnostics: &LintContext,
-    noqa_directives: &FileNoqaDirectives,
-) {
+pub(crate) fn redirected_file_noqa(context: &LintContext, noqa_directives: &FileNoqaDirectives) {
     for line in noqa_directives.lines() {
         let Directive::Codes(codes) = &line.parsed_file_exemption else {
             continue;
         };
 
-        build_diagnostics(diagnostics, codes);
+        build_diagnostics(context, codes);
     }
 }
 
 /// Convert a sequence of [Codes] into [Diagnostic]s and append them to `diagnostics`.
-pub(crate) fn build_diagnostics(diagnostics: &LintContext, codes: &Codes<'_>) {
+pub(crate) fn build_diagnostics(context: &LintContext, codes: &Codes<'_>) {
     for code in codes.iter() {
         if let Some(redirected) = get_redirect_target(code.as_str()) {
-            let mut diagnostic = diagnostics.report_diagnostic(
+            let mut diagnostic = context.report_diagnostic(
                 RedirectedNOQA {
                     original: code.to_string(),
                     target: redirected.to_string(),

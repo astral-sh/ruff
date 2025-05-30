@@ -181,11 +181,7 @@ impl Violation for InvalidCharacterZeroWidthSpace {
 }
 
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
-pub(crate) fn invalid_string_characters(
-    diagnostics: &LintContext,
-    token: &Token,
-    locator: &Locator,
-) {
+pub(crate) fn invalid_string_characters(context: &LintContext, token: &Token, locator: &Locator) {
     let text = match token.kind() {
         // We can't use the `value` field since it's decoded and e.g. for f-strings removed a curly
         // brace that escaped another curly brace, which would gives us wrong column information.
@@ -200,23 +196,20 @@ pub(crate) fn invalid_string_characters(
         let (replacement, mut diagnostic) = match c {
             '\x08' => (
                 "\\b",
-                diagnostics.report_diagnostic(InvalidCharacterBackspace, range),
+                context.report_diagnostic(InvalidCharacterBackspace, range),
             ),
             '\x1A' => (
                 "\\x1A",
-                diagnostics.report_diagnostic(InvalidCharacterSub, range),
+                context.report_diagnostic(InvalidCharacterSub, range),
             ),
             '\x1B' => (
                 "\\x1B",
-                diagnostics.report_diagnostic(InvalidCharacterEsc, range),
+                context.report_diagnostic(InvalidCharacterEsc, range),
             ),
-            '\0' => (
-                "\\0",
-                diagnostics.report_diagnostic(InvalidCharacterNul, range),
-            ),
+            '\0' => ("\\0", context.report_diagnostic(InvalidCharacterNul, range)),
             '\u{200b}' => (
                 "\\u200b",
-                diagnostics.report_diagnostic(InvalidCharacterZeroWidthSpace, range),
+                context.report_diagnostic(InvalidCharacterZeroWidthSpace, range),
             ),
             _ => {
                 continue;

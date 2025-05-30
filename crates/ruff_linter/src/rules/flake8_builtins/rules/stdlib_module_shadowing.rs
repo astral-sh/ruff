@@ -70,7 +70,7 @@ pub(crate) fn stdlib_module_shadowing(
     mut path: &Path,
     settings: &LinterSettings,
     target_version: PythonVersion,
-    diagnostics: &LintContext,
+    context: &LintContext,
 ) {
     if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file) {
         return;
@@ -112,7 +112,7 @@ pub(crate) fn stdlib_module_shadowing(
         return;
     }
 
-    diagnostics.report_diagnostic(
+    context.report_diagnostic(
         StdlibModuleShadowing {
             name: module_name.to_string(),
         },

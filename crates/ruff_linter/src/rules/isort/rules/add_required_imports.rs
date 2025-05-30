@@ -92,7 +92,7 @@ fn add_required_import(
     locator: &Locator,
     stylist: &Stylist,
     source_type: PySourceType,
-    diagnostics: &LintContext,
+    context: &LintContext,
 ) {
     // Don't add imports to semantically-empty files.
     if parsed.suite().iter().all(is_docstring_stmt) {
@@ -114,7 +114,7 @@ fn add_required_import(
     }
 
     // Always insert the diagnostic at top-of-file.
-    let mut diagnostic = diagnostics.report_diagnostic(
+    let mut diagnostic = context.report_diagnostic(
         MissingRequiredImport(required_import.to_string()),
         TextRange::default(),
     );
@@ -130,7 +130,7 @@ pub(crate) fn add_required_imports(
     stylist: &Stylist,
     settings: &LinterSettings,
     source_type: PySourceType,
-    diagnostics: &LintContext,
+    context: &LintContext,
 ) {
     for required_import in &settings.isort.required_imports {
         add_required_import(
@@ -139,7 +139,7 @@ pub(crate) fn add_required_imports(
             locator,
             stylist,
             source_type,
-            diagnostics,
+            context,
         );
     }
 }

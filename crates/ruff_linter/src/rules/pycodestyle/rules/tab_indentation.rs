@@ -34,7 +34,7 @@ impl Violation for TabIndentation {
 }
 
 /// W191
-pub(crate) fn tab_indentation(diagnostics: &LintContext, locator: &Locator, indexer: &Indexer) {
+pub(crate) fn tab_indentation(context: &LintContext, locator: &Locator, indexer: &Indexer) {
     let contents = locator.contents().as_bytes();
     let mut offset = 0;
     while let Some(index) = memchr::memchr(b'\t', &contents[offset..]) {
@@ -43,7 +43,7 @@ pub(crate) fn tab_indentation(diagnostics: &LintContext, locator: &Locator, inde
 
         // Determine whether the tab is part of the line's indentation.
         if let Some(indent) = tab_indentation_at_line_start(range.start(), locator, indexer) {
-            diagnostics.report_diagnostic(TabIndentation, indent);
+            context.report_diagnostic(TabIndentation, indent);
         }
 
         // Advance to the next line.

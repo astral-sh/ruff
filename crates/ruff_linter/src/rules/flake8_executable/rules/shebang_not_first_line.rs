@@ -43,11 +43,7 @@ impl Violation for ShebangNotFirstLine {
 }
 
 /// EXE005
-pub(crate) fn shebang_not_first_line(
-    range: TextRange,
-    locator: &Locator,
-    diagnostics: &LintContext,
-) {
+pub(crate) fn shebang_not_first_line(range: TextRange, locator: &Locator, context: &LintContext) {
     // If the shebang is at the beginning of the file, abort.
     if range.start() == TextSize::from(0) {
         return;
@@ -62,5 +58,5 @@ pub(crate) fn shebang_not_first_line(
         return;
     }
 
-    diagnostics.report_diagnostic(ShebangNotFirstLine, range);
+    context.report_diagnostic(ShebangNotFirstLine, range);
 }

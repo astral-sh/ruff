@@ -20,7 +20,7 @@ pub(crate) fn check_file_path(
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
     target_version: PythonVersion,
-    diagnostics: &LintContext,
+    context: &LintContext,
 ) {
     // flake8-no-pep420
     if settings.rules.enabled(Rule::ImplicitNamespacePackage) {
@@ -33,22 +33,17 @@ pub(crate) fn check_file_path(
             &settings.project_root,
             &settings.src,
             allow_nested_roots,
-            diagnostics,
+            context,
         );
     }
 
     // pep8-naming
     if settings.rules.enabled(Rule::InvalidModuleName) {
-        invalid_module_name(
-            path,
-            package,
-            &settings.pep8_naming.ignore_names,
-            diagnostics,
-        );
+        invalid_module_name(path, package, &settings.pep8_naming.ignore_names, context);
     }
 
     // flake8-builtins
     if settings.rules.enabled(Rule::StdlibModuleShadowing) {
-        stdlib_module_shadowing(path, settings, target_version, diagnostics);
+        stdlib_module_shadowing(path, settings, target_version, context);
     }
 }

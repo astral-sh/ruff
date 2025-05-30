@@ -24,7 +24,7 @@ pub(crate) fn check_physical_lines(
     indexer: &Indexer,
     doc_lines: &[TextSize],
     settings: &LinterSettings,
-    diagnostics: &LintContext,
+    context: &LintContext,
 ) {
     let enforce_doc_line_too_long = settings.rules.enabled(Rule::DocLineTooLong);
     let enforce_line_too_long = settings.rules.enabled(Rule::LineTooLong);
@@ -45,37 +45,37 @@ pub(crate) fn check_physical_lines(
             .is_some()
         {
             if enforce_doc_line_too_long {
-                doc_line_too_long(&line, comment_ranges, settings, diagnostics);
+                doc_line_too_long(&line, comment_ranges, settings, context);
             }
         }
 
         if enforce_mixed_spaces_and_tabs {
-            mixed_spaces_and_tabs(&line, diagnostics);
+            mixed_spaces_and_tabs(&line, context);
         }
 
         if enforce_line_too_long {
-            line_too_long(&line, comment_ranges, settings, diagnostics);
+            line_too_long(&line, comment_ranges, settings, context);
         }
 
         if enforce_bidirectional_unicode {
-            pylint::rules::bidirectional_unicode(&line, diagnostics);
+            pylint::rules::bidirectional_unicode(&line, context);
         }
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
-            trailing_whitespace(&line, locator, indexer, settings, diagnostics);
+            trailing_whitespace(&line, locator, indexer, settings, context);
         }
 
         if settings.rules.enabled(Rule::IndentedFormFeed) {
-            indented_form_feed(&line, diagnostics);
+            indented_form_feed(&line, context);
         }
     }
 
     if enforce_no_newline_at_end_of_file {
-        no_newline_at_end_of_file(locator, stylist, diagnostics);
+        no_newline_at_end_of_file(locator, stylist, context);
     }
 
     if enforce_copyright_notice {
-        missing_copyright_notice(locator, settings, diagnostics);
+        missing_copyright_notice(locator, settings, context);
     }
 }
 

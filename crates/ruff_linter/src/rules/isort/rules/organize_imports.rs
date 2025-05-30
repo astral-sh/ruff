@@ -99,7 +99,7 @@ pub(crate) fn organize_imports(
     source_type: PySourceType,
     tokens: &Tokens,
     target_version: PythonVersion,
-    diagnostics: &LintContext,
+    context: &LintContext,
 ) {
     let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
     let indentation = leading_indentation(indentation);
@@ -112,7 +112,7 @@ pub(crate) fn organize_imports(
         || indexer
             .followed_by_multi_statement_line(block.imports.last().unwrap(), locator.contents())
     {
-        diagnostics.report_diagnostic(UnsortedImports, range);
+        context.report_diagnostic(UnsortedImports, range);
         return;
     }
 
@@ -158,7 +158,7 @@ pub(crate) fn organize_imports(
     if matches_ignoring_indentation(actual, &expected) {
         return;
     }
-    let mut diagnostic = diagnostics.report_diagnostic(UnsortedImports, range);
+    let mut diagnostic = context.report_diagnostic(UnsortedImports, range);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         indent(&expected, indentation).to_string(),
         fix_range,

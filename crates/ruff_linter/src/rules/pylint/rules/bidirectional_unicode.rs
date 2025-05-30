@@ -53,8 +53,8 @@ impl Violation for BidirectionalUnicode {
 }
 
 /// PLE2502
-pub(crate) fn bidirectional_unicode(line: &Line, diagnostics: &LintContext) {
+pub(crate) fn bidirectional_unicode(line: &Line, context: &LintContext) {
     if line.contains(BIDI_UNICODE) {
-        diagnostics.report_diagnostic(BidirectionalUnicode, line.full_range());
+        context.report_diagnostic(BidirectionalUnicode, line.full_range());
     }
 }
