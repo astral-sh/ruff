@@ -51,7 +51,7 @@ UP004.py:16:5: UP004 [*] Class `A` inherits from `object`
    |
    = help: Remove `object` inheritance
 
-ℹ Safe fix
+ℹ Unsafe fix
 12 12 |     ...
 13 13 | 
 14 14 | 
@@ -75,7 +75,7 @@ UP004.py:24:5: UP004 [*] Class `A` inherits from `object`
    |
    = help: Remove `object` inheritance
 
-ℹ Safe fix
+ℹ Unsafe fix
 19 19 |     ...
 20 20 | 
 21 21 | 
@@ -99,7 +99,7 @@ UP004.py:31:5: UP004 [*] Class `A` inherits from `object`
    |
    = help: Remove `object` inheritance
 
-ℹ Safe fix
+ℹ Unsafe fix
 26 26 |     ...
 27 27 | 
 28 28 | 
@@ -122,7 +122,7 @@ UP004.py:37:5: UP004 [*] Class `A` inherits from `object`
    |
    = help: Remove `object` inheritance
 
-ℹ Safe fix
+ℹ Unsafe fix
 33 33 |     ...
 34 34 | 
 35 35 | 
@@ -146,7 +146,7 @@ UP004.py:45:5: UP004 [*] Class `A` inherits from `object`
    |
    = help: Remove `object` inheritance
 
-ℹ Safe fix
+ℹ Unsafe fix
 40 40 |     ...
 41 41 | 
 42 42 | 
@@ -171,7 +171,7 @@ UP004.py:53:5: UP004 [*] Class `A` inherits from `object`
    |
    = help: Remove `object` inheritance
 
-ℹ Safe fix
+ℹ Unsafe fix
 48 48 |     ...
 49 49 | 
 50 50 | 
@@ -196,7 +196,7 @@ UP004.py:61:5: UP004 [*] Class `A` inherits from `object`
    |
    = help: Remove `object` inheritance
 
-ℹ Safe fix
+ℹ Unsafe fix
 56 56 |     ...
 57 57 | 
 58 58 | 
@@ -221,7 +221,7 @@ UP004.py:69:5: UP004 [*] Class `A` inherits from `object`
    |
    = help: Remove `object` inheritance
 
-ℹ Safe fix
+ℹ Unsafe fix
 64 64 |     ...
 65 65 | 
 66 66 | 
@@ -320,7 +320,7 @@ UP004.py:98:5: UP004 [*] Class `B` inherits from `object`
     |
     = help: Remove `object` inheritance
 
-ℹ Safe fix
+ℹ Unsafe fix
 95 95 | 
 96 96 | 
 97 97 | class B(
@@ -381,7 +381,7 @@ UP004.py:125:5: UP004 [*] Class `A` inherits from `object`
     |
     = help: Remove `object` inheritance
 
-ℹ Safe fix
+ℹ Unsafe fix
 121 121 |     ...
 122 122 | 
 123 123 | 
@@ -403,7 +403,7 @@ UP004.py:131:5: UP004 [*] Class `A` inherits from `object`
     |
     = help: Remove `object` inheritance
 
-ℹ Safe fix
+ℹ Unsafe fix
 127 127 |     ...
 128 128 | 
 129 129 | 
