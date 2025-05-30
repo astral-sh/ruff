@@ -27,7 +27,7 @@ use crate::Locator;
 use crate::codes::NoqaCode;
 use crate::logging::DisplayParseErrorType;
 use crate::registry::Rule;
-use crate::{Diagnostic, Fix};
+use crate::{Fix, OldDiagnostic};
 
 mod azure;
 mod diff;
@@ -50,7 +50,7 @@ mod text;
 /// `noqa` offsets.
 ///
 /// For diagnostic messages, the [`db::Diagnostic`]'s primary message contains the
-/// [`Diagnostic::body`], and the primary annotation optionally contains the suggestion accompanying
+/// [`OldDiagnostic::body`], and the primary annotation optionally contains the suggestion accompanying
 /// a fix. The `db::Diagnostic::id` field contains the kebab-case lint name derived from the `Rule`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Message {
@@ -113,19 +113,16 @@ impl Message {
         }
     }
 
-    /// Create a [`Message`] from the given [`Diagnostic`] corresponding to a rule violation.
-    pub fn from_diagnostic(
-        diagnostic: Diagnostic,
-        file: SourceFile,
-        noqa_offset: Option<TextSize>,
-    ) -> Message {
-        let Diagnostic {
+    /// Create a [`Message`] from the given [`OldDiagnostic`] corresponding to a rule violation.
+    pub fn from_diagnostic(diagnostic: OldDiagnostic, noqa_offset: Option<TextSize>) -> Message {
+        let OldDiagnostic {
             body,
             suggestion,
             range,
             fix,
             parent,
             rule,
+            file,
         } = diagnostic;
         Self::diagnostic(
             body,

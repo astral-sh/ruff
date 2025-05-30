@@ -4,7 +4,8 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
-use crate::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::checkers::ast::LintContext;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for a # symbol appearing on a line not followed by an actual comment.
@@ -45,7 +46,7 @@ impl Violation for EmptyComment {
 
 /// PLR2044
 pub(crate) fn empty_comments(
-    diagnostics: &mut Vec<Diagnostic>,
+    context: &LintContext,
     comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {
@@ -58,14 +59,12 @@ pub(crate) fn empty_comments(
         }
 
         // If the line contains an empty comment, add a diagnostic.
-        if let Some(diagnostic) = empty_comment(range, locator) {
-            diagnostics.push(diagnostic);
-        }
+        empty_comment(context, range, locator);
     }
 }
 
 /// Return a [`Diagnostic`] if the comment at the given [`TextRange`] is empty.
-fn empty_comment(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
+fn empty_comment(context: &LintContext, range: TextRange, locator: &Locator) {
     // Check: is the comment empty?
     if !locator
         .slice(range)
@@ -73,7 +72,7 @@ fn empty_comment(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
         .skip(1)
         .all(is_python_whitespace)
     {
-        return None;
+        return;
     }
 
     // Find the location of the `#`.
@@ -96,13 +95,13 @@ fn empty_comment(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
             }
         });
 
-    Some(
-        Diagnostic::new(EmptyComment, TextRange::new(first_hash_col, line.end())).with_fix(
-            Fix::safe_edit(if let Some(deletion_start_col) = deletion_start_col {
+    context
+        .report_diagnostic(EmptyComment, TextRange::new(first_hash_col, line.end()))
+        .set_fix(Fix::safe_edit(
+            if let Some(deletion_start_col) = deletion_start_col {
                 Edit::deletion(line.start() + deletion_start_col, line.end())
             } else {
                 Edit::range_deletion(locator.full_line_range(first_hash_col))
-            }),
-        ),
-    )
+            },
+        ));
 }

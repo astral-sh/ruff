@@ -792,6 +792,8 @@ pub enum KnownFunction {
     GenericContext,
     /// `ty_extensions.dunder_all_names`
     DunderAllNames,
+    /// `ty_extensions.all_members`
+    AllMembers,
 }
 
 impl KnownFunction {
@@ -851,7 +853,8 @@ impl KnownFunction {
             | Self::IsSubtypeOf
             | Self::GenericContext
             | Self::DunderAllNames
-            | Self::StaticAssert => module.is_ty_extensions(),
+            | Self::StaticAssert
+            | Self::AllMembers => module.is_ty_extensions(),
         }
     }
 }

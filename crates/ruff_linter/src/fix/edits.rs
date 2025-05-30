@@ -600,14 +600,12 @@ mod tests {
     use ruff_python_parser::{parse_expression, parse_module};
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
-    use crate::Locator;
-    use crate::codes::Rule;
     use crate::fix::apply_fixes;
     use crate::fix::edits::{
         add_to_dunder_all, make_redundant_alias, next_stmt_break, trailing_semicolon,
     };
     use crate::message::Message;
-    use crate::{Diagnostic, Edit, Fix};
+    use crate::{Edit, Fix, Locator, OldDiagnostic};
 
     /// Parse the given source using [`Mode::Module`] and return the first statement.
     fn parse_first_stmt(source: &str) -> Result<Stmt> {
@@ -738,24 +736,16 @@ x = 1 \
         let diag = {
             use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
             let mut iter = edits.into_iter();
-            let diag = Diagnostic::new(
+            let diag = OldDiagnostic::new(
                 MissingNewlineAtEndOfFile, // The choice of rule here is arbitrary.
                 TextRange::default(),
+                &SourceFileBuilder::new("<filename>", "<code>").finish(),
             )
             .with_fix(Fix::safe_edits(
                 iter.next().ok_or(anyhow!("expected edits nonempty"))?,
                 iter,
             ));
-            Message::diagnostic(
-                diag.body,
-                diag.suggestion,
-                diag.range,
-                diag.fix,
-                diag.parent,
-                SourceFileBuilder::new("<filename>", "<code>").finish(),
-                None,
-                Rule::MissingNewlineAtEndOfFile,
-            )
+            Message::from_diagnostic(diag, None)
         };
         assert_eq!(apply_fixes([diag].iter(), &locator).code, expect);
         Ok(())
