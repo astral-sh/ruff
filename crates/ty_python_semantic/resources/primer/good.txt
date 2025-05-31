@@ -19,8 +19,8 @@ bandersnatch
 beartype
 bidict
 black
-boostedblob
 bokeh
+boostedblob
 check-jsonschema
 cki-lib
 cloud-init
