@@ -385,7 +385,7 @@ Using a constrained typevar for the callable return type:
 from typing import Callable, Generic, overload
 from typing_extensions import TypeVar, reveal_type
 
-class B[T: int | str]:
+class B[T: (int, str)]:
     def __init__(self, x: Callable[..., T | None]):
         self.x = x
 
