@@ -997,6 +997,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
+            return_type: None,
             overloads: smallvec![from],
         };
         Bindings {
@@ -1015,14 +1016,9 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
 /// If the callable has multiple overloads, the first one that matches is used as the overall
 /// binding match.
 ///
-/// TODO: Implement the call site evaluation algorithm in the [proposed updated typing
-/// spec][overloads], which is much more subtle than “first match wins”.
-///
 /// If the arguments cannot be matched to formal parameters, we store information about the
 /// specific errors that occurred when trying to match them up. If the callable has multiple
 /// overloads, we store this error information for each overload.
-///
-/// [overloads]: https://github.com/python/typing/pull/1839
 #[derive(Debug)]
 pub(crate) struct CallableBinding<'db> {
     /// The type that is (hopefully) callable.
@@ -1039,6 +1035,8 @@ pub(crate) struct CallableBinding<'db> {
 
     /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
     pub(crate) bound_type: Option<Type<'db>>,
+
+    return_type: Option<Type<'db>>,
 
     /// The bindings of each overload of this callable. Will be empty if the type is not callable.
     ///
@@ -1061,6 +1059,7 @@ impl<'db> CallableBinding<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
+            return_type: None,
             overloads,
         }
     }
@@ -1071,6 +1070,7 @@ impl<'db> CallableBinding<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
+            return_type: None,
             overloads: smallvec![],
         }
     }
@@ -1099,23 +1099,152 @@ impl<'db> CallableBinding<'db> {
         // before checking.
         let arguments = arguments.with_self(self.bound_type);
 
-        // TODO: This checks every overload. In the proposed more detailed call checking spec [1],
-        // arguments are checked for arity first, and are only checked for type assignability against
-        // the matching overloads. Make sure to implement that as part of separating call binding into
-        // two phases.
-        //
-        // [1] https://typing.python.org/en/latest/spec/overload.html#overload-call-evaluation
         for overload in &mut self.overloads {
             overload.match_parameters(arguments.as_ref(), argument_forms, conflicting_forms);
         }
     }
 
     fn check_types(&mut self, db: &'db dyn Db, argument_types: &CallArgumentTypes<'_, 'db>) {
+        /// Represents the snapshot of the overload bindings.
+        struct OverloadSnapshots<'db>(SmallVec<[BindingSnapshot<'db>; 1]>);
+
+        /// Takes a snapshot of the current state of the overload bindings.
+        fn snapshot<'db>(binding: &CallableBinding<'db>) -> OverloadSnapshots<'db> {
+            OverloadSnapshots(binding.overloads.iter().map(Binding::snapshot).collect())
+        }
+
+        /// Restores the state of the overload bindings from the given snapshots.
+        fn restore<'db>(binding: &mut CallableBinding<'db>, snapshots: OverloadSnapshots<'db>) {
+            debug_assert_eq!(binding.overloads.len(), snapshots.0.len());
+            binding
+                .overloads
+                .iter_mut()
+                .zip(snapshots.0)
+                .for_each(|(binding, snapshot)| {
+                    binding.restore(snapshot);
+                });
+        }
+
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
         let argument_types = argument_types.with_self(self.bound_type);
-        for overload in &mut self.overloads {
-            overload.check_types(db, argument_types.as_ref());
+
+        // Step 1: Check the result of the arity check which is done by `match_parameters`
+        match self.matching_overload_index() {
+            MatchingOverloadIndex::None => {
+                // If no candidate overloads remain from the arity check, we can stop here. We
+                // still perform type checking for non-overloaded function to provide better user
+                // experience.
+                if let [overload] = self.overloads.as_mut_slice() {
+                    overload.check_types(db, argument_types.as_ref(), argument_types.types());
+                }
+                return;
+            }
+            MatchingOverloadIndex::Single(index) => {
+                // If only one candidate overload remains, it is the winning match.
+                self.overloads.get_mut(index).unwrap().check_types(
+                    db,
+                    argument_types.as_ref(),
+                    argument_types.types(),
+                );
+                return;
+            }
+            MatchingOverloadIndex::Multiple(_) => {
+                // If two or more candidate overloads remain, proceed to step 2.
+            }
+        }
+
+        let pre_evaluation_snapshot = snapshot(self);
+
+        // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
+        // whether it is compatible with the supplied argument list.
+        for (_, overload) in self.matching_overloads_mut() {
+            overload.check_types(db, argument_types.as_ref(), argument_types.types());
+        }
+
+        match self.matching_overload_index() {
+            MatchingOverloadIndex::None => {
+                // If all overloads result in errors, proceed to step 3.
+            }
+            MatchingOverloadIndex::Single(_) => {
+                // If only one overload evaluates without error, it is the winning match.
+                return;
+            }
+            MatchingOverloadIndex::Multiple(_) => {
+                // If two or more candidate overloads remain, proceed to step 4.
+                // TODO: Step 4 and Step 5 goes here...
+                // We're returning here because this shouldn't lead to argument type expansion.
+                return;
+            }
+        }
+
+        // Step 3: Perform "argument type expansion". Reference:
+        // https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion
+
+        let mut expansions = argument_types.expand(db);
+
+        let Some(first_expansion) = expansions.next() else {
+            // Return early if there are no argument types to expand. This is especially useful to
+            // avoid restoring the bindings state.
+            return;
+        };
+
+        restore(self, pre_evaluation_snapshot);
+
+        for expanded_argument_lists in std::iter::once(first_expansion).chain(expansions) {
+            let mut return_types = vec![];
+
+            for expanded_argument_types in &expanded_argument_lists {
+                let pre_evaluation_snapshot = snapshot(self);
+
+                for (_, overload) in self.matching_overloads_mut() {
+                    overload.check_types(db, argument_types.as_ref(), expanded_argument_types);
+                }
+
+                let return_type = match self.matching_overload_index() {
+                    MatchingOverloadIndex::None => None,
+                    MatchingOverloadIndex::Single(index) => {
+                        Some(self.overloads[index].return_type())
+                    }
+                    MatchingOverloadIndex::Multiple(index) => {
+                        // TODO: Step 4 and Step 5 goes here... but for now we just use the return
+                        // type of the first matched overload.
+                        Some(self.overloads[index].return_type())
+                    }
+                };
+
+                // Restore the bindings state before evaluating the next argument list.
+                restore(self, pre_evaluation_snapshot);
+
+                if let Some(return_type) = return_type {
+                    return_types.push(return_type);
+                } else {
+                    // No need to check the remaining argument lists if the current argument list
+                    // doesn't evaluate successfully. Move on to expanding the next argument type.
+                    break;
+                }
+            }
+
+            if return_types.len() == expanded_argument_lists.len() {
+                // If the number of return types is equal to the number of expanded argument lists,
+                // they all evaluated successfully. So, we need to combine their return types by
+                // union to determine the final return type.
+                //
+                // TODO: What should be the state of the bindings at this point?
+                self.return_type = Some(UnionType::from_elements(db, return_types));
+                return;
+            }
+        }
+
+        // If the type expansion didn't yield any successful return type, we need to restore the
+        // bindings state back to the one after the type checking step. This is necessary because
+        // we restore the state to the pre-evaluation snapshot when processing the expanded
+        // argument lists.
+        //
+        // This will be skipped if there are no argument types to expand because of the early
+        // return.
+        for (_, overload) in self.matching_overloads_mut() {
+            overload.check_types(db, argument_types.as_ref(), argument_types.types());
         }
     }
 
@@ -1145,6 +1274,21 @@ impl<'db> CallableBinding<'db> {
         self.matching_overloads().next().is_none()
     }
 
+    /// Returns the index of the matching overload in the form of [`MatchingOverloadIndex`].
+    fn matching_overload_index(&self) -> MatchingOverloadIndex {
+        let mut matching_overloads = self.matching_overloads();
+        match matching_overloads.next() {
+            None => MatchingOverloadIndex::None,
+            Some((index, _)) => {
+                if matching_overloads.next().is_some() {
+                    MatchingOverloadIndex::Multiple(index)
+                } else {
+                    MatchingOverloadIndex::Single(index)
+                }
+            }
+        }
+    }
+
     /// Returns an iterator over all the overloads that matched for this call binding.
     pub(crate) fn matching_overloads(&self) -> impl Iterator<Item = (usize, &Binding<'db>)> {
         self.overloads
@@ -1169,10 +1313,9 @@ impl<'db> CallableBinding<'db> {
     /// function, we return `Type::unknown`, since we cannot make any useful conclusions about
     /// which overload was intended to be called.
     pub(crate) fn return_type(&self) -> Type<'db> {
-        // TODO: Implement the overload call evaluation algorithm as mentioned in the spec [1] to
-        // get the matching overload and use that to get the return type.
-        //
-        // [1]: https://typing.python.org/en/latest/spec/overload.html#overload-call-evaluation
+        if let Some(return_type) = self.return_type {
+            return return_type;
+        }
         if let Some((_, first_overload)) = self.matching_overloads().next() {
             return first_overload.return_type();
         }
@@ -1317,6 +1460,22 @@ impl<'a, 'db> IntoIterator for &'a CallableBinding<'db> {
     fn into_iter(self) -> Self::IntoIter {
         self.overloads.iter()
     }
+}
+
+#[derive(Debug)]
+enum MatchingOverloadIndex {
+    /// No matching overloads found.
+    None,
+
+    /// Exactly one matching overload found.
+    ///
+    /// The index is the position of the matching overload.
+    Single(usize),
+
+    /// Multiple matching overloads found.
+    ///
+    /// The index is the position of the first matching overload.
+    Multiple(usize),
 }
 
 /// Binding information for one of the overloads of a callable.
@@ -1493,7 +1652,12 @@ impl<'db> Binding<'db> {
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
     }
 
-    fn check_types(&mut self, db: &'db dyn Db, argument_types: &CallArgumentTypes<'_, 'db>) {
+    fn check_types(
+        &mut self,
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_>,
+        argument_types: &[Type<'db>],
+    ) {
         let mut num_synthetic_args = 0;
         let get_argument_index = |argument_index: usize, num_synthetic_args: usize| {
             if argument_index >= num_synthetic_args {
@@ -1507,13 +1671,20 @@ impl<'db> Binding<'db> {
             }
         };
 
+        let enumerate_argument_types = || {
+            arguments
+                .iter()
+                .zip(argument_types.iter().copied())
+                .enumerate()
+        };
+
         // If this overload is generic, first see if we can infer a specialization of the function
         // from the arguments that were passed in.
         let signature = &self.signature;
         let parameters = signature.parameters();
         if signature.generic_context.is_some() || signature.inherited_generic_context.is_some() {
             let mut builder = SpecializationBuilder::new(db);
-            for (argument_index, (argument, argument_type)) in argument_types.iter().enumerate() {
+            for (argument_index, (argument, argument_type)) in enumerate_argument_types() {
                 if matches!(argument, Argument::Synthetic) {
                     num_synthetic_args += 1;
                 }
@@ -1545,7 +1716,7 @@ impl<'db> Binding<'db> {
         }
 
         num_synthetic_args = 0;
-        for (argument_index, (argument, mut argument_type)) in argument_types.iter().enumerate() {
+        for (argument_index, (argument, mut argument_type)) in enumerate_argument_types() {
             if matches!(argument, Argument::Synthetic) {
                 num_synthetic_args += 1;
             }
@@ -1648,6 +1819,44 @@ impl<'db> Binding<'db> {
         }
         Ok(())
     }
+
+    fn snapshot(&self) -> BindingSnapshot<'db> {
+        BindingSnapshot {
+            return_ty: self.return_ty,
+            specialization: self.specialization,
+            inherited_specialization: self.inherited_specialization,
+            argument_parameters: self.argument_parameters.clone(),
+            parameter_tys: self.parameter_tys.clone(),
+            errors_position: self.errors.len(),
+        }
+    }
+
+    fn restore(&mut self, snapshot: BindingSnapshot<'db>) {
+        let BindingSnapshot {
+            return_ty,
+            specialization,
+            inherited_specialization,
+            argument_parameters,
+            parameter_tys,
+            errors_position,
+        } = snapshot;
+
+        self.return_ty = return_ty;
+        self.specialization = specialization;
+        self.inherited_specialization = inherited_specialization;
+        self.argument_parameters = argument_parameters;
+        self.parameter_tys = parameter_tys;
+        self.errors.truncate(errors_position);
+    }
+}
+
+struct BindingSnapshot<'db> {
+    return_ty: Type<'db>,
+    specialization: Option<Specialization<'db>>,
+    inherited_specialization: Option<Specialization<'db>>,
+    argument_parameters: Box<[Option<usize>]>,
+    parameter_tys: Box<[Option<Type<'db>>]>,
+    errors_position: usize,
 }
 
 /// Describes a callable for the purposes of diagnostics.
