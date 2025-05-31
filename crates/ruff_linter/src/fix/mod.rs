@@ -7,7 +7,6 @@ use ruff_diagnostics::{IsolationLevel, SourceMap};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
-use crate::codes::NoqaCode;
 use crate::linter::FixTable;
 use crate::message::OldDiagnostic;
 use crate::registry::Rule;
@@ -64,7 +63,7 @@ fn apply_fixes<'a>(
     let mut source_map = SourceMap::default();
 
     for (rule, fix) in diagnostics
-        .filter_map(|msg| msg.to_noqa_code().map(|rule| (rule, msg)))
+        .filter_map(|msg| msg.to_rule().map(|rule| (rule, msg)))
         .filter_map(|(rule, diagnostic)| diagnostic.fix().map(|fix| (rule, fix)))
         .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
     {
@@ -126,44 +125,34 @@ fn apply_fixes<'a>(
 }
 
 /// Compare two fixes.
-fn cmp_fix(rule1: NoqaCode, rule2: NoqaCode, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
+fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
     // Always apply `RedefinedWhileUnused` before `UnusedImport`, as the latter can end up fixing
     // the former. But we can't apply this just for `RedefinedWhileUnused` and `UnusedImport` because it violates
     // `< is transitive: a < b and b < c implies a < c. The same must hold for both == and >.`
     // See https://github.com/astral-sh/ruff/issues/12469#issuecomment-2244392085
-    let redefined_while_unused = Rule::RedefinedWhileUnused.noqa_code();
-    if (rule1, rule2) == (redefined_while_unused, redefined_while_unused) {
-        std::cmp::Ordering::Equal
-    } else if rule1 == redefined_while_unused {
-        std::cmp::Ordering::Less
-    } else if rule2 == redefined_while_unused {
-        std::cmp::Ordering::Greater
-    } else {
-        std::cmp::Ordering::Equal
+    match (rule1, rule2) {
+        (Rule::RedefinedWhileUnused, Rule::RedefinedWhileUnused) => std::cmp::Ordering::Equal,
+        (Rule::RedefinedWhileUnused, _) => std::cmp::Ordering::Less,
+        (_, Rule::RedefinedWhileUnused) => std::cmp::Ordering::Greater,
+        _ => std::cmp::Ordering::Equal,
     }
     // Apply fixes in order of their start position.
     .then_with(|| fix1.min_start().cmp(&fix2.min_start()))
     // Break ties in the event of overlapping rules, for some specific combinations.
-    .then_with(|| {
-        let rules = (rule1, rule2);
+    .then_with(|| match (&rule1, &rule2) {
         // Apply `MissingTrailingPeriod` fixes before `NewLineAfterLastParagraph` fixes.
-        let missing_trailing_period = Rule::MissingTrailingPeriod.noqa_code();
-        let newline_after_last_paragraph = Rule::NewLineAfterLastParagraph.noqa_code();
-        let if_else_instead_of_dict_get = Rule::IfElseBlockInsteadOfDictGet.noqa_code();
-        let if_else_instead_of_if_exp = Rule::IfElseBlockInsteadOfIfExp.noqa_code();
-        if rules == (missing_trailing_period, newline_after_last_paragraph) {
-            std::cmp::Ordering::Less
-        } else if rules == (newline_after_last_paragraph, missing_trailing_period) {
+        (Rule::MissingTrailingPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
+        (Rule::NewLineAfterLastParagraph, Rule::MissingTrailingPeriod) => {
             std::cmp::Ordering::Greater
         }
         // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseBlockInsteadOfIfExp` fixes.
-        else if rules == (if_else_instead_of_dict_get, if_else_instead_of_if_exp) {
+        (Rule::IfElseBlockInsteadOfDictGet, Rule::IfElseBlockInsteadOfIfExp) => {
             std::cmp::Ordering::Less
-        } else if rules == (if_else_instead_of_if_exp, if_else_instead_of_dict_get) {
-            std::cmp::Ordering::Greater
-        } else {
-            std::cmp::Ordering::Equal
         }
+        (Rule::IfElseBlockInsteadOfIfExp, Rule::IfElseBlockInsteadOfDictGet) => {
+            std::cmp::Ordering::Greater
+        }
+        _ => std::cmp::Ordering::Equal,
     })
 }
 

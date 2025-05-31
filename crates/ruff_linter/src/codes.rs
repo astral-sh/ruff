@@ -10,7 +10,7 @@ use crate::registry::Linter;
 use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NoqaCode(&'static str, &'static str);
 
 impl NoqaCode {
