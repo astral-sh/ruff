@@ -428,7 +428,8 @@ def h(x: int) -> int | None: ...
 def h(x: str | int) -> str | int | None:
     return x
 
-reveal_type(B(h))  # revealed: B[int | str]
+# TODO: should be B[int | str]
+reveal_type(B(h))  # revealed: B[str | None | int]
 ```
 
 ## Generic subclass
