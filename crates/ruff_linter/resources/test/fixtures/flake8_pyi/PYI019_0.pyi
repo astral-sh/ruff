@@ -172,3 +172,36 @@ MetaType = TypeVar("MetaType")
 class MetaTestClass(type):
     def m(cls: MetaType) -> MetaType:
         return cls
+
+
+from __future__ import annotations
+
+
+class BadClassWithStringTypeHints:
+    def bad_instance_method_with_string_annotations(self: "_S", arg: str) -> "_S": ... # PYI019
+
+    @classmethod
+    def bad_class_method_with_string_annotations(cls: "type[_S]") -> "_S": ... # PYI019
+
+
+    @classmethod
+    def bad_class_method_with_mixed_annotations_1(cls: "type[_S]") -> _S: ... # PYI019
+
+
+    @classmethod
+    def bad_class_method_with_mixed_annotations_1(cls: type[_S]) -> "_S": ... # PYI019
+
+
+class BadSubscriptReturnTypeWithStringTypeHints:
+    @classmethod
+    def m[S](cls: "type[S]") -> "type[S]": ...  # PYI019
+
+
+class GoodClassWithStringTypeHints:
+    @classmethod
+    def good_cls_method_with_mixed_annotations(cls: "type[Self]", arg: str) -> Self: ...
+    @staticmethod
+    def good_static_method_with_string_annotations(arg: "_S") -> "_S": ...
+    @classmethod
+    def good_class_method_with_args_string_annotations(cls, arg1: "_S", arg2: "_S") -> "_S": ...
+

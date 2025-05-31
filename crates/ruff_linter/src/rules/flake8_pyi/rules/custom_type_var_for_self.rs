@@ -142,8 +142,22 @@ pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Bindi
         return;
     };
 
-    let Some(self_or_cls_annotation) = self_or_cls_parameter.annotation() else {
+    let Some(self_or_cls_annotation_unchecked) = self_or_cls_parameter.annotation() else {
         return;
+    };
+    let self_or_cls_annotation = match self_or_cls_annotation_unchecked {
+        ast::Expr::StringLiteral(_) => {
+            let Some(literal_expr) = self_or_cls_annotation_unchecked.as_string_literal_expr()
+            else {
+                return;
+            };
+            let Ok(parsed_expr) = checker.parse_type_annotation(literal_expr) else {
+                return;
+            };
+            parsed_expr.expression()
+        }
+        ast::Expr::Subscript(_) | ast::Expr::Name(_) => self_or_cls_annotation_unchecked,
+        _ => return,
     };
     let Some(parent_class) = current_scope.kind.as_class() else {
         return;
@@ -202,7 +216,7 @@ pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Bindi
             function_def,
             custom_typevar,
             self_or_cls_parameter,
-            self_or_cls_annotation,
+            self_or_cls_annotation_unchecked,
         )
     });
 }
