@@ -1,9 +1,9 @@
 use crate::Db;
-use crate::semantic_index::symbol::ScopeId;
+use crate::place::{imported_symbol, place_from_bindings, place_from_declarations};
+use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{
-    attribute_scopes, global_scope, semantic_index, symbol_table, use_def_map,
+    attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
 };
-use crate::symbol::{imported_symbol, symbol_from_bindings, symbol_from_declarations};
 use crate::types::{ClassBase, ClassLiteral, KnownClass, Type};
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
@@ -101,16 +101,18 @@ impl AllMembers {
 
                 let module_scope = global_scope(db, file);
                 let use_def_map = use_def_map(db, module_scope);
-                let symbol_table = symbol_table(db, module_scope);
+                let place_table = place_table(db, module_scope);
 
                 for (symbol_id, _) in use_def_map.all_public_declarations() {
-                    let symbol_name = symbol_table.symbol(symbol_id).name();
+                    let Some(symbol_name) = place_table.place_expr(symbol_id).as_name() else {
+                        continue;
+                    };
                     if !imported_symbol(db, file, symbol_name, None)
-                        .symbol
+                        .place
                         .is_unbound()
                     {
                         self.members
-                            .insert(symbol_table.symbol(symbol_id).name().clone());
+                            .insert(place_table.place_expr(symbol_id).expect_name().clone());
                     }
                 }
             }
@@ -119,21 +121,25 @@ impl AllMembers {
 
     fn extend_with_declarations_and_bindings(&mut self, db: &dyn Db, scope_id: ScopeId) {
         let use_def_map = use_def_map(db, scope_id);
-        let symbol_table = symbol_table(db, scope_id);
+        let place_table = place_table(db, scope_id);
 
         for (symbol_id, declarations) in use_def_map.all_public_declarations() {
-            if symbol_from_declarations(db, declarations)
-                .is_ok_and(|result| !result.symbol.is_unbound())
+            if place_from_declarations(db, declarations)
+                .is_ok_and(|result| !result.place.is_unbound())
             {
-                self.members
-                    .insert(symbol_table.symbol(symbol_id).name().clone());
+                let Some(symbol_name) = place_table.place_expr(symbol_id).as_name() else {
+                    continue;
+                };
+                self.members.insert(symbol_name.clone());
             }
         }
 
         for (symbol_id, bindings) in use_def_map.all_public_bindings() {
-            if !symbol_from_bindings(db, bindings).is_unbound() {
-                self.members
-                    .insert(symbol_table.symbol(symbol_id).name().clone());
+            if !place_from_bindings(db, bindings).is_unbound() {
+                let Some(symbol_name) = place_table.place_expr(symbol_id).as_name() else {
+                    continue;
+                };
+                self.members.insert(symbol_name.clone());
             }
         }
     }
@@ -167,9 +173,10 @@ impl AllMembers {
             let file = class_body_scope.file(db);
             let index = semantic_index(db, file);
             for function_scope_id in attribute_scopes(db, class_body_scope) {
-                let attribute_table = index.instance_attribute_table(function_scope_id);
-                for symbol in attribute_table.symbols() {
-                    self.members.insert(symbol.name().clone());
+                let place_table = index.place_table(function_scope_id);
+                for instance_attribute in place_table.instance_attributes() {
+                    let name = instance_attribute.sub_segments()[0].as_member().unwrap();
+                    self.members.insert(name.clone());
                 }
             }
         }

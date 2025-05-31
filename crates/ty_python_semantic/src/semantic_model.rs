@@ -8,8 +8,8 @@ use crate::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{Module, resolve_module};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
+use crate::semantic_index::place::FileScopeId;
 use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::FileScopeId;
 use crate::types::{Type, binding_type, infer_scope_types};
 
 pub struct SemanticModel<'db> {
@@ -59,8 +59,8 @@ impl<'db> SemanticModel<'db> {
         };
         let mut symbols = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
-            for symbol in index.symbol_table(file_scope).symbols() {
-                symbols.push(symbol.name().clone());
+            for symbol in index.place_table(file_scope).symbols() {
+                symbols.push(symbol.expect_name().clone());
             }
         }
         symbols

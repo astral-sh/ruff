@@ -23,5 +23,7 @@ scikit-learn  # success, but mypy-primer hangs processing the output
 setuptools  # vendors packaging, see above
 spack  # success, but mypy-primer hangs processing the output
 spark  # too many iterations
+static-frame # probabilistic panic https://github.com/salsa-rs/salsa/issues/831
 steam.py  # hangs
+sympy # hangs when multi-threaded
 xarray  # too many iterations
