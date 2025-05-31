@@ -4551,12 +4551,24 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = list;
 
-        for elt in elts {
-            self.infer_expression(elt);
-        }
+        let element_types: Vec<_> = elts
+            .iter()
+            .map(|elt| {
+                let inferred = self.infer_expression(elt);
+                inferred
+                    .literal_fallback_instance(self.db())
+                    .unwrap_or(inferred)
+            })
+            .collect();
 
-        // TODO generic
-        KnownClass::List.to_instance(self.db())
+        if element_types.is_empty() {
+            KnownClass::List.to_instance(self.db())
+        } else {
+            KnownClass::List.to_specialized_instance(
+                self.db(),
+                [UnionType::from_elements(self.db(), element_types)],
+            )
+        }
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet) -> Type<'db> {
