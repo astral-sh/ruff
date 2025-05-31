@@ -8727,42 +8727,73 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             },
 
-            // TODO: Generics
-            KnownInstanceType::ChainMap => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::ChainMap.to_instance(db)
-            }
-            KnownInstanceType::OrderedDict => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::OrderedDict.to_instance(db)
-            }
-            KnownInstanceType::Dict => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::Dict.to_instance(db)
-            }
+            KnownInstanceType::ChainMap => match arguments_slice {
+                ast::Expr::Tuple(t) => {
+                    let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
+                    let ty = KnownClass::ChainMap.to_specialized_instance(db, args_ty);
+                    self.store_expression_type(arguments_slice, ty);
+                    ty
+                }
+                _ => {
+                    self.infer_type_expression(arguments_slice);
+                    KnownClass::ChainMap.to_instance(db)
+                }
+            },
+            KnownInstanceType::OrderedDict => match arguments_slice {
+                ast::Expr::Tuple(t) => {
+                    let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
+                    let ty = KnownClass::OrderedDict.to_specialized_instance(db, args_ty);
+                    self.store_expression_type(arguments_slice, ty);
+                    ty
+                }
+                _ => {
+                    self.infer_type_expression(arguments_slice);
+                    KnownClass::OrderedDict.to_instance(db)
+                }
+            },
+            KnownInstanceType::Dict => match arguments_slice {
+                ast::Expr::Tuple(t) => {
+                    let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
+                    let ty = KnownClass::Dict.to_specialized_instance(db, args_ty);
+                    self.store_expression_type(arguments_slice, ty);
+                    ty
+                }
+                _ => {
+                    self.infer_type_expression(arguments_slice);
+                    KnownClass::Dict.to_instance(db)
+                }
+            },
             KnownInstanceType::List => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::List.to_instance(db)
+                let ty = self.infer_type_expression(arguments_slice);
+                KnownClass::List.to_specialized_instance(db, [ty])
             }
-            KnownInstanceType::DefaultDict => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::DefaultDict.to_instance(db)
-            }
+            KnownInstanceType::DefaultDict => match arguments_slice {
+                ast::Expr::Tuple(t) => {
+                    let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
+                    let ty = KnownClass::DefaultDict.to_specialized_instance(db, args_ty);
+                    self.store_expression_type(arguments_slice, ty);
+                    ty
+                }
+                _ => {
+                    self.infer_type_expression(arguments_slice);
+                    KnownClass::DefaultDict.to_instance(db)
+                }
+            },
             KnownInstanceType::Counter => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::Counter.to_instance(db)
+                let ty = self.infer_type_expression(arguments_slice);
+                KnownClass::Counter.to_specialized_instance(db, [ty])
             }
             KnownInstanceType::Set => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::Set.to_instance(db)
+                let ty = self.infer_type_expression(arguments_slice);
+                KnownClass::Set.to_specialized_instance(db, [ty])
             }
             KnownInstanceType::FrozenSet => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::FrozenSet.to_instance(db)
+                let ty = self.infer_type_expression(arguments_slice);
+                KnownClass::FrozenSet.to_specialized_instance(db, [ty])
             }
             KnownInstanceType::Deque => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::Deque.to_instance(db)
+                let ty = self.infer_type_expression(arguments_slice);
+                KnownClass::Deque.to_specialized_instance(db, [ty])
             }
 
             KnownInstanceType::ReadOnly => {

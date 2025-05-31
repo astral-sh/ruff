@@ -31,41 +31,31 @@ def f(
     ordered_dict_parametrized: typing.OrderedDict[int, str],
 ):
     reveal_type(list_bare)  # revealed: list[Unknown]
-    # TODO: revealed: list[int]
-    reveal_type(list_parametrized)  # revealed: list[Unknown]
+    reveal_type(list_parametrized)  # revealed: list[int]
 
     reveal_type(dict_bare)  # revealed: dict[Unknown, Unknown]
-    # TODO: revealed: dict[int, str]
-    reveal_type(dict_parametrized)  # revealed: dict[Unknown, Unknown]
+    reveal_type(dict_parametrized)  # revealed: dict[int, str]
 
     reveal_type(set_bare)  # revealed: set[Unknown]
-    # TODO: revealed: set[int]
-    reveal_type(set_parametrized)  # revealed: set[Unknown]
+    reveal_type(set_parametrized)  # revealed: set[int]
 
-    # TODO: revealed: frozenset[Unknown]
     reveal_type(frozen_set_bare)  # revealed: frozenset[Unknown]
-    # TODO: revealed: frozenset[str]
-    reveal_type(frozen_set_parametrized)  # revealed: frozenset[Unknown]
+    reveal_type(frozen_set_parametrized)  # revealed: frozenset[str]
 
     reveal_type(chain_map_bare)  # revealed: ChainMap[Unknown, Unknown]
-    # TODO: revealed: ChainMap[str, int]
-    reveal_type(chain_map_parametrized)  # revealed: ChainMap[Unknown, Unknown]
+    reveal_type(chain_map_parametrized)  # revealed: ChainMap[str, int]
 
     reveal_type(counter_bare)  # revealed: Counter[Unknown]
-    # TODO: revealed: Counter[int]
-    reveal_type(counter_parametrized)  # revealed: Counter[Unknown]
+    reveal_type(counter_parametrized)  # revealed: Counter[int]
 
     reveal_type(default_dict_bare)  # revealed: defaultdict[Unknown, Unknown]
-    # TODO: revealed: defaultdict[str, int]
-    reveal_type(default_dict_parametrized)  # revealed: defaultdict[Unknown, Unknown]
+    reveal_type(default_dict_parametrized)  # revealed: defaultdict[str, int]
 
     reveal_type(deque_bare)  # revealed: deque[Unknown]
-    # TODO: revealed: deque[str]
-    reveal_type(deque_parametrized)  # revealed: deque[Unknown]
+    reveal_type(deque_parametrized)  # revealed: deque[str]
 
     reveal_type(ordered_dict_bare)  # revealed: OrderedDict[Unknown, Unknown]
-    # TODO: revealed: OrderedDict[int, str]
-    reveal_type(ordered_dict_parametrized)  # revealed: OrderedDict[Unknown, Unknown]
+    reveal_type(ordered_dict_parametrized)  # revealed: OrderedDict[int, str]
 ```
 
 ## Inheritance
