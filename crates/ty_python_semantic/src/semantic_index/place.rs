@@ -105,10 +105,13 @@ impl TryFrom<&ast::ExprSubscript> for PlaceExpr {
     fn try_from(subscript: &ast::ExprSubscript) -> Result<Self, ()> {
         let mut place = PlaceExpr::try_from(&*subscript.value)?;
         match &*subscript.slice {
-            ast::Expr::NumberLiteral(number) if number.value.is_int() => {
-                place.sub_segments.push(PlaceExprSubSegment::IntSubscript(
-                    number.value.as_int().unwrap().clone(),
-                ));
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(index),
+                ..
+            }) => {
+                place
+                    .sub_segments
+                    .push(PlaceExprSubSegment::IntSubscript(index.clone()));
             }
             ast::Expr::StringLiteral(string) => {
                 place
@@ -285,6 +288,7 @@ bitflags! {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlaceSegment<'db> {
+    /// A first segment of a place expression (root name), e.g. `x` in `x.y.z[0]`.
     Name(&'db ast::name::Name),
     Member(&'db ast::name::Name),
     IntSubscript(&'db ast::Int),

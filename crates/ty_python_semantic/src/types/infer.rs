@@ -4772,10 +4772,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // (2) We must *not* call `self.extend()` on the result of the type inference,
         //     because `ScopedExpressionId`s are only meaningful within their own scope, so
         //     we'd add types for random wrong expressions in the current scope
-        let iterable_type = if comprehension.is_first()
-            && !target.is_attribute_expr()
-            && !target.is_subscript_expr()
-        {
+        let iterable_type = if comprehension.is_first() && target.is_name_expr() {
             let lookup_scope = self
                 .index
                 .parent_scope_id(self.scope().file_scope_id(self.db()))
