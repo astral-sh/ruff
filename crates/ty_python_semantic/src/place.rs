@@ -3,7 +3,7 @@ use ruff_db::files::File;
 use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::definition::{Definition, DefinitionState};
-use crate::semantic_index::place::{PlaceExpr, PlaceExprSubSegment, ScopeId, ScopedPlaceId};
+use crate::semantic_index::place::{PlaceExpr, ScopeId, ScopedPlaceId};
 use crate::semantic_index::{
     BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, place_table,
 };
@@ -214,17 +214,6 @@ pub(crate) fn place<'db>(
     expr: &PlaceExpr,
 ) -> PlaceAndQualifiers<'db> {
     place_impl(db, scope, expr, RequiresExplicitReExport::No)
-}
-
-/// Used when the bound type cannot be obtained using [`place`]/[`place_from_declarations`]/[`place_from_bindings`].
-/// For example, if the place `x.y.z` is not assigned within the scope,
-/// this will look up the place `x` and resolve `x.y.z` in a chained manner.
-pub(crate) fn fallback_place<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    expr: &PlaceExpr,
-) -> PlaceAndQualifiers<'db> {
-    fallback_place_impl(db, scope, expr, RequiresExplicitReExport::No)
 }
 
 /// Infer the public type of a class symbol (its type as seen from outside its scope) in the given
@@ -753,42 +742,6 @@ fn place_impl<'db>(
         .place_id_by_expr(expr)
         .map(|place| place_by_id(db, scope, place, requires_explicit_reexport))
         .unwrap_or_default()
-}
-
-/// Implementation of [`fallback_place`].
-fn fallback_place_impl<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    expr: &PlaceExpr,
-    requires_explicit_reexport: RequiresExplicitReExport,
-) -> PlaceAndQualifiers<'db> {
-    let _span = tracing::trace_span!("fallback_place", ?expr).entered();
-
-    let mut result = place_table(db, scope)
-        .place_id_by_name(expr.root_name())
-        .map(|symbol| place_by_id(db, scope, symbol, requires_explicit_reexport))
-        .unwrap_or_default();
-
-    for segment in expr.sub_segments() {
-        let Place::Type(ty, Boundness::Bound) = result.place else {
-            return PlaceAndQualifiers::default();
-        };
-
-        match segment {
-            PlaceExprSubSegment::Member(member) => {
-                result = ty.member(db, member);
-            }
-            // TODO:
-            PlaceExprSubSegment::IntSubscript(_) => {
-                return PlaceAndQualifiers::default();
-            }
-            PlaceExprSubSegment::StringSubscript(_) => {
-                return PlaceAndQualifiers::default();
-            }
-        }
-    }
-
-    result
 }
 
 /// Implementation of [`place_from_bindings`].

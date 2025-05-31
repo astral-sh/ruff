@@ -49,7 +49,7 @@ use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::place::{
     Boundness, LookupError, Place, PlaceAndQualifiers, builtins_module_scope, builtins_symbol,
-    explicit_global_symbol, fallback_place, global_symbol, module_type_implicit_global_declaration,
+    explicit_global_symbol, global_symbol, module_type_implicit_global_declaration,
     module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
     typing_extensions_symbol,
 };
@@ -1484,14 +1484,31 @@ impl<'db> TypeInferenceBuilder<'db> {
                      ..
                  }| {
                     if resolved_place.is_unbound() && !place_table.place_expr(place_id).is_name() {
-                        if let Place::Type(ty, Boundness::Bound) = fallback_place(
-                            db,
-                            file_scope_id.to_scope_id(db, self.file()),
-                            place_table.place_expr(place_id),
-                        )
-                        .place
+                        if let AnyNodeRef::ExprAttribute(ast::ExprAttribute {
+                            value, attr, ..
+                        }) = node
                         {
-                            return ty;
+                            let value_type = if self.index.is_standalone_expression(&**value) {
+                                self.infer_standalone_expression(value)
+                            } else {
+                                self.infer_expression(value)
+                            };
+                            if let Place::Type(ty, Boundness::Bound) =
+                                value_type.member(db, attr).place
+                            {
+                                return ty;
+                            }
+                        } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript {
+                            value,
+                            slice,
+                            ..
+                        }) = node
+                        {
+                            let value_ty = self.infer_expression(value);
+                            let slice_ty = self.infer_expression(slice);
+                            let result_ty =
+                                self.infer_subscript_expression_types(value, value_ty, slice_ty);
+                            return result_ty;
                         }
                     }
                     resolved_place

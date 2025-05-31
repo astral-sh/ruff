@@ -299,3 +299,20 @@ def _():
     reveal_type(b.a.x)  # revealed: Unknown | list[int | None]
     reveal_type(b.a)  # revealed: Unknown | A | None
 ```
+
+## Invalid assignments are not used for narrowing
+
+```py
+class C:
+    x: int | None
+    l: list[int]
+
+def f(c: C, s: str):
+    c.x = s  # error: [invalid-assignment]
+    reveal_type(c.x)  # revealed: int | None
+    s = c.x  # error: [invalid-assignment]
+
+    # TODO: This assignment is invalid and should result in an error.
+    c.l[0] = s
+    reveal_type(c.l[0])  # revealed: int
+```
