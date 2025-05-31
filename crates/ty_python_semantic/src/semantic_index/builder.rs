@@ -469,11 +469,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         #[expect(unsafe_code)]
         // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
         let kind = unsafe { definition_node.into_owned(self.module.clone()) };
-        let is_instance_attribute = self
-            .current_place_table()
-            .place_expr(place)
-            .is_instance_attribute();
-        let category = kind.category(self.source_type.is_stub(), is_instance_attribute);
+        let category = kind.category(self.source_type.is_stub());
         let is_reexported = kind.is_reexported();
 
         let definition = Definition::new(

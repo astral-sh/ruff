@@ -37,7 +37,9 @@ reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 # See https://github.com/astral-sh/ruff/issues/15960 for a related discussion.
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
-reveal_type(c_instance.declared_only)  # revealed: bytes
+# TODO: Should be `bytes` with no error, like mypy and pyright?
+# error: [unresolved-attribute]
+reveal_type(c_instance.declared_only)  # revealed: Unknown
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
@@ -147,14 +149,16 @@ class C:
 c_instance = C(True)
 
 reveal_type(c_instance.only_declared_in_body)  # revealed: str | None
-reveal_type(c_instance.only_declared_in_init)  # revealed: str | None
+# TODO: should be `str | None` without error
+# error: [unresolved-attribute]
+reveal_type(c_instance.only_declared_in_init)  # revealed: Unknown
 reveal_type(c_instance.declared_in_body_and_init)  # revealed: str | None
 
 reveal_type(c_instance.declared_in_body_defined_in_init)  # revealed: str | None
 
 # TODO: This should be `str | None`. Fixing this requires an overhaul of the `Symbol` API,
 # which is planned in https://github.com/astral-sh/ruff/issues/14297
-reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | str | None
+reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | Literal["a"]
 
 reveal_type(c_instance.bound_in_body_and_init)  # revealed: Unknown | None | Literal["a"]
 ```
@@ -185,7 +189,9 @@ reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
-reveal_type(c_instance.declared_only)  # revealed: bytes
+# TODO: should be `bytes` with no error, like mypy and pyright?
+# error: [unresolved-attribute]
+reveal_type(c_instance.declared_only)  # revealed: Unknown
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 

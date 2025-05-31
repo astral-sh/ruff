@@ -1436,7 +1436,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         debug_assert!(
             binding
                 .kind(self.db())
-                .category(self.context.in_stub(), false)
+                .category(self.context.in_stub())
                 .is_binding()
         );
 
@@ -1537,7 +1537,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         debug_assert!(
             declaration
                 .kind(self.db())
-                .category(self.context.in_stub(), false)
+                .category(self.context.in_stub())
                 .is_declaration()
         );
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
@@ -1583,13 +1583,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         debug_assert!(
             definition
                 .kind(self.db())
-                .category(self.context.in_stub(), false)
+                .category(self.context.in_stub())
                 .is_binding()
         );
         debug_assert!(
             definition
                 .kind(self.db())
-                .category(self.context.in_stub(), false)
+                .category(self.context.in_stub())
                 .is_declaration()
         );
 
