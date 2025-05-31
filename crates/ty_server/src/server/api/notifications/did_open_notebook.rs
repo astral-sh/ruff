@@ -9,8 +9,8 @@ use crate::document::NotebookDocument;
 use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
-use crate::server::client::{Notifier, Requester};
 use crate::session::Session;
+use crate::session::client::Client;
 use crate::system::{AnySystemPath, url_to_any_system_path};
 
 pub(crate) struct DidOpenNotebookHandler;
@@ -22,8 +22,7 @@ impl NotificationHandler for DidOpenNotebookHandler {
 impl SyncNotificationHandler for DidOpenNotebookHandler {
     fn run(
         session: &mut Session,
-        _notifier: Notifier,
-        _requester: &mut Requester,
+        _client: &Client,
         params: DidOpenNotebookDocumentParams,
     ) -> Result<()> {
         let Ok(path) = url_to_any_system_path(&params.notebook_document.uri) else {

@@ -2,12 +2,12 @@ use std::fmt;
 
 use anyhow::Result;
 
-use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast::{Expr, ExprContext, ExprName, ExprSubscript, ExprTuple, name::Name};
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::TypingImporter;
+use crate::{Applicability, Edit, Fix};
 
 pub(crate) use any_eq_ne_annotation::*;
 pub(crate) use bad_generator_return_type::*;

@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for docstrings that do not start with a capital letter.
@@ -90,7 +90,7 @@ pub(crate) fn capitalized(checker: &Checker, docstring: &Docstring) {
 
     let leading_whitespace_len = body.text_len() - trim_start_body.text_len();
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         FirstWordUncapitalized {
             first_word: first_word.to_string(),
             capitalized_word: capitalized_word.to_string(),
@@ -102,6 +102,4 @@ pub(crate) fn capitalized(checker: &Checker, docstring: &Docstring) {
         capitalized_word,
         TextRange::at(body.start() + leading_whitespace_len, first_word.text_len()),
     )));
-
-    checker.report_diagnostic(diagnostic);
 }

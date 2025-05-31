@@ -34,7 +34,6 @@ impl Index {
         }
     }
 
-    #[expect(dead_code)]
     pub(super) fn text_document_urls(&self) -> impl Iterator<Item = &Url> + '_ {
         self.documents
             .iter()
@@ -135,7 +134,7 @@ impl Index {
     }
 
     pub(super) fn open_notebook_document(&mut self, notebook_url: Url, document: NotebookDocument) {
-        for cell_url in document.urls() {
+        for cell_url in document.cell_urls() {
             self.notebook_cells
                 .insert(cell_url.clone(), notebook_url.clone());
         }

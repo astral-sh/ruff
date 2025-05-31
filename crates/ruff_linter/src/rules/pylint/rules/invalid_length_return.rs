@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
@@ -9,6 +8,7 @@ use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -73,10 +73,7 @@ pub(crate) fn invalid_length_return(checker: &Checker, function_def: &ast::StmtF
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.report_diagnostic(Diagnostic::new(
-            InvalidLengthReturnType,
-            function_def.identifier(),
-        ));
+        checker.report_diagnostic(InvalidLengthReturnType, function_def.identifier());
         return;
     }
 
@@ -95,11 +92,11 @@ pub(crate) fn invalid_length_return(checker: &Checker, function_def: &ast::StmtF
                         | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
                 )
             {
-                checker.report_diagnostic(Diagnostic::new(InvalidLengthReturnType, value.range()));
+                checker.report_diagnostic(InvalidLengthReturnType, value.range());
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidLengthReturnType, stmt.range()));
+            checker.report_diagnostic(InvalidLengthReturnType, stmt.range());
         }
     }
 }

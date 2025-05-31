@@ -1,7 +1,7 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, StmtFunctionDef};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -57,22 +57,22 @@ pub(crate) fn ssl_with_bad_defaults(checker: &Checker, function_def: &StmtFuncti
         match default {
             Expr::Name(ast::ExprName { id, range, .. }) => {
                 if is_insecure_protocol(id.as_str()) {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(
                         SslWithBadDefaults {
                             protocol: id.to_string(),
                         },
                         *range,
-                    ));
+                    );
                 }
             }
             Expr::Attribute(ast::ExprAttribute { attr, range, .. }) => {
                 if is_insecure_protocol(attr.as_str()) {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(
                         SslWithBadDefaults {
                             protocol: attr.to_string(),
                         },
                         *range,
-                    ));
+                    );
                 }
             }
             _ => {}

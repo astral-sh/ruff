@@ -1,9 +1,7 @@
 //! Scheduling, I/O, and API endpoints.
 
-use lsp_server::Message;
 use lsp_types::{
-    ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities,
-    DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, HoverProviderCapability,
+    ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
     InlayHintOptions, InlayHintServerCapabilities, MessageType, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
     TypeDefinitionProviderCapability, Url,
@@ -11,19 +9,20 @@ use lsp_types::{
 use std::num::NonZeroUsize;
 use std::panic::PanicHookInfo;
 
-use self::connection::{Connection, ConnectionInitializer};
-use self::schedule::event_loop_thread;
+use self::connection::Connection;
+use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
 use crate::session::{AllSettings, ClientSettings, Experimental, Session};
 
 mod api;
-mod client;
 mod connection;
+mod main_loop;
 mod schedule;
 
-use crate::message::try_show_message;
-use crate::server::schedule::Task;
-pub(crate) use connection::ClientSender;
+use crate::session::client::Client;
+pub(crate) use api::Error;
+pub(crate) use connection::{ConnectionInitializer, ConnectionSender};
+pub(crate) use main_loop::{Action, Event, MainLoopReceiver, MainLoopSender};
 
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
@@ -31,13 +30,16 @@ pub(crate) struct Server {
     connection: Connection,
     client_capabilities: ClientCapabilities,
     worker_threads: NonZeroUsize,
+    main_loop_receiver: MainLoopReceiver,
+    main_loop_sender: MainLoopSender,
     session: Session,
 }
 
 impl Server {
-    pub(crate) fn new(worker_threads: NonZeroUsize) -> crate::Result<Self> {
-        let connection = ConnectionInitializer::stdio();
-
+    pub(crate) fn new(
+        worker_threads: NonZeroUsize,
+        connection: ConnectionInitializer,
+    ) -> crate::Result<Self> {
         let (id, init_params) = connection.initialize_start()?;
 
         let AllSettings {
@@ -61,7 +63,11 @@ impl Server {
             crate::version(),
         )?;
 
-        crate::message::init_messenger(connection.make_sender());
+        // The number 32 was chosen arbitrarily. The main goal was to have enough capacity to queue
+        // some responses before blocking.
+        let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
+        let client = Client::new(main_loop_sender.clone(), connection.sender());
+
         crate::logging::init_logging(
             global_settings.tracing.log_level.unwrap_or_default(),
             global_settings.tracing.log_file.as_deref(),
@@ -99,10 +105,10 @@ impl Server {
                 "Multiple workspaces are not yet supported, using the first workspace: {}",
                 &first_workspace.0
             );
-            show_warn_msg!(
+            client.show_warning_message(format_args!(
                 "Multiple workspaces are not yet supported, using the first workspace: {}",
-                &first_workspace.0
-            );
+                &first_workspace.0,
+            ));
             vec![first_workspace]
         } else {
             workspaces
@@ -111,6 +117,8 @@ impl Server {
         Ok(Self {
             connection,
             worker_threads,
+            main_loop_receiver,
+            main_loop_sender,
             session: Session::new(
                 &client_capabilities,
                 position_encoding,
@@ -121,7 +129,7 @@ impl Server {
         })
     }
 
-    pub(crate) fn run(self) -> crate::Result<()> {
+    pub(crate) fn run(mut self) -> crate::Result<()> {
         type PanicHook = Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>;
         struct RestorePanicHook {
             hook: Option<PanicHook>,
@@ -141,6 +149,8 @@ impl Server {
             hook: Some(std::panic::take_hook()),
         };
 
+        let client = Client::new(self.main_loop_sender.clone(), self.connection.sender());
+
         // When we panic, try to notify the client.
         std::panic::set_hook(Box::new(move |panic_info| {
             use std::io::Write;
@@ -154,118 +164,15 @@ impl Server {
             let mut stderr = std::io::stderr().lock();
             writeln!(stderr, "{panic_info}\n{backtrace}").ok();
 
-            try_show_message(
-                "The ty language server exited with a panic. See the logs for more details."
-                    .to_string(),
-                MessageType::ERROR,
-            )
-            .ok();
+            client
+                .show_message(
+                    "The ty language server exited with a panic. See the logs for more details.",
+                    MessageType::ERROR,
+                )
+                .ok();
         }));
 
-        event_loop_thread(move || {
-            Self::event_loop(
-                &self.connection,
-                &self.client_capabilities,
-                self.session,
-                self.worker_threads,
-            )?;
-            self.connection.close()?;
-            Ok(())
-        })?
-        .join()
-    }
-
-    fn event_loop(
-        connection: &Connection,
-        client_capabilities: &ClientCapabilities,
-        mut session: Session,
-        worker_threads: NonZeroUsize,
-    ) -> crate::Result<()> {
-        let mut scheduler =
-            schedule::Scheduler::new(&mut session, worker_threads, connection.make_sender());
-
-        let fs_watcher = client_capabilities
-            .workspace
-            .as_ref()
-            .and_then(|workspace| workspace.did_change_watched_files?.dynamic_registration)
-            .unwrap_or_default();
-
-        if fs_watcher {
-            let registration = lsp_types::Registration {
-                id: "workspace/didChangeWatchedFiles".to_owned(),
-                method: "workspace/didChangeWatchedFiles".to_owned(),
-                register_options: Some(
-                    serde_json::to_value(DidChangeWatchedFilesRegistrationOptions {
-                        watchers: vec![
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/ty.toml".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String(
-                                    "**/.gitignore".into(),
-                                ),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/.ignore".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String(
-                                    "**/pyproject.toml".into(),
-                                ),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/*.py".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/*.pyi".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/*.ipynb".into()),
-                                kind: None,
-                            },
-                        ],
-                    })
-                    .unwrap(),
-                ),
-            };
-            let response_handler = |()| {
-                tracing::info!("File watcher successfully registered");
-                Task::nothing()
-            };
-
-            if let Err(err) = scheduler.request::<lsp_types::request::RegisterCapability>(
-                lsp_types::RegistrationParams {
-                    registrations: vec![registration],
-                },
-                response_handler,
-            ) {
-                tracing::error!(
-                    "An error occurred when trying to register the configuration file watcher: {err}"
-                );
-            }
-        } else {
-            tracing::warn!("The client does not support file system watching.");
-        }
-
-        for msg in connection.incoming() {
-            if connection.handle_shutdown(&msg)? {
-                break;
-            }
-            let task = match msg {
-                Message::Request(req) => api::request(req),
-                Message::Notification(notification) => api::notification(notification),
-                Message::Response(response) => scheduler.response(response),
-            };
-            scheduler.dispatch(task);
-        }
-
-        Ok(())
+        spawn_main_loop(move || self.main_loop())?.join()
     }
 
     fn find_best_position_encoding(client_capabilities: &ClientCapabilities) -> PositionEncoding {

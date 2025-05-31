@@ -1,8 +1,8 @@
 use crate::db::tests::TestDb;
 use crate::symbol::{builtins_symbol, known_module_symbol};
 use crate::types::{
-    BoundMethodType, CallableType, IntersectionBuilder, KnownClass, KnownInstanceType, Parameter,
-    Parameters, Signature, SubclassOfType, TupleType, Type, UnionType,
+    BoundMethodType, CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters,
+    Signature, SpecialFormType, SubclassOfType, TupleType, Type, UnionType,
 };
 use crate::{Db, KnownModule};
 use hashbrown::HashSet;
@@ -142,7 +142,7 @@ impl Ty {
             Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .symbol
                 .expect_type(),
-            Ty::TypingLiteral => Type::KnownInstance(KnownInstanceType::Literal),
+            Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
             Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).symbol.expect_type(),
             Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
             Ty::Union(tys) => {
@@ -188,13 +188,13 @@ impl Ty {
 
                 create_bound_method(db, function, builtins_class)
             }
-            Ty::Callable { params, returns } => Type::Callable(CallableType::single(
+            Ty::Callable { params, returns } => CallableType::single(
                 db,
                 Signature::new(
                     params.into_parameters(db),
                     returns.map(|ty| ty.into_type(db)),
                 ),
-            )),
+            ),
         }
     }
 }

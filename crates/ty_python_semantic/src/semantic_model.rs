@@ -1,7 +1,7 @@
 use ruff_db::files::{File, FilePath};
 use ruff_db::source::line_index;
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, ExprRef};
+use ruff_python_ast::{Expr, ExprRef, name::Name};
 use ruff_source_file::LineIndex;
 
 use crate::Db;
@@ -9,6 +9,7 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{Module, resolve_module};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::semantic_index;
+use crate::semantic_index::symbol::FileScopeId;
 use crate::types::{Type, binding_type, infer_scope_types};
 
 pub struct SemanticModel<'db> {
@@ -37,6 +38,32 @@ impl<'db> SemanticModel<'db> {
 
     pub fn resolve_module(&self, module_name: &ModuleName) -> Option<Module> {
         resolve_module(self.db, module_name)
+    }
+
+    /// Returns completions for symbols available in the scope containing the
+    /// given expression.
+    ///
+    /// If a scope could not be determined, then completions for the global
+    /// scope of this model's `File` are returned.
+    pub fn completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Name> {
+        let index = semantic_index(self.db, self.file);
+        let file_scope = match node {
+            ast::AnyNodeRef::Identifier(identifier) => index.expression_scope_id(identifier),
+            node => match node.as_expr_ref() {
+                // If we couldn't identify a specific
+                // expression that we're in, then just
+                // fall back to the global scope.
+                None => FileScopeId::global(),
+                Some(expr) => index.expression_scope_id(expr),
+            },
+        };
+        let mut symbols = vec![];
+        for (file_scope, _) in index.ancestor_scopes(file_scope) {
+            for symbol in index.symbol_table(file_scope).symbols() {
+                symbols.push(symbol.name().clone());
+            }
+        }
+        symbols
     }
 }
 
@@ -89,6 +116,7 @@ impl_expression_has_type!(ast::ExprYieldFrom);
 impl_expression_has_type!(ast::ExprCompare);
 impl_expression_has_type!(ast::ExprCall);
 impl_expression_has_type!(ast::ExprFString);
+impl_expression_has_type!(ast::ExprTString);
 impl_expression_has_type!(ast::ExprStringLiteral);
 impl_expression_has_type!(ast::ExprBytesLiteral);
 impl_expression_has_type!(ast::ExprNumberLiteral);
@@ -125,6 +153,7 @@ impl HasType for ast::Expr {
             Expr::Compare(inner) => inner.inferred_type(model),
             Expr::Call(inner) => inner.inferred_type(model),
             Expr::FString(inner) => inner.inferred_type(model),
+            Expr::TString(inner) => inner.inferred_type(model),
             Expr::StringLiteral(inner) => inner.inferred_type(model),
             Expr::BytesLiteral(inner) => inner.inferred_type(model),
             Expr::NumberLiteral(inner) => inner.inferred_type(model),

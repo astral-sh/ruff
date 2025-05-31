@@ -82,10 +82,10 @@ pub(crate) struct CheckCommand {
     /// type definitions of first- and third-party modules that are conditional on the Python version.
     ///
     /// By default, the Python version is inferred as the lower bound of the project's
-    /// `requires-python` field from the `pyproject.toml`, if available. Otherwise, the latest
-    /// stable version supported by ty is used, which is currently 3.13.
-    ///
-    /// ty will not infer the Python version from the Python environment at this time.
+    /// `requires-python` field from the `pyproject.toml`, if available. Otherwise, if a virtual
+    /// environment has been configured or detected and a Python version can be inferred from the
+    /// virtual environment's metadata, that version will be used. If neither of these applies, ty
+    /// will fall back to the latest stable Python version supported by ty (currently 3.13).
     #[arg(long, value_name = "VERSION", alias = "target-version")]
     pub(crate) python_version: Option<PythonVersion>,
 
@@ -106,6 +106,12 @@ pub(crate) struct CheckCommand {
 
     #[clap(flatten)]
     pub(crate) config: ConfigsArg,
+
+    /// The path to a `ty.toml` file to use for configuration.
+    ///
+    /// While ty configuration can be included in a `pyproject.toml` file, it is not allowed in this context.
+    #[arg(long, env = "TY_CONFIG_FILE", value_name = "PATH")]
+    pub(crate) config_file: Option<SystemPathBuf>,
 
     /// The format to use for printing diagnostic messages.
     #[arg(long)]

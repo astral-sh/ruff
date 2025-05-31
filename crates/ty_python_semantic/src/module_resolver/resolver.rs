@@ -14,8 +14,8 @@ use ruff_python_ast::PythonVersion;
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versions};
-use crate::site_packages::{PythonEnvironment, SitePackagesDiscoveryError, SysPrefixPathOrigin};
-use crate::{Program, PythonPath, SearchPathSettings};
+use crate::site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
+use crate::{Program, PythonPath, PythonVersionWithSource, SearchPathSettings};
 
 use super::module::{Module, ModuleKind};
 use super::path::{ModulePath, SearchPath, SearchPathValidationError};
@@ -163,6 +163,11 @@ pub struct SearchPaths {
     site_packages: Vec<SearchPath>,
 
     typeshed_versions: TypeshedVersions,
+
+    /// The Python version for the search paths, if any.
+    ///
+    /// This is read from the `pyvenv.cfg` if present.
+    python_version: Option<PythonVersionWithSource>,
 }
 
 impl SearchPaths {
@@ -237,7 +242,7 @@ impl SearchPaths {
 
         static_paths.push(stdlib_path);
 
-        let site_packages_paths = match python_path {
+        let (site_packages_paths, python_version) = match python_path {
             PythonPath::SysPrefix(sys_prefix, origin) => {
                 tracing::debug!(
                     "Discovering site-packages paths from sys-prefix `{sys_prefix}` ({origin}')"
@@ -246,8 +251,7 @@ impl SearchPaths {
                 //  than the one resolved in the program settings because it indicates
                 //  that the `target-version` is incorrectly configured or that the
                 //  venv is out of date.
-                PythonEnvironment::new(sys_prefix, *origin, system)
-                    .and_then(|env| env.site_packages_directories(system))?
+                PythonEnvironment::new(sys_prefix, *origin, system)?.into_settings(system)?
             }
 
             PythonPath::Resolve(target, origin) => {
@@ -273,45 +277,43 @@ impl SearchPaths {
                     // handle the error.
                     .unwrap_or(target);
 
-                PythonEnvironment::new(root, *origin, system)
-                    .and_then(|venv| venv.site_packages_directories(system))?
+                PythonEnvironment::new(root, *origin, system)?.into_settings(system)?
             }
 
             PythonPath::Discover(root) => {
                 tracing::debug!("Discovering virtual environment in `{root}`");
-                let virtual_env_path = discover_venv_in(db.system(), root);
-                if let Some(virtual_env_path) = virtual_env_path {
-                    tracing::debug!("Found `.venv` folder at `{}`", virtual_env_path);
+                discover_venv_in(db.system(), root)
+                    .and_then(|virtual_env_path| {
+                        tracing::debug!("Found `.venv` folder at `{}`", virtual_env_path);
 
-                    let handle_invalid_virtual_env = |error: SitePackagesDiscoveryError| {
-                        tracing::debug!(
-                            "Ignoring automatically detected virtual environment at `{}`: {}",
-                            virtual_env_path,
-                            error
-                        );
-                        vec![]
-                    };
-
-                    match PythonEnvironment::new(
-                        virtual_env_path.clone(),
-                        SysPrefixPathOrigin::LocalVenv,
-                        system,
-                    ) {
-                        Ok(venv) => venv
-                            .site_packages_directories(system)
-                            .unwrap_or_else(handle_invalid_virtual_env),
-                        Err(error) => handle_invalid_virtual_env(error),
-                    }
-                } else {
-                    tracing::debug!("No virtual environment found");
-                    vec![]
-                }
+                        PythonEnvironment::new(
+                            virtual_env_path.clone(),
+                            SysPrefixPathOrigin::LocalVenv,
+                            system,
+                        )
+                        .and_then(|env| env.into_settings(system))
+                        .inspect_err(|err| {
+                            tracing::debug!(
+                                "Ignoring automatically detected virtual environment at `{}`: {}",
+                                virtual_env_path,
+                                err
+                            );
+                        })
+                        .ok()
+                    })
+                    .unwrap_or_else(|| {
+                        tracing::debug!("No virtual environment found");
+                        (SitePackagesPaths::default(), None)
+                    })
             }
 
-            PythonPath::KnownSitePackages(paths) => paths
-                .iter()
-                .map(|path| canonicalize(path, system))
-                .collect(),
+            PythonPath::KnownSitePackages(paths) => (
+                paths
+                    .iter()
+                    .map(|path| canonicalize(path, system))
+                    .collect(),
+                None,
+            ),
         };
 
         let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
@@ -345,6 +347,7 @@ impl SearchPaths {
             static_paths,
             site_packages,
             typeshed_versions,
+            python_version,
         })
     }
 
@@ -369,6 +372,10 @@ impl SearchPaths {
     pub(super) fn typeshed_versions(&self) -> &TypeshedVersions {
         &self.typeshed_versions
     }
+
+    pub fn python_version(&self) -> Option<&PythonVersionWithSource> {
+        self.python_version.as_ref()
+    }
 }
 
 /// Collect all dynamic search paths. For each `site-packages` path:
@@ -387,6 +394,7 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
         static_paths,
         site_packages,
         typeshed_versions: _,
+        python_version: _,
     } = Program::get(db).search_paths(db);
 
     let mut dynamic_paths = Vec::new();
@@ -1470,10 +1478,10 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersionWithSource {
+                python_version: Some(PythonVersionWithSource {
                     version: PythonVersion::PY38,
                     source: PythonVersionSource::default(),
-                },
+                }),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -1989,7 +1997,7 @@ not_a_directory
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersionWithSource::default(),
+                python_version: Some(PythonVersionWithSource::default()),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -2068,7 +2076,7 @@ not_a_directory
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersionWithSource::default(),
+                python_version: Some(PythonVersionWithSource::default()),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -2111,7 +2119,7 @@ not_a_directory
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersionWithSource::default(),
+                python_version: Some(PythonVersionWithSource::default()),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],

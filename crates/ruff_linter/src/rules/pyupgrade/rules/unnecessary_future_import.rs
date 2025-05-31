@@ -1,12 +1,12 @@
 use itertools::Itertools;
 use ruff_python_ast::{Alias, Stmt};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Applicability, Fix};
 
 /// ## What it does
 /// Checks for unnecessary `__future__` imports.
@@ -98,7 +98,7 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, stmt: &Stmt, names: &
     if unused_imports.is_empty() {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryFutureImport {
             names: unused_imports
                 .iter()
@@ -137,5 +137,4 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, stmt: &Stmt, names: &
             )),
         )
     });
-    checker.report_diagnostic(diagnostic);
 }

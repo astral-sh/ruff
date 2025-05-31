@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
-snapshot_kind: text
 ---
 doubles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner quotes
   |
@@ -116,3 +115,202 @@ doubles_escaped.py:23:5: Q003 [*] Change outer quotes to avoid escaping inner qu
 24 24 | )
 25 25 | 
 26 26 | # Nested f-strings (Python 3.12+)
+
+doubles_escaped.py:46:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+   |
+45 | # Same as above, but with t-strings
+46 | t'This is a \'string\''  # Q003
+   | ^^^^^^^^^^^^^^^^^^^^^^^ Q003
+47 | t'This is \\ a \\\'string\''  # Q003
+48 | t'"This" is a \'string\''
+   |
+   = help: Change outer quotes to avoid escaping inner quotes
+
+ℹ Safe fix
+43 43 | 
+44 44 | 
+45 45 | # Same as above, but with t-strings
+46    |-t'This is a \'string\''  # Q003
+   46 |+t"This is a 'string'"  # Q003
+47 47 | t'This is \\ a \\\'string\''  # Q003
+48 48 | t'"This" is a \'string\''
+49 49 | f"This is a 'string'"
+
+doubles_escaped.py:47:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+   |
+45 | # Same as above, but with t-strings
+46 | t'This is a \'string\''  # Q003
+47 | t'This is \\ a \\\'string\''  # Q003
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003
+48 | t'"This" is a \'string\''
+49 | f"This is a 'string'"
+   |
+   = help: Change outer quotes to avoid escaping inner quotes
+
+ℹ Safe fix
+44 44 | 
+45 45 | # Same as above, but with t-strings
+46 46 | t'This is a \'string\''  # Q003
+47    |-t'This is \\ a \\\'string\''  # Q003
+   47 |+t"This is \\ a \\'string'"  # Q003
+48 48 | t'"This" is a \'string\''
+49 49 | f"This is a 'string'"
+50 50 | f"\"This\" is a 'string'"
+
+doubles_escaped.py:55:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
+   |
+53 | foo = (
+54 |     t'This is a'
+55 |     t'\'string\''  # Q003
+   |     ^^^^^^^^^^^^^ Q003
+56 | )
+57 | t'\'foo\' {'nested'}'  # Q003
+   |
+   = help: Change outer quotes to avoid escaping inner quotes
+
+ℹ Safe fix
+52 52 | fR'This is a \'string\''
+53 53 | foo = (
+54 54 |     t'This is a'
+55    |-    t'\'string\''  # Q003
+   55 |+    t"'string'"  # Q003
+56 56 | )
+57 57 | t'\'foo\' {'nested'}'  # Q003
+58 58 | t'\'foo\' {t'nested'}'  # Q003
+
+doubles_escaped.py:57:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+   |
+55 |     t'\'string\''  # Q003
+56 | )
+57 | t'\'foo\' {'nested'}'  # Q003
+   | ^^^^^^^^^^^^^^^^^^^^^ Q003
+58 | t'\'foo\' {t'nested'}'  # Q003
+59 | t'\'foo\' {t'\'nested\''} \'\''  # Q003
+   |
+   = help: Change outer quotes to avoid escaping inner quotes
+
+ℹ Safe fix
+54 54 |     t'This is a'
+55 55 |     t'\'string\''  # Q003
+56 56 | )
+57    |-t'\'foo\' {'nested'}'  # Q003
+   57 |+t"'foo' {'nested'}"  # Q003
+58 58 | t'\'foo\' {t'nested'}'  # Q003
+59 59 | t'\'foo\' {t'\'nested\''} \'\''  # Q003
+60 60 | 
+
+doubles_escaped.py:58:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+   |
+56 | )
+57 | t'\'foo\' {'nested'}'  # Q003
+58 | t'\'foo\' {t'nested'}'  # Q003
+   | ^^^^^^^^^^^^^^^^^^^^^^ Q003
+59 | t'\'foo\' {t'\'nested\''} \'\''  # Q003
+   |
+   = help: Change outer quotes to avoid escaping inner quotes
+
+ℹ Safe fix
+55 55 |     t'\'string\''  # Q003
+56 56 | )
+57 57 | t'\'foo\' {'nested'}'  # Q003
+58    |-t'\'foo\' {t'nested'}'  # Q003
+   58 |+t"'foo' {t'nested'}"  # Q003
+59 59 | t'\'foo\' {t'\'nested\''} \'\''  # Q003
+60 60 | 
+61 61 | t'normal {t'nested'} normal'
+
+doubles_escaped.py:59:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+   |
+57 | t'\'foo\' {'nested'}'  # Q003
+58 | t'\'foo\' {t'nested'}'  # Q003
+59 | t'\'foo\' {t'\'nested\''} \'\''  # Q003
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003
+60 |
+61 | t'normal {t'nested'} normal'
+   |
+   = help: Change outer quotes to avoid escaping inner quotes
+
+ℹ Safe fix
+56 56 | )
+57 57 | t'\'foo\' {'nested'}'  # Q003
+58 58 | t'\'foo\' {t'nested'}'  # Q003
+59    |-t'\'foo\' {t'\'nested\''} \'\''  # Q003
+   59 |+t"'foo' {t'\'nested\''} ''"  # Q003
+60 60 | 
+61 61 | t'normal {t'nested'} normal'
+62 62 | t'\'normal\' {t'nested'} normal'  # Q003
+
+doubles_escaped.py:59:12: Q003 [*] Change outer quotes to avoid escaping inner quotes
+   |
+57 | t'\'foo\' {'nested'}'  # Q003
+58 | t'\'foo\' {t'nested'}'  # Q003
+59 | t'\'foo\' {t'\'nested\''} \'\''  # Q003
+   |            ^^^^^^^^^^^^^ Q003
+60 |
+61 | t'normal {t'nested'} normal'
+   |
+   = help: Change outer quotes to avoid escaping inner quotes
+
+ℹ Safe fix
+56 56 | )
+57 57 | t'\'foo\' {'nested'}'  # Q003
+58 58 | t'\'foo\' {t'nested'}'  # Q003
+59    |-t'\'foo\' {t'\'nested\''} \'\''  # Q003
+   59 |+t'\'foo\' {t"'nested'"} \'\''  # Q003
+60 60 | 
+61 61 | t'normal {t'nested'} normal'
+62 62 | t'\'normal\' {t'nested'} normal'  # Q003
+
+doubles_escaped.py:62:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+   |
+61 | t'normal {t'nested'} normal'
+62 | t'\'normal\' {t'nested'} normal'  # Q003
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003
+63 | t'\'normal\' {t'nested'} "double quotes"'
+64 | t'\'normal\' {t'\'nested\' {'other'} normal'} "double quotes"'  # Q003
+   |
+   = help: Change outer quotes to avoid escaping inner quotes
+
+ℹ Safe fix
+59 59 | t'\'foo\' {t'\'nested\''} \'\''  # Q003
+60 60 | 
+61 61 | t'normal {t'nested'} normal'
+62    |-t'\'normal\' {t'nested'} normal'  # Q003
+   62 |+t"'normal' {t'nested'} normal"  # Q003
+63 63 | t'\'normal\' {t'nested'} "double quotes"'
+64 64 | t'\'normal\' {t'\'nested\' {'other'} normal'} "double quotes"'  # Q003
+65 65 | t'\'normal\' {t'\'nested\' {'other'} "double quotes"'} normal'  # Q00l
+
+doubles_escaped.py:64:15: Q003 [*] Change outer quotes to avoid escaping inner quotes
+   |
+62 | t'\'normal\' {t'nested'} normal'  # Q003
+63 | t'\'normal\' {t'nested'} "double quotes"'
+64 | t'\'normal\' {t'\'nested\' {'other'} normal'} "double quotes"'  # Q003
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003
+65 | t'\'normal\' {t'\'nested\' {'other'} "double quotes"'} normal'  # Q00l
+   |
+   = help: Change outer quotes to avoid escaping inner quotes
+
+ℹ Safe fix
+61 61 | t'normal {t'nested'} normal'
+62 62 | t'\'normal\' {t'nested'} normal'  # Q003
+63 63 | t'\'normal\' {t'nested'} "double quotes"'
+64    |-t'\'normal\' {t'\'nested\' {'other'} normal'} "double quotes"'  # Q003
+   64 |+t'\'normal\' {t"'nested' {'other'} normal"} "double quotes"'  # Q003
+65 65 | t'\'normal\' {t'\'nested\' {'other'} "double quotes"'} normal'  # Q00l
+
+doubles_escaped.py:65:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+   |
+63 | t'\'normal\' {t'nested'} "double quotes"'
+64 | t'\'normal\' {t'\'nested\' {'other'} normal'} "double quotes"'  # Q003
+65 | t'\'normal\' {t'\'nested\' {'other'} "double quotes"'} normal'  # Q00l
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003
+   |
+   = help: Change outer quotes to avoid escaping inner quotes
+
+ℹ Safe fix
+62 62 | t'\'normal\' {t'nested'} normal'  # Q003
+63 63 | t'\'normal\' {t'nested'} "double quotes"'
+64 64 | t'\'normal\' {t'\'nested\' {'other'} normal'} "double quotes"'  # Q003
+65    |-t'\'normal\' {t'\'nested\' {'other'} "double quotes"'} normal'  # Q00l
+   65 |+t"'normal' {t'\'nested\' {'other'} "double quotes"'} normal"  # Q00l

@@ -12,7 +12,7 @@ use colored::Colorize;
 use log::{debug, warn};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::Diagnostic;
+use ruff_linter::OldDiagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
 use ruff_linter::message::Message;
@@ -64,13 +64,13 @@ impl Diagnostics {
                     let source_file = SourceFileBuilder::new(name, "").finish();
                     Self::new(
                         vec![Message::from_diagnostic(
-                            Diagnostic::new(
+                            OldDiagnostic::new(
                                 IOError {
                                     message: err.to_string(),
                                 },
                                 TextRange::default(),
+                                &source_file,
                             ),
-                            source_file,
                             None,
                         )],
                         FxHashMap::default(),
@@ -235,7 +235,7 @@ pub(crate) fn lint_path(
                     };
                     let source_file =
                         SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
-                    lint_pyproject_toml(source_file, settings)
+                    lint_pyproject_toml(&source_file, settings)
                 } else {
                     vec![]
                 };
@@ -396,7 +396,7 @@ pub(crate) fn lint_stdin(
                 }
 
                 return Ok(Diagnostics {
-                    messages: lint_pyproject_toml(source_file, &settings.linter),
+                    messages: lint_pyproject_toml(&source_file, &settings.linter),
                     fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
                     notebook_indexes: FxHashMap::default(),
                 });
