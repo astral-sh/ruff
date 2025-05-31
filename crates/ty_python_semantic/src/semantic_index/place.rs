@@ -188,7 +188,7 @@ impl PlaceExpr {
 
     /// Does the place expression have the form `self.{name}` (`self` is the first parameter of the method)?
     pub(super) fn is_instance_attribute_named(&self, name: &str) -> bool {
-        self.flags.contains(PlaceFlags::IS_INSTANCE_ATTRIBUTE)
+        self.is_instance_attribute()
             && self.sub_segments.len() == 1
             && self.sub_segments[0].as_member().unwrap().as_str() == name
     }
