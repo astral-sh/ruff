@@ -369,7 +369,7 @@ impl SearchPaths {
         })
     }
 
-    pub(super) fn typeshed_versions(&self) -> &TypeshedVersions {
+    pub(crate) fn typeshed_versions(&self) -> &TypeshedVersions {
         &self.typeshed_versions
     }
 

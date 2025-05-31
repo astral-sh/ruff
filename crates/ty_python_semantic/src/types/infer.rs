@@ -3899,8 +3899,32 @@ impl<'db> TypeInferenceBuilder<'db> {
             module.unwrap_or_default()
         ));
         if level == 0 {
+            if let Some(module_name) = module.and_then(ModuleName::new) {
+                let program = Program::get(self.db());
+                let typeshed_versions = program.search_paths(self.db()).typeshed_versions();
+
+                if let Some(version_range) = typeshed_versions.exact(&module_name) {
+                    // We know it is a stdlib module on *some* Python versions...
+                    let python_version = program.python_version(self.db());
+                    if !version_range.contains(python_version) {
+                        // ...But not on *this* Python version.
+                        diagnostic.info(format_args!(
+                            "The stdlib module `{module_name}` is only available on Python {version_range}",
+                            version_range = version_range.diagnostic_display(),
+                        ));
+                        add_inferred_python_version_hint_to_diagnostic(
+                            self.db(),
+                            &mut diagnostic,
+                            "resolving modules",
+                        );
+                        return;
+                    }
+                }
+            }
+
             diagnostic.info(
-                "make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment"
+                "make sure your Python environment is properly configured: \
+                https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment",
             );
         }
     }
