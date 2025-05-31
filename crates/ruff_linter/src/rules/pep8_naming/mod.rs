@@ -15,7 +15,7 @@ mod tests {
     use crate::rules::pep8_naming::settings::IgnoreNames;
     use crate::rules::{flake8_import_conventions, pep8_naming};
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::InvalidClassName, Path::new("N801.py"))]
     #[test_case(Rule::InvalidFunctionName, Path::new("N802.py"))]
@@ -85,7 +85,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -104,7 +104,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::CamelcaseImportedAsAcronym)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -124,7 +124,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::InvalidFirstArgumentNameForMethod)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -143,7 +143,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::InvalidFirstArgumentNameForMethod)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -181,7 +181,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

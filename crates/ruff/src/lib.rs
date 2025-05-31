@@ -370,7 +370,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         Printer::clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = commands::check::check(
+        let diagnostics = commands::check::check(
             &files,
             &pyproject_config,
             &config_arguments,
@@ -379,7 +379,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             fix_mode,
             unsafe_fixes,
         )?;
-        printer.write_continuously(&mut writer, &messages, preview)?;
+        printer.write_continuously(&mut writer, &diagnostics, preview)?;
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
@@ -399,7 +399,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                     Printer::clear_screen()?;
                     printer.write_to_user("File change detected...\n");
 
-                    let messages = commands::check::check(
+                    let diagnostics = commands::check::check(
                         &files,
                         &pyproject_config,
                         &config_arguments,
@@ -408,7 +408,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                         fix_mode,
                         unsafe_fixes,
                     )?;
-                    printer.write_continuously(&mut writer, &messages, preview)?;
+                    printer.write_continuously(&mut writer, &diagnostics, preview)?;
                 }
                 Err(err) => return Err(err.into()),
             }
@@ -470,11 +470,11 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                 // there are any violations, unless we're explicitly asked to exit zero on
                 // fix.
                 if cli.exit_non_zero_on_fix {
-                    if !diagnostics.fixed.is_empty() || !diagnostics.messages.is_empty() {
+                    if !diagnostics.fixed.is_empty() || !diagnostics.inner.is_empty() {
                         return Ok(ExitStatus::Failure);
                     }
                 } else {
-                    if !diagnostics.messages.is_empty() {
+                    if !diagnostics.inner.is_empty() {
                         return Ok(ExitStatus::Failure);
                     }
                 }
