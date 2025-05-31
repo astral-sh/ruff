@@ -2781,15 +2781,10 @@ impl<'db> Type<'db> {
                 })
                 .ok()?;
 
-            let descriptor_kind = if self.class_member(db, "__set__".into()).place.is_unbound()
-                && self
-                    .class_member(db, "__delete__".into())
-                    .place
-                    .is_unbound()
-            {
-                AttributeKind::NormalOrNonDataDescriptor
-            } else {
+            let descriptor_kind = if self.is_data_descriptor(db, false) {
                 AttributeKind::DataDescriptor
+            } else {
+                AttributeKind::NormalOrNonDataDescriptor
             };
 
             Some((return_ty, descriptor_kind))
@@ -2876,6 +2871,36 @@ impl<'db> Type<'db> {
             }
 
             _ => (attribute, AttributeKind::NormalOrNonDataDescriptor),
+        }
+    }
+
+    /// Returns whether this type is a data descriptor, i.e. defines `__set__` or `__delete__`.
+    /// Normally, if this method is called on a union type, we should check whether "all" of its element types are data descriptors.
+    /// However, when we want to determine whether we should narrow an attribute type by assignment (we shouldn't do in the case of a data descriptor),
+    /// we should use the "any" logic for the union type.
+    pub(crate) fn is_data_descriptor(self, db: &'db dyn Db, any_of_union: bool) -> bool {
+        match self {
+            Type::Dynamic(_) | Type::Never | Type::PropertyInstance(_) => true,
+            Type::Union(union) if any_of_union => union
+                .elements(db)
+                .iter()
+                // Types of instance attributes that are not explicitly typed are unioned with `Unknown`, it should be excluded when checking.
+                .filter(|ty| !ty.is_unknown())
+                .any(|ty| ty.is_data_descriptor(db, any_of_union)),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|ty| ty.is_data_descriptor(db, any_of_union)),
+            Type::Intersection(intersection) => intersection
+                .iter_positive(db)
+                .any(|ty| ty.is_data_descriptor(db, any_of_union)),
+            _ => {
+                !self.class_member(db, "__set__".into()).place.is_unbound()
+                    || !self
+                        .class_member(db, "__delete__".into())
+                        .place
+                        .is_unbound()
+            }
         }
     }
 

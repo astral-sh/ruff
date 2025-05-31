@@ -5908,24 +5908,28 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // If `attribute` is a valid reference, we attempt type narrowing by assignment.
         if let Ok(place_expr) = PlaceExpr::try_from(attribute) {
-            let member = value_type.class_member(db, attr.id.clone());
-            let member_is_property = member.place.ignore_possibly_unbound().is_some_and(|ty| {
-                ty.is_property_instance()
-                    || ty.into_union().is_some_and(|union| {
-                        union.elements(db).iter().any(Type::is_property_instance)
-                    })
-            });
-            let (_symbol, kind) = Type::try_call_dunder_get_on_attribute(
-                db,
-                member,
-                value_type,
-                value_type.to_meta_type(db),
-            );
-            // If the member is a property or a descriptor, the value most recently assigned
+            let member = value_type
+                .class_member(db, attr.id.clone())
+                .or_fall_back_to(db, || {
+                    if matches!(
+                        value_type,
+                        Type::NominalInstance(_)
+                            | Type::ClassLiteral(_)
+                            | Type::SubclassOf(_)
+                            | Type::GenericAlias(_)
+                    ) {
+                        value_type.member(db, &attr.id)
+                    } else {
+                        Place::Unbound.into()
+                    }
+                });
+            // If the member is a data descriptor, the value most recently assigned
             // to the attribute may not necessarily be obtained here.
-            // If an attribute is unresolved, its type is `Unknown` and it can be considered as a `DataDescriptor`,
-            // so it will be automatically excluded from narrowing.
-            if !member_is_property && !kind.is_data() {
+            if member
+                .place
+                .ignore_possibly_unbound()
+                .is_some_and(|ty| !ty.is_data_descriptor(db, true))
+            {
                 let (resolved, _) =
                     self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
                 if let Place::Type(ty, Boundness::Bound) = resolved.place {
