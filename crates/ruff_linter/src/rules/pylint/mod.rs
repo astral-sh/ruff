@@ -168,6 +168,7 @@ mod tests {
     )]
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"))]
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"))]
+    #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing_2/__init__.py"))]
     #[test_case(Rule::UselessReturn, Path::new("useless_return.py"))]
     #[test_case(Rule::UselessWithLock, Path::new("useless_with_lock.py"))]
     #[test_case(Rule::UnreachableCode, Path::new("unreachable.py"))]
