@@ -28,7 +28,7 @@ pub(crate) enum PlaceExprSubSegment {
 }
 
 impl PlaceExprSubSegment {
-    fn as_member(&self) -> Option<&ast::name::Name> {
+    pub(crate) fn as_member(&self) -> Option<&ast::name::Name> {
         match self {
             PlaceExprSubSegment::Member(name) => Some(name),
             _ => None,
@@ -557,6 +557,11 @@ impl PlaceTable {
 
     pub fn symbols(&self) -> impl Iterator<Item = &PlaceExpr> {
         self.places().filter(|place_expr| place_expr.is_name())
+    }
+
+    pub fn instance_attributes(&self) -> impl Iterator<Item = &PlaceExpr> {
+        self.places()
+            .filter(|place_expr| place_expr.is_instance_attribute())
     }
 
     /// Returns the symbol named `name`.

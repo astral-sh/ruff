@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -6,6 +5,7 @@ use ruff_python_semantic::analyze::typing::{is_dict, is_list};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::refurb::helpers::generate_method_call;
 
@@ -66,7 +66,7 @@ pub(crate) fn delete_full_slice(checker: &Checker, delete: &ast::StmtDelete) {
             continue;
         };
 
-        let mut diagnostic = Diagnostic::new(DeleteFullSlice, delete.range);
+        let mut diagnostic = checker.report_diagnostic(DeleteFullSlice, delete.range);
 
         // Fix is only supported for single-target deletions.
         if delete.targets.len() == 1 {
@@ -77,8 +77,6 @@ pub(crate) fn delete_full_slice(checker: &Checker, delete: &ast::StmtDelete) {
                 delete.end(),
             )));
         }
-
-        checker.report_diagnostic(diagnostic);
     }
 }
 

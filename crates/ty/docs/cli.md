@@ -47,7 +47,9 @@ ty check [OPTIONS] [PATH]...
 overriding a specific configuration option.</p>
 <p>Overrides of individual settings using this option always take precedence
 over all configuration files.</p>
-</dd><dt id="ty-check--error"><a href="#ty-check--error"><code>--error</code></a> <i>rule</i></dt><dd><p>Treat the given rule as having severity 'error'. Can be specified multiple times.</p>
+</dd><dt id="ty-check--config-file"><a href="#ty-check--config-file"><code>--config-file</code></a> <i>path</i></dt><dd><p>The path to a <code>ty.toml</code> file to use for configuration.</p>
+<p>While ty configuration can be included in a <code>pyproject.toml</code> file, it is not allowed in this context.</p>
+<p>May also be set with the <code>TY_CONFIG_FILE</code> environment variable.</p></dd><dt id="ty-check--error"><a href="#ty-check--error"><code>--error</code></a> <i>rule</i></dt><dd><p>Treat the given rule as having severity 'error'. Can be specified multiple times.</p>
 </dd><dt id="ty-check--error-on-warning"><a href="#ty-check--error-on-warning"><code>--error-on-warning</code></a></dt><dd><p>Use exit code 1 if there are any warning-level diagnostics</p>
 </dd><dt id="ty-check--exit-zero"><a href="#ty-check--exit-zero"><code>--exit-zero</code></a></dt><dd><p>Always use exit code 0, even when there are error-level diagnostics</p>
 </dd><dt id="ty-check--extra-search-path"><a href="#ty-check--extra-search-path"><code>--extra-search-path</code></a> <i>path</i></dt><dd><p>Additional path to use as a module-resolution source (can be passed multiple times)</p>
@@ -70,8 +72,7 @@ over all configuration files.</p>
 <p>This is used to specialize the type of <code>sys.platform</code> and will affect the visibility of platform-specific functions and attributes. If the value is set to <code>all</code>, no assumptions are made about the target platform. If unspecified, the current system's platform will be used.</p>
 </dd><dt id="ty-check--python-version"><a href="#ty-check--python-version"><code>--python-version</code></a>, <code>--target-version</code> <i>version</i></dt><dd><p>Python version to assume when resolving types.</p>
 <p>The Python version affects allowed syntax, type definitions of the standard library, and type definitions of first- and third-party modules that are conditional on the Python version.</p>
-<p>By default, the Python version is inferred as the lower bound of the project's <code>requires-python</code> field from the <code>pyproject.toml</code>, if available. Otherwise, the latest stable version supported by ty is used, which is currently 3.13.</p>
-<p>ty will not infer the Python version from the Python environment at this time.</p>
+<p>By default, the Python version is inferred as the lower bound of the project's <code>requires-python</code> field from the <code>pyproject.toml</code>, if available. Otherwise, if a virtual environment has been configured or detected and a Python version can be inferred from the virtual environment's metadata, that version will be used. If neither of these applies, ty will fall back to the latest stable Python version supported by ty (currently 3.13).</p>
 <p>Possible values:</p>
 <ul>
 <li><code>3.7</code></li>

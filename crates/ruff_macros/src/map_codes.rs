@@ -413,16 +413,17 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             #name,
         });
         // Apply the `attrs` to each arm, like `[cfg(feature = "foo")]`.
-        rule_message_formats_match_arms
-            .extend(quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::message_formats(),});
+        rule_message_formats_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::Violation>::message_formats(),},
+        );
         rule_fixable_match_arms.extend(
-            quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::FIX_AVAILABILITY,},
+            quote! {#(#attrs)* Self::#name => <#path as crate::Violation>::FIX_AVAILABILITY,},
         );
         rule_explanation_match_arms.extend(quote! {#(#attrs)* Self::#name => #path::explain(),});
     }
 
     quote! {
-        use ruff_diagnostics::Violation;
+        use crate::Violation;
 
         #[derive(
             EnumIter,
@@ -453,24 +454,15 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
             /// Returns the documentation for this rule.
             pub fn explanation(&self) -> Option<&'static str> {
-                use ruff_diagnostics::ViolationMetadata;
+                use crate::ViolationMetadata;
                 match self { #rule_explanation_match_arms }
             }
 
             /// Returns the fix status of this rule.
-            pub const fn fixable(&self) -> ruff_diagnostics::FixAvailability {
+            pub const fn fixable(&self) -> crate::FixAvailability {
                 match self { #rule_fixable_match_arms }
             }
         }
-
-        impl AsRule for ruff_diagnostics::Diagnostic {
-            fn rule(&self) -> Rule {
-                self.name
-                    .parse()
-                    .unwrap_or_else(|_| unreachable!("invalid rule name: {}", self.name))
-            }
-        }
-
     }
 }
 

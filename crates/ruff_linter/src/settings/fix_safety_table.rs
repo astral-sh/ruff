@@ -1,10 +1,10 @@
 use std::fmt::{Debug, Display, Formatter};
 
-use ruff_diagnostics::Applicability;
 use ruff_macros::CacheKey;
 use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
 
+use crate::Applicability;
 use crate::{
     RuleSelector, display_settings,
     registry::{Rule, RuleSet},

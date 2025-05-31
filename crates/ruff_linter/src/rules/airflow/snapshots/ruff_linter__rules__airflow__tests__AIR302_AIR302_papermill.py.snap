@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR302_papermill.py:5:1: AIR302 `airflow.operators.papermill_operator.PapermillOperator` is moved into `papermill` provider in Airflow 3.0;
+AIR302_papermill.py:5:1: AIR302 [*] `airflow.operators.papermill_operator.PapermillOperator` is moved into `papermill` provider in Airflow 3.0;
   |
 3 | from airflow.operators.papermill_operator import PapermillOperator
 4 |
@@ -9,3 +9,11 @@ AIR302_papermill.py:5:1: AIR302 `airflow.operators.papermill_operator.PapermillO
   | ^^^^^^^^^^^^^^^^^ AIR302
   |
   = help: Install `apache-airflow-providers-papermill>=1.0.0` and use `PapermillOperator` from `airflow.providers.papermill.operators.papermill` instead.
+
+ℹ Unsafe fix
+1 1 | from __future__ import annotations
+2 2 | 
+3   |-from airflow.operators.papermill_operator import PapermillOperator
+  3 |+from airflow.providers.papermill.operators.papermill import PapermillOperator
+4 4 | 
+5 5 | PapermillOperator()

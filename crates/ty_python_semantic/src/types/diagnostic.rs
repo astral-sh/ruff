@@ -1,8 +1,11 @@
 use super::call::CallErrorKind;
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
-use super::{CallArgumentTypes, CallDunderError, ClassBase, ClassLiteral, KnownClass};
-use crate::db::Db;
+use super::{
+    CallArgumentTypes, CallDunderError, ClassBase, ClassLiteral, KnownClass,
+    add_inferred_python_version_hint_to_diagnostic,
+};
+use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
 use crate::types::LintDiagnosticGuard;
@@ -11,11 +14,9 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{KnownFunction, KnownInstanceType, Type, protocol_class::ProtocolClassLiteral};
-use crate::{Program, PythonVersionWithSource, declare_lint};
+use crate::types::{KnownFunction, SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
-use ruff_db::files::system_path_to_file;
+use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
@@ -1684,15 +1685,29 @@ pub(super) fn report_implicit_return_type(
     expected_ty: Type,
     has_empty_body: bool,
     enclosing_class_of_method: Option<ClassLiteral>,
+    no_return: bool,
 ) {
     let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, range) else {
         return;
     };
     let db = context.db();
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Function can implicitly return `None`, which is not assignable to return type `{}`",
-        expected_ty.display(db)
-    ));
+
+    // If no return statement is defined in the function, then the function always returns `None`
+    let mut diagnostic = if no_return {
+        let mut diag = builder.into_diagnostic(format_args!(
+            "Function always implicitly returns `None`, which is not assignable to return type `{}`",
+            expected_ty.display(db),
+        ));
+        diag.info(
+            "Consider changing the return annotation to `-> None` or adding a `return` statement",
+        );
+        diag
+    } else {
+        builder.into_diagnostic(format_args!(
+            "Function can implicitly return `None`, which is not assignable to return type `{}`",
+            expected_ty.display(db),
+        ))
+    };
     if !has_empty_body {
         return;
     }
@@ -1762,44 +1777,6 @@ pub(super) fn report_possibly_unbound_attribute(
     ));
 }
 
-pub(super) fn add_inferred_python_version_hint(db: &dyn Db, mut diagnostic: LintDiagnosticGuard) {
-    let program = Program::get(db);
-    let PythonVersionWithSource { version, source } = program.python_version_with_source(db);
-
-    match source {
-        crate::PythonVersionSource::Cli => {
-            diagnostic.info(format_args!(
-                "Python {version} was assumed when resolving types because it was specified on the command line",
-            ));
-        }
-        crate::PythonVersionSource::File(path, range) => {
-            if let Ok(file) = system_path_to_file(db.upcast(), &**path) {
-                let mut sub_diagnostic = SubDiagnostic::new(
-                    Severity::Info,
-                    format_args!("Python {version} was assumed when resolving types"),
-                );
-                sub_diagnostic.annotate(
-                    Annotation::primary(Span::from(file).with_optional_range(*range)).message(
-                        format_args!("Python {version} assumed due to this configuration setting"),
-                    ),
-                );
-                diagnostic.sub(sub_diagnostic);
-            } else {
-                diagnostic.info(format_args!(
-                    "Python {version} was assumed when resolving types because of your configuration file(s)",
-                ));
-            }
-        }
-        crate::PythonVersionSource::Default => {
-            diagnostic.info(format_args!(
-                "Python {version} was assumed when resolving types \
-                because it is the newest Python version supported by ty, \
-                and neither a command-line argument nor a configuration setting was provided",
-            ));
-        }
-    }
-}
-
 pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
     let Some(builder) = context.report_lint(&UNRESOLVED_REFERENCE, expr_name_node) else {
         return;
@@ -1811,7 +1788,11 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
         diagnostic.info(format_args!(
             "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
         ));
-        add_inferred_python_version_hint(context.db(), diagnostic);
+        add_inferred_python_version_hint_to_diagnostic(
+            context.db(),
+            &mut diagnostic,
+            "resolving types",
+        );
     }
 }
 
@@ -1855,7 +1836,6 @@ pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: 
 }
 
 pub(crate) fn report_invalid_arguments_to_annotated(
-    db: &dyn Db,
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
@@ -1865,7 +1845,7 @@ pub(crate) fn report_invalid_arguments_to_annotated(
     builder.into_diagnostic(format_args!(
         "Special form `{}` expected at least 2 arguments \
          (one type and at least one metadata element)",
-        KnownInstanceType::Annotated.repr(db)
+        SpecialFormType::Annotated
     ));
 }
 
@@ -1905,7 +1885,6 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
 }
 
 pub(crate) fn report_invalid_arguments_to_callable(
-    db: &dyn Db,
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
@@ -1914,7 +1893,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
     };
     builder.into_diagnostic(format_args!(
         "Special form `{}` expected exactly two arguments (parameter types and return type)",
-        KnownInstanceType::Callable.repr(db)
+        SpecialFormType::Callable
     ));
 }
 

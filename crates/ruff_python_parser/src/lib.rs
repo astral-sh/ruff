@@ -67,8 +67,8 @@ use std::iter::FusedIterator;
 use std::ops::Deref;
 
 pub use crate::error::{
-    FStringErrorType, LexicalErrorType, ParseError, ParseErrorType, UnsupportedSyntaxError,
-    UnsupportedSyntaxErrorKind,
+    InterpolatedStringErrorType, LexicalErrorType, ParseError, ParseErrorType,
+    UnsupportedSyntaxError, UnsupportedSyntaxErrorKind,
 };
 pub use crate::parser::ParseOptions;
 pub use crate::token::{Token, TokenKind};
@@ -637,6 +637,41 @@ impl Tokens {
         }
     }
 
+    /// Returns a slice of tokens before the given [`TextSize`] offset.
+    ///
+    /// If the given offset is between two tokens, the returned slice will end just before the
+    /// following token. In other words, if the offset is between the end of previous token and
+    /// start of next token, the returned slice will end just before the next token.
+    ///
+    /// # Panics
+    ///
+    /// If the given offset is inside a token range at any point
+    /// other than the start of the range.
+    pub fn before(&self, offset: TextSize) -> &[Token] {
+        match self.binary_search_by(|token| token.start().cmp(&offset)) {
+            Ok(idx) => &self[..idx],
+            Err(idx) => {
+                // We can't use `saturating_sub` here because a file could contain a BOM header, in
+                // which case the token starts at offset 3 for UTF-8 encoded file content.
+                if idx > 0 {
+                    if let Some(prev) = self.get(idx - 1) {
+                        // If it's equal to the end offset, then it's at a token boundary which is
+                        // valid. If it's greater than the end offset, then it's in the gap between
+                        // the tokens which is valid as well.
+                        assert!(
+                            offset >= prev.end(),
+                            "Offset {:?} is inside a token range {:?}",
+                            offset,
+                            prev.range()
+                        );
+                    }
+                }
+
+                &self[..idx]
+            }
+        }
+    }
+
     /// Returns a slice of tokens after the given [`TextSize`] offset.
     ///
     /// If the given offset is between two tokens, the returned slice will start from the following
@@ -645,7 +680,8 @@ impl Tokens {
     ///
     /// # Panics
     ///
-    /// If the given offset is inside a token range.
+    /// If the given offset is inside a token range at any point
+    /// other than the start of the range.
     pub fn after(&self, offset: TextSize) -> &[Token] {
         match self.binary_search_by(|token| token.start().cmp(&offset)) {
             Ok(idx) => &self[idx..],
@@ -945,6 +981,68 @@ mod tests {
     fn tokens_after_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.after(TextSize::new(5));
+    }
+
+    #[test]
+    fn tokens_before_offset_at_first_token_start() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let before = tokens.before(TextSize::new(0));
+        assert_eq!(before.len(), 0);
+    }
+
+    #[test]
+    fn tokens_before_offset_after_first_token_gap() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let before = tokens.before(TextSize::new(3));
+        assert_eq!(before.len(), 1);
+        assert_eq!(before.last().unwrap().kind(), TokenKind::Def);
+    }
+
+    #[test]
+    fn tokens_before_offset_at_second_token_start() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let before = tokens.before(TextSize::new(4));
+        assert_eq!(before.len(), 1);
+        assert_eq!(before.last().unwrap().kind(), TokenKind::Def);
+    }
+
+    #[test]
+    fn tokens_before_offset_at_token_start() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let before = tokens.before(TextSize::new(8));
+        assert_eq!(before.len(), 3);
+        assert_eq!(before.last().unwrap().kind(), TokenKind::Lpar);
+    }
+
+    #[test]
+    fn tokens_before_offset_at_token_end() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let before = tokens.before(TextSize::new(11));
+        assert_eq!(before.len(), 6);
+        assert_eq!(before.last().unwrap().kind(), TokenKind::Newline);
+    }
+
+    #[test]
+    fn tokens_before_offset_between_tokens() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let before = tokens.before(TextSize::new(13));
+        assert_eq!(before.len(), 6);
+        assert_eq!(before.last().unwrap().kind(), TokenKind::Newline);
+    }
+
+    #[test]
+    fn tokens_before_offset_at_last_token_end() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let before = tokens.before(TextSize::new(33));
+        assert_eq!(before.len(), 10);
+        assert_eq!(before.last().unwrap().kind(), TokenKind::Pass);
+    }
+
+    #[test]
+    #[should_panic(expected = "Offset 5 is inside a token range 4..7")]
+    fn tokens_before_offset_inside_token() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        tokens.before(TextSize::new(5));
     }
 
     #[test]

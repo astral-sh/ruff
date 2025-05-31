@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for chained operators where adding parentheses could improve the
@@ -86,10 +86,9 @@ pub(crate) fn parenthesize_chained_logical_operators(checker: &Checker, expr: &a
                 {
                     let new_source = format!("({})", locator.slice(source_range));
                     let edit = Edit::range_replacement(new_source, source_range);
-                    checker.report_diagnostic(
-                        Diagnostic::new(ParenthesizeChainedOperators, source_range)
-                            .with_fix(Fix::safe_edit(edit)),
-                    );
+                    checker
+                        .report_diagnostic(ParenthesizeChainedOperators, source_range)
+                        .set_fix(Fix::safe_edit(edit));
                 }
             }
             _ => continue,

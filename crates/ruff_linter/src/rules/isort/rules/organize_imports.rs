@@ -1,6 +1,5 @@
 use itertools::{EitherOrBoth, Itertools};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::whitespace::trailing_lines_end;
 use ruff_python_ast::{PySourceType, PythonVersion, Stmt};
@@ -14,11 +13,13 @@ use ruff_text_size::{Ranged, TextRange};
 use super::super::block::Block;
 use super::super::{comments, format_imports};
 use crate::Locator;
+use crate::checkers::ast::LintContext;
 use crate::line_width::LineWidthBuilder;
 use crate::package::PackageRoot;
 use crate::preview::is_full_path_match_source_strategy_enabled;
 use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::settings::LinterSettings;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// De-duplicates, groups, and sorts imports based on the provided `isort` settings.
@@ -98,7 +99,8 @@ pub(crate) fn organize_imports(
     source_type: PySourceType,
     tokens: &Tokens,
     target_version: PythonVersion,
-) -> Option<Diagnostic> {
+    context: &LintContext,
+) {
     let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
     let indentation = leading_indentation(indentation);
 
@@ -110,7 +112,8 @@ pub(crate) fn organize_imports(
         || indexer
             .followed_by_multi_statement_line(block.imports.last().unwrap(), locator.contents())
     {
-        return Some(Diagnostic::new(UnsortedImports, range));
+        context.report_diagnostic(UnsortedImports, range);
+        return;
     }
 
     // Extract comments. Take care to grab any inline comments from the last line.
@@ -153,12 +156,11 @@ pub(crate) fn organize_imports(
     let fix_range = TextRange::new(locator.line_start(range.start()), trailing_line_end);
     let actual = locator.slice(fix_range);
     if matches_ignoring_indentation(actual, &expected) {
-        return None;
+        return;
     }
-    let mut diagnostic = Diagnostic::new(UnsortedImports, range);
+    let mut diagnostic = context.report_diagnostic(UnsortedImports, range);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         indent(&expected, indentation).to_string(),
         fix_range,
     )));
-    Some(diagnostic)
 }

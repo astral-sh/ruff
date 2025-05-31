@@ -99,7 +99,9 @@ pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseD
     index.use_def_map(scope.file_scope_id(db))
 }
 
-/// Returns all attribute assignments (and their method scope IDs) for a specific class body scope.
+/// Returns all attribute assignments (and their method scope IDs) with a symbol name matching
+/// the one given for a specific class body scope.
+///
 /// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
 /// introduces a direct dependency on that file's AST.
 pub(crate) fn attribute_assignments<'db, 's>(
@@ -107,6 +109,25 @@ pub(crate) fn attribute_assignments<'db, 's>(
     class_body_scope: ScopeId<'db>,
     name: &'s str,
 ) -> impl Iterator<Item = (BindingWithConstraintsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
+    let file = class_body_scope.file(db);
+    let index = semantic_index(db, file);
+
+    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
+        let place_table = index.place_table(function_scope_id);
+        let place = place_table.place_id_by_instance_attribute_name(name)?;
+        let use_def = &index.use_def_maps[function_scope_id];
+        Some((use_def.public_bindings(place), function_scope_id))
+    })
+}
+
+/// Returns all attribute assignments as scope IDs for a specific class body scope.
+///
+/// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
+/// introduces a direct dependency on that file's AST.
+pub(crate) fn attribute_scopes<'db, 's>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+) -> impl Iterator<Item = FileScopeId> + use<'s, 'db> {
     let file = class_body_scope.file(db);
     let index = semantic_index(db, file);
     let class_scope_id = class_body_scope.file_scope_id(db);
@@ -124,10 +145,7 @@ pub(crate) fn attribute_assignments<'db, 's>(
             };
 
         function_scope.node().as_function()?;
-        let place_table = index.place_table(function_scope_id);
-        let place = place_table.place_id_by_instance_attribute_name(name)?;
-        let use_def = &index.use_def_maps[function_scope_id];
-        Some((use_def.public_bindings(place), function_scope_id))
+        Some(function_scope_id)
     })
 }
 
@@ -509,8 +527,8 @@ pub struct ChildrenIter<'a> {
 }
 
 impl<'a> ChildrenIter<'a> {
-    fn new(module_table: &'a SemanticIndex, parent: FileScopeId) -> Self {
-        let descendants = DescendantsIter::new(module_table, parent);
+    pub(crate) fn new(module_index: &'a SemanticIndex, parent: FileScopeId) -> Self {
+        let descendants = DescendantsIter::new(module_index, parent);
 
         Self {
             parent,

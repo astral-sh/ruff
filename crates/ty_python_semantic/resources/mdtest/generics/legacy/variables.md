@@ -172,4 +172,28 @@ T = TypeVar("T", covariant=cond())
 U = TypeVar("U", contravariant=cond())
 ```
 
+## Callability
+
+A typevar bound to a Callable type is callable:
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T", bound=Callable[[], int])
+
+def bound(f: T):
+    reveal_type(f)  # revealed: T
+    reveal_type(f())  # revealed: int
+```
+
+Same with a constrained typevar, as long as all constraints are callable:
+
+```py
+T = TypeVar("T", Callable[[], int], Callable[[], str])
+
+def constrained(f: T):
+    reveal_type(f)  # revealed: T
+    reveal_type(f())  # revealed: int | str
+```
+
 [generics]: https://typing.python.org/en/latest/spec/generics.html

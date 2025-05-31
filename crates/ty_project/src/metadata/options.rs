@@ -2,7 +2,7 @@ use crate::Db;
 use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, Severity, Span};
 use ruff_db::files::system_path_to_file;
-use ruff_db::system::{System, SystemPath};
+use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::{Combine, OptionsMetadata};
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
@@ -11,8 +11,8 @@ use std::fmt::Debug;
 use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
-    SearchPathSettings,
+    ProgramSettings, PythonPath, PythonPlatform, PythonVersionFileSource, PythonVersionSource,
+    PythonVersionWithSource, SearchPathSettings,
 };
 
 use super::settings::{Settings, TerminalSettings};
@@ -57,19 +57,6 @@ pub struct Options {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
     pub terminal: Option<TerminalOptions>,
-
-    /// Whether to automatically exclude files that are ignored by `.ignore`,
-    /// `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
-    /// Enabled by default.
-    #[option(
-        default = r#"true"#,
-        value_type = r#"bool"#,
-        example = r#"
-            respect-ignore-files = false
-        "#
-    )]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub respect_ignore_files: Option<bool>,
 }
 
 impl Options {
@@ -101,12 +88,11 @@ impl Options {
                 version: **ranged_version,
                 source: match ranged_version.source() {
                     ValueSource::Cli => PythonVersionSource::Cli,
-                    ValueSource::File(path) => {
-                        PythonVersionSource::File(path.clone(), ranged_version.range())
-                    }
+                    ValueSource::File(path) => PythonVersionSource::ConfigFile(
+                        PythonVersionFileSource::new(path.clone(), ranged_version.range()),
+                    ),
                 },
-            })
-            .unwrap_or_default();
+            });
         let python_platform = self
             .environment
             .as_ref()
@@ -216,7 +202,7 @@ impl Options {
     pub(crate) fn to_settings(&self, db: &dyn Db) -> (Settings, Vec<OptionDiagnostic>) {
         let (rules, diagnostics) = self.to_rule_selection(db);
 
-        let mut settings = Settings::new(rules, self.respect_ignore_files);
+        let mut settings = Settings::new(rules, self.src.as_ref());
 
         if let Some(terminal) = self.terminal.as_ref() {
             settings.set_terminal(TerminalSettings {
@@ -421,6 +407,19 @@ pub struct SrcOptions {
         "#
     )]
     pub root: Option<RelativePathBuf>,
+
+    /// Whether to automatically exclude files that are ignored by `.ignore`,
+    /// `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
+    /// Enabled by default.
+    #[option(
+        default = r#"true"#,
+        value_type = r#"bool"#,
+        example = r#"
+            respect-ignore-files = false
+        "#
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub respect_ignore_files: Option<bool>,
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
@@ -572,6 +571,23 @@ impl OptionDiagnostic {
             diag
         } else {
             Diagnostic::new(self.id, self.severity, &self.message)
+        }
+    }
+}
+
+/// This is a wrapper for options that actually get loaded from configuration files
+/// and the CLI, which also includes a `config_file_override` option that overrides
+/// default configuration discovery with an explicitly-provided path to a configuration file
+pub struct ProjectOptionsOverrides {
+    pub config_file_override: Option<SystemPathBuf>,
+    pub options: Options,
+}
+
+impl ProjectOptionsOverrides {
+    pub fn new(config_file_override: Option<SystemPathBuf>, options: Options) -> Self {
+        Self {
+            config_file_override,
+            options,
         }
     }
 }

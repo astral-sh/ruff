@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::whitespace;
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
@@ -9,6 +8,7 @@ use ruff_text_size::Ranged;
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the use of string literals in exception constructors.
@@ -188,7 +188,7 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                     if checker.enabled(Rule::RawStringInException) {
                         if string.len() >= checker.settings.flake8_errmsg.max_string_length {
                             let mut diagnostic =
-                                Diagnostic::new(RawStringInException, first.range());
+                                checker.report_diagnostic(RawStringInException, first.range());
                             if let Some(indentation) =
                                 whitespace::indentation(checker.source(), stmt)
                             {
@@ -200,14 +200,14 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                                     checker.locator(),
                                 ));
                             }
-                            checker.report_diagnostic(diagnostic);
                         }
                     }
                 }
                 // Check for f-strings.
                 Expr::FString(_) => {
                     if checker.enabled(Rule::FStringInException) {
-                        let mut diagnostic = Diagnostic::new(FStringInException, first.range());
+                        let mut diagnostic =
+                            checker.report_diagnostic(FStringInException, first.range());
                         if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
                             diagnostic.set_fix(generate_fix(
                                 stmt,
@@ -217,7 +217,6 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                                 checker.locator(),
                             ));
                         }
-                        checker.report_diagnostic(diagnostic);
                     }
                 }
                 // Check for .format() calls.
@@ -228,7 +227,7 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                         {
                             if attr == "format" && value.is_literal_expr() {
                                 let mut diagnostic =
-                                    Diagnostic::new(DotFormatInException, first.range());
+                                    checker.report_diagnostic(DotFormatInException, first.range());
                                 if let Some(indentation) =
                                     whitespace::indentation(checker.source(), stmt)
                                 {
@@ -240,7 +239,6 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                                         checker.locator(),
                                     ));
                                 }
-                                checker.report_diagnostic(diagnostic);
                             }
                         }
                     }

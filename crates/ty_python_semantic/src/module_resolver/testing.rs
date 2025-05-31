@@ -237,10 +237,10 @@ impl TestCaseBuilder<MockedTypeshed> {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersionWithSource {
+                python_version: Some(PythonVersionWithSource {
                     version: python_version,
                     source: PythonVersionSource::default(),
-                },
+                }),
                 python_platform,
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -298,10 +298,10 @@ impl TestCaseBuilder<VendoredTypeshed> {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersionWithSource {
+                python_version: Some(PythonVersionWithSource {
                     version: python_version,
                     source: PythonVersionSource::default(),
-                },
+                }),
                 python_platform,
                 search_paths: SearchPathSettings {
                     python_path: PythonPath::KnownSitePackages(vec![site_packages.clone()]),

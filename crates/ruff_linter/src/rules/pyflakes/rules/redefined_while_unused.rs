@@ -1,6 +1,7 @@
-use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::SourceRow;
+
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for variable definitions that redefine (or "shadow") unused

@@ -3012,7 +3012,6 @@ impl<'src> Parser<'src> {
                             // test_ok param_with_annotation
                             // def foo(arg: int): ...
                             // def foo(arg: lambda x: x): ...
-                            // def foo(arg: (x := int)): ...
 
                             // test_err param_with_invalid_annotation
                             // def foo(arg: *int): ...
@@ -3703,6 +3702,7 @@ impl<'src> Parser<'src> {
             | TokenKind::Complex
             | TokenKind::String
             | TokenKind::FStringStart
+            | TokenKind::TStringStart
             | TokenKind::Lbrace
             | TokenKind::Tilde
             | TokenKind::Ellipsis

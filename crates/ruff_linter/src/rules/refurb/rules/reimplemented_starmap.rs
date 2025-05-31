@@ -1,5 +1,4 @@
 use anyhow::{Result, bail};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
@@ -9,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for generator expressions, list and set comprehensions that can
@@ -133,7 +133,7 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
         }
     }
 
-    let mut diagnostic = Diagnostic::new(ReimplementedStarmap, target.range());
+    let mut diagnostic = checker.report_diagnostic(ReimplementedStarmap, target.range());
     diagnostic.try_set_fix(|| {
         // Import `starmap` from `itertools`.
         let (import_edit, starmap_name) = checker.importer().get_or_import_symbol(
@@ -156,7 +156,6 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
         );
         Ok(Fix::safe_edits(import_edit, [main_edit]))
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 /// An enum for a node that can be considered a candidate for replacement with `starmap`.

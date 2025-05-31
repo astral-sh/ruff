@@ -58,9 +58,13 @@ class Bar1(Protocol[T], Generic[T]):
 class Bar2[T](Protocol):
     x: T
 
-# error: [invalid-generic-class] "Cannot both inherit from subscripted `typing.Protocol` and use PEP 695 type variables"
+# error: [invalid-generic-class] "Cannot both inherit from subscripted `Protocol` and use PEP 695 type variables"
 class Bar3[T](Protocol[T]):
     x: T
+
+# Note that this class definition *will* actually succeed at runtime,
+# unlike classes that combine PEP-695 type parameters with inheritance from `Generic[]`
+reveal_type(Bar3.__mro__)  # revealed: tuple[<class 'Bar3[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 ```
 
 It's an error to include both bare `Protocol` and subscripted `Protocol[]` in the bases list
