@@ -220,3 +220,32 @@ def _(flag: bool):
     reveal_type(f(False))  # revealed: F
     reveal_type(f(flag))  # revealed: T | F
 ```
+
+### Builtin type: `tuple`
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Literal, overload
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+@overload
+def f(x: tuple[A, int], y: tuple[int, Literal[True]]) -> A: ...
+@overload
+def f(x: tuple[A, int], y: tuple[int, Literal[False]]) -> B: ...
+@overload
+def f(x: tuple[B, int], y: tuple[int, Literal[True]]) -> C: ...
+@overload
+def f(x: tuple[B, int], y: tuple[int, Literal[False]]) -> D: ...
+```
+
+```py
+from overloaded import A, B, f
+
+def _(x: tuple[A | B, int], y: tuple[int, bool]):
+    reveal_type(f(x, y))  # revealed: A | B | C | D
+```
