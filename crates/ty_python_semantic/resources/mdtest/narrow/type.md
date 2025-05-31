@@ -127,7 +127,8 @@ class B: ...
 
 def _[T](x: A | B):
     if type(x) is A[str]:
-        reveal_type(x)  # revealed: (A[int] & A[Unknown]) | (B & A[Unknown])
+        # TODO: previous was revealed: (A[int] & A[Unknown]) | (B & A[Unknown])
+        reveal_type(x)  # revealed: Never
     else:
         reveal_type(x)  # revealed: A[int] | B
 ```

@@ -52,7 +52,7 @@ def _(x: A | B):
 
     if False and isinstance(x, A):
         # TODO: should emit an `unreachable code` diagnostic
-        reveal_type(x)  # revealed: A
+        reveal_type(x)  # revealed: Never
     else:
         reveal_type(x)  # revealed: A | B
 

@@ -827,8 +827,8 @@ if sys.version_info >= (3, 12):
     from exporter import *
 
     # it's correct to have no diagnostics here as this branch is unreachable
-    reveal_type(A)  # revealed: Unknown
-    reveal_type(B)  # revealed: bool
+    reveal_type(A)  # revealed: Never
+    reveal_type(B)  # revealed: Never
 else:
     from exporter import *
 
