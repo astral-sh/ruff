@@ -4334,6 +4334,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_bytes_literal_expression(bytes_literal)
             }
             ast::Expr::FString(fstring) => self.infer_fstring_expression(fstring),
+            ast::Expr::TString(tstring) => self.infer_tstring_expression(tstring),
             ast::Expr::EllipsisLiteral(literal) => self.infer_ellipsis_literal_expression(literal),
             ast::Expr::Tuple(tuple) => self.infer_tuple_expression(tuple),
             ast::Expr::List(list) => self.infer_list_expression(list),
@@ -4432,8 +4433,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ast::FStringPart::FString(fstring) => {
                     for element in &fstring.elements {
                         match element {
-                            ast::FStringElement::Expression(expression) => {
-                                let ast::FStringExpressionElement {
+                            ast::InterpolatedStringElement::Interpolation(expression) => {
+                                let ast::InterpolatedElement {
                                     range: _,
                                     expression,
                                     debug_text: _,
@@ -4443,7 +4444,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 let ty = self.infer_expression(expression);
 
                                 if let Some(format_spec) = format_spec {
-                                    for element in format_spec.elements.expressions() {
+                                    for element in format_spec.elements.interpolations() {
                                         self.infer_expression(&element.expression);
                                     }
                                 }
@@ -4462,7 +4463,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     }
                                 }
                             }
-                            ast::FStringElement::Literal(literal) => {
+                            ast::InterpolatedStringElement::Literal(literal) => {
                                 collector.push_str(&literal.value);
                             }
                         }
@@ -4471,6 +4472,59 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
         collector.string_type(self.db())
+    }
+
+    fn infer_tstring_expression(&mut self, tstring: &ast::ExprTString) -> Type<'db> {
+        let ast::ExprTString { value, .. } = tstring;
+        for part in value {
+            match part {
+                ast::TStringPart::Literal(_) => {}
+                ast::TStringPart::FString(fstring) => {
+                    for element in &fstring.elements {
+                        match element {
+                            ast::InterpolatedStringElement::Interpolation(expression) => {
+                                let ast::InterpolatedElement {
+                                    expression,
+                                    format_spec,
+                                    ..
+                                } = expression;
+                                self.infer_expression(expression);
+
+                                if let Some(format_spec) = format_spec {
+                                    for element in format_spec.elements.interpolations() {
+                                        self.infer_expression(&element.expression);
+                                    }
+                                }
+                            }
+                            ast::InterpolatedStringElement::Literal(_) => {}
+                        }
+                    }
+                }
+                ast::TStringPart::TString(tstring) => {
+                    for element in &tstring.elements {
+                        match element {
+                            ast::InterpolatedStringElement::Interpolation(
+                                tstring_interpolation_element,
+                            ) => {
+                                let ast::InterpolatedElement {
+                                    expression,
+                                    format_spec,
+                                    ..
+                                } = tstring_interpolation_element;
+                                self.infer_expression(expression);
+                                if let Some(format_spec) = format_spec {
+                                    for element in format_spec.elements.interpolations() {
+                                        self.infer_expression(&element.expression);
+                                    }
+                                }
+                            }
+                            ast::InterpolatedStringElement::Literal(_) => {}
+                        }
+                    }
+                }
+            }
+        }
+        todo_type!("Template")
     }
 
     fn infer_ellipsis_literal_expression(
@@ -6769,6 +6823,37 @@ impl<'db> TypeInferenceBuilder<'db> {
         right: Type<'db>,
         range: TextRange,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
+        let is_str_literal_in_tuple = |literal: Type<'db>, tuple: TupleType<'db>| {
+            // Protect against doing a lot of work for pathologically large
+            // tuples.
+            //
+            // Ref: https://github.com/astral-sh/ruff/pull/18251#discussion_r2115909311
+            if tuple.len(self.db()) > 1 << 12 {
+                return None;
+            }
+
+            let mut definitely_true = false;
+            let mut definitely_false = true;
+            for element in tuple.elements(self.db()) {
+                if element.is_string_literal() {
+                    if literal == *element {
+                        definitely_true = true;
+                        definitely_false = false;
+                    }
+                } else if !literal.is_disjoint_from(self.db(), *element) {
+                    definitely_false = false;
+                }
+            }
+
+            if definitely_true {
+                Some(true)
+            } else if definitely_false {
+                Some(false)
+            } else {
+                None
+            }
+        };
+
         // Note: identity (is, is not) for equal builtin types is unreliable and not part of the
         // language spec.
         // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
@@ -6899,6 +6984,30 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
                 }
+            }
+            (Type::StringLiteral(_), Type::Tuple(tuple)) if op == ast::CmpOp::In => {
+                if let Some(answer) = is_str_literal_in_tuple(left, tuple) {
+                    return Ok(Type::BooleanLiteral(answer));
+                }
+
+                self.infer_binary_type_comparison(
+                    KnownClass::Str.to_instance(self.db()),
+                    op,
+                    right,
+                    range,
+                )
+            }
+            (Type::StringLiteral(_), Type::Tuple(tuple)) if op == ast::CmpOp::NotIn => {
+                if let Some(answer) = is_str_literal_in_tuple(left, tuple) {
+                    return Ok(Type::BooleanLiteral(!answer));
+                }
+
+                self.infer_binary_type_comparison(
+                    KnownClass::Str.to_instance(self.db()),
+                    op,
+                    right,
+                    range,
+                )
             }
             (Type::StringLiteral(_), _) => self.infer_binary_type_comparison(
                 KnownClass::Str.to_instance(self.db()),
@@ -8277,6 +8386,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("F-strings are not allowed in type expressions"),
+                )
+            }
+
+            ast::Expr::TString(tstring) => {
+                self.infer_tstring_expression(tstring);
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("T-strings are not allowed in type expressions"),
                 )
             }
 

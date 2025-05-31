@@ -65,6 +65,7 @@ mod context;
 mod diagnostic;
 mod display;
 mod generics;
+mod ide_support;
 mod infer;
 mod instance;
 mod mro;
@@ -2196,23 +2197,22 @@ impl<'db> Type<'db> {
 
             (
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
-                Type::NominalInstance(instance),
+                instance @ Type::NominalInstance(NominalInstanceType { class, .. }),
             )
             | (
-                Type::NominalInstance(instance),
+                instance @ Type::NominalInstance(NominalInstanceType { class, .. }),
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
-            ) if instance.class.is_final(db) => {
-                let member = self.member_lookup_with_policy(
+            ) if class.is_final(db) => instance
+                .member_lookup_with_policy(
                     db,
                     Name::new_static("__call__"),
                     MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                );
-                match member.symbol {
-                    // TODO: ideally this would check disjointness of the `__call__` signature and the callable signature
-                    Symbol::Type(ty, _) => !ty.is_assignable_to(db, CallableType::unknown(db)),
-                    Symbol::Unbound => true,
-                }
-            }
+                )
+                .symbol
+                .ignore_possibly_unbound()
+                .is_none_or(|dunder_call| {
+                    !dunder_call.is_assignable_to(db, CallableType::unknown(db))
+                }),
 
             (
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
@@ -3636,6 +3636,15 @@ impl<'db> Type<'db> {
                     .into()
             }
 
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => CallableBinding::not_callable(self).into(),
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.bindings(db),
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => Bindings::from_union(
+                    self,
+                    constraints.elements(db).iter().map(|ty| ty.bindings(db)),
+                ),
+            },
+
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
                 CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
@@ -4450,7 +4459,6 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::Tuple(_)
             | Type::BoundSuper(_)
-            | Type::TypeVar(_)
             | Type::ModuleLiteral(_)
             | Type::TypeIs(_) => CallableBinding::not_callable(self).into(),
         }
@@ -7699,6 +7707,8 @@ pub enum KnownFunction {
     GenericContext,
     /// `ty_extensions.dunder_all_names`
     DunderAllNames,
+    /// `ty_extensions.all_members`
+    AllMembers,
 }
 
 impl KnownFunction {
@@ -7758,7 +7768,8 @@ impl KnownFunction {
             | Self::IsSubtypeOf
             | Self::GenericContext
             | Self::DunderAllNames
-            | Self::StaticAssert => module.is_ty_extensions(),
+            | Self::StaticAssert
+            | Self::AllMembers => module.is_ty_extensions(),
         }
     }
 }
@@ -9276,7 +9287,7 @@ impl<'db> TypeIsType<'db> {
 // Make sure that the `Type` enum does not grow unexpectedly.
 #[cfg(not(debug_assertions))]
 #[cfg(target_pointer_width = "64")]
-static_assertions::assert_eq_size!(Type, [u8; 16]);
+static_assertions::assert_eq_size!(Type, [u8; 24]);
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -9477,7 +9488,8 @@ pub(crate) mod tests {
                 | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
                 | KnownFunction::IsEquivalentTo
-                | KnownFunction::IsGradualEquivalentTo => KnownModule::TyExtensions,
+                | KnownFunction::IsGradualEquivalentTo
+                | KnownFunction::AllMembers => KnownModule::TyExtensions,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)

@@ -465,8 +465,15 @@ static_assert(is_disjoint_from(bool, Callable[..., Any]))
 static_assert(is_disjoint_from(C, Callable[..., Any]))
 static_assert(is_disjoint_from(bool | C, Callable[..., Any]))
 
+static_assert(is_disjoint_from(Callable[..., Any], bool))
+static_assert(is_disjoint_from(Callable[..., Any], C))
+static_assert(is_disjoint_from(Callable[..., Any], bool | C))
+
 static_assert(not is_disjoint_from(str, Callable[..., Any]))
 static_assert(not is_disjoint_from(bool | str, Callable[..., Any]))
+
+static_assert(not is_disjoint_from(Callable[..., Any], str))
+static_assert(not is_disjoint_from(Callable[..., Any], bool | str))
 
 def bound_with_valid_type():
     @final
@@ -474,6 +481,7 @@ def bound_with_valid_type():
         def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
 
     static_assert(not is_disjoint_from(D, Callable[..., Any]))
+    static_assert(not is_disjoint_from(Callable[..., Any], D))
 
 def possibly_unbound_with_valid_type(flag: bool):
     @final
@@ -482,6 +490,7 @@ def possibly_unbound_with_valid_type(flag: bool):
             def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
 
     static_assert(not is_disjoint_from(E, Callable[..., Any]))
+    static_assert(not is_disjoint_from(Callable[..., Any], E))
 
 def bound_with_invalid_type():
     @final
@@ -489,6 +498,7 @@ def bound_with_invalid_type():
         __call__: int = 1
 
     static_assert(is_disjoint_from(F, Callable[..., Any]))
+    static_assert(is_disjoint_from(Callable[..., Any], F))
 
 def possibly_unbound_with_invalid_type(flag: bool):
     @final
@@ -497,4 +507,5 @@ def possibly_unbound_with_invalid_type(flag: bool):
             __call__: int = 1
 
     static_assert(is_disjoint_from(G, Callable[..., Any]))
+    static_assert(is_disjoint_from(Callable[..., Any], G))
 ```

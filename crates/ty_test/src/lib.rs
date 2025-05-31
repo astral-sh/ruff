@@ -258,10 +258,10 @@ fn run_test(
     let configuration = test.configuration();
 
     let settings = ProgramSettings {
-        python_version: PythonVersionWithSource {
+        python_version: Some(PythonVersionWithSource {
             version: python_version,
             source: PythonVersionSource::Cli,
-        },
+        }),
         python_platform: configuration
             .python_platform()
             .unwrap_or(PythonPlatform::Identifier("linux".to_string())),

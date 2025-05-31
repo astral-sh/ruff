@@ -146,6 +146,15 @@ fn f_strings() {
     assert_snapshot!(trace);
 }
 
+#[test]
+fn t_strings() {
+    let source = r"'pre' t'foo {bar:.{x}f} baz'";
+
+    let trace = trace_source_order_visitation(source);
+
+    assert_snapshot!(trace);
+}
+
 fn trace_source_order_visitation(source: &str) -> String {
     let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
 
