@@ -23,8 +23,8 @@ use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators, FunctionType,
     KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType,
-    SpecialFormType, TupleType, TypeMapping, UnionType, WrapperDescriptorKind, ide_support,
-    todo_type,
+    SpecialFormType, TupleType, TypeMapping, UnionBuilder, UnionType, WrapperDescriptorKind,
+    ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -1142,7 +1142,7 @@ impl<'db> CallableBinding<'db> {
             }
             MatchingOverloadIndex::Single(index) => {
                 // If only one candidate overload remains, it is the winning match.
-                self.overloads.get_mut(index).unwrap().check_types(
+                self.overloads[index].check_types(
                     db,
                     argument_types.as_ref(),
                     argument_types.types(),
@@ -1181,18 +1181,19 @@ impl<'db> CallableBinding<'db> {
         // Step 3: Perform "argument type expansion". Reference:
         // https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion
 
-        let mut expansions = argument_types.expand(db);
+        let mut expansions = argument_types.expand(db).peekable();
 
-        let Some(first_expansion) = expansions.next() else {
+        if expansions.peek().is_none() {
             // Return early if there are no argument types to expand. This is especially useful to
             // avoid restoring the bindings state.
             return;
-        };
+        }
 
         restore(self, pre_evaluation_snapshot);
 
-        for expanded_argument_lists in std::iter::once(first_expansion).chain(expansions) {
-            let mut return_types = vec![];
+        for expanded_argument_lists in expansions {
+            let mut all_evaluated_successfully = true;
+            let mut union_builder = UnionBuilder::new(db);
 
             for expanded_argument_types in &expanded_argument_lists {
                 let pre_evaluation_snapshot = snapshot(self);
@@ -1217,21 +1218,22 @@ impl<'db> CallableBinding<'db> {
                 restore(self, pre_evaluation_snapshot);
 
                 if let Some(return_type) = return_type {
-                    return_types.push(return_type);
+                    union_builder.add_in_place(return_type);
                 } else {
                     // No need to check the remaining argument lists if the current argument list
                     // doesn't evaluate successfully. Move on to expanding the next argument type.
+                    all_evaluated_successfully = false;
                     break;
                 }
             }
 
-            if return_types.len() == expanded_argument_lists.len() {
+            if all_evaluated_successfully {
                 // If the number of return types is equal to the number of expanded argument lists,
                 // they all evaluated successfully. So, we need to combine their return types by
                 // union to determine the final return type.
                 //
                 // TODO: What should be the state of the bindings at this point?
-                self.return_type = Some(UnionType::from_elements(db, return_types));
+                self.return_type = Some(union_builder.build());
                 return;
             }
         }

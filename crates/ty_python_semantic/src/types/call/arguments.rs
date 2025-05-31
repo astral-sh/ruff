@@ -257,9 +257,7 @@ mod tests {
         let union_type = UnionType::from_elements(&db, types);
         let expanded = expand_type(&db, union_type).unwrap();
         assert_eq!(expanded.len(), 3);
-        for (expected, actual) in types.iter().zip(expanded) {
-            assert_eq!(expected, &actual);
-        }
+        assert_eq!(expanded, types);
     }
 
     #[test]
@@ -267,9 +265,9 @@ mod tests {
         let db = setup_db();
         let bool_instance = KnownClass::Bool.to_instance(&db);
         let expanded = expand_type(&db, bool_instance).unwrap();
-        assert_eq!(expanded.len(), 2);
-        assert_eq!(expanded[0], Type::BooleanLiteral(true));
-        assert_eq!(expanded[1], Type::BooleanLiteral(false));
+        let expected_types = [Type::BooleanLiteral(true), Type::BooleanLiteral(false)];
+        assert_eq!(expanded.len(), expected_types.len());
+        assert_eq!(expanded, expected_types);
     }
 
     #[test]
@@ -310,10 +308,8 @@ mod tests {
             TupleType::from_elements(&db, [false_ty, bytes_ty]),
         ];
         let expanded = expand_type(&db, tuple_type2).unwrap();
-        assert_eq!(expanded.len(), 6);
-        for (expected, actual) in expected_types.iter().zip(expanded) {
-            assert_eq!(expected, &actual);
-        }
+        assert_eq!(expanded.len(), expected_types.len());
+        assert_eq!(expanded, expected_types);
 
         // Mixed set of elements where some can be expanded while others cannot be.
         let tuple_type3 = TupleType::from_elements(
@@ -332,9 +328,7 @@ mod tests {
             TupleType::from_elements(&db, [false_ty, int_ty, bytes_ty, str_ty]),
         ];
         let expanded = expand_type(&db, tuple_type3).unwrap();
-        assert_eq!(expanded.len(), 4);
-        for (expected, actual) in expected_types.iter().zip(expanded) {
-            assert_eq!(expected, &actual);
-        }
+        assert_eq!(expanded.len(), expected_types.len());
+        assert_eq!(expanded, expected_types);
     }
 }
