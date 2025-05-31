@@ -169,6 +169,32 @@ reveal_type(f(None))  # revealed: None
 reveal_type(f("string"))  # revealed: Unknown
 ```
 
+## Inferring a callable return type from a function parameter
+
+```py
+from typing import Callable, Generic, overload
+from typing_extensions import TypeVar, reveal_type
+
+T = TypeVar("T")
+
+def foo(x: Callable[..., T]) -> Callable[..., T]:
+    return x
+
+def f() -> int:
+    return 1
+
+reveal_type(foo(f))  # revealed: (...) -> int
+
+@overload
+def g(x: int) -> int: ...
+@overload
+def g(x: str) -> str: ...
+def g(x: str | int) -> str | int:
+    return x
+
+reveal_type(foo(g))  # revealed: (...) -> int | str
+```
+
 ## Typevar constraints
 
 If a type parameter has an upper bound, that upper bound constrains which types can be used for that

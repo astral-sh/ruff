@@ -723,6 +723,17 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
+            (Type::Callable(formal), Type::FunctionLiteral(actual)) => {
+                let formal_signature = formal.signatures(self.db);
+                let actual_signature = &actual.signature(self.db).overloads;
+                // TODO: Inference based on input parameters
+
+                let formal_return_types = UnionType::from_elements(self.db, formal_signature.overloads.iter().filter_map(|signature| signature.return_ty));
+                let actual_return_types = UnionType::from_elements(self.db, actual_signature.overloads.iter().filter_map(|signature| signature.return_ty));
+
+                self.infer(formal_return_types, actual_return_types)?;
+            }
+
             // TODO: Add more forms that we can structurally induct into: type[C], callables
             _ => {}
         }
