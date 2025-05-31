@@ -67,6 +67,13 @@ pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
     if alias.name.as_str() != asname.as_str() {
         return;
     }
+
+    // A re-export in __init__.py is probably intentional.
+    let in_init = checker.path().ends_with("__init__.py");
+    if in_init {
+        return;
+    }
+
     // A required import with a useless alias causes an infinite loop.
     // See https://github.com/astral-sh/ruff/issues/14283
     let required_import_conflict = checker
@@ -100,6 +107,13 @@ pub(crate) fn useless_import_from_alias(
     if alias.name.as_str() != asname.as_str() {
         return;
     }
+
+    // A re-export in __init__.py is probably intentional.
+    let in_init = checker.path().ends_with("__init__.py");
+    if in_init {
+        return;
+    }
+
     // A required import with a useless alias causes an infinite loop.
     // See https://github.com/astral-sh/ruff/issues/14283
     let required_import_conflict = checker.settings.isort.requires_member_import(
