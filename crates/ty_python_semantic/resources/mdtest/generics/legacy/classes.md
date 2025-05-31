@@ -379,6 +379,58 @@ C[None](b"bytes")  # error: [no-matching-overload]
 C[None](12)
 ```
 
+## Inferring callable return type from generic class constructor
+
+```py
+from typing import Callable, Generic, overload
+from typing_extensions import TypeVar, reveal_type
+
+T = TypeVar("T")
+
+class A(Generic[T]):
+    def __init__(self, x: Callable[..., T]):
+        self.x = x
+
+def f() -> int:
+    return 1
+
+reveal_type(A(f))  # revealed: A[int]
+
+@overload
+def g(x: int) -> int: ...
+@overload
+def g(x: str) -> str: ...
+def g(x: str | int) -> str | int:
+    return x
+
+reveal_type(A(g))  # revealed: A[int | str]
+```
+
+Using a constrained typevar for the callable return type:
+
+```py
+from typing import Callable, Generic, overload
+from typing_extensions import TypeVar, reveal_type
+
+T = TypeVar("T", int, str)
+
+class B(Generic[T]):
+    def __init__(self, x: Callable[..., T | None]):
+        self.x = x
+
+def h(x: int) -> int | None:
+    return x
+
+@overload
+def h(x: str) -> str | None: ...
+@overload
+def h(x: int) -> int | None: ...
+def h(x: str | int) -> str | int | None:
+    return x
+
+reveal_type(B(h))  # revealed: B[int | str]
+```
+
 ## Generic subclass
 
 When a generic subclass fills its superclass's type parameter with one of its own, the actual types
