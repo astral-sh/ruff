@@ -302,7 +302,7 @@ class C:
 
 c_instance = C()
 reveal_type(c_instance.a)  # revealed: Unknown | Literal[1]
-reveal_type(c_instance.b)  # revealed: Unknown
+reveal_type(c_instance.b)  # revealed: Unknown | list[Literal[2, 3]]
 ```
 
 #### Attributes defined in for-loop (unpacking)
