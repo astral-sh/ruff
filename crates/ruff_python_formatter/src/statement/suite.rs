@@ -2,7 +2,7 @@ use ruff_formatter::{
     FormatContext, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions, write,
 };
 use ruff_python_ast::helpers::is_compound_statement;
-use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt, Suite};
+use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt, StmtIf, Suite};
 use ruff_python_ast::{AnyNodeRef, StmtExpr};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_end_of_line_trivia, lines_before};
 use ruff_text_size::{Ranged, TextRange};
@@ -244,7 +244,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         }
                     }
                 }
-            } else if is_import_definition(preceding)
+            } else if (is_import_definition(preceding) || is_import_only_if_statement(preceding))
                 && (!is_import_definition(following) || following_comments.has_leading())
             {
                 // Enforce _at least_ one empty line after an import statement (but allow up to
@@ -743,6 +743,20 @@ const fn is_class_or_function_definition(stmt: &Stmt) -> bool {
 /// Returns `true` if a [`Stmt`] is an import.
 const fn is_import_definition(stmt: &Stmt) -> bool {
     matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_))
+}
+
+/// Returns `true` if a statement is a standalone `if` block that contains only imports
+fn is_import_only_if_statement(stmt: &Stmt) -> bool {
+    if let Stmt::If(StmtIf {
+        body,
+        elif_else_clauses,
+        ..
+    }) = stmt
+    {
+        elif_else_clauses.is_empty() && !body.is_empty() && body.iter().all(is_import_definition)
+    } else {
+        false
+    }
 }
 
 impl FormatRuleWithOptions<Suite, PyFormatContext<'_>> for FormatSuite {
