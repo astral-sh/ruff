@@ -10,6 +10,8 @@ class Person(TypedDict):
     name: str
     age: int | None
 
+# TODO: This should not be an error:
+# error: [invalid-assignment]
 alice: Person = {"name": "Alice", "age": 30}
 
 # Alternative syntax
