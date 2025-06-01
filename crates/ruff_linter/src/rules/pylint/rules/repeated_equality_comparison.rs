@@ -32,6 +32,23 @@ use crate::Locator;
 /// If the items are hashable, use a `set` for efficiency; otherwise, use a
 /// `tuple`.
 ///
+/// ## Fix safety
+/// This rule is always unsafe when the expression has side effects.
+///
+/// ```python
+/// class Obj:
+///     def __init__(self):
+///         self.n = 0
+///     @property
+///     def attr(self):
+///         self.n += 1
+///         return self.n
+///
+/// obj = Obj()
+/// if obj.attr == 0 or obj.attr == 1:  # before fix: obj.n == 2
+/// if obj.attr in {0, 1}:              # after fix: obj.n == 1
+/// ```
+///
 /// ## Example
 /// ```python
 /// foo == "bar" or foo == "baz" or foo == "qux"
