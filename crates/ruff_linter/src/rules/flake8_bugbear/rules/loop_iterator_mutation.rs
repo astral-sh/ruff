@@ -145,6 +145,7 @@ struct LoopMutationsVisitor<'a> {
     mutations: HashMap<u32, Vec<TextRange>>,
     branches: Vec<u32>,
     branch: u32,
+    in_return_or_break: bool,
 }
 
 impl<'a> LoopMutationsVisitor<'a> {
@@ -157,12 +158,17 @@ impl<'a> LoopMutationsVisitor<'a> {
             mutations: HashMap::new(),
             branches: vec![0],
             branch: 0,
+            in_return_or_break: false,
         }
     }
 
     /// Register a mutation.
     fn add_mutation(&mut self, range: TextRange) {
-        self.mutations.entry(self.branch).or_default().push(range);
+        // Skip mutations that occur within return or break statements,
+        // as they are safe early exits from the loop
+        if !self.in_return_or_break {
+            self.mutations.entry(self.branch).or_default().push(range);
+        }
     }
 
     /// Handle, e.g., `del items[0]`.
@@ -280,12 +286,17 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 }
             }
 
-            // On break, clear the mutations for the current branch.
+            // On break or return, set flag to ignore mutations within the statement expression
             Stmt::Break(_) | Stmt::Return(_) => {
+                let old_flag = self.in_return_or_break;
+                self.in_return_or_break = true;
+                visitor::walk_stmt(self, stmt);
+                self.in_return_or_break = old_flag;
+
+                // Also clear any mutations for this branch that were added before this statement
                 if let Some(mutations) = self.mutations.get_mut(&self.branch) {
                     mutations.clear();
                 }
-                visitor::walk_stmt(self, stmt);
             }
 
             // Avoid recursion for class and function definitions.
