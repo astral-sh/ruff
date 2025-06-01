@@ -1,7 +1,8 @@
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::{AnyNodeRef, ElifElseClause, StmtIf};
+use ruff_python_ast::{AnyNodeRef, ElifElseClause, Stmt, StmtIf, Suite};
 use ruff_text_size::Ranged;
 
+use crate::comments::Comments;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
@@ -42,6 +43,11 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
                 ),
             ]
         )?;
+
+        if elif_else_clauses.is_empty() && suite_contains_only_imports(body, f.context().comments())
+        {
+            empty_line().fmt(f)?;
+        }
 
         let mut last_node = body.last().unwrap().into();
         for clause in elif_else_clauses {
@@ -110,4 +116,17 @@ pub(crate) fn format_elif_else_clause(
                 .then_some(source_position(item.end()))
         ]
     )
+}
+
+fn suite_contains_only_imports(body: &Suite, comments: &Comments) -> bool {
+    if body.is_empty() {
+        return false;
+    }
+
+    body.iter()
+        .all(|stmt| is_import_definition(stmt) && !comments.has_trailing_own_line(stmt))
+}
+
+fn is_import_definition(stmt: &Stmt) -> bool {
+    matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_))
 }
