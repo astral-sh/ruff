@@ -31,6 +31,9 @@ from typing_extensions import Self, TypeAlias, deprecated
 if sys.platform == "win32":
     from _ctypes import FormatError as FormatError, get_last_error as get_last_error, set_last_error as set_last_error
 
+    if sys.version_info >= (3, 14):
+        from _ctypes import COMError as COMError
+
 if sys.version_info >= (3, 11):
     from ctypes._endian import BigEndianUnion as BigEndianUnion, LittleEndianUnion as LittleEndianUnion
 
@@ -197,8 +200,13 @@ if sys.platform == "win32":
 
 def wstring_at(ptr: _CVoidConstPLike, size: int = -1) -> str: ...
 
+if sys.version_info >= (3, 14):
+    def memoryview_at(ptr: _CVoidConstPLike, size: int, readonly: bool = False) -> memoryview: ...
+
 class py_object(_CanCastTo, _SimpleCData[_T]):
     _type_: ClassVar[Literal["O"]]
+    if sys.version_info >= (3, 14):
+        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
 class c_bool(_SimpleCData[bool]):
     _type_: ClassVar[Literal["?"]]
@@ -270,15 +278,15 @@ class c_double(_SimpleCData[float]):
 class c_longdouble(_SimpleCData[float]):  # can be an alias for c_double
     _type_: ClassVar[Literal["d", "g"]]
 
-if sys.version_info >= (3, 14):
-    class c_float_complex(_SimpleCData[complex]):
-        _type_: ClassVar[Literal["E"]]
-
+if sys.version_info >= (3, 14) and sys.platform != "win32":
     class c_double_complex(_SimpleCData[complex]):
-        _type_: ClassVar[Literal["C"]]
+        _type_: ClassVar[Literal["D"]]
+
+    class c_float_complex(_SimpleCData[complex]):
+        _type_: ClassVar[Literal["F"]]
 
     class c_longdouble_complex(_SimpleCData[complex]):
-        _type_: ClassVar[Literal["F"]]
+        _type_: ClassVar[Literal["G"]]
 
 class c_char(_SimpleCData[bytes]):
     _type_: ClassVar[Literal["c"]]
