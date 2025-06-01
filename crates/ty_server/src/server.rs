@@ -200,7 +200,7 @@ impl ServerPanicHookHandler {
         let hook = std::panic::take_hook();
         let client = Arc::new(client);
 
-        // Use a weak reference to the client because it must be dropped when existing or the
+        // Use a weak reference to the client because it must be dropped when exiting or the
         // io-threads join hangs forever (because client has a reference to the connection sender).
         let hook_client = Arc::downgrade(&client);
 
