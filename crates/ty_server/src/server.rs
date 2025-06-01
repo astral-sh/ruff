@@ -129,59 +129,12 @@ impl Server {
     }
 
     pub(crate) fn run(mut self) -> crate::Result<()> {
-        type PanicHook = Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>;
-        struct RestorePanicHook<'a> {
-            hook: Option<PanicHook>,
-            client: &'a std::sync::Mutex<Option<Client>>,
-        }
-
-        impl Drop for RestorePanicHook<'_> {
-            fn drop(&mut self) {
-                if let Ok(mut client) = self.client.lock() {
-                    // Take the client and drop it
-                    let _ = client.take();
-                }
-                if let Some(hook) = self.hook.take() {
-                    std::panic::set_hook(hook);
-                }
-            }
-        }
-
-        // It's important that this client gets dropped when exiting the main loop or
-        // joining the io_thread will wait forever because we hold on to a connection sender.
-        let client = std::sync::Mutex::new(Some(Client::new(
+        let client = Client::new(
             self.main_loop_sender.clone(),
             self.connection.sender.clone(),
-        )));
+        );
 
-        // unregister any previously registered panic hook
-        // The hook will be restored when this function exits.
-        let _ = RestorePanicHook {
-            hook: Some(std::panic::take_hook()),
-            client: &client,
-        };
-
-        // When we panic, try to notify the client.
-        std::panic::set_hook(Box::new(move |panic_info| {
-            use std::io::Write;
-
-            let backtrace = std::backtrace::Backtrace::force_capture();
-            tracing::error!("{panic_info}\n{backtrace}");
-
-            // we also need to print to stderr directly for when using `$logTrace` because
-            // the message won't be sent to the client.
-            // But don't use `eprintln` because `eprintln` itself may panic if the pipe is broken.
-            let mut stderr = std::io::stderr().lock();
-            writeln!(stderr, "{panic_info}\n{backtrace}").ok();
-
-            if let Ok(Some(client)) = client.lock().as_deref() {
-                client.show_message(
-                    "The ty language server exited with a panic. See the logs for more details.",
-                    MessageType::ERROR,
-                )
-                .ok();
-            }
-        }));
+        let _panic_hook = ServerPanicHookHandler::new(client);
 
         spawn_main_loop(move || self.main_loop())?.join()
     }
@@ -229,6 +182,50 @@ impl Server {
                     ..Default::default()
                 }),
             ..Default::default()
+        }
+    }
+}
+
+struct ServerPanicHookHandler {
+    hook: Option<Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>>,
+}
+
+impl ServerPanicHookHandler {
+    fn new(client: Client) -> Self {
+        let hook = std::panic::take_hook();
+        // When we panic, try to notify the client.
+        std::panic::set_hook(Box::new(move |panic_info| {
+            use std::io::Write;
+
+            let backtrace = std::backtrace::Backtrace::force_capture();
+            tracing::error!("{panic_info}\n{backtrace}");
+
+            // we also need to print to stderr directly for when using `$logTrace` because
+            // the message won't be sent to the client.
+            // But don't use `eprintln` because `eprintln` itself may panic if the pipe is broken.
+            let mut stderr = std::io::stderr().lock();
+            writeln!(stderr, "{panic_info}\n{backtrace}").ok();
+
+            client
+                .show_message(
+                    "The ty language server exited with a panic. See the logs for more details.",
+                    MessageType::ERROR,
+                )
+                .ok();
+        }));
+
+        Self { hook: Some(hook) }
+    }
+}
+
+impl Drop for ServerPanicHookHandler {
+    fn drop(&mut self) {
+        // Unregistering the panic hook is important because it ensures that the `Client`
+        // is dropped. Dropping the `Client` is necessary or the server will hang
+        // after a shutdown request because the io-threads keep running in the hope
+        // that the panic-hook's client will send a message.
+        if let Some(hook) = self.hook.take() {
+            std::panic::set_hook(hook);
         }
     }
 }
