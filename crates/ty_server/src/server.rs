@@ -186,8 +186,10 @@ impl Server {
     }
 }
 
+type PanicHook = Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>;
+
 struct ServerPanicHookHandler {
-    hook: Option<Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>>,
+    hook: Option<PanicHook>,
 }
 
 impl ServerPanicHookHandler {
