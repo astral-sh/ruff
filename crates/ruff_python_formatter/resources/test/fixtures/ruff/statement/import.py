@@ -85,3 +85,8 @@ import os
 # comment
 x = 1
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
+path: Path # Expect separating empty line after typechecking imports
