@@ -75,6 +75,8 @@ class _CData:
     _objects: Mapping[Any, int] | None
     def __buffer__(self, flags: int, /) -> memoryview: ...
     def __ctypes_from_outparam__(self, /) -> Self: ...
+    if sys.version_info >= (3, 14):
+        __pointer_type__: type
 
 # this is a union of all the subclasses of _CData, which is useful because of
 # the methods that are present on each of those subclasses which are not present
