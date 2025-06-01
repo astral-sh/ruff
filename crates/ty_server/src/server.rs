@@ -1,5 +1,9 @@
 //! Scheduling, I/O, and API endpoints.
 
+use self::schedule::spawn_main_loop;
+use crate::PositionEncoding;
+use crate::session::{AllSettings, ClientSettings, Experimental, Session};
+use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
     InlayHintOptions, InlayHintServerCapabilities, MessageType, ServerCapabilities,
@@ -8,11 +12,6 @@ use lsp_types::{
 };
 use std::num::NonZeroUsize;
 use std::panic::PanicHookInfo;
-
-use self::connection::Connection;
-use self::schedule::spawn_main_loop;
-use crate::PositionEncoding;
-use crate::session::{AllSettings, ClientSettings, Experimental, Session};
 
 mod api;
 mod connection;
@@ -66,7 +65,7 @@ impl Server {
         // The number 32 was chosen arbitrarily. The main goal was to have enough capacity to queue
         // some responses before blocking.
         let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
-        let client = Client::new(main_loop_sender.clone(), connection.sender());
+        let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
         crate::logging::init_logging(
             global_settings.tracing.log_level.unwrap_or_default(),
@@ -131,25 +130,36 @@ impl Server {
 
     pub(crate) fn run(mut self) -> crate::Result<()> {
         type PanicHook = Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>;
-        struct RestorePanicHook {
+        struct RestorePanicHook<'a> {
             hook: Option<PanicHook>,
+            client: &'a std::sync::Mutex<Option<Client>>,
         }
 
-        impl Drop for RestorePanicHook {
+        impl Drop for RestorePanicHook<'_> {
             fn drop(&mut self) {
+                if let Ok(mut client) = self.client.lock() {
+                    // Take the client and drop it
+                    let _ = client.take();
+                }
                 if let Some(hook) = self.hook.take() {
                     std::panic::set_hook(hook);
                 }
             }
         }
 
+        // It's important that this client gets dropped when exiting the main loop or
+        // joining the io_thread will wait forever because we hold on to a connection sender.
+        let client = std::sync::Mutex::new(Some(Client::new(
+            self.main_loop_sender.clone(),
+            self.connection.sender.clone(),
+        )));
+
         // unregister any previously registered panic hook
         // The hook will be restored when this function exits.
         let _ = RestorePanicHook {
             hook: Some(std::panic::take_hook()),
+            client: &client,
         };
-
-        let client = Client::new(self.main_loop_sender.clone(), self.connection.sender());
 
         // When we panic, try to notify the client.
         std::panic::set_hook(Box::new(move |panic_info| {
@@ -164,12 +174,13 @@ impl Server {
             let mut stderr = std::io::stderr().lock();
             writeln!(stderr, "{panic_info}\n{backtrace}").ok();
 
-            client
-                .show_message(
+            if let Ok(Some(client)) = client.lock().as_deref() {
+                client.show_message(
                     "The ty language server exited with a panic. See the logs for more details.",
                     MessageType::ERROR,
                 )
                 .ok();
+            }
         }));
 
         spawn_main_loop(move || self.main_loop())?.join()

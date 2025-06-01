@@ -49,6 +49,15 @@ pub(super) fn request(req: server::Request) -> Task {
         >(
             req, BackgroundSchedule::LatencySensitive
         ),
+        lsp_types::request::Shutdown::METHOD => {
+            tracing::debug!("Received shutdown request, waiting for shutdown notification.");
+            Ok(Task::local(move |session, client| {
+                session.set_shutdown_requested(true);
+                if let Err(error) = client.respond(&req.id, Ok(())) {
+                    tracing::debug!("Failed to send shutdown response: {error}");
+                }
+            }))
+        }
 
         method => {
             tracing::warn!("Received request {method} which does not have a handler");

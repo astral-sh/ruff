@@ -37,10 +37,18 @@ pub fn run_server() -> anyhow::Result<()> {
 
     let io_result = io_threads.join();
 
-    match (server_result, io_result) {
+    let result = match (server_result, io_result) {
         (Ok(()), Ok(())) => Ok(()),
         (Err(server), Err(io)) => Err(server).context(format!("IO thread error: {io}")),
         (Err(server), _) => Err(server),
         (_, Err(io)) => Err(io).context("IO thread error"),
+    };
+
+    if let Err(err) = result.as_ref() {
+        tracing::warn!("Server shut down with an error: {err}");
+    } else {
+        tracing::info!("Server shut down");
     }
+
+    result
 }
