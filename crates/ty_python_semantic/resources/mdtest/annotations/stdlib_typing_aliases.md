@@ -66,13 +66,14 @@ In case the incorrect number of type arguments is passed, a diagnostic is given.
 
 ```py
 import typing
+
 def f(
     # error: [invalid-type-form]
     incorrect_list: typing.List[int, int],
     # error: [invalid-type-form]
     incorrect_dict: typing.Dict[int, int, int],
     # error: [invalid-type-form]
-    incorrect_dict2: typing.Dict[int], # type argument is not a tuple here
+    incorrect_dict2: typing.Dict[int],  # type argument is not a tuple here
     # error: [invalid-type-form]
     incorrect_set: typing.Set[int, int],
     # error: [invalid-type-form]
@@ -96,13 +97,17 @@ def f(
 ):
     reveal_type(incorrect_list)  # revealed: list[Unknown]
     reveal_type(incorrect_dict)  # revealed: dict[Unknown, Unknown]
+    reveal_type(incorrect_dict2)  # revealed: dict[Unknown, Unknown]
     reveal_type(incorrect_set)  # revealed: set[Unknown]
     reveal_type(incorrect_frozen_set)  # revealed: frozenset[Unknown]
     reveal_type(incorrect_chain_map)  # revealed: ChainMap[Unknown, Unknown]
+    reveal_type(incorrect_chain_map2)  # revealed: ChainMap[Unknown, Unknown]
     reveal_type(incorrect_counter)  # revealed: Counter[Unknown]
     reveal_type(incorrect_default_dict)  # revealed: defaultdict[Unknown, Unknown]
+    reveal_type(incorrect_default_dict2)  # revealed: defaultdict[Unknown, Unknown]
     reveal_type(incorrect_deque)  # revealed: deque[Unknown]
     reveal_type(incorrect_ordered_dict)  # revealed: OrderedDict[Unknown, Unknown]
+    reveal_type(incorrect_ordered_dict2)  # revealed: OrderedDict[Unknown, Unknown]
 ```
 
 ## Inheritance

@@ -8870,7 +8870,12 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             SpecialFormType::ChainMap => match arguments_slice {
                 ast::Expr::Tuple(t) => {
-                    if t.len() != 2 {
+                    if t.len() == 2 {
+                        let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
+                        let ty = KnownClass::ChainMap.to_specialized_instance(db, args_ty);
+                        self.store_expression_type(arguments_slice, ty);
+                        ty
+                    } else {
                         self.infer_type_expression(arguments_slice);
                         report_invalid_arguments_to_legacy_alias(
                             &self.context,
@@ -8880,11 +8885,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                             t.len(),
                         );
                         KnownClass::ChainMap.to_instance(db)
-                    } else {
-                        let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
-                        let ty = KnownClass::ChainMap.to_specialized_instance(db, args_ty);
-                        self.store_expression_type(arguments_slice, ty);
-                        ty
                     }
                 }
                 _ => {
@@ -8901,7 +8901,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             },
             SpecialFormType::OrderedDict => match arguments_slice {
                 ast::Expr::Tuple(t) => {
-                    if t.len() != 2 {
+                    if t.len() == 2 {
+                        let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
+                        let ty = KnownClass::OrderedDict.to_specialized_instance(db, args_ty);
+                        self.store_expression_type(arguments_slice, ty);
+                        ty
+                    } else {
                         self.infer_type_expression(arguments_slice);
                         report_invalid_arguments_to_legacy_alias(
                             &self.context,
@@ -8911,11 +8916,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                             t.len(),
                         );
                         KnownClass::OrderedDict.to_instance(db)
-                    } else {
-                        let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
-                        let ty = KnownClass::OrderedDict.to_specialized_instance(db, args_ty);
-                        self.store_expression_type(arguments_slice, ty);
-                        ty
                     }
                 }
                 _ => {
@@ -8932,7 +8932,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             },
             SpecialFormType::Dict => match arguments_slice {
                 ast::Expr::Tuple(t) => {
-                    if t.len() != 2 {
+                    if t.len() == 2 {
+                        let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
+                        let ty = KnownClass::Dict.to_specialized_instance(db, args_ty);
+                        self.store_expression_type(arguments_slice, ty);
+                        ty
+                    } else {
                         self.infer_type_expression(arguments_slice);
                         report_invalid_arguments_to_legacy_alias(
                             &self.context,
@@ -8942,11 +8947,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                             t.len(),
                         );
                         KnownClass::Dict.to_instance(db)
-                    } else {
-                        let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
-                        let ty = KnownClass::Dict.to_specialized_instance(db, args_ty);
-                        self.store_expression_type(arguments_slice, ty);
-                        ty
                     }
                 }
                 _ => {
@@ -8980,7 +8980,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             },
             SpecialFormType::DefaultDict => match arguments_slice {
                 ast::Expr::Tuple(t) => {
-                    if t.len() != 2 {
+                    if t.len() == 2 {
+                        let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
+                        let ty = KnownClass::DefaultDict.to_specialized_instance(db, args_ty);
+                        self.store_expression_type(arguments_slice, ty);
+                        ty
+                    } else {
                         self.infer_type_expression(arguments_slice);
                         report_invalid_arguments_to_legacy_alias(
                             &self.context,
@@ -8990,11 +8995,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                             t.len(),
                         );
                         KnownClass::DefaultDict.to_instance(db)
-                    } else {
-                        let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
-                        let ty = KnownClass::DefaultDict.to_specialized_instance(db, args_ty);
-                        self.store_expression_type(arguments_slice, ty);
-                        ty
                     }
                 }
                 _ => {
