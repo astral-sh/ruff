@@ -102,7 +102,8 @@ use crate::{Db, FxOrderSet, Program};
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
     INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
-    SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE, report_attempted_protocol_instantiation,
+    SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
+    hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_argument_to_get_protocol_members, report_duplicate_bases,
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_or_unsupported_base,
@@ -4122,10 +4123,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             return;
         };
 
-        let Some(module_ty) = self.module_type_from_name(&module_name) else {
+        let Some(module) = resolve_module(self.db(), &module_name) else {
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
+
+        let module_ty = Type::module_literal(self.db(), self.file(), &module);
 
         // The indirection of having `star_import_info` as a separate variable
         // is required in order to make the borrow checker happy.
@@ -4175,6 +4178,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
+        // Evaluate whether `X.Y` would constitute a valid submodule name,
+        // given a `from X import Y` statement. If it is valid, this will be `Some()`;
+        // else, it will be `None`.
+        let full_submodule_name = ModuleName::new(name).map(|final_part| {
+            let mut ret = module_name.clone();
+            ret.extend(&final_part);
+            ret
+        });
+
         // If the module doesn't bind the symbol, check if it's a submodule.  This won't get
         // handled by the `Type::member` call because it relies on the semantic index's
         // `imported_modules` set.  The semantic index does not include information about
@@ -4190,35 +4202,47 @@ impl<'db> TypeInferenceBuilder<'db> {
         //
         // Regardless, for now, we sidestep all of that by repeating the submodule-or-attribute
         // check here when inferring types for a `from...import` statement.
-        if let Some(submodule_name) = ModuleName::new(name) {
-            let mut full_submodule_name = module_name.clone();
-            full_submodule_name.extend(&submodule_name);
-            if let Some(submodule_ty) = self.module_type_from_name(&full_submodule_name) {
-                self.add_declaration_with_binding(
-                    alias.into(),
-                    definition,
-                    &DeclaredAndInferredType::AreTheSame(submodule_ty),
-                );
-                return;
-            }
-        }
-
-        if &alias.name != "*" {
-            let is_import_reachable = self.is_reachable(import_from);
-
-            if is_import_reachable {
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&UNRESOLVED_IMPORT, AnyNodeRef::Alias(alias))
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Module `{module_name}` has no member `{name}`"
-                    ));
-                }
-            }
+        if let Some(submodule_type) = full_submodule_name
+            .as_ref()
+            .and_then(|submodule_name| self.module_type_from_name(submodule_name))
+        {
+            self.add_declaration_with_binding(
+                alias.into(),
+                definition,
+                &DeclaredAndInferredType::AreTheSame(submodule_type),
+            );
+            return;
         }
 
         self.add_unknown_declaration_with_binding(alias.into(), definition);
+
+        if &alias.name == "*" {
+            return;
+        }
+
+        if !self.is_reachable(import_from) {
+            return;
+        }
+
+        let Some(builder) = self
+            .context
+            .report_lint(&UNRESOLVED_IMPORT, AnyNodeRef::Alias(alias))
+        else {
+            return;
+        };
+
+        let diagnostic = builder.into_diagnostic(format_args!(
+            "Module `{module_name}` has no member `{name}`"
+        ));
+
+        if let Some(full_submodule_name) = full_submodule_name {
+            hint_if_stdlib_submodule_exists_on_other_versions(
+                self.db(),
+                diagnostic,
+                &full_submodule_name,
+                &module,
+            );
+        }
     }
 
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
@@ -4242,7 +4266,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn module_type_from_name(&self, module_name: &ModuleName) -> Option<Type<'db>> {
         resolve_module(self.db(), module_name)
-            .map(|module| Type::module_literal(self.db(), self.file(), module))
+            .map(|module| Type::module_literal(self.db(), self.file(), &module))
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {

@@ -189,6 +189,7 @@ python-version = "3.10"
 ```py
 import tomllib  # error: [unresolved-import]
 from string.templatelib import Template  # error: [unresolved-import]
+from importlib.resources import abc  # error: [unresolved-import]
 ```
 
 ## Attempting to import a stdlib module that was previously removed
