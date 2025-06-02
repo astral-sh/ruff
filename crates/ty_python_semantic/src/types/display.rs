@@ -255,9 +255,8 @@ impl Display for DisplayFunctionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let signature = self.ty.signature(self.db);
 
-        // TODO: when generic function types are supported, we should add
-        // the generic type parameters to the signature, i.e.
-        // show `def foo[T](x: T) -> T`.
+        // TODO: We should consider adding the type parameters to the signature of a generic
+        // function, i.e. `def foo[T](x: T) -> T`.
 
         match signature.overloads.as_slice() {
             [signature] => {
