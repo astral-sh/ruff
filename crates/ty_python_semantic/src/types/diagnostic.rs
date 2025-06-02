@@ -5,7 +5,6 @@ use super::{
     CallArgumentTypes, CallDunderError, ClassBase, ClassLiteral, KnownClass,
     add_inferred_python_version_hint_to_diagnostic,
 };
-use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
 use crate::types::LintDiagnosticGuard;
@@ -16,6 +15,7 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
+use crate::{Db, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -2139,4 +2139,52 @@ fn report_invalid_base<'ctx, 'db>(
         class.name(context.db())
     ));
     Some(diagnostic)
+}
+
+/// This function receives an unresolved `from foo import bar` import,
+/// where `foo` can be resolved to a module but that module does not
+/// have a `bar` member or submdoule.
+///
+/// If the `foo` module originates from the standard library and `foo.bar`
+/// *does* exist as a submodule in the standard library on *other* Python
+/// versions, we add a hint to the diagnostic that the user may have
+/// misconfigured their Python version.
+pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
+    db: &dyn Db,
+    mut diagnostic: LintDiagnosticGuard,
+    full_submodule_name: &ModuleName,
+    parent_module: &Module,
+) {
+    let Some(search_path) = parent_module.search_path() else {
+        return;
+    };
+
+    if !search_path.is_standard_library() {
+        return;
+    }
+
+    let program = Program::get(db);
+    let typeshed_versions = program.search_paths(db).typeshed_versions();
+
+    let Some(version_range) = typeshed_versions.exact(full_submodule_name) else {
+        return;
+    };
+
+    let python_version = program.python_version(db);
+    if version_range.contains(python_version) {
+        return;
+    }
+
+    diagnostic.info(format_args!(
+        "The stdlib module `{module_name}` only has a `{name}` \
+            submodule on Python {version_range}",
+        module_name = parent_module.name(),
+        name = full_submodule_name
+            .components()
+            .next_back()
+            .expect("A `ModuleName` always has at least one component"),
+        version_range = version_range.diagnostic_display(),
+    ));
+
+    add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving modules");
 }

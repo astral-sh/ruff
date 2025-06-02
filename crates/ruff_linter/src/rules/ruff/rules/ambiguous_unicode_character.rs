@@ -3,7 +3,7 @@ use std::fmt;
 use bitflags::bitflags;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, StringLike};
+use ruff_python_ast::{self as ast, FString, StringLike, TString};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -211,8 +211,9 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like:
                 }
             }
             ast::StringLikePart::Bytes(_) => {}
-            ast::StringLikePart::FString(f_string) => {
-                for literal in f_string.elements.literals() {
+            ast::StringLikePart::FString(FString { elements, .. })
+            | ast::StringLikePart::TString(TString { elements, .. }) => {
+                for literal in elements.literals() {
                     let text = checker.locator().slice(literal);
                     for candidate in
                         ambiguous_unicode_character(text, literal.range(), checker.settings)

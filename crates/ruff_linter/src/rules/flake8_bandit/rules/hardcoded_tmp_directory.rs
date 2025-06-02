@@ -75,7 +75,10 @@ pub(crate) fn hardcoded_tmp_directory(checker: &Checker, string: StringLike) {
                 }
             }
         }
+        // These are not actually strings
         StringLike::Bytes(_) => (),
+        // TODO(dylan) - verify that we should skip these
+        StringLike::TString(_) => (),
     }
 }
 

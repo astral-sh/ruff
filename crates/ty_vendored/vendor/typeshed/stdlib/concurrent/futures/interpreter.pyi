@@ -1,7 +1,7 @@
 import sys
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
-from typing import Final, Literal, Protocol, overload, type_check_only
+from typing import Literal, Protocol, overload, type_check_only
 from typing_extensions import ParamSpec, Self, TypeAlias, TypeVar, TypeVarTuple, Unpack
 
 _Task: TypeAlias = tuple[bytes, Literal["function", "script"]]
@@ -36,8 +36,6 @@ if sys.version_info >= (3, 14):
 
     class ExecutionFailed(InterpreterError):
         def __init__(self, excinfo: _ExcInfo) -> None: ...  #  type: ignore[override]
-
-    UNBOUND: Final = 2
 
     class WorkerContext(ThreadWorkerContext):
         # Parent class doesn't have `shared` argument,

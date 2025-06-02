@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
 expression: suite
-snapshot_kind: text
 ---
 [
     Expr(
@@ -17,13 +16,13 @@ snapshot_kind: text
                                     range: 0..9,
                                     elements: [
                                         Literal(
-                                            FStringLiteralElement {
+                                            InterpolatedStringLiteralElement {
                                                 range: 3..5,
                                                 value: "\\\n",
                                             },
                                         ),
-                                        Expression(
-                                            FStringExpressionElement {
+                                        Interpolation(
+                                            InterpolatedElement {
                                                 range: 5..8,
                                                 expression: Name(
                                                     ExprName {

@@ -85,23 +85,23 @@ impl ast::ExprCompare {
     }
 }
 
-impl ast::FStringFormatSpec {
+impl ast::InterpolatedStringFormatSpec {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         for element in &self.elements {
-            visitor.visit_f_string_element(element);
+            visitor.visit_interpolated_string_element(element);
         }
     }
 }
 
-impl ast::FStringExpressionElement {
+impl ast::InterpolatedElement {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::FStringExpressionElement {
+        let ast::InterpolatedElement {
             expression,
             format_spec,
             ..
@@ -110,18 +110,18 @@ impl ast::FStringExpressionElement {
 
         if let Some(format_spec) = format_spec {
             for spec_part in &format_spec.elements {
-                visitor.visit_f_string_element(spec_part);
+                visitor.visit_interpolated_string_element(spec_part);
             }
         }
     }
 }
 
-impl ast::FStringLiteralElement {
+impl ast::InterpolatedStringLiteralElement {
     pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::FStringLiteralElement { range: _, value: _ } = self;
+        let ast::InterpolatedStringLiteralElement { range: _, value: _ } = self;
     }
 }
 
@@ -139,6 +139,29 @@ impl ast::ExprFString {
                 }
                 ast::FStringPart::FString(f_string) => {
                     visitor.visit_f_string(f_string);
+                }
+            }
+        }
+    }
+}
+
+impl ast::ExprTString {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprTString { value, range: _ } = self;
+
+        for t_string_part in value {
+            match t_string_part {
+                ast::TStringPart::Literal(string_literal) => {
+                    visitor.visit_string_literal(string_literal);
+                }
+                ast::TStringPart::FString(f_string) => {
+                    visitor.visit_f_string(f_string);
+                }
+                ast::TStringPart::TString(t_string) => {
+                    visitor.visit_t_string(t_string);
                 }
             }
         }
@@ -615,7 +638,24 @@ impl ast::FString {
         } = self;
 
         for fstring_element in elements {
-            visitor.visit_f_string_element(fstring_element);
+            visitor.visit_interpolated_string_element(fstring_element);
+        }
+    }
+}
+
+impl ast::TString {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ast::TString {
+            elements,
+            range: _,
+            flags: _,
+        } = self;
+
+        for tstring_element in elements {
+            visitor.visit_interpolated_string_element(tstring_element);
         }
     }
 }

@@ -823,7 +823,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::PropertyInstance(..))
     }
 
-    pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: Module) -> Self {
+    pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: &Module) -> Self {
         Self::ModuleLiteral(ModuleLiteralType::new(db, importing_file, submodule))
     }
 
@@ -1634,6 +1634,13 @@ impl<'db> Type<'db> {
                 } else {
                     false
                 }
+            }
+
+            _ if self
+                .literal_fallback_instance(db)
+                .is_some_and(|instance| instance.is_assignable_to(db, target)) =>
+            {
+                true
             }
 
             (Type::ClassLiteral(class_literal), Type::Callable(_)) => {
@@ -7470,7 +7477,7 @@ impl<'db> ModuleLiteralType<'db> {
             full_submodule_name.extend(&submodule_name);
             if imported_submodules.contains(&full_submodule_name) {
                 if let Some(submodule) = resolve_module(db, &full_submodule_name) {
-                    return Symbol::bound(Type::module_literal(db, importing_file, submodule));
+                    return Symbol::bound(Type::module_literal(db, importing_file, &submodule));
                 }
             }
         }
@@ -8476,7 +8483,7 @@ impl<'db> BoundSuperType<'db> {
 // Make sure that the `Type` enum does not grow unexpectedly.
 #[cfg(not(debug_assertions))]
 #[cfg(target_pointer_width = "64")]
-static_assertions::assert_eq_size!(Type, [u8; 24]);
+static_assertions::assert_eq_size!(Type, [u8; 16]);
 
 #[cfg(test)]
 pub(crate) mod tests {

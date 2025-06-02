@@ -444,7 +444,10 @@ pub(crate) fn check_string_quotes(checker: &Checker, string_like: StringLike) {
     }
 
     // TODO(dhruvmanila): Support checking for escaped quotes in f-strings.
-    if checker.semantic().in_f_string_replacement_field() {
+    if checker
+        .semantic()
+        .in_interpolated_string_replacement_field()
+    {
         return;
     }
 

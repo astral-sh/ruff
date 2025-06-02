@@ -252,6 +252,7 @@ fn is_allowed_value(expr: &Expr) -> bool {
         | Expr::Compare(_)
         | Expr::Call(_)
         | Expr::FString(_)
+        | Expr::TString(_)
         | Expr::StringLiteral(_)
         | Expr::BytesLiteral(_)
         | Expr::NumberLiteral(_)

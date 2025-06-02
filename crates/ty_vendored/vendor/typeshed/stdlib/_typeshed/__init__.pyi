@@ -298,9 +298,6 @@ class SupportsGetItemBuffer(SliceableBuffer, IndexableBuffer, Protocol):
 
 class SizedBuffer(Sized, Buffer, Protocol): ...
 
-# for compatibility with third-party stubs that may use this
-_BufferWithLen: TypeAlias = SizedBuffer  # not stable  # noqa: Y047
-
 ExcInfo: TypeAlias = tuple[type[BaseException], BaseException, TracebackType]
 OptExcInfo: TypeAlias = ExcInfo | tuple[None, None, None]
 

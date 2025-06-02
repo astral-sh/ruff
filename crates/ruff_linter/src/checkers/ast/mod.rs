@@ -37,8 +37,8 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern,
-    PythonVersion, Stmt, Suite, UnaryOp,
+    ExprContext, InterpolatedStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters,
+    Pattern, PythonVersion, Stmt, Suite, UnaryOp,
 };
 use ruff_python_ast::{PySourceType, helpers, str, visitor};
 use ruff_python_codegen::{Generator, Stylist};
@@ -338,6 +338,7 @@ impl<'a> Checker<'a> {
         ast::BytesLiteralFlags::empty().with_quote_style(self.preferred_quote())
     }
 
+    // TODO(dylan) add similar method for t-strings
     /// Return the default f-string flags a generated `FString` node should use, given where we are
     /// in the AST.
     pub(crate) fn default_fstring_flags(&self) -> ast::FStringFlags {
@@ -1897,6 +1898,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.flags |= SemanticModelFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
+            Expr::TString(_) => {
+                self.semantic.flags |= SemanticModelFlags::T_STRING;
+                visitor::walk_expr(self, expr);
+            }
             Expr::Named(ast::ExprNamed {
                 target,
                 value,
@@ -1930,6 +1935,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
             Expr::BytesLiteral(bytes_literal) => analyze::string_like(bytes_literal.into(), self),
             Expr::FString(f_string) => analyze::string_like(f_string.into(), self),
+            Expr::TString(t_string) => analyze::string_like(t_string.into(), self),
             _ => {}
         }
 
@@ -2119,12 +2125,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
     }
 
-    fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement) {
+    fn visit_interpolated_string_element(
+        &mut self,
+        interpolated_string_element: &'a InterpolatedStringElement,
+    ) {
         let snapshot = self.semantic.flags;
-        if f_string_element.is_expression() {
-            self.semantic.flags |= SemanticModelFlags::F_STRING_REPLACEMENT_FIELD;
+        if interpolated_string_element.is_interpolation() {
+            self.semantic.flags |= SemanticModelFlags::INTERPOLATED_STRING_REPLACEMENT_FIELD;
         }
-        visitor::walk_f_string_element(self, f_string_element);
+        visitor::walk_interpolated_string_element(self, interpolated_string_element);
         self.semantic.flags = snapshot;
     }
 }
