@@ -33,7 +33,7 @@ name = "formatter"
 harness = false
 
 [[bench]]
-name = "red_knot"
+name = "ty"
 harness = false
 
 [dependencies]
@@ -49,7 +49,7 @@ ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
-red_knot_project = { workspace = true }
+ty_project = { workspace = true }
 
 [lints]
 workspace = true

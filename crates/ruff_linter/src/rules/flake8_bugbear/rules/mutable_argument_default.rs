@@ -1,21 +1,21 @@
 use std::fmt::Write;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Parameter};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
-use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
 use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of mutable objects as function argument defaults.
@@ -68,6 +68,12 @@ use crate::Locator;
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
 ///
+/// ## Fix safety
+///
+/// This fix is marked as unsafe because it replaces the mutable default with `None`
+/// and initializes it in the function body, which may not be what the user intended,
+/// as described above.
+///
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
 #[derive(ViolationMetadata)]
@@ -111,7 +117,7 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
                 is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
             })
         {
-            let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
+            let mut diagnostic = checker.report_diagnostic(MutableArgumentDefault, default.range());
 
             // If the function body is on the same line as the function def, do not fix
             if let Some(fix) = move_initialization(
@@ -126,14 +132,13 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
             ) {
                 diagnostic.set_fix(fix);
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 }
 
 /// Generate a [`Fix`] to move a mutable argument default initialization
 /// into the function body.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn move_initialization(
     function_def: &ast::StmtFunctionDef,
     parameter: &Parameter,

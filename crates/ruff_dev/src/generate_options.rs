@@ -4,9 +4,9 @@
 use itertools::Itertools;
 use std::fmt::Write;
 
+use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
 use ruff_python_trivia::textwrap;
 use ruff_workspace::options::Options;
-use ruff_workspace::options_base::{OptionField, OptionSet, OptionsMetadata, Visit};
 
 pub(crate) fn generate() -> String {
     let mut output = String::new();
@@ -100,8 +100,8 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     if parents_anchor.is_empty() {
         let _ = writeln!(output, "{header_level} [`{name}`](#{name}) {{: #{name} }}");
     } else {
-        let _ =
-            writeln!(output,
+        let _ = writeln!(
+            output,
             "{header_level} [`{name}`](#{parents_anchor}_{name}) {{: #{parents_anchor}_{name} }}"
         );
 

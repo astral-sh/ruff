@@ -1,8 +1,7 @@
 use anyhow::Result;
 use itertools::Itertools;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -10,6 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for the use of `sum()` to flatten lists of lists, which has
@@ -45,6 +45,14 @@ use crate::importer::ImportRequest;
 /// lists = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
 /// functools.reduce(operator.iadd, lists, [])
 /// ```
+///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because `sum` uses the `__add__` magic method while
+/// `operator.iadd` uses the `__iadd__` magic method, and these behave differently on lists.
+/// The former requires the right summand to be a list, whereas the latter allows for any iterable.
+/// Therefore, the fix could inadvertently cause code that previously raised an error to silently
+/// succeed. Moreover, the fix could remove comments from the original code.
 ///
 /// ## References
 /// - [_How Not to Flatten a List of Lists in Python_](https://mathieularose.com/how-not-to-flatten-a-list-of-lists-in-python)
@@ -87,9 +95,8 @@ pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(QuadraticListSummation, *range);
+    let mut diagnostic = checker.report_diagnostic(QuadraticListSummation, *range);
     diagnostic.try_set_fix(|| convert_to_reduce(iterable, call, checker));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Generate a [`Fix`] to convert a `sum()` call to a `functools.reduce()` call.

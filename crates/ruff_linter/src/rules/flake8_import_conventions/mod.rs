@@ -11,7 +11,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::rules::flake8_import_conventions::settings::{default_aliases, BannedAliases};
+    use crate::rules::flake8_import_conventions::settings::{BannedAliases, default_aliases};
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 

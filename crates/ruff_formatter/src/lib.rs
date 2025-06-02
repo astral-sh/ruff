@@ -38,7 +38,7 @@ use crate::prelude::TagKind;
 use std::fmt;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
-use std::num::{NonZeroU16, NonZeroU8, TryFromIntError};
+use std::num::{NonZeroU8, NonZeroU16, TryFromIntError};
 
 use crate::format_element::document::Document;
 use crate::printer::{Printer, PrinterOptions};
@@ -50,7 +50,7 @@ pub use builders::BestFitting;
 pub use source_code::{SourceCode, SourceCodeSlice};
 
 pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, PrintError};
-pub use format_element::{normalize_newlines, FormatElement, LINE_TERMINATORS};
+pub use format_element::{FormatElement, LINE_TERMINATORS, normalize_newlines};
 pub use group_id::GroupId;
 use ruff_macros::CacheKey;
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -92,7 +92,7 @@ impl std::fmt::Display for IndentStyle {
     }
 }
 
-/// The visual width of a indentation.
+/// The visual width of an indentation.
 ///
 /// Determines the visual width of a tab character (`\t`) and the number of
 /// spaces per indent when using [`IndentStyle::Space`].
@@ -207,7 +207,7 @@ pub trait FormatOptions {
     /// What's the max width of a line. Defaults to 80.
     fn line_width(&self) -> LineWidth;
 
-    /// Derives the print options from the these format options
+    /// Derives the print options from these format options
     fn as_print_options(&self) -> PrinterOptions;
 }
 
@@ -925,7 +925,7 @@ pub struct FormatState<Context> {
     group_id_builder: UniqueGroupIdBuilder,
 }
 
-#[allow(clippy::missing_fields_in_debug)]
+#[expect(clippy::missing_fields_in_debug)]
 impl<Context> std::fmt::Debug for FormatState<Context>
 where
     Context: std::fmt::Debug,

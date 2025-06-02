@@ -244,7 +244,6 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
     }
 
     /// Returns `true` if `key` has any *leading*, *dangling*, or *trailing* parts.
-    #[allow(unused)]
     pub(super) fn has(&self, key: &K) -> bool {
         self.index.contains_key(key)
     }
@@ -542,7 +541,7 @@ impl PartIndex {
         // OK because:
         // * The `value < u32::MAX` guarantees that the add doesn't overflow.
         // * The `+ 1` guarantees that the index is not zero
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         Self(std::num::NonZeroU32::new((value as u32) + 1).expect("valid value"))
     }
 

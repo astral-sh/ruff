@@ -4,12 +4,12 @@ use ruff_python_ast::StmtAugAssign;
 use crate::comments::SourceComment;
 use crate::expression::parentheses::is_expression_parenthesized;
 use crate::statement::stmt_assign::{
-    has_target_own_parentheses, AnyAssignmentOperator, AnyBeforeOperator,
-    FormatStatementsLastExpression,
+    AnyAssignmentOperator, AnyBeforeOperator, FormatStatementsLastExpression,
+    has_target_own_parentheses,
 };
 use crate::statement::trailing_semicolon;
-use crate::{has_skip_comment, prelude::*};
 use crate::{AsFormat, FormatNodeRule};
+use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
 pub struct FormatStmtAugAssign;

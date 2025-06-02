@@ -1,14 +1,14 @@
 use ast::FStringFlags;
 use itertools::Itertools;
 
-use crate::fix::edits::pad;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use crate::rules::flynt::helpers;
 
@@ -27,6 +27,14 @@ use crate::rules::flynt::helpers;
 /// ```python
 /// f"{foo} {bar}"
 /// ```
+///
+/// # Fix safety
+/// The fix is always marked unsafe because the evaluation of the f-string
+/// expressions will default to calling the `__format__` method of each
+/// object, whereas `str.join` expects each object to be an instance of
+/// `str` and uses the corresponding string. Therefore it is possible for
+/// the values of the resulting strings to differ, or for one expression
+/// to raise an exception while the other does not.
 ///
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
@@ -97,9 +105,9 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
             return None;
         }
         if !std::mem::take(&mut first) {
-            f_string_elements.push(helpers::to_f_string_literal_element(joiner));
+            f_string_elements.push(helpers::to_interpolated_string_literal_element(joiner));
         }
-        f_string_elements.push(helpers::to_f_string_element(expr)?);
+        f_string_elements.push(helpers::to_interpolated_string_element(expr)?);
     }
 
     let node = ast::FString {
@@ -144,7 +152,7 @@ pub(crate) fn static_join_to_fstring(checker: &Checker, expr: &Expr, joiner: &st
 
     let contents = checker.generator().expr(&new_expr);
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         StaticJoinToFString {
             expression: SourceCodeSnippet::new(contents.clone()),
         },
@@ -154,5 +162,4 @@ pub(crate) fn static_join_to_fstring(checker: &Checker, expr: &Expr, joiner: &st
         pad(contents, expr.range(), checker.locator()),
         expr.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

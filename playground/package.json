@@ -5,15 +5,15 @@
   "type": "module",
   "scripts": {
     "check": "npm run dev:wasm && npm run lint && npm run tsc",
-    "dev:wasm": "npm run dev:wasm --workspace knot-playground && npm run dev:wasm --workspace ruff-playground",
-    "dev:build": "npm run dev:build --workspace knot-playground && npm run dev:build --workspace ruff-playground",
+    "dev:wasm": "npm run dev:wasm --workspace ty-playground && npm run dev:wasm --workspace ruff-playground",
+    "dev:build": "npm run dev:build --workspace ty-playground && npm run dev:build --workspace ruff-playground",
     "fmt": "prettier --cache -w .",
     "fmt:check": "prettier --cache --check .",
-    "lint": "eslint --cache --ext .ts,.tsx ruff/src knot/src",
+    "lint": "eslint --cache --ext .ts,.tsx ruff/src ty/src",
     "tsc": "tsc"
   },
   "workspaces": [
-    "knot",
+    "ty",
     "ruff",
     "shared"
   ],

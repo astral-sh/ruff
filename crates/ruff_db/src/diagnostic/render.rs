@@ -7,14 +7,17 @@ use ruff_annotate_snippets::{
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
 use crate::{
-    files::File,
-    source::{line_index, source_text, SourceText},
     Db,
+    files::File,
+    source::{SourceText, line_index, source_text},
+    system::SystemPath,
 };
 
 use super::{
-    Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, Severity, SubDiagnostic,
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticSource, DisplayDiagnosticConfig, Severity,
+    SubDiagnostic,
 };
 
 /// A type that implements `std::fmt::Display` for diagnostic rendering.
@@ -28,17 +31,16 @@ use super::{
 ///   values. When using Salsa, this most commonly corresponds to the lifetime
 ///   of a Salsa `Db`.
 /// * The lifetime of the diagnostic being rendered.
-#[derive(Debug)]
 pub struct DisplayDiagnostic<'a> {
     config: &'a DisplayDiagnosticConfig,
-    resolver: FileResolver<'a>,
+    resolver: &'a dyn FileResolver,
     annotate_renderer: AnnotateRenderer,
     diag: &'a Diagnostic,
 }
 
 impl<'a> DisplayDiagnostic<'a> {
     pub(crate) fn new(
-        resolver: FileResolver<'a>,
+        resolver: &'a dyn FileResolver,
         config: &'a DisplayDiagnosticConfig,
         diag: &'a Diagnostic,
     ) -> DisplayDiagnostic<'a> {
@@ -47,6 +49,7 @@ impl<'a> DisplayDiagnostic<'a> {
         } else {
             AnnotateRenderer::plain()
         };
+
         DisplayDiagnostic {
             config,
             resolver,
@@ -58,31 +61,66 @@ impl<'a> DisplayDiagnostic<'a> {
 
 impl std::fmt::Display for DisplayDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if matches!(self.config.format, DiagnosticFormat::Concise) {
-            match self.diag.severity() {
-                Severity::Info => f.write_str("info")?,
-                Severity::Warning => f.write_str("warning")?,
-                Severity::Error => f.write_str("error")?,
-                Severity::Fatal => f.write_str("fatal")?,
-            }
+        let stylesheet = if self.config.color {
+            DiagnosticStylesheet::styled()
+        } else {
+            DiagnosticStylesheet::plain()
+        };
 
-            write!(f, "[{rule}]", rule = self.diag.id())?;
+        if matches!(self.config.format, DiagnosticFormat::Concise) {
+            let (severity, severity_style) = match self.diag.severity() {
+                Severity::Info => ("info", stylesheet.info),
+                Severity::Warning => ("warning", stylesheet.warning),
+                Severity::Error => ("error", stylesheet.error),
+                Severity::Fatal => ("fatal", stylesheet.error),
+            };
+
+            write!(
+                f,
+                "{severity}[{id}]",
+                severity = fmt_styled(severity, severity_style),
+                id = fmt_styled(self.diag.id(), stylesheet.emphasis)
+            )?;
+
             if let Some(span) = self.diag.primary_span() {
-                write!(f, " {path}", path = self.resolver.path(span.file()))?;
+                write!(
+                    f,
+                    " {path}",
+                    path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
+                )?;
                 if let Some(range) = span.range() {
-                    let input = self.resolver.input(span.file());
-                    let start = input.as_source_code().source_location(range.start());
-                    write!(f, ":{line}:{col}", line = start.row, col = start.column)?;
+                    let diagnostic_source = span.file().diagnostic_source(self.resolver);
+                    let start = diagnostic_source
+                        .as_source_code()
+                        .line_column(range.start());
+
+                    write!(
+                        f,
+                        ":{line}:{col}",
+                        line = fmt_styled(start.line, stylesheet.emphasis),
+                        col = fmt_styled(start.column, stylesheet.emphasis),
+                    )?;
                 }
                 write!(f, ":")?;
             }
-            return writeln!(f, " {}", self.diag.concise_message());
+            return writeln!(f, " {message}", message = self.diag.concise_message());
         }
 
-        let resolved = Resolved::new(&self.resolver, self.diag);
+        let mut renderer = self.annotate_renderer.clone();
+        renderer = renderer
+            .error(stylesheet.error)
+            .warning(stylesheet.warning)
+            .info(stylesheet.info)
+            .note(stylesheet.note)
+            .help(stylesheet.help)
+            .line_no(stylesheet.line_no)
+            .emphasis(stylesheet.emphasis)
+            .none(stylesheet.none);
+
+        let resolved = Resolved::new(self.resolver, self.diag);
         let renderable = resolved.to_renderable(self.config.context);
         for diag in renderable.diagnostics.iter() {
-            writeln!(f, "{}", self.annotate_renderer.render(diag.to_annotate()))?;
+            writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
         }
         writeln!(f)
     }
@@ -102,26 +140,23 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
 /// both.)
 #[derive(Debug)]
 struct Resolved<'a> {
-    id: String,
     diagnostics: Vec<ResolvedDiagnostic<'a>>,
 }
 
 impl<'a> Resolved<'a> {
     /// Creates a new resolved set of diagnostics.
-    fn new(resolver: &FileResolver<'a>, diag: &'a Diagnostic) -> Resolved<'a> {
+    fn new(resolver: &'a dyn FileResolver, diag: &'a Diagnostic) -> Resolved<'a> {
         let mut diagnostics = vec![];
         diagnostics.push(ResolvedDiagnostic::from_diagnostic(resolver, diag));
         for sub in &diag.inner.subs {
             diagnostics.push(ResolvedDiagnostic::from_sub_diagnostic(resolver, sub));
         }
-        let id = diag.inner.id.to_string();
-        Resolved { id, diagnostics }
+        Resolved { diagnostics }
     }
 
     /// Creates a value that is amenable to rendering directly.
     fn to_renderable(&self, context: usize) -> Renderable<'_> {
         Renderable {
-            id: &self.id,
             diagnostics: self
                 .diagnostics
                 .iter()
@@ -139,6 +174,7 @@ impl<'a> Resolved<'a> {
 #[derive(Debug)]
 struct ResolvedDiagnostic<'a> {
     severity: Severity,
+    id: Option<String>,
     message: String,
     annotations: Vec<ResolvedAnnotation<'a>>,
 }
@@ -146,7 +182,7 @@ struct ResolvedDiagnostic<'a> {
 impl<'a> ResolvedDiagnostic<'a> {
     /// Resolve a single diagnostic.
     fn from_diagnostic(
-        resolver: &FileResolver<'a>,
+        resolver: &'a dyn FileResolver,
         diag: &'a Diagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
@@ -154,25 +190,16 @@ impl<'a> ResolvedDiagnostic<'a> {
             .annotations
             .iter()
             .filter_map(|ann| {
-                let path = resolver.path(ann.span.file);
-                let input = resolver.input(ann.span.file);
-                ResolvedAnnotation::new(path, &input, ann)
+                let path = ann.span.file.path(resolver);
+                let diagnostic_source = ann.span.file.diagnostic_source(resolver);
+                ResolvedAnnotation::new(path, &diagnostic_source, ann)
             })
             .collect();
-        let message = if diag.inner.message.as_str().is_empty() {
-            diag.inner.id.to_string()
-        } else {
-            // TODO: See the comment on `Renderable::id` for
-            // a plausible better idea than smushing the ID
-            // into the diagnostic message.
-            format!(
-                "{id}: {message}",
-                id = diag.inner.id,
-                message = diag.inner.message.as_str(),
-            )
-        };
+        let id = Some(diag.inner.id.to_string());
+        let message = diag.inner.message.as_str().to_string();
         ResolvedDiagnostic {
             severity: diag.inner.severity,
+            id,
             message,
             annotations,
         }
@@ -180,7 +207,7 @@ impl<'a> ResolvedDiagnostic<'a> {
 
     /// Resolve a single sub-diagnostic.
     fn from_sub_diagnostic(
-        resolver: &FileResolver<'a>,
+        resolver: &'a dyn FileResolver,
         diag: &'a SubDiagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
@@ -188,13 +215,14 @@ impl<'a> ResolvedDiagnostic<'a> {
             .annotations
             .iter()
             .filter_map(|ann| {
-                let path = resolver.path(ann.span.file);
-                let input = resolver.input(ann.span.file);
-                ResolvedAnnotation::new(path, &input, ann)
+                let path = ann.span.file.path(resolver);
+                let diagnostic_source = ann.span.file.diagnostic_source(resolver);
+                ResolvedAnnotation::new(path, &diagnostic_source, ann)
             })
             .collect();
         ResolvedDiagnostic {
             severity: diag.inner.severity,
+            id: None,
             message: diag.inner.message.as_str().to_string(),
             annotations,
         }
@@ -223,10 +251,18 @@ impl<'a> ResolvedDiagnostic<'a> {
                     continue;
                 };
 
-                let prev_context_ends =
-                    context_after(&prev.input.as_source_code(), context, prev.line_end).get();
-                let this_context_begins =
-                    context_before(&ann.input.as_source_code(), context, ann.line_start).get();
+                let prev_context_ends = context_after(
+                    &prev.diagnostic_source.as_source_code(),
+                    context,
+                    prev.line_end,
+                )
+                .get();
+                let this_context_begins = context_before(
+                    &ann.diagnostic_source.as_source_code(),
+                    context,
+                    ann.line_start,
+                )
+                .get();
                 // The boundary case here is when `prev_context_ends`
                 // is exactly one less than `this_context_begins`. In
                 // that case, the context windows are adajcent and we
@@ -253,6 +289,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             .sort_by(|snips1, snips2| snips1.has_primary.cmp(&snips2.has_primary).reverse());
         RenderableDiagnostic {
             severity: self.severity,
+            id: self.id.as_deref(),
             message: &self.message,
             snippets_by_input,
         }
@@ -268,7 +305,7 @@ impl<'a> ResolvedDiagnostic<'a> {
 #[derive(Debug)]
 struct ResolvedAnnotation<'a> {
     path: &'a str,
-    input: Input,
+    diagnostic_source: DiagnosticSource,
     range: TextRange,
     line_start: OneIndexed,
     line_end: OneIndexed,
@@ -282,8 +319,12 @@ impl<'a> ResolvedAnnotation<'a> {
     /// `path` is the path of the file that this annotation points to.
     ///
     /// `input` is the contents of the file that this annotation points to.
-    fn new(path: &'a str, input: &Input, ann: &'a Annotation) -> Option<ResolvedAnnotation<'a>> {
-        let source = input.as_source_code();
+    fn new(
+        path: &'a str,
+        diagnostic_source: &DiagnosticSource,
+        ann: &'a Annotation,
+    ) -> Option<ResolvedAnnotation<'a>> {
+        let source = diagnostic_source.as_source_code();
         let (range, line_start, line_end) = match (ann.span.range(), ann.message.is_some()) {
             // An annotation with no range AND no message is probably(?)
             // meaningless, but we should try to render it anyway.
@@ -309,7 +350,7 @@ impl<'a> ResolvedAnnotation<'a> {
         };
         Some(ResolvedAnnotation {
             path,
-            input: input.clone(),
+            diagnostic_source: diagnostic_source.clone(),
             range,
             line_start,
             line_end,
@@ -328,20 +369,6 @@ impl<'a> ResolvedAnnotation<'a> {
 /// renderable value. This is usually the lifetime of `Resolved`.
 #[derive(Debug)]
 struct Renderable<'r> {
-    // TODO: This is currently unused in the rendering logic below. I'm not
-    // 100% sure yet where I want to put it, but I like what `rustc` does:
-    //
-    //     error[E0599]: no method named `sub_builder` <..snip..>
-    //
-    // I believe in order to do this, we'll need to patch it in to
-    // `ruff_annotate_snippets` though. We leave it here for now with that plan
-    // in mind.
-    //
-    // (At time of writing, 2025-03-13, we currently render the diagnostic
-    // ID into the main message of the parent diagnostic. We don't use this
-    // specific field to do that though.)
-    #[allow(dead_code)]
-    id: &'r str,
     diagnostics: Vec<RenderableDiagnostic<'r>>,
 }
 
@@ -350,6 +377,12 @@ struct Renderable<'r> {
 struct RenderableDiagnostic<'r> {
     /// The severity of the diagnostic.
     severity: Severity,
+    /// The ID of the diagnostic. The ID can usually be used on the CLI or in a
+    /// config file to change the severity of a lint.
+    ///
+    /// An ID is always present for top-level diagnostics and always absent for
+    /// sub-diagnostics.
+    id: Option<&'r str>,
     /// The message emitted with the diagnostic, before any snippets are
     /// rendered.
     message: &'r str,
@@ -370,7 +403,11 @@ impl RenderableDiagnostic<'_> {
                 .iter()
                 .map(|snippet| snippet.to_annotate(path))
         });
-        level.title(self.message).snippets(snippets)
+        let mut message = level.title(self.message);
+        if let Some(id) = self.id {
+            message = message.id(id);
+        }
+        message.snippets(snippets)
     }
 }
 
@@ -474,8 +511,8 @@ impl<'r> RenderableSnippet<'r> {
             !anns.is_empty(),
             "creating a renderable snippet requires a non-zero number of annotations",
         );
-        let input = &anns[0].input;
-        let source = input.as_source_code();
+        let diagnostic_source = &anns[0].diagnostic_source;
+        let source = diagnostic_source.as_source_code();
         let has_primary = anns.iter().any(|ann| ann.is_primary);
 
         let line_start = context_before(
@@ -491,7 +528,7 @@ impl<'r> RenderableSnippet<'r> {
 
         let snippet_start = source.line_start(line_start);
         let snippet_end = source.line_end(line_end);
-        let snippet = input
+        let snippet = diagnostic_source
             .as_source_code()
             .slice(TextRange::new(snippet_start, snippet_end));
 
@@ -577,7 +614,7 @@ impl<'r> RenderableAnnotation<'r> {
     }
 }
 
-/// A type that facilitates the retrieval of source code from a `Span`.
+/// A trait that facilitates the retrieval of source code from a `Span`.
 ///
 /// At present, this is tightly coupled with a Salsa database. In the future,
 /// it is intended for this resolver to become an abstraction providing a
@@ -588,37 +625,28 @@ impl<'r> RenderableAnnotation<'r> {
 /// For example, at time of writing (2025-03-07), the plan is (roughly) for
 /// Ruff to grow its own interner of file paths so that a `Span` can store an
 /// interned ID instead of a (roughly) `Arc<Path>`. This interner is planned
-/// to be entirely separate from the Salsa interner used by Red Knot, and so,
+/// to be entirely separate from the Salsa interner used by ty, and so,
 /// callers will need to pass in a different "resolver" for turning `Span`s
 /// into actual file paths/contents. The infrastructure for this isn't fully in
 /// place, but this type serves to demarcate the intended abstraction boundary.
-pub(crate) struct FileResolver<'a> {
-    db: &'a dyn Db,
-}
-
-impl<'a> FileResolver<'a> {
-    /// Creates a new resolver from a Salsa database.
-    pub(crate) fn new(db: &'a dyn Db) -> FileResolver<'a> {
-        FileResolver { db }
-    }
-
+pub trait FileResolver {
     /// Returns the path associated with the file given.
-    fn path(&self, file: File) -> &'a str {
-        file.path(self.db).as_str()
-    }
+    fn path(&self, file: File) -> &str;
 
     /// Returns the input contents associated with the file given.
-    fn input(&self, file: File) -> Input {
-        Input {
-            text: source_text(self.db, file),
-            line_index: line_index(self.db, file),
-        }
-    }
+    fn input(&self, file: File) -> Input;
 }
 
-impl std::fmt::Debug for FileResolver<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "<salsa based file resolver>")
+impl FileResolver for &dyn Db {
+    fn path(&self, file: File) -> &str {
+        relativize_path(self.system().current_directory(), file.path(*self).as_str())
+    }
+
+    fn input(&self, file: File) -> Input {
+        Input {
+            text: source_text(*self, file),
+            line_index: line_index(*self, file),
+        }
     }
 }
 
@@ -628,16 +656,9 @@ impl std::fmt::Debug for FileResolver<'_> {
 /// This contains the actual content of that input as well as a
 /// line index for efficiently querying its contents.
 #[derive(Clone, Debug)]
-struct Input {
-    text: SourceText,
-    line_index: LineIndex,
-}
-
-impl Input {
-    /// Returns this input as a `SourceCode` for convenient querying.
-    fn as_source_code(&self) -> SourceCode<'_, '_> {
-        SourceCode::new(self.text.as_str(), &self.line_index)
-    }
+pub struct Input {
+    pub(crate) text: SourceText,
+    pub(crate) line_index: LineIndex,
 }
 
 /// Returns the line number accounting for the given `len`
@@ -676,9 +697,18 @@ fn context_after(source: &SourceCode<'_, '_>, len: usize, start: OneIndexed) -> 
     line
 }
 
+/// Convert an absolute path to be relative to the current working directory.
+fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
+    if let Ok(path) = SystemPath::new(path).strip_prefix(cwd) {
+        return path.as_str();
+    }
+    path
+}
+
 #[cfg(test)]
 mod tests {
 
+    use crate::Upcast;
     use crate::diagnostic::{Annotation, DiagnosticId, Severity, Span};
     use crate::files::system_path_to_file;
     use crate::system::{DbWithWritableSystem, SystemPath};
@@ -756,8 +786,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:5:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:5:1
           |
         3 | canary
         4 | dog
@@ -780,8 +810,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        warning: lint:test-diagnostic: main diagnostic message
-         --> /animals:5:1
+        warning[test-diagnostic]: main diagnostic message
+         --> animals:5:1
           |
         3 | canary
         4 | dog
@@ -800,8 +830,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        info: lint:test-diagnostic: main diagnostic message
-         --> /animals:5:1
+        info[test-diagnostic]: main diagnostic message
+         --> animals:5:1
           |
         3 | canary
         4 | dog
@@ -827,8 +857,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:1:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:1:1
           |
         1 | aardvark
           | ^
@@ -846,8 +876,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:1:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:1:1
           |
         1 | aardvark
           | ^ primary annotation message
@@ -867,8 +897,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /non-ascii:5:1
+        error[test-diagnostic]: main diagnostic message
+         --> non-ascii:5:1
           |
         3 | ΔΔΔΔΔΔΔΔΔΔΔΔ
         4 | ββββββββββββ
@@ -886,8 +916,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /non-ascii:2:2
+        error[test-diagnostic]: main diagnostic message
+         --> non-ascii:2:2
           |
         1 | ☃☃☃☃☃☃☃☃☃☃☃☃
         2 | 💩💩💩💩💩💩💩💩💩💩💩💩
@@ -910,8 +940,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:5:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:5:1
           |
         4 | dog
         5 | elephant
@@ -927,8 +957,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:5:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:5:1
           |
         5 | elephant
           | ^^^^^^^^
@@ -942,8 +972,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:1:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:1:1
           |
         1 | aardvark
           | ^^^^^^^^
@@ -959,8 +989,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-          --> /animals:11:1
+        error[test-diagnostic]: main diagnostic message
+          --> animals:11:1
            |
          9 | inchworm
         10 | jackrabbit
@@ -976,8 +1006,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-          --> /animals:5:1
+        error[test-diagnostic]: main diagnostic message
+          --> animals:5:1
            |
          1 | aardvark
          2 | beetle
@@ -1009,15 +1039,15 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-          --> /animals:1:1
+        error[test-diagnostic]: main diagnostic message
+          --> animals:1:1
            |
          1 | aardvark
            | ^^^^^^^^
          2 | beetle
          3 | canary
            |
-          ::: /animals:11:1
+          ::: animals:11:1
            |
          9 | inchworm
         10 | jackrabbit
@@ -1053,8 +1083,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:1:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:1:1
           |
         1 | aardvark
           | ^^^^^^^^
@@ -1078,8 +1108,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:1:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:1:1
           |
         1 | aardvark
           | ^^^^^^^^
@@ -1106,14 +1136,14 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:1:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:1:1
           |
         1 | aardvark
           | ^^^^^^^^
         2 | beetle
           |
-         ::: /animals:5:1
+         ::: animals:5:1
           |
         4 | dog
         5 | elephant
@@ -1134,8 +1164,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:1:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:1:1
           |
         1 | aardvark
           | ^^^^^^^^
@@ -1159,8 +1189,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-          --> /animals:1:1
+        error[test-diagnostic]: main diagnostic message
+          --> animals:1:1
            |
          1 | aardvark
            | ^^^^^^^^
@@ -1190,8 +1220,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-          --> /animals:1:1
+        error[test-diagnostic]: main diagnostic message
+          --> animals:1:1
            |
          1 | aardvark
            | ^^^^^^^^
@@ -1199,7 +1229,7 @@ watermelon
          3 | canary
          4 | dog
            |
-          ::: /animals:9:1
+          ::: animals:9:1
            |
          6 | finch
          7 | gorilla
@@ -1228,8 +1258,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /spacey-animals:8:1
+        error[test-diagnostic]: main diagnostic message
+         --> spacey-animals:8:1
           |
         7 | dog
         8 | elephant
@@ -1245,8 +1275,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-          --> /spacey-animals:12:1
+        error[test-diagnostic]: main diagnostic message
+          --> spacey-animals:12:1
            |
         11 | gorilla
         12 | hippopotamus
@@ -1263,8 +1293,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-          --> /spacey-animals:13:1
+        error[test-diagnostic]: main diagnostic message
+          --> spacey-animals:13:1
            |
         11 | gorilla
         12 | hippopotamus
@@ -1303,13 +1333,13 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /spacey-animals:3:1
+        error[test-diagnostic]: main diagnostic message
+         --> spacey-animals:3:1
           |
         3 | beetle
           | ^^^^^^
           |
-         ::: /spacey-animals:5:1
+         ::: spacey-animals:5:1
           |
         5 | canary
           | ^^^^^^
@@ -1332,8 +1362,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:3:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:3:1
           |
         1 | aardvark
         2 | beetle
@@ -1342,7 +1372,7 @@ watermelon
         4 | dog
         5 | elephant
           |
-         ::: /fruits:3:1
+         ::: fruits:3:1
           |
         1 | apple
         2 | banana
@@ -1369,8 +1399,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:3:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:3:1
           |
         1 | aardvark
         2 | beetle
@@ -1406,8 +1436,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:3:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:3:1
           |
         1 | aardvark
         2 | beetle
@@ -1434,8 +1464,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:3:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:3:1
           |
         1 | aardvark
         2 | beetle
@@ -1445,7 +1475,7 @@ watermelon
         5 | elephant
           |
         warning: sub-diagnostic message
-         --> /fruits:3:1
+         --> fruits:3:1
           |
         1 | apple
         2 | banana
@@ -1470,8 +1500,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:3:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:3:1
           |
         1 | aardvark
         2 | beetle
@@ -1481,7 +1511,7 @@ watermelon
         5 | elephant
           |
         warning: sub-diagnostic message
-         --> /fruits:3:1
+         --> fruits:3:1
           |
         1 | apple
         2 | banana
@@ -1491,7 +1521,7 @@ watermelon
         5 | orange
           |
         warning: sub-diagnostic message
-          --> /animals:11:1
+          --> animals:11:1
            |
          9 | inchworm
         10 | jackrabbit
@@ -1509,8 +1539,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:3:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:3:1
           |
         1 | aardvark
         2 | beetle
@@ -1520,7 +1550,7 @@ watermelon
         5 | elephant
           |
         warning: sub-diagnostic message
-          --> /animals:11:1
+          --> animals:11:1
            |
          9 | inchworm
         10 | jackrabbit
@@ -1528,7 +1558,7 @@ watermelon
            | ^^^^^^^^
            |
         warning: sub-diagnostic message
-         --> /fruits:3:1
+         --> fruits:3:1
           |
         1 | apple
         2 | banana
@@ -1557,8 +1587,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:3:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:3:1
           |
         1 | aardvark
         2 | beetle
@@ -1568,7 +1598,7 @@ watermelon
         5 | elephant
           |
         warning: sub-diagnostic message
-         --> /animals:3:1
+         --> animals:3:1
           |
         1 | aardvark
         2 | beetle
@@ -1593,8 +1623,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:5:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:5:1
           |
         3 |   canary
         4 |   dog
@@ -1616,8 +1646,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:5:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:5:1
           |
         3 |   canary
         4 |   dog
@@ -1636,8 +1666,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:5:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:5:1
           |
         3 |   canary
         4 |   dog
@@ -1656,8 +1686,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-          --> /animals:5:4
+        error[test-diagnostic]: main diagnostic message
+          --> animals:5:4
            |
          3 |   canary
          4 |   dog
@@ -1678,8 +1708,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-          --> /animals:5:4
+        error[test-diagnostic]: main diagnostic message
+          --> animals:5:4
            |
          3 |   canary
          4 |   dog
@@ -1710,8 +1740,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:4:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:4:1
           |
         2 |    beetle
         3 |    canary
@@ -1739,8 +1769,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:4:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:4:1
           |
         2 |    beetle
         3 |    canary
@@ -1770,8 +1800,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:5:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:5:1
           |
         3 |    canary
         4 |    dog
@@ -1805,8 +1835,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:5:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:5:1
           |
         3 |    canary
         4 |    dog
@@ -1833,8 +1863,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:5:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:5:1
           |
         3 |    canary
         4 |    dog
@@ -1865,8 +1895,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:5:3
+        error[test-diagnostic]: main diagnostic message
+         --> animals:5:3
           |
         3 | canary
         4 | dog
@@ -1887,8 +1917,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:5:3
+        error[test-diagnostic]: main diagnostic message
+         --> animals:5:3
           |
         3 | canary
         4 | dog
@@ -1920,8 +1950,8 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-          --> /animals:8:1
+        error[test-diagnostic]: main diagnostic message
+          --> animals:8:1
            |
          6 | finch
          7 | gorilla
@@ -1930,7 +1960,7 @@ watermelon
          9 | inchworm
         10 | jackrabbit
            |
-          ::: /animals:1:1
+          ::: animals:1:1
            |
          1 | aardvark
            | -------- secondary
@@ -1960,28 +1990,28 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /animals:5:1
+        error[test-diagnostic]: main diagnostic message
+         --> animals:5:1
           |
         5 | elephant
           | ^^^^^^^^ primary 5
           |
-         ::: /animals:9:1
+         ::: animals:9:1
           |
         9 | inchworm
           | ^^^^^^^^ primary 9
           |
-         ::: /animals:1:1
+         ::: animals:1:1
           |
         1 | aardvark
           | -------- secondary 1
           |
-         ::: /animals:3:1
+         ::: animals:3:1
           |
         3 | canary
           | ------ secondary 3
           |
-         ::: /animals:7:1
+         ::: animals:7:1
           |
         7 | gorilla
           | ------- secondary 7
@@ -2004,15 +2034,15 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-         --> /fruits:1:1
+        error[test-diagnostic]: main diagnostic message
+         --> fruits:1:1
           |
         1 | apple
           | ^^^^^ primary
         2 | banana
         3 | cantelope
           |
-         ::: /animals:1:1
+         ::: animals:1:1
           |
         1 | aardvark
           | -------- secondary
@@ -2039,33 +2069,33 @@ watermelon
         insta::assert_snapshot!(
             env.render(&diag),
             @r"
-        error: lint:test-diagnostic: main diagnostic message
-          --> /animals:11:1
+        error[test-diagnostic]: main diagnostic message
+          --> animals:11:1
            |
         11 | kangaroo
            | ^^^^^^^^ primary animals 11
            |
-          ::: /animals:1:1
+          ::: animals:1:1
            |
          1 | aardvark
            | -------- secondary animals 1
            |
-          ::: /animals:3:1
+          ::: animals:3:1
            |
          3 | canary
            | ------ secondary animals 3
            |
-          ::: /animals:7:1
+          ::: animals:7:1
            |
          7 | gorilla
            | ------- secondary animals 7
            |
-          ::: /fruits:10:1
+          ::: fruits:10:1
            |
         10 | watermelon
            | ^^^^^^^^^^ primary fruits 10
            |
-          ::: /fruits:2:1
+          ::: fruits:2:1
            |
          2 | banana
            | ------ secondary fruits 2
@@ -2127,8 +2157,9 @@ watermelon
         fn span(&self, path: &str, line_offset_start: &str, line_offset_end: &str) -> Span {
             let span = self.path(path);
 
-            let text = source_text(&self.db, span.file());
-            let line_index = line_index(&self.db, span.file());
+            let file = span.expect_ty_file();
+            let text = source_text(&self.db, file);
+            let line_index = line_index(&self.db, file);
             let source = SourceCode::new(text.as_str(), &line_index);
 
             let (line_start, offset_start) = parse_line_offset(line_offset_start);
@@ -2190,7 +2221,7 @@ watermelon
         ///
         /// (This will set the "printed" flag on `Diagnostic`.)
         fn render(&self, diag: &Diagnostic) -> String {
-            diag.display(&self.db, &self.config).to_string()
+            diag.display(&self.db.upcast(), &self.config).to_string()
         }
     }
 

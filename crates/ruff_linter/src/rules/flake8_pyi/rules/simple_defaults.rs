@@ -1,14 +1,14 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Operator, Parameters, Stmt, UnaryOp};
-use ruff_python_semantic::{analyze::class::is_enumeration, ScopeKind, SemanticModel};
+use ruff_python_semantic::{ScopeKind, SemanticModel, analyze::class::is_enumeration};
 use ruff_text_size::Ranged;
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pyi::rules::TypingModule;
-use crate::Locator;
-use ruff_python_ast::PythonVersion;
+use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 
 /// ## What it does
 /// Checks for typed function arguments in stubs with complex default values.
@@ -190,7 +190,9 @@ impl Violation for UnassignedSpecialVariableInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnassignedSpecialVariableInStub { name } = self;
-        format!("`{name}` in a stub file must have a value, as it has the same semantics as `{name}` at runtime")
+        format!(
+            "`{name}` in a stub file must have a value, as it has the same semantics as `{name}` at runtime"
+        )
     }
 }
 
@@ -217,6 +219,16 @@ impl Violation for UnassignedSpecialVariableInStub {
 ///
 /// Vector: TypeAlias = list[float]
 /// ```
+///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for Python versions
+/// before 3.10, its diagnostic will not be emitted, and no fix will be offered, if
+/// `typing_extensions` imports have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
 pub(crate) struct TypeAliasWithoutAnnotation {
     module: TypingModule,
@@ -497,14 +509,13 @@ pub(crate) fn typed_argument_simple_defaults(checker: &Checker, parameters: &Par
                 checker.locator(),
                 checker.semantic(),
             ) {
-                let mut diagnostic = Diagnostic::new(TypedArgumentDefaultInStub, default.range());
+                let mut diagnostic =
+                    checker.report_diagnostic(TypedArgumentDefaultInStub, default.range());
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "...".to_string(),
                     default.range(),
                 )));
-
-                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -523,14 +534,13 @@ pub(crate) fn argument_simple_defaults(checker: &Checker, parameters: &Parameter
                 checker.locator(),
                 checker.semantic(),
             ) {
-                let mut diagnostic = Diagnostic::new(ArgumentDefaultInStub, default.range());
+                let mut diagnostic =
+                    checker.report_diagnostic(ArgumentDefaultInStub, default.range());
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "...".to_string(),
                     default.range(),
                 )));
-
-                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -557,12 +567,11 @@ pub(crate) fn assignment_default_in_stub(checker: &Checker, targets: &[Expr], va
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
+    let mut diagnostic = checker.report_diagnostic(AssignmentDefaultInStub, value.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         value.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// PYI015
@@ -591,12 +600,11 @@ pub(crate) fn annotated_assignment_default_in_stub(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
+    let mut diagnostic = checker.report_diagnostic(AssignmentDefaultInStub, value.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         value.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// PYI052
@@ -626,12 +634,12 @@ pub(crate) fn unannotated_assignment_in_stub(checker: &Checker, targets: &[Expr]
             return;
         }
     }
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         UnannotatedAssignmentInStub {
             name: id.to_string(),
         },
         value.range(),
-    ));
+    );
 }
 
 /// PYI035
@@ -644,12 +652,12 @@ pub(crate) fn unassigned_special_variable_in_stub(checker: &Checker, target: &Ex
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         UnassignedSpecialVariableInStub {
             name: id.to_string(),
         },
         stmt.range(),
-    ));
+    );
 }
 
 /// PYI026
@@ -672,7 +680,11 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
         TypingModule::TypingExtensions
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let Some(importer) = checker.typing_importer("TypeAlias", PythonVersion::PY310) else {
+        return;
+    };
+
+    let mut diagnostic = checker.report_diagnostic(
         TypeAliasWithoutAnnotation {
             module,
             name: id.to_string(),
@@ -681,12 +693,10 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
         target.range(),
     );
     diagnostic.try_set_fix(|| {
-        let (import_edit, binding) =
-            checker.import_from_typing("TypeAlias", target.start(), PythonVersion::PY310)?;
+        let (import_edit, binding) = importer.import(target.start())?;
         Ok(Fix::safe_edits(
             Edit::range_replacement(format!("{id}: {binding}"), target.range()),
             [import_edit],
         ))
     });
-    checker.report_diagnostic(diagnostic);
 }

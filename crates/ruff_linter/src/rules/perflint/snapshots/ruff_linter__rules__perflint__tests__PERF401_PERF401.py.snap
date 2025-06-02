@@ -93,7 +93,7 @@ PERF401.py:142:9: PERF401 Use a list comprehension to create a transformed list
 
 PERF401.py:149:9: PERF401 Use a list comprehension to create a transformed list
     |
-147 |     tmp = 1; result = []  # commment should be protected
+147 |     tmp = 1; result = []  # comment should be protected
 148 |     for i in range(10):
 149 |         result.append(i + 1)  # PERF401
     |         ^^^^^^^^^^^^^^^^^^^^ PERF401
@@ -102,7 +102,7 @@ PERF401.py:149:9: PERF401 Use a list comprehension to create a transformed list
 
 PERF401.py:156:9: PERF401 Use a list comprehension to create a transformed list
     |
-154 |     result = []; tmp = 1  # commment should be protected
+154 |     result = []; tmp = 1  # comment should be protected
 155 |     for i in range(10):
 156 |         result.append(i + 1)  # PERF401
     |         ^^^^^^^^^^^^^^^^^^^^ PERF401

@@ -1,0 +1,121 @@
+import socket
+import sys
+from _typeshed import Incomplete, ReadableBuffer, WriteableBuffer
+from collections.abc import Callable
+from typing import IO, Any, ClassVar, Final, NoReturn
+
+from . import events, futures, proactor_events, selector_events, streams, windows_utils
+
+# Keep asyncio.__all__ updated with any changes to __all__ here
+if sys.platform == "win32":
+    if sys.version_info >= (3, 14):
+        __all__ = (
+            "SelectorEventLoop",
+            "ProactorEventLoop",
+            "IocpProactor",
+            "_DefaultEventLoopPolicy",
+            "_WindowsSelectorEventLoopPolicy",
+            "_WindowsProactorEventLoopPolicy",
+            "EventLoop",
+        )
+    elif sys.version_info >= (3, 13):
+        # 3.13 added `EventLoop`.
+        __all__ = (
+            "SelectorEventLoop",
+            "ProactorEventLoop",
+            "IocpProactor",
+            "DefaultEventLoopPolicy",
+            "WindowsSelectorEventLoopPolicy",
+            "WindowsProactorEventLoopPolicy",
+            "EventLoop",
+        )
+    else:
+        __all__ = (
+            "SelectorEventLoop",
+            "ProactorEventLoop",
+            "IocpProactor",
+            "DefaultEventLoopPolicy",
+            "WindowsSelectorEventLoopPolicy",
+            "WindowsProactorEventLoopPolicy",
+        )
+
+    NULL: Final = 0
+    INFINITE: Final = 0xFFFFFFFF
+    ERROR_CONNECTION_REFUSED: Final = 1225
+    ERROR_CONNECTION_ABORTED: Final = 1236
+    CONNECT_PIPE_INIT_DELAY: float
+    CONNECT_PIPE_MAX_DELAY: float
+
+    class PipeServer:
+        def __init__(self, address: str) -> None: ...
+        def __del__(self) -> None: ...
+        def closed(self) -> bool: ...
+        def close(self) -> None: ...
+
+    class _WindowsSelectorEventLoop(selector_events.BaseSelectorEventLoop): ...
+
+    class ProactorEventLoop(proactor_events.BaseProactorEventLoop):
+        def __init__(self, proactor: IocpProactor | None = None) -> None: ...
+        async def create_pipe_connection(
+            self, protocol_factory: Callable[[], streams.StreamReaderProtocol], address: str
+        ) -> tuple[proactor_events._ProactorDuplexPipeTransport, streams.StreamReaderProtocol]: ...
+        async def start_serving_pipe(
+            self, protocol_factory: Callable[[], streams.StreamReaderProtocol], address: str
+        ) -> list[PipeServer]: ...
+
+    class IocpProactor:
+        def __init__(self, concurrency: int = 0xFFFFFFFF) -> None: ...
+        def __del__(self) -> None: ...
+        def set_loop(self, loop: events.AbstractEventLoop) -> None: ...
+        def select(self, timeout: int | None = None) -> list[futures.Future[Any]]: ...
+        def recv(self, conn: socket.socket, nbytes: int, flags: int = 0) -> futures.Future[bytes]: ...
+        def recv_into(self, conn: socket.socket, buf: WriteableBuffer, flags: int = 0) -> futures.Future[Any]: ...
+        def recvfrom(
+            self, conn: socket.socket, nbytes: int, flags: int = 0
+        ) -> futures.Future[tuple[bytes, socket._RetAddress]]: ...
+        def sendto(
+            self, conn: socket.socket, buf: ReadableBuffer, flags: int = 0, addr: socket._Address | None = None
+        ) -> futures.Future[int]: ...
+        def send(self, conn: socket.socket, buf: WriteableBuffer, flags: int = 0) -> futures.Future[Any]: ...
+        def accept(self, listener: socket.socket) -> futures.Future[Any]: ...
+        def connect(
+            self,
+            conn: socket.socket,
+            address: tuple[Incomplete, Incomplete] | tuple[Incomplete, Incomplete, Incomplete, Incomplete],
+        ) -> futures.Future[Any]: ...
+        def sendfile(self, sock: socket.socket, file: IO[bytes], offset: int, count: int) -> futures.Future[Any]: ...
+        def accept_pipe(self, pipe: socket.socket) -> futures.Future[Any]: ...
+        async def connect_pipe(self, address: str) -> windows_utils.PipeHandle: ...
+        def wait_for_handle(self, handle: windows_utils.PipeHandle, timeout: int | None = None) -> bool: ...
+        def close(self) -> None: ...
+        if sys.version_info >= (3, 11):
+            def recvfrom_into(
+                self, conn: socket.socket, buf: WriteableBuffer, flags: int = 0
+            ) -> futures.Future[tuple[int, socket._RetAddress]]: ...
+
+    SelectorEventLoop = _WindowsSelectorEventLoop
+
+    if sys.version_info >= (3, 14):
+        class _WindowsSelectorEventLoopPolicy(events._BaseDefaultEventLoopPolicy):
+            _loop_factory: ClassVar[type[SelectorEventLoop]]
+
+        class _WindowsProactorEventLoopPolicy(events._BaseDefaultEventLoopPolicy):
+            _loop_factory: ClassVar[type[ProactorEventLoop]]
+
+    else:
+        class WindowsSelectorEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
+            _loop_factory: ClassVar[type[SelectorEventLoop]]
+            def get_child_watcher(self) -> NoReturn: ...
+            def set_child_watcher(self, watcher: Any) -> NoReturn: ...
+
+        class WindowsProactorEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
+            _loop_factory: ClassVar[type[ProactorEventLoop]]
+            def get_child_watcher(self) -> NoReturn: ...
+            def set_child_watcher(self, watcher: Any) -> NoReturn: ...
+
+    if sys.version_info >= (3, 14):
+        _DefaultEventLoopPolicy = _WindowsProactorEventLoopPolicy
+    else:
+        DefaultEventLoopPolicy = WindowsSelectorEventLoopPolicy
+    if sys.version_info >= (3, 13):
+        EventLoop = ProactorEventLoop

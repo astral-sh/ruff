@@ -1,16 +1,16 @@
 use std::{fmt::Formatter, sync::Arc};
 
-use thiserror::Error;
+use render::{FileResolver, Input};
+use ruff_source_file::{SourceCode, SourceFile};
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange};
 
 pub use self::render::DisplayDiagnostic;
-use crate::files::File;
-use crate::Db;
+use crate::{Db, files::File};
 
-use self::render::FileResolver;
 mod render;
+mod stylesheet;
 
 /// A collection of information that can be rendered into a diagnostic.
 ///
@@ -114,10 +114,9 @@ impl Diagnostic {
     /// callers should prefer using this with `write!` instead of `writeln!`.
     pub fn display<'a>(
         &'a self,
-        db: &'a dyn Db,
+        resolver: &'a dyn FileResolver,
         config: &'a DisplayDiagnosticConfig,
     ) -> DisplayDiagnostic<'a> {
-        let resolver = FileResolver::new(db);
         DisplayDiagnostic::new(resolver, config, self)
     }
 
@@ -133,20 +132,20 @@ impl Diagnostic {
     /// NOTE: At present, this routine will return the first primary
     /// annotation's message as the primary message when the main diagnostic
     /// message is empty. This is meant to facilitate an incremental migration
-    /// in Red Knot over to the new diagnostic data model. (The old data model
+    /// in ty over to the new diagnostic data model. (The old data model
     /// didn't distinguish between messages on the entire diagnostic and
     /// messages attached to a particular span.)
     pub fn primary_message(&self) -> &str {
         if !self.inner.message.as_str().is_empty() {
             return self.inner.message.as_str();
         }
-        // FIXME: As a special case, while we're migrating Red Knot
+        // FIXME: As a special case, while we're migrating ty
         // to the new diagnostic data model, we'll look for a primary
         // message from the primary annotation. This is because most
-        // Red Knot diagnostics are created with an empty diagnostic
+        // ty diagnostics are created with an empty diagnostic
         // message and instead attach the message to the annotation.
         // Fixing this will require touching basically every diagnostic
-        // in Red Knot, so we do it this way for now to match the old
+        // in ty, so we do it this way for now to match the old
         // semantics. ---AG
         self.primary_annotation()
             .and_then(|ann| ann.get_message())
@@ -164,7 +163,7 @@ impl Diagnostic {
     ///
     /// The reason why we don't just always return both the main diagnostic
     /// message and the primary annotation message is because this was written
-    /// in the midst of an incremental migration of Red Knot over to the new
+    /// in the midst of an incremental migration of ty over to the new
     /// diagnostic data model. At time of writing, diagnostics were still
     /// constructed in the old model where the main diagnostic message and the
     /// primary annotation message were not distinguished from each other. So
@@ -226,6 +225,49 @@ impl Diagnostic {
     pub fn primary_span(&self) -> Option<Span> {
         self.primary_annotation().map(|ann| ann.span.clone())
     }
+
+    /// Returns the tags from the primary annotation of this diagnostic if it exists.
+    pub fn primary_tags(&self) -> Option<&[DiagnosticTag]> {
+        self.primary_annotation().map(|ann| ann.tags.as_slice())
+    }
+
+    /// Returns the "primary" span of this diagnostic, panicking if it does not exist.
+    ///
+    /// This should typically only be used when working with diagnostics in Ruff, where diagnostics
+    /// are currently required to have a primary span.
+    ///
+    /// See [`Diagnostic::primary_span`] for more details.
+    pub fn expect_primary_span(&self) -> Span {
+        self.primary_span().expect("Expected a primary span")
+    }
+
+    /// Returns a key that can be used to sort two diagnostics into the canonical order
+    /// in which they should appear when rendered.
+    pub fn rendering_sort_key<'a>(&'a self, db: &'a dyn Db) -> impl Ord + 'a {
+        RenderingSortKey {
+            db,
+            diagnostic: self,
+        }
+    }
+
+    /// Returns all annotations, skipping the first primary annotation.
+    pub fn secondary_annotations(&self) -> impl Iterator<Item = &Annotation> {
+        let mut seen_primary = false;
+        self.inner.annotations.iter().filter(move |ann| {
+            if seen_primary {
+                true
+            } else if ann.is_primary {
+                seen_primary = true;
+                false
+            } else {
+                true
+            }
+        })
+    }
+
+    pub fn sub_diagnostics(&self) -> &[SubDiagnostic] {
+        &self.inner.subs
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -236,6 +278,60 @@ struct DiagnosticInner {
     annotations: Vec<Annotation>,
     subs: Vec<SubDiagnostic>,
 }
+
+struct RenderingSortKey<'a> {
+    db: &'a dyn Db,
+    diagnostic: &'a Diagnostic,
+}
+
+impl Ord for RenderingSortKey<'_> {
+    // We sort diagnostics in a way that keeps them in source order
+    // and grouped by file. After that, we fall back to severity
+    // (with fatal messages sorting before info messages) and then
+    // finally the diagnostic ID.
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if let (Some(span1), Some(span2)) = (
+            self.diagnostic.primary_span(),
+            other.diagnostic.primary_span(),
+        ) {
+            let order = span1.file().path(&self.db).cmp(span2.file().path(&self.db));
+            if order.is_ne() {
+                return order;
+            }
+
+            if let (Some(range1), Some(range2)) = (span1.range(), span2.range()) {
+                let order = range1.start().cmp(&range2.start());
+                if order.is_ne() {
+                    return order;
+                }
+            }
+        }
+        // Reverse so that, e.g., Fatal sorts before Info.
+        let order = self
+            .diagnostic
+            .severity()
+            .cmp(&other.diagnostic.severity())
+            .reverse();
+        if order.is_ne() {
+            return order;
+        }
+        self.diagnostic.id().cmp(&other.diagnostic.id())
+    }
+}
+
+impl PartialOrd for RenderingSortKey<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for RenderingSortKey<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other).is_eq()
+    }
+}
+
+impl Eq for RenderingSortKey<'_> {}
 
 /// A collection of information subservient to a diagnostic.
 ///
@@ -294,6 +390,57 @@ impl SubDiagnostic {
     pub fn annotate(&mut self, ann: Annotation) {
         self.inner.annotations.push(ann);
     }
+
+    pub fn annotations(&self) -> &[Annotation] {
+        &self.inner.annotations
+    }
+
+    /// Returns a shared borrow of the "primary" annotation of this diagnostic
+    /// if one exists.
+    ///
+    /// When there are multiple primary annotations, then the first one that
+    /// was added to this diagnostic is returned.
+    pub fn primary_annotation(&self) -> Option<&Annotation> {
+        self.inner.annotations.iter().find(|ann| ann.is_primary)
+    }
+
+    /// Introspects this diagnostic and returns what kind of "primary" message
+    /// it contains for concise formatting.
+    ///
+    /// When we concisely format diagnostics, we likely want to not only
+    /// include the primary diagnostic message but also the message attached
+    /// to the primary annotation. In particular, the primary annotation often
+    /// contains *essential* information or context for understanding the
+    /// diagnostic.
+    ///
+    /// The reason why we don't just always return both the main diagnostic
+    /// message and the primary annotation message is because this was written
+    /// in the midst of an incremental migration of ty over to the new
+    /// diagnostic data model. At time of writing, diagnostics were still
+    /// constructed in the old model where the main diagnostic message and the
+    /// primary annotation message were not distinguished from each other. So
+    /// for now, we carefully return what kind of messages this diagnostic
+    /// contains. In effect, if this diagnostic has a non-empty main message
+    /// *and* a non-empty primary annotation message, then the diagnostic is
+    /// 100% using the new diagnostic data model and we can format things
+    /// appropriately.
+    ///
+    /// The type returned implements the `std::fmt::Display` trait. In most
+    /// cases, just converting it to a string (or printing it) will do what
+    /// you want.
+    pub fn concise_message(&self) -> ConciseMessage {
+        let main = self.inner.message.as_str();
+        let annotation = self
+            .primary_annotation()
+            .and_then(|ann| ann.get_message())
+            .unwrap_or_default();
+        match (main.is_empty(), annotation.is_empty()) {
+            (false, true) => ConciseMessage::MainDiagnostic(main),
+            (true, false) => ConciseMessage::PrimaryAnnotation(annotation),
+            (false, false) => ConciseMessage::Both { main, annotation },
+            (true, true) => ConciseMessage::Empty,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -337,6 +484,8 @@ pub struct Annotation {
     /// Whether this annotation is "primary" or not. When it isn't primary, an
     /// annotation is said to be "secondary."
     is_primary: bool,
+    /// The diagnostic tags associated with this annotation.
+    tags: Vec<DiagnosticTag>,
 }
 
 impl Annotation {
@@ -354,6 +503,7 @@ impl Annotation {
             span,
             message: None,
             is_primary: true,
+            tags: Vec::new(),
         }
     }
 
@@ -369,6 +519,7 @@ impl Annotation {
             span,
             message: None,
             is_primary: false,
+            tags: Vec::new(),
         }
     }
 
@@ -411,6 +562,41 @@ impl Annotation {
     pub fn get_span(&self) -> &Span {
         &self.span
     }
+
+    /// Sets the span on this annotation.
+    pub fn set_span(&mut self, span: Span) {
+        self.span = span;
+    }
+
+    /// Returns the tags associated with this annotation.
+    pub fn get_tags(&self) -> &[DiagnosticTag] {
+        &self.tags
+    }
+
+    /// Attaches this tag to this annotation.
+    ///
+    /// It will not replace any existing tags.
+    pub fn tag(mut self, tag: DiagnosticTag) -> Annotation {
+        self.tags.push(tag);
+        self
+    }
+
+    /// Attaches an additional tag to this annotation.
+    pub fn push_tag(&mut self, tag: DiagnosticTag) {
+        self.tags.push(tag);
+    }
+}
+
+/// Tags that can be associated with an annotation.
+///
+/// These tags are used to provide additional information about the annotation.
+/// and are passed through to the language server protocol.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum DiagnosticTag {
+    /// Unused or unnecessary code. Used for unused parameters, unreachable code, etc.
+    Unnecessary,
+    /// Deprecated or obsolete code.
+    Deprecated,
 }
 
 /// A string identifier for a lint rule.
@@ -501,62 +687,84 @@ impl DiagnosticId {
         code.split_once(':').map(|(_, rest)| rest)
     }
 
-    /// Returns `true` if this `DiagnosticId` matches the given name.
+    /// Returns a concise description of this diagnostic ID.
     ///
-    /// ## Examples
-    /// ```
-    /// use ruff_db::diagnostic::DiagnosticId;
-    ///
-    /// assert!(DiagnosticId::Io.matches("io"));
-    /// assert!(DiagnosticId::lint("test").matches("lint:test"));
-    /// assert!(!DiagnosticId::lint("test").matches("test"));
-    /// ```
-    pub fn matches(&self, expected_name: &str) -> bool {
-        match self.as_str() {
-            Ok(id) => id == expected_name,
-            Err(DiagnosticAsStrError::Category { category, name }) => expected_name
-                .strip_prefix(category)
-                .and_then(|prefix| prefix.strip_prefix(":"))
-                .is_some_and(|rest| rest == name),
-        }
-    }
-
-    pub fn as_str(&self) -> Result<&str, DiagnosticAsStrError> {
-        Ok(match self {
+    /// Note that this doesn't include the lint's category. It
+    /// only includes the lint's name.
+    pub fn as_str(&self) -> &'static str {
+        match self {
             DiagnosticId::Panic => "panic",
             DiagnosticId::Io => "io",
             DiagnosticId::InvalidSyntax => "invalid-syntax",
-            DiagnosticId::Lint(name) => {
-                return Err(DiagnosticAsStrError::Category {
-                    category: "lint",
-                    name: name.as_str(),
-                })
-            }
+            DiagnosticId::Lint(name) => name.as_str(),
             DiagnosticId::RevealedType => "revealed-type",
             DiagnosticId::UnknownRule => "unknown-rule",
-        })
+        }
     }
-}
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Error)]
-pub enum DiagnosticAsStrError {
-    /// The id can't be converted to a string because it belongs to a sub-category.
-    #[error("id from a sub-category: {category}:{name}")]
-    Category {
-        /// The id's category.
-        category: &'static str,
-        /// The diagnostic id in this category.
-        name: &'static str,
-    },
+    pub fn is_invalid_syntax(&self) -> bool {
+        matches!(self, Self::InvalidSyntax)
+    }
 }
 
 impl std::fmt::Display for DiagnosticId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.as_str() {
-            Ok(name) => f.write_str(name),
-            Err(DiagnosticAsStrError::Category { category, name }) => {
-                write!(f, "{category}:{name}")
-            }
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// A unified file representation for both ruff and ty.
+///
+/// Such a representation is needed for rendering [`Diagnostic`]s that can optionally contain
+/// [`Annotation`]s with [`Span`]s that need to refer to the text of a file. However, ty and ruff
+/// use very different file types: a `Copy`-able salsa-interned [`File`], and a heavier-weight
+/// [`SourceFile`], respectively.
+///
+/// This enum presents a unified interface to these two types for the sake of creating [`Span`]s and
+/// emitting diagnostics from both ty and ruff.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnifiedFile {
+    Ty(File),
+    Ruff(SourceFile),
+}
+
+impl UnifiedFile {
+    pub fn path<'a>(&'a self, resolver: &'a dyn FileResolver) -> &'a str {
+        match self {
+            UnifiedFile::Ty(file) => resolver.path(*file),
+            UnifiedFile::Ruff(file) => file.name(),
+        }
+    }
+
+    fn diagnostic_source(&self, resolver: &dyn FileResolver) -> DiagnosticSource {
+        match self {
+            UnifiedFile::Ty(file) => DiagnosticSource::Ty(resolver.input(*file)),
+            UnifiedFile::Ruff(file) => DiagnosticSource::Ruff(file.clone()),
+        }
+    }
+}
+
+/// A unified wrapper for types that can be converted to a [`SourceCode`].
+///
+/// As with [`UnifiedFile`], ruff and ty use slightly different representations for source code.
+/// [`DiagnosticSource`] wraps both of these and provides the single
+/// [`DiagnosticSource::as_source_code`] method to produce a [`SourceCode`] with the appropriate
+/// lifetimes.
+///
+/// See [`UnifiedFile::diagnostic_source`] for a way to obtain a [`DiagnosticSource`] from a file
+/// and [`FileResolver`].
+#[derive(Clone, Debug)]
+enum DiagnosticSource {
+    Ty(Input),
+    Ruff(SourceFile),
+}
+
+impl DiagnosticSource {
+    /// Returns this input as a `SourceCode` for convenient querying.
+    fn as_source_code(&self) -> SourceCode {
+        match self {
+            DiagnosticSource::Ty(input) => SourceCode::new(input.text.as_str(), &input.line_index),
+            DiagnosticSource::Ruff(source) => SourceCode::new(source.source_text(), source.index()),
         }
     }
 }
@@ -568,14 +776,14 @@ impl std::fmt::Display for DiagnosticId {
 /// the entire file. For example, when the file should be executable but isn't.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span {
-    file: File,
+    file: UnifiedFile,
     range: Option<TextRange>,
 }
 
 impl Span {
-    /// Returns the `File` attached to this `Span`.
-    pub fn file(&self) -> File {
-        self.file
+    /// Returns the `UnifiedFile` attached to this `Span`.
+    pub fn file(&self) -> &UnifiedFile {
+        &self.file
     }
 
     /// Returns the range, if available, attached to this `Span`.
@@ -596,10 +804,38 @@ impl Span {
     pub fn with_optional_range(self, range: Option<TextRange>) -> Span {
         Span { range, ..self }
     }
+
+    /// Returns the [`File`] attached to this [`Span`].
+    ///
+    /// Panics if the file is a [`UnifiedFile::Ruff`] instead of a [`UnifiedFile::Ty`].
+    pub fn expect_ty_file(&self) -> File {
+        match self.file {
+            UnifiedFile::Ty(file) => file,
+            UnifiedFile::Ruff(_) => panic!("Expected a ty `File`, found a ruff `SourceFile`"),
+        }
+    }
+
+    /// Returns the [`SourceFile`] attached to this [`Span`].
+    ///
+    /// Panics if the file is a [`UnifiedFile::Ty`] instead of a [`UnifiedFile::Ruff`].
+    pub fn expect_ruff_file(&self) -> &SourceFile {
+        match &self.file {
+            UnifiedFile::Ty(_) => panic!("Expected a ruff `SourceFile`, found a ty `File`"),
+            UnifiedFile::Ruff(file) => file,
+        }
+    }
 }
 
 impl From<File> for Span {
     fn from(file: File) -> Span {
+        let file = UnifiedFile::Ty(file);
+        Span { file, range: None }
+    }
+}
+
+impl From<SourceFile> for Span {
+    fn from(file: SourceFile) -> Self {
+        let file = UnifiedFile::Ruff(file);
         Span { file, range: None }
     }
 }
@@ -633,6 +869,10 @@ impl Severity {
             // `Level::Fatal`. ---AG
             Severity::Fatal => AnnotateLevel::Error,
         }
+    }
+
+    pub const fn is_fatal(self) -> bool {
+        matches!(self, Severity::Fatal)
     }
 }
 

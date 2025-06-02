@@ -7,11 +7,11 @@ use serde_json::json;
 
 use ruff_source_file::OneIndexed;
 
+use crate::VERSION;
 use crate::codes::Rule;
 use crate::fs::normalize_path;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::{Linter, RuleNamespace};
-use crate::VERSION;
 
 pub struct SarifEmitter;
 
@@ -121,35 +121,35 @@ impl SarifResult {
     fn from_message(message: &Message) -> Result<Self> {
         let start_location = message.compute_start_location();
         let end_location = message.compute_end_location();
-        let path = normalize_path(message.filename());
+        let path = normalize_path(&*message.filename());
         Ok(Self {
-            rule: message.rule(),
+            rule: message.to_rule(),
             level: "error".to_string(),
             message: message.body().to_string(),
             uri: url::Url::from_file_path(&path)
                 .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))?
                 .to_string(),
-            start_line: start_location.row,
+            start_line: start_location.line,
             start_column: start_location.column,
-            end_line: end_location.row,
+            end_line: end_location.line,
             end_column: end_location.column,
         })
     }
 
     #[cfg(target_arch = "wasm32")]
-    #[allow(clippy::unnecessary_wraps)]
+    #[expect(clippy::unnecessary_wraps)]
     fn from_message(message: &Message) -> Result<Self> {
         let start_location = message.compute_start_location();
         let end_location = message.compute_end_location();
-        let path = normalize_path(message.filename());
+        let path = normalize_path(&*message.filename());
         Ok(Self {
-            rule: message.rule(),
+            rule: message.to_rule(),
             level: "error".to_string(),
             message: message.body().to_string(),
             uri: path.display().to_string(),
-            start_line: start_location.row,
+            start_line: start_location.line,
             start_column: start_location.column,
-            end_line: end_location.row,
+            end_line: end_location.line,
             end_column: end_location.column,
         })
     }
@@ -186,10 +186,10 @@ impl Serialize for SarifResult {
 
 #[cfg(test)]
 mod tests {
+    use crate::message::SarifEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
-    use crate::message::SarifEmitter;
 
     fn get_output() -> String {
         let mut emitter = SarifEmitter {};

@@ -9,17 +9,17 @@ use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
 
-use ruff_diagnostics::Edit;
-use ruff_python_trivia::{indentation_at_offset, CommentRanges, Cursor};
+use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Edit;
+use crate::Locator;
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
 use crate::message::Message;
-use crate::registry::{AsRule, Rule, RuleSet};
+use crate::registry::{Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
-use crate::Locator;
 
 /// Generates an array of edits that matches the length of `messages`.
 /// Each potential edit in the array is paired, in order, with the associated diagnostic.
@@ -105,8 +105,7 @@ impl Codes<'_> {
 
     /// Returns `true` if the string list of `codes` includes `code` (or an alias
     /// thereof).
-    pub(crate) fn includes(&self, needle: Rule) -> bool {
-        let needle = needle.noqa_code();
+    pub(crate) fn includes(&self, needle: NoqaCode) -> bool {
         self.iter()
             .any(|code| needle == get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
     }
@@ -140,7 +139,7 @@ pub(crate) fn rule_is_ignored(
         Ok(Some(NoqaLexerOutput {
             directive: Directive::Codes(codes),
             ..
-        })) => codes.includes(code),
+        })) => codes.includes(code.noqa_code()),
         _ => false,
     }
 }
@@ -238,16 +237,20 @@ impl<'a> FileNoqaDirectives<'a> {
                     let no_indentation_at_offset =
                         indentation_at_offset(range.start(), locator.contents()).is_none();
                     if !warnings.is_empty() || no_indentation_at_offset {
-                        #[allow(deprecated)]
+                        #[expect(deprecated)]
                         let line = locator.compute_line_index(range.start());
                         let path_display = relativize_path(path);
 
                         for warning in warnings {
-                            warn!("Missing or joined rule code(s) at {path_display}:{line}: {warning}");
+                            warn!(
+                                "Missing or joined rule code(s) at {path_display}:{line}: {warning}"
+                            );
                         }
 
                         if no_indentation_at_offset {
-                            warn!("Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line. For line-level suppression, omit the `ruff:` prefix.");
+                            warn!(
+                                "Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line. For line-level suppression, omit the `ruff:` prefix."
+                            );
                             continue;
                         }
                     }
@@ -268,7 +271,7 @@ impl<'a> FileNoqaDirectives<'a> {
                                 {
                                     Some(rule.noqa_code())
                                 } else {
-                                    #[allow(deprecated)]
+                                    #[expect(deprecated)]
                                     let line = locator.compute_line_index(range.start());
                                     let path_display = relativize_path(path);
                                     warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
@@ -285,7 +288,7 @@ impl<'a> FileNoqaDirectives<'a> {
                     });
                 }
                 Err(err) => {
-                    #[allow(deprecated)]
+                    #[expect(deprecated)]
                     let line = locator.compute_line_index(range.start());
                     let path_display = relativize_path(path);
                     warn!("Invalid `# ruff: noqa` directive at {path_display}:{line}: {err}");
@@ -842,10 +845,12 @@ fn find_noqa_comments<'a>(
 
     // Mark any non-ignored diagnostics.
     for message in messages {
-        let Message::Diagnostic(diagnostic) = message else {
+        let Some(rule) = message.to_rule() else {
             comments_by_line.push(None);
             continue;
         };
+
+        let code = rule.noqa_code();
 
         match &exemption {
             FileExemption::All(_) => {
@@ -855,7 +860,7 @@ fn find_noqa_comments<'a>(
             }
             FileExemption::Codes(codes) => {
                 // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
-                if codes.contains(&&diagnostic.kind.rule().noqa_code()) {
+                if codes.contains(&&code) {
                     comments_by_line.push(None);
                     continue;
                 }
@@ -863,7 +868,7 @@ fn find_noqa_comments<'a>(
         }
 
         // Is the violation ignored by a `noqa` directive on the parent line?
-        if let Some(parent) = diagnostic.parent {
+        if let Some(parent) = message.parent {
             if let Some(directive_line) =
                 directives.find_line_with_directive(noqa_line_for.resolve(parent))
             {
@@ -873,7 +878,7 @@ fn find_noqa_comments<'a>(
                         continue;
                     }
                     Directive::Codes(codes) => {
-                        if codes.includes(diagnostic.kind.rule()) {
+                        if codes.includes(code) {
                             comments_by_line.push(None);
                             continue;
                         }
@@ -882,9 +887,7 @@ fn find_noqa_comments<'a>(
             }
         }
 
-        let noqa_offset = noqa_line_for.resolve(diagnostic.range.start());
-
-        let rule = diagnostic.kind.rule();
+        let noqa_offset = noqa_line_for.resolve(message.range().start());
 
         // Or ignored by the directive itself?
         if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {
@@ -894,7 +897,7 @@ fn find_noqa_comments<'a>(
                     continue;
                 }
                 directive @ Directive::Codes(codes) => {
-                    if !codes.includes(rule) {
+                    if !codes.includes(code) {
                         comments_by_line.push(Some(NoqaComment {
                             line: directive_line.start(),
                             rule,
@@ -1053,11 +1056,13 @@ impl<'a> NoqaDirectives<'a> {
                     directive,
                 })) => {
                     if !warnings.is_empty() {
-                        #[allow(deprecated)]
+                        #[expect(deprecated)]
                         let line = locator.compute_line_index(range.start());
                         let path_display = relativize_path(path);
                         for warning in warnings {
-                            warn!("Missing or joined rule code(s) at {path_display}:{line}: {warning}");
+                            warn!(
+                                "Missing or joined rule code(s) at {path_display}:{line}: {warning}"
+                            );
                         }
                     }
                     if let Directive::Codes(codes) = &directive {
@@ -1073,10 +1078,12 @@ impl<'a> NoqaDirectives<'a> {
                                 )
                                 .is_err()
                                 {
-                                    #[allow(deprecated)]
+                                    #[expect(deprecated)]
                                     let line = locator.compute_line_index(range.start());
                                     let path_display = relativize_path(path);
-                                    warn!("Invalid rule code provided to `# noqa` at {path_display}:{line}: {code}");
+                                    warn!(
+                                        "Invalid rule code provided to `# noqa` at {path_display}:{line}: {code}"
+                                    );
                                 }
                             }
                         }
@@ -1091,7 +1098,7 @@ impl<'a> NoqaDirectives<'a> {
                     });
                 }
                 Err(err) => {
-                    #[allow(deprecated)]
+                    #[expect(deprecated)]
                     let line = locator.compute_line_index(range.start());
                     let path_display = relativize_path(path);
                     warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");
@@ -1214,20 +1221,20 @@ mod tests {
 
     use insta::assert_debug_snapshot;
 
-    use ruff_diagnostics::{Diagnostic, Edit};
     use ruff_python_trivia::CommentRanges;
     use ruff_source_file::{LineEnding, SourceFileBuilder};
     use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
     use crate::message::Message;
     use crate::noqa::{
-        add_noqa_inner, lex_codes, lex_file_exemption, lex_inline_noqa, Directive, LexicalError,
-        NoqaLexerOutput, NoqaMapping,
+        Directive, LexicalError, NoqaLexerOutput, NoqaMapping, add_noqa_inner, lex_codes,
+        lex_file_exemption, lex_inline_noqa,
     };
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
-    use crate::{generate_noqa_edits, Locator};
+    use crate::{Edit, OldDiagnostic};
+    use crate::{Locator, generate_noqa_edits};
 
     fn assert_lexed_ranges_match_slices(
         directive: Result<Option<NoqaLexerOutput>, LexicalError>,
@@ -1245,14 +1252,9 @@ mod tests {
     }
 
     /// Create a [`Message`] with a placeholder filename and rule code from `diagnostic`.
-    fn message_from_diagnostic(
-        diagnostic: Diagnostic,
-        path: impl AsRef<Path>,
-        source: &str,
-    ) -> Message {
+    fn message_from_diagnostic(diagnostic: OldDiagnostic) -> Message {
         let noqa_offset = diagnostic.start();
-        let file = SourceFileBuilder::new(path.as_ref().to_string_lossy(), source).finish();
-        Message::from_diagnostic(diagnostic, file, noqa_offset)
+        Message::from_diagnostic(diagnostic, Some(noqa_offset))
     }
 
     #[test]
@@ -2835,13 +2837,15 @@ mod tests {
         assert_eq!(count, 0);
         assert_eq!(output, format!("{contents}"));
 
-        let messages = [Diagnostic::new(
+        let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+        let messages = [OldDiagnostic::new(
             UnusedVariable {
                 name: "x".to_string(),
             },
             TextRange::new(TextSize::from(0), TextSize::from(0)),
+            &source_file,
         )]
-        .map(|d| message_from_diagnostic(d, path, contents));
+        .map(message_from_diagnostic);
 
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
@@ -2857,19 +2861,22 @@ mod tests {
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: F841\n");
 
+        let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
         let messages = [
-            Diagnostic::new(
+            OldDiagnostic::new(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
+                &source_file,
             ),
-            Diagnostic::new(
+            OldDiagnostic::new(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
+                &source_file,
             ),
         ]
-        .map(|d| message_from_diagnostic(d, path, contents));
+        .map(message_from_diagnostic);
         let contents = "x = 1  # noqa: E741\n";
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
@@ -2886,19 +2893,22 @@ mod tests {
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
 
+        let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
         let messages = [
-            Diagnostic::new(
+            OldDiagnostic::new(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
+                &source_file,
             ),
-            Diagnostic::new(
+            OldDiagnostic::new(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
+                &source_file,
             ),
         ]
-        .map(|d| message_from_diagnostic(d, path, contents));
+        .map(message_from_diagnostic);
         let contents = "x = 1  # noqa";
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
@@ -2929,11 +2939,13 @@ print(
 )
 "#;
         let noqa_line_for = [TextRange::new(8.into(), 68.into())].into_iter().collect();
-        let messages = [Diagnostic::new(
+        let source_file = SourceFileBuilder::new(path.to_string_lossy(), source).finish();
+        let messages = [OldDiagnostic::new(
             PrintfStringFormatting,
             TextRange::new(12.into(), 79.into()),
+            &source_file,
         )]
-        .map(|d| message_from_diagnostic(d, path, source));
+        .map(message_from_diagnostic);
         let comment_ranges = CommentRanges::default();
         let edits = generate_noqa_edits(
             path,
@@ -2961,11 +2973,13 @@ print(
 foo;
 bar =
 ";
-        let messages = [Diagnostic::new(
+        let source_file = SourceFileBuilder::new(path.to_string_lossy(), source).finish();
+        let messages = [OldDiagnostic::new(
             UselessSemicolon,
             TextRange::new(4.into(), 5.into()),
+            &source_file,
         )]
-        .map(|d| message_from_diagnostic(d, path, source));
+        .map(message_from_diagnostic);
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges = CommentRanges::default();
         let edits = generate_noqa_edits(

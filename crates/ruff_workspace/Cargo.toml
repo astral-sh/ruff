@@ -18,6 +18,7 @@ ruff_formatter = { workspace = true }
 ruff_graph = { workspace = true, features = ["serde", "schemars"] }
 ruff_linter = { workspace = true }
 ruff_macros = { workspace = true }
+ruff_options_metadata = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true, features = ["serde"] }
 ruff_python_semantic = { workspace = true, features = ["serde"] }

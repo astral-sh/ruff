@@ -43,7 +43,6 @@ def func():
 
 import builtins
 
-
 with builtins.open("FURB129.py") as f:
     for line in f.readlines():
         pass
@@ -51,13 +50,12 @@ with builtins.open("FURB129.py") as f:
 
 from builtins import open as o
 
-
 with o("FURB129.py") as f:
     for line in f.readlines():
         pass
 
 
-# False positives
+# Ok
 def func(f):
     for _line in f.readlines():
         pass
@@ -88,4 +86,19 @@ with open("FURB129.py") as f:
     for _line in f.readlines(10):
         pass
     for _not_line in f.readline():
+        pass
+
+# https://github.com/astral-sh/ruff/issues/18231
+with open("furb129.py") as f:
+    for line in (f).readlines():
+        pass
+
+with open("furb129.py") as f:
+    [line for line in (f).readlines()]
+
+
+with open("furb129.py") as f:
+    for line in (((f))).readlines():
+        pass
+    for line in(f).readlines():
         pass

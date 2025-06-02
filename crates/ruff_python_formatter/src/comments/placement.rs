@@ -4,15 +4,15 @@ use ruff_python_ast::{
     self as ast, AnyNodeRef, Comprehension, Expr, ModModule, Parameter, Parameters, StringLike,
 };
 use ruff_python_trivia::{
-    find_only_token_in_range, first_non_trivia_token, indentation_at_offset, BackwardsTokenizer,
-    CommentRanges, SimpleToken, SimpleTokenKind, SimpleTokenizer,
+    BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, SimpleTokenizer,
+    find_only_token_in_range, first_non_trivia_token, indentation_at_offset,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange};
 use std::cmp::Ordering;
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
-use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
+use crate::expression::expr_slice::{ExprSliceCommentSection, assign_comment_in_slice};
 use crate::expression::parentheses::is_expression_parenthesized;
 use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_parameter_separators,
@@ -314,15 +314,14 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
         AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
         AnyNodeRef::ExprCall(_) => handle_call_comment(comment),
-        AnyNodeRef::ExprStringLiteral(_) => {
-            if let Some(AnyNodeRef::FString(fstring)) = comment.enclosing_parent() {
-                CommentPlacement::dangling(fstring, comment)
-            } else {
-                CommentPlacement::Default(comment)
-            }
-        }
+        AnyNodeRef::ExprStringLiteral(_) => match comment.enclosing_parent() {
+            Some(AnyNodeRef::FString(fstring)) => CommentPlacement::dangling(fstring, comment),
+            Some(AnyNodeRef::TString(tstring)) => CommentPlacement::dangling(tstring, comment),
+            _ => CommentPlacement::Default(comment),
+        },
         AnyNodeRef::FString(fstring) => CommentPlacement::dangling(fstring, comment),
-        AnyNodeRef::FStringExpressionElement(_) => {
+        AnyNodeRef::TString(tstring) => CommentPlacement::dangling(tstring, comment),
+        AnyNodeRef::InterpolatedElement(_) => {
             // Handle comments after the format specifier (should be rare):
             //
             // ```python
@@ -336,7 +335,8 @@ fn handle_enclosed_comment<'a>(
             if matches!(
                 comment.preceding_node(),
                 Some(
-                    AnyNodeRef::FStringExpressionElement(_) | AnyNodeRef::FStringLiteralElement(_)
+                    AnyNodeRef::InterpolatedElement(_)
+                        | AnyNodeRef::InterpolatedStringLiteralElement(_)
                 )
             ) {
                 CommentPlacement::trailing(comment.enclosing_node(), comment)
@@ -344,6 +344,7 @@ fn handle_enclosed_comment<'a>(
                 handle_bracketed_end_of_line_comment(comment, source)
             }
         }
+
         AnyNodeRef::ExprList(_)
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprListComp(_)
@@ -2256,7 +2257,9 @@ mod tests {
         );
 
         assert_eq!(
-            max_empty_lines("# trailing comment\n\n# own line comment\n\n\n# an other own line comment\n# block"),
+            max_empty_lines(
+                "# trailing comment\n\n# own line comment\n\n\n# an other own line comment\n# block"
+            ),
             2
         );
 

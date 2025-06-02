@@ -1,13 +1,16 @@
 use ruff_python_ast::{self as ast, Arguments, Expr};
 
-use crate::{checkers::ast::Checker, rules::perflint::helpers::statement_deletion_range};
-use anyhow::{anyhow, Result};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::{
+    checkers::ast::Checker, preview::is_fix_manual_list_comprehension_enabled,
+    rules::perflint::helpers::statement_deletion_range,
+};
+use anyhow::{Result, anyhow};
 
 use crate::rules::perflint::helpers::comment_strings_in_range;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_semantic::{analyze::typing::is_list, Binding};
+use ruff_python_semantic::{Binding, analyze::typing::is_list};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 /// ## What it does
@@ -110,12 +113,14 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         //     if z:
         //         filtered.append(x)
         // ```
-        [ast::Stmt::If(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            test,
-            ..
-        })] => {
+        [
+            ast::Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                test,
+                ..
+            }),
+        ] => {
             if !elif_else_clauses.is_empty() {
                 return;
             }
@@ -326,7 +331,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         ComprehensionType::Extend
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ManualListComprehension {
             is_async: for_stmt.is_async,
             comprehension_type: Some(comprehension_type),
@@ -335,7 +340,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     );
 
     // TODO: once this fix is stabilized, change the rule to always fixable
-    if checker.settings.preview.is_enabled() {
+    if is_fix_manual_list_comprehension_enabled(checker.settings) {
         diagnostic.try_set_fix(|| {
             convert_to_list_extend(
                 comprehension_type,
@@ -347,8 +352,6 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             )
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 fn convert_to_list_extend(

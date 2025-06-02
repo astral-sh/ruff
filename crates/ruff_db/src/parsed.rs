@@ -3,11 +3,11 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use ruff_python_ast::ModModule;
-use ruff_python_parser::{parse_unchecked, ParseOptions, Parsed};
+use ruff_python_parser::{ParseOptions, Parsed, parse_unchecked};
 
+use crate::Db;
 use crate::files::File;
 use crate::source::source_text;
-use crate::Db;
 
 /// Returns the parsed AST of `file`, including its token stream.
 ///
@@ -20,7 +20,7 @@ use crate::Db;
 /// reflected in the changed AST offsets.
 /// The other reason is that Ruff's AST doesn't implement `Eq` which Sala requires
 /// for determining if a query result is unchanged.
-#[salsa::tracked(return_ref, no_eq)]
+#[salsa::tracked(returns(ref), no_eq)]
 pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     let _span = tracing::trace_span!("parsed_module", ?file).entered();
 
@@ -79,6 +79,7 @@ impl Eq for ParsedModule {}
 
 #[cfg(test)]
 mod tests {
+    use crate::Db;
     use crate::files::{system_path_to_file, vendored_path_to_file};
     use crate::parsed::parsed_module;
     use crate::system::{
@@ -86,7 +87,6 @@ mod tests {
     };
     use crate::tests::TestDb;
     use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
-    use crate::Db;
     use zip::CompressionMethod;
 
     #[test]

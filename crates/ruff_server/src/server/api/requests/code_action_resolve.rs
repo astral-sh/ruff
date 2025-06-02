@@ -5,13 +5,13 @@ use lsp_types::{self as types, request as req};
 
 use ruff_linter::codes::Rule;
 
+use crate::PositionEncoding;
 use crate::edit::WorkspaceEditTracker;
 use crate::fix::Fixes;
-use crate::server::api::LSPResult;
 use crate::server::SupportedCodeAction;
-use crate::server::{client::Notifier, Result};
+use crate::server::api::LSPResult;
+use crate::server::{Result, client::Notifier};
 use crate::session::{DocumentQuery, DocumentSnapshot, ResolvedClientCapabilities};
-use crate::PositionEncoding;
 
 pub(crate) struct CodeActionResolve;
 

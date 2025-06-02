@@ -418,7 +418,7 @@ fn suspected_as_section(line: &str, style: SectionStyle) -> Option<SectionKind> 
 }
 
 /// Check if the suspected context is really a section header.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn is_docstring_section(
     line: &Line,
     indent_size: TextSize,
@@ -444,8 +444,7 @@ fn is_docstring_section(
         if next_line.is_empty() {
             false
         } else {
-            let next_line_is_underline = next_line.chars().all(|char| matches!(char, '-' | '='));
-            next_line_is_underline
+            next_line.chars().all(|char| matches!(char, '-' | '='))
         }
     });
     if next_line_is_underline {

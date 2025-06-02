@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/f_string_invalid_conversion_flag_name_tok.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -22,8 +21,8 @@ Module(
                                         FString {
                                             range: 0..8,
                                             elements: [
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 2..7,
                                                         expression: Name(
                                                             ExprName {
