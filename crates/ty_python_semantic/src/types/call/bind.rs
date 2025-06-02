@@ -1036,6 +1036,12 @@ pub(crate) struct CallableBinding<'db> {
     /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
     pub(crate) bound_type: Option<Type<'db>>,
 
+    /// The return type of this callable.
+    ///
+    /// This is only `Some` if it's an overloaded callable, "argument type expansion" was
+    /// performed, and one of the expansion evaluated successfully for all of the argument lists.
+    /// This type is then the union of all the return types of the matched overloads for the
+    /// expanded argument lists.
     return_type: Option<Type<'db>>,
 
     /// The bindings of each overload of this callable. Will be empty if the type is not callable.
@@ -1322,11 +1328,16 @@ impl<'db> CallableBinding<'db> {
             .filter(|(_, overload)| overload.as_result().is_ok())
     }
 
-    /// Returns the return type of this call. For a valid call, this is the return type of the
-    /// first overload that the arguments matched against. For an invalid call to a non-overloaded
-    /// function, this is the return type of the function. For an invalid call to an overloaded
-    /// function, we return `Type::unknown`, since we cannot make any useful conclusions about
-    /// which overload was intended to be called.
+    /// Returns the return type of this call.
+    ///
+    /// For a valid call, this is the return type of either a successful argument type expansion of
+    /// an overloaded function, or the return type of the first overload that the arguments matched
+    /// against.
+    ///
+    /// For an invalid call to a non-overloaded function, this is the return type of the function.
+    ///
+    /// For an invalid call to an overloaded function, we return `Type::unknown`, since we cannot
+    /// make any useful conclusions about which overload was intended to be called.
     pub(crate) fn return_type(&self) -> Type<'db> {
         if let Some(return_type) = self.return_type {
             return return_type;
