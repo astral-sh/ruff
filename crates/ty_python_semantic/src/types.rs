@@ -843,7 +843,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::PropertyInstance(..))
     }
 
-    pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: Module) -> Self {
+    pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: &Module) -> Self {
         Self::ModuleLiteral(ModuleLiteralType::new(db, importing_file, submodule))
     }
 
@@ -8201,7 +8201,7 @@ impl<'db> ModuleLiteralType<'db> {
             full_submodule_name.extend(&submodule_name);
             if imported_submodules.contains(&full_submodule_name) {
                 if let Some(submodule) = resolve_module(db, &full_submodule_name) {
-                    return Symbol::bound(Type::module_literal(db, importing_file, submodule));
+                    return Symbol::bound(Type::module_literal(db, importing_file, &submodule));
                 }
             }
         }
