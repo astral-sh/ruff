@@ -253,12 +253,6 @@ impl<'db> OverloadLiteral<'db> {
     ///
     /// This represents the annotations on the function itself, unmodified by decorators and
     /// overloads.
-    ///
-    /// These are the parameter and return types that should be used for type checking the body of
-    /// the function.
-    ///
-    /// Don't call this when checking any other file; only when type-checking the function body
-    /// scope.
     pub(crate) fn signature(
         self,
         db: &'db dyn Db,
