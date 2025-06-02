@@ -391,9 +391,8 @@ pub fn check_path(
     if !per_file_ignores.is_empty() {
         diagnostics.as_mut_vec().retain(|diagnostic| {
             diagnostic
-                .name()
-                .parse()
-                .ok()
+                .noqa_code()
+                .and_then(|code| code.rule())
                 .is_none_or(|rule| !per_file_ignores.contains(rule))
         });
     }
@@ -428,9 +427,8 @@ pub fn check_path(
         // Remove fixes for any rules marked as unfixable.
         for diagnostic in &mut diagnostics {
             if diagnostic
-                .name()
-                .parse()
-                .ok()
+                .noqa_code()
+                .and_then(|code| code.rule())
                 .is_none_or(|rule| !settings.rules.should_fix(rule))
             {
                 diagnostic.fix = None;
