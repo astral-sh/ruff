@@ -91,9 +91,9 @@ use crate::types::{
     IntersectionType, KnownClass, KnownFunction, KnownInstanceType, MemberLookupPolicy,
     MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType,
     StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type,
-    TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
-    todo_type,
+    TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeMapping, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder,
+    UnionType, binding_type, todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -4555,8 +4555,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .iter()
             .map(|elt| {
                 let inferred = self.infer_expression(elt);
-                inferred
-                    .apply_type_mapping(self.db(), &TypeMapping::PromoteLiterals)
+                inferred.apply_type_mapping(self.db(), &TypeMapping::PromoteLiterals)
             })
             .collect();
 
