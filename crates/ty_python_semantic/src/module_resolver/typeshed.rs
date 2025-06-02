@@ -283,7 +283,7 @@ impl PyVersionRange {
                         // Don't trust the start Python version if it's 3.0 or lower.
                         // Typeshed doesn't attempt to give accurate start versions if a module was added
                         // in the Python 2 era.
-                        if range_inclusive.start() <= &PythonVersion::PY30 {
+                        if range_inclusive.start() <= &(PythonVersion { major: 3, minor: 0 }) {
                             write!(f, "<={}", range_inclusive.end())
                         } else {
                             write!(f, "{}-{}", range_inclusive.start(), range_inclusive.end())

@@ -11,7 +11,6 @@ pub struct PythonVersion {
 }
 
 impl PythonVersion {
-    pub const PY30: PythonVersion = PythonVersion { major: 3, minor: 0 };
     pub const PY37: PythonVersion = PythonVersion { major: 3, minor: 7 };
     pub const PY38: PythonVersion = PythonVersion { major: 3, minor: 8 };
     pub const PY39: PythonVersion = PythonVersion { major: 3, minor: 9 };
