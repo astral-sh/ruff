@@ -1613,9 +1613,9 @@ checksum = "d750af042f7ef4f724306de029d18836c26c1765a54a6a3f094cbd23a7267ffa"
 
 [[package]]
 name = "libcst"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad9e315e3f679e61b9095ffd5e509de78b8a4ea3bba9d772f6fb243209f808d4"
+checksum = "3ac076e37f8fe6bcddbb6c3282897e6e9498b254907ccbfc806dc8f9f1491f02"
 dependencies = [
  "annotate-snippets",
  "libcst_derive",
@@ -1623,14 +1623,14 @@ dependencies = [
  "paste",
  "peg",
  "regex",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
 name = "libcst_derive"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfa96ed35d0dccc67cf7ba49350cb86de3dcb1d072a7ab28f99117f19d874953"
+checksum = "9cf4a12c744a301b216c4f0cb73542709ab15e6dadbb06966ac05864109d05da"
 dependencies = [
  "quote",
  "syn",
