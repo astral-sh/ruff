@@ -340,16 +340,6 @@ impl<'db> ClassType<'db> {
         class_literal.is_final(db)
     }
 
-    /// Is this class a subclass of `Any` or `Unknown`?
-    pub(crate) fn is_subclass_of_any_or_unknown(self, db: &'db dyn Db) -> bool {
-        self.iter_mro(db).any(|base| {
-            matches!(
-                base,
-                ClassBase::Dynamic(DynamicType::Any | DynamicType::Unknown)
-            )
-        })
-    }
-
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
         self.iter_mro(db).any(|base| {

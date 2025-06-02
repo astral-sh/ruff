@@ -103,14 +103,10 @@ impl<'db> SubclassOfType<'db> {
         Type::from(self.subclass_of).find_name_in_mro_with_policy(db, name, policy)
     }
 
-    /// Return `true` if `self` is a subtype of `other`.
-    ///
-    /// This can only return `true` if `self.subclass_of` is a [`SubclassOfInner::Class`] variant;
-    /// only fully static types participate in subtyping.
-    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: SubclassOfType<'db>) -> bool {
+    /// Return `true` if `self` is assignable to `other`.
+    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, other: SubclassOfType<'db>) -> bool {
         match (self.subclass_of, other.subclass_of) {
-            // Non-fully-static types do not participate in subtyping
-            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => false,
+            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => true,
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
             // and `type[int]` describes all possible runtime subclasses of the class `int`.

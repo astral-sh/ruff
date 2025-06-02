@@ -211,6 +211,15 @@ static_assert(is_assignable_to(type[AnyMeta], type[object]))
 static_assert(is_assignable_to(type[AnyMeta], type[Any]))
 ```
 
+## `type[]` is not assignable to types disjoint from `builtins.type`
+
+```py
+from typing import Any
+from ty_extensions import is_assignable_to, static_assert
+
+static_assert(not is_assignable_to(type[Any], None))
+```
+
 ## Class-literals that inherit from `Any`
 
 Class-literal types that inherit from `Any` are assignable to any type `T` where `T` is assignable
@@ -715,6 +724,53 @@ from functools import partial
 def f(x: int, y: str) -> None: ...
 
 c1: Callable[[int], None] = partial(f, y="a")
+```
+
+### Generic classes with `__call__`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import Callable, Any, Generic, TypeVar, ParamSpec
+from ty_extensions import static_assert, is_assignable_to
+
+T = TypeVar("T")
+P = ParamSpec("P")
+
+class Foo[T]:
+    def __call__(self): ...
+
+class FooLegacy(Generic[T]):
+    def __call__(self): ...
+
+class Bar[T, **P]:
+    def __call__(self): ...
+
+# TODO: should not error
+class BarLegacy(Generic[T, P]):  # error: [invalid-argument-type] "`ParamSpec` is not a valid argument to `Generic`"
+    def __call__(self): ...
+
+static_assert(is_assignable_to(Foo, Callable[..., Any]))
+static_assert(is_assignable_to(FooLegacy, Callable[..., Any]))
+static_assert(is_assignable_to(Bar, Callable[..., Any]))
+static_assert(is_assignable_to(BarLegacy, Callable[..., Any]))
+
+class Spam[T]: ...
+class SpamLegacy(Generic[T]): ...
+class Eggs[T, **P]: ...
+
+# TODO: should not error
+class EggsLegacy(Generic[T, P]): ...  # error: [invalid-argument-type] "`ParamSpec` is not a valid argument to `Generic`"
+
+static_assert(not is_assignable_to(Spam, Callable[..., Any]))
+static_assert(not is_assignable_to(SpamLegacy, Callable[..., Any]))
+static_assert(not is_assignable_to(Eggs, Callable[..., Any]))
+
+# TODO: should pass
+static_assert(not is_assignable_to(EggsLegacy, Callable[..., Any]))  # error: [static-assert-error]
 ```
 
 ### Classes with `__call__` as attribute
