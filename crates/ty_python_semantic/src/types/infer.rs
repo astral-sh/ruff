@@ -4556,8 +4556,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .map(|elt| {
                 let inferred = self.infer_expression(elt);
                 inferred
-                    .literal_fallback_instance(self.db())
-                    .unwrap_or(inferred)
+                    .apply_type_mapping(self.db(), &TypeMapping::PromoteLiterals)
             })
             .collect();
 
