@@ -119,7 +119,8 @@ use super::string_annotation::{
 };
 use super::subclass_of::SubclassOfInner;
 use super::{
-    BoundSuperError, BoundSuperType, ClassBase, add_inferred_python_version_hint_to_diagnostic,
+    BoundSuperError, BoundSuperType, ClassBase, NominalInstanceType,
+    add_inferred_python_version_hint_to_diagnostic,
 };
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -9131,9 +9132,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         parameters: &ast::Expr,
     ) -> Option<Parameters<'db>> {
-        Some(match parameters {
+        match parameters {
             ast::Expr::EllipsisLiteral(ast::ExprEllipsisLiteral { .. }) => {
-                Parameters::gradual_form()
+                return Some(Parameters::gradual_form());
             }
             ast::Expr::List(ast::ExprList { elts: params, .. }) => {
                 let mut parameter_types = Vec::with_capacity(params.len());
@@ -9152,43 +9153,48 @@ impl<'db> TypeInferenceBuilder<'db> {
                     parameter_types.push(param_type);
                 }
 
-                if return_todo {
+                return Some(if return_todo {
                     // TODO: `Unpack`
                     Parameters::todo()
                 } else {
                     Parameters::new(parameter_types.iter().map(|param_type| {
                         Parameter::positional_only(None).with_annotated_type(*param_type)
                     }))
-                }
+                });
             }
             ast::Expr::Subscript(_) => {
                 // TODO: Support `Concatenate[...]`
-                Parameters::todo()
-            }
-            ast::Expr::Name(name) if name.is_invalid() => {
-                // This is a special case to avoid raising the error suggesting what the first
-                // argument should be. This only happens when there's already a syntax error like
-                // `Callable[]`.
-                return None;
-            }
-            ast::Expr::Name(name)
-                if self.infer_name_load(name)
-                    == Type::Dynamic(DynamicType::TodoPEP695ParamSpec) =>
-            {
                 return Some(Parameters::todo());
             }
-            _ => {
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, parameters) {
-                    let diag = builder.into_diagnostic(format_args!(
-                        "The first argument to `Callable` \
-                         must be either a list of types, \
-                         ParamSpec, Concatenate, or `...`",
-                    ));
-                    diagnostic::add_type_expression_reference_link(diag);
+            ast::Expr::Name(name) => {
+                if name.is_invalid() {
+                    // This is a special case to avoid raising the error suggesting what the first
+                    // argument should be. This only happens when there's already a syntax error like
+                    // `Callable[]`.
+                    return None;
                 }
-                return None;
+                match self.infer_name_load(name) {
+                    Type::Dynamic(DynamicType::TodoPEP695ParamSpec) => {
+                        return Some(Parameters::todo());
+                    }
+                    Type::NominalInstance(NominalInstanceType { class, .. })
+                        if class.is_known(self.db(), KnownClass::ParamSpec) =>
+                    {
+                        return Some(Parameters::todo());
+                    }
+                    _ => {}
+                }
             }
-        })
+            _ => {}
+        }
+        if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, parameters) {
+            let diag = builder.into_diagnostic(format_args!(
+                "The first argument to `Callable` must be either a list of types, \
+                ParamSpec, Concatenate, or `...`",
+            ));
+            diagnostic::add_type_expression_reference_link(diag);
+        }
+        None
     }
 }
 
