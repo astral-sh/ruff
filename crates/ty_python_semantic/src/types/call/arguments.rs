@@ -256,7 +256,7 @@ mod tests {
         ];
         let union_type = UnionType::from_elements(&db, types);
         let expanded = expand_type(&db, union_type).unwrap();
-        assert_eq!(expanded.len(), 3);
+        assert_eq!(expanded.len(), types.len());
         assert_eq!(expanded, types);
     }
 

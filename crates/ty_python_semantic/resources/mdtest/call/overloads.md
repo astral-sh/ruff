@@ -24,7 +24,7 @@ def f(x: int) -> int: ...
 ```py
 from overloaded import f
 
-# These matches a single overload
+# These match a single overload
 reveal_type(f())  # revealed: None
 reveal_type(f(1))  # revealed: int
 
@@ -52,8 +52,8 @@ def f(x: str) -> str: ...
 def f(x: bytes) -> bytes: ...
 ```
 
-Here, all of the calls below pass the arity check, so we proceed to type checking which filters out
-all but the matching overload:
+Here, all of the calls below pass the arity check for all overloads, so we proceed to type checking
+which filters out all but the matching overload:
 
 ```py
 from overloaded import f
