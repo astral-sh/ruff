@@ -351,18 +351,6 @@ impl<'db> FunctionLiteral<'db> {
         )
     }
 
-    fn update_last_definition(
-        self,
-        db: &'db dyn Db,
-        f: impl FnOnce(OverloadLiteral<'db>) -> OverloadLiteral<'db>,
-    ) -> Self {
-        Self::new(
-            db,
-            f(self.last_definition(db)),
-            self.inherited_generic_context(db),
-        )
-    }
-
     fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         // All of the overloads of a function literal should have the same name.
         self.last_definition(db).name(db)
@@ -518,15 +506,15 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         params: DataclassTransformerParams,
     ) -> Self {
-        // A decorator only applies to the specific overload that it is attached, not to all
+        // A decorator only applies to the specific overload that it is attached to, not to all
         // previous overloads.
-        Self::new(
-            db,
-            self.literal(db).update_last_definition(db, |overload| {
-                overload.with_dataclass_transformer_params(db, params)
-            }),
-            self.type_mappings(db),
-        )
+        let literal = self.literal(db);
+        let last_definition = literal
+            .last_definition(db)
+            .with_dataclass_transformer_params(db, params);
+        let literal =
+            FunctionLiteral::new(db, last_definition, literal.inherited_generic_context(db));
+        Self::new(db, literal, self.type_mappings(db))
     }
 
     /// Returns the [`File`] in which this function is defined.
