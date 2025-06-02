@@ -4956,7 +4956,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // TODO: Useful inference of a lambda's return type will require a different approach,
         // which does the inference of the body expression based on arguments at each call site,
         // rather than eagerly computing a return type without knowing the argument types.
-        CallableType::single(self.db(), Signature::new(parameters, Some(Type::unknown())))
+        CallableType::function_like(self.db(), Signature::new(parameters, Some(Type::unknown())))
     }
 
     /// Returns the type of the first parameter if the given scope is function-like (i.e. function or lambda).
