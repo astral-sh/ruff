@@ -2,6 +2,7 @@ use crate::Session;
 use crate::server::schedule::Scheduler;
 use crate::server::{Server, api};
 use crate::session::client::Client;
+use anyhow::anyhow;
 use crossbeam::select;
 use lsp_server::Message;
 use lsp_types::notification::Notification;
@@ -46,7 +47,7 @@ impl Server {
                                     req.id,
                                     lsp_server::ResponseError {
                                         code: lsp_server::ErrorCode::InvalidRequest as i32,
-                                        message: "Shutdown already requested.".to_owned(),
+                                        message: "Shutdown already requested".to_owned(),
                                         data: None,
                                     },
                                 )?;
@@ -57,12 +58,13 @@ impl Server {
                         }
                         Message::Notification(notification) => {
                             if notification.method == lsp_types::notification::Exit::METHOD {
-                                tracing::debug!("Received exit notification, exiting");
                                 if !self.session.is_shutdown_requested() {
-                                    tracing::warn!(
-                                        "Received exit notification before shutdown request"
-                                    );
+                                    return Err(anyhow!(
+                                        "Received exit notification before a shutdown request"
+                                    ));
                                 }
+
+                                tracing::debug!("Received exit notification, exiting");
                                 return Ok(());
                             }
 
@@ -140,12 +142,13 @@ impl Server {
     ///
     /// Returns `Ok(None)` if the client connection is closed.
     fn next_event(&self) -> Result<Option<Event>, crossbeam::channel::RecvError> {
-        let next = select!(
-            recv(self.connection.receiver) -> msg => return Ok(msg.ok().map(Event::Message)),
-            recv(self.main_loop_receiver) -> event => event,
-        );
-
-        next.map(Some)
+        select!(
+            recv(self.connection.receiver) -> msg => {
+                // Ignore disconnect errors, they're handled by the main loop (it will exit).
+                Ok(msg.ok().map(Event::Message))
+            },
+            recv(self.main_loop_receiver) -> event => event.map(Some),
+        )
     }
 
     fn initialize(&mut self, client: &Client) {

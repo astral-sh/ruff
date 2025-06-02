@@ -49,15 +49,7 @@ pub(super) fn request(req: server::Request) -> Task {
         >(
             req, BackgroundSchedule::LatencySensitive
         ),
-        lsp_types::request::Shutdown::METHOD => {
-            tracing::debug!("Received shutdown request, waiting for shutdown notification.");
-            Ok(Task::local(move |session, client| {
-                session.set_shutdown_requested(true);
-                if let Err(error) = client.respond(&req.id, Ok(())) {
-                    tracing::debug!("Failed to send shutdown response: {error}");
-                }
-            }))
-        }
+        lsp_types::request::Shutdown::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
 
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
@@ -71,7 +63,7 @@ pub(super) fn request(req: server::Request) -> Task {
     .unwrap_or_else(|err| {
         tracing::error!("Encountered error when routing request with ID {id}: {err}");
 
-        Task::local(move |_session, client| {
+        Task::sync(move |_session, client| {
             client.show_error_message(
                 "ty failed to handle a request from the editor. Check the logs for more details.",
             );
@@ -91,25 +83,25 @@ pub(super) fn request(req: server::Request) -> Task {
 pub(super) fn notification(notif: server::Notification) -> Task {
     match notif.method.as_str() {
         notifications::DidCloseTextDocumentHandler::METHOD => {
-            local_notification_task::<notifications::DidCloseTextDocumentHandler>(notif)
+            sync_notification_task::<notifications::DidCloseTextDocumentHandler>(notif)
         }
         notifications::DidOpenTextDocumentHandler::METHOD => {
-            local_notification_task::<notifications::DidOpenTextDocumentHandler>(notif)
+            sync_notification_task::<notifications::DidOpenTextDocumentHandler>(notif)
         }
         notifications::DidChangeTextDocumentHandler::METHOD => {
-            local_notification_task::<notifications::DidChangeTextDocumentHandler>(notif)
+            sync_notification_task::<notifications::DidChangeTextDocumentHandler>(notif)
         }
         notifications::DidOpenNotebookHandler::METHOD => {
-            local_notification_task::<notifications::DidOpenNotebookHandler>(notif)
+            sync_notification_task::<notifications::DidOpenNotebookHandler>(notif)
         }
         notifications::DidCloseNotebookHandler::METHOD => {
-            local_notification_task::<notifications::DidCloseNotebookHandler>(notif)
+            sync_notification_task::<notifications::DidCloseNotebookHandler>(notif)
         }
         notifications::DidChangeWatchedFiles::METHOD => {
-            local_notification_task::<notifications::DidChangeWatchedFiles>(notif)
+            sync_notification_task::<notifications::DidChangeWatchedFiles>(notif)
         }
         lsp_types::notification::Cancel::METHOD => {
-            local_notification_task::<notifications::CancelNotificationHandler>(notif)
+            sync_notification_task::<notifications::CancelNotificationHandler>(notif)
         }
         lsp_types::notification::SetTrace::METHOD => {
             tracing::trace!("Ignoring `setTrace` notification");
@@ -123,7 +115,7 @@ pub(super) fn notification(notif: server::Notification) -> Task {
     }
         .unwrap_or_else(|err| {
             tracing::error!("Encountered error when routing notification: {err}");
-            Task::local(|_session, client| {
+            Task::sync(|_session, client| {
                 client.show_error_message(
                     "ty failed to handle a notification from the editor. Check the logs for more details."
                 );
@@ -131,12 +123,12 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         })
 }
 
-fn _local_request_task<R: traits::SyncRequestHandler>(req: server::Request) -> Result<Task>
+fn sync_request_task<R: traits::SyncRequestHandler>(req: server::Request) -> Result<Task>
 where
     <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
 {
     let (id, params) = cast_request::<R>(req)?;
-    Ok(Task::local(move |session, client: &Client| {
+    Ok(Task::sync(move |session, client: &Client| {
         let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
         let result = R::run(session, client, params);
         respond::<R>(&id, result, client);
@@ -254,11 +246,11 @@ where
     }
 }
 
-fn local_notification_task<N: traits::SyncNotificationHandler>(
+fn sync_notification_task<N: traits::SyncNotificationHandler>(
     notif: server::Notification,
 ) -> Result<Task> {
     let (id, params) = cast_notification::<N>(notif)?;
-    Ok(Task::local(move |session, client| {
+    Ok(Task::sync(move |session, client| {
         let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
         if let Err(err) = N::run(session, client, params) {
             tracing::error!("An error occurred while running {id}: {err}");
