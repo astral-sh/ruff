@@ -1849,6 +1849,21 @@ pub(crate) fn report_invalid_arguments_to_annotated(
     ));
 }
 
+pub(crate) fn report_invalid_arguments_to_legacy_alias(
+    context: &InferContext,
+    subscript: &ast::ExprSubscript,
+    alias: SpecialFormType,
+    expected_number: usize,
+    actual_number: usize,
+) {
+    let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, subscript) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Legacy alias `{alias}` expected exactly {expected_number} arguments, got {actual_number}"
+    ));
+}
+
 pub(crate) fn report_bad_argument_to_get_protocol_members(
     context: &InferContext,
     call: &ast::ExprCall,
