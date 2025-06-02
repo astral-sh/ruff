@@ -1,12 +1,13 @@
 //! Contains representations of function literals. There are several complicating factors:
 //!
-//! - Functions can be overloaded. In some cases we need to consider each overload separately; in
-//!   others we need to consider all of the overloads (and any implementation) as a single collective
-//!   entity.
-//!
 //! - Functions can be generic, and can have specializations applied to them. These are not the
 //!   same thing! For instance, a method of a generic class might not itself be generic, but it can
 //!   still have the class's specialization applied to it.
+//!
+//! - Functions can be overloaded, and each overload can be independently generic or not, with
+//!   different sets of typevars for different generic overloads. In some cases we need to consider
+//!   each overload separately; in others we need to consider all of the overloads (and any
+//!   implementation) as a single collective entity.
 //!
 //! - Certain “known” functions need special treatment — for instance, inferring a special return
 //!   type, or raising custom diagnostics.
