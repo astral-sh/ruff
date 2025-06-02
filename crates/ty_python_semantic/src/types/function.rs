@@ -253,6 +253,13 @@ impl<'db> OverloadLiteral<'db> {
     ///
     /// This represents the annotations on the function itself, unmodified by decorators and
     /// overloads.
+    ///
+    /// ## Warning
+    ///
+    /// This uses the semantic index to find the definition of the function. This means that if the
+    /// calling query is not in the same file as this function is defined in, then this will create
+    /// a cross-module dependency directly on the full AST which will lead to cache
+    /// over-invalidation.
     pub(crate) fn signature(
         self,
         db: &'db dyn Db,
@@ -423,6 +430,13 @@ impl<'db> FunctionLiteral<'db> {
     ///
     /// This is the signature as seen by external callers, possibly modified by decorators and/or
     /// overloaded.
+    ///
+    /// ## Warning
+    ///
+    /// This uses the semantic index to find the definition of the function. This means that if the
+    /// calling query is not in the same file as this function is defined in, then this will create
+    /// a cross-module dependency directly on the full AST which will lead to cache
+    /// over-invalidation.
     fn signature<'a>(
         self,
         db: &'db dyn Db,
