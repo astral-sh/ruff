@@ -3426,7 +3426,7 @@ pub struct RefurbOptions {
     )]
     pub allow_abc_meta_bases: Option<FxHashSet<String>>,
 
-    /// A list of additional classes to [`allow_abc_meta_bases`].
+    /// A list of additional classes to [`allow_abc_meta_bases`](#lint_refurb_allow-abc-meta-bases).
     ///
     /// Expects to receive a list of fully-qualified names (e.g., `typing.Protocol`, rather than
     /// `Protocol`).

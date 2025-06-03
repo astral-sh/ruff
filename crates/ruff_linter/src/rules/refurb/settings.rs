@@ -24,7 +24,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             allow_abc_meta_bases: default_allow_abc_meta_bases(),
-            extend_abc_meta_bases: Default::default(),
+            extend_abc_meta_bases: FxHashSet::default(),
         }
     }
 }
