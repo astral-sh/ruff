@@ -1685,6 +1685,60 @@ date.year = 2025
 date.tz = "UTC"
 ```
 
+### Return type of `__setattr__`
+
+If the return type of the `__setattr__` method is `Never`, we do not allow any attribute assignments
+on instances of that class:
+
+```py
+from typing_extensions import Never
+
+class Frozen:
+    existing: int = 1
+
+    def __setattr__(self, name, value) -> Never:
+        raise AttributeError("Attributes can not be modified")
+
+instance = Frozen()
+instance.non_existing = 2  # error: [invalid-assignment]
+instance.existing = 2  # error: [invalid-assignment]
+```
+
+### `__setattr__` on `object`
+
+`object` has a custom `__setattr__` implementation, but we still emit an error if a non-existing
+attribute is assigned on an `object` instance.
+
+```py
+obj = object()
+obj.non_existing = 1  # error: [unresolved-attribute]
+```
+
+### Setting attributes on `Never` / `Any`
+
+Setting attributes on `Never` itself should be allowed (even though it has a `__setattr__` attribute
+of type `Never`):
+
+```py
+from typing_extensions import Never, Any
+
+def _(n: Never):
+    reveal_type(n.__setattr__)  # revealed: Never
+
+    # No error:
+    n.non_existing = 1
+```
+
+And similarly for `Any`:
+
+```py
+def _(a: Any):
+    reveal_type(a.__setattr__)  # revealed: Any
+
+    # No error:
+    a.non_existing = 1
+```
+
 ### `argparse.Namespace`
 
 A standard library example of a class with a custom `__setattr__` method is `argparse.Namespace`:
