@@ -13,7 +13,6 @@ use itertools::Itertools;
 use log::{debug, error};
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelBridge};
-use ruff_linter::codes::Rule;
 use rustc_hash::FxHashMap;
 use tempfile::NamedTempFile;
 
@@ -356,7 +355,9 @@ impl FileCache {
                             msg.parent,
                             file.clone(),
                             msg.noqa_offset,
-                            msg.rule,
+                            msg.rule_name
+                                .parse()
+                                .expect("Expected a valid rule name in the cache"),
                         )
                     })
                     .collect()
@@ -439,8 +440,8 @@ impl LintCacheData {
 
         let messages = messages
             .iter()
-            .filter_map(|msg| msg.to_rule().map(|rule| (rule, msg)))
-            .map(|(rule, msg)| {
+            .filter(|msg| !msg.is_syntax_error())
+            .map(|msg| {
                 // Make sure that all message use the same source file.
                 assert_eq!(
                     msg.source_file(),
@@ -448,7 +449,7 @@ impl LintCacheData {
                     "message uses a different source file"
                 );
                 CacheMessage {
-                    rule,
+                    rule_name: msg.name().to_string(),
                     body: msg.body().to_string(),
                     suggestion: msg.suggestion().map(ToString::to_string),
                     range: msg.range(),
@@ -470,9 +471,9 @@ impl LintCacheData {
 /// On disk representation of a diagnostic message.
 #[derive(bincode::Decode, Debug, bincode::Encode, PartialEq)]
 pub(super) struct CacheMessage {
-    /// The rule for the cached diagnostic.
+    /// The kebab-case name of the rule for the cached diagnostic.
     #[bincode(with_serde)]
-    rule: Rule,
+    rule_name: String,
     /// The message body to display to the user, to explain the diagnostic.
     body: String,
     /// The message to display to the user, to explain the suggested fix.
