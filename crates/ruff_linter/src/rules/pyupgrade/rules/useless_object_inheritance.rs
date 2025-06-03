@@ -78,11 +78,7 @@ pub(crate) fn useless_object_inheritance(checker: &Checker, class_def: &ast::Stm
                 Applicability::Safe
             };
 
-            Ok(
-                Fix::applicable_edit(edit, applicability).isolate(Checker::isolation(
-                    checker.semantic().current_statement_parent_id(),
-                )),
-            )
+            Ok(Fix::applicable_edit(edit, applicability))
         });
     }
 }
