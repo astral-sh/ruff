@@ -1216,13 +1216,16 @@ impl<'db> CallableBinding<'db> {
                     }
                 };
 
+                // This split between initializing and updating the merged evaluation state is
+                // required because otherwise it's difficult to differentiate between the
+                // following:
+                // 1. An initial unmatched overload becomes a matched overload when evaluating the
+                //    first argument list
+                // 2. An unmatched overload after evaluating the first argument list becomes a
+                //    matched overload when evaluating the second argument list
                 if let Some(merged_evaluation_state) = merged_evaluation_state.as_mut() {
-                    // Update the evaluation state with the state of the bindings after evaluating
-                    // the current argument list.
-                    merged_evaluation_state.update(db, self);
+                    merged_evaluation_state.update(self);
                 } else {
-                    // Initialize the merged evaluation state with the state of the bindings after
-                    // evaluating the _first_ argument list.
                     merged_evaluation_state = Some(snapshotter.take(self));
                 }
 
@@ -1888,52 +1891,42 @@ struct BindingSnapshot<'db> {
 struct MatchingOverloadsSnapshot<'db>(Vec<(usize, BindingSnapshot<'db>)>);
 
 impl<'db> MatchingOverloadsSnapshot<'db> {
-    fn update(&mut self, db: &'db dyn Db, binding: &CallableBinding<'db>) {
-        fn combine_specializations<'db>(
-            db: &'db dyn Db,
-            s1: Option<Specialization<'db>>,
-            s2: Option<Specialization<'db>>,
-        ) -> Option<Specialization<'db>> {
-            match (s1, s2) {
-                (None, None) => None,
-                (Some(s), None) | (None, Some(s)) => Some(s),
-                (Some(s1), Some(s2)) => Some(s1.combine(db, s2)),
-            }
-        }
-
+    /// Update the state of the matched overload bindings in this snapshot with the current
+    /// state in the given `binding`.
+    fn update(&mut self, binding: &CallableBinding<'db>) {
         // Here, the `snapshot` is the state of this binding for the previous argument list and
-        // `binding` would be the state after evaluating the current argument list.
+        // `binding` would contain the state after evaluating the current argument list.
         for (snapshot, binding) in self
             .0
             .iter_mut()
             .map(|(index, snapshot)| (snapshot, &binding.overloads[*index]))
         {
-            snapshot.return_ty = binding.return_ty;
-            snapshot.specialization =
-                combine_specializations(db, snapshot.specialization, binding.specialization);
-            snapshot.inherited_specialization = combine_specializations(
-                db,
-                snapshot.inherited_specialization,
-                binding.inherited_specialization,
-            );
-            snapshot
-                .argument_parameters
-                .clone_from(&binding.argument_parameters);
-            snapshot.parameter_tys.clone_from(&binding.parameter_tys);
-
             if binding.errors.is_empty() {
                 // If the binding has no errors, this means that the current argument list was
-                // evaluated successfully and this is the matched overload. Clear the errors from
-                // the snapshot of this overload to signal this change.
-                snapshot.errors.clear();
-            } else if !snapshot.errors.is_empty() {
-                // If the errors in the snapshot was empty, then this binding is the matched
-                // overload for a previously evaluated argument list.
+                // evaluated successfully and this is the matching overload.
                 //
-                // If it does have errors, we just extend it with the errors from evaluating the
-                // current argument list.
-                snapshot.errors.extend_from_slice(&binding.errors);
+                // Clear the errors from the snapshot of this overload to signal this change ...
+                snapshot.errors.clear();
+
+                // ... and update the snapshot with the current state of the binding.
+                snapshot.return_ty = binding.return_ty;
+                snapshot.specialization = binding.specialization;
+                snapshot.inherited_specialization = binding.inherited_specialization;
+                snapshot
+                    .argument_parameters
+                    .clone_from(&binding.argument_parameters);
+                snapshot.parameter_tys.clone_from(&binding.parameter_tys);
             }
+
+            // If the errors in the snapshot was empty, then this binding is the matching overload
+            // for a previously evaluated argument list. This means that we don't need to change
+            // any information for an already matched overload binding.
+            //
+            // If it does have errors, we could extend it with the errors from evaluating the
+            // current argument list. Arguably, this isn't required, since the errors in the
+            // snapshot should already signal that this is an unmatched overload which is why we
+            // don't do it. Similarly, due to this being an unmatched overload, there's no point in
+            // updating the binding state.
         }
     }
 }
