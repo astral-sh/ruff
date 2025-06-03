@@ -2426,7 +2426,7 @@ impl<'db> KnownClass {
             return Type::unknown();
         };
         let Some(generic_context) = class_literal.generic_context(db) else {
-            return Type::unknown();
+            return Type::instance(db, ClassType::NonGeneric(class_literal));
         };
 
         let types = specialization.into_iter().collect::<Box<[_]>>();
@@ -2437,11 +2437,11 @@ impl<'db> KnownClass {
             if MESSAGES.lock().unwrap().insert(self) {
                 tracing::info!(
                     "Wrong number of types when specializing {}. \
-                     Falling back to `Unknown` for the symbol instead.",
+                     Falling back to default specialization for the symbol instead.",
                     self.display(db)
                 );
             }
-            return Type::unknown();
+            return Type::instance(db, class_literal.default_specialization(db));
         }
 
         let specialization = generic_context.specialize(db, types);

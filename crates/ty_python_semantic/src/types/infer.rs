@@ -104,8 +104,7 @@ use super::diagnostic::{
     INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
     SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE, report_attempted_protocol_instantiation,
     report_bad_argument_to_get_protocol_members, report_duplicate_bases,
-    report_index_out_of_bounds, report_invalid_arguments_to_legacy_alias,
-    report_invalid_exception_caught, report_invalid_exception_cause,
+    report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_or_unsupported_base,
     report_invalid_type_checking_constant, report_non_subscriptable,
     report_possibly_unresolved_reference,
@@ -7927,7 +7926,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 match value_ty {
                     Type::SpecialForm(SpecialFormType::Annotated) => {
-                        // This branch is similar to the corresponding branch in `infer_parameterized_known_instance_type_expression`, but
+                        // This branch is similar to the corresponding branch in `infer_parameterized_special_form_type_expression`, but
                         // `Annotated[…]` can appear both in annotation expressions and in type expressions, and needs to be handled slightly
                         // differently in each case (calling either `infer_type_expression_*` or `infer_annotation_expression_*`).
                         if let ast::Expr::Tuple(ast::ExprTuple {
@@ -8653,6 +8652,43 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    fn infer_parameterized_legacy_typing_alias(
+        &mut self,
+        subscript_node: &ast::ExprSubscript,
+        expected_arg_count: usize,
+        alias: SpecialFormType,
+        class: KnownClass,
+    ) -> Type<'db> {
+        let arguments = &*subscript_node.slice;
+        let (args, args_number) = if let ast::Expr::Tuple(t) = arguments {
+            (Either::Left(t), t.len())
+        } else {
+            (Either::Right([arguments]), 1)
+        };
+        if args_number != expected_arg_count {
+            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript_node) {
+                let noun = if expected_arg_count == 1 {
+                    "argument"
+                } else {
+                    "arguments"
+                };
+                builder.into_diagnostic(format_args!(
+                    "Legacy alias `{alias}` expected exactly {expected_arg_count} {noun}, \
+                    got {args_number}",
+                ));
+            }
+        }
+        let ty = class.to_specialized_instance(
+            self.db(),
+            args.into_iter()
+                .map(|node| self.infer_type_expression(node)),
+        );
+        if arguments.is_tuple_expr() {
+            self.store_expression_type(arguments, ty);
+        }
+        ty
+    }
+
     fn infer_parameterized_special_form_type_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
@@ -8868,215 +8904,60 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             },
 
-            SpecialFormType::ChainMap => match arguments_slice {
-                ast::Expr::Tuple(t) => {
-                    if t.len() == 2 {
-                        let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
-                        let ty = KnownClass::ChainMap.to_specialized_instance(db, args_ty);
-                        self.store_expression_type(arguments_slice, ty);
-                        ty
-                    } else {
-                        self.infer_type_expression(arguments_slice);
-                        report_invalid_arguments_to_legacy_alias(
-                            &self.context,
-                            subscript,
-                            SpecialFormType::ChainMap,
-                            2,
-                            t.len(),
-                        );
-                        KnownClass::ChainMap.to_instance(db)
-                    }
-                }
-                _ => {
-                    self.infer_type_expression(arguments_slice);
-                    report_invalid_arguments_to_legacy_alias(
-                        &self.context,
-                        subscript,
-                        SpecialFormType::ChainMap,
-                        2,
-                        1,
-                    );
-                    KnownClass::ChainMap.to_instance(db)
-                }
-            },
-            SpecialFormType::OrderedDict => match arguments_slice {
-                ast::Expr::Tuple(t) => {
-                    if t.len() == 2 {
-                        let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
-                        let ty = KnownClass::OrderedDict.to_specialized_instance(db, args_ty);
-                        self.store_expression_type(arguments_slice, ty);
-                        ty
-                    } else {
-                        self.infer_type_expression(arguments_slice);
-                        report_invalid_arguments_to_legacy_alias(
-                            &self.context,
-                            subscript,
-                            SpecialFormType::OrderedDict,
-                            2,
-                            t.len(),
-                        );
-                        KnownClass::OrderedDict.to_instance(db)
-                    }
-                }
-                _ => {
-                    self.infer_type_expression(arguments_slice);
-                    report_invalid_arguments_to_legacy_alias(
-                        &self.context,
-                        subscript,
-                        SpecialFormType::OrderedDict,
-                        2,
-                        1,
-                    );
-                    KnownClass::OrderedDict.to_instance(db)
-                }
-            },
-            SpecialFormType::Dict => match arguments_slice {
-                ast::Expr::Tuple(t) => {
-                    if t.len() == 2 {
-                        let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
-                        let ty = KnownClass::Dict.to_specialized_instance(db, args_ty);
-                        self.store_expression_type(arguments_slice, ty);
-                        ty
-                    } else {
-                        self.infer_type_expression(arguments_slice);
-                        report_invalid_arguments_to_legacy_alias(
-                            &self.context,
-                            subscript,
-                            SpecialFormType::Dict,
-                            2,
-                            t.len(),
-                        );
-                        KnownClass::Dict.to_instance(db)
-                    }
-                }
-                _ => {
-                    self.infer_type_expression(arguments_slice);
-                    report_invalid_arguments_to_legacy_alias(
-                        &self.context,
-                        subscript,
-                        SpecialFormType::Dict,
-                        2,
-                        1,
-                    );
-                    KnownClass::Dict.to_instance(db)
-                }
-            },
-            SpecialFormType::List => match arguments_slice {
-                ast::Expr::Tuple(t) => {
-                    self.infer_type_expression(arguments_slice);
-                    report_invalid_arguments_to_legacy_alias(
-                        &self.context,
-                        subscript,
-                        SpecialFormType::List,
-                        1,
-                        t.len(),
-                    );
-                    KnownClass::List.to_instance(db)
-                }
-                _ => {
-                    let ty = self.infer_type_expression(arguments_slice);
-                    KnownClass::List.to_specialized_instance(db, [ty])
-                }
-            },
-            SpecialFormType::DefaultDict => match arguments_slice {
-                ast::Expr::Tuple(t) => {
-                    if t.len() == 2 {
-                        let args_ty = t.elts.iter().map(|elt| self.infer_type_expression(elt));
-                        let ty = KnownClass::DefaultDict.to_specialized_instance(db, args_ty);
-                        self.store_expression_type(arguments_slice, ty);
-                        ty
-                    } else {
-                        self.infer_type_expression(arguments_slice);
-                        report_invalid_arguments_to_legacy_alias(
-                            &self.context,
-                            subscript,
-                            SpecialFormType::DefaultDict,
-                            2,
-                            t.len(),
-                        );
-                        KnownClass::DefaultDict.to_instance(db)
-                    }
-                }
-                _ => {
-                    self.infer_type_expression(arguments_slice);
-                    report_invalid_arguments_to_legacy_alias(
-                        &self.context,
-                        subscript,
-                        SpecialFormType::DefaultDict,
-                        2,
-                        1,
-                    );
-                    KnownClass::DefaultDict.to_instance(db)
-                }
-            },
-            SpecialFormType::Counter => match arguments_slice {
-                ast::Expr::Tuple(t) => {
-                    self.infer_type_expression(arguments_slice);
-                    report_invalid_arguments_to_legacy_alias(
-                        &self.context,
-                        subscript,
-                        SpecialFormType::Counter,
-                        1,
-                        t.len(),
-                    );
-                    KnownClass::Counter.to_instance(db)
-                }
-                _ => {
-                    let ty = self.infer_type_expression(arguments_slice);
-                    KnownClass::Counter.to_specialized_instance(db, [ty])
-                }
-            },
-            SpecialFormType::Set => match arguments_slice {
-                ast::Expr::Tuple(t) => {
-                    self.infer_type_expression(arguments_slice);
-                    report_invalid_arguments_to_legacy_alias(
-                        &self.context,
-                        subscript,
-                        SpecialFormType::Set,
-                        1,
-                        t.len(),
-                    );
-                    KnownClass::Set.to_instance(db)
-                }
-                _ => {
-                    let ty = self.infer_type_expression(arguments_slice);
-                    KnownClass::Set.to_specialized_instance(db, [ty])
-                }
-            },
-            SpecialFormType::FrozenSet => match arguments_slice {
-                ast::Expr::Tuple(t) => {
-                    self.infer_type_expression(arguments_slice);
-                    report_invalid_arguments_to_legacy_alias(
-                        &self.context,
-                        subscript,
-                        SpecialFormType::FrozenSet,
-                        1,
-                        t.len(),
-                    );
-                    KnownClass::FrozenSet.to_instance(db)
-                }
-                _ => {
-                    let ty = self.infer_type_expression(arguments_slice);
-                    KnownClass::FrozenSet.to_specialized_instance(db, [ty])
-                }
-            },
-            SpecialFormType::Deque => match arguments_slice {
-                ast::Expr::Tuple(t) => {
-                    self.infer_type_expression(arguments_slice);
-                    report_invalid_arguments_to_legacy_alias(
-                        &self.context,
-                        subscript,
-                        SpecialFormType::Deque,
-                        1,
-                        t.len(),
-                    );
-                    KnownClass::Deque.to_instance(db)
-                }
-                _ => {
-                    let ty = self.infer_type_expression(arguments_slice);
-                    KnownClass::Deque.to_specialized_instance(db, [ty])
-                }
-            },
+            SpecialFormType::ChainMap => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                2,
+                SpecialFormType::ChainMap,
+                KnownClass::ChainMap,
+            ),
+            SpecialFormType::OrderedDict => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                2,
+                SpecialFormType::OrderedDict,
+                KnownClass::OrderedDict,
+            ),
+            SpecialFormType::Dict => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                2,
+                SpecialFormType::Dict,
+                KnownClass::Dict,
+            ),
+            SpecialFormType::List => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                1,
+                SpecialFormType::List,
+                KnownClass::List,
+            ),
+            SpecialFormType::DefaultDict => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                2,
+                SpecialFormType::DefaultDict,
+                KnownClass::DefaultDict,
+            ),
+            SpecialFormType::Counter => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                1,
+                SpecialFormType::Counter,
+                KnownClass::Counter,
+            ),
+            SpecialFormType::Set => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                1,
+                SpecialFormType::Set,
+                KnownClass::Set,
+            ),
+            SpecialFormType::FrozenSet => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                1,
+                SpecialFormType::FrozenSet,
+                KnownClass::FrozenSet,
+            ),
+            SpecialFormType::Deque => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                1,
+                SpecialFormType::Deque,
+                KnownClass::Deque,
+            ),
 
             SpecialFormType::ReadOnly => {
                 self.infer_type_expression(arguments_slice);

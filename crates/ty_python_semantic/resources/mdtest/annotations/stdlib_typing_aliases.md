@@ -60,19 +60,17 @@ def f(
 
 ## Incorrect number of type arguments
 
-<!-- snapshot-diagnostics -->
-
 In case the incorrect number of type arguments is passed, a diagnostic is given.
 
 ```py
 import typing
 
 def f(
-    # error: [invalid-type-form]
+    # error: [invalid-type-form] "Legacy alias `typing.List` expected exactly 1 argument, got 2"
     incorrect_list: typing.List[int, int],
-    # error: [invalid-type-form]
+    # error: [invalid-type-form] "Legacy alias `typing.Dict` expected exactly 2 arguments, got 3"
     incorrect_dict: typing.Dict[int, int, int],
-    # error: [invalid-type-form]
+    # error: [invalid-type-form] "Legacy alias `typing.Dict` expected exactly 2 arguments, got 1"
     incorrect_dict2: typing.Dict[int],  # type argument is not a tuple here
     # error: [invalid-type-form]
     incorrect_set: typing.Set[int, int],
