@@ -14,10 +14,9 @@ pip  # vendors packaging, see above
 pylint  # cycle panics (self-recursive type alias)
 pyodide  # too many cycle iterations
 pywin32  # bad use-def map (binding with definitely-visible unbound)
+schemathesis # unknown panic
 setuptools  # vendors packaging, see above
 spack  # slow, success, but mypy-primer hangs processing the output
 spark  # too many iterations
-static-frame # probabilistic panic https://github.com/salsa-rs/salsa/issues/831
 steam.py  # hangs (single threaded)
-sympy # hangs when multi-threaded
 xarray  # too many iterations
