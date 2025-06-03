@@ -1144,7 +1144,7 @@ impl<'db> CallableBinding<'db> {
             }
         };
 
-        let snapshotter = Snapshotter::new(matching_overload_indexes);
+        let snapshotter = MatchingOverloadsSnapshotter::new(matching_overload_indexes);
 
         // State of the bindings _before_ evaluating (type checking) the matching overloads using
         // the non-expanded argument types.
@@ -1942,12 +1942,12 @@ impl<'db> MatchingOverloadsSnapshot<'db> {
 
 /// A helper to take snapshots of the matched overload bindings for the current state of the
 /// bindings.
-struct Snapshotter(Vec<usize>);
+struct MatchingOverloadsSnapshotter(Vec<usize>);
 
-impl Snapshotter {
+impl MatchingOverloadsSnapshotter {
     fn new(indexes: Vec<usize>) -> Self {
         debug_assert!(indexes.len() > 1);
-        Snapshotter(indexes)
+        MatchingOverloadsSnapshotter(indexes)
     }
 
     /// Takes a snapshot of the current state of the matched overload bindings.
