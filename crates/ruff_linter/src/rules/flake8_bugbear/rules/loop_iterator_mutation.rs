@@ -286,14 +286,8 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 }
             }
 
-            // On break or return, set flag to ignore mutations within the statement expression
+            // On break, clear the mutations for the current branch.
             Stmt::Break(_) | Stmt::Return(_) => {
-                let old_flag = self.in_return_or_break;
-                self.in_return_or_break = true;
-                visitor::walk_stmt(self, stmt);
-                self.in_return_or_break = old_flag;
-
-                // Also clear any mutations for this branch that were added before this statement
                 if let Some(mutations) = self.mutations.get_mut(&self.branch) {
                     mutations.clear();
                 }
