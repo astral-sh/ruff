@@ -63,6 +63,33 @@ reveal_type(f("a"))  # revealed: str
 reveal_type(f(b"b"))  # revealed: bytes
 ```
 
+### Single match error
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f() -> None: ...
+@overload
+def f(x: int) -> int: ...
+```
+
+If the arity check only matches a single overload, it should be evaluated as a regular
+(non-overloaded) function call. This means that any diagnostics resulted during type checking that
+call should be reported directly and not as a `no-matching-overload` error.
+
+```py
+from overloaded import f
+
+reveal_type(f())  # revealed: None
+
+# TODO: This should be `invalid-argument-type` instead
+# error: [no-matching-overload]
+reveal_type(f("a"))  # revealed: Unknown
+```
+
 ### Multiple matches
 
 `overloaded.pyi`:
@@ -190,13 +217,70 @@ def f(x: B, y: D) -> D: ...
 from overloaded import A, B, C, D, f
 
 def _(a: A, bc: B | C, cd: C | D):
+    # This also tests that partial matching works correctly as the argument type expansion results
+    # in matching the first and second overloads, but not the third one.
     reveal_type(f(a, bc))  # revealed: B | C
 
     # error: [no-matching-overload] "No overload of function `f` matches arguments"
     reveal_type(f(a, cd))  # revealed: Unknown
 ```
 
-### Builtin type: `bool`
+### Generics (legacy)
+
+`overloaded.pyi`:
+
+```pyi
+from typing import TypeVar, overload
+
+_T = TypeVar("_T")
+
+class A: ...
+class B: ...
+
+@overload
+def f(x: A) -> A: ...
+@overload
+def f(x: _T) -> _T: ...
+```
+
+```py
+from overloaded import A, f
+
+def _(x: int, y: A | int):
+    reveal_type(f(x))  # revealed: int
+    reveal_type(f(y))  # revealed: A | int
+```
+
+### Generics (PEP 695)
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class A: ...
+class B: ...
+
+@overload
+def f(x: B) -> B: ...
+@overload
+def f[T](x: T) -> T: ...
+```
+
+```py
+from overloaded import B, f
+
+def _(x: int, y: B | int):
+    reveal_type(f(x))  # revealed: int
+    reveal_type(f(y))  # revealed: B | int
+```
+
+### Expanding `bool`
 
 `overloaded.pyi`:
 
@@ -221,7 +305,7 @@ def _(flag: bool):
     reveal_type(f(flag))  # revealed: T | F
 ```
 
-### Builtin type: `tuple`
+### Expanding `tuple`
 
 `overloaded.pyi`:
 
@@ -248,4 +332,70 @@ from overloaded import A, B, f
 
 def _(x: tuple[A | B, int], y: tuple[int, bool]):
     reveal_type(f(x, y))  # revealed: A | B | C | D
+```
+
+### Expanding `type`
+
+There's no special handling for expanding `type[A | B]` type because ty stores this type in it's
+distributed form, which is `type[A] | type[B]`.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class A: ...
+class B: ...
+
+@overload
+def f(x: type[A]) -> A: ...
+@overload
+def f(x: type[B]) -> B: ...
+```
+
+```py
+from overloaded import A, B, f
+
+def _(x: type[A | B]):
+    reveal_type(x)  # revealed: type[A] | type[B]
+    reveal_type(f(x))  # revealed: A | B
+```
+
+### Expanding enums
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum
+from typing import Literal, overload
+
+class SomeEnum(Enum):
+    A = 1
+    B = 2
+    C = 3
+
+
+class A: ...
+class B: ...
+class C: ...
+
+@overload
+def f(x: Literal[SomeEnum.A]) -> A: ...
+@overload
+def f(x: Literal[SomeEnum.B]) -> B: ...
+@overload
+def f(x: Literal[SomeEnum.C]) -> C: ...
+```
+
+```py
+from overloaded import SomeEnum, A, B, C, f
+
+def _(x: SomeEnum):
+    reveal_type(f(SomeEnum.A))  # revealed: A
+    # TODO: This should be `B` once enums are supported and are expanded
+    reveal_type(f(SomeEnum.B))  # revealed: A
+    # TODO: This should be `C` once enums are supported and are expanded
+    reveal_type(f(SomeEnum.C))  # revealed: A
+    # TODO: This should be `A | B | C` once enums are supported and are expanded
+    reveal_type(f(x))  # revealed: A
 ```

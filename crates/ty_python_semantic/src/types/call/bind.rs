@@ -1222,8 +1222,7 @@ impl<'db> CallableBinding<'db> {
                     merged_evaluation_state.update(db, self);
                 } else {
                     // Initialize the merged evaluation state with the state of the bindings after
-                    // evaluating the _first_ argument list. It only contains the snapshots for the
-                    // matching overloads from the pre-evaluation snapshot.
+                    // evaluating the _first_ argument list.
                     merged_evaluation_state = Some(snapshotter.take(self));
                 }
 
@@ -1256,12 +1255,9 @@ impl<'db> CallableBinding<'db> {
         }
 
         // If the type expansion didn't yield any successful return type, we need to restore the
-        // bindings state back to the one after the type checking step. This is necessary because
-        // we restore the state to the pre-evaluation snapshot when processing the expanded
-        // argument lists.
-        //
-        // This will be skipped if there are no argument types to expand because of the early
-        // return.
+        // bindings state back to the one after the type checking step using the non-expanded
+        // argument types. This is necessary because we restore the state to the pre-evaluation
+        // snapshot when processing the expanded argument lists.
         snapshotter.restore(self, post_evaluation_snapshot);
     }
 
@@ -1905,6 +1901,8 @@ impl<'db> MatchingOverloadsSnapshot<'db> {
             }
         }
 
+        // Here, the `snapshot` is the state of this binding for the previous argument list and
+        // `binding` would be the state after evaluating the current argument list.
         for (snapshot, binding) in self
             .0
             .iter_mut()
@@ -1924,16 +1922,16 @@ impl<'db> MatchingOverloadsSnapshot<'db> {
             snapshot.parameter_tys.clone_from(&binding.parameter_tys);
 
             if binding.errors.is_empty() {
-                // If the binding has no errors, this means that the current argument list
-                // was evaluated successfully and this is the matched overload. Clear the
-                // errors from the snapshot of this overload to signal this change.
+                // If the binding has no errors, this means that the current argument list was
+                // evaluated successfully and this is the matched overload. Clear the errors from
+                // the snapshot of this overload to signal this change.
                 snapshot.errors.clear();
             } else if !snapshot.errors.is_empty() {
-                // If the errors in the snapshot was empty, then this binding is the
-                // matched overload for a previously evaluated argument list.
+                // If the errors in the snapshot was empty, then this binding is the matched
+                // overload for a previously evaluated argument list.
                 //
-                // If it does have errors, we just extend it with the errors from
-                // evaluating the current argument list.
+                // If it does have errors, we just extend it with the errors from evaluating the
+                // current argument list.
                 snapshot.errors.extend_from_slice(&binding.errors);
             }
         }
@@ -1945,6 +1943,7 @@ impl<'db> MatchingOverloadsSnapshot<'db> {
 struct MatchingOverloadsSnapshotter(Vec<usize>);
 
 impl MatchingOverloadsSnapshotter {
+    /// Creates a new snapshotter for the given indexes of the matched overloads.
     fn new(indexes: Vec<usize>) -> Self {
         debug_assert!(indexes.len() > 1);
         MatchingOverloadsSnapshotter(indexes)
