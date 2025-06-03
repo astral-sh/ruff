@@ -12,7 +12,7 @@ use crate::{
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
     Locator,
-    codes::Rule,
+    codes::NoqaCode,
     directives::{Flags, extract_directives},
     generate_noqa_edits,
     linter::check_path,
@@ -166,9 +166,9 @@ pub(crate) fn check(
         messages
             .into_iter()
             .zip(noqa_edits)
-            .filter_map(|(message, noqa_edit)| match message.to_rule() {
-                Some(rule) => Some(to_lsp_diagnostic(
-                    rule,
+            .filter_map(|(message, noqa_edit)| match message.to_noqa_code() {
+                Some(code) => Some(to_lsp_diagnostic(
+                    code,
                     &message,
                     noqa_edit,
                     &source_kind,
@@ -241,7 +241,7 @@ pub(crate) fn fixes_for_diagnostics(
 /// Generates an LSP diagnostic with an associated cell index for the diagnostic to go in.
 /// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
-    rule: Rule,
+    code: NoqaCode,
     diagnostic: &Message,
     noqa_edit: Option<Edit>,
     source_kind: &SourceKind,
@@ -274,13 +274,13 @@ fn to_lsp_diagnostic(
                 title: suggestion.unwrap_or(name).to_string(),
                 noqa_edit,
                 edits,
-                code: rule.noqa_code().to_string(),
+                code: code.to_string(),
             })
             .ok()
         })
         .flatten();
 
-    let code = rule.noqa_code().to_string();
+    let code = code.to_string();
 
     let range: lsp_types::Range;
     let cell: usize;
@@ -304,7 +304,7 @@ fn to_lsp_diagnostic(
             severity: Some(severity(&code)),
             tags: tags(&code),
             code: Some(lsp_types::NumberOrString::String(code)),
-            code_description: rule.url().and_then(|url| {
+            code_description: diagnostic.to_url().and_then(|url| {
                 Some(lsp_types::CodeDescription {
                     href: lsp_types::Url::parse(&url).ok()?,
                 })
