@@ -224,15 +224,6 @@ impl Message {
         self.fix().is_some()
     }
 
-    /// Returns the [`Rule`] corresponding to the diagnostic message.
-    pub fn to_rule(&self) -> Option<Rule> {
-        if self.is_syntax_error() {
-            None
-        } else {
-            Some(self.name().parse().expect("Expected a valid rule name"))
-        }
-    }
-
     /// Returns the [`NoqaCode`] corresponding to the diagnostic message.
     pub fn to_noqa_code(&self) -> Option<NoqaCode> {
         self.noqa_code
