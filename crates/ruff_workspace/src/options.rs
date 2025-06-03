@@ -3395,7 +3395,7 @@ impl PyUpgradeOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct RefurbOptions {
-    /// Define a list of classes. If a class `C` is a subclass of only classes in this list,
+    /// Define a list of classes. If a class `C` is a subclass of at least one class in this list,
     /// `refurb` will allow `C` to explicitly set its metaclass to `abc.ABCMeta`, instead of
     /// insisting on inheriting from `abc.ABC` instead.
     ///
