@@ -81,19 +81,21 @@ use crate::types::diagnostic::{
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
     report_invalid_return_type, report_possibly_unbound_attribute,
 };
+use crate::types::function::{
+    FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
+};
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     BareTypeAliasType, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, FunctionDecorators, FunctionType, GenericAlias, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownFunction, KnownInstanceType, MemberLookupPolicy,
-    MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType,
-    StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type,
-    TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
-    todo_type,
+    DynamicType, GenericAlias, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter,
+    ParameterForm, Parameters, SpecialFormType, StringLiteralType, SubclassOfType, Symbol,
+    SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
+    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -1131,12 +1133,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         for function in self.called_functions.union(&public_functions) {
-            let Some(overloaded) = function.to_overloaded(self.db()) else {
+            let (overloads, implementation) = function.overloads_and_implementation(self.db());
+            if overloads.is_empty() {
                 continue;
-            };
+            }
 
             // Check that the overloaded function has at least two overloads
-            if let [single_overload] = overloaded.overloads.as_slice() {
+            if let [single_overload] = overloads.as_ref() {
                 let function_node = function.node(self.db(), self.file());
                 if let Some(builder) = self
                     .context
@@ -1157,7 +1160,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Check that the overloaded function has an implementation. Overload definitions
             // within stub files, protocols, and on abstract methods within abstract base classes
             // are exempt from this check.
-            if overloaded.implementation.is_none() && !self.in_stub() {
+            if implementation.is_none() && !self.in_stub() {
                 let mut implementation_required = true;
 
                 if let NodeWithScopeKind::Class(class_node_ref) = scope {
@@ -1169,7 +1172,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                     if class.is_protocol(self.db())
                         || (class.is_abstract(self.db())
-                            && overloaded.overloads.iter().all(|overload| {
+                            && overloads.iter().all(|overload| {
                                 overload.has_known_decorator(
                                     self.db(),
                                     FunctionDecorators::ABSTRACT_METHOD,
@@ -1199,7 +1202,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let mut decorator_present = false;
                 let mut decorator_missing = vec![];
 
-                for function in overloaded.all() {
+                for function in overloads.iter().chain(implementation.as_ref()) {
                     if function.has_known_decorator(self.db(), decorator) {
                         decorator_present = true;
                     } else {
@@ -1240,8 +1243,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 (FunctionDecorators::FINAL, "final"),
                 (FunctionDecorators::OVERRIDE, "override"),
             ] {
-                if let Some(implementation) = overloaded.implementation.as_ref() {
-                    for overload in &overloaded.overloads {
+                if let Some(implementation) = implementation {
+                    for overload in overloads.as_ref() {
                         if !overload.has_known_decorator(self.db(), decorator) {
                             continue;
                         }
@@ -1263,7 +1266,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         );
                     }
                 } else {
-                    let mut overloads = overloaded.overloads.iter();
+                    let mut overloads = overloads.iter();
                     let Some(first_overload) = overloads.next() else {
                         continue;
                     };
@@ -2027,7 +2030,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        let function_kind =
+        let known_function =
             KnownFunction::try_from_definition_and_name(self.db(), definition, name);
 
         let body_scope = self
@@ -2035,17 +2038,23 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Function(function))
             .to_scope_id(self.db(), self.file());
 
-        let inherited_generic_context = None;
-        let type_mappings = Box::from([]);
-
-        let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
+        let overload_literal = OverloadLiteral::new(
             self.db(),
             &name.id,
-            function_kind,
+            known_function,
             body_scope,
             function_decorators,
             dataclass_transformer_params,
-            inherited_generic_context,
+        );
+
+        let inherited_generic_context = None;
+        let function_literal =
+            FunctionLiteral::new(self.db(), overload_literal, inherited_generic_context);
+
+        let type_mappings = Box::from([]);
+        let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
+            self.db(),
+            function_literal,
             type_mappings,
         ));
 
@@ -2314,14 +2323,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // overload, or an overload and the implementation both. Nevertheless, this is not
                 // allowed. We do not try to treat the offenders intelligently -- just use the
                 // params of the last seen usage of `@dataclass_transform`
-                if let Some(overloaded) = f.to_overloaded(self.db()) {
-                    overloaded.overloads.iter().for_each(|overload| {
-                        if let Some(params) = overload.dataclass_transformer_params(self.db()) {
-                            dataclass_params = Some(params.into());
-                        }
-                    });
-                }
-                if let Some(params) = f.dataclass_transformer_params(self.db()) {
+                let params = f
+                    .iter_overloads_and_implementation(self.db())
+                    .find_map(|overload| overload.dataclass_transformer_params(self.db()));
+                if let Some(params) = params {
                     dataclass_params = Some(params.into());
                     continue;
                 }

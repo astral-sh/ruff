@@ -18,13 +18,13 @@ use crate::types::diagnostic::{
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT,
 };
+use crate::types::function::{DataclassTransformerParams, FunctionDecorators, KnownFunction};
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators, FunctionType,
-    KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType,
-    SpecialFormType, TupleType, TypeMapping, UnionType, WrapperDescriptorKind, ide_support,
-    todo_type,
+    BoundMethodType, DataclassParams, KnownClass, KnownInstanceType, MethodWrapperKind,
+    PropertyInstanceType, SpecialFormType, TupleType, TypeMapping, UnionType,
+    WrapperDescriptorKind, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -871,47 +871,47 @@ impl<'db> Bindings<'db> {
                         }
 
                         _ => {
-                            let mut handle_dataclass_transformer_params =
-                                |function_type: &FunctionType| {
-                                    if let Some(params) =
-                                        function_type.dataclass_transformer_params(db)
-                                    {
-                                        // This is a call to a custom function that was decorated with `@dataclass_transformer`.
-                                        // If this function was called with a keyword argument like `order=False`, we extract
-                                        // the argument type and overwrite the corresponding flag in `dataclass_params` after
-                                        // constructing them from the `dataclass_transformer`-parameter defaults.
-
-                                        let mut dataclass_params = DataclassParams::from(params);
-
-                                        if let Some(Some(Type::BooleanLiteral(order))) = overload
-                                            .signature
-                                            .parameters()
-                                            .keyword_by_name("order")
-                                            .map(|(idx, _)| idx)
-                                            .and_then(|idx| overload.parameter_types().get(idx))
-                                        {
-                                            dataclass_params.set(DataclassParams::ORDER, *order);
-                                        }
-
-                                        overload.set_return_type(Type::DataclassDecorator(
-                                            dataclass_params,
-                                        ));
-                                    }
-                                };
-
                             // Ideally, either the implementation, or exactly one of the overloads
                             // of the function can have the dataclass_transform decorator applied.
                             // However, we do not yet enforce this, and in the case of multiple
                             // applications of the decorator, we will only consider the last one
                             // for the return value, since the prior ones will be over-written.
-                            if let Some(overloaded) = function_type.to_overloaded(db) {
-                                overloaded
-                                    .overloads
-                                    .iter()
-                                    .for_each(&mut handle_dataclass_transformer_params);
-                            }
+                            let return_type = function_type
+                                .iter_overloads_and_implementation(db)
+                                .filter_map(|function_overload| {
+                                    function_overload.dataclass_transformer_params(db).map(
+                                        |params| {
+                                            // This is a call to a custom function that was decorated with `@dataclass_transformer`.
+                                            // If this function was called with a keyword argument like `order=False`, we extract
+                                            // the argument type and overwrite the corresponding flag in `dataclass_params` after
+                                            // constructing them from the `dataclass_transformer`-parameter defaults.
 
-                            handle_dataclass_transformer_params(&function_type);
+                                            let mut dataclass_params =
+                                                DataclassParams::from(params);
+
+                                            if let Some(Some(Type::BooleanLiteral(order))) =
+                                                overload
+                                                    .signature
+                                                    .parameters()
+                                                    .keyword_by_name("order")
+                                                    .map(|(idx, _)| idx)
+                                                    .and_then(|idx| {
+                                                        overload.parameter_types().get(idx)
+                                                    })
+                                            {
+                                                dataclass_params
+                                                    .set(DataclassParams::ORDER, *order);
+                                            }
+
+                                            Type::DataclassDecorator(dataclass_params)
+                                        },
+                                    )
+                                })
+                                .last();
+
+                            if let Some(return_type) = return_type {
+                                overload.set_return_type(return_type);
+                            }
                         }
                     },
 
@@ -1261,47 +1261,49 @@ impl<'db> CallableBinding<'db> {
                     _ => None,
                 };
                 if let Some((kind, function)) = function_type_and_kind {
-                    if let Some(overloaded_function) = function.to_overloaded(context.db()) {
-                        if let Some(spans) = overloaded_function
-                            .overloads
-                            .first()
-                            .and_then(|overload| overload.spans(context.db()))
-                        {
-                            let mut sub =
-                                SubDiagnostic::new(Severity::Info, "First overload defined here");
-                            sub.annotate(Annotation::primary(spans.signature));
-                            diag.sub(sub);
-                        }
+                    let (overloads, implementation) =
+                        function.overloads_and_implementation(context.db());
 
+                    if let Some(spans) = overloads
+                        .first()
+                        .and_then(|overload| overload.spans(context.db()))
+                    {
+                        let mut sub =
+                            SubDiagnostic::new(Severity::Info, "First overload defined here");
+                        sub.annotate(Annotation::primary(spans.signature));
+                        diag.sub(sub);
+                    }
+
+                    diag.info(format_args!(
+                        "Possible overloads for {kind} `{}`:",
+                        function.name(context.db())
+                    ));
+
+                    for overload in overloads.iter().take(MAXIMUM_OVERLOADS) {
                         diag.info(format_args!(
-                            "Possible overloads for {kind} `{}`:",
-                            function.name(context.db())
+                            "  {}",
+                            overload.signature(context.db(), None).display(context.db())
                         ));
+                    }
+                    if overloads.len() > MAXIMUM_OVERLOADS {
+                        diag.info(format_args!(
+                            "... omitted {remaining} overloads",
+                            remaining = overloads.len() - MAXIMUM_OVERLOADS
+                        ));
+                    }
 
-                        let overloads = &function.signature(context.db()).overloads.overloads;
-                        for overload in overloads.iter().take(MAXIMUM_OVERLOADS) {
-                            diag.info(format_args!("  {}", overload.display(context.db())));
-                        }
-                        if overloads.len() > MAXIMUM_OVERLOADS {
-                            diag.info(format_args!(
-                                "... omitted {remaining} overloads",
-                                remaining = overloads.len() - MAXIMUM_OVERLOADS
-                            ));
-                        }
-
-                        if let Some(spans) = overloaded_function
-                            .implementation
-                            .and_then(|function| function.spans(context.db()))
-                        {
-                            let mut sub = SubDiagnostic::new(
-                                Severity::Info,
-                                "Overload implementation defined here",
-                            );
-                            sub.annotate(Annotation::primary(spans.signature));
-                            diag.sub(sub);
-                        }
+                    if let Some(spans) =
+                        implementation.and_then(|function| function.spans(context.db()))
+                    {
+                        let mut sub = SubDiagnostic::new(
+                            Severity::Info,
+                            "Overload implementation defined here",
+                        );
+                        sub.annotate(Annotation::primary(spans.signature));
+                        diag.sub(sub);
                     }
                 }
+
                 if let Some(union_diag) = union_diag {
                     union_diag.add_union_context(context.db(), &mut diag);
                 }
