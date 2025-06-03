@@ -1062,7 +1062,7 @@ fn config_file_broken_python_setting() -> anyhow::Result<()> {
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
       Cause: Invalid search path settings
-      Cause: Failed to discover the site-packages directory: Invalid `--python` argument: `<temp_dir>/not-a-directory-or-executable` does not point to a Python executable or a directory on disk
+      Cause: Failed to discover the site-packages directory: Invalid `environment.python` setting in your configuration file: `<temp_dir>/not-a-directory-or-executable` does not point to a Python executable or a directory on disk
     ");
 
     Ok(())

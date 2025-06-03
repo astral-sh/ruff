@@ -857,6 +857,8 @@ impl fmt::Display for SysPrefixPath {
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SysPrefixPathOrigin {
+    /// The `sys.prefix` path came from a configuration file setting: `pyproject.toml` or `ty.toml`
+    ConfigFileSetting,
     /// The `sys.prefix` path came from a `--python` CLI flag
     PythonCliFlag,
     /// The `sys.prefix` path came from the `VIRTUAL_ENV` environment variable
@@ -878,7 +880,10 @@ impl SysPrefixPathOrigin {
     pub(crate) const fn must_be_virtual_env(self) -> bool {
         match self {
             Self::LocalVenv | Self::VirtualEnvVar => true,
-            Self::PythonCliFlag | Self::DerivedFromPyvenvCfg | Self::CondaPrefixVar => false,
+            Self::ConfigFileSetting
+            | Self::PythonCliFlag
+            | Self::DerivedFromPyvenvCfg
+            | Self::CondaPrefixVar => false,
         }
     }
 
@@ -888,7 +893,7 @@ impl SysPrefixPathOrigin {
     /// the `sys.prefix` directory, e.g. the `--python` CLI flag.
     pub(crate) const fn must_point_directly_to_sys_prefix(self) -> bool {
         match self {
-            Self::PythonCliFlag => false,
+            Self::PythonCliFlag | Self::ConfigFileSetting => false,
             Self::VirtualEnvVar
             | Self::CondaPrefixVar
             | Self::DerivedFromPyvenvCfg
@@ -901,6 +906,9 @@ impl Display for SysPrefixPathOrigin {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::PythonCliFlag => f.write_str("`--python` argument"),
+            Self::ConfigFileSetting => {
+                f.write_str("`environment.python` setting in your configuration file")
+            }
             Self::VirtualEnvVar => f.write_str("`VIRTUAL_ENV` environment variable"),
             Self::CondaPrefixVar => f.write_str("`CONDA_PREFIX` environment variable"),
             Self::DerivedFromPyvenvCfg => f.write_str("derived `sys.prefix` path"),

@@ -184,7 +184,11 @@ impl Options {
                 .map(|python_path| {
                     PythonPath::sys_prefix(
                         python_path.absolute(project_root, system),
-                        SysPrefixPathOrigin::PythonCliFlag,
+                        if python_path.source().is_cli() {
+                            SysPrefixPathOrigin::PythonCliFlag
+                        } else {
+                            SysPrefixPathOrigin::ConfigFileSetting
+                        },
                     )
                 })
                 .or_else(|| {

@@ -32,6 +32,10 @@ impl ValueSource {
             ValueSource::Cli => None,
         }
     }
+
+    pub const fn is_cli(&self) -> bool {
+        matches!(self, ValueSource::Cli)
+    }
 }
 
 thread_local! {
@@ -322,6 +326,10 @@ impl RelativePathBuf {
     /// Returns the relative path as specified by the user.
     pub fn path(&self) -> &SystemPath {
         &self.0
+    }
+
+    pub fn source(&self) -> &ValueSource {
+        self.0.source()
     }
 
     /// Returns the owned relative path.
