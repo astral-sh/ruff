@@ -17,19 +17,6 @@ bar = overload(foo)
 reveal_type(bar)  # revealed: def foo(x: int) -> int
 ```
 
-## Another example
-
-```py
-from typing import overload
-
-@overload
-def func() -> None: ...
-@overload
-def func(x: int) -> int: ...
-def func(x: int | None = None) -> int | None:
-    return x
-```
-
 ## Functions
 
 ```py
