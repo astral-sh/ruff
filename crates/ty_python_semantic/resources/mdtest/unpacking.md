@@ -1,8 +1,8 @@
 # Unpacking
 
-If there are not enough or too many values ​​when unpacking, an error will occur and the types of
-all variables (if nested tuple unpacking fails, only the variables within the failed tuples) is
-inferred to be `Unknown`.
+If there are not enough or too many values when unpacking, an error will occur and the types of all
+variables (if nested tuple unpacking fails, only the variables within the failed tuples) is inferred
+to be `Unknown`.
 
 ## Tuple
 
@@ -207,6 +207,57 @@ reveal_type(c)  # revealed: int
 reveal_type(d)  # revealed: Literal[2]
 ```
 
+## List
+
+### Literal unpacking
+
+```py
+a, b = [1, 2]
+# TODO: should be `int` for both `a` and `b`
+reveal_type(a)  # revealed: Unknown
+reveal_type(b)  # revealed: Unknown
+```
+
+### Simple unpacking
+
+```py
+def _(value: list[int]):
+    a, b = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
+```
+
+### Nested unpacking
+
+```py
+def _(value: list[list[int]]):
+    a, (b, c) = value
+    reveal_type(a)  # revealed: list[int]
+    reveal_type(b)  # revealed: int
+    reveal_type(c)  # revealed: int
+```
+
+### Invalid nested unpacking
+
+```py
+def _(value: list[int]):
+    # error: [not-iterable] "Object of type `int` is not iterable"
+    a, (b, c) = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+```
+
+### Starred expression
+
+```py
+def _(value: list[int]):
+    a, *b, c = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: list[int]
+    reveal_type(c)  # revealed: int
+```
+
 ## String
 
 ### Simple unpacking
@@ -291,6 +342,18 @@ reveal_type(d)  # revealed: LiteralString
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: LiteralString
 reveal_type(c)  # revealed: list[LiteralString]
+```
+
+### Starred expression (6)
+
+```py
+from typing_extensions import LiteralString
+
+def _(s: LiteralString):
+    a, b, *c = s
+    reveal_type(a)  # revealed: LiteralString
+    reveal_type(b)  # revealed: LiteralString
+    reveal_type(c)  # revealed: list[LiteralString]
 ```
 
 ### Unicode

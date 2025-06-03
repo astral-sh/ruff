@@ -192,8 +192,15 @@ impl<'db> Unpacker<'db> {
                                 err.fallback_element_type(self.db())
                             })
                         };
-                        for target_type in &mut target_types {
-                            target_type.push(ty);
+                        // Both `elts` and `target_types` are guaranteed to have the same length.
+                        for (element, target_type) in elts.iter().zip(&mut target_types) {
+                            if element.is_starred_expr() {
+                                target_type.push(
+                                    KnownClass::List.to_specialized_instance(self.db(), [ty]),
+                                );
+                            } else {
+                                target_type.push(ty);
+                            }
                         }
                     }
                 }
