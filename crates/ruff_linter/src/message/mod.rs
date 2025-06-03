@@ -240,14 +240,15 @@ impl Message {
 
     /// Returns the URL for the rule documentation, if it exists.
     pub fn to_url(&self) -> Option<String> {
-        // TODO(brent) Rule::url calls Rule::explanation, which calls ViolationMetadata::explain,
-        // which when derived (seems always to be the case?) is always `Some`, so I think it's
-        // pretty safe to inline the Rule::url implementation here, using `self.name()`:
-        //
-        // format!("{}/rules/{}", env!("CARGO_PKG_HOMEPAGE"), self.name())
-        //
-        // at least in the case of diagnostics, I guess syntax errors will return None
-        self.to_rule().and_then(|rule| rule.url())
+        if self.is_syntax_error() {
+            None
+        } else {
+            Some(format!(
+                "{}/rules/{}",
+                env!("CARGO_PKG_HOMEPAGE"),
+                self.name()
+            ))
+        }
     }
 
     /// Returns the filename for the message.
