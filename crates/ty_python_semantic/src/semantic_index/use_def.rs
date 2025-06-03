@@ -180,7 +180,7 @@
 //!
 //! There is another special kind of possible "definition" for a place: there might be a path from
 //! the scope entry to a given use in which the place is never bound. We model this with a special
-//! "unbound" definition (a `None` entry at the start of the `all_definitions` vector). If that
+//! "unbound/undeclared" definition (a [`DefinitionState::Undefined`] entry at the start of the `all_definitions` vector). If that
 //! sentinel definition is present in the live bindings at a given use, it means that there is a
 //! possible path through control flow in which that place is unbound. Similarly, if that sentinel
 //! is present in the live declarations, it means that the place is (possibly) undeclared.
@@ -294,7 +294,7 @@ mod place_state;
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct UseDefMap<'db> {
-    /// Array of [`Definition`] in this scope. Only the first entry should be `None`;
+    /// Array of [`Definition`] in this scope. Only the first entry should be [`DefinitionState::Undefined`];
     /// this represents the implicit "unbound"/"undeclared" definition of every place.
     all_definitions: IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
 

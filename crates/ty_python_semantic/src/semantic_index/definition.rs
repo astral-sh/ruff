@@ -92,7 +92,10 @@ impl<'a, 'db> IntoIterator for &'a Definitions<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update)]
 pub(crate) enum DefinitionState<'db> {
     Defined(Definition<'db>),
+    /// Represents the implicit "unbound"/"undeclared" definition of every place.
     Undefined,
+    /// Represents a definition that has been deleted.
+    /// This used when an attribute/subscript definition (such as `x.y = ...`, `x[0] = ...`) becomes obsolete due to a reassignment of the root place.
     Deleted,
 }
 
