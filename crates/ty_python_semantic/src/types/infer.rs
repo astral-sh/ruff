@@ -5894,16 +5894,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                 LookupError::Unbound(qualifiers) => {
                     if self.is_reachable(name_node) {
                         let class = self.class_context_of_current_method();
-                        let attribute_exists = match class {
-                            Some(class) => match class.instance_member(db, None, &symbol_name) {
-                                SymbolAndQualifiers {
-                                    symbol: Symbol::Unbound,
-                                    ..
-                                } => false,
+                        let attribute_exists = if let Some(class) = class {
+                            let symbol = Type::instance(db, class.default_specialization(db))
+                                .member(db, &symbol_name)
+                                .symbol;
+                            match symbol {
+                                Symbol::Unbound => false,
                                 _ => true,
-                            },
-                            None => false,
+                            }
+                        } else {
+                            false
                         };
+
                         report_unresolved_reference(&self.context, name_node, attribute_exists);
                     }
                     TypeAndQualifiers::new(Type::unknown(), qualifiers)
