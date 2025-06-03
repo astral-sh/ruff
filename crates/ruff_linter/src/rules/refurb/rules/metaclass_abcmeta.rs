@@ -75,9 +75,10 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         return;
     }
 
-    let applicability = match class_def.bases().is_empty() {
-        true => Applicability::Safe,
-        false => Applicability::Unsafe,
+    let applicability = if class_def.bases().is_empty() {
+        Applicability::Safe
+    } else {
+        Applicability::Unsafe
     };
     let mut diagnostic = checker.report_diagnostic(MetaClassABCMeta, keyword.range);
 
