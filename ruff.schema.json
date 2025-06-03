@@ -2904,7 +2904,7 @@
           },
           "uniqueItems": true
         },
-        "extend-abc-meta-bases": {
+        "extend-allow-abc-meta-bases": {
           "description": "A list of additional classes to [`allow_abc_meta_bases`](#lint_refurb_allow-abc-meta-bases).\n\nExpects to receive a list of fully-qualified names (e.g., `typing.Protocol`, rather than `Protocol`).",
           "type": [
             "array",

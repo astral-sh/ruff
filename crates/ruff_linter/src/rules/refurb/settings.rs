@@ -17,14 +17,12 @@ pub fn default_allow_abc_meta_bases() -> FxHashSet<String> {
 #[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub allow_abc_meta_bases: FxHashSet<String>,
-    pub extend_abc_meta_bases: FxHashSet<String>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             allow_abc_meta_bases: default_allow_abc_meta_bases(),
-            extend_abc_meta_bases: FxHashSet::default(),
         }
     }
 }

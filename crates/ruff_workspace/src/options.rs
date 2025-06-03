@@ -3433,9 +3433,9 @@ pub struct RefurbOptions {
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
-        example = r#"extend-abc-meta-bases = ["my_package.SpecialBaseClass"]"#
+        example = r#"extend-allow-abc-meta-bases = ["my_package.SpecialBaseClass"]"#
     )]
-    pub extend_abc_meta_bases: Option<FxHashSet<String>>,
+    pub extend_allow_abc_meta_bases: Option<FxHashSet<String>>,
 }
 
 impl RefurbOptions {
@@ -3443,8 +3443,10 @@ impl RefurbOptions {
         refurb::settings::Settings {
             allow_abc_meta_bases: self
                 .allow_abc_meta_bases
-                .unwrap_or_else(refurb::settings::default_allow_abc_meta_bases),
-            extend_abc_meta_bases: self.extend_abc_meta_bases.unwrap_or_default(),
+                .unwrap_or_else(refurb::settings::default_allow_abc_meta_bases)
+                .into_iter()
+                .chain(self.extend_allow_abc_meta_bases.unwrap_or_default())
+                .collect(),
         }
     }
 }
