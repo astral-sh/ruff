@@ -71,20 +71,18 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
     }
 
     // Determine if all base classes are in the configured list of exceptions.
-    let bases: Option<FxHashSet<String>> = class_def
-        .bases()
-        .iter()
-        .map(|base| {
+    let bases = class_def.bases();
+    let all_bases_allowed = !bases.is_empty()
+        && bases.iter().all(|base| {
             checker
                 .semantic()
                 .resolve_qualified_name(base)
                 .map(|qualified_name| qualified_name.to_string())
-        })
-        .collect();
-    if let Some(bases) = &bases {
-        if !bases.is_empty() && bases.is_subset(&checker.settings.refurb.allow_abc_meta_bases) {
-            return;
-        }
+                .is_some_and(|name| checker.settings.refurb.allow_abc_meta_bases.contains(&name))
+        });
+
+    if all_bases_allowed {
+        return;
     }
 
     let mut diagnostic = checker.report_diagnostic(MetaClassABCMeta, keyword.range);
