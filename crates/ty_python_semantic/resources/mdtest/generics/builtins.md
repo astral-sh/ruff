@@ -24,12 +24,13 @@ class dict[K, V, Extra]: ...
 def reveal_type(obj, /): ...
 ```
 
-If we don't, then we won't be able to infer the types of variadic keyword arguments correctly.
+If we don't, then we may get "surprising" results when inferring the types of variadic keyword
+arguments.
 
 ```py
 def f(**kwargs):
-    reveal_type(kwargs)  # revealed: Unknown
+    reveal_type(kwargs)  # revealed: dict[Unknown, Unknown, Unknown]
 
 def g(**kwargs: int):
-    reveal_type(kwargs)  # revealed: Unknown
+    reveal_type(kwargs)  # revealed: dict[Unknown, Unknown, Unknown]
 ```

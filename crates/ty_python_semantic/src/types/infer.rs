@@ -7975,7 +7975,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 match value_ty {
                     Type::SpecialForm(SpecialFormType::Annotated) => {
-                        // This branch is similar to the corresponding branch in `infer_parameterized_known_instance_type_expression`, but
+                        // This branch is similar to the corresponding branch in `infer_parameterized_special_form_type_expression`, but
                         // `Annotated[…]` can appear both in annotation expressions and in type expressions, and needs to be handled slightly
                         // differently in each case (calling either `infer_type_expression_*` or `infer_annotation_expression_*`).
                         if let ast::Expr::Tuple(ast::ExprTuple {
@@ -8701,6 +8701,43 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    fn infer_parameterized_legacy_typing_alias(
+        &mut self,
+        subscript_node: &ast::ExprSubscript,
+        expected_arg_count: usize,
+        alias: SpecialFormType,
+        class: KnownClass,
+    ) -> Type<'db> {
+        let arguments = &*subscript_node.slice;
+        let (args, args_number) = if let ast::Expr::Tuple(t) = arguments {
+            (Either::Left(t), t.len())
+        } else {
+            (Either::Right([arguments]), 1)
+        };
+        if args_number != expected_arg_count {
+            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript_node) {
+                let noun = if expected_arg_count == 1 {
+                    "argument"
+                } else {
+                    "arguments"
+                };
+                builder.into_diagnostic(format_args!(
+                    "Legacy alias `{alias}` expected exactly {expected_arg_count} {noun}, \
+                    got {args_number}",
+                ));
+            }
+        }
+        let ty = class.to_specialized_instance(
+            self.db(),
+            args.into_iter()
+                .map(|node| self.infer_type_expression(node)),
+        );
+        if arguments.is_tuple_expr() {
+            self.store_expression_type(arguments, ty);
+        }
+        ty
+    }
+
     fn infer_parameterized_special_form_type_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
@@ -8916,43 +8953,60 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             },
 
-            // TODO: Generics
-            SpecialFormType::ChainMap => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::ChainMap.to_instance(db)
-            }
-            SpecialFormType::OrderedDict => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::OrderedDict.to_instance(db)
-            }
-            SpecialFormType::Dict => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::Dict.to_instance(db)
-            }
-            SpecialFormType::List => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::List.to_instance(db)
-            }
-            SpecialFormType::DefaultDict => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::DefaultDict.to_instance(db)
-            }
-            SpecialFormType::Counter => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::Counter.to_instance(db)
-            }
-            SpecialFormType::Set => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::Set.to_instance(db)
-            }
-            SpecialFormType::FrozenSet => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::FrozenSet.to_instance(db)
-            }
-            SpecialFormType::Deque => {
-                self.infer_type_expression(arguments_slice);
-                KnownClass::Deque.to_instance(db)
-            }
+            SpecialFormType::ChainMap => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                2,
+                SpecialFormType::ChainMap,
+                KnownClass::ChainMap,
+            ),
+            SpecialFormType::OrderedDict => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                2,
+                SpecialFormType::OrderedDict,
+                KnownClass::OrderedDict,
+            ),
+            SpecialFormType::Dict => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                2,
+                SpecialFormType::Dict,
+                KnownClass::Dict,
+            ),
+            SpecialFormType::List => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                1,
+                SpecialFormType::List,
+                KnownClass::List,
+            ),
+            SpecialFormType::DefaultDict => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                2,
+                SpecialFormType::DefaultDict,
+                KnownClass::DefaultDict,
+            ),
+            SpecialFormType::Counter => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                1,
+                SpecialFormType::Counter,
+                KnownClass::Counter,
+            ),
+            SpecialFormType::Set => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                1,
+                SpecialFormType::Set,
+                KnownClass::Set,
+            ),
+            SpecialFormType::FrozenSet => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                1,
+                SpecialFormType::FrozenSet,
+                KnownClass::FrozenSet,
+            ),
+            SpecialFormType::Deque => self.infer_parameterized_legacy_typing_alias(
+                subscript,
+                1,
+                SpecialFormType::Deque,
+                KnownClass::Deque,
+            ),
 
             SpecialFormType::ReadOnly => {
                 self.infer_type_expression(arguments_slice);
