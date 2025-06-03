@@ -7441,10 +7441,9 @@ impl<'db> FunctionType<'db> {
         // However, our representation of a function literal includes any specialization that
         // should be applied to the signature. Different specializations of the same function
         // literal are only assignable to each other if they result in assignable signatures.
-        self.body_scope(db) == other.body_scope(db)
-            && self
-                .into_callable_type(db)
-                .is_assignable_to(db, other.into_callable_type(db))
+
+        self.into_callable_type(db)
+            .is_assignable_to(db, other.into_callable_type(db))
     }
 
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
