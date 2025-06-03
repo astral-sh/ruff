@@ -13,6 +13,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::rules::refurb;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -100,6 +101,43 @@ mod tests {
                 .with_target_version(PythonVersion::PY311),
         )?;
         assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn allow_abc_meta_bases() -> Result<()> {
+        test_furb180_exemption(refurb::settings::Settings {
+            allow_abc_meta_bases: ["ast.Name", "FURB180_exceptions.A0"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            ..refurb::settings::Settings::default()
+        })
+    }
+
+    #[test]
+    fn extend_abc_meta_bases() -> Result<()> {
+        test_furb180_exemption(refurb::settings::Settings {
+            extend_abc_meta_bases: ["ast.Name", "FURB180_exceptions.A0"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            ..refurb::settings::Settings::default()
+        })
+    }
+
+    fn test_furb180_exemption(settings: refurb::settings::Settings) -> Result<()> {
+        let rule_code = Rule::MetaClassABCMeta;
+        let path = Path::new("FURB180_exceptions.py");
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("refurb").join(path).as_path(),
+            &settings::LinterSettings {
+                refurb: settings,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }
