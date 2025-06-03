@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-assertion_line: 140
 ---
 FURB180_exceptions.py:19:14: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
